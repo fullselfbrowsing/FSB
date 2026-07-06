@@ -171,6 +171,10 @@ const nonToolAllowlist = new Set([
   // Hermes-side imported-tool prefix examples (Hermes auto-prefixes MCP tools as mcp_fsb_<tool>):
   'mcp_fsb_click', 'mcp_fsb_read_page', 'mcp_fsb_type_text',
   'mcp_fsb_get_dom_snapshot', 'mcp_fsb_execute_js',
+  // v0.9.90 Capability Catalog MCP tools (mcp runtime surface, not in tool-definitions.cjs):
+  'search_capabilities', 'invoke_capability',
+  // v0.9.90 Trigger Watchers params / conditions (action inputs, not tools):
+  'trigger_id', 'include_terminal', 'delta_percent',
 ]);
 let unknownTokens = [];
 for (const token of referenced) {

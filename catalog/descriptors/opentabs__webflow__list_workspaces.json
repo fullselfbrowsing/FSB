@@ -1,0 +1,31 @@
+{
+  "slug": "webflow.list_workspaces",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "list workspaces in webflow",
+    "show me my workspaces in webflow",
+    "view my workspaces in webflow",
+    "see all my workspaces in webflow",
+    "list all workspaces in webflow"
+  ],
+  "description": "List all Webflow workspaces the current user belongs to. Returns workspace names, slugs, roles, and site counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/list-workspaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "medium.search_posts",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "search posts in medium",
+    "search for posts by keyword in medium",
+    "search for medium posts by keyword in medium"
+  ],
+  "description": "Search for Medium posts by keyword. Returns post titles, authors, clap counts, and reading times. Use page parameter to paginate through results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "limit": {
+        "description": "Maximum results to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      },
+      "page": {
+        "description": "Page number for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/search-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

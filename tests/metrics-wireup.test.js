@@ -82,6 +82,22 @@ assert(
 ['cost:', 'totalCost:', 'totalTokens:'].forEach(function (key) {
   assert(body.includes(key), '[MET-04] _broadcastMetrics payload includes cost key ' + key);
 });
+['usage:', "timeRange: '24h'", 'totalRequests:', 'successfulRequests:', 'successRate:'].forEach(function (key) {
+  assert(body.includes(key), '[MET-04] _broadcastMetrics payload includes stable usage key ' + key);
+});
+
+console.log('\n--- Phase 223 MET-04b: Metrics rebroadcast triggers ---');
+assert(
+  WS.includes("case 'dash:request-status':") &&
+  /case\s+['"]dash:request-status['"]:[\s\S]*?_sendStateSnapshot\(['"]dash:request-status['"]\)[\s\S]*?_broadcastMetrics\(this,\s*this\.serverHashKey\)/.test(WS),
+  '[MET-04b] dash:request-status returns ext:snapshot and ext:metrics'
+);
+assert(
+  WS.includes('_installMetricsStorageListener') &&
+  WS.includes('changes.fsbUsageData') &&
+  WS.includes('_scheduleMetricsBroadcast'),
+  '[MET-04b] ws-client debounces fsbUsageData/fsbCurrentModel storage changes into metrics broadcasts'
+);
 
 console.log('\n--- Phase 223 MET-05: Active tab metadata, omitted when detached ---');
 assert(
@@ -106,6 +122,10 @@ const p209body = phase209Fn ? phase209Fn[0] : '';
 assert(
   !p209body.includes('connection:') && !p209body.includes('totalCost:'),
   '[MET-08] metrics fields NOT bolted onto _broadcastRemoteControlState (separate frame ext:metrics)'
+);
+assert(
+  p209body.includes('_broadcastMetrics(wsInstance'),
+  '[MET-08] remote-control state changes trigger a separate ext:metrics frame'
 );
 
 console.log('\n=== Phase 223 MET wire-up results: ' + passed + ' passed, ' + failed + ' failed ===');

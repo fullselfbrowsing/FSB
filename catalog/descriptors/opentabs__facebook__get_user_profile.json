@@ -1,0 +1,40 @@
+{
+  "slug": "facebook.get_user_profile",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "get an user profile in facebook",
+    "look up an user profile in facebook",
+    "fetch a single user profile in facebook",
+    "view one specific user profile in facebook",
+    "get user profile in facebook",
+    "get a user profile by id in facebook"
+  ],
+  "description": "Get a Facebook user profile by their numeric user ID. Returns name, bio, profile picture, cover photo, friend count, and friendship status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "Facebook user ID (numeric string)"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

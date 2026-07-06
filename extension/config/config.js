@@ -1,5 +1,5 @@
 /**
- * Configuration management for FSB v0.9.50
+ * Configuration management for FSB v0.9.90
  * This file handles loading configuration from environment variables and Chrome storage
  */
 
@@ -32,7 +32,7 @@ class Config {
       speedMode: 'normal', // Deprecated - use modelName instead
 
       // Automation settings
-      maxIterations: 20,
+      maxIterations: 100,
       debugMode: false,
 
       // DOM Optimization settings

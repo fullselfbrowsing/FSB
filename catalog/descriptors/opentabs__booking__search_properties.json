@@ -1,0 +1,71 @@
+{
+  "slug": "booking.search_properties",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "search properties in booking",
+    "search for properties by destination and dates in booking",
+    "search for hotels, apartments, and other properties on booking in booking"
+  ],
+  "description": "Search for hotels, apartments, and other properties on Booking.com by destination, dates, and guests. Returns up to 25 results per page with pricing, ratings, and location details. Use offset for pagination.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "destination": {
+        "type": "string",
+        "description": "Destination city, region, or property name (e.g., \"Paris\", \"London\", \"New York\")"
+      },
+      "checkin": {
+        "type": "string",
+        "description": "Check-in date in YYYY-MM-DD format"
+      },
+      "checkout": {
+        "type": "string",
+        "description": "Check-out date in YYYY-MM-DD format"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      },
+      "children": {
+        "description": "Number of children (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "rooms": {
+        "description": "Number of rooms (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      },
+      "offset": {
+        "description": "Result offset for pagination (default 0, increment by 25)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "destination",
+      "checkin",
+      "checkout"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/search-properties.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

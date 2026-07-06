@@ -1,0 +1,47 @@
+{
+  "slug": "snowflake.get_query",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "get a query in snowflake",
+    "look up a query in snowflake",
+    "fetch a single query in snowflake",
+    "view one specific query in snowflake",
+    "get query in snowflake",
+    "fetch additional result chunks for a query in snowflake"
+  ],
+  "description": "Fetch a specific result chunk from a previously executed query by its query ID and chunk index. Use this when run_query indicates hasMoreChunks=true. Chunk index 0 is the first chunk (already returned by run_query), so start from index 1. Returns raw row arrays — use the column metadata from the original run_query response to interpret values.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "queryId": {
+        "type": "string",
+        "description": "Query ID returned from run_query"
+      },
+      "chunkIndex": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Chunk index to fetch (0-based, start from 1 for additional chunks)"
+      }
+    },
+    "required": [
+      "queryId",
+      "chunkIndex"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/get-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

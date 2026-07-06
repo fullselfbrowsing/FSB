@@ -1,0 +1,32 @@
+{
+  "slug": "twilio.get_balance",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a balance in twilio",
+    "look up a balance in twilio",
+    "fetch a single balance in twilio",
+    "view one specific balance in twilio",
+    "get balance in twilio",
+    "get twilio account balance in twilio"
+  ],
+  "description": "Get the current account balance including currency.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-balance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

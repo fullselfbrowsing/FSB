@@ -1,0 +1,32 @@
+{
+  "slug": "gdocs.get_current_document",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "get a current document in gdocs",
+    "look up a current document in gdocs",
+    "fetch a single current document in gdocs",
+    "view one specific current document in gdocs",
+    "get current document in gdocs",
+    "get the document open in the editor in gdocs"
+  ],
+  "description": "Get metadata, revision info, and available tabs for the Google Doc currently open in the editor. This is the recommended first step before reading or editing the active document.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/get-current-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

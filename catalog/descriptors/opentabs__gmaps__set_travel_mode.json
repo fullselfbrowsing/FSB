@@ -1,0 +1,44 @@
+{
+  "slug": "gmaps.set_travel_mode",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "set a travel mode in gmaps",
+    "set travel mode in gmaps",
+    "set a travel mode in google maps",
+    "switch driving/transit/walking/biking in gmaps"
+  ],
+  "description": "Change the travel mode for the current directions view. Only works when viewing directions (URL contains /dir/). Switches between driving, transit, walking, and bicycling modes.",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "travel_mode": {
+        "type": "string",
+        "enum": [
+          "driving",
+          "transit",
+          "walking",
+          "bicycling"
+        ],
+        "description": "Travel mode to switch to"
+      }
+    },
+    "required": [
+      "travel_mode"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/set-travel-mode.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "set"
+    }
+  }
+}

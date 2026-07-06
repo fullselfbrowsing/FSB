@@ -1,0 +1,55 @@
+{
+  "slug": "gdrive.list_files",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "list files in gdrive",
+    "show me my files in gdrive",
+    "view my files in gdrive",
+    "see all my files in gdrive",
+    "list files in google drive",
+    "list files and folders in a drive folder in gdrive"
+  ],
+  "description": "List files and folders in Google Drive. By default lists items in the root \"My Drive\" folder. Use parent_id to list children of a specific folder. Supports ordering by name, modifiedTime, or createdTime. Trashed files are excluded by default.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "parent_id": {
+        "description": "Parent folder ID to list contents of. Defaults to \"root\" (My Drive)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Maximum number of files to return (default 50, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "page_token": {
+        "description": "Page token from a previous response for pagination",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort order. Examples: \"name\", \"modifiedTime desc\", \"createdTime desc\". Default: \"modifiedTime desc\"",
+        "type": "string"
+      },
+      "include_trashed": {
+        "description": "Include trashed files in results (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/list-files.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

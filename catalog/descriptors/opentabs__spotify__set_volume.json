@@ -1,0 +1,43 @@
+{
+  "slug": "spotify.set_volume",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "set a volume in spotify",
+    "set volume in spotify",
+    "set playback volume in spotify"
+  ],
+  "description": "Set the playback volume on the user’s active device.",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "volume_percent": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Volume percentage to set (0-100)"
+      },
+      "device_id": {
+        "description": "Device ID to set volume on",
+        "type": "string"
+      }
+    },
+    "required": [
+      "volume_percent"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/set-volume.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "set"
+    }
+  }
+}

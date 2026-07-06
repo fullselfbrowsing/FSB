@@ -1,0 +1,52 @@
+{
+  "slug": "gmaps.search_nearby",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "search a nearby in gmaps",
+    "search nearby in gmaps",
+    "search a nearby in google maps",
+    "search by category near coordinates in gmaps"
+  ],
+  "description": "Open a Google Maps search for a category of places near specific coordinates. Navigates the browser to show results on the map. Common categories: restaurants, hotels, gas stations, coffee, pharmacies, ATMs, grocery stores, parking, hospitals, banks.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "type": "string",
+        "description": "Category to search for (e.g., \"restaurants\", \"gas stations\", \"coffee shops\")"
+      },
+      "lat": {
+        "description": "Latitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "lng": {
+        "description": "Longitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "zoom": {
+        "description": "Zoom level (1-21, default 15)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 21
+      }
+    },
+    "required": [
+      "category"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/search-nearby.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

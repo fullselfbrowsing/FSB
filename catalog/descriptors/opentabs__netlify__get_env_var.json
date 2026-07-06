@@ -1,0 +1,49 @@
+{
+  "slug": "netlify.get_env_var",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "get an env var in netlify",
+    "look up an env var in netlify",
+    "fetch a single env var in netlify",
+    "view one specific env var in netlify",
+    "get env var in netlify",
+    "get environment variable by key in netlify"
+  ],
+  "description": "Get a specific environment variable by key for a Netlify account. Optionally scope to a specific site. Returns the variable name, scopes, context-specific values, and secret status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID the variable belongs to"
+      },
+      "key": {
+        "type": "string",
+        "description": "The environment variable key name"
+      },
+      "site_id": {
+        "description": "Optional site ID to scope to a specific site",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_id",
+      "key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/get-env-var.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

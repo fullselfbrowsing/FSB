@@ -1,0 +1,40 @@
+{
+  "slug": "instagram.get_friendship_status",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get a friendship status in instagram",
+    "look up a friendship status in instagram",
+    "fetch a single friendship status in instagram",
+    "view one specific friendship status in instagram",
+    "get friendship status in instagram",
+    "check relationship with a user in instagram"
+  ],
+  "description": "Check the relationship between the authenticated user and another user. Returns follow status, blocking, muting, and request states.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-friendship-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

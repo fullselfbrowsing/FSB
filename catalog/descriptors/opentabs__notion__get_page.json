@@ -1,0 +1,41 @@
+{
+  "slug": "notion.get_page",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "get a page in notion",
+    "look up a page in notion",
+    "fetch a single page in notion",
+    "view one specific page in notion",
+    "get page in notion",
+    "get a page with its content in notion"
+  ],
+  "description": "Get a Notion page by ID, including its title, metadata, and content blocks. Returns the page info and its direct child blocks.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID (UUID format, e.g., \"f4ab7079-036d-4893-aaa3-6440d973a22f\")"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/get-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

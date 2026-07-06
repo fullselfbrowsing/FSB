@@ -1,0 +1,38 @@
+{
+  "slug": "coinbase.list_price_alerts",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "list price alerts in coinbase",
+    "show me my price alerts in coinbase",
+    "view my price alerts in coinbase",
+    "see all my price alerts in coinbase",
+    "list all price alerts in coinbase"
+  ],
+  "description": "List all active price alerts for the authenticated user. Price alerts notify the user when an asset reaches a target price. Returns alert details including target price, direction, and associated asset.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of alerts to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/list-price-alerts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

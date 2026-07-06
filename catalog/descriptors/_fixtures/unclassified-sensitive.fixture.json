@@ -1,0 +1,13 @@
+{
+  "slug": "fixture-payments.send_payment",
+  "service": "pay.unclassified-fixture.test",
+  "description": "Send a payment from the user's wallet (fail-closed gate fixture)",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "_fixture": "DENY-03: this origin MUST be rejected by verify-classification-gate.mjs unless explicitly classified"
+}

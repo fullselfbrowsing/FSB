@@ -1,0 +1,45 @@
+{
+  "slug": "bsky.delete_message",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "delete a message in bsky",
+    "remove a message in bsky",
+    "trash a message in bsky",
+    "permanently delete a message in bsky",
+    "delete message in bsky",
+    "delete a message in bluesky"
+  ],
+  "description": "Delete a message for yourself in a conversation.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      },
+      "message_id": {
+        "type": "string",
+        "description": "Message ID to delete"
+      }
+    },
+    "required": [
+      "convo_id",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

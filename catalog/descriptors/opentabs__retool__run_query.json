@@ -1,0 +1,42 @@
+{
+  "slug": "retool.run_query",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "run a query in retool",
+    "run query in retool",
+    "run a sql query against a resource in retool"
+  ],
+  "description": "Execute a SQL query against a Retool resource and return the results. Use this to test resources, inspect data, or validate queries before wiring them into an app. The resource can be specified by display name or internal UUID.",
+  "actionVerb": "run",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_name": {
+        "type": "string",
+        "description": "Resource display name (e.g., \"Billing Lifecycle (readonly / replica)\") or internal UUID"
+      },
+      "query": {
+        "type": "string",
+        "description": "SQL query to execute"
+      }
+    },
+    "required": [
+      "resource_name",
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/run-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "run"
+    }
+  }
+}

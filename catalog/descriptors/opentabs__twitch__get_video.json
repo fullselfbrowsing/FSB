@@ -1,0 +1,40 @@
+{
+  "slug": "twitch.get_video",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get a video in twitch",
+    "look up a video in twitch",
+    "fetch a single video in twitch",
+    "view one specific video in twitch",
+    "get video in twitch",
+    "get details about a specific video in twitch"
+  ],
+  "description": "Get details about a specific Twitch video by its ID. Returns title, view count, duration, game, and broadcaster info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Video ID (e.g., \"2717949378\")"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-video.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

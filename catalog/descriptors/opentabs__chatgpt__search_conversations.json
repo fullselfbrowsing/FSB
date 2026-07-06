@@ -1,0 +1,43 @@
+{
+  "slug": "chatgpt.search_conversations",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "search conversations in chatgpt",
+    "search conversations by keyword in chatgpt",
+    "search chatgpt conversations by text query in chatgpt"
+  ],
+  "description": "Search ChatGPT conversations by text query. Searches across conversation titles and message content.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "limit": {
+        "description": "Maximum results to return (default 28)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/search-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "slug": "cloudflare.list_dns_records",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list dns records in cloudflare",
+    "show me my dns records in cloudflare",
+    "view my dns records in cloudflare",
+    "see all my dns records in cloudflare",
+    "list dns records for a zone in cloudflare"
+  ],
+  "description": "List DNS records for a zone. Returns record type, name, content, TTL, and proxy status. Supports filtering by type and name, with pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      },
+      "type": {
+        "description": "Filter by record type",
+        "type": "string",
+        "enum": [
+          "A",
+          "AAAA",
+          "CNAME",
+          "MX",
+          "TXT",
+          "NS",
+          "SRV",
+          "CAA",
+          "PTR",
+          "SOA"
+        ]
+      },
+      "name": {
+        "description": "Filter by record name (e.g., \"www.example.com\")",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Results per page (default 50, max 100)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-dns-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

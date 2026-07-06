@@ -1,0 +1,51 @@
+{
+  "slug": "jira.list_comments",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list comments in jira",
+    "show me my comments in jira",
+    "view my comments in jira",
+    "see all my comments in jira",
+    "list comments on an issue in jira"
+  ],
+  "description": "List comments on a Jira issue with pagination support.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_key": {
+        "type": "string",
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
+      },
+      "max_results": {
+        "description": "Maximum number of comments to return (default 20)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first comment to return for pagination",
+        "type": "number"
+      },
+      "order_by": {
+        "description": "Sort order: \"created\" (oldest first) or \"-created\" (newest first, default)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/list-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

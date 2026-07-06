@@ -1,0 +1,55 @@
+{
+  "slug": "gemini.send_message",
+  "service": "gemini.google.com",
+  "intentSynonyms": [
+    "send a message in gemini",
+    "post a message in gemini",
+    "write a new message in gemini",
+    "send message in gemini",
+    "send a message to gemini and get a response in gemini"
+  ],
+  "description": "Send a message to Google Gemini and receive a response. Creates a new conversation if no conversation context is provided. To continue an existing conversation, pass conversation_id, response_id, and response_choice_id from a previous response. Optionally specify a model_id to use a specific model (from list_models). The response includes the full text and conversation context for follow-up messages.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Message text to send to Gemini"
+      },
+      "conversation_id": {
+        "description": "Conversation ID to continue (e.g., \"c_ab3da395ea4fb30b\"). Omit to start a new conversation.",
+        "type": "string"
+      },
+      "response_id": {
+        "description": "Response ID from the previous turn (e.g., \"r_7d6e8f6883d3d249\"). Required when continuing a conversation.",
+        "type": "string"
+      },
+      "response_choice_id": {
+        "description": "Response choice ID from the previous turn (e.g., \"rc_ec1efdaca48d5324\"). Required when continuing a conversation.",
+        "type": "string"
+      },
+      "model_id": {
+        "description": "Model ID to use (from list_models). Defaults to the active model.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gemini/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "send"
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "slug": "airtable.update_cell",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "update a cell in airtable",
+    "edit a cell in airtable",
+    "change the details of cell in airtable",
+    "modify a cell in airtable",
+    "update cell in airtable",
+    "update a single cell value in a record in airtable"
+  ],
+  "description": "Update a single cell value in a record. The value format depends on the field type: text fields accept strings, number fields accept numbers, select fields accept an object like {\"id\": \"selXxx\"}, and so on. Use get_base_schema to discover field IDs and types.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix)"
+      },
+      "table_id": {
+        "type": "string",
+        "description": "Table ID (tbl prefix)"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "Record ID (rec prefix)"
+      },
+      "field_id": {
+        "type": "string",
+        "description": "Field/column ID (fld prefix)"
+      },
+      "value": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          {
+            "type": "array",
+            "items": {}
+          }
+        ],
+        "description": "New cell value — type depends on the field type"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id",
+      "record_id",
+      "field_id",
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/update-cell.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

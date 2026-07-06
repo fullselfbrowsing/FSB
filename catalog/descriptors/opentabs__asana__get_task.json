@@ -1,0 +1,45 @@
+{
+  "slug": "asana.get_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a task in asana",
+    "look up a task in asana",
+    "fetch a single task in asana",
+    "view one specific task in asana",
+    "get task in asana",
+    "get details of a specific task in asana"
+  ],
+  "description": "Get detailed information about a specific task by its GID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to retrieve"
+      },
+      "opt_fields": {
+        "description": "Comma-separated list of fields to return (defaults to standard task fields)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

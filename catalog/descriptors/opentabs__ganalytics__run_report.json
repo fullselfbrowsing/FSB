@@ -1,0 +1,87 @@
+{
+  "slug": "ganalytics.run_report",
+  "service": "analytics.google.com",
+  "intentSynonyms": [
+    "run a report in ganalytics",
+    "run report in ganalytics",
+    "run a report in google analytics",
+    "run a ga4 analytics report in ganalytics"
+  ],
+  "description": "Run a GA4 analytics report with specified dimensions, metrics, and date ranges. This is the primary reporting tool — supports all 374+ dimensions and 86+ metrics. Use get_metadata to discover available fields, and check_compatibility to verify combinations work together. Common dimensions: \"country\", \"city\", \"pagePath\", \"sessionSource\", \"deviceCategory\", \"browser\". Common metrics: \"activeUsers\", \"sessions\", \"screenPageViews\", \"bounceRate\", \"averageSessionDuration\", \"conversions\". Date formats: \"YYYY-MM-DD\", \"today\", \"yesterday\", \"NdaysAgo\" (e.g., \"7daysAgo\"). Returns up to 10000 rows per request; use offset for pagination.",
+  "actionVerb": "run",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "string",
+        "description": "GA4 property ID (numeric string)"
+      },
+      "dimensions": {
+        "description": "Dimension API names to include (e.g., [\"country\", \"pagePath\"]). Max 9 dimensions per report.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "metrics": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Metric API names to include (e.g., [\"activeUsers\", \"sessions\"]). At least 1 required."
+      },
+      "start_date": {
+        "type": "string",
+        "description": "Start date (YYYY-MM-DD, \"today\", \"yesterday\", or \"NdaysAgo\")"
+      },
+      "end_date": {
+        "type": "string",
+        "description": "End date (YYYY-MM-DD, \"today\", \"yesterday\", or \"NdaysAgo\")"
+      },
+      "dimension_filter": {
+        "description": "JSON string of a dimension filter object. Example: {\"filter\":{\"fieldName\":\"country\",\"stringFilter\":{\"value\":\"United States\"}}}",
+        "type": "string"
+      },
+      "metric_filter": {
+        "description": "JSON string of a metric filter object. Example: {\"filter\":{\"fieldName\":\"activeUsers\",\"numericFilter\":{\"operation\":\"GREATER_THAN\",\"value\":{\"int64Value\":\"100\"}}}}",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "JSON string of orderBys array. Example: [{\"metric\":{\"metricName\":\"activeUsers\"},\"desc\":true}]",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Max rows to return (default 100, max 10000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10000
+      },
+      "offset": {
+        "description": "Row offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "property_id",
+      "metrics",
+      "start_date",
+      "end_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-analytics/src/tools/run-report.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "run"
+    }
+  }
+}

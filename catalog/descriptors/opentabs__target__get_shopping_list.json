@@ -1,0 +1,40 @@
+{
+  "slug": "target.get_shopping_list",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get a shopping list in target",
+    "look up a shopping list in target",
+    "fetch a single shopping list in target",
+    "view one specific shopping list in target",
+    "get shopping list in target",
+    "get items in a shopping list in target"
+  ],
+  "description": "Get items in a specific Target shopping list by its list ID. Use list_shopping_lists to find list IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Shopping list ID (from list_shopping_lists)"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-shopping-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

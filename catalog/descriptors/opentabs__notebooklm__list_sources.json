@@ -1,0 +1,39 @@
+{
+  "slug": "notebooklm.list_sources",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "list sources in notebooklm",
+    "show me my sources in notebooklm",
+    "view my sources in notebooklm",
+    "see all my sources in notebooklm",
+    "list sources in a notebook in notebooklm"
+  ],
+  "description": "List all sources in a notebook. Returns source IDs, titles, types, and word counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/list-sources.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

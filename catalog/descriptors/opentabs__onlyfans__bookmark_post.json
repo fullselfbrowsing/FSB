@@ -1,0 +1,39 @@
+{
+  "slug": "onlyfans.bookmark_post",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "bookmark a post in onlyfans",
+    "bookmark post in onlyfans",
+    "bookmark or unbookmark a post in onlyfans"
+  ],
+  "description": "Toggle the bookmark/save status on a post. If the post is already bookmarked, it will be removed from bookmarks.",
+  "actionVerb": "bookmark",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Post ID to bookmark/unbookmark"
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/bookmark-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "bookmark"
+    }
+  }
+}

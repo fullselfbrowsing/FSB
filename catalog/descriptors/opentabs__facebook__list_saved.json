@@ -1,0 +1,39 @@
+{
+  "slug": "facebook.list_saved",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "list a saved in facebook",
+    "show me my saved in facebook",
+    "view my saved in facebook",
+    "see all my saved in facebook",
+    "list saved in facebook",
+    "list your saved items in facebook"
+  ],
+  "description": "List items saved by the current user on Facebook (posts, marketplace listings, links, videos, etc.). Returns title, URL, and saved timestamp.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of saved items to return (default 10, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/list-saved.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "medium.get_recommended_publishers",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get recommended publishers in medium",
+    "look up recommended publishers in medium",
+    "fetch a single recommended publishers in medium",
+    "view one specific recommended publishers in medium",
+    "get recommended accounts to follow in medium"
+  ],
+  "description": "Get personalized publisher recommendations — users and publications to follow based on your interests.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum recommendations to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-recommended-publishers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

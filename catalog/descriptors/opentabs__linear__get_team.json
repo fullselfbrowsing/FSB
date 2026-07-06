@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_team",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a team in linear",
+    "look up a team in linear",
+    "fetch a single team in linear",
+    "view one specific team in linear",
+    "get team in linear",
+    "get details of a single team in linear"
+  ],
+  "description": "Get detailed information about a single Linear team by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "description": "Team UUID"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-team.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

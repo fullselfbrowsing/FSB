@@ -1,0 +1,65 @@
+{
+  "slug": "linear.update_initiative",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update an initiative in linear",
+    "edit an initiative in linear",
+    "change the details of initiative in linear",
+    "modify an initiative in linear",
+    "update initiative in linear",
+    "update an existing initiative in linear"
+  ],
+  "description": "Update an existing Linear initiative. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "initiative_id": {
+        "type": "string",
+        "description": "Initiative UUID to update"
+      },
+      "name": {
+        "description": "New initiative name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New initiative description in markdown",
+        "type": "string"
+      },
+      "status": {
+        "description": "New initiative status",
+        "type": "string",
+        "enum": [
+          "Planned",
+          "Active",
+          "Completed"
+        ]
+      },
+      "color": {
+        "description": "New color hex code",
+        "type": "string"
+      },
+      "owner_id": {
+        "description": "New owner user UUID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "initiative_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-initiative.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

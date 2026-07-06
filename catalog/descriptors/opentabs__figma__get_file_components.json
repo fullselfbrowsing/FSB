@@ -1,0 +1,40 @@
+{
+  "slug": "figma.get_file_components",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "get file components in figma",
+    "look up file components in figma",
+    "fetch a single file components in figma",
+    "view one specific file components in figma",
+    "list components in a file in figma"
+  ],
+  "description": "List all published components in a Figma file. Returns component names, descriptions, and keys for use in design systems.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File key to list components for"
+      }
+    },
+    "required": [
+      "file_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/get-file-components.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

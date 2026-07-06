@@ -1,0 +1,69 @@
+{
+  "slug": "terraform.create_workspace",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "create a workspace in terraform",
+    "add a workspace in terraform",
+    "make a new workspace in terraform",
+    "open a new workspace in terraform",
+    "create workspace in terraform",
+    "create a new workspace in terraform"
+  ],
+  "description": "Create a new workspace in an organization. Optionally specify project, execution mode, Terraform version, and other settings.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "name": {
+        "type": "string",
+        "description": "Workspace name"
+      },
+      "description": {
+        "description": "Workspace description",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Project ID to assign workspace to",
+        "type": "string"
+      },
+      "execution_mode": {
+        "description": "Execution mode: \"remote\", \"local\", or \"agent\" (default \"remote\")",
+        "type": "string"
+      },
+      "terraform_version": {
+        "description": "Terraform version constraint",
+        "type": "string"
+      },
+      "auto_apply": {
+        "description": "Whether to auto-apply after successful plan",
+        "type": "boolean"
+      },
+      "working_directory": {
+        "description": "Working directory for Terraform runs",
+        "type": "string"
+      }
+    },
+    "required": [
+      "organization",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/create-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

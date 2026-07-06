@@ -1,0 +1,39 @@
+{
+  "slug": "netflix.add_to_my_list",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "add a to my list in netflix",
+    "add to my list in netflix",
+    "save a title to my list in netflix"
+  ],
+  "description": "Add a movie or TV show to the current Netflix profile's \"My List\". Use search_titles or get_title to find the video ID first.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix video ID to add"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/add-to-my-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

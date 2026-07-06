@@ -1,0 +1,39 @@
+{
+  "slug": "excel.get_table_columns",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "get table columns in excel",
+    "look up table columns in excel",
+    "fetch a single table columns in excel",
+    "view one specific table columns in excel",
+    "get column definitions of a table in excel"
+  ],
+  "description": "Get the column definitions of a table. Returns column names, IDs, and indices. Useful for understanding the table structure before reading or writing data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "table": {
+        "type": "string",
+        "description": "Table name or ID"
+      }
+    },
+    "required": [
+      "table"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/get-table-columns.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "target.find_nearby_stores",
+  "service": "target.com",
+  "intentSynonyms": [
+    "find nearby stores in target",
+    "find target stores near a location in target",
+    "find target stores near a zip code or city name in target"
+  ],
+  "description": "Find Target stores near a ZIP code or city name. Returns store name, address, phone number, and distance. Default radius is 50 miles.",
+  "actionVerb": "find",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "place": {
+        "type": "string",
+        "description": "ZIP code or city name (e.g., \"95133\", \"San Jose\")"
+      },
+      "limit": {
+        "description": "Maximum number of stores to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      },
+      "radius": {
+        "description": "Search radius in miles (default 50)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "place"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/find-nearby-stores.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "find"
+    }
+  }
+}

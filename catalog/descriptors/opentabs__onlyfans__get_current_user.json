@@ -1,0 +1,32 @@
+{
+  "slug": "onlyfans.get_current_user",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get a current user in onlyfans",
+    "look up a current user in onlyfans",
+    "fetch a single current user in onlyfans",
+    "view one specific current user in onlyfans",
+    "get current user in onlyfans",
+    "get your onlyfans profile in onlyfans"
+  ],
+  "description": "Get the authenticated user's profile including email, subscription count, notification count, and credit balance.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

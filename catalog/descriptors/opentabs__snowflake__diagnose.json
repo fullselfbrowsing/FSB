@@ -1,0 +1,29 @@
+{
+  "slug": "snowflake.diagnose",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "diagnose in snowflake",
+    "diagnose snowflake connection state in snowflake",
+    "diagnose the snowflake browser adapter connection in snowflake"
+  ],
+  "description": "Diagnose the Snowflake browser adapter connection. Returns whether the internal Snowflake app state is available, the authenticated user, API server URL, and available internal APIs. Use this to debug connectivity issues when other Snowflake tools fail.",
+  "actionVerb": "diagnose",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/diagnose.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "diagnose"
+    }
+  }
+}

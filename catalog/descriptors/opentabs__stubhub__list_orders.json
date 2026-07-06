@@ -1,0 +1,47 @@
+{
+  "slug": "stubhub.list_orders",
+  "service": "www.stubhub.com",
+  "intentSynonyms": [
+    "list orders in stubhub",
+    "show me my orders in stubhub",
+    "view my orders in stubhub",
+    "see all my orders in stubhub",
+    "show me my stubhub orders in stubhub"
+  ],
+  "description": "List your StubHub ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "past",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stubhub/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "msword.list_children",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "list a children in msword",
+    "show me my children in msword",
+    "view my children in msword",
+    "see all my children in msword",
+    "list children in msword",
+    "list a children in microsoft word"
+  ],
+  "description": "List files and folders in a directory. Use item_id to specify the folder, or omit for root.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "description": "Folder ID — omit for drive root",
+        "type": "string"
+      },
+      "top": {
+        "description": "Max results (default 20, max 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "order_by": {
+        "description": "Sort field (e.g., \"name asc\", \"lastModifiedDateTime desc\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/list-children.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

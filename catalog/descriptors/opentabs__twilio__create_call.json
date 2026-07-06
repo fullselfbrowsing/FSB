@@ -1,0 +1,61 @@
+{
+  "slug": "twilio.create_call",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "create a call in twilio",
+    "add a call in twilio",
+    "make a new call in twilio",
+    "open a new call in twilio",
+    "create call in twilio"
+  ],
+  "description": "Initiate a voice call. Requires a TwiML URL that returns instructions for the call.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "description": "Recipient phone number in E.164 format (e.g., +15551234567)"
+      },
+      "from": {
+        "type": "string",
+        "description": "Caller Twilio phone number in E.164 format (e.g., +15559876543)"
+      },
+      "url": {
+        "type": "string",
+        "description": "TwiML URL that returns voice instructions for the call"
+      },
+      "method": {
+        "description": "HTTP method for the TwiML URL (GET or POST)",
+        "type": "string"
+      },
+      "status_callback": {
+        "description": "URL to receive call status webhooks",
+        "type": "string"
+      },
+      "status_callback_method": {
+        "description": "HTTP method for the status callback URL (GET or POST)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "to",
+      "from",
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/create-call.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

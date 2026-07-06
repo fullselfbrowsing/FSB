@@ -1,0 +1,39 @@
+{
+  "slug": "netlify.list_build_hooks",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list build hooks in netlify",
+    "show me my build hooks in netlify",
+    "view my build hooks in netlify",
+    "see all my build hooks in netlify",
+    "list site build hooks in netlify"
+  ],
+  "description": "List build hooks for a Netlify site. Build hooks are URLs that trigger a new build when POSTed to. Returns hook title, branch, and trigger URL.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to list build hooks for"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-build-hooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

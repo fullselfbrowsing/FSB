@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs shopify plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://*.shopify.com/* -> service shopify.com after readPluginMeta strips the leading '*.'). shopify.com derives the host stem 'shopify' correctly, but the dir-name STEM_OVERRIDES {shopify:'shopify'} pins the slug to opentabs__shopify__* for stability (the same data-map discipline as the 39-02..05 commerce apps). *.shopify.com is classified SENSITIVE (Phase 39-01, the payment/money-movement axis -- a Shopify storefront create_order charges the saved payment method) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, shopify-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; create_order is the PAYMENT op (api {method:'POST'} -- create_order is in 39-01 PAYMENT_OP_NAMES) and cancel_order the DESTRUCTIVE op (apiVoid {method:'DELETE'}). create_order is DOM-only on a sensitive origin -> the payment-op CI guard PASSES (not safe-and-API-invocable).",
+  "name": "@opentabs-dev/opentabs-plugin-shopify",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Shopify",
+    "description": "OpenTabs plugin for Shopify",
+    "urlPatterns": [
+      "*://*.shopify.com/*"
+    ],
+    "homepage": "https://www.shopify.com"
+  },
+  "license": "MIT"
+}

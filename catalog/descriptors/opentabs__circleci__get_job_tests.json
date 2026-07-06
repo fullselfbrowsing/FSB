@@ -1,0 +1,46 @@
+{
+  "slug": "circleci.get_job_tests",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get job tests in circleci",
+    "look up job tests in circleci",
+    "fetch a single job tests in circleci",
+    "view one specific job tests in circleci",
+    "get job test results in circleci"
+  ],
+  "description": "Get test metadata for a job. Returns test names, results, run times, and failure messages.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "job_number": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Job number within the project"
+      }
+    },
+    "required": [
+      "project_slug",
+      "job_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-job-tests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-# FSB v0.9.72 Full Self Browsing
+# FSB v0.9.90 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.72-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.90-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-BSL_1.1-F5C518?style=for-the-badge)
 
@@ -18,11 +18,11 @@
 ![Issues](https://img.shields.io/github/issues/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Issues)
 ![Last Commit](https://img.shields.io/github/last-commit/fullselfbrowsing/FSB?style=flat-square&logo=github&label=Last%20Commit)
 
-**AI powered browser automation through natural language. Tell it what to do, and watch it browse for you.**
+**AI-powered browser automation through natural language. Tell it what to do, and watch it browse for you.**
 
 *Pure structural intelligence. Zero vision. Zero guessing.*
 
-[Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
+[What's New](#whats-new) · [Quick Start](#quick-start) · [MCP Server](#mcp-server) · [Architecture](#architecture) · [Providers](#ai-providers) · [Development](#development)
 
 </div>
 
@@ -30,9 +30,9 @@
 
 ## Overview
 
-FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English and FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the side panel or MCP.
+FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.72 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.90 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 
@@ -47,15 +47,15 @@ Project Mariner, Claude Computer Use, and OpenAI Operator rely heavily on visual
 
 ### Quick Start TL;DR
 
-**FSB shines when your AI client drives it directly.** Install the MCP server for your client of choice with one command. There are no manual config edits, and **no FSB API key is needed** because your MCP client's model handles the reasoning:
+**FSB shines when your AI client drives it directly.** Install the MCP server for your client of choice — one command, no manual config edits, and **no FSB API key needed** (your MCP client's model handles the reasoning):
 
-| Client | Install command |
+| Client | One-command install |
 |--------|---------------------|
 | Claude Code | `npx -y fsb-mcp-server install --claude-code` |
 | Claude Desktop | `npx -y fsb-mcp-server install --claude-desktop` |
 | Cursor | `npx -y fsb-mcp-server install --cursor` |
 | VS Code | `npx -y fsb-mcp-server install --vscode` |
-| Antigravity | `npx -y fsb-mcp-server install --windsurf` |
+| Windsurf | `npx -y fsb-mcp-server install --windsurf` |
 | Codex | `npx -y fsb-mcp-server install --codex` |
 | All at once | `npx -y fsb-mcp-server install --all` |
 
@@ -66,7 +66,7 @@ Preview before writing: append `--dry-run`. Sanity check with `npx -y fsb-mcp-se
 1. Get **FSB** from the [Chrome Web Store](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk).
 2. From your MCP client, try: `Search for cats on Google` or `Read this page and summarize it`.
 
-Want to run FSB standalone from the extension side panel? Open settings, paste an API key for xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, or a custom endpoint, then start there. MCP is optional.
+Want to run FSB standalone from the extension popup/side panel? Open settings, paste an API key (xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, or custom), and start there — no MCP needed.
 
 **On OpenClaw?** Install FSB directly from [ClawHub](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing). That is the fastest onboarding route. If you need the manual fallback, the FSB skill in [`skills/fsb/`](./skills/fsb/SKILL.md) still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag stays manual because OpenClaw's MCP config schema is unstable across builds.
 
@@ -74,15 +74,16 @@ Want to run FSB standalone from the extension side panel? Open settings, paste a
 
 ### What It Does
 
-- Runs natural language browser tasks from the side panel.
-- Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI compatible endpoints.
+- Runs natural language browser tasks from the popup or side panel.
+- Supports xAI, Gemini, OpenAI, Anthropic, OpenRouter, LM Studio, and custom OpenAI-compatible endpoints.
 - Discovers live provider model lists and falls back to bundled defaults.
-- Uses a 51 entry extension tool registry with 36 action tools and 15 read or lifecycle tools.
-- Exposes 59 registered MCP handlers for external clients, including manual actions, read tools, autopilot, observability, vault, and compatibility stubs.
+- Uses 56 canonical extension tool definitions and 66 registered MCP tools for external clients.
 - Provides DOM snapshots, action verification, smart waiting, stuck detection, visual feedback, and session logs.
+- Searches a 128-app capability catalog and invokes verified signed, audited, denylist-gated first-party API capabilities through the MCP capability surface.
+- Uploads real local files to file inputs through the supervised `upload_file` tool with sensitive-path safeguards.
 - Maintains long term memory for past sites, workflows, selectors, and task outcomes.
 - Includes secure credential and payment vault flows for supervised autofill.
-- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Antigravity, and other MCP clients can drive the browser.
+- Exposes a local MCP server so Claude Code, Codex, Cursor, VS Code, Windsurf, and other MCP clients can drive the browser.
 
 Background agents are retired. Existing `chrome.storage.local['bgAgents']` data is preserved for users who had old agents, but scheduled or recurring automation is no longer an active FSB feature.
 
@@ -93,10 +94,9 @@ Background agents are retired. Existing `chrome.storage.local['bgAgents']` data 
 - **Data entry**: move through structured forms with validation, dropdowns, custom controls, and table inputs.
 - **Ecommerce**: compare product pages, inspect prices, monitor availability manually, and prepare carts under supervision.
 - **Finance and dashboards**: read charts, tables, and current page state when a human remains in control.
+- **Trigger watchers**: watch one page element for changes, threshold crossings, or availability while Chrome and the extension stay open.
 - **Developer workflows**: drive GitHub, issue trackers, documentation sites, coding platforms, and browser-based tools.
 - **Accessibility and DOM inspection**: expose structure, labels, selectors, forms, and hidden controls for debugging.
-
-Short version: if you can do it in a browser, FSB can probably help you do it, repeat it, and show its work. It turns browser busywork into browse work, then goes beyond ordinary clicking with DOM structure, memory, verification, vault flows, and MCP agent control.
 
 FSB is most reliable when the task can be expressed as page structure and user actions. It is intentionally not a stealth browser, scraper farm, or unsupervised account operator.
 
@@ -105,15 +105,34 @@ FSB is most reliable when the task can be expressed as page structure and user a
 | Area | Current behavior |
 |------|------------------|
 | DOM analysis | Captures visible and structural page data, element refs, selectors, forms, ARIA labels, and DOM deltas. |
-| Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, and direct JavaScript. |
+| Action execution | Supports clicks, typing, keys, scrolling, navigation, tabs, spreadsheet ranges, coordinate tools, direct JavaScript, and real file uploads. |
+| Capability catalog | Searches the 128-app catalog and invokes verified signed, audited, denylist-gated T1/T1b first-party API capabilities through `search_capabilities` and `invoke_capability`. Catalog-tail hits remain learn-pending, discovery-pending, or guarded fail-closed until proven. Sensitive origins are flagged, while denylisted origins remain blocked. |
 | Verification | Checks post-action state, loading behavior, DOM stability, and stuck-action repetition. |
-| UI surfaces | Persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
+| UI surfaces | Popup chat, persistent side panel, options/control panel, logs, analytics, memory, vault, and sync controls. |
 | Model support | Hosted providers, OpenRouter routing, LM Studio local models, custom endpoints, and live model discovery. |
 | Output rendering | Markdown, sanitized HTML, Mermaid diagrams, Chart.js charts, and task progress messages. |
 | Observability | Session history, action logs, token/cost accounting, diagnostics ring buffer, and MCP status probes. |
-| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, and restricted-tab recovery messaging. |
+| Security | Encrypted keys, vault unlock flows, redaction helpers, DOMPurify, capability signature/audit gates, origin denylisting, upload-path denylisting, and restricted-tab recovery messaging. |
+| Trigger watchers | MCP callers can arm one-element watches with blocking or detached reporting, plus status/list/stop companions. |
+| DOM live preview | PhantomStream-backed capture, renderer, protocol, media mirroring, and relay compatibility with FSB-owned pairing, task status, overlays, and remote-control ownership. |
 
 The core design goal is to keep the browser as the source of truth. The model receives structured page context, makes a tool decision, and the extension verifies what changed before moving to the next step.
+
+---
+
+## What's New
+
+**Native Capability Catalog: first-party API execution.** Beyond DOM automation, FSB can search a capability catalog covering 128 apps and invoke verified API capabilities with `search_capabilities` and `invoke_capability`. Verified capabilities run through a router that checks the origin, verifies the recipe signature, checks the denylist, serializes the action, and logs an audit record that never includes secrets. Capabilities that are not yet verified are clearly labeled instead of being presented as ready to use. Every origin is allowed by default unless it is on the denylist, and denylisted origins stay blocked. Sensitive origins are flagged in the interface and the audit trail, and reading data through network capture on a sensitive origin still asks for extra confirmation. The API integration model is inspired by **OpenTabs** (see [Acknowledgements](#acknowledgements)). Capability execution is fully supported and has been tested, including live browser testing. The automated test suite is green.
+
+**`upload_file`: real file input uploads.** MCP clients and FSB autopilot can now call `upload_file(selector, file_path, tab_id?)` to set an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
+
+**PhantomStream 0.2.1 media mirroring.** Dashboard DOM live preview now consumes the published PhantomStream media side channel in reference mode, so progressive `<video>` and `<audio>` nodes can mirror alongside DOM snapshots. Adaptive HLS/DASH discovery remains deferred because it would require a new `webRequest` permission; MCP tool schemas, pairing, auth, and dashboard ownership behavior are unchanged.
+
+**v0.11.0 — Trigger Tool (reactive DOM monitoring).** MCP callers can arm a watch on one page element with `trigger` and manage it with `stop_trigger`, `get_trigger_status`, and `list_triggers`. Watches support `live-observe` and `refresh-poll` modes, threshold/delta/regex/compound conditions, blocking or detached reporting, and a configurable concurrency cap. See [Trigger Watchers](mcp/README.md#trigger-watchers) for the full contract.
+
+**Showcase and ecosystem pages.** [full-selfbrowsing.com](https://full-selfbrowsing.com) added pages for [Lattice](https://full-selfbrowsing.com/lattice) (capability runtime SDK), [PhantomStream](https://full-selfbrowsing.com/phantom-stream) (DOM-native browser mirroring), [Prometheus](https://full-selfbrowsing.com/prometheus) (the autonomous browser build behind FSB), and a community [Site Maps](https://full-selfbrowsing.com/sitemaps) hub, plus a live [stats](https://full-selfbrowsing.com/stats) page with an anonymized active-regions globe, a [legal](https://full-selfbrowsing.com/legal) posture page, and an interactive knowledge-graph viewer on [About](https://full-selfbrowsing.com/about).
+
+Full history is in [`CHANGELOG.md`](./CHANGELOG.md); the MCP package keeps its own log in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ---
 
@@ -125,7 +144,7 @@ The core design goal is to keep the browser as the source of truth. The model re
 | [`mcp/`](./mcp/README.md) | npm package `fsb-mcp-server`, the local MCP bridge for external AI clients. |
 | [`skills/fsb/`](./skills/fsb/SKILL.md) | OpenClaw + Hermes skill: doctor + stdio/YAML printers + consent gated install for multiple hosts. |
 | [`showcase/`](./showcase/README.md) | Marketing and dashboard site for full-selfbrowsing.com. Angular 20 static prerender + Express relay. |
-| `showcase/server/` | Node/Express deploy backend for pairing, relay, auth, and dashboard data. |
+| `showcase/server/` | Node/Express deploy backend for pairing, PhantomStream-compatible relay, auth, and dashboard data. |
 | `server-py/` | Legacy Python/FastAPI-style backend prototype retained for reference. |
 | `tests/` | Node tests for extension modules, MCP contracts, bridge behavior, and regression coverage. |
 | `scripts/` | Repo maintenance and validation scripts. |
@@ -174,47 +193,6 @@ Top level deploy and validation files:
 
 </details>
 
-## Real Demos
-
-The showcase About page includes real videos of FSB doing browser work across direct automation and MCP driven agent loops.
-
-<table>
-<tr>
-<td width="50%" align="center">
-<a href="https://www.youtube.com/watch?v=_iQ4_LSXcTU">
-<img src="https://i.ytimg.com/vi/_iQ4_LSXcTU/hqdefault.jpg" alt="FSB Ecommerce Autopilot by Grok 4.1 demo thumbnail" width="100%" />
-</a>
-<br/><strong>FSB Ecommerce Autopilot by Grok 4.1</strong>
-<br/><sub>A shopping workflow moving from instruction to browser actions.</sub>
-</td>
-<td width="50%" align="center">
-<a href="https://www.youtube.com/watch?v=WbpOrFwgGME">
-<img src="https://i.ytimg.com/vi/WbpOrFwgGME/hqdefault.jpg" alt="Flight Booking Powered by Codex MCP demo thumbnail" width="100%" />
-</a>
-<br/><strong>Flight Booking Powered by Codex MCP</strong>
-<br/><sub>Codex using FSB through MCP as the browser layer for a travel task.</sub>
-</td>
-</tr>
-<tr>
-<td width="50%" align="center">
-<a href="https://www.youtube.com/watch?v=PNTGCWGopf8">
-<img src="https://i.ytimg.com/vi/PNTGCWGopf8/hqdefault.jpg" alt="OpenClaw Monitoring Doge Price demo thumbnail" width="100%" />
-</a>
-<br/><strong>OpenClaw Monitoring Doge Price</strong>
-<br/><sub>OpenClaw providing the agent loop while FSB controls the live browser.</sub>
-</td>
-<td width="50%" align="center">
-<a href="https://www.youtube.com/watch?v=mD9oGB2JqVM">
-<img src="https://i.ytimg.com/vi/mD9oGB2JqVM/hqdefault.jpg" alt="An Aha Moment by Claude Opus 4.7 demo thumbnail" width="100%" />
-</a>
-<br/><strong>An Aha Moment by Claude Opus 4.7</strong>
-<br/><sub>Claude pairing reasoning with FSB browser execution and iteration.</sub>
-</td>
-</tr>
-</table>
-
-For stats nerds, the showcase also has [live project and usage charts](https://full-selfbrowsing.com/stats) with GitHub activity, active users, token flow, running agents, and popular MCP clients.
-
 ---
 
 ## Quick Start
@@ -233,12 +211,6 @@ For stats nerds, the showcase also has [live project and usage charts](https://f
 
 ### Install The Extension
 
-Use the [Chrome Web Store listing](https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk) for normal installs. This is the recommended path because Chrome handles release updates automatically.
-
-Use **Load unpacked** only for local development or when a breaking issue has been fixed in the repository and you need that fix before the Chrome Web Store listing updates. Loaded unpacked builds do not receive automatic release updates.
-
-For local development or an urgent unreleased fix:
-
 ```bash
 git clone https://github.com/fullselfbrowsing/FSB.git
 cd FSB
@@ -248,7 +220,7 @@ cd FSB
 2. Enable **Developer mode**.
 3. Click **Load unpacked**.
 4. Select the `extension/` directory.
-5. Open the FSB side panel, open settings, configure a provider, and test the API connection.
+5. Click the FSB toolbar icon, open settings, configure a provider, and test the API connection.
 
 Start with simple tasks such as:
 
@@ -275,7 +247,7 @@ If a site uses heavy client rendering, custom canvas controls, or unusual shadow
 
 | Problem | Check |
 |---------|-------|
-| Extension does not appear | For Web Store installs, confirm FSB is enabled. For local development, confirm Chrome loaded `extension/`, not the repo root. |
+| Extension does not appear | Confirm Chrome loaded `extension/`, not the repo root. |
 | API test fails | Confirm the selected provider, key, endpoint, and model belong together. |
 | Page reads fail | Move away from browser-internal pages such as `chrome://` or extension pages. |
 | Clicks miss targets | Refresh the DOM snapshot, scroll the target into view, or use coordinate tools. |
@@ -301,7 +273,7 @@ The extension reads bundled scripts directly from `extension/`. The MCP package 
 
 ## MCP Server
 
-FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 59 registered handlers across manual browser control, read tools, autopilot, vault, observability, and visual session compatibility stubs.
+FSB ships [`fsb-mcp-server`](https://www.npmjs.com/package/fsb-mcp-server), a local MCP server that lets external AI clients control the same browser extension. It exposes 66 registered tools across visual sessions, trigger watchers, manual browser control, capability search/invoke, read-only page inspection, autopilot, vault, and observability.
 
 The extension connects to the MCP bridge on:
 
@@ -374,21 +346,22 @@ npx -y fsb-mcp-server wait-for-extension
 
 See [mcp/README.md](mcp/README.md) for the full tool reference and client-specific setup notes.
 
-OpenCode uses a manual setup path. OpenClaw users should start with the direct [ClawHub install](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing), then use the manual stdio fallback only when needed.
+OpenCode and OpenClaw are supported through manual or unsupported fallback setup paths; after editing host configuration, refresh or reload the client if FSB tools do not appear.
 
 ### MCP Usage Guidance
 
 Manual tools are the default path for most external clients. They let the caller inspect the page, pick a selector, act, and verify. `run_task` is useful when the user explicitly wants FSB to run its own automation loop, but manual control is easier to audit and recover.
 
+Use Trigger Watchers when a caller wants to watch one selector for a future value change instead of polling manually. They are local to the open browser session: Chrome and the FSB extension must remain running, results are reported back to the MCP caller, and FSB does not provide server-side monitoring or push delivery.
+
 Recommended manual pattern:
 
-1. Use `read_page` or `get_dom_snapshot` to understand the current page.
-2. Choose the smallest action tool that can make the change.
-3. Include `visual_reason` and `client` on every action tool call so the browser shows the trusted client badge.
-4. Use `execute_js` for safe DOM reads and simple DOM triggered clicks.
-5. Use native tools such as `click`, `type_text`, `press_key`, and `drag` when real browser events matter.
-6. Verify with `read_page`, `get_page_snapshot`, or `get_dom_snapshot`.
-7. Set `is_final: true` on the last action so the overlay clears immediately.
+1. Add `visual_reason` and `client` on action calls when you want the trusted overlay.
+2. `read_page` or `get_dom_snapshot` to understand the current page.
+3. Use `execute_js` for safe DOM reads and simple DOM-triggered clicks.
+4. Use native tools such as `click`, `type_text`, `press_key`, and `drag` when real browser events matter.
+5. Verify with `read_page`, `get_page_snapshot`, or `get_dom_snapshot`.
+6. Set `is_final:true` on the last action to clear the overlay immediately.
 
 Use `doctor` and `status --watch` before changing client configs. Most MCP failures are connection, extension wake, active-tab, or content-script readiness issues, not install problems.
 
@@ -398,35 +371,25 @@ Use `doctor` and `status --watch` before changing client configs. Most MCP failu
 
 ```mermaid
 graph TB
-    CLIENTS["MCP Clients<br/>Claude Code / Codex / Cursor / VS Code / Antigravity / OpenClaw"] --> SERVER["fsb-mcp-server<br/>stdio or Streamable HTTP"]
-    SERVER --> BRIDGE["Local WebSocket Bridge<br/>ws://localhost:7225"]
-    BRIDGE --> EXTBRIDGE["Extension MCP Bridge Client"]
-    SIDE["Side Panel"] --> BG["MV3 Background Worker"]
-    OPTIONS["Options / Control Panel"] --> BG
-    EXTBRIDGE --> BG
+    UI["Popup / Side Panel / Options"] --> BG["MV3 Background Worker"]
     BG --> AI["Universal Provider"]
-    AI --> APIs["xAI / Gemini / OpenAI / Anthropic / OpenRouter / LM Studio / Custom"]
-    BG --> CS["Injected Content Scripts"]
-    CS --> PAGE["Active Web Page DOM"]
-    BG --> STORAGE["Chrome Storage<br/>config / sessions / memory / analytics / vault"]
-    STORAGE --> MEMORY["Memory + Site Guides"]
-    BG --> TELEMETRY["Telemetry Collector"]
-    BG --> DASHRELAY["Dashboard Sync Client"]
-    TELEMETRY --> SHOWCASE["Showcase Server<br/>telemetry ingest / relay / stats"]
-    DASHRELAY --> SHOWCASE
+    BG --> CS["Content Scripts"]
+    BG --> MEM["Memory + Analytics"]
+    BG --> MCP["MCP Bridge"]
+    AI --> APIs["xAI / Gemini / OpenAI / Anthropic / OpenRouter / Local"]
+    CS --> PAGE["Web Page DOM"]
+    MCP --> CLIENTS["Claude Code / Codex / Cursor / VS Code / Others"]
 ```
 
 ### Main Runtime Pieces
 
-- **Background worker** (`extension/background.js`): owns sessions, model calls, tool execution, MCP routing, storage orchestration, telemetry flushing, and optional dashboard sync.
-- **MCP bridge client** (`extension/ws/mcp-bridge-client.js` plus `extension/ws/mcp-tool-dispatcher.js`): keeps the extension connected to the local `fsb-mcp-server`, routes tool calls, records MCP metrics, and enforces tab ownership.
-- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state, wait for stable state, and render visual feedback.
+- **Background worker** (`extension/background.js`): owns sessions, model calls, tool execution, MCP routing, and storage orchestration.
+- **Content scripts** (`extension/content/`): analyze the DOM, create element references, execute actions, stream DOM state through the PhantomStream capture adapter, wait for stable state, and render visual feedback.
 - **AI layer** (`extension/ai/`): universal OpenAI-compatible request engine, provider settings, model discovery, tool definitions, transcripts, and action history.
-- **Memory and site guides** (`extension/lib/memory/` plus `extension/site-guides/`): store prior task context and provide domain specific guidance.
+- **Memory** (`extension/lib/memory/`): stores episodic, semantic, and procedural records, then retrieves relevant prior context for later tasks.
 - **Visualization** (`extension/lib/visualization/`): D3/site graph views for guide and memory exploration.
 - **Vault** (`extension/config/secure-config.js` plus UI flows): encrypts API keys and saved user data in Chrome storage.
-- **Telemetry and dashboard sync** (`extension/utils/telemetry-collector.js`, `extension/ws/ws-client.js`, and `showcase/server/`): send anonymous aggregate beats, relay paired dashboard sessions, and power the public stats page.
-- **MCP package** (`mcp/`): TypeScript server that exposes stdio and optional Streamable HTTP, then translates MCP calls into extension bridge messages.
+- **MCP package** (`mcp/`): TypeScript server that translates MCP calls into extension bridge messages.
 
 ### Automation Flow
 
@@ -441,33 +404,32 @@ graph TB
 
 FSB stores configuration and runtime data in Chrome storage. API keys and saved sensitive values go through the secure configuration layer. Session logs, analytics, and memory records are kept locally unless a user explicitly enables server sync or uses the showcase dashboard pairing flow.
 
-During a task, the background worker owns the session state and talks to five main collaborators:
+During a task, the background worker owns the session state and talks to three main collaborators:
 
 - content scripts for page reads and browser actions
 - the selected provider for planning and response generation
-- local storage for config, analytics, memory, vault records, and logs
-- the local MCP bridge when an external client is driving the browser
-- optional showcase services for paired dashboard sessions and anonymous aggregate stats
+- local storage for config, analytics, memory, and logs
 
 The MCP server does not replace the extension runtime. It is a local bridge that translates MCP requests into the same background-worker routes used by FSB's own UI.
 
 ### Browser Action Surface
 
-The extension's canonical tool registry covers navigation, search, clicking, typing, keyboard events, scrolling, waiting, tabs, spreadsheets, coordinate interactions, DOM mutation helpers, read inspection, site guide lookup, memory search, and task finalization signals.
+The extension's canonical tool registry covers navigation, search, clicking, typing, keyboard events, scrolling, waiting, tabs, spreadsheets, coordinate interactions, real file uploads, DOM mutation helpers, read-only inspection, site guide lookup, memory search, and task finalization signals.
 
-The MCP server exposes a curated public surface around that registry:
+The MCP server exposes a curated public surface around that registry plus direct server-registered companion tools:
 
 | Surface | Count | Examples |
 |---------|-------|----------|
-| Manual action tools | 36 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `set_attribute` |
-| Read tools | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
-| Autopilot | 3 | `run_task`, `stop_task`, `get_task_status` |
-| Browser history helper | 1 | `back` |
-| Visual session compatibility stubs | 2 | `start_visual_session`, `end_visual_session` return `TOOL_REMOVED` |
+| Visual sessions | 2 | `start_visual_session`, `end_visual_session` |
+| Autopilot and agent navigation | 4 | `run_task`, `stop_task`, `get_task_status`, `back` |
+| Trigger watchers | 4 | `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers` |
+| Manual control | 37 | `execute_js`, `navigate`, `click`, `type_text`, `drag`, `upload_file` |
+| Read-only inspection | 8 | `read_page`, `get_dom_snapshot`, `get_site_guide`, `read_sheet` |
+| Capabilities | 2 | `search_capabilities`, `invoke_capability` |
 | Observability | 5 | `list_sessions`, `get_logs`, `search_memory` |
 | Vault | 4 | `list_credentials`, `fill_credential`, `use_payment_method` |
 
-Read tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, or navigate at the same time.
+Read-only tools bypass the mutation queue where safe. Mutation tools are serialized so two clients do not click, type, upload, invoke, or navigate at the same time. Capability tools remain outside the canonical extension registry by design; `search_capabilities` bypasses the queue, while `invoke_capability` serializes like other side-effecting tools. Search results include readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits.
 
 ---
 
@@ -571,6 +533,8 @@ Use separate API keys for development and production, rotate keys regularly, res
 - FSB does not bypass browser restrictions on internal pages.
 - CAPTCHA solving support is a framework and optional service integration, not a guarantee.
 - The extension can interact with the active page, tabs, and debugger-backed coordinate tools because those permissions are declared in the MV3 manifest.
+- `upload_file` requires an absolute local path, blocks known sensitive path patterns, and records audit metadata without persisting the disk path.
+- Capability invokes allow every non-denied origin under Auto and run through denylist, mutation, signature, and audit gates. Only verified T1/T1b capabilities execute directly; guarded or catalog-tail capabilities return typed pending/fallback responses. Sensitive origins are flagged for review; network-capture discovery on sensitive origins still requires extra confirmation.
 - Saved credentials and payment methods require explicit user configuration and unlock flows.
 - Automation should be treated like a fast assistant operating your browser, not like an unattended production worker.
 
@@ -649,6 +613,10 @@ Before cutting a release, verify:
 The root README should describe what a new user needs to understand before installing, testing, or choosing an integration path. Detailed package behavior belongs in the package README that owns it. This split keeps the public overview useful while still giving maintainers a clear place to update tool surfaces, extension entry points, or showcase deploy instructions.
 
 ---
+
+## Acknowledgements
+
+- **OpenTabs** inspired FSB's Native Capability Catalog (first-party API execution: turning authenticated browser sessions into reusable, signed, audited API capabilities). Thanks for the direction on this approach.
 
 ## License
 

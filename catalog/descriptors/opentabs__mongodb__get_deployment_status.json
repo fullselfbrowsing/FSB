@@ -1,0 +1,31 @@
+{
+  "slug": "mongodb.get_deployment_status",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "get a deployment status in mongodb",
+    "look up a deployment status in mongodb",
+    "fetch a single deployment status in mongodb",
+    "view one specific deployment status in mongodb",
+    "get deployment status in mongodb"
+  ],
+  "description": "Get the current deployment status for the MongoDB Atlas project including goal state, version conflicts, draft status, and in-progress jobs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/get-deployment-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

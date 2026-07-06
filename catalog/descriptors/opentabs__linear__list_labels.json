@@ -1,0 +1,31 @@
+{
+  "slug": "linear.list_labels",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list labels in linear",
+    "show me my labels in linear",
+    "view my labels in linear",
+    "see all my labels in linear",
+    "list all issue labels in linear"
+  ],
+  "description": "List all issue labels in the Linear workspace. Use this to find label IDs for creating or filtering issues.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-labels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "costco.remove_list_item",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "remove a list item in costco",
+    "remove list item in costco",
+    "remove an item from a shopping list in costco"
+  ],
+  "description": "Remove an item from a Costco shopping list.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Shopping list ID (from get_lists)"
+      },
+      "entry_id": {
+        "type": "string",
+        "description": "List entry ID to remove (from get_list_items)"
+      }
+    },
+    "required": [
+      "list_id",
+      "entry_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/remove-list-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "amplitude.list_orgs",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "list orgs in amplitude",
+    "show me my orgs in amplitude",
+    "view my orgs in amplitude",
+    "see all my orgs in amplitude",
+    "list all organizations in amplitude"
+  ],
+  "description": "List all Amplitude organizations the current user belongs to. Returns organization IDs and names.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/list-orgs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

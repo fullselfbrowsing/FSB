@@ -1,0 +1,43 @@
+{
+  "slug": "yelp.autocomplete",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "autocomplete in yelp",
+    "get search autocomplete suggestions in yelp",
+    "get autocomplete suggestions for a search query in yelp"
+  ],
+  "description": "Get autocomplete suggestions for a search query. Returns suggested search terms, business names, and categories matching the prefix. Useful for building search-as-you-type experiences.",
+  "actionVerb": "autocomplete",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "prefix": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search text prefix to get suggestions for (e.g., \"sushi\", \"dent\")"
+      },
+      "location": {
+        "type": "string",
+        "description": "Location context for suggestions (e.g., \"San Jose, CA\")"
+      }
+    },
+    "required": [
+      "prefix",
+      "location"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/autocomplete.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "autocomplete"
+    }
+  }
+}

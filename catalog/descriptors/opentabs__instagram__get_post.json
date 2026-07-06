@@ -1,0 +1,40 @@
+{
+  "slug": "instagram.get_post",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get a post in instagram",
+    "look up a post in instagram",
+    "fetch a single post in instagram",
+    "view one specific post in instagram",
+    "get post in instagram",
+    "get a post by media id in instagram"
+  ],
+  "description": "Get detailed information about a single Instagram post by its media ID. Returns caption, like/comment counts, author, and image URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "media_id": {
+        "type": "string",
+        "description": "Media ID (numeric string, e.g. \"3849123669892697076_25025320\" or just the numeric pk)"
+      }
+    },
+    "required": [
+      "media_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "slug": "linear.update_document",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update a document in linear",
+    "edit a document in linear",
+    "change the details of document in linear",
+    "modify a document in linear",
+    "update document in linear",
+    "update an existing document in linear"
+  ],
+  "description": "Update an existing Linear document. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "type": "string",
+        "description": "Document UUID to update"
+      },
+      "title": {
+        "description": "New document title",
+        "type": "string"
+      },
+      "content": {
+        "description": "New document content in markdown",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Move to this project UUID",
+        "type": "string"
+      },
+      "icon": {
+        "description": "New icon emoji",
+        "type": "string"
+      }
+    },
+    "required": [
+      "document_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

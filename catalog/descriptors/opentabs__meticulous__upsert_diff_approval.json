@@ -1,0 +1,65 @@
+{
+  "slug": "meticulous.upsert_diff_approval",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "upsert a diff approval in meticulous",
+    "upsert diff approval in meticulous",
+    "bulk approve/reject diffs in meticulous"
+  ],
+  "description": "Approve or reject one or more screenshot diffs in bulk. Updates the approval state of diffs for a test run.",
+  "actionVerb": "upsert",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "approvals": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "replay_diff_id": {
+              "type": "string",
+              "description": "Replay diff ID"
+            },
+            "screenshot_file_name": {
+              "type": "string",
+              "description": "Screenshot filename"
+            },
+            "approved": {
+              "type": "boolean",
+              "description": "Whether to approve (true) or reject (false)"
+            }
+          },
+          "required": [
+            "replay_diff_id",
+            "screenshot_file_name",
+            "approved"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of diff approval states to set"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "approvals"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/upsert-diff-approval.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "upsert"
+    }
+  }
+}

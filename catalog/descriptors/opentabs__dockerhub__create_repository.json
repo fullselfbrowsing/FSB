@@ -1,0 +1,56 @@
+{
+  "slug": "dockerhub.create_repository",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "create a repository in dockerhub",
+    "add a repository in dockerhub",
+    "make a new repository in dockerhub",
+    "open a new repository in dockerhub",
+    "create repository in dockerhub",
+    "create a repository in docker hub"
+  ],
+  "description": "Create a new Docker Hub repository in a namespace. The repository is created as a public image repository by default.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Namespace (user or org). Defaults to the authenticated user.",
+        "type": "string"
+      },
+      "name": {
+        "type": "string",
+        "description": "Repository name (lowercase, alphanumeric, hyphens, underscores)"
+      },
+      "description": {
+        "description": "Short description (max 100 chars)",
+        "type": "string"
+      },
+      "full_description": {
+        "description": "Full description in Markdown",
+        "type": "string"
+      },
+      "is_private": {
+        "description": "Whether the repository is private (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/create-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

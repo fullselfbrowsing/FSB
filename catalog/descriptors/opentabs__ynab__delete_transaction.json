@@ -1,0 +1,46 @@
+{
+  "slug": "ynab.delete_transaction",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "delete a transaction in ynab",
+    "remove a transaction in ynab",
+    "trash a transaction in ynab",
+    "permanently delete a transaction in ynab",
+    "delete transaction in ynab"
+  ],
+  "description": "Delete a transaction from the active YNAB plan. This marks the transaction as deleted (soft delete). Transfer transactions cannot be deleted through this tool — delete them directly in YNAB.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "transaction_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Transaction ID to delete"
+      },
+      "account_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Account ID the transaction belongs to"
+      }
+    },
+    "required": [
+      "transaction_id",
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/delete-transaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "hack2hire.get_completed_question_count",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get a completed question count in hack2hire",
+    "look up a completed question count in hack2hire",
+    "fetch a single completed question count in hack2hire",
+    "view one specific completed question count in hack2hire",
+    "get completed question count in hack2hire",
+    "count completed questions in a scope in hack2hire"
+  ],
+  "description": "Get how many questions the authenticated user has marked as COMPLETED, scoped to a single dimension. Provide exactly one of `company` (uppercase company key), `type` (ALGORITHM, SD, ML_SD, BLOG), or `selectedCollectionKey` (e.g. \"hack2hire-50-picks\"). Useful for showing study progress against a goal.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "company": {
+        "description": "Company key in uppercase (e.g. \"PINTEREST\", \"AMAZON\").",
+        "type": "string"
+      },
+      "type": {
+        "description": "Post type to count completed questions for.",
+        "type": "string",
+        "enum": [
+          "ALGORITHM",
+          "SD",
+          "ML_SD",
+          "BLOG"
+        ]
+      },
+      "selectedCollectionKey": {
+        "description": "Curated collection key (e.g. \"hack2hire-50-picks\").",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-completed-question-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "coinbase.get_asset_price",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "get an asset price in coinbase",
+    "look up an asset price in coinbase",
+    "fetch a single asset price in coinbase",
+    "view one specific asset price in coinbase",
+    "get asset price in coinbase",
+    "get current price for an asset in coinbase"
+  ],
+  "description": "Get the current price of a cryptocurrency asset by UUID. Returns the latest price, timestamp, and quote currency. Use get_asset_by_symbol or get_asset_by_slug first to find the UUID if needed.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uuid": {
+        "type": "string",
+        "description": "Asset UUID"
+      },
+      "quote_currency": {
+        "description": "Quote currency for price (default \"USD\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/get-asset-price.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

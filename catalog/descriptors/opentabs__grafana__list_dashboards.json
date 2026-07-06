@@ -1,0 +1,46 @@
+{
+  "slug": "grafana.list_dashboards",
+  "service": "grafana.com",
+  "intentSynonyms": [
+    "list dashboards in grafana",
+    "show me my dashboards in grafana",
+    "view my dashboards in grafana",
+    "see all my dashboards in grafana",
+    "list dashboards on grafana in grafana"
+  ],
+  "description": "List the Grafana dashboards in your organization. Optionally filter by folder or tag.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder": {
+        "description": "Folder ID or title to filter by",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Dashboard tag to filter by",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of dashboards to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/grafana/src/tools/list-dashboards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

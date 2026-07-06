@@ -1,0 +1,41 @@
+{
+  "slug": "ticketmaster.get_event",
+  "service": "www.ticketmaster.com",
+  "intentSynonyms": [
+    "get an event in ticketmaster",
+    "look up an event in ticketmaster",
+    "fetch a single event in ticketmaster",
+    "view one specific event in ticketmaster",
+    "get event in ticketmaster",
+    "look up a ticketmaster event in ticketmaster"
+  ],
+  "description": "Get the details, venue, lineup, and ticket price ranges of a single Ticketmaster event by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The event ID to fetch"
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ticketmaster/src/tools/get-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "newrelic.list_entity_tags",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "list entity tags in newrelic",
+    "show me my entity tags in newrelic",
+    "view my entity tags in newrelic",
+    "see all my entity tags in newrelic",
+    "list tags on an entity in newrelic"
+  ],
+  "description": "List all tags on a specific entity. Tags are key-value pairs used for filtering and organizing entities.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Entity GUID"
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/list-entity-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

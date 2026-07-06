@@ -1,4 +1,4 @@
-// Background service worker for FSB v0.9.50
+// Background service worker for FSB v0.9.90
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
@@ -9,10 +9,26 @@ importScripts('config/config.js');
 importScripts('config/init-config.js');
 importScripts('config/secure-config.js');
 importScripts('ai/cli-parser.js');
+importScripts('ai/lattice-provider-bridge.js');
+importScripts('ai/lattice-step-emitter.js');
+// Phase 9 FINT-13 -- activate FSB SurvivabilityAdapter (closes audit gap G2).
+// Mirrors Phase 6 flag-flip-in-background.js precedent (FSB_LATTICE_PROVIDER_BRIDGE_ENABLED
+// pre-Phase-7). Code-only activation; options-page exposure deferred per 09-CONTEXT.md
+// deferred ideas. Set BEFORE chrome.runtime.onInstalled at line 13142+ so the flag is
+// observable from the first runAgentLoop invocation.
+//
+// The adapter module MUST be loaded here too -- setting the flag alone is a
+// no-op unless globalThis.FsbLatticeRuntimeAdapter has been populated, which
+// happens as a side effect of importing lattice-runtime-adapter.js. Kept
+// alongside its sibling lattice-* imports so both live in one dependency
+// group at SW top.
+importScripts('ai/lattice-runtime-adapter.js');
+globalThis.FSB_LATTICE_RUNTIME_ADAPTER_ENABLED = true;
 importScripts('ai/ai-integration.js');
 importScripts('ai/tool-definitions.js');
 importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
+try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
 // globalThis.fsbAgentRegistryInstance via getAgentTabs(agentId). Loaded
@@ -24,6 +40,22 @@ try { importScripts('utils/agent-tab-resolver.js'); } catch (e) { console.error(
 // at this file's line ~2464 calls FsbAgentNavEmission._maybeEmitUserNavigation.
 try { importScripts('utils/agent-nav-emission.js'); } catch (e) { console.error('[FSB] Failed to load agent-nav-emission.js:', e.message); }
 try { importScripts('utils/mcp-task-store.js'); } catch (e) { console.error('[FSB] Failed to load mcp-task-store.js:', e.message); }
+// Phase 14 Plan 03 (v0.11.0): trigger survivability modules. trigger-store.js
+// is the chrome.storage.session envelope store; trigger-lifecycle.js is the
+// chrome.alarms lifecycle that calls FsbTriggerStore at load/runtime, so the
+// store MUST be imported BEFORE the lifecycle (D-07 glue point 0). Wrapped in
+// try/catch (mirroring mcp-task-store.js) so a load failure logs and the
+// typeof FsbTriggerLifecycle guards at every call site make the glue inert.
+// Phase 15 Plan 03 (v0.11.0): the fire-condition engine joins the load chain.
+// LOAD ORDER (load-bearing): the value-extractor module (pure, no deps) loads
+// BEFORE the trigger store so FsbValueExtractor is on the global; the trigger
+// manager loads AFTER the store (its cap resolves FsbTriggerStore) and BEFORE
+// the lifecycle (whose Phase-15 SEAM calls FsbTriggerManager.evaluate). Concrete
+// order below: value-extractor -> trigger-store -> trigger-manager -> lifecycle.
+try { importScripts('utils/value-extractor.js'); } catch (e) { console.error('[FSB] Failed to load value-extractor.js:', e.message); }
+try { importScripts('utils/trigger-store.js'); } catch (e) { console.error('[FSB] Failed to load trigger-store.js:', e.message); }
+try { importScripts('utils/trigger-manager.js'); } catch (e) { console.error('[FSB] Failed to load trigger-manager.js:', e.message); }
+try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('[FSB] Failed to load trigger-lifecycle.js:', e.message); }
 // Phase 245 (v0.9.60): action-verification.js exports buildChangeReport /
 // applyChangeReportSizeCap which the dispatcher calls from SW context after
 // harvesting mutations from the page. capturePageState / startMutationHarvest
@@ -71,12 +103,305 @@ armMcpBridge('service-worker-evaluated');
 
 // Dashboard relay WebSocket client (auto-connects to full-selfbrowsing.com)
 try { importScripts('lib/lz-string.min.js'); } catch (e) { console.error('[FSB] Failed to load lz-string.min.js:', e.message); }
+try { importScripts('ws/phantom-stream-protocol.js'); } catch (e) { console.error('[FSB] Failed to load phantom-stream-protocol.js:', e.message); }
 // Phase 211-03 diagnostic logging: load the ring buffer BEFORE redactForLog so
 // that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. Both load
 // BEFORE ws-client.js so the WebSocket layer can use the helpers.
 try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.error('[FSB] Failed to load diagnostics-ring-buffer.js:', e.message); }
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
+
+// Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
+// data spine. The three vendored libraries load FIRST so their classic-script
+// globals (lowercase `jmespath`, `MiniSearch`, `CfworkerJsonSchema`) exist
+// before the recipe-schema module's typeof-guarded accessors read them; the
+// recipe-schema module loads AFTER (it calls CfworkerJsonSchema.Validator only
+// at validateRecipe runtime). Concrete order: jmespath -> minisearch ->
+// cfworker-json-schema -> capability-recipe-schema. minisearch is vendored now
+// per CAP-05 but not wired until Phase 28 (search). cfworker-json-schema is the
+// eval-free IIFE-bundled JSON Schema validator (a top-level import/export is a
+// SyntaxError under importScripts in a classic service worker, so it MUST be
+// IIFE-bundled, not vendored raw). Each wrapped in try/catch mirroring the
+// lz-string precedent above; D-05 keeps these edits additive (manifest and
+// permissions unchanged; background.js is byte-frozen as an esbuild input).
+try { importScripts('lib/jmespath.min.js'); } catch (e) { console.error('[FSB] Failed to load jmespath.min.js:', e.message); }
+try { importScripts('lib/minisearch.min.js'); } catch (e) { console.error('[FSB] Failed to load minisearch.min.js:', e.message); }
+try { importScripts('lib/cfworker-json-schema.min.js'); } catch (e) { console.error('[FSB] Failed to load cfworker-json-schema.min.js:', e.message); }
+try { importScripts('utils/capability-recipe-schema.js'); } catch (e) { console.error('[FSB] Failed to load capability-recipe-schema.js:', e.message); }
+
+// Phase 26 Plan 02 (v0.9.99 CAP-02/CAP-03): the bundled interpreter family.
+// Loaded AFTER the Plan 01 lib + schema block (the libs and the recipe-schema
+// module are already on the global). Concrete order: capability-auth-strategies
+// (the frozen enum->handler registry) BEFORE capability-interpreter (which reads
+// FsbCapabilityAuthStrategies.bindAuthStrategy and FsbCapabilityRecipeSchema.
+// validateRecipe at interpretRecipe runtime). The interpreter validates + binds
+// and emits a bound request spec, stopping before the network (D-11; the
+// authenticated request is Phase 27). Additive only (D-05; background.js is
+// byte-frozen as an esbuild input).
+try { importScripts('utils/capability-auth-strategies.js'); } catch (e) { console.error('[FSB] Failed to load capability-auth-strategies.js:', e.message); }
+try { importScripts('utils/capability-interpreter.js'); } catch (e) { console.error('[FSB] Failed to load capability-interpreter.js:', e.message); }
+
+// Phase 27 Plan 02 (v0.9.99 FETCH-01..05): the MAIN-world authenticated fetch
+// spine. Loaded LAST of the capability family -- AFTER capability-interpreter.js
+// (so FsbCapabilityInterpreter.getFSBJmespath exists for executeBoundSpec's
+// service-worker-side extract) and AFTER jmespath.min.js. mcp-task-store.js loads
+// far earlier (~line 34), so globalThis.FsbMcpTaskStore is already present for the
+// resume-sidecar write. Additive only (D-05; background.js is byte-frozen as an
+// esbuild input; no manifest/permission change).
+try { importScripts('utils/capability-fetch.js'); } catch (e) { console.error('[FSB] Failed to load capability-fetch.js:', e.message); }
+
+// Phase 28 Plan 01 (v0.9.99 SURF-04/SURF-01/D-16): the capability-search index +
+// its build-time catalog. Loaded LAST of the capability family. Order is
+// load-bearing: minisearch.min.js (the MiniSearch global, line ~120) AND
+// catalog/recipe-index.generated.js (the FsbRecipeIndex catalog global, generated
+// by scripts/package-extension.mjs) must BOTH precede capability-search.js, which
+// reads them. recipe-index.generated.js is absent in a dev tree until a packaged
+// build runs -> the try/catch tolerates its absence (the module degrades to an
+// empty catalog). Additive only (D-05; background.js is byte-frozen as an esbuild
+// input; no manifest/permission change).
+try { importScripts('catalog/recipe-index.generated.js'); } catch (e) { console.error('[FSB] Failed to load recipe-index.generated.js:', e.message); }
+try { importScripts('utils/capability-search.js'); } catch (e) { console.error('[FSB] Failed to load capability-search.js:', e.message); }
+// Build-or-restore the capability-search index at service-worker startup (D-05).
+// async + non-blocking; a typeof guard tolerates a missing module so a load
+// failure above never throws at boot.
+try {
+  if (typeof FsbCapabilitySearch !== 'undefined' && FsbCapabilitySearch && typeof FsbCapabilitySearch.buildOrRestore === 'function') {
+    FsbCapabilitySearch.buildOrRestore();
+  }
+} catch (e) { console.error('[FSB] capability-search buildOrRestore failed at startup:', e.message); }
+
+// Phase 29 Plan 02 (v0.9.99 CAT-01): the tiered-router engine -- the catalog
+// (slug->tier registry) then the router (tier dispatch + typed fall-through),
+// loaded LAST of the capability family. Order is load-bearing: the catalog reads
+// FsbCapabilitySearch.getRecipeBySlug (the T1b recipe source, D-04) so it MUST
+// follow capability-search.js; the router reads FsbCapabilityCatalog so it MUST
+// follow the catalog. This is the engine both front doors share (INV-02; the MCP
+// dispatcher + autopilot reroutes are Plans 03/04). Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+// Phase 32 (HEAL-01/HEAL-02/HEAL-04, D-16): the eval-free recipe-rot classifier the
+// router calls after executeBoundSpec (broken -> RECIPE_DOM_FALLBACK_PENDING). Pure
+// (no chrome.*, no network); reaches the jmespath engine via the interpreter loaded
+// above. MUST precede capability-router.js so FsbCapabilityRotDetector is published
+// before the router's post-fetch classify hook runs.
+try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
+try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
+
+// Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
+// are reviewed CODE (catalog/handlers/*.js), copied under extension/catalog/handlers/
+// by scripts/package-extension.mjs; in a dev tree the path resolves directly. They
+// MUST load AFTER capability-catalog.js -- each handler self-registers its slugs into
+// FsbCapabilityCatalog at load, and the explicit seedHeadHandlers() pass below
+// re-asserts the head from the catalog's authoritative manifest (defense-in-depth).
+// Each line is independently try/catch'd so an absent handler degrades to that slug
+// routing to RECIPE_NOT_FOUND (never a load crash). github.notifications stays a T1b
+// recipe; these add the github.issues.* / slack.* / notion.* T1a head.
+try { importScripts('catalog/handlers/github.js'); } catch (e) { console.error('[FSB] Failed to load handlers/github.js:', e.message); }
+try { importScripts('catalog/handlers/slack.js'); } catch (e) { console.error('[FSB] Failed to load handlers/slack.js:', e.message); }
+try { importScripts('catalog/handlers/notion.js'); } catch (e) { console.error('[FSB] Failed to load handlers/notion.js:', e.message); }
+// Phase 40 (DEPTH-01): the GitLab READ head (gitlab.com/api/v4). Independent
+// try/catch so an absent handler degrades to RECIPE_NOT_FOUND, never a load crash.
+try { importScripts('catalog/handlers/gitlab.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gitlab.js:', e.message); }
+try { importScripts('catalog/handlers/netlify.js'); } catch (e) { console.error('[FSB] Failed to load handlers/netlify.js:', e.message); }
+try { importScripts('catalog/handlers/bitbucket.js'); } catch (e) { console.error('[FSB] Failed to load handlers/bitbucket.js:', e.message); }
+try { importScripts('catalog/handlers/jira.js'); } catch (e) { console.error('[FSB] Failed to load handlers/jira.js:', e.message); }
+try { importScripts('catalog/handlers/confluence.js'); } catch (e) { console.error('[FSB] Failed to load handlers/confluence.js:', e.message); }
+try { importScripts('catalog/handlers/circleci.js'); } catch (e) { console.error('[FSB] Failed to load handlers/circleci.js:', e.message); }
+try { importScripts('catalog/handlers/vercel.js'); } catch (e) { console.error('[FSB] Failed to load handlers/vercel.js:', e.message); }
+try { importScripts('catalog/handlers/retool.js'); } catch (e) { console.error('[FSB] Failed to load handlers/retool.js:', e.message); }
+try { importScripts('catalog/handlers/asana.js'); } catch (e) { console.error('[FSB] Failed to load handlers/asana.js:', e.message); }
+try { importScripts('catalog/handlers/shortcut.js'); } catch (e) { console.error('[FSB] Failed to load handlers/shortcut.js:', e.message); }
+try { importScripts('catalog/handlers/leetcode.js'); } catch (e) { console.error('[FSB] Failed to load handlers/leetcode.js:', e.message); }
+try { importScripts('catalog/handlers/wikipedia.js'); } catch (e) { console.error('[FSB] Failed to load handlers/wikipedia.js:', e.message); }
+try { importScripts('catalog/handlers/hackernews.js'); } catch (e) { console.error('[FSB] Failed to load handlers/hackernews.js:', e.message); }
+try { importScripts('catalog/handlers/reddit.js'); } catch (e) { console.error('[FSB] Failed to load handlers/reddit.js:', e.message); }
+try { importScripts('catalog/handlers/npm.js'); } catch (e) { console.error('[FSB] Failed to load handlers/npm.js:', e.message); }
+try { importScripts('catalog/handlers/yelp.js'); } catch (e) { console.error('[FSB] Failed to load handlers/yelp.js:', e.message); }
+try { importScripts('catalog/handlers/tripadvisor.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tripadvisor.js:', e.message); }
+try { importScripts('catalog/handlers/zillow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/zillow.js:', e.message); }
+try { importScripts('catalog/handlers/redfin.js'); } catch (e) { console.error('[FSB] Failed to load handlers/redfin.js:', e.message); }
+try { importScripts('catalog/handlers/bsky.js'); } catch (e) { console.error('[FSB] Failed to load handlers/bsky.js:', e.message); }
+try { importScripts('catalog/handlers/mastodon.js'); } catch (e) { console.error('[FSB] Failed to load handlers/mastodon.js:', e.message); }
+try { importScripts('catalog/handlers/meticulous.js'); } catch (e) { console.error('[FSB] Failed to load handlers/meticulous.js:', e.message); }
+try { importScripts('catalog/handlers/stripe.js'); } catch (e) { console.error('[FSB] Failed to load handlers/stripe.js:', e.message); }
+try { importScripts('catalog/handlers/coinbase.js'); } catch (e) { console.error('[FSB] Failed to load handlers/coinbase.js:', e.message); }
+try { importScripts('catalog/handlers/carta.js'); } catch (e) { console.error('[FSB] Failed to load handlers/carta.js:', e.message); }
+try { importScripts('catalog/handlers/x.js'); } catch (e) { console.error('[FSB] Failed to load handlers/x.js:', e.message); }
+try { importScripts('catalog/handlers/instagram.js'); } catch (e) { console.error('[FSB] Failed to load handlers/instagram.js:', e.message); }
+try { importScripts('catalog/handlers/tiktok.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tiktok.js:', e.message); }
+try { importScripts('catalog/handlers/facebook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/facebook.js:', e.message); }
+try { importScripts('catalog/handlers/threads.js'); } catch (e) { console.error('[FSB] Failed to load handlers/threads.js:', e.message); }
+try { importScripts('catalog/handlers/stackoverflow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/stackoverflow.js:', e.message); }
+try { importScripts('catalog/handlers/cloudflare.js'); } catch (e) { console.error('[FSB] Failed to load handlers/cloudflare.js:', e.message); }
+try { importScripts('catalog/handlers/terraform.js'); } catch (e) { console.error('[FSB] Failed to load handlers/terraform.js:', e.message); }
+try { importScripts('catalog/handlers/twilio.js'); } catch (e) { console.error('[FSB] Failed to load handlers/twilio.js:', e.message); }
+try { importScripts('catalog/handlers/tumblr.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tumblr.js:', e.message); }
+try { importScripts('catalog/handlers/priceline.js'); } catch (e) { console.error('[FSB] Failed to load handlers/priceline.js:', e.message); }
+try { importScripts('catalog/handlers/airbnb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/airbnb.js:', e.message); }
+try { importScripts('catalog/handlers/airtable.js'); } catch (e) { console.error('[FSB] Failed to load handlers/airtable.js:', e.message); }
+try { importScripts('catalog/handlers/aws.js'); } catch (e) { console.error('[FSB] Failed to load handlers/aws.js:', e.message); }
+try { importScripts('catalog/handlers/gcloud.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gcloud.js:', e.message); }
+try { importScripts('catalog/handlers/expedia.js'); } catch (e) { console.error('[FSB] Failed to load handlers/expedia.js:', e.message); }
+try { importScripts('catalog/handlers/booking.js'); } catch (e) { console.error('[FSB] Failed to load handlers/booking.js:', e.message); }
+try { importScripts('catalog/handlers/stubhub.js'); } catch (e) { console.error('[FSB] Failed to load handlers/stubhub.js:', e.message); }
+try { importScripts('catalog/handlers/kayak.js'); } catch (e) { console.error('[FSB] Failed to load handlers/kayak.js:', e.message); }
+try { importScripts('catalog/handlers/opentable.js'); } catch (e) { console.error('[FSB] Failed to load handlers/opentable.js:', e.message); }
+try { importScripts('catalog/handlers/mongodb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/mongodb.js:', e.message); }
+try { importScripts('catalog/handlers/snowflake.js'); } catch (e) { console.error('[FSB] Failed to load handlers/snowflake.js:', e.message); }
+try { importScripts('catalog/handlers/cockroachdb.js'); } catch (e) { console.error('[FSB] Failed to load handlers/cockroachdb.js:', e.message); }
+try { importScripts('catalog/handlers/clickhouse.js'); } catch (e) { console.error('[FSB] Failed to load handlers/clickhouse.js:', e.message); }
+try { importScripts('catalog/handlers/temporal.js'); } catch (e) { console.error('[FSB] Failed to load handlers/temporal.js:', e.message); }
+try { importScripts('catalog/handlers/msword.js'); } catch (e) { console.error('[FSB] Failed to load handlers/msword.js:', e.message); }
+try { importScripts('catalog/handlers/excel.js'); } catch (e) { console.error('[FSB] Failed to load handlers/excel.js:', e.message); }
+try { importScripts('catalog/handlers/pinterest.js'); } catch (e) { console.error('[FSB] Failed to load handlers/pinterest.js:', e.message); }
+try { importScripts('catalog/handlers/starbucks.js'); } catch (e) { console.error('[FSB] Failed to load handlers/starbucks.js:', e.message); }
+try { importScripts('catalog/handlers/medium.js'); } catch (e) { console.error('[FSB] Failed to load handlers/medium.js:', e.message); }
+try { importScripts('catalog/handlers/dominos.js'); } catch (e) { console.error('[FSB] Failed to load handlers/dominos.js:', e.message); }
+try { importScripts('catalog/handlers/whatsapp.js'); } catch (e) { console.error('[FSB] Failed to load handlers/whatsapp.js:', e.message); }
+try { importScripts('catalog/handlers/telegram.js'); } catch (e) { console.error('[FSB] Failed to load handlers/telegram.js:', e.message); }
+try { importScripts('catalog/handlers/amplitude.js'); } catch (e) { console.error('[FSB] Failed to load handlers/amplitude.js:', e.message); }
+try { importScripts('catalog/handlers/newrelic.js'); } catch (e) { console.error('[FSB] Failed to load handlers/newrelic.js:', e.message); }
+try { importScripts('catalog/handlers/grafana.js'); } catch (e) { console.error('[FSB] Failed to load handlers/grafana.js:', e.message); }
+try { importScripts('catalog/handlers/datadog.js'); } catch (e) { console.error('[FSB] Failed to load handlers/datadog.js:', e.message); }
+try { importScripts('catalog/handlers/posthog.js'); } catch (e) { console.error('[FSB] Failed to load handlers/posthog.js:', e.message); }
+try { importScripts('catalog/handlers/chipotle.js'); } catch (e) { console.error('[FSB] Failed to load handlers/chipotle.js:', e.message); }
+try { importScripts('catalog/handlers/pandaexpress.js'); } catch (e) { console.error('[FSB] Failed to load handlers/pandaexpress.js:', e.message); }
+try { importScripts('catalog/handlers/grubhub.js'); } catch (e) { console.error('[FSB] Failed to load handlers/grubhub.js:', e.message); }
+try { importScripts('catalog/handlers/costco.js'); } catch (e) { console.error('[FSB] Failed to load handlers/costco.js:', e.message); }
+try { importScripts('catalog/handlers/instacart.js'); } catch (e) { console.error('[FSB] Failed to load handlers/instacart.js:', e.message); }
+try { importScripts('catalog/handlers/ubereats.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ubereats.js:', e.message); }
+try { importScripts('catalog/handlers/uber.js'); } catch (e) { console.error('[FSB] Failed to load handlers/uber.js:', e.message); }
+try { importScripts('catalog/handlers/doordash.js'); } catch (e) { console.error('[FSB] Failed to load handlers/doordash.js:', e.message); }
+try { importScripts('catalog/handlers/lyft.js'); } catch (e) { console.error('[FSB] Failed to load handlers/lyft.js:', e.message); }
+try { importScripts('catalog/handlers/lucid.js'); } catch (e) { console.error('[FSB] Failed to load handlers/lucid.js:', e.message); }
+try { importScripts('catalog/handlers/linear.js'); } catch (e) { console.error('[FSB] Failed to load handlers/linear.js:', e.message); }
+try { importScripts('catalog/handlers/linkedin.js'); } catch (e) { console.error('[FSB] Failed to load handlers/linkedin.js:', e.message); }
+try { importScripts('catalog/handlers/clickup.js'); } catch (e) { console.error('[FSB] Failed to load handlers/clickup.js:', e.message); }
+try { importScripts('catalog/handlers/discord.js'); } catch (e) { console.error('[FSB] Failed to load handlers/discord.js:', e.message); }
+try { importScripts('catalog/handlers/target.js'); } catch (e) { console.error('[FSB] Failed to load handlers/target.js:', e.message); }
+try { importScripts('catalog/handlers/walmart.js'); } catch (e) { console.error('[FSB] Failed to load handlers/walmart.js:', e.message); }
+try { importScripts('catalog/handlers/amazon.js'); } catch (e) { console.error('[FSB] Failed to load handlers/amazon.js:', e.message); }
+try { importScripts('catalog/handlers/ebay.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ebay.js:', e.message); }
+try { importScripts('catalog/handlers/homedepot.js'); } catch (e) { console.error('[FSB] Failed to load handlers/homedepot.js:', e.message); }
+try { importScripts('catalog/handlers/etsy.js'); } catch (e) { console.error('[FSB] Failed to load handlers/etsy.js:', e.message); }
+try { importScripts('catalog/handlers/hack2hire.js'); } catch (e) { console.error('[FSB] Failed to load handlers/hack2hire.js:', e.message); }
+try { importScripts('catalog/handlers/chatgpt.js'); } catch (e) { console.error('[FSB] Failed to load handlers/chatgpt.js:', e.message); }
+try { importScripts('catalog/handlers/claude.js'); } catch (e) { console.error('[FSB] Failed to load handlers/claude.js:', e.message); }
+try { importScripts('catalog/handlers/minimax.js'); } catch (e) { console.error('[FSB] Failed to load handlers/minimax.js:', e.message); }
+try { importScripts('catalog/handlers/gemini.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gemini.js:', e.message); }
+try { importScripts('catalog/handlers/ganalytics.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ganalytics.js:', e.message); }
+try { importScripts('catalog/handlers/figma.js'); } catch (e) { console.error('[FSB] Failed to load handlers/figma.js:', e.message); }
+try { importScripts('catalog/handlers/gdrive.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdrive.js:', e.message); }
+try { importScripts('catalog/handlers/gdocs.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdocs.js:', e.message); }
+try { importScripts('catalog/handlers/powerpoint.js'); } catch (e) { console.error('[FSB] Failed to load handlers/powerpoint.js:', e.message); }
+try { importScripts('catalog/handlers/outlook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/outlook.js:', e.message); }
+try { importScripts('catalog/handlers/teams.js'); } catch (e) { console.error('[FSB] Failed to load handlers/teams.js:', e.message); }
+try { importScripts('catalog/handlers/onenote.js'); } catch (e) { console.error('[FSB] Failed to load handlers/onenote.js:', e.message); }
+try { importScripts('catalog/handlers/ynab.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ynab.js:', e.message); }
+try { importScripts('catalog/handlers/todoist.js'); } catch (e) { console.error('[FSB] Failed to load handlers/todoist.js:', e.message); }
+try { importScripts('catalog/handlers/webflow.js'); } catch (e) { console.error('[FSB] Failed to load handlers/webflow.js:', e.message); }
+try { importScripts('catalog/handlers/calendly.js'); } catch (e) { console.error('[FSB] Failed to load handlers/calendly.js:', e.message); }
+try { importScripts('catalog/handlers/dockerhub.js'); } catch (e) { console.error('[FSB] Failed to load handlers/dockerhub.js:', e.message); }
+try { importScripts('catalog/handlers/tinder.js'); } catch (e) { console.error('[FSB] Failed to load handlers/tinder.js:', e.message); }
+try { importScripts('catalog/handlers/sentry.js'); } catch (e) { console.error('[FSB] Failed to load handlers/sentry.js:', e.message); }
+try { importScripts('catalog/handlers/supabase.js'); } catch (e) { console.error('[FSB] Failed to load handlers/supabase.js:', e.message); }
+try { importScripts('catalog/handlers/azure.js'); } catch (e) { console.error('[FSB] Failed to load handlers/azure.js:', e.message); }
+try { importScripts('catalog/handlers/robinhood.js'); } catch (e) { console.error('[FSB] Failed to load handlers/robinhood.js:', e.message); }
+try { importScripts('catalog/handlers/fidelity.js'); } catch (e) { console.error('[FSB] Failed to load handlers/fidelity.js:', e.message); }
+try { importScripts('catalog/handlers/shopify.js'); } catch (e) { console.error('[FSB] Failed to load handlers/shopify.js:', e.message); }
+try { importScripts('catalog/handlers/gcal.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gcal.js:', e.message); }
+try { importScripts('catalog/handlers/gmaps.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gmaps.js:', e.message); }
+try { importScripts('catalog/handlers/notebooklm.js'); } catch (e) { console.error('[FSB] Failed to load handlers/notebooklm.js:', e.message); }
+try { importScripts('catalog/handlers/craigslist.js'); } catch (e) { console.error('[FSB] Failed to load handlers/craigslist.js:', e.message); }
+try { importScripts('catalog/handlers/ticketmaster.js'); } catch (e) { console.error('[FSB] Failed to load handlers/ticketmaster.js:', e.message); }
+try { importScripts('catalog/handlers/eventbrite.js'); } catch (e) { console.error('[FSB] Failed to load handlers/eventbrite.js:', e.message); }
+try { importScripts('catalog/handlers/zendesk.js'); } catch (e) { console.error('[FSB] Failed to load handlers/zendesk.js:', e.message); }
+try { importScripts('catalog/handlers/spotify.js'); } catch (e) { console.error('[FSB] Failed to load handlers/spotify.js:', e.message); }
+try { importScripts('catalog/handlers/twitch.js'); } catch (e) { console.error('[FSB] Failed to load handlers/twitch.js:', e.message); }
+try { importScripts('catalog/handlers/steam.js'); } catch (e) { console.error('[FSB] Failed to load handlers/steam.js:', e.message); }
+try { importScripts('catalog/handlers/fiverr.js'); } catch (e) { console.error('[FSB] Failed to load handlers/fiverr.js:', e.message); }
+try { importScripts('catalog/handlers/glama.js'); } catch (e) { console.error('[FSB] Failed to load handlers/glama.js:', e.message); }
+try {
+  if (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+      && typeof FsbCapabilityCatalog.seedHeadHandlers === 'function') {
+    FsbCapabilityCatalog.seedHeadHandlers();
+  }
+} catch (e) { console.error('[FSB] capability-catalog seedHeadHandlers failed at startup:', e.message); }
+
+// Phase 30 Plan 01 (v0.9.99 GOV-02/GOV-05/SIGN-01/GOV-08): the consent +
+// signature + audit + denylist modules, PRE-ARMED ahead of their creation (Plans
+// 02/03 write them) -- the Phase-27/28/29 "register ahead of creation" precedent.
+// Load order is dependency-first: consent-policy-store + audit-log (read at the
+// invoke gate) BEFORE capability-signature (read inside interpretRecipe) BEFORE
+// service-denylist (read by the gate just above the interpret path). Each line is
+// independently try/catch'd: a not-yet-existent module logs and is skipped, so the
+// service worker still boots until Plans 02/03 land. Additive only (D-05;
+// background.js is byte-frozen as an esbuild input; no manifest/permission change).
+try { importScripts('utils/consent-policy-store.js'); } catch (e) { console.error('[FSB] Failed to load consent-policy-store.js:', e.message); }
+try { importScripts('utils/audit-log.js'); } catch (e) { console.error('[FSB] Failed to load audit-log.js:', e.message); }
+try { importScripts('utils/capability-signature.js'); } catch (e) { console.error('[FSB] Failed to load capability-signature.js:', e.message); }
+try { importScripts('utils/service-denylist.js'); } catch (e) { console.error('[FSB] Failed to load service-denylist.js:', e.message); }
+try { importScripts('utils/upload-path-denylist.js'); } catch (e) { console.error('[FSB] Failed to load upload-path-denylist.js:', e.message); }
+// Warm the denylist + sensitive seed at service-worker startup (D-15). The
+// consent/capture gates still await the module's shared load() promise before
+// evaluating, so this async warmup is not the load-bearing security check.
+try {
+  if (typeof FsbServiceDenylist !== 'undefined' && FsbServiceDenylist && typeof FsbServiceDenylist.load === 'function') {
+    FsbServiceDenylist.load();
+  }
+} catch (e) { console.error('[FSB] service-denylist load failed at startup:', e.message); }
+
+// Phase 31 (v0.10.0 -- DISC-01/DISC-02/LEARN-01; D-01/D-02/D-10): the network-
+// capture discovery stack, loaded LAST of the capability family. Order is
+// dependency-first: the redactor (the capture event handler's shape-only reducer)
+// BEFORE network-capture.js (which reads FsbNetworkCaptureRedactor), then the
+// synthesizer + the learned-recipe store (read by the discovery orchestrator and
+// the catalog T2 path), then discovery-session.js LAST (it orchestrates capture ->
+// synthesize -> replay -> promote and reads ALL of the above PLUS the already-loaded
+// FsbCapabilityInterpreter / FsbCapabilityFetch / FsbCapabilitySearch). Each line is
+// independently try/catch'd so an absent module degrades to that path being a no-op
+// (the discovery trigger surfaces RECIPE_CAPTURE_UNAVAILABLE) rather than a boot
+// crash. Additive only: NO manifest change -- the 'debugger' permission is already
+// granted (DISC-02, D-02); no tool-definitions / TOOL_REGISTRY edit (INV-01).
+try { importScripts('utils/network-capture-redactor.js'); } catch (e) { console.error('[FSB] Failed to load network-capture-redactor.js:', e.message); }
+try { importScripts('utils/network-capture.js'); } catch (e) { console.error('[FSB] Failed to load network-capture.js:', e.message); }
+try { importScripts('utils/recipe-synthesizer.js'); } catch (e) { console.error('[FSB] Failed to load recipe-synthesizer.js:', e.message); }
+try { importScripts('utils/learned-recipe-store.js'); } catch (e) { console.error('[FSB] Failed to load learned-recipe-store.js:', e.message); }
+try { importScripts('utils/discovery-session.js'); } catch (e) { console.error('[FSB] Failed to load discovery-session.js:', e.message); }
+// SCALE-02 (Phase 43): the per-origin re-learn coalescing/back-off scheduler. Loaded
+// AFTER the discovery stack it debounces; additive (no manifest/permission change). It
+// is NOT a capability-*.js module (it only schedules a consent-gated fn call, never binds
+// or executes a recipe) so it stays off the recipe-path allowlist by construction (Wall-1).
+try { importScripts('utils/relearn-scheduler.js'); } catch (e) { console.error('[FSB] Failed to load relearn-scheduler.js:', e.message); }
+
+// Hydrate the learned-recipe sync mirror at service-worker startup (Plan 06) so a
+// recipe promoted in a PRIOR SW lifetime surfaces synchronously via the catalog's
+// resolve() -> getLearnedSync path (LEARN-04 outranking fires at runtime). async +
+// non-blocking; a typeof guard tolerates a missing module so a load failure above
+// never throws at boot (the buildOrRestore / denylist-load precedent).
+try {
+  if (typeof FsbLearnedRecipeStore !== 'undefined' && FsbLearnedRecipeStore
+      && typeof FsbLearnedRecipeStore.hydrateSyncCache === 'function') {
+    FsbLearnedRecipeStore.hydrateSyncCache();
+  }
+} catch (e) { console.error('[FSB] learned-recipe-store hydrateSyncCache failed at startup:', e.message); }
+
+// Register the Network-domain CDP event listener ONCE on the existing
+// chrome.debugger surface (D-02). FsbNetworkCapture._onCdpEvent is method-dispatched
+// and a no-op whenever there is no active capture session (it guards `if (!_session)
+// return`), so registering it here -- ahead of any session -- is safe and never
+// disrupts the Input-domain emulation: a non-Network method (Input.*, Page.*) is
+// ignored. This is the FIRST onEvent consumer in the extension (the existing
+// debugger usage is all sendCommand/attach/detach), so it adds cleanly. NO manifest
+// change (the 'debugger' permission is already present, DISC-02).
+try {
+  if (typeof chrome !== 'undefined' && chrome.debugger && chrome.debugger.onEvent
+      && typeof chrome.debugger.onEvent.addListener === 'function'
+      && typeof FsbNetworkCapture !== 'undefined' && FsbNetworkCapture
+      && typeof FsbNetworkCapture._onCdpEvent === 'function') {
+    chrome.debugger.onEvent.addListener(FsbNetworkCapture._onCdpEvent);
+  }
+} catch (e) { console.error('[FSB] network-capture onEvent registration failed at startup:', e.message); }
 
 // Site-specific AI guidance modules
 importScripts('site-guides/index.js');
@@ -253,13 +578,20 @@ const CONTENT_SCRIPT_FILES = [
   'content/selectors.js',
   'content/badge-combine.js',
   'content/visual-feedback.js',
+  'content/phantom-stream-capture.js',
+  'content/dom-stream.js',
+  'content/trigger-observe.js',
   'content/accessibility.js',
   'content/actions.js',
   'content/dom-analysis.js',
-  'content/dom-stream.js',
   'content/messaging.js',
   'content/lifecycle.js'
 ];
+
+const FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX = 'fsbTriggerObserveWatchdog:';
+const FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES = 1;
+const FSB_TRIGGER_OBSERVE_STALE_MS = FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES * 60 * 1000 * 2;
+const FSB_TRIGGER_REPORTED_TEXT_MAX = 10000;
 
 async function loadBundledSiteMap(domain) {
   if (bundledSiteMapCache.has(domain)) {
@@ -845,6 +1177,55 @@ function findActiveAutomationSessionForTab(tabId) {
   return null;
 }
 
+// QT-uof-6 (A-FIX) -- Chrome 141+ sidePanel.close auto-collapse with
+// per-window has-any-working-tab gate. See .planning/debug/cluster1-routing.md
+// Cluster 2 leftover items + memory file project_chrome_sidepanel_no_close.md
+// (amended in this same commit with an EXCEPTION block for the Chrome 141+
+// close() API).
+//
+// Pre-Chrome-141: silently skip (feature-detect via typeof). The original
+// memory prohibition on setOptions({tabId, enabled:false}) STILL stands --
+// this listener uses chrome.sidePanel.close({windowId}), which is a
+// SEPARATE API added in Chrome 141+ that operates per-window and DOES
+// close the panel reliably even when the manifest declares
+// side_panel.default_path.
+//
+// Per-window gate: if ANY tab in the activated tab's window has an active
+// automation session (e.g., user switches from working Tab A to non-working
+// Tab B in the SAME window), DO NOT close -- Tab A's panel must stay
+// visible. Only close when NO tab in the window has an active session.
+chrome.tabs.onActivated.addListener(async function (activeInfo) {
+  try {
+    if (typeof chrome.sidePanel === 'undefined') return;
+    if (typeof chrome.sidePanel.close !== 'function') return; // pre-Chrome-141
+
+    var activatedTabId = activeInfo && activeInfo.tabId;
+    var activatedWindowId = activeInfo && activeInfo.windowId;
+    if (typeof activatedTabId !== 'number' || typeof activatedWindowId !== 'number') return;
+
+    // Per-window has-any-working-tab gate.
+    var tabsInWindow = await chrome.tabs.query({ windowId: activatedWindowId });
+    var anyWorking = false;
+    for (var i = 0; i < tabsInWindow.length; i++) {
+      var t = tabsInWindow[i];
+      if (t && typeof t.id === 'number' && findActiveAutomationSessionForTab(t.id)) {
+        anyWorking = true;
+        break;
+      }
+    }
+    if (anyWorking) return; // keep panel visible -- some tab in this window still working
+
+    // No working tab in this window -- close the panel.
+    try {
+      await chrome.sidePanel.close({ windowId: activatedWindowId });
+    } catch (closeErr) {
+      console.warn('[FSB] chrome.sidePanel.close failed (non-fatal)', closeErr && closeErr.message);
+    }
+  } catch (outerErr) {
+    console.warn('[FSB] chrome.tabs.onActivated A-FIX handler error', outerErr && outerErr.message);
+  }
+});
+
 async function updateMcpVisualSessionProgress(sessionToken, message) {
   const manager = getMcpVisualSessionManager();
   if (isMcpVisualSessionFinalizing(sessionToken)) {
@@ -1371,7 +1752,7 @@ function formatDuration(ms) {
  * @returns {{ progressPercent: number, estimatedTimeRemaining: string|null }}
  */
 function calculateProgress(session) {
-  const maxIter = session.maxIterations || 20;
+  const maxIter = session.maxIterations || 100;
   const current = session.iterationCount || 0;
   const progressPercent = Math.min(99, Math.round((current / maxIter) * 100));
 
@@ -1434,7 +1815,7 @@ function broadcastDashboardProgress(session) {
     elapsed: Date.now() - (session.startTime || Date.now()),
     action: session._lastActionSummary || session.lastAiReasoning || 'Working...',
     iteration: session.iterationCount || 0,
-    maxIterations: session.maxIterations || 20,
+    maxIterations: session.maxIterations || 100,
     taskRunId: session._dashboardTaskRunId || '',
     task: session.task || '',
     taskSource: 'live',
@@ -2101,6 +2482,81 @@ function fsbBroadcastAutomationLifecycle(message) {
 if (typeof globalThis !== 'undefined') {
   globalThis.fsbBroadcastAutomationLifecycle = fsbBroadcastAutomationLifecycle;
 }
+
+/**
+ * QT-wnz Codex-3 -- background-side authoritative terminal persist.
+ *
+ * Writes an assistant terminal message into chrome.storage.local key
+ * 'fsbConversationMessages' (the same envelope sidepanel reads via
+ * FSBSidepanelMessageLog) so the durable record exists BEFORE the
+ * broadcast goes out. Sidepanel's automationComplete handler still
+ * persists as an idempotent backup (C4 adds dedupe to make this safe).
+ *
+ * Idempotency: scans the per-conv log for any existing message with
+ * sessionId === sessionId AND terminal === true. If found, no-op.
+ *
+ * Best-effort: chrome.storage failures swallowed silently. The broadcast
+ * still goes out via the caller (finalizeSession -> notifySidepanel).
+ *
+ * @param {string} convId
+ * @param {string} sessionId
+ * @param {string} content
+ * @returns {Promise<void>}
+ */
+async function fsbPersistTerminalMessageToConversation(convId, sessionId, content) {
+  if (typeof convId !== 'string' || convId.length === 0) return;
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  try {
+    var STORAGE_KEY = 'fsbConversationMessages';
+    var bag = await chrome.storage.local.get(STORAGE_KEY);
+    var envelope = bag[STORAGE_KEY];
+    if (!envelope || envelope.v !== 1 || !envelope.byConv || !Array.isArray(envelope.lru)) {
+      envelope = { v: 1, byConv: {}, lru: [] };
+    }
+    var log = envelope.byConv[convId];
+    var now = Date.now();
+    if (!log || !Array.isArray(log.messages)) {
+      log = { v: 1, messages: [], lastWriteAt: now, createdAt: now };
+      envelope.byConv[convId] = log;
+    }
+    // Idempotency: skip if terminal for this sessionId already present.
+    for (var i = 0; i < log.messages.length; i++) {
+      var m = log.messages[i];
+      if (m && m.sessionId === sessionId && m.terminal === true) {
+        return;
+      }
+    }
+    log.messages.push({
+      role: 'assistant',
+      content: content,
+      timestamp: now,
+      kind: 'text',
+      sessionId: sessionId,
+      terminal: true
+    });
+    log.lastWriteAt = now;
+    // LRU touch (head).
+    var idx = envelope.lru.indexOf(convId);
+    if (idx !== -1) envelope.lru.splice(idx, 1);
+    envelope.lru.unshift(convId);
+    // Cap = 50 (matches sidepanel-message-log.js DEFAULT_CAP).
+    while (envelope.lru.length > 50) {
+      var tailKey = envelope.lru.pop();
+      if (tailKey) delete envelope.byConv[tailKey];
+    }
+    var payload = {};
+    payload[STORAGE_KEY] = envelope;
+    await chrome.storage.local.set(payload);
+  } catch (_e) {
+    // Best-effort: do not block broadcast on storage failure.
+  }
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.fsbPersistTerminalMessageToConversation = fsbPersistTerminalMessageToConversation;
+}
+
 const mcpVisualSessionManager = (typeof MCPVisualSessionUtils !== 'undefined' && typeof MCPVisualSessionUtils.McpVisualSessionManager === 'function')
   ? new MCPVisualSessionUtils.McpVisualSessionManager()
   : null;
@@ -2305,6 +2761,8 @@ async function restoreSessionsFromStorage() {
               fsbBroadcastAutomationLifecycle({
                 action: 'automationComplete',
                 sessionId: persistedSession.sessionId,
+                // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId per .planning/debug/cluster1-routing.md
+                tabId: (persistedSession && typeof persistedSession.tabId === 'number') ? persistedSession.tabId : null,
                 conversationId: persistedSession.conversationId || null,
                 historySessionId: persistedSession.historySessionId || persistedSession.sessionId,
                 result: 'Session interrupted by service worker restart. Automation cannot resume.',
@@ -2367,6 +2825,33 @@ async function restoreSessionsFromStorage() {
       MCPVisualSessionLifecycleUtils.restoreVisualSessionLifecyclesFromStorage()
         .catch((err) => {
           console.warn('[FSB MCP] restoreVisualSessionLifecyclesFromStorage failed (non-blocking):', err && err.message);
+        });
+    }
+
+    // Phase 14 Plan 03 (v0.11.0) -- restore survivable trigger registry after
+    // MV3 SW eviction / cold boot. Reads the single fsbTriggerRegistry envelope
+    // from chrome.storage.session, re-arms non-elapsed armed snapshots with
+    // their original deadline_at, drops terminal/expired entries, and sweeps
+    // orphan fsbTrigger:* alarms (D-07.2 / D-08). Non-blocking .catch so a
+    // reconcile failure never aborts SW bootstrap.
+    // Requirements satisfied: SURV-03 (cold-boot reconcile + orphan sweep).
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && typeof FsbTriggerLifecycle.restoreTriggersFromStorage === 'function') {
+      FsbTriggerLifecycle.restoreTriggersFromStorage()
+        .catch((err) => {
+          console.warn('[FSB TRG] restoreTriggersFromStorage failed (non-blocking):', err && err.message);
+        });
+    }
+
+    // Hydrate the operator-configured trigger cap (fsbTriggerCap in
+    // chrome.storage.local) so armTrigger enforces the configured value, not
+    // the static default. Best-effort + non-blocking, mirroring the restore
+    // above; live changes are picked up by the storage.onChanged listener.
+    if (typeof FsbTriggerManager !== 'undefined'
+        && typeof FsbTriggerManager.loadCapFromStorage === 'function') {
+      FsbTriggerManager.loadCapFromStorage()
+        .catch((err) => {
+          console.warn('[FSB TRG] loadCapFromStorage failed (non-blocking):', err && err.message);
         });
     }
 
@@ -2558,6 +3043,19 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     transitionType: details.transitionType,
     url: details.url
   });
+
+  fsbTriggerRearmLiveObserversForTab(tabId, 'webNavigation.onCommitted')
+    .catch((err) => {
+      console.warn('[FSB TRG] live-observe webNavigation re-arm failed (non-blocking):', err && err.message);
+    });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo || changeInfo.status !== 'complete') return;
+  fsbTriggerRearmLiveObserversForTab(tabId, 'tabs.onUpdated.complete')
+    .catch((err) => {
+      console.warn('[FSB TRG] live-observe tabs.onUpdated re-arm failed (non-blocking):', err && err.message);
+    });
 });
 
 // PERF: Clean up all state when a tab is closed to prevent memory leaks
@@ -2574,6 +3072,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
         fsbBroadcastAutomationLifecycle({
           action: 'automationComplete',
           sessionId: sessionId,
+          // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId; the for-loop key is sessionId
+          // but the value is `session` with .tabId. Falls back to the loop variable tabId
+          // (the tab being torn down) for parity with the onTabRemoved closure scope.
+          tabId: (session && typeof session.tabId === 'number') ? session.tabId : (typeof tabId === 'number' ? tabId : null),
           conversationId: session.conversationId || null,
           historySessionId: session.historySessionId || sessionId,
           result: 'Tab was closed during automation.',
@@ -3214,6 +3716,1833 @@ async function ensureContentScriptInjected(tabId, maxRetries = 3) {
   return false;
 }
 
+function fsbTriggerObserveWatchdogName(triggerId) {
+  return FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX + triggerId;
+}
+
+function fsbTriggerSnapshotId(snap) {
+  return snap && typeof snap.trigger_id === 'string' && snap.trigger_id ? snap.trigger_id : null;
+}
+
+function fsbTriggerIsLiveObserveSnapshot(snap) {
+  if (!snap || snap.status !== 'armed') return false;
+  return snap.watch === 'live-observe' || snap.watch === 'live_observe' || snap.mode === 'live-observe';
+}
+
+function fsbTriggerIsRefreshPollSnapshot(snap) {
+  if (!snap || snap.status !== 'armed') return false;
+  return snap.watch === 'refresh-poll' || snap.watch === 'refresh_poll' || snap.mode === 'refresh-poll';
+}
+
+const fsbTriggerRefreshPollTabLocks = new Map();
+const fsbTriggerRefreshPollPendingTabRescans = new Map();
+
+function fsbTriggerValidateRefreshPollOwnership(snap) {
+  const tabId = Number(snap && snap.target_tab_id);
+  const rawAgentId = snap && snap.agent_id;
+  const agentId = (typeof rawAgentId === 'string') ? rawAgentId.trim() : '';
+  const base = {
+    requestedTabId: Number.isFinite(tabId) ? tabId : snap && snap.target_tab_id,
+    requestingAgentId: agentId || rawAgentId || null
+  };
+
+  if (!Number.isFinite(tabId)) {
+    return Object.assign({ ok: false, code: 'INVALID_TAB_ID' }, base);
+  }
+  if (!agentId) {
+    return Object.assign({ ok: false, code: 'AGENT_NOT_REGISTERED' }, base, {
+      requestedTabId: tabId,
+      requestingAgentId: agentId || null
+    });
+  }
+
+  const registry = globalThis && globalThis.fsbAgentRegistryInstance;
+  if (!registry) {
+    return Object.assign({ ok: false, code: 'AGENT_REGISTRY_UNAVAILABLE' }, base, {
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    });
+  }
+
+  if (typeof registry.hasAgent === 'function' && registry.hasAgent(agentId) === false) {
+    return {
+      ok: false,
+      code: 'AGENT_NOT_REGISTERED',
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  const owner = (typeof registry.getOwner === 'function') ? registry.getOwner(tabId) : null;
+  if (owner && owner !== agentId) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  const snapshotOwnershipToken = snap && typeof snap.ownership_token === 'string'
+    ? snap.ownership_token
+    : (snap && typeof snap.ownershipToken === 'string' ? snap.ownershipToken : undefined);
+  const tabMetadata = (typeof registry.getTabMetadata === 'function') ? registry.getTabMetadata(tabId) : null;
+  const registryOwnershipToken = tabMetadata && typeof tabMetadata.ownershipToken === 'string'
+    ? tabMetadata.ownershipToken
+    : null;
+  if (registryOwnershipToken && !snapshotOwnershipToken) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner || null,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  if (typeof registry.isOwnedBy === 'function' && registry.isOwnedBy(tabId, agentId, snapshotOwnershipToken) === false) {
+    return {
+      ok: false,
+      code: 'TAB_NOT_OWNED',
+      ownerAgentId: owner || null,
+      requestedTabId: tabId,
+      requestingAgentId: agentId
+    };
+  }
+
+  return { ok: true, tabId, agentId, registry };
+}
+
+function fsbTriggerExtractKind(snap) {
+  const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
+  return snap.extract || condition.extract || 'text';
+}
+
+function fsbTriggerAttrName(snap) {
+  const condition = snap && snap.condition && typeof snap.condition === 'object' ? snap.condition : {};
+  return snap.attrName || snap.attribute || condition.attrName || condition.attribute || null;
+}
+
+function fsbTriggerObserveMessage(snap) {
+  return {
+    action: 'triggerObserveStart',
+    trigger_id: fsbTriggerSnapshotId(snap),
+    selector: snap.selector,
+    extract: fsbTriggerExtractKind(snap),
+    attrName: fsbTriggerAttrName(snap)
+  };
+}
+
+async function fsbTriggerArmObserveWatchdog(triggerId) {
+  if (!triggerId || !chrome.alarms || typeof chrome.alarms.create !== 'function') return;
+  try {
+    const created = chrome.alarms.create(fsbTriggerObserveWatchdogName(triggerId), {
+      periodInMinutes: FSB_TRIGGER_OBSERVE_WATCHDOG_PERIOD_MINUTES
+    });
+    if (created && typeof created.catch === 'function') {
+      created.catch(function() { /* best-effort */ });
+    }
+  } catch (_e) { /* best-effort */ }
+}
+
+async function fsbTriggerClearObserveWatchdog(triggerId) {
+  if (!triggerId || !chrome.alarms || typeof chrome.alarms.clear !== 'function') return;
+  try {
+    const cleared = chrome.alarms.clear(fsbTriggerObserveWatchdogName(triggerId));
+    if (cleared && typeof cleared.catch === 'function') {
+      cleared.catch(function() { /* best-effort */ });
+    }
+  } catch (_e) { /* best-effort */ }
+}
+
+async function fsbTriggerSendTabMessage(tabId, payload) {
+  if (!Number.isFinite(Number(tabId)) || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, reason: 'tabs_unavailable' };
+  }
+  try {
+    await chrome.tabs.sendMessage(Number(tabId), payload);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'send_failed', error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// Build a short human-readable caption from a trigger snapshot for the
+// on-page progress overlay. Auto-derived (no caller input) so the trigger tool
+// schema stays free of visual_reason. Output is single-line, ~80 chars max.
+function fsbTriggerBuildCaption(snap) {
+  if (!snap || typeof snap !== 'object') return 'Watching DOM for change';
+  const selector = typeof snap.selector === 'string' && snap.selector ? snap.selector : 'element';
+  const condition = (snap.condition && typeof snap.condition === 'object') ? snap.condition : {};
+  const watch = snap.watch || snap.mode || 'live-observe';
+  const watchSuffix = watch === 'refresh-poll'
+    ? (Number.isFinite(Number(snap.poll_interval_ms))
+        ? ' (poll ' + Math.round(Number(snap.poll_interval_ms) / 1000) + 's)'
+        : ' (poll)')
+    : ' (live)';
+
+  let detail = 'changed';
+  if (condition.combinator) {
+    const kids = Array.isArray(condition.conditions) ? condition.conditions.length : 0;
+    detail = String(condition.combinator).toUpperCase() + ' of ' + kids + ' conditions';
+  } else {
+    const kind = String(condition.kind || '').toLowerCase();
+    if (kind === 'threshold') {
+      const op = condition.operator || '>=';
+      const target = condition.target != null ? String(condition.target) : '?';
+      const hyst = Number.isFinite(Number(condition.hysteresis)) && Number(condition.hysteresis) > 0
+        ? ' ±' + condition.hysteresis
+        : '';
+      detail = op + ' ' + target + hyst;
+    } else if (kind === 'equals') {
+      detail = '= ' + (condition.value != null ? String(condition.value) : '?');
+    } else if (kind === 'contains') {
+      const v = condition.value != null ? String(condition.value) : '';
+      detail = 'contains "' + (v.length > 24 ? v.slice(0, 21) + '...' : v) + '"';
+    } else if (kind === 'regex') {
+      const p = condition.pattern != null ? String(condition.pattern) : '';
+      detail = '/' + (p.length > 24 ? p.slice(0, 21) + '...' : p) + '/';
+    } else if (kind === 'percent_change' || kind === 'delta_percent') {
+      detail = '±' + (condition.percent != null ? String(condition.percent) : '?') + '%';
+    } else if (kind === 'changed' || !kind) {
+      detail = 'changed';
+    } else {
+      detail = kind;
+    }
+  }
+  const caption = 'Watching ' + selector + ' ' + detail + watchSuffix;
+  return caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
+}
+
+// Count active vs terminal triggers on a given tab. Used to drive the
+// in-page TriggerBadge tally. Reads from FsbTriggerStore.hydrate() which is
+// the same source of truth list_triggers exposes, so badge stays consistent
+// with the MCP-visible state.
+async function fsbTriggerCountsForTab(tabId) {
+  const numericTabId = Number(tabId);
+  if (!Number.isFinite(numericTabId)
+      || typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return { watching: 0, fired: 0 };
+  }
+  let envelope = null;
+  try {
+    envelope = await FsbTriggerStore.hydrate();
+  } catch (_e) {
+    return { watching: 0, fired: 0 };
+  }
+  const records = envelope && envelope.records && typeof envelope.records === 'object'
+    ? envelope.records
+    : {};
+  let watching = 0;
+  let fired = 0;
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || typeof snap !== 'object') continue;
+    if (Number(snap.target_tab_id) !== numericTabId) continue;
+    if (snap.status === 'armed' || snap.status === 'needs_attention' || snap.status === 'blocked') {
+      watching++;
+    } else if (snap.status === 'fired') {
+      fired++;
+    }
+  }
+  return { watching, fired };
+}
+
+async function fsbTriggerStartObserveForSnapshot(snap, reason) {
+  const triggerId = fsbTriggerSnapshotId(snap);
+  const tabId = Number(snap && snap.target_tab_id);
+  if (!triggerId || !Number.isFinite(tabId) || !snap.selector) {
+    return { ok: false, reason: 'invalid_snapshot' };
+  }
+  await ensureContentScriptInjected(tabId);
+  const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
+  const caption = fsbTriggerBuildCaption(snap);
+  const counts = await fsbTriggerCountsForTab(tabId);
+  const pulseResult = await fsbTriggerSendTabMessage(tabId, {
+    action: 'triggerPulseStart',
+    selector: snap.selector,
+    reason: reason || 'trigger-watch',
+    trigger_id: triggerId,
+    caption: caption,
+    watch_mode: snap.watch || snap.mode || 'live-observe',
+    counts: counts
+  });
+  await fsbTriggerArmObserveWatchdog(triggerId);
+  return { ok: observeResult.ok !== false, observe: observeResult, pulse: pulseResult };
+}
+
+async function fsbTriggerStopObserveForSnapshot(snap) {
+  const triggerId = fsbTriggerSnapshotId(snap);
+  const tabId = Number(snap && snap.target_tab_id);
+  if (!triggerId || !Number.isFinite(tabId)) return;
+  await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
+  const counts = await fsbTriggerCountsForTab(tabId);
+  await fsbTriggerSendTabMessage(tabId, {
+    action: 'triggerPulseStop',
+    trigger_id: triggerId,
+    counts: counts
+  });
+}
+
+function fsbTriggerCopyReportedAttributes(attributes) {
+  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return null;
+  const out = {};
+  Object.keys(attributes).slice(0, 50).forEach((name) => {
+    const value = attributes[name];
+    if (typeof name === 'string' && typeof value === 'string') {
+      out[name] = value.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX);
+    }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+async function fsbTriggerWaitForRefreshPollReady(tabId) {
+  if (typeof pageLoadWatcher !== 'undefined'
+      && pageLoadWatcher
+      && typeof pageLoadWatcher.waitForPageReady === 'function') {
+    try {
+      const ready = await pageLoadWatcher.waitForPageReady(tabId, {
+        maxWait: 30000,
+        requireDOMStable: false
+      });
+      if (ready && ready.success !== false) return ready;
+    } catch (_err) { /* fall through to explicit tab completion polling */ }
+  }
+
+  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
+    return { success: false, method: 'tabs-unavailable' };
+  }
+
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab || tab.status === 'complete') {
+        return { success: true, method: 'tabs.get' };
+      }
+    } catch (err) {
+      return { success: false, method: 'tabs.get-error', error: err && err.message ? err.message : String(err) };
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return { success: false, method: 'tabs.get-timeout' };
+}
+
+async function fsbTriggerSendRefreshPollRead(tabId, snap) {
+  if (!Number.isFinite(Number(tabId)) || !chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, success: false, reason: 'tabs_unavailable' };
+  }
+  const numericTabId = Number(tabId);
+  await ensureContentScriptInjected(tabId);
+  return chrome.tabs.sendMessage(numericTabId, {
+    action: 'triggerRead',
+    selector: snap.selector,
+    extract: fsbTriggerExtractKind(snap),
+    attrName: fsbTriggerAttrName(snap)
+  }, { frameId: 0 });
+}
+
+
+async function fsbTriggerGetRefreshPollTabState(tabId) {
+  if (!chrome.tabs || typeof chrome.tabs.get !== 'function') {
+    return { blocked: false, url: '' };
+  }
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab && (typeof tab.url === 'string' ? tab.url : (typeof tab.pendingUrl === 'string' ? tab.pendingUrl : ''));
+    if (!url || isRestrictedURL(url)) {
+      return { blocked: true, blocked_reason: 'restricted_url', url: url || '' };
+    }
+    return { blocked: false, url };
+  } catch (err) {
+    return {
+      blocked: true,
+      blocked_reason: 'restricted_url',
+      url: '',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+function fsbTriggerBuildBlockedAttention(snap, blockedReason, url, extra) {
+  return Object.assign({
+    selector: snap && snap.selector,
+    code: 'TRIGGER_PAGE_BLOCKED',
+    blocked_reason: blockedReason || 'challenge',
+    url: typeof url === 'string' ? url : ''
+  }, extra || {});
+}
+
+async function fsbTriggerMarkRefreshPollAttention(triggerId, snap, reason, extra) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.writeSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const now = Date.now();
+  if (reason === 'blocked') {
+    snap.status = 'blocked';
+  } else {
+    snap.status = 'needs_attention';
+  }
+  snap.attention_reason = reason;
+  snap.attention_at = now;
+  snap.last_attention = Object.assign({ reason, at: now }, extra || {});
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+  return { ok: true, action: snap.status, reason };
+}
+
+function fsbTriggerCollectDueRefreshPollSnapshots(records, tabId, nowMs, requiredTriggerId) {
+  if (!records || typeof records !== 'object') return [];
+  const out = [];
+  const numericTabId = Number(tabId);
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    let snapshot = records[key];
+    if (!fsbTriggerIsRefreshPollSnapshot(snapshot)) continue;
+    if (Number(snapshot.target_tab_id) !== numericTabId) continue;
+    const triggerId = fsbTriggerSnapshotId(snapshot) || key;
+    if (triggerId === requiredTriggerId || Number(snapshot.next_poll_at || 0) <= nowMs) {
+      if (!fsbTriggerSnapshotId(snapshot) && typeof key === 'string' && key) {
+        snapshot = Object.assign({ trigger_id: key }, snapshot);
+      }
+      out.push(snapshot);
+    }
+  }
+  return out;
+}
+
+function fsbTriggerAddRefreshPollCandidate(candidates, seen, snap, fallbackTriggerId, tabId) {
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) return;
+  if (Number(snap.target_tab_id) !== Number(tabId)) return;
+  const triggerId = fsbTriggerSnapshotId(snap) || fallbackTriggerId;
+  if (!triggerId || seen[triggerId]) return;
+  seen[triggerId] = true;
+  candidates.push({ triggerId, snap });
+}
+
+async function fsbTriggerReadRefreshPollRecords() {
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore) return {};
+  if (typeof FsbTriggerStore.hydrate === 'function') {
+    const envelope = await FsbTriggerStore.hydrate();
+    return envelope && envelope.records && typeof envelope.records === 'object'
+      ? envelope.records
+      : {};
+  }
+  return {};
+}
+
+async function fsbTriggerWithRefreshPollTabLock(tabId, task) {
+  const key = String(Number(tabId));
+  const existing = fsbTriggerRefreshPollTabLocks.get(key);
+  if (existing) {
+    fsbTriggerRefreshPollPendingTabRescans.set(key, true);
+    return existing;
+  }
+  const promise = Promise.resolve()
+    .then(async () => {
+      const result = await task();
+      while (fsbTriggerRefreshPollPendingTabRescans.get(key)) {
+        fsbTriggerRefreshPollPendingTabRescans.delete(key);
+        await fsbTriggerRunRefreshPollTabBatchUnlocked(Number(tabId), null, null);
+      }
+      return result;
+    })
+    .finally(() => {
+      if (fsbTriggerRefreshPollTabLocks.get(key) === promise) {
+        fsbTriggerRefreshPollTabLocks.delete(key);
+      }
+      fsbTriggerRefreshPollPendingTabRescans.delete(key);
+    });
+  fsbTriggerRefreshPollTabLocks.set(key, promise);
+  return promise;
+}
+
+async function fsbTriggerEvaluateRefreshPollAfterReload(triggerId, snap, tabId, preReloadTab, postReloadTab) {
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+    return { ok: true, ignored: true };
+  }
+  if (!snap.selector) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
+  }
+  if (postReloadTab && postReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+  }
+
+  let readResult;
+  try {
+    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  } catch (err) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+  }
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
+  }
+  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: readResult && readResult.code,
+      error: readResult && (readResult.error || readResult.reason)
+    });
+  }
+
+  const value = readResult.value;
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    readResult && readResult.url,
+    readResult && readResult.current_url,
+    postReloadTab && postReloadTab.url,
+    preReloadTab && preReloadTab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  if (seamResult && seamResult.action !== 'fired'
+      && typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
+    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
+      await fsbTriggerSendTabMessage(tabId, {
+        action: 'triggerPulseStart',
+        selector: latestSnap.selector,
+        reason: 'refresh-poll'
+      });
+      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
+      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
+    }
+  }
+
+  return { ok: true, action: 'evaluated', result: seamResult };
+}
+
+async function fsbTriggerRunRefreshPollTabBatch(requiredTriggerId, requiredSnap) {
+  const tabId = Number(requiredSnap && requiredSnap.target_tab_id);
+  if (!Number.isFinite(tabId)) {
+    return fsbTriggerRunRefreshPollTick(requiredTriggerId, requiredSnap);
+  }
+  return fsbTriggerWithRefreshPollTabLock(tabId, () => (
+    fsbTriggerRunRefreshPollTabBatchUnlocked(tabId, requiredTriggerId, requiredSnap)
+  ));
+}
+
+async function fsbTriggerRunRefreshPollTabBatchUnlocked(tabId, requiredTriggerId, requiredSnap) {
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.writeSnapshot !== 'function'
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const records = await fsbTriggerReadRefreshPollRecords();
+  const dueSnapshots = fsbTriggerCollectDueRefreshPollSnapshots(records, tabId, Date.now(), requiredTriggerId);
+  const seen = {};
+  const candidates = [];
+  for (let i = 0; i < dueSnapshots.length; i++) {
+    fsbTriggerAddRefreshPollCandidate(candidates, seen, dueSnapshots[i], null, tabId);
+  }
+  fsbTriggerAddRefreshPollCandidate(candidates, seen, requiredSnap, requiredTriggerId, tabId);
+
+  const results = {};
+  const eligible = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const item = candidates[i];
+    if (!item.snap.selector) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'invalid_selector');
+      continue;
+    }
+    const ownership = fsbTriggerValidateRefreshPollOwnership(item.snap);
+    if (!ownership || ownership.ok !== true) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(
+        item.triggerId,
+        item.snap,
+        'ownership_failed',
+        ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
+      );
+      continue;
+    }
+    eligible.push({ triggerId: item.triggerId, snap: item.snap, ownership });
+  }
+
+  if (!eligible.length) {
+    return { ok: true, action: 'refresh_poll_batch_empty', tab_id: tabId, results };
+  }
+
+  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        code: 'TABS_UNAVAILABLE',
+        requestedTabId: tabId,
+        requestingAgentId: item.ownership.agentId
+      });
+    }
+    return { ok: true, action: 'refresh_poll_batch_attention', tab_id: tabId, results };
+  }
+
+  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (preReloadTab && preReloadTab.blocked) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(item.snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
+    }
+    return { ok: true, action: 'refresh_poll_batch_blocked', tab_id: tabId, results };
+  }
+
+  const registry = eligible[0] && eligible[0].ownership && eligible[0].ownership.registry;
+  if (registry && typeof registry.stampAgentNavigation === 'function') {
+    try {
+      registry.stampAgentNavigation(tabId);
+    } catch (_err) { /* best-effort navigation stamp */ }
+  }
+
+  let postReloadTab = null;
+  try {
+    await chrome.tabs.reload(tabId);
+    await fsbTriggerWaitForRefreshPollReady(tabId);
+    postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  } catch (err) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+    return { ok: true, action: 'refresh_poll_batch_attention', tab_id: tabId, results };
+  }
+
+  if (postReloadTab && postReloadTab.blocked) {
+    for (let i = 0; i < eligible.length; i++) {
+      const item = eligible[i];
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(item.snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    }
+    return { ok: true, action: 'refresh_poll_batch_blocked', tab_id: tabId, results };
+  }
+
+  for (let i = 0; i < eligible.length; i++) {
+    const item = eligible[i];
+    try {
+      const latestSnap = await FsbTriggerStore.readSnapshot(item.triggerId);
+      if (!fsbTriggerIsRefreshPollSnapshot(latestSnap) || Number(latestSnap.target_tab_id) !== Number(tabId)) {
+        results[item.triggerId] = { ok: true, ignored: true };
+        continue;
+      }
+      results[item.triggerId] = await fsbTriggerEvaluateRefreshPollAfterReload(
+        item.triggerId,
+        latestSnap,
+        tabId,
+        preReloadTab,
+        postReloadTab
+      );
+    } catch (err) {
+      results[item.triggerId] = await fsbTriggerMarkRefreshPollAttention(item.triggerId, item.snap, 'read_failed', {
+        selector: item.snap.selector,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    action: 'refresh_poll_batch',
+    tab_id: tabId,
+    batch_size: eligible.length,
+    results
+  };
+}
+
+async function fsbTriggerRunRefreshPollTick(triggerId, snap) {
+  if (!triggerId || typeof triggerId !== 'string') {
+    return { ok: false, reason: 'invalid_trigger_id' };
+  }
+  if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+    return { ok: true, ignored: true };
+  }
+  if (!snap.selector) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'invalid_selector');
+  }
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.writeSnapshot !== 'function'
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const ownership = fsbTriggerValidateRefreshPollOwnership(snap);
+  if (!ownership || ownership.ok !== true) {
+    return fsbTriggerMarkRefreshPollAttention(
+      triggerId,
+      snap,
+      'ownership_failed',
+      ownership || { code: 'OWNERSHIP_VALIDATION_FAILED' }
+    );
+  }
+  const tabId = ownership.tabId;
+  const registry = ownership.registry;
+
+  if (!chrome.tabs || typeof chrome.tabs.reload !== 'function') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: 'TABS_UNAVAILABLE',
+      requestedTabId: tabId,
+      requestingAgentId: ownership.agentId
+    });
+  }
+
+  const preReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+  if (preReloadTab && preReloadTab.blocked) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, 'restricted_url', preReloadTab.url, { error: preReloadTab.error }));
+  }
+
+  if (registry && typeof registry.stampAgentNavigation === 'function') {
+    try {
+      registry.stampAgentNavigation(tabId);
+    } catch (_err) { /* best-effort navigation stamp */ }
+  }
+
+  let readResult;
+  let postReloadTab = null;
+  try {
+    await chrome.tabs.reload(tabId);
+    await fsbTriggerWaitForRefreshPollReady(tabId);
+
+    postReloadTab = await fsbTriggerGetRefreshPollTabState(tabId);
+    if (postReloadTab && postReloadTab.blocked) {
+      return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+        fsbTriggerBuildBlockedAttention(snap, 'restricted_url', postReloadTab.url, { error: postReloadTab.error }));
+    }
+
+    readResult = await fsbTriggerSendRefreshPollRead(tabId, snap);
+  } catch (err) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      error: err && err.message ? err.message : String(err)
+    });
+  }
+
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'blocked',
+      fsbTriggerBuildBlockedAttention(snap, readResult.blocked_reason, readResult.url));
+  }
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'element_not_found', { selector: snap.selector, code: 'ELEMENT_NOT_FOUND' });
+  }
+  if (!readResult || readResult.success === false || readResult.ok === false || !readResult.value || typeof readResult.value !== 'object') {
+    return fsbTriggerMarkRefreshPollAttention(triggerId, snap, 'read_failed', {
+      selector: snap.selector,
+      code: readResult && readResult.code,
+      error: readResult && (readResult.error || readResult.reason)
+    });
+  }
+
+  const value = readResult.value;
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    readResult && readResult.url,
+    readResult && readResult.current_url,
+    postReloadTab && postReloadTab.url,
+    preReloadTab && preReloadTab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  if (seamResult && seamResult.action !== 'fired'
+      && typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.scheduleNextRefreshPollAlarm === 'function') {
+    const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (fsbTriggerIsRefreshPollSnapshot(latestSnap) && latestSnap.status === 'armed') {
+      await fsbTriggerSendTabMessage(tabId, {
+        action: 'triggerPulseStart',
+        selector: latestSnap.selector,
+        reason: 'refresh-poll'
+      });
+      await FsbTriggerLifecycle.scheduleNextRefreshPollAlarm(latestSnap, Date.now());
+      await FsbTriggerStore.writeSnapshot(triggerId, latestSnap);
+    }
+  }
+
+  return { ok: true, action: 'evaluated', result: seamResult };
+}
+
+async function fsbTriggerHandleRefreshPollAlarm(alarm) {
+  if (typeof FsbTriggerLifecycle === 'undefined'
+      || !FsbTriggerLifecycle
+      || !FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX
+      || !alarm
+      || typeof alarm.name !== 'string'
+      || !alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
+    return { handled: false };
+  }
+
+  const triggerId = alarm.name.slice(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX.length);
+  if (!triggerId) {
+    return { handled: false, reason: 'malformed_alarm_name' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { handled: false, reason: 'store_unavailable' };
+  }
+
+  try {
+    const snap = await FsbTriggerStore.readSnapshot(triggerId);
+    if (!fsbTriggerIsRefreshPollSnapshot(snap)) {
+      return { handled: false };
+    }
+    const result = await fsbTriggerRunRefreshPollTabBatch(triggerId, snap);
+    return Object.assign({ handled: true }, result || {});
+  } catch (err) {
+    try {
+      if (typeof FsbTriggerStore !== 'undefined'
+          && FsbTriggerStore
+          && typeof FsbTriggerStore.readSnapshot === 'function'
+          && typeof FsbTriggerStore.writeSnapshot === 'function') {
+        const latestSnap = await FsbTriggerStore.readSnapshot(triggerId);
+        if (fsbTriggerIsRefreshPollSnapshot(latestSnap)) {
+          await fsbTriggerMarkRefreshPollAttention(triggerId, latestSnap, 'refresh_poll_failed', {
+            error: err && err.message ? err.message : String(err)
+          });
+        }
+      }
+    } catch (_markErr) { /* preserve the original failure result */ }
+    return {
+      handled: true,
+      ok: false,
+      reason: 'refresh_poll_failed',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+async function fsbTriggerHandleValueReport(request, sender) {
+  const triggerId = request && typeof request.trigger_id === 'string' ? request.trigger_id : null;
+  if (!triggerId) return { ok: false, reason: 'invalid_trigger_id' };
+  if (typeof FsbTriggerStore === 'undefined' || !FsbTriggerStore || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap || snap.status !== 'armed') {
+    return { ok: true, ignored: true };
+  }
+
+  const senderTabId = sender && sender.tab ? Number(sender.tab.id) : null;
+  if (Number.isFinite(Number(snap.target_tab_id))
+      && (!Number.isFinite(senderTabId) || Number(snap.target_tab_id) !== senderTabId)) {
+    return { ok: true, ignored: true, reason: 'foreign_tab' };
+  }
+
+  const value = request.value && typeof request.value === 'object' ? request.value : {};
+  const now = Date.now();
+  snap.reported_value = (typeof value.text === 'string')
+    ? value.text.slice(0, FSB_TRIGGER_REPORTED_TEXT_MAX)
+    : snap.last_value;
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) snap.reported_attributes = attrs;
+  const reportedUrl = fsbTriggerFirstString(
+    request && request.url,
+    request && request.current_url,
+    request && request.href,
+    sender && sender.tab && sender.tab.url,
+    snap.reported_url,
+    snap.url
+  );
+  if (reportedUrl) snap.reported_url = reportedUrl;
+  snap.last_reported_at = now;
+  await FsbTriggerStore.writeSnapshot(triggerId, snap);
+
+  let seamResult = { ok: false, reason: 'lifecycle_unavailable' };
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && FsbTriggerLifecycle
+      && typeof FsbTriggerLifecycle.handleTriggerAlarm === 'function'
+      && FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX) {
+    seamResult = await FsbTriggerLifecycle.handleTriggerAlarm({
+      name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+    });
+  }
+
+  await fsbTriggerArmObserveWatchdog(triggerId);
+
+  if (seamResult && seamResult.action === 'fired') {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    await fsbTriggerStopObserveForSnapshot(Object.assign({}, snap, {
+      target_tab_id: Number.isFinite(senderTabId) ? senderTabId : snap.target_tab_id
+    }));
+  }
+
+  return { ok: true, result: seamResult };
+}
+
+async function fsbTriggerRearmLiveObserversForTab(tabId, reason) {
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.listArmedSnapshots !== 'function') {
+    return { ok: false, reason: 'store_unavailable' };
+  }
+  const armed = await FsbTriggerStore.listArmedSnapshots();
+  const owned = (Array.isArray(armed) ? armed : []).filter((snap) => {
+    return fsbTriggerIsLiveObserveSnapshot(snap) && Number(snap.target_tab_id) === Number(tabId);
+  });
+  for (const snap of owned) {
+    try {
+      await fsbTriggerStartObserveForSnapshot(snap, reason || 'rearm');
+    } catch (err) {
+      console.warn('[FSB TRG] live-observe re-arm failed (non-blocking):', err && err.message);
+    }
+  }
+  return { ok: true, rearmed: owned.length };
+}
+
+async function fsbTriggerHandleObserveWatchdog(alarm) {
+  const triggerId = alarm && typeof alarm.name === 'string'
+    ? alarm.name.slice(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX.length)
+    : '';
+  if (!triggerId
+      || typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { ok: false, reason: 'invalid_watchdog' };
+  }
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!fsbTriggerIsLiveObserveSnapshot(snap)) {
+    await fsbTriggerClearObserveWatchdog(triggerId);
+    return { ok: true, ignored: true };
+  }
+  const now = Date.now();
+  const lastSeen = Number(snap.last_reported_at || snap.last_evaluated_at || snap.armed_at || 0);
+  if (Number.isFinite(lastSeen) && lastSeen > 0 && now - lastSeen <= FSB_TRIGGER_OBSERVE_STALE_MS) {
+    return { ok: true, stale: false };
+  }
+  return fsbTriggerStartObserveForSnapshot(snap, 'watchdog');
+}
+
+function fsbTriggerFirstString() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function fsbTriggerFirstFiniteTabId() {
+  for (let i = 0; i < arguments.length; i++) {
+    // Number(null) === 0 and Number('') === 0: an absent candidate must never
+    // coerce into tab id 0. Skip nullish/empty candidates before coercion.
+    if (arguments[i] == null || arguments[i] === '') continue;
+    const value = Number(arguments[i]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function fsbTriggerReadSnapshotAgentId(snap) {
+  return fsbTriggerFirstString(
+    snap && snap.agent_id,
+    snap && snap.agentId
+  );
+}
+
+function fsbTriggerReadSnapshotOwnershipToken(snap) {
+  return fsbTriggerFirstString(
+    snap && snap.ownership_token,
+    snap && snap.ownershipToken
+  );
+}
+
+function fsbTriggerReadRegistryOwner(registry, tabId) {
+  if (!registry || tabId == null || !Number.isFinite(Number(tabId))) return null;
+  try {
+    if (typeof registry.findAgentByTabId === 'function') {
+      const found = registry.findAgentByTabId(Number(tabId));
+      if (typeof found === 'string' && found) return found;
+      if (found && typeof found === 'object') {
+        const fromFound = fsbTriggerFirstString(found.agentId, found.agent_id);
+        if (fromFound) return fromFound;
+      }
+    }
+  } catch (_err) { /* fall through to getOwner */ }
+  try {
+    if (typeof registry.getOwner === 'function') {
+      return fsbTriggerFirstString(registry.getOwner(Number(tabId)));
+    }
+  } catch (_err) { /* best-effort owner read */ }
+  return null;
+}
+
+function fsbTriggerReadRegistryOwnershipToken(registry, tabId) {
+  if (!registry || tabId == null || !Number.isFinite(Number(tabId)) || typeof registry.getTabMetadata !== 'function') return null;
+  try {
+    const meta = registry.getTabMetadata(Number(tabId));
+    return fsbTriggerFirstString(meta && meta.ownershipToken, meta && meta.ownership_token);
+  } catch (_err) {
+    return null;
+  }
+}
+
+function fsbTriggerAccessDeniedContext(base, extra) {
+  return Object.assign({
+    source: base && base.source,
+    tabId: base && base.tabId,
+    agentId: base && base.agentId,
+    ownershipToken: base && base.ownershipToken,
+    accessDenied: true,
+    errorCode: 'TRIGGER_ACCESS_DENIED'
+  }, extra || {});
+}
+
+async function fsbTriggerOwnerContext(payload, sender) {
+  const input = (payload && typeof payload === 'object') ? payload : {};
+  const source = fsbTriggerFirstString(input.source) || 'unknown';
+  const tabId = fsbTriggerFirstFiniteTabId(
+    input.tabId,
+    input.tab_id,
+    input.target_tab_id,
+    sender && sender.tab && sender.tab.id
+  );
+
+  if (source === 'autopilot') {
+    const base = { source, tabId, agentId: null, ownershipToken: null };
+    if (tabId === null) return base;
+
+    const registry = globalThis && globalThis.fsbAgentRegistryInstance;
+    if (!registry) return Object.assign(base, { registry: null });
+
+    let ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId);
+    if (ownerAgentId && ownerAgentId !== 'legacy:autopilot') {
+      return fsbTriggerAccessDeniedContext(Object.assign(base, { agentId: 'legacy:autopilot' }), {
+        ownerAgentId,
+        requestedTabId: tabId,
+        requestingAgentId: 'legacy:autopilot'
+      });
+    }
+
+    let ownershipToken = fsbTriggerReadRegistryOwnershipToken(registry, tabId);
+    if (!ownerAgentId
+        && typeof registry.getOrRegisterLegacyAgent === 'function'
+        && typeof registry.bindTab === 'function') {
+      try {
+        const legacy = await registry.getOrRegisterLegacyAgent('autopilot');
+        const legacyAgentId = fsbTriggerFirstString(legacy && legacy.agentId, legacy && legacy.agent_id);
+        if (legacyAgentId) {
+          const bindResult = await registry.bindTab(legacyAgentId, Number(tabId));
+          if (bindResult === false) {
+            ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId);
+            if (ownerAgentId && ownerAgentId !== legacyAgentId) {
+              return fsbTriggerAccessDeniedContext(Object.assign(base, { agentId: legacyAgentId }), {
+                ownerAgentId,
+                requestedTabId: tabId,
+                requestingAgentId: legacyAgentId
+              });
+            }
+          } else {
+            ownerAgentId = fsbTriggerFirstString(bindResult && bindResult.agentId, legacyAgentId);
+            ownershipToken = fsbTriggerFirstString(bindResult && bindResult.ownershipToken, ownershipToken);
+          }
+        }
+      } catch (_err) { /* best-effort legacy bind */ }
+    }
+
+    if (!ownerAgentId) ownerAgentId = fsbTriggerReadRegistryOwner(registry, tabId) || 'legacy:autopilot';
+    ownershipToken = fsbTriggerFirstString(ownershipToken, fsbTriggerReadRegistryOwnershipToken(registry, tabId));
+    return { source, tabId: Number(tabId), agentId: ownerAgentId, ownershipToken, registry };
+  }
+
+  return {
+    source,
+    tabId,
+    agentId: fsbTriggerFirstString(input.agentId, input.agent_id),
+    ownershipToken: fsbTriggerFirstString(input.ownershipToken, input.ownership_token)
+  };
+}
+
+function fsbTriggerSnapshotVisibleToContext(snap, context) {
+  if (!snap || typeof snap !== 'object') return false;
+  if (context && context.accessDenied) return false;
+
+  const snapshotAgentId = fsbTriggerReadSnapshotAgentId(snap);
+  const contextAgentId = fsbTriggerFirstString(context && context.agentId, context && context.agent_id);
+  if (!snapshotAgentId || !contextAgentId) return true;
+  if (snapshotAgentId !== contextAgentId) return false;
+
+  const snapshotToken = fsbTriggerReadSnapshotOwnershipToken(snap);
+  const contextToken = fsbTriggerFirstString(context && context.ownershipToken, context && context.ownership_token);
+  if (snapshotToken && !contextToken) return false;
+  if (snapshotToken && contextToken && snapshotToken !== contextToken) return false;
+  return true;
+}
+
+function fsbTriggerProjectFiniteDuration(from, to) {
+  const start = Number(from);
+  const end = Number(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.max(0, Math.floor(end - start));
+}
+
+function fsbTriggerProjectRemaining(deadlineAt, now) {
+  const deadline = Number(deadlineAt);
+  const baseNow = Number(now);
+  if (!Number.isFinite(deadline) || !Number.isFinite(baseNow)) return null;
+  return Math.max(0, Math.floor(deadline - baseNow));
+}
+
+function fsbTriggerProjectCurrentValue(snap) {
+  if (!snap || typeof snap !== 'object') return null;
+  if (snap.reported_value !== undefined && snap.reported_value !== null) return snap.reported_value;
+  if (snap.last_value !== undefined && snap.last_value !== null) return snap.last_value;
+  return snap.baseline !== undefined ? snap.baseline : null;
+}
+
+function fsbTriggerProjectLastEvent(snap) {
+  if (!snap || typeof snap !== 'object') return null;
+  return snap.last_event || snap.last_fire_event || null;
+}
+
+function fsbTriggerProjectFireCount(snap) {
+  const count = Number(snap && snap.fire_count);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+function fsbTriggerIsTerminalStatus(status) {
+  return status === 'fired' || status === 'timed_out' || status === 'stopped';
+}
+
+function fsbTriggerProjectTriggerStatus(snap, now) {
+  const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  return {
+    trigger_id: snap && snap.trigger_id,
+    status: snap && snap.status,
+    outcome: snap && (snap.outcome || snap.status || null),
+    watch: snap && (snap.watch || snap.mode || null),
+    condition: snap && snap.condition,
+    target_tab_id: snap && snap.target_tab_id,
+    agent_id: fsbTriggerReadSnapshotAgentId(snap),
+    initial_value: snap && snap.baseline !== undefined ? snap.baseline : null,
+    current_value: fsbTriggerProjectCurrentValue(snap),
+    last_event: fsbTriggerProjectLastEvent(snap),
+    fire_count: fsbTriggerProjectFireCount(snap),
+    last_fired_at: snap && snap.last_fired_at,
+    timed_out_at: snap && snap.timed_out_at,
+    terminal_reason: snap && snap.terminal_reason,
+    detached: snap && snap.detached === true,
+    detached_at: snap && snap.detached_at,
+    armed_at: snap && snap.armed_at,
+    deadline_at: snap && snap.deadline_at,
+    elapsed_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
+    remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
+    last_evaluated_at: snap && snap.last_evaluated_at,
+    last_reported_at: snap && snap.last_reported_at,
+    attention_reason: snap && snap.attention_reason,
+    last_attention: snap && snap.last_attention
+  };
+}
+
+function fsbTriggerProjectTriggerSummary(snap, now, options) {
+  const baseNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const includeEvent = (options && options.include_events === true)
+    || fsbTriggerIsTerminalStatus(snap && snap.status);
+  return {
+    trigger_id: snap && snap.trigger_id,
+    status: snap && snap.status,
+    outcome: snap && (snap.outcome || snap.status || null),
+    watch: snap && (snap.watch || snap.mode || null),
+    agent_id: fsbTriggerReadSnapshotAgentId(snap),
+    target_tab_id: snap && snap.target_tab_id,
+    age_ms: fsbTriggerProjectFiniteDuration(snap && snap.armed_at, baseNow),
+    remaining_ms: fsbTriggerProjectRemaining(snap && snap.deadline_at, baseNow),
+    last_event: includeEvent ? fsbTriggerProjectLastEvent(snap) : null,
+    fire_count: fsbTriggerProjectFireCount(snap),
+    last_fired_at: snap && snap.last_fired_at,
+    timed_out_at: snap && snap.timed_out_at,
+    terminal_reason: snap && snap.terminal_reason,
+    detached: snap && snap.detached === true,
+    last_evaluated_at: snap && snap.last_evaluated_at,
+    last_reported_at: snap && snap.last_reported_at,
+    attention_reason: snap && snap.attention_reason
+  };
+}
+
+function fsbTriggerNormalizeListStatuses(params) {
+  const input = params && (params.statuses || params.status);
+  if (Array.isArray(input)) {
+    const filtered = input.map((value) => fsbTriggerFirstString(value)).filter(Boolean);
+    if (filtered.length) return new Set(filtered);
+  }
+  const one = fsbTriggerFirstString(input);
+  if (one) return new Set([one]);
+  const defaults = new Set(['armed', 'needs_attention', 'blocked']);
+  if (params && params.include_terminal === true) {
+    defaults.add('fired');
+    defaults.add('timed_out');
+    defaults.add('stopped');
+  }
+  return defaults;
+}
+
+function fsbTriggerMergeParamsAndContext(params, context) {
+  return Object.assign({}, params || {}, context || {});
+}
+
+async function fsbTriggerHandleToolStatus(params, context) {
+  const triggerId = fsbTriggerFirstString(params && params.trigger_id);
+  if (!triggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(params, context),
+    context && context.sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap) {
+    return { success: false, errorCode: 'TRIGGER_NOT_FOUND', trigger_id: triggerId };
+  }
+
+  if (ownerContext
+      && ownerContext.source === 'autopilot'
+      && !Number.isFinite(Number(ownerContext.tabId))
+      && Number.isFinite(Number(snap.target_tab_id))) {
+    ownerContext = await fsbTriggerOwnerContext(
+      fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+      context && context.sender
+    );
+  }
+
+  if (!fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  return { success: true, status: fsbTriggerProjectTriggerStatus(snap, Date.now()) };
+}
+
+async function fsbTriggerHandleToolList(params, context) {
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(params, context),
+    context && context.sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', triggers: [] };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', triggers: [] };
+  }
+
+  const wanted = fsbTriggerNormalizeListStatuses(params);
+  const summaryOptions = { include_events: params && params.include_events === true };
+  const envelope = await FsbTriggerStore.hydrate();
+  const records = (envelope && envelope.records && typeof envelope.records === 'object') ? envelope.records : {};
+  const now = Date.now();
+  const triggers = [];
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || !wanted.has(snap.status)) continue;
+
+    let perSnapshotContext = ownerContext;
+    if (ownerContext
+        && ownerContext.source === 'autopilot'
+        && !Number.isFinite(Number(ownerContext.tabId))
+        && Number.isFinite(Number(snap.target_tab_id))) {
+      perSnapshotContext = await fsbTriggerOwnerContext(
+        fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+        context && context.sender
+      );
+      if (perSnapshotContext && perSnapshotContext.accessDenied) continue;
+    }
+
+    if (fsbTriggerSnapshotVisibleToContext(snap, perSnapshotContext)) {
+      triggers.push(fsbTriggerProjectTriggerSummary(snap, now, summaryOptions));
+    }
+  }
+  return { success: true, triggers };
+}
+
+function fsbTriggerCleanupOk(result) {
+  return result && result.ok === false ? false : true;
+}
+
+function fsbTriggerCleanupError(err) {
+  return err && err.message ? err.message : String(err);
+}
+
+async function fsbTriggerHandleToolStop(params, context) {
+  const triggerId = fsbTriggerFirstString(params && params.trigger_id);
+  if (!triggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(triggerId);
+  if (!snap) {
+    return { success: true, stopped: false, idempotent: true, trigger_id: triggerId, status: 'not_found' };
+  }
+
+  let ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, params || {}, { target_tab_id: snap.target_tab_id }), context),
+    context && context.sender
+  );
+  if ((ownerContext && ownerContext.accessDenied) || !fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: triggerId };
+  }
+
+  const cleanup = {
+    observe: { ok: true, skipped: true },
+    watchdog: { ok: false, skipped: true },
+    lifecycle: { ok: false, skipped: true }
+  };
+
+  const terminal = fsbTriggerIsTerminalStatus(snap.status);
+  if (!terminal || snap.status === 'timed_out') {
+    try {
+      const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
+      cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
+    } catch (err) {
+      cleanup.observe = { ok: false, error: fsbTriggerCleanupError(err) };
+    }
+  }
+
+  try {
+    const watchdogResult = await fsbTriggerClearObserveWatchdog(triggerId);
+    cleanup.watchdog = { ok: fsbTriggerCleanupOk(watchdogResult), result: watchdogResult };
+  } catch (err) {
+    cleanup.watchdog = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  try {
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && FsbTriggerLifecycle
+        && typeof FsbTriggerLifecycle.clearTrigger === 'function') {
+      const lifecycleResult = await FsbTriggerLifecycle.clearTrigger(triggerId);
+      cleanup.lifecycle = { ok: fsbTriggerCleanupOk(lifecycleResult), result: lifecycleResult };
+    } else {
+      cleanup.lifecycle = { ok: false, reason: 'lifecycle_unavailable' };
+    }
+  } catch (err) {
+    cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  if (terminal) {
+    return {
+      success: true,
+      stopped: false,
+      idempotent: true,
+      trigger_id: triggerId,
+      status: snap.status,
+      cleanup
+    };
+  }
+
+  return { success: true, stopped: true, trigger_id: triggerId, cleanup };
+}
+
+async function fsbTriggerMarkTimedOutForMcp(triggerId, context) {
+  const safeTriggerId = fsbTriggerFirstString(triggerId);
+  if (!safeTriggerId) {
+    return { success: false, errorCode: 'INVALID_TRIGGER_ID' };
+  }
+
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.readSnapshot !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_STORE_UNAVAILABLE', trigger_id: safeTriggerId };
+  }
+
+  const snap = await FsbTriggerStore.readSnapshot(safeTriggerId);
+  if (!snap) {
+    return {
+      success: true,
+      outcome: 'timed_out',
+      trigger_id: safeTriggerId,
+      status: { trigger_id: safeTriggerId, status: 'timed_out', outcome: 'timed_out' },
+      cleanup: { missing: true }
+    };
+  }
+
+  const ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, context || {}, { trigger_id: safeTriggerId, target_tab_id: snap.target_tab_id }), context),
+    context && context.sender
+  );
+  if ((ownerContext && ownerContext.accessDenied) || !fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED', trigger_id: safeTriggerId };
+  }
+
+  const cleanup = {
+    observe: { ok: true, skipped: true },
+    watchdog: { ok: false, skipped: true },
+    lifecycle: { ok: false, skipped: true }
+  };
+  const terminal = snap.status === 'fired' || snap.status === 'stopped' || snap.status === 'timed_out';
+
+  if (!terminal) {
+    try {
+      const observeResult = await fsbTriggerStopObserveForSnapshot(snap);
+      cleanup.observe = { ok: fsbTriggerCleanupOk(observeResult), result: observeResult };
+    } catch (err) {
+      cleanup.observe = { ok: false, error: fsbTriggerCleanupError(err) };
+    }
+  }
+
+  try {
+    const watchdogResult = await fsbTriggerClearObserveWatchdog(safeTriggerId);
+    cleanup.watchdog = { ok: fsbTriggerCleanupOk(watchdogResult), result: watchdogResult };
+  } catch (err) {
+    cleanup.watchdog = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  let lifecycleResult = null;
+  try {
+    if (typeof FsbTriggerLifecycle !== 'undefined'
+        && FsbTriggerLifecycle
+        && typeof FsbTriggerLifecycle.markTriggerTimedOut === 'function') {
+      lifecycleResult = await FsbTriggerLifecycle.markTriggerTimedOut(safeTriggerId, {
+        timed_out_at: Date.now(),
+        last_event: null
+      });
+      cleanup.lifecycle = { ok: fsbTriggerCleanupOk(lifecycleResult), result: lifecycleResult };
+    } else {
+      cleanup.lifecycle = { ok: false, reason: 'lifecycle_unavailable' };
+    }
+  } catch (err) {
+    cleanup.lifecycle = { ok: false, error: fsbTriggerCleanupError(err) };
+  }
+
+  const latestSnap = (lifecycleResult && lifecycleResult.snapshot)
+    || (await FsbTriggerStore.readSnapshot(safeTriggerId))
+    || snap;
+  return {
+    success: true,
+    outcome: latestSnap && latestSnap.status === 'fired' ? 'fired' : 'timed_out',
+    trigger_id: safeTriggerId,
+    status: fsbTriggerProjectTriggerStatus(latestSnap, Date.now()),
+    cleanup
+  };
+}
+
+function fsbTriggerValidateToolCondition(condition, nested) {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'condition_required' };
+  }
+
+  const combinator = fsbTriggerFirstString(condition.combinator);
+  if (combinator) {
+    const upper = combinator.toUpperCase();
+    if (nested || (upper !== 'AND' && upper !== 'OR') || !Array.isArray(condition.conditions) || condition.conditions.length === 0) {
+      return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'compound_invalid' };
+    }
+    for (let i = 0; i < condition.conditions.length; i++) {
+      const child = fsbTriggerValidateToolCondition(condition.conditions[i], true);
+      if (!child.ok) return child;
+    }
+    return { ok: true };
+  }
+
+  const rawKind = fsbTriggerFirstString(condition.kind);
+  const kind = rawKind === 'delta_percent' ? 'percent_change' : rawKind;
+  if (['changed', 'threshold', 'equals', 'regex', 'contains', 'percent_change'].indexOf(kind) === -1) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'kind_invalid' };
+  }
+
+  if (kind === 'threshold') {
+    const operator = fsbTriggerFirstString(condition.operator);
+    if (['>=', '<=', '>', '<'].indexOf(operator) === -1 || condition.target === undefined || condition.target === null) {
+      return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'threshold_invalid' };
+    }
+  }
+  if (kind === 'regex' && typeof condition.pattern !== 'string') {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'regex_invalid' };
+  }
+  if ((kind === 'contains' || kind === 'equals') && condition.value === undefined) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: kind + '_invalid' };
+  }
+  if (kind === 'percent_change' && !Number.isFinite(Number(condition.percent))) {
+    return { ok: false, errorCode: 'TRIGGER_CONDITION_INVALID', reason: 'percent_change_invalid' };
+  }
+
+  return { ok: true };
+}
+
+function fsbTriggerNormalizeToolCondition(condition) {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+    return condition;
+  }
+  const normalized = Object.assign({}, condition);
+  const rawKind = fsbTriggerFirstString(normalized.kind);
+  if (rawKind === 'delta_percent') {
+    normalized.kind = 'percent_change';
+  }
+  if (Array.isArray(normalized.conditions)) {
+    normalized.conditions = normalized.conditions.map(fsbTriggerNormalizeToolCondition);
+  }
+  return normalized;
+}
+
+function fsbTriggerNormalizeToolWatch(value) {
+  const raw = fsbTriggerFirstString(value) || 'live-observe';
+  if (raw === 'refresh_poll') return 'refresh-poll';
+  if (raw === 'live_observe') return 'live-observe';
+  if (raw === 'refresh-poll' || raw === 'live-observe') return raw;
+  return null;
+}
+
+function fsbTriggerToolAttrName(params) {
+  return fsbTriggerFirstString(
+    params && params.attrName,
+    params && params.attr_name,
+    params && params.attribute
+  );
+}
+
+function fsbTriggerToolExtract(params, condition) {
+  return fsbTriggerFirstString(
+    params && params.extract,
+    condition && condition.extract
+  ) || 'text';
+}
+
+function fsbTriggerCopyIntervalAliases(params, spec) {
+  ['poll_interval_ms', 'pollIntervalMs', 'interval_ms', 'intervalMs'].forEach((key) => {
+    if (params && Object.prototype.hasOwnProperty.call(params, key)) {
+      spec[key] = params[key];
+    }
+  });
+}
+
+function fsbTriggerReadResultValue(readResult) {
+  if (!readResult || readResult.success === false || readResult.ok === false) return null;
+  if (readResult.value && typeof readResult.value === 'object') return readResult.value;
+  return null;
+}
+
+const FSB_TRIGGER_TAB_WATCH_CONFLICT_ACTIVE_STATUSES = {
+  armed: true,
+  needs_attention: true,
+  blocked: true
+};
+
+async function fsbTriggerFindTabWatchConflict(targetTabId, requestedWatch, ownerContext) {
+  const normalizedRequestedWatch = fsbTriggerNormalizeToolWatch(requestedWatch);
+  const normalizedTabId = Number(targetTabId);
+  if (!Number.isFinite(normalizedTabId) || !normalizedRequestedWatch) return null;
+  if (typeof FsbTriggerStore === 'undefined'
+      || !FsbTriggerStore
+      || typeof FsbTriggerStore.hydrate !== 'function') {
+    return null;
+  }
+
+  let envelope = null;
+  try {
+    envelope = await FsbTriggerStore.hydrate();
+  } catch (_err) {
+    return null;
+  }
+  const records = envelope && envelope.records && typeof envelope.records === 'object'
+    ? envelope.records
+    : {};
+  const keys = Object.keys(records);
+  for (let i = 0; i < keys.length; i++) {
+    const snap = records[keys[i]];
+    if (!snap || typeof snap !== 'object') continue;
+    if (!FSB_TRIGGER_TAB_WATCH_CONFLICT_ACTIVE_STATUSES[snap.status]) continue;
+    if (Number(snap.target_tab_id) !== normalizedTabId) continue;
+    if (!fsbTriggerSnapshotVisibleToContext(snap, ownerContext)) continue;
+
+    const existingWatch = fsbTriggerNormalizeToolWatch(snap.watch || snap.mode);
+    if (!existingWatch || existingWatch === normalizedRequestedWatch) continue;
+    return snap;
+  }
+  return null;
+}
+
+async function fsbTriggerHandleToolArm(params, context) {
+  const safeParams = (params && typeof params === 'object') ? params : {};
+  const sender = context && context.sender;
+  const tabId = fsbTriggerFirstFiniteTabId(
+    safeParams.tab_id,
+    safeParams.target_tab_id,
+    safeParams.tabId,
+    context && context.tab_id,
+    context && context.target_tab_id,
+    context && context.tabId,
+    sender && sender.tab && sender.tab.id
+  );
+
+  const ownerContext = await fsbTriggerOwnerContext(
+    fsbTriggerMergeParamsAndContext(Object.assign({}, safeParams, { target_tab_id: tabId }), context),
+    sender
+  );
+  if (ownerContext && ownerContext.accessDenied) {
+    return { success: false, errorCode: 'TRIGGER_ACCESS_DENIED' };
+  }
+
+  const selector = fsbTriggerFirstString(safeParams.selector);
+  if (!selector) {
+    return { success: false, errorCode: 'TRIGGER_SELECTOR_INVALID' };
+  }
+  // fsbTriggerFirstFiniteTabId returns a finite number or null; the old
+  // Number.isFinite(Number(tabId)) guard was unreachable for null because
+  // Number(null) === 0 is finite.
+  if (tabId === null) {
+    return { success: false, errorCode: 'INVALID_TAB_ID' };
+  }
+
+  let condition = fsbTriggerNormalizeToolCondition(safeParams.condition);
+  const conditionValidation = fsbTriggerValidateToolCondition(condition);
+  if (!conditionValidation.ok) {
+    return Object.assign({ success: false }, conditionValidation);
+  }
+
+  const watch = fsbTriggerNormalizeToolWatch(safeParams.watch || safeParams.mode);
+  if (!watch) {
+    return { success: false, errorCode: 'TRIGGER_WATCH_INVALID' };
+  }
+
+  const watchConflict = await fsbTriggerFindTabWatchConflict(Number(tabId), watch, ownerContext);
+  if (watchConflict) {
+    return {
+      success: false,
+      error: 'TRIGGER_TAB_WATCH_CONFLICT',
+      code: 'TRIGGER_TAB_WATCH_CONFLICT',
+      errorCode: 'TRIGGER_TAB_WATCH_CONFLICT',
+      target_tab_id: Number(tabId),
+      existing_trigger_id: watchConflict.trigger_id || watchConflict.id || null,
+      existing_watch: watchConflict.watch || watchConflict.mode || null,
+      requested_watch: watch
+    };
+  }
+
+  const extract = fsbTriggerToolExtract(safeParams, condition);
+  const attrName = fsbTriggerToolAttrName(safeParams) || fsbTriggerAttrName({ condition });
+  if (extract === 'attribute' && attrName && condition && typeof condition === 'object'
+      && !fsbTriggerFirstString(condition.attribute, condition.attrName, condition.attr_name)) {
+    condition = Object.assign({}, condition, { attribute: attrName });
+  }
+  const locale = fsbTriggerFirstString(safeParams.locale);
+  const decimalSeparator = fsbTriggerFirstString(safeParams.decimal_separator);
+  if (condition && typeof condition === 'object' && (locale || decimalSeparator)) {
+    const parseCondition = Object.assign({}, condition);
+    let copiedParseOption = false;
+    if (locale && !Object.prototype.hasOwnProperty.call(parseCondition, 'locale')) {
+      parseCondition.locale = locale;
+      copiedParseOption = true;
+    }
+    if (decimalSeparator && !Object.prototype.hasOwnProperty.call(parseCondition, 'decimal_separator')) {
+      parseCondition.decimal_separator = decimalSeparator;
+      copiedParseOption = true;
+    }
+    if (copiedParseOption) condition = parseCondition;
+  }
+  const readShape = { selector, condition, extract, attrName };
+  const readResult = await fsbTriggerSendRefreshPollRead(Number(tabId), readShape);
+  if (readResult && readResult.code === 'TRIGGER_PAGE_BLOCKED') {
+    return Object.assign({ success: false, errorCode: 'TRIGGER_PAGE_BLOCKED' }, readResult);
+  }
+  if (readResult && (readResult.code === 'ELEMENT_NOT_FOUND' || readResult.reason === 'element_not_found')) {
+    return Object.assign({ success: false, errorCode: 'ELEMENT_NOT_FOUND' }, readResult);
+  }
+  const value = fsbTriggerReadResultValue(readResult);
+  if (!value || typeof value.text !== 'string') {
+    return {
+      success: false,
+      errorCode: 'TRIGGER_READ_FAILED',
+      reason: readResult && (readResult.reason || readResult.error || readResult.code)
+    };
+  }
+
+  const triggerId = fsbTriggerFirstString(safeParams.trigger_id)
+    || (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : ('trigger_' + Date.now().toString(36)));
+  const spec = {
+    trigger_id: triggerId,
+    condition,
+    selector,
+    baseline: value.text,
+    reported_value: value.text,
+    target_tab_id: Number(tabId),
+    agent_id: ownerContext && ownerContext.agentId,
+    ownership_token: ownerContext && ownerContext.ownershipToken,
+    watch,
+    extract,
+    attrName
+  };
+  const attrs = fsbTriggerCopyReportedAttributes(value.attributes);
+  if (attrs) spec.reported_attributes = attrs;
+  fsbTriggerCopyIntervalAliases(safeParams, spec);
+  // Thread the tool's rearm_on_fire opt-in into the spec; copyArmMetadata
+  // (trigger-manager.js) persists it onto the snapshot and the fire path keeps
+  // watching instead of terminally disarming. Without this copy every trigger
+  // disarmed on first fire regardless of the caller's parameter.
+  if (safeParams.rearm_on_fire === true) spec.rearm_on_fire = true;
+
+  const triggerManager = (typeof FsbTriggerManager !== 'undefined') ? FsbTriggerManager : null;
+  if (!triggerManager || typeof triggerManager.armTrigger !== 'function') {
+    return { success: false, errorCode: 'TRIGGER_MANAGER_UNAVAILABLE', trigger_id: triggerId };
+  }
+
+  const armResult = await FsbTriggerManager.armTrigger(spec);
+  if (!armResult || armResult.ok === false || armResult.error || armResult.code) {
+    return Object.assign({
+      success: false,
+      errorCode: (armResult && (armResult.code || armResult.error)) || 'TRIGGER_ARM_FAILED',
+      trigger_id: triggerId
+    }, armResult || {});
+  }
+
+  let snapshot = null;
+  if (typeof FsbTriggerStore !== 'undefined'
+      && FsbTriggerStore
+      && typeof FsbTriggerStore.readSnapshot === 'function') {
+    snapshot = await FsbTriggerStore.readSnapshot(triggerId);
+  }
+  if (!snapshot) snapshot = Object.assign({ status: 'armed', armed_at: Date.now() }, spec);
+
+  if (fsbTriggerIsLiveObserveSnapshot(snapshot)) {
+    await fsbTriggerStartObserveForSnapshot(snapshot, 'trigger-arm');
+  } else if (fsbTriggerIsRefreshPollSnapshot(snapshot)) {
+    await fsbTriggerSendTabMessage(Number(tabId), {
+      action: 'triggerPulseStart',
+      selector: snapshot.selector,
+      reason: 'trigger-arm'
+    });
+  }
+
+  return {
+    success: true,
+    trigger_id: triggerId,
+    status: fsbTriggerProjectTriggerStatus(snapshot, Date.now())
+  };
+}
+
+async function fsbTriggerDispatchToolRequest(toolName, params, context) {
+  switch (toolName) {
+    case 'trigger':
+      return fsbTriggerHandleToolArm(params, context);
+    case 'stop_trigger':
+      return fsbTriggerHandleToolStop(params, context);
+    case 'get_trigger_status':
+      return fsbTriggerHandleToolStatus(params, context);
+    case 'list_triggers':
+      return fsbTriggerHandleToolList(params, context);
+    default:
+      return { success: false, errorCode: 'TRIGGER_TOOL_UNKNOWN', tool: toolName };
+  }
+}
+
+globalThis.fsbTriggerMarkTimedOutForMcp = fsbTriggerMarkTimedOutForMcp;
+globalThis.fsbTriggerToolHandlersForTest = { fsbTriggerOwnerContext: fsbTriggerOwnerContext, fsbTriggerSnapshotVisibleToContext: fsbTriggerSnapshotVisibleToContext, fsbTriggerProjectTriggerStatus: fsbTriggerProjectTriggerStatus, fsbTriggerProjectTriggerSummary: fsbTriggerProjectTriggerSummary, fsbTriggerValidateToolCondition: fsbTriggerValidateToolCondition, fsbTriggerHandleToolStatus: fsbTriggerHandleToolStatus, fsbTriggerHandleToolList: fsbTriggerHandleToolList, fsbTriggerHandleToolStop: fsbTriggerHandleToolStop, fsbTriggerMarkTimedOutForMcp: fsbTriggerMarkTimedOutForMcp, fsbTriggerHandleToolArm: fsbTriggerHandleToolArm, fsbTriggerDispatchToolRequest: fsbTriggerDispatchToolRequest };
+
+async function fsbTriggerArmLiveObserveForTest(spec) {
+  const safeSpec = spec && typeof spec === 'object' ? spec : {};
+  if (typeof FsbTriggerLifecycle === 'undefined'
+      || !FsbTriggerLifecycle
+      || typeof FsbTriggerLifecycle.armTrigger !== 'function') {
+    return { ok: false, reason: 'lifecycle_unavailable' };
+  }
+  const now = typeof safeSpec.now === 'number' ? safeSpec.now : Date.now();
+  const triggerId = safeSpec.trigger_id || ('test-live-observe-' + now);
+  const ttl = typeof FsbTriggerLifecycle.FSB_TRIGGER_DEFAULT_TTL_MS === 'number'
+    ? FsbTriggerLifecycle.FSB_TRIGGER_DEFAULT_TTL_MS
+    : 21600000;
+  const snapshot = {
+    trigger_id: triggerId,
+    status: 'armed',
+    watch: 'live-observe',
+    condition: safeSpec.condition || { kind: 'changed' },
+    baseline: safeSpec.baseline == null ? null : safeSpec.baseline,
+    last_value: safeSpec.baseline == null ? null : safeSpec.baseline,
+    was_satisfied: false,
+    selector: safeSpec.selector,
+    extract: safeSpec.extract || (safeSpec.condition && safeSpec.condition.extract) || 'text',
+    attrName: safeSpec.attrName || (safeSpec.condition && safeSpec.condition.attribute) || null,
+    target_tab_id: safeSpec.target_tab_id,
+    agent_id: safeSpec.agent_id || 'test-trigger-agent',
+    armed_at: now,
+    deadline_at: now + ttl,
+    alarm_name: FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX + triggerId
+  };
+  const armed = await FsbTriggerLifecycle.armTrigger(snapshot);
+  if (armed && armed.ok !== false) {
+    await fsbTriggerStartObserveForSnapshot(snapshot, 'test-arm');
+  }
+  return Object.assign({ snapshot }, armed || {});
+}
+
+globalThis.fsbTriggerArmLiveObserveForTest = fsbTriggerArmLiveObserveForTest;
+globalThis.fsbTriggerHandleRefreshPollForTest = fsbTriggerHandleRefreshPollAlarm;
+
 // Classify failure type based on error message and context
 function classifyFailure(error, action, context = {}) {
   const errorMessage = (error.message || error || '').toLowerCase();
@@ -3483,6 +5812,13 @@ async function executeReplaySequence(replaySessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId: replaySessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+        // Thread the originating conversation (null for a conversation-less
+        // replay) so the sidepanel never mispersists this completion into
+        // whatever conversation happens to be visible.
+        conversationId: (session && session.conversationId) || null,
+        historySessionId: (session && session.historySessionId) || replaySessionId,
         result: `Replay complete: ${successCount}/${session.totalSteps} steps executed successfully.${failedCount > 0 ? ` ${failedCount} steps skipped.` : ''}`
       });
     } catch (e) { /* UI may not be listening */ }
@@ -5268,8 +7604,10 @@ function detectRepeatedSuccess(session) {
   return null;
 }
 
-// Listen for messages from popup and content scripts
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// Listen for messages from popup and content scripts. Named (rather than
+// inline) so fsbDispatchInternalMessage, defined right after the listener
+// body, can invoke it directly for same-service-worker callers.
+const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
   // Security: Only accept messages from our own extension contexts
   if (sender.id !== chrome.runtime.id) {
     console.warn('[FSB] Rejected message from unknown sender:', sender.id);
@@ -5282,6 +7620,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
 
   switch (request.action) {
+    case 'fsbAuditLogClearAndExport': {
+      // Race-safe clear-and-export delegated from a page realm (control
+      // panel / sidepanel). Running the read/set here serializes it against
+      // in-flight append() calls on the SW's own _withStorageLock chain; a
+      // page-realm chain is a separate mutex instance that could not
+      // synchronize against the SW's writer. Falls back to signalling
+      // failure via the sendResponse envelope so the caller's local best-
+      // effort branch can take over.
+      try {
+        var auditStore = globalThis && globalThis.FsbAuditLog;
+        if (auditStore && typeof auditStore._localClear === 'function') {
+          Promise.resolve(auditStore._localClear()).then(function(result) {
+            sendResponse({
+              entries: (result && Array.isArray(result.entries)) ? result.entries : [],
+              clearedAt: (result && result.clearedAt) || Date.now()
+            });
+          }, function() {
+            sendResponse({ entries: [], clearedAt: Date.now(), error: 'clear-failed' });
+          });
+          return true; // keep the channel open until _localClear settles
+        }
+      } catch (_e) { /* swallow -- fall through to failure envelope */ }
+      sendResponse({ entries: [], clearedAt: Date.now(), error: 'audit-log-unavailable' });
+      return false;
+    }
+
     case 'ensureLegacyAgent': {
       // Phase 240 D-02: legacy surfaces (popup, sidepanel, autopilot)
       // synthesize a constant agentId via Plan 01's getOrRegisterLegacyAgent
@@ -5329,22 +7693,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       handleAICall(request, sender, sendResponse);
       return true; // Will respond asynchronously
       
-    case 'getStatus':
-      // Return sessionIds so UI can recover after service worker restart
-      const sessionIds = Array.from(activeSessions.keys());
-      const firstSession = sessionIds.length > 0 ? activeSessions.get(sessionIds[0]) : null;
+    case 'getStatus': {
+      // QT-wnz Codex-2 -- tab-scoped status lookup.
+      // Pre-wnz: returned sessionIds[0] globally; a fresh sidepanel document
+      // on Tab B would adopt sess_A if sess_A was activeSessions.keys()[0],
+      // poisoning Tab B's currentSessionId. See CODEX-RESPONSE.md L10042.
+      var _allSessionIds = Array.from(activeSessions.keys());
+      var _scopedSessionIds = _allSessionIds;
+      var _scopedFirst = null;
+      if (typeof request.activeTabId === 'number') {
+        _scopedSessionIds = _allSessionIds.filter(function (sid) {
+          var s = activeSessions.get(sid);
+          return s && s.tabId === request.activeTabId;
+        });
+        _scopedFirst = _scopedSessionIds.length > 0 ? activeSessions.get(_scopedSessionIds[0]) : null;
+      } else {
+        // Backward-compat: legacy callers (popup.js) may omit activeTabId.
+        // Preserve global sessionIds[0] behavior + warn so we can find them.
+        console.warn('[FSB] getStatus called without activeTabId -- legacy global-scope fallback. See .planning/quick/260608-wnz-codex-strategy-b-5-item-architectural-fi/');
+        _scopedFirst = _allSessionIds.length > 0 ? activeSessions.get(_allSessionIds[0]) : null;
+      }
       sendResponse({
         status: 'ready',
-        activeSessions: activeSessions.size,
-        sessionIds: sessionIds,
-        currentSessionId: sessionIds[0] || null,  // First active session for UI recovery
-        currentTask: firstSession?.task || null,
-        currentStartTime: firstSession?.startTime || null,
-        currentIterationCount: firstSession?.iterationCount || 0,
-        currentMaxIterations: firstSession?.maxIterations || 20,
-        currentActionCount: firstSession?.actionHistory?.length || 0
+        activeSessions: _scopedSessionIds.length,
+        sessionIds: _scopedSessionIds,
+        currentSessionId: _scopedSessionIds[0] || null,
+        currentTask: _scopedFirst?.task || null,
+        currentStartTime: _scopedFirst?.startTime || null,
+        currentIterationCount: _scopedFirst?.iterationCount || 0,
+        currentMaxIterations: _scopedFirst?.maxIterations || 100,
+        currentActionCount: _scopedFirst?.actionHistory?.length || 0
       });
       break;
+    }
 
     case 'checkSessionAlive': {
       const sessionId = request.sessionId;
@@ -5390,6 +7771,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } catch (error) {
         sendResponse({ success: false, error: error && error.message ? error.message : 'reconnect failed' });
       }
+      break;
+    }
+
+    case 'getDashboardWebSocketStatus': {
+      // Replay-on-attach for the Sync tab pill's Connected input: reports the
+      // dashboard relay's live socket state. Mirrors getRemoteControlState;
+      // ws/ws-client.js pushes 'dashboardWsStatusChanged' on open/close.
+      const wsConnected = !!(typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected === true);
+      sendResponse({ success: true, connected: wsConnected });
       break;
     }
 
@@ -6169,6 +8559,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // DOM Stream forwarding (content -> dashboard via WebSocket)
     // ==========================================
 
+    case 'triggerValueChanged':
+    case 'triggerValueReport':
+      (async () => {
+        try {
+          const result = await fsbTriggerHandleValueReport(request, sender);
+          sendResponse(result);
+        } catch (error) {
+          sendResponse({ ok: false, error: error && error.message ? error.message : String(error) });
+        }
+      })();
+      return true;
+
     case 'domStreamSnapshot':
       if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
         fsbWebSocket.send('ext:dom-snapshot', request.snapshot || {});
@@ -6240,6 +8642,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'domStreamMedia':
+      // Phase 33 (MEDIA): relay live <video>/<audio> playback state to the
+      // dashboard viewer. The MediaSyncPayload is forwarded as the ws payload
+      // so the viewer receives it verbatim (additive STREAM.* type; the relay
+      // and ws-client are generic by type, so no other hop changes).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media', request.media || {});
+      }
+      sendResponse({ success: true });
+      break;
+
+    case 'domStreamMediaHint':
+      // Phase 33 (MEDIA): relay an adaptive-manifest discovery hint (dormant
+      // until chrome.webRequest discovery is opt-in enabled).
+      if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
+        fsbWebSocket.send('ext:dom-media-hint', request.hint || {});
+      }
+      sendResponse({ success: true });
+      break;
+
     case 'domStreamReady':
       if (typeof fsbWebSocket !== 'undefined' && fsbWebSocket && fsbWebSocket.connected) {
         fsbWebSocket.send('ext:dom-ready', { tabId: sender.tab ? sender.tab.id : null });
@@ -6262,10 +8684,87 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'lattice-test-connection': {
+      // UAT-08 prep: SW-bounce for options.js Test Connection.
+      // executeViaBridge is SW-only (lattice-provider-bridge.js global);
+      // control_panel.html does not script-load that file.
+      if (typeof executeViaBridge !== 'function') {
+        sendResponse({ ok: false, error: 'executeViaBridge unavailable in SW global' });
+        return true;
+      }
+      (async function () {
+        try {
+          await executeViaBridge(request.provider, request.config, { __testConnection: true }, { mode: 'test-connection' });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: (err && err.message) ? err.message : 'Unknown bridge error' });
+        }
+      })();
+      return true;
+    }
+
     default:
       sendResponse({ error: 'Unknown action' });
   }
-});
+};
+chrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);
+
+// In-SW direct dispatch for the MCP bridge client.
+//
+// chrome.runtime.sendMessage() never loops back to onMessage listeners
+// registered in the SAME service-worker context -- the constraint the
+// Phase 225-01 lifecycle bus (fsbAutomationLifecycleBus, near the top of
+// this file) already works around for terminal broadcasts. The MCP bridge
+// client (ws/mcp-bridge-client.js) is evaluated inside this service
+// worker, so its vault/payment lookups previously always failed with
+// "The message port closed before a response was received."
+//
+// fsbDispatchInternalMessage invokes fsbHandleRuntimeMessage directly with
+// a synthetic sender that passes the own-extension guard above. Envelopes
+// are NOT normalized: the switch's default branch still answers
+// { error: 'Unknown action' } with no success field, exactly as a
+// cross-context caller would see. The synthetic sender carries no tab, so
+// only dispatch actions that do not depend on sender.tab. This reaches
+// ONLY the listener above, not the exportDiagnostics listener.
+const FSB_INTERNAL_DISPATCH_TIMEOUT_MS = 20000; // < the MCP server's 30s sendAndWait default (mcp/src/bridge.ts)
+
+function fsbDispatchInternalMessage(request) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const settle = (response) => {
+      if (settled) return; // late sendResponse after settle is dropped (mirrors Chrome's closed port)
+      settled = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      resolve(response);
+    };
+    let keepOpen;
+    try {
+      keepOpen = fsbHandleRuntimeMessage(
+        request,
+        { id: chrome.runtime.id, fsbInternal: 'mcp-bridge' },
+        settle
+      );
+    } catch (error) {
+      settle({ success: false, error: (error && error.message) ? error.message : String(error) });
+      return;
+    }
+    if (settled) return;
+    if (keepOpen !== true) {
+      // Handler neither responded synchronously nor kept the channel open --
+      // mirror Chrome's closed-port semantics with a structured envelope.
+      settle({ success: false, error: 'Background handler returned no response for action: ' + ((request && request.action) || 'unknown') });
+      return;
+    }
+    timer = setTimeout(() => {
+      settle({ success: false, error: 'Background handler timed out after ' + FSB_INTERNAL_DISPATCH_TIMEOUT_MS + 'ms for action: ' + ((request && request.action) || 'unknown') });
+    }, FSB_INTERNAL_DISPATCH_TIMEOUT_MS);
+  });
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;
+}
 
 /**
  * Handles the start of a new automation session
@@ -6416,6 +8915,42 @@ async function handleStartAutomation(request, sender, sendResponse) {
   try {
     // Get the target tab ID (may be updated by smart tab management below)
     let targetTabId = tabId || sender.tab?.id;
+
+    // QT-wnz Codex-1 -- the sidepanel reopen rekeys the document, which
+    // loses the post-send callback that records currentSessionId in this
+    // tab's _tabRunningMap. When the start request originated from inside
+    // an already-open sidepanel context (sender.url ends in
+    // 'ui/sidepanel.html'), skip the reopen. sender.tab may be undefined
+    // for sidepanel senders; sender.url is the durable discriminator per
+    // Chrome MV3 docs. Non-sidepanel callers (popup.js etc.) still hit
+    // the setOptions + open path below to bind the panel for first-open.
+    var _senderIsSidepanel = sender && typeof sender.url === 'string' && sender.url.endsWith('ui/sidepanel.html');
+
+    // Phase 12 FINT-24 (Plan 12-04) -- per-tab sidepanel auto-open binding.
+    // The setOptions + open awaits MUST be the FIRST awaits in this handler
+    // so the user-gesture context (originating from the sendBtn click in
+    // sidepanel.js -> chrome.runtime.sendMessage round-trip) is preserved
+    // through to the panel-open call per Chrome MV3 user-gesture contract
+    // (12-RESEARCH Section 7.1 + Pitfall 2 -- gesture decays through long
+    // await chains; calling these two awaits BEFORE any other await
+    // prevents the decay). Best-effort try/catch per CONTEXT D-13:
+    // sidePanel API failure does NOT abort automation. Graceful
+    // degradation on Chrome <114 (the API is undefined; rare).
+    if (targetTabId && typeof chrome.sidePanel !== 'undefined' && !_senderIsSidepanel) {
+      try {
+        await chrome.sidePanel.setOptions({
+          tabId: targetTabId,
+          enabled: true,
+          path: 'ui/sidepanel.html'
+        });
+        await chrome.sidePanel.open({ tabId: targetTabId });
+      } catch (sidePanelErr) {
+        console.warn('[FSB] Phase 12 FINT-24 sidePanel auto-open failed', {
+          tabId: targetTabId,
+          error: sidePanelErr && sidePanelErr.message
+        });
+      }
+    }
 
     // Check for existing conversation session for follow-up reuse
     if (conversationId && conversationSessions.has(conversationId)) {
@@ -6568,9 +9103,9 @@ async function handleStartAutomation(request, sender, sendResponse) {
     const storedSettings = await getStorageWithTimeout(
       ['maxIterations', 'animatedActionHighlights', 'domOptimization', 'maxDOMElements', 'prioritizeViewport'],
       3000,
-      { maxIterations: 20, animatedActionHighlights: true, domOptimization: true, maxDOMElements: 2000, prioritizeViewport: true }
+      { maxIterations: 100, animatedActionHighlights: true, domOptimization: true, maxDOMElements: 2000, prioritizeViewport: true }
     );
-    const userMaxIterations = parseInt(storedSettings.maxIterations) || 20;
+    const userMaxIterations = parseInt(storedSettings.maxIterations) || 100;
 
     // Pre-populate allowedTabs with all non-restricted tabs in the current window
     // so the AI can switch to any tab the user already has open
@@ -6654,7 +9189,7 @@ async function handleStartAutomation(request, sender, sendResponse) {
         sessionData.task = buildSingleCompanyTask(sessionData.multiSite.originalTask, companies[0]);
         sessionData.taskSummary = `Job search: 1/${companies.length} companies`;
         // Cap iterations per company for multi-site sessions
-        sessionData.maxIterations = Math.min(sessionData.maxIterations || 20, 15);
+        sessionData.maxIterations = Math.min(sessionData.maxIterations || 100, 15);
 
         automationLogger.info('Multi-site orchestration initialized', {
           sessionId,
@@ -7078,6 +9613,12 @@ async function handleStopAutomation(request, sender, sendResponse) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId: sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+        // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+        // fallback never targets the currently-visible one.
+        conversationId: (session && session.conversationId) || null,
+        historySessionId: (session && session.historySessionId) || sessionId,
         outcome: 'stopped',
         reason: 'user_stopped',
         stopped: true,
@@ -7094,6 +9635,31 @@ async function handleStopAutomation(request, sender, sendResponse) {
     });
   } else {
     automationLogger.warn('Session not found in memory or storage', { sessionId });
+
+    // QT-uof-4 (C-FIX) -- tier-3 lookup: if the sessionId appears in
+    // fsbSessionLogs, this session completed cleanly and was cleaned up
+    // (likely between UI state and stop-click). Distinguish so the
+    // sidepanel renders a friendly "Already completed" toast instead of
+    // the misleading "Session not found" error. See
+    // .planning/debug/cluster1-routing.md (Symptom C is a consequence of
+    // D, but C-FIX is a cosmetic polish for the narrow race window).
+    try {
+      const stored = await chrome.storage.local.get(['fsbSessionLogs']);
+      const sessionLogs = stored.fsbSessionLogs || {};
+      if (sessionLogs[sessionId]) {
+        automationLogger.info('Stop on already-completed session (race with natural completion)', { sessionId });
+        sendResponse({
+          success: false,
+          alreadyEnded: true,
+          error: 'Already completed'
+        });
+        return;
+      }
+    } catch (logsErr) {
+      automationLogger.warn('fsbSessionLogs tier-3 lookup failed', { sessionId, error: logsErr.message });
+      // fall through to default 'Session not found' response
+    }
+
     sendResponse({
       success: false,
       error: 'Session not found'
@@ -8169,7 +10735,7 @@ async function handleMultiTabAction(action, currentTabId) {
               phase: 'acting',
               taskName: session.task,
               iteration: session.iterationCount,
-              maxIterations: session.maxIterations || 20,
+              maxIterations: session.maxIterations || 100,
               statusText: 'Switched tab -- preparing next step...',
               animatedHighlights: session.animatedActionHighlights,
               taskSummary: session.taskSummary || null
@@ -8588,7 +11154,7 @@ async function launchNextCompanySearch(sessionId, session, companyName) {
   session.status = 'running';
 
   // Cap iterations per company to prevent one company consuming all iterations
-  session.maxIterations = Math.min(session.maxIterations || 20, 15);
+  session.maxIterations = Math.min(session.maxIterations || 100, 15);
 
   session.taskSummary = `Job search: ${ms.currentIndex + 1}/${totalCompanies} companies`;
 
@@ -9304,7 +11870,7 @@ async function startAutomationLoop(sessionId) {
     phase: 'analyzing',
     taskName: session.task,
     iteration: session.iterationCount,
-    maxIterations: session.maxIterations || 20,
+    maxIterations: session.maxIterations || 100,
     animatedHighlights: session.animatedActionHighlights,
     statusText: null,  // Don't carry over previous action text; let content script show "Analyzing page..."
     ...calculateProgress(session),
@@ -9321,7 +11887,7 @@ async function startAutomationLoop(sessionId) {
   }
 
   // === SAFETY NET: Absolute iteration cap and session time limit ===
-  const ABSOLUTE_MAX_ITERATIONS = session.maxIterations || 20;
+  const ABSOLUTE_MAX_ITERATIONS = session.maxIterations || 100;
   const MAX_SESSION_DURATION = 5 * 60 * 1000; // 5 minutes
   const sessionAge = Date.now() - (session.startTime || Date.now());
 
@@ -9348,6 +11914,12 @@ async function startAutomationLoop(sessionId) {
     fsbBroadcastAutomationLifecycle({
       action: 'automationComplete',
       sessionId,
+      // QT-uof-2 (BROADCAST-tabId-THREAD)
+      tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+      // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+      // fallback never targets the currently-visible one.
+      conversationId: (session && session.conversationId) || null,
+      historySessionId: (session && session.historySessionId) || sessionId,
       result: finalResult,
       partial: true,
       reason: 'max_iterations',
@@ -9383,6 +11955,12 @@ async function startAutomationLoop(sessionId) {
     fsbBroadcastAutomationLifecycle({
       action: 'automationComplete',
       sessionId,
+      // QT-uof-2 (BROADCAST-tabId-THREAD)
+      tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
+      // QT-7bi-02 parity: thread the originating conversation so the sidepanel
+      // fallback never targets the currently-visible one.
+      conversationId: (session && session.conversationId) || null,
+      historySessionId: (session && session.historySessionId) || sessionId,
       result: finalResult,
       partial: true,
       reason: 'timeout',
@@ -9950,7 +12528,7 @@ async function startAutomationLoop(sessionId) {
           phase: 'acting',
           taskName: session.task,
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           statusText: 'Signing in...',
           animatedHighlights: session.animatedActionHighlights
         });
@@ -9961,7 +12539,7 @@ async function startAutomationLoop(sessionId) {
           sessionId,
           message: 'Signing in...',
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           progressPercent: signinProgress.progressPercent,
           estimatedTimeRemaining: signinProgress.estimatedTimeRemaining
         }).catch((err) => {
@@ -10111,7 +12689,7 @@ async function startAutomationLoop(sessionId) {
     }
     
     // Calculate progress metrics for AI context
-    const maxIterations = session.maxIterations || 20;
+    const maxIterations = session.maxIterations || 100;
     const actionsSucceeded = session.actionHistory?.filter(a => a.result?.success).length || 0;
     const actionsFailed = session.actionHistory?.filter(a => !a.result?.success).length || 0;
     const uniquePagesVisited = new Set(session.urlHistory?.map(u => u.url) || []).size;
@@ -10288,7 +12866,7 @@ async function startAutomationLoop(sessionId) {
       phase: 'thinking',
       taskName: session.task,
       iteration: session.iterationCount,
-      maxIterations: session.maxIterations || 20,
+      maxIterations: session.maxIterations || 100,
       animatedHighlights: session.animatedActionHighlights,
       statusText: null,  // Don't carry over previous action text; let content script show "Planning next step..."
       ...calculateProgress(session),
@@ -10412,7 +12990,7 @@ async function startAutomationLoop(sessionId) {
         phase: 'acting',
         taskName: session.task,
         iteration: session.iterationCount,
-        maxIterations: session.maxIterations || 20,
+        maxIterations: session.maxIterations || 100,
         actionCount: aiResponse.actions.length,
         animatedHighlights: session.animatedActionHighlights,
         statusText: getActionStatus(aiResponse.actions[0].tool, aiResponse.actions[0].params),
@@ -10520,7 +13098,7 @@ async function startAutomationLoop(sessionId) {
           sessionId,
           message: getActionStatus(action.tool, action.params),
           iteration: session.iterationCount,
-          maxIterations: session.maxIterations || 20,
+          maxIterations: session.maxIterations || 100,
           progressPercent: actionProgress.progressPercent,
           estimatedTimeRemaining: actionProgress.estimatedTimeRemaining
         }).catch(() => {
@@ -10547,7 +13125,7 @@ async function startAutomationLoop(sessionId) {
             phase: 'acting',
             taskName: session.task,
             iteration: session.iterationCount,
-            maxIterations: session.maxIterations || 20,
+            maxIterations: session.maxIterations || 100,
             statusText: getActionStatus(action.tool, action.params),
             animatedHighlights: session.animatedActionHighlights,
             ...calculateProgress(session),
@@ -11002,6 +13580,8 @@ async function startAutomationLoop(sessionId) {
           fsbBroadcastAutomationLifecycle({
             action: 'automationComplete',
             sessionId,
+            // QT-uof-2 (BROADCAST-tabId-THREAD)
+            tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
             result: session.multiSiteResult
           });
           return;
@@ -11040,6 +13620,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: finalResult,
         partial: true,
         reason: 'no_progress',
@@ -11083,6 +13665,8 @@ async function startAutomationLoop(sessionId) {
         fsbBroadcastAutomationLifecycle({
           action: 'automationComplete',
           sessionId,
+          // QT-uof-2 (BROADCAST-tabId-THREAD)
+          tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
           result: session.multiSiteResult || repeatedResult,
           navigatedTo: currentUrl
         });
@@ -11131,6 +13715,8 @@ async function startAutomationLoop(sessionId) {
           fsbBroadcastAutomationLifecycle({
             action: 'automationComplete',
             sessionId,
+            // QT-uof-2 (BROADCAST-tabId-THREAD)
+            tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
             result: session.multiSiteResult
           });
           return;
@@ -11172,6 +13758,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: finalResult,
         partial: true,
         task: session.task
@@ -11317,6 +13905,8 @@ async function startAutomationLoop(sessionId) {
       fsbBroadcastAutomationLifecycle({
         action: 'automationComplete',
         sessionId,
+        // QT-uof-2 (BROADCAST-tabId-THREAD)
+        tabId: (session && typeof session.tabId === 'number') ? session.tabId : null,
         result: aiResponse.result
       });
     } else {
@@ -12195,6 +14785,165 @@ async function handleCDPMouseWheel(request, sender, sendResponse) {
 }
 
 /**
+ * Phase 34 (UPLOAD-01/02/04): set a real file from a disk PATH on an
+ * <input type="file"> via CDP DOM.setFileInputFiles -- the only mechanism that
+ * can populate a file input from disk (page JS is forbidden from setting
+ * input.value or reading the filesystem). Shared by BOTH front doors (the MCP
+ * dispatcher route and the autopilot executeBackgroundTool case) so the
+ * sensitive-path denylist + audit chokepoint (security posture A) covers both.
+ * Mirrors the executeCDPToolDirect attach / stale-retry / detach seam.
+ *
+ * @param {number} tabId    target tab (gate-resolved / owned)
+ * @param {string} selector CSS selector for the file input (or a container holding one)
+ * @param {string} filePath ABSOLUTE disk path; relative / ~ paths are rejected
+ * @returns {Promise<{success:boolean, method?:string, selector?:string, file?:string, hadEffect?:boolean, error?:string, reason?:string}>}
+ */
+async function executeUploadFile(tabId, selector, filePath) {
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbUploadPathDenylist : null;
+  const auditLog = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+
+  // Best-effort target origin for the audit (never throws).
+  let origin = '';
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab && tab.url) { try { origin = new URL(tab.url).origin; } catch (_e) { origin = ''; } }
+  } catch (_e) { /* tab gone */ }
+
+  async function audit(outcome, decision, errName) {
+    if (!auditLog || typeof auditLog.append !== 'function') return;
+    try {
+      // The audit-log whitelist has no path field by design; persist origin +
+      // outcome + decision only. The full path could leak filesystem structure
+      // and must not be written to any durable logs.
+      const rec = { ts: Date.now(), origin, slug: 'upload_file', method: 'upload', sideEffectClass: 'mutating', consentDecision: decision, outcome };
+      if (errName) rec.error = errName;
+      const p = auditLog.append(rec);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_e) { /* audit is best-effort, never blocks the action */ }
+  }
+
+  if (!tabId) return { success: false, error: 'No tab ID available' };
+  if (typeof selector !== 'string' || !selector.trim()) {
+    return { success: false, error: 'upload_file requires a selector (CSS selector for the file input)' };
+  }
+  if (typeof filePath !== 'string' || !filePath.trim()) {
+    return { success: false, error: 'upload_file requires file_path (an absolute path to the file)' };
+  }
+
+  // Security posture A: sensitive-path denylist (shared chokepoint, both front doors).
+  // Fail closed if the module failed to load or its contract is incomplete.
+  if (!denylist
+      || typeof denylist.isAbsolutePath !== 'function'
+      || typeof denylist.classify !== 'function'
+      || typeof denylist.basenameOf !== 'function') {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-unavailable' });
+    await audit('blocked', 'denylist-unavailable', null);
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist unavailable', reason: 'denylist-unavailable' };
+  }
+
+  let absolutePath = false;
+  try {
+    absolutePath = denylist.isAbsolutePath(filePath);
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while checking the path', reason: 'denylist-error' };
+  }
+  if (!absolutePath) {
+    await audit('blocked', 'non-absolute-path', null);
+    return { success: false, error: 'upload_file requires an ABSOLUTE file path (relative or ~ paths cannot be resolved by the browser)' };
+  }
+
+  try {
+    const verdict = denylist.classify(filePath);
+    if (verdict && verdict.denied) {
+      automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: verdict.reason });
+      await audit('blocked', verdict.reason || 'sensitive-path', null);
+      return { success: false, error: 'upload_file blocked: the path matches a sensitive-path denylist rule (' + (verdict.reason || 'sensitive-path') + '); uploading secrets is not permitted', reason: verdict.reason };
+    }
+  } catch (error) {
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, blocked: true, reason: 'denylist-error' });
+    await audit('blocked', 'denylist-error', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file blocked: sensitive-path denylist failed while classifying the path', reason: 'denylist-error' };
+  }
+
+  let fileName = '';
+  const redactPathForUploadLog = (value) => String(value).split(filePath).join(fileName || '[redacted-file-path]');
+  let debuggerAttached = false;
+  try {
+    fileName = denylist.basenameOf(filePath);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'start', { tabId, selector, file: fileName });
+
+    if (keyboardEmulator && keyboardEmulator.isAttachedTo(tabId)) {
+      try { await keyboardEmulator.detachDebugger(tabId); } catch (_e) { /* ignore */ }
+    }
+    try {
+      await chrome.debugger.attach({ tabId }, '1.3');
+    } catch (attachErr) {
+      if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
+        try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+        await chrome.debugger.attach({ tabId }, '1.3');
+      } else {
+        throw attachErr;
+      }
+    }
+    debuggerAttached = true;
+
+    const doc = await chrome.debugger.sendCommand({ tabId }, 'DOM.getDocument', { depth: 0 });
+    const rootNodeId = doc && doc.root && doc.root.nodeId;
+    if (!rootNodeId) throw new Error('could not resolve the document root');
+
+    const q = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId: rootNodeId, selector });
+    let nodeId = q && q.nodeId;
+    if (!nodeId) throw new Error('no element matched selector: ' + selector);
+
+    // Ensure the node is a file input; if not, look for a descendant
+    // input[type=file] (handles styled dropzones / labels that wrap a hidden one).
+    let isFileInput = false;
+    try {
+      const desc = await chrome.debugger.sendCommand({ tabId }, 'DOM.describeNode', { nodeId });
+      const node = desc && desc.node;
+      if (node && node.nodeName === 'INPUT') {
+        const attrs = node.attributes || [];
+        for (let i = 0; i + 1 < attrs.length; i += 2) {
+          if (attrs[i] === 'type' && String(attrs[i + 1]).toLowerCase() === 'file') { isFileInput = true; break; }
+        }
+      }
+    } catch (_e) { /* describeNode best-effort */ }
+
+    if (!isFileInput) {
+      const q2 = await chrome.debugger.sendCommand({ tabId }, 'DOM.querySelector', { nodeId, selector: 'input[type="file"]' });
+      if (q2 && q2.nodeId) { nodeId = q2.nodeId; isFileInput = true; }
+    }
+    if (!isFileInput) {
+      throw new Error('selector did not resolve to an <input type="file"> (or a container holding one): ' + selector);
+    }
+
+    // Set the file by absolute path -- the browser process performs the disk
+    // read and fires input/change natively.
+    await chrome.debugger.sendCommand({ tabId }, 'DOM.setFileInputFiles', { nodeId, files: [filePath] });
+
+    // The upload has succeeded. Leave the detach to the finally block (which
+    // swallows detach errors) so a detach hiccup can never flip a real success
+    // into a reported failure -- a false negative could trigger a retry / double
+    // upload.
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: true, tabId, selector, file: fileName });
+    await audit('success', 'allow', null);
+    return { success: true, method: 'cdp_set_file_input', selector, file: fileName, hadEffect: true };
+  } catch (error) {
+    const msg = error && error.message ? error.message : String(error);
+    const redactedMsg = redactPathForUploadLog(msg);
+    automationLogger.logActionExecution(null, 'cdpUploadFile', 'complete', { success: false, tabId, error: redactedMsg });
+    await audit('error', 'allow', (error && error.name) ? error.name : 'Error');
+    return { success: false, error: 'upload_file failed: ' + redactedMsg };
+  } finally {
+    if (debuggerAttached) {
+      try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* ignore */ }
+    }
+  }
+}
+
+/**
  * Direct CDP tool dispatcher for tool-executor.js CDP routing.
  *
  * Called from agent-loop.js via the cdpHandler wrapper:
@@ -12831,6 +15580,25 @@ function initializeKeyboardEmulator() {
   return keyboardEmulator;
 }
 
+// Reconcile the KeyboardEmulator when Chrome initiates a debugger detach on its
+// attached tab (navigation, canceled_by_user banner dismissal, target crash/close).
+// Without this, a Chrome-side detach would leave the emulator's
+// debuggerAttached/attachedTabId/attachPromise stale and poison the next attach.
+// Mirrors the network-capture.js onDetach style; registered once at boot beside the
+// onRemoved/onSuspend cleanup. Guarded + non-throwing so a reconcile failure never
+// disrupts other onDetach concerns.
+if (chrome.debugger && chrome.debugger.onDetach && typeof chrome.debugger.onDetach.addListener === 'function') {
+  chrome.debugger.onDetach.addListener((source) => {
+    try {
+      if (keyboardEmulator && source && typeof keyboardEmulator.handleExternalDetach === 'function') {
+        keyboardEmulator.handleExternalDetach(source.tabId);
+      }
+    } catch (err) {
+      console.warn('[FSB KeyboardEmulator] onDetach reconcile failed (non-blocking):', err && err.message);
+    }
+  });
+}
+
 /**
  * Handle keyboard emulator actions from content scripts
  * @param {Object} request - The keyboard action request
@@ -12941,6 +15709,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     });
 });
 
+// Phase 14 Plan 03 (v0.11.0) -- trigger tab-close reap. Independent per-concern
+// onRemoved listener (FSB already registers multiple) that scans the trigger
+// registry for snapshots bound to the closed tab (target_tab_id) and reaps
+// their entry + alarm. Guarded + non-blocking (Promise.resolve(...).catch) so a
+// reap failure never disrupts sibling onRemoved concerns (D-07.3 / D-10c).
+// Requirements satisfied: LIFE-05 (tab-close reap).
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (typeof FsbTriggerLifecycle === 'undefined') return;
+  if (typeof FsbTriggerLifecycle.handleTriggerTabRemoved !== 'function') return;
+  Promise.resolve(FsbTriggerLifecycle.handleTriggerTabRemoved(tabId))
+    .catch((err) => {
+      console.warn('[FSB TRG] handleTriggerTabRemoved failed (non-blocking):', err && err.message);
+    });
+});
+
 /**
  * Clean up keyboard emulator when extension is suspended/unloaded
  */
@@ -12968,18 +15751,80 @@ chrome.action.onClicked.addListener(async (tab) => {
   armMcpBridge('action.onClicked');
   automationLogger.logInit('sidepanel', 'opening', { windowId: tab.windowId });
 
-  // Open global side panel for the entire browser window
+  // QT-93i-01 (redo: force-open with welcome state WITHOUT consuming the
+  // user-gesture token). The prior attempt (779bbae2 reverted in b7cb5283)
+  // awaited chrome.sidePanel.setOptions BEFORE chrome.sidePanel.open, which
+  // consumed the gesture and forced open() to reject -> popup-fallback.
+  //
+  // Fix: create BOTH Promises synchronously (inside the gesture window),
+  // then await later. open() is gesture-critical; setOptions() is not, so
+  // we await open() first and surface its failure into the popup fallback,
+  // then await setOptions() and log only. Per CONTEXT D-02: never block
+  // manual open. Defensive typeof guards for Chrome <114 graceful path.
+  var setOptionsPromise = null;
+  var openPromise = null;
+
   try {
-    await chrome.sidePanel.open({ windowId: tab.windowId });
-    automationLogger.logInit('sidepanel', 'ready', { windowId: tab.windowId });
+    if (tab && typeof tab.id === 'number'
+        && typeof chrome.sidePanel !== 'undefined'
+        && typeof chrome.sidePanel.setOptions === 'function') {
+      setOptionsPromise = chrome.sidePanel.setOptions({
+        tabId: tab.id,
+        enabled: true,
+        path: 'ui/sidepanel.html'
+      });
+    }
+  } catch (setErrSync) {
+    console.warn('[FSB] QT-93i-01 force-open setOptions threw sync', {
+      tabId: tab && tab.id,
+      error: setErrSync && setErrSync.message
+    });
+  }
+
+  try {
+    if (typeof chrome.sidePanel !== 'undefined'
+        && typeof chrome.sidePanel.open === 'function') {
+      openPromise = chrome.sidePanel.open({ windowId: tab.windowId });
+    }
+  } catch (openErrSync) {
+    console.warn('[FSB] QT-93i-01 sidePanel.open threw sync', {
+      windowId: tab && tab.windowId,
+      error: openErrSync && openErrSync.message
+    });
+  }
+
+  // Await OPEN first -- gesture-critical. Fail mode is the existing popup
+  // fallback. Note: open() was already CREATED synchronously above, so
+  // the gesture window is closed by Chrome's open() call site BEFORE any
+  // await touches it.
+  try {
+    if (openPromise) {
+      await openPromise;
+      automationLogger.logInit('sidepanel', 'ready', { windowId: tab.windowId });
+    } else {
+      throw new Error('chrome.sidePanel.open unavailable');
+    }
   } catch (error) {
-    automationLogger.logInit('sidepanel', 'failed', { error: error.message, fallback: 'popup' });
+    automationLogger.logInit('sidepanel', 'failed', {
+      error: error && error.message,
+      fallback: 'popup'
+    });
     // Fallback to popup window if side panel fails
     chrome.windows.create({
       url: chrome.runtime.getURL('ui/popup.html'),
       type: 'popup',
       width: 400,
       height: 600
+    });
+  }
+
+  // Await setOptions LAST -- non-gesture-critical, log only.
+  try {
+    if (setOptionsPromise) await setOptionsPromise;
+  } catch (setErr) {
+    console.warn('[FSB] QT-93i-01 force-open setOptions failed', {
+      tabId: tab && tab.id,
+      error: setErr && setErr.message
     });
   }
 });
@@ -13000,6 +15845,47 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await MCPVisualSessionLifecycleUtils.handleVisualSessionLifecycleAlarm(alarm);
     } catch (err) {
       console.warn('[FSB MCP] handleVisualSessionLifecycleAlarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
+  // Phase 14 Plan 03 (v0.11.0) -- trigger alarm tick. Alarm names of the form
+  // 'fsbTrigger:<triggerId>' route to the lifecycle helper which re-reads the
+  // snapshot from chrome.storage.session (storage-is-truth) and decides against
+  // persisted state. Additive branch with an early return so the fan-out stops
+  // at the matched concern (mirrors the visual branch above); never throws out
+  // of the listener (try/catch + non-blocking warn).
+  // Requirements satisfied: SURV-01 (alarm-wake routing to handleTriggerAlarm).
+  if (typeof FsbTriggerLifecycle !== 'undefined'
+      && alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(FsbTriggerLifecycle.TRIGGER_ALARM_PREFIX)) {
+    try {
+      const refreshPoll = await fsbTriggerHandleRefreshPollAlarm(alarm);
+      if (refreshPoll && refreshPoll.handled) return;
+      const handleResult = await FsbTriggerLifecycle.handleTriggerAlarm(alarm);
+      // A live-observe trigger reaped at its TTL deadline must stop the in-page
+      // observer + overlay. handleTriggerAlarm deletes the snapshot but cannot
+      // message the tab, so mirror the fire-path cleanup here (the MCP timeout
+      // path already does this via fsbTriggerMarkTimedOutForMcp).
+      if (handleResult && handleResult.action === 'reaped_ttl'
+          && fsbTriggerIsLiveObserveSnapshot(handleResult.snapshot)) {
+        await fsbTriggerClearObserveWatchdog(handleResult.trigger_id);
+        await fsbTriggerStopObserveForSnapshot(handleResult.snapshot);
+      }
+    } catch (err) {
+      console.warn('[FSB TRG] handleTriggerAlarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
+  if (alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(FSB_TRIGGER_OBSERVE_WATCHDOG_PREFIX)) {
+    try {
+      await fsbTriggerHandleObserveWatchdog(alarm);
+    } catch (err) {
+      console.warn('[FSB TRG] live-observe watchdog failed (non-blocking):', err && err.message);
     }
     return;
   }
@@ -13052,7 +15938,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
           && fsbWebSocket
           && fsbWebSocket.connected
           && typeof fsbWebSocket.send === 'function') {
-        fsbWebSocket.send('ext:request-snapshot', {
+        var streamTypes = (globalThis.FSBPhantomStreamProtocol && globalThis.FSBPhantomStreamProtocol.STREAM)
+          ? globalThis.FSBPhantomStreamProtocol.STREAM
+          : {};
+        fsbWebSocket.send(streamTypes.REQUEST_SNAPSHOT || 'ext:request-snapshot', {
           reason: 'sw-watchdog-tick',
           ts: Date.now()
         });
@@ -13130,12 +16019,44 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 //   }
 });
 
+// Phase 6 Plan 06-02 (FINT-07): SW-side startup wiring for the offscreen
+// Lattice host (extension/offscreen/lattice-host.js Phase 5 + 06-01).
+// Closes audit gap G3 from v0.10.0-MILESTONE-AUDIT.md: SW never opened the
+// offscreen document; D-22 deferred that to Phase 6.
+// CONTEXT.md post-research amendment: the WORKERS reason value per Chrome
+// docs (offscreen page hosts fetch + JS execution -- worker semantics).
+// Idempotent on both onInstalled + onStartup -- mirrors the Phase 269
+// telemetry-alarm pattern at line 13136.
+async function ensureLatticeOffscreen() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.offscreen || typeof chrome.offscreen.hasDocument !== 'function') {
+      console.warn('[FSB Lattice] chrome.offscreen unavailable; bridge will be inert');
+      return;
+    }
+    const has = await chrome.offscreen.hasDocument();
+    if (has) return;
+    await chrome.offscreen.createDocument({
+      url: 'offscreen/lattice-host.html',
+      reasons: ['WORKERS'],
+      justification: 'Hosts the Lattice provider bus; calls fetch() to external AI APIs on behalf of the service worker.'
+    });
+    console.log('[FSB Lattice] offscreen lattice-host opened');
+  } catch (err) {
+    console.error('[FSB Lattice] offscreen createDocument failed:', err && err.message ? err.message : err);
+  }
+}
+globalThis.ensureLatticeOffscreen = ensureLatticeOffscreen;
+
 // Set up side panel behavior
 chrome.runtime.onInstalled.addListener(async () => {
-  automationLogger.logInit('extension', 'installed', { version: 'v0.9.50' });
+  automationLogger.logInit('extension', 'installed', { version: chrome.runtime.getManifest().version });
 
   // Initialize analytics
   initializeAnalytics();
+
+  // Phase 6 Plan 06-02 (FINT-07): open offscreen Lattice host idempotently.
+  // Fire-and-forget; the helper's try/catch handles all errors.
+  ensureLatticeOffscreen();
 
   // Phase 269 / IDENT-01, IDENT-02: lazy-mint or reuse the install UUID.
   // Idempotent across both onInstalled and onStartup. Module guarantees no
@@ -13210,6 +16131,8 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(async () => {
   automationLogger.logServiceWorker('startup', {});
   initializeAnalytics();
+  // Phase 6 Plan 06-02 (FINT-07): re-open offscreen Lattice host idempotently on SW wake.
+  ensureLatticeOffscreen();
   // Phase 269 / IDENT-01, IDENT-02: idempotent get-or-create on every SW wake.
   // Returns the existing UUID after first install -- no re-mint.
   try {
@@ -13249,6 +16172,15 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.debugMode) {
     fsbDebugMode = changes.debugMode.newValue === true;
     console.log('[FSB] Debug mode ' + (fsbDebugMode ? 'enabled' : 'disabled'));
+  }
+
+  // React to the options-page trigger cap immediately (the cached cap in
+  // trigger-manager.js otherwise only refreshes on SW wake). setCap clamps and
+  // re-writes the same value, which Chrome does not re-fire onChanged for.
+  if (namespace === 'local' && changes.fsbTriggerCap
+      && typeof FsbTriggerManager !== 'undefined'
+      && typeof FsbTriggerManager.setCap === 'function') {
+    FsbTriggerManager.setCap(changes.fsbTriggerCap.newValue);
   }
 
   // React to dashboard sync toggle -- connect/disconnect relay WebSocket immediately

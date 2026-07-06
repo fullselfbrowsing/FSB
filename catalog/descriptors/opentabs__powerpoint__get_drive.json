@@ -1,0 +1,32 @@
+{
+  "slug": "powerpoint.get_drive",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get a drive in powerpoint",
+    "look up a drive in powerpoint",
+    "fetch a single drive in powerpoint",
+    "view one specific drive in powerpoint",
+    "get drive in powerpoint",
+    "get drive storage quota info in powerpoint"
+  ],
+  "description": "Get OneDrive storage information including total capacity, used space, and remaining quota.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-drive.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

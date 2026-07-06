@@ -1,0 +1,37 @@
+{
+  "slug": "yelp.navigate_to_business",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "navigate a to business in yelp",
+    "navigate to business in yelp",
+    "open a business page in the browser in yelp"
+  ],
+  "description": "Navigate the browser to a specific Yelp business page by its URL alias. Opens the business detail page in the current tab.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "alias": {
+        "type": "string",
+        "description": "Business URL alias (e.g., \"a-slice-of-new-york-san-jose\"). Found in business URLs: yelp.com/biz/{alias}"
+      }
+    },
+    "required": [
+      "alias"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/navigate-to-business.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

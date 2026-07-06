@@ -1,0 +1,45 @@
+{
+  "slug": "pinterest.create_board_section",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "create a board section in pinterest",
+    "add a board section in pinterest",
+    "make a new board section in pinterest",
+    "open a new board section in pinterest",
+    "create board section in pinterest",
+    "create a section in a board in pinterest"
+  ],
+  "description": "Create a new section within a board to organize pins into groups.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to create the section in"
+      },
+      "name": {
+        "type": "string",
+        "description": "Section name"
+      }
+    },
+    "required": [
+      "board_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/create-board-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourcepost",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

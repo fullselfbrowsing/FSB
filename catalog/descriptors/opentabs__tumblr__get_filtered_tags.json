@@ -1,0 +1,31 @@
+{
+  "slug": "tumblr.get_filtered_tags",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get filtered tags in tumblr",
+    "look up filtered tags in tumblr",
+    "fetch a single filtered tags in tumblr",
+    "view one specific filtered tags in tumblr",
+    "get your filtered tags in tumblr"
+  ],
+  "description": "Get the list of tags the authenticated user has filtered out of their dashboard. Posts with these tags are hidden.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-filtered-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

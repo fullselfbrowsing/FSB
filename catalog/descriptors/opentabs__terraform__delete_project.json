@@ -1,0 +1,39 @@
+{
+  "slug": "terraform.delete_project",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "delete a project in terraform",
+    "remove a project in terraform",
+    "trash a project in terraform",
+    "permanently delete a project in terraform",
+    "delete project in terraform"
+  ],
+  "description": "Delete a project. The project must have no workspaces.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project ID (e.g., \"prj-...\")"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/delete-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

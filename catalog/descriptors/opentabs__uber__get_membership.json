@@ -1,0 +1,32 @@
+{
+  "slug": "uber.get_membership",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get a membership in uber",
+    "look up a membership in uber",
+    "fetch a single membership in uber",
+    "view one specific membership in uber",
+    "get membership in uber",
+    "get uber one membership details and savings in uber"
+  ],
+  "description": "Get Uber One membership details including average monthly savings, monthly membership price, and potential savings for non-members.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-membership.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

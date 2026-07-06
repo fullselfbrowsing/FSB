@@ -1,0 +1,63 @@
+{
+  "slug": "outlook.get_calendar_view",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "get a calendar view in outlook",
+    "look up a calendar view in outlook",
+    "fetch a single calendar view in outlook",
+    "view one specific calendar view in outlook",
+    "get calendar view in outlook",
+    "view events in a date range in outlook"
+  ],
+  "description": "Get the events occurring within a date/time range, with recurring series expanded into individual occurrences. This is the tool to answer \"what is on my calendar\" for a given day, week, or range. The range bounds are read from the offset in the start/end timestamps (UTC when no offset is given); time_zone only controls the zone of the returned event times.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "start": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z||([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+        "description": "Range start as ISO 8601. Include a UTC offset to anchor the zone (e.g. \"2026-06-02T00:00:00-04:00\"); without an offset it is treated as UTC."
+      },
+      "end": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z||([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+        "description": "Range end as ISO 8601. Include a UTC offset to anchor the zone (e.g. \"2026-06-09T00:00:00-04:00\"); without an offset it is treated as UTC."
+      },
+      "calendar_id": {
+        "description": "Calendar ID to read (from list_calendars). Defaults to the primary calendar.",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Max occurrences to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "time_zone": {
+        "description": "Time zone for the returned event start/end times, e.g. \"Eastern Standard Time\" (does not shift the range bounds). Defaults to UTC.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "start",
+      "end"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/get-calendar-view.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "slack.edit_message",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "edit a message in slack",
+    "edit message in slack",
+    "edit an existing message in slack"
+  ],
+  "description": "Edit an existing Slack message. The caller must be the original author of the message.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the message to edit — serves as the unique message ID (e.g., 1234567890.123456)"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New message text — replaces the entire message content. Supports Slack mrkdwn formatting."
+      }
+    },
+    "required": [
+      "channel",
+      "ts",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/edit-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "edit"
+    }
+  }
+}

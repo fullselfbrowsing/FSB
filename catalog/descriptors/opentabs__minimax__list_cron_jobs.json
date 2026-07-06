@@ -1,0 +1,44 @@
+{
+  "slug": "minimax.list_cron_jobs",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list cron jobs in minimax",
+    "show me my cron jobs in minimax",
+    "view my cron jobs in minimax",
+    "see all my cron jobs in minimax",
+    "list scheduled jobs in minimax"
+  ],
+  "description": "List scheduled (cron) jobs with pagination. Returns job definitions including their schedules and statuses.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_num": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-cron-jobs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

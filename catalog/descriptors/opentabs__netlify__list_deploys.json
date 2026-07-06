@@ -1,0 +1,47 @@
+{
+  "slug": "netlify.list_deploys",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "list deploys in netlify",
+    "show me my deploys in netlify",
+    "view my deploys in netlify",
+    "see all my deploys in netlify",
+    "list site deploys in netlify"
+  ],
+  "description": "List deploys for a Netlify site. Returns deploy state, branch, commit info, context, framework, and timestamps. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to list deploys for"
+      },
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "per_page": {
+        "description": "Number of deploys per page (default 20)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/list-deploys.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

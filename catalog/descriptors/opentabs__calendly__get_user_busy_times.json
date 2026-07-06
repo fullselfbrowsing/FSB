@@ -1,0 +1,44 @@
+{
+  "slug": "calendly.get_user_busy_times",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get user busy times in calendly",
+    "look up user busy times in calendly",
+    "fetch a single user busy times in calendly",
+    "view one specific user busy times in calendly",
+    "get busy time slots for a date range in calendly"
+  ],
+  "description": "Get busy time slots for the current user within a date range. Returns both Calendly events and external calendar events that block availability. Requires start_time and end_time in ISO 8601 format.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "start_time": {
+        "type": "string",
+        "description": "Start of the time range in ISO 8601 format (e.g. \"2026-03-10T00:00:00Z\")"
+      },
+      "end_time": {
+        "type": "string",
+        "description": "End of the time range in ISO 8601 format (e.g. \"2026-03-17T00:00:00Z\")"
+      }
+    },
+    "required": [
+      "start_time",
+      "end_time"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-user-busy-times.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "powerpoint.move_item",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "move an item in powerpoint",
+    "move item in powerpoint",
+    "move a file or folder in powerpoint"
+  ],
+  "description": "Move a file or folder to a different folder in OneDrive. Returns the updated item details.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder to move"
+      },
+      "destination_folder_id": {
+        "type": "string",
+        "description": "Destination folder item ID"
+      }
+    },
+    "required": [
+      "item_id",
+      "destination_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/move-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "move"
+    }
+  }
+}

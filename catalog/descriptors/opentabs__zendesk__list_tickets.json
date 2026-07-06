@@ -1,0 +1,56 @@
+{
+  "slug": "zendesk.list_tickets",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "list tickets in zendesk",
+    "show me my tickets in zendesk",
+    "view my tickets in zendesk",
+    "see all my tickets in zendesk",
+    "list support tickets with pagination and sorting in zendesk"
+  ],
+  "description": "List support tickets from Zendesk. Returns tickets with full details including subject, status, priority, assignee, requester, and timestamps. Supports pagination and sorting by created/updated date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Number of tickets per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "sort_by": {
+        "description": "Field to sort by (e.g., \"created_at\", \"updated_at\", \"status\", \"priority\")",
+        "type": "string"
+      },
+      "sort_order": {
+        "description": "Sort direction: ascending or descending",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/list-tickets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

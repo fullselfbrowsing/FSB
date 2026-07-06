@@ -1,0 +1,31 @@
+{
+  "slug": "datadog.list_monitor_tags",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list monitor tags in datadog",
+    "show me my monitor tags in datadog",
+    "view my monitor tags in datadog",
+    "see all my monitor tags in datadog",
+    "list tags used by monitors in datadog"
+  ],
+  "description": "List all tags used across monitors. Useful for discovering available filter values.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-monitor-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

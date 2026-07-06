@@ -1,0 +1,47 @@
+{
+  "slug": "msword.append_to_document",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "append a to document in msword",
+    "append to document in msword",
+    "append a to document in microsoft word",
+    "append paragraphs to a word document in msword"
+  ],
+  "description": "Append paragraphs to the end of an existing Word document (.docx). Downloads the document, adds the new paragraphs after all existing content, and re-uploads. Existing content is preserved.",
+  "actionVerb": "append",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID of the .docx document to append to"
+      },
+      "paragraphs": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Text paragraphs to append at the end of the document"
+      }
+    },
+    "required": [
+      "item_id",
+      "paragraphs"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/append-to-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "append"
+    }
+  }
+}

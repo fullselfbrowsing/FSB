@@ -1,0 +1,43 @@
+{
+  "slug": "pinterest.get_board_sections",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get board sections in pinterest",
+    "look up board sections in pinterest",
+    "fetch a single board sections in pinterest",
+    "view one specific board sections in pinterest",
+    "get sections for a board in pinterest"
+  ],
+  "description": "Get all sections (subsections) of a board. Sections are used to organize pins within a board.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to get sections for"
+      },
+      "board_url": {
+        "description": "Board URL path (e.g., \"/username/board-name/\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "board_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-board-sections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

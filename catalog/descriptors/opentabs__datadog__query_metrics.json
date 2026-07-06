@@ -1,0 +1,47 @@
+{
+  "slug": "datadog.query_metrics",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "query metrics in datadog",
+    "query metric time-series data in datadog",
+    "query time-series metric data from datadog in datadog"
+  ],
+  "description": "Query time-series metric data from Datadog. Use standard metric query syntax with aggregation, scope, and optional group-by (e.g., \"avg:system.cpu.user{env:prod} by {host}\").",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Metric query (e.g., \"avg:system.cpu.user{*}\", \"sum:my.metric{env:prod} by {host}\")"
+      },
+      "from": {
+        "type": "number",
+        "description": "Start time (POSIX epoch seconds)"
+      },
+      "to": {
+        "type": "number",
+        "description": "End time (POSIX epoch seconds)"
+      }
+    },
+    "required": [
+      "query",
+      "from",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/query-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "query"
+    }
+  }
+}

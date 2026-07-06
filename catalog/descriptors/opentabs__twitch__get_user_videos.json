@@ -1,0 +1,63 @@
+{
+  "slug": "twitch.get_user_videos",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get user videos in twitch",
+    "look up user videos in twitch",
+    "fetch a single user videos in twitch",
+    "view one specific user videos in twitch",
+    "get videos from a twitch channel in twitch"
+  ],
+  "description": "Get videos (VODs, highlights, uploads) from a Twitch channel. Optionally filter by video type and sort order.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "login": {
+        "type": "string",
+        "description": "Broadcaster login name (e.g., \"shroud\")"
+      },
+      "type": {
+        "description": "Video type filter (default: all types)",
+        "type": "string",
+        "enum": [
+          "ARCHIVE",
+          "HIGHLIGHT",
+          "UPLOAD",
+          "PAST_PREMIERE"
+        ]
+      },
+      "sort": {
+        "description": "Sort order (default TIME — most recent first)",
+        "type": "string",
+        "enum": [
+          "TIME",
+          "VIEWS"
+        ]
+      },
+      "first": {
+        "description": "Number of videos to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "required": [
+      "login"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-user-videos.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

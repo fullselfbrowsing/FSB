@@ -1,0 +1,44 @@
+{
+  "slug": "netlify.delete_build_hook",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "delete a build hook in netlify",
+    "remove a build hook in netlify",
+    "trash a build hook in netlify",
+    "permanently delete a build hook in netlify",
+    "delete build hook in netlify"
+  ],
+  "description": "Delete a build hook from a Netlify site by its ID. The hook URL will no longer trigger builds. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID the build hook belongs to"
+      },
+      "hook_id": {
+        "type": "string",
+        "description": "The build hook ID to delete"
+      }
+    },
+    "required": [
+      "site_id",
+      "hook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/delete-build-hook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

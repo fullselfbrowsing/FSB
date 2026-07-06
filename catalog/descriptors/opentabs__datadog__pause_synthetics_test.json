@@ -1,0 +1,46 @@
+{
+  "slug": "datadog.pause_synthetics_test",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "pause a synthetics test in datadog",
+    "pause synthetics test in datadog",
+    "pause or resume a synthetic test in datadog"
+  ],
+  "description": "Pause or resume a synthetic test by changing its status.",
+  "actionVerb": "pause",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "public_id": {
+        "type": "string",
+        "description": "Synthetic test public ID"
+      },
+      "new_status": {
+        "type": "string",
+        "enum": [
+          "live",
+          "paused"
+        ],
+        "description": "New status: \"live\" to resume, \"paused\" to pause"
+      }
+    },
+    "required": [
+      "public_id",
+      "new_status"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/pause-synthetics-test.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiput",
+      "httpMethod": "PUT",
+      "opNameVerb": "pause"
+    }
+  }
+}

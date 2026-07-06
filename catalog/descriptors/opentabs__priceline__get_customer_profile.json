@@ -1,0 +1,32 @@
+{
+  "slug": "priceline.get_customer_profile",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get a customer profile in priceline",
+    "look up a customer profile in priceline",
+    "fetch a single customer profile in priceline",
+    "view one specific customer profile in priceline",
+    "get customer profile in priceline",
+    "get your priceline profile in priceline"
+  ],
+  "description": "Get the authenticated user's Priceline customer profile including loyalty tier and audience segments.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-customer-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

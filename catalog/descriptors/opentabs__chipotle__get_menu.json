@@ -1,0 +1,42 @@
+{
+  "slug": "chipotle.get_menu",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get a menu in chipotle",
+    "look up a menu in chipotle",
+    "fetch a single menu in chipotle",
+    "view one specific menu in chipotle",
+    "get menu in chipotle",
+    "get restaurant menu with prices and calories in chipotle"
+  ],
+  "description": "Get the full online menu for a specific Chipotle restaurant. Returns all entrees with item name, price, calorie range, availability, and thumbnail image.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Restaurant ID (from find_restaurants)"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

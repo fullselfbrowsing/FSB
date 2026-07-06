@@ -1,0 +1,40 @@
+{
+  "slug": "x.delete_list",
+  "service": "x.com",
+  "intentSynonyms": [
+    "delete a list in x",
+    "remove a list in x",
+    "trash a list in x",
+    "permanently delete a list in x",
+    "delete list in x"
+  ],
+  "description": "Delete a list. Only works for lists you own.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID to delete"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/delete-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

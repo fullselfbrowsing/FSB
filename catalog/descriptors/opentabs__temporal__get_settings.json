@@ -1,0 +1,36 @@
+{
+  "slug": "temporal.get_settings",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "get settings in temporal",
+    "look up settings in temporal",
+    "fetch a single settings in temporal",
+    "view one specific settings in temporal",
+    "get namespace ui settings and capabilities in temporal"
+  ],
+  "description": "Get the Temporal UI settings for a namespace. Shows which actions are enabled/disabled (terminate, cancel, signal, reset, etc.), the server version, and codec configuration.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/get-settings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

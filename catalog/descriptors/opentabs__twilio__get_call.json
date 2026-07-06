@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.get_call",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a call in twilio",
+    "look up a call in twilio",
+    "fetch a single call in twilio",
+    "view one specific call in twilio",
+    "get call in twilio"
+  ],
+  "description": "Get a specific voice call by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Call SID (e.g., CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-call.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

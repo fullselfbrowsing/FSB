@@ -1,0 +1,59 @@
+{
+  "slug": "datadog.search_rum_events",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search rum events in datadog",
+    "search rum events with query syntax in datadog",
+    "search real user monitoring (rum) events in datadog"
+  ],
+  "description": "Search Real User Monitoring (RUM) events. Filter by event type, user, URL, browser, and more using Datadog query syntax (e.g., \"@type:error\", \"@view.url:*/checkout/*\", \"@usr.id:user123\").",
+  "actionVerb": "search",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "RUM search query (e.g., \"@type:error\", \"@type:view @view.loading_time:>5000\")"
+      },
+      "from": {
+        "description": "Start time (default now-15m)",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time (default now)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum results (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "sort": {
+        "description": "Sort order",
+        "type": "string",
+        "enum": [
+          "timestamp",
+          "-timestamp"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-rum-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "search"
+    }
+  }
+}

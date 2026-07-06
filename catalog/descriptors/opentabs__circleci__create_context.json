@@ -1,0 +1,52 @@
+{
+  "slug": "circleci.create_context",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "create a context in circleci",
+    "add a context in circleci",
+    "make a new context in circleci",
+    "open a new context in circleci",
+    "create context in circleci"
+  ],
+  "description": "Create a new context in an organization.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Context name"
+      },
+      "owner_id": {
+        "type": "string",
+        "description": "Organization UUID"
+      },
+      "owner_type": {
+        "description": "Owner type (default \"organization\")",
+        "type": "string",
+        "enum": [
+          "account",
+          "organization"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "owner_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/create-context.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "instagram.unsave_post",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "unsave a post in instagram",
+    "unsave post in instagram",
+    "remove a saved post from your saved collection in instagram"
+  ],
+  "description": "Remove a saved post from your saved collection.",
+  "actionVerb": "unsave",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "media_id": {
+        "type": "string",
+        "description": "Media numeric pk"
+      }
+    },
+    "required": [
+      "media_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/unsave-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unsave"
+    }
+  }
+}

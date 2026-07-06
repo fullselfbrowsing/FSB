@@ -1,0 +1,50 @@
+{
+  "slug": "azure.get_deployment",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "get a deployment in azure",
+    "look up a deployment in azure",
+    "fetch a single deployment in azure",
+    "view one specific deployment in azure",
+    "get deployment in azure",
+    "get deployment details in azure"
+  ],
+  "description": "Get detailed information about a specific template deployment in a resource group.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "deployment_name": {
+        "type": "string",
+        "description": "Deployment name"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name",
+      "deployment_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/get-deployment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

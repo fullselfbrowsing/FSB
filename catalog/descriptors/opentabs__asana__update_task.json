@@ -1,0 +1,69 @@
+{
+  "slug": "asana.update_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "update a task in asana",
+    "edit a task in asana",
+    "change the details of task in asana",
+    "modify a task in asana",
+    "update a to-do in asana",
+    "update a to-do item in asana"
+  ],
+  "description": "Update an existing task — change name, completion status, assignee, dates, or notes.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to update"
+      },
+      "name": {
+        "description": "New task name",
+        "type": "string"
+      },
+      "completed": {
+        "description": "Whether the task is completed",
+        "type": "boolean"
+      },
+      "assignee": {
+        "description": "New assignee user GID",
+        "type": "string"
+      },
+      "due_on": {
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "due_at": {
+        "description": "Due datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "start_on": {
+        "description": "Start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "notes": {
+        "description": "Plain-text task description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/update-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "leetcode.get_current_user",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get a current user in leetcode",
+    "look up a current user in leetcode",
+    "fetch a single current user in leetcode",
+    "view one specific current user in leetcode",
+    "get current user in leetcode",
+    "get your leetcode profile in leetcode"
+  ],
+  "description": "Get the authenticated LeetCode user profile including username, premium status, and notification count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

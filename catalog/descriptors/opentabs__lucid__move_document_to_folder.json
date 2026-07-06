@@ -1,0 +1,42 @@
+{
+  "slug": "lucid.move_document_to_folder",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "move a document to folder in lucid",
+    "move document to folder in lucid",
+    "move a document into a folder in lucid"
+  ],
+  "description": "Create a folder entry that links a document to a folder. This effectively moves or adds the document to the specified folder.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "type": "string",
+        "description": "Document UUID to move"
+      },
+      "folder_id": {
+        "type": "string",
+        "description": "Target folder entry ID"
+      }
+    },
+    "required": [
+      "document_id",
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/move-document-to-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "move"
+    }
+  }
+}

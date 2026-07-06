@@ -1,0 +1,32 @@
+{
+  "slug": "leetcode.get_daily_challenge",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get a daily challenge in leetcode",
+    "look up a daily challenge in leetcode",
+    "fetch a single daily challenge in leetcode",
+    "view one specific daily challenge in leetcode",
+    "get daily challenge in leetcode",
+    "get today's daily challenge in leetcode"
+  ],
+  "description": "Get today daily coding challenge question including the date, link, and full problem metadata.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-daily-challenge.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

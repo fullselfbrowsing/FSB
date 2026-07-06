@@ -1,0 +1,40 @@
+{
+  "slug": "robinhood.get_instrument",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get an instrument in robinhood",
+    "look up an instrument in robinhood",
+    "fetch a single instrument in robinhood",
+    "view one specific instrument in robinhood",
+    "get instrument in robinhood",
+    "get instrument details by uuid in robinhood"
+  ],
+  "description": "Get detailed instrument information by UUID including ticker symbol, company name, type, country, tradeability, and listing date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instrument_id": {
+        "type": "string",
+        "description": "Instrument UUID"
+      }
+    },
+    "required": [
+      "instrument_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-instrument.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

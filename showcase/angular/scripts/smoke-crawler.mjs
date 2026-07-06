@@ -5,7 +5,8 @@
 // (home), Content-Type headers, and llms-full.txt size budget.
 //
 // Run:
-//   BASE_URL=http://localhost:3217 node scripts/smoke-crawler.mjs   (local)
+//   npm --prefix showcase/angular run smoke:crawler:local           (local static build)
+//   BASE_URL=http://localhost:3217 node scripts/smoke-crawler.mjs   (custom local target)
 //   node scripts/smoke-crawler.mjs                                  (production default)
 //
 // Zero new npm dependencies -- node:fetch is built into Node 18+; no other
@@ -39,11 +40,18 @@ async function fetchText(url, opts = {}) {
 }
 
 const MARKETING_ASSERTIONS = [
-  { path: '/',        titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}` },
-  { path: '/about',   titleSubstr: 'About',              canonical: `${PROD_HOST}/about` },
-  { path: '/privacy', titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
-  { path: '/support', titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
+  { path: '/',               titleSubstr: 'Full Self-Browsing', canonical: `${PROD_HOST}` },
+  { path: '/about',          titleSubstr: 'About',              canonical: `${PROD_HOST}/about` },
+  { path: '/agents',         titleSubstr: 'Agents',             canonical: `${PROD_HOST}/agents` },
+  { path: '/support',        titleSubstr: 'Support',            canonical: `${PROD_HOST}/support` },
+  { path: '/privacy',        titleSubstr: 'Privacy',            canonical: `${PROD_HOST}/privacy` },
+  { path: '/lattice',        titleSubstr: 'Lattice',            canonical: `${PROD_HOST}/lattice` },
+  { path: '/phantom-stream', titleSubstr: 'PhantomStream',      canonical: `${PROD_HOST}/phantom-stream` },
+  { path: '/prometheus',     titleSubstr: 'Prometheus',         canonical: `${PROD_HOST}/prometheus` },
+  { path: '/sitemaps',       titleSubstr: 'Site Maps',          canonical: `${PROD_HOST}/sitemaps` },
 ];
+
+const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.map(({ canonical }) => canonical);
 
 async function checkMarketingRoutes() {
   for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
@@ -114,7 +122,13 @@ async function checkSitemapLocs() {
     return;
   }
   const locs = [...r.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
-  record(locs.length === 5, 'sitemap has 5 <loc> entries', `actual ${locs.length}`);
+  const missing = EXPECTED_SITEMAP_LOCS.filter((loc) => !locs.includes(loc));
+  const unexpected = locs.filter((loc) => !EXPECTED_SITEMAP_LOCS.includes(loc));
+  record(
+    locs.length === EXPECTED_SITEMAP_LOCS.length && missing.length === 0 && unexpected.length === 0,
+    `sitemap has exact expected <loc> set (${EXPECTED_SITEMAP_LOCS.length} entries)`,
+    `actual ${locs.length}; missing ${missing.join(', ') || 'none'}; unexpected ${unexpected.join(', ') || 'none'}`
+  );
   for (const loc of locs) {
     // When running locally, rewrite the prod-host URLs in sitemap.xml to BASE_URL
     // so the loc assertions exercise the local server (the sitemap content is

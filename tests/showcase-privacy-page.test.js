@@ -27,6 +27,10 @@ const PRIVACY_HTML = path.join(
   ROOT,
   'showcase/angular/src/app/pages/privacy/privacy-page.component.html'
 );
+const PRIVACY_ARCHIVE_HTML = path.join(
+  ROOT,
+  'showcase/angular/src/app/pages/privacy/privacy-history-archive.component.html'
+);
 
 let passed = 0;
 let failed = 0;
@@ -42,6 +46,9 @@ if (!fs.existsSync(PRIVACY_HTML)) {
   process.exit(1);
 }
 const html = fs.readFileSync(PRIVACY_HTML, 'utf8');
+const archiveHtml = fs.existsSync(PRIVACY_ARCHIVE_HTML)
+  ? fs.readFileSync(PRIVACY_ARCHIVE_HTML, 'utf8')
+  : '';
 
 // =============================================================================
 // 1. Stable anchor + section heading.
@@ -52,6 +59,35 @@ check('has id="telemetry-disclosure" anchor',
 check('has "Anonymous Usage Telemetry" H2 source text',
   html.includes('Anonymous Usage Telemetry'),
   'section heading text missing');
+check('has Site API capabilities disclosure',
+  /Site.*API.*capabilities/.test(html) && /same-origin site.*API.*requests/.test(html) && /CSRF/.test(html),
+  'site API capability disclosure missing or too vague');
+check('no visible LEGAL.md reference remains',
+  !/LEGAL\.md/.test(html) && !/LEGAL\.md/.test(archiveHtml),
+  'LEGAL.md should not appear in live policy or visible archive copy');
+check('has PhantomStream live preview disclosure',
+  /Remote Dashboard.*PhantomStream.*Live Preview/.test(html) &&
+    /MutationObserver/.test(html) &&
+    /WebSocket/.test(html) &&
+    /live-preview frames/.test(html),
+  'PhantomStream live preview disclosure missing or too vague');
+check('discloses PhantomStream relay non-persistence',
+  /do not persist page.*DOM/.test(html) &&
+    /site.*API.*payloads/.test(html),
+  'relay non-persistence wording missing');
+check('discloses PhantomStream input masking',
+  /maskInputs: true/.test(html) &&
+    /passwords and form-control values are masked/.test(html),
+  'PhantomStream input masking disclosure missing');
+check('discloses PhantomStream sandboxed viewer',
+  /scriptless sandbox/.test(html) &&
+    /sanitizes mirrored.*DOM.*CSS/.test(html),
+  'PhantomStream sandbox/sanitization disclosure missing');
+check('discloses PhantomStream media-by-reference fetch behavior',
+  /Media bytes do not cross the relay/.test(html) &&
+    /public.*HTTPS.*asset or media URLs/.test(html) &&
+    /fail-closed fetch policy/.test(html),
+  'PhantomStream media-by-reference disclosure missing');
 
 // =============================================================================
 // 2. Five collected fields enumerated.
@@ -89,7 +125,7 @@ for (const [label, re] of COLLECTED_CHECKS) {
 const NOT_COLLECTED_CHECKS = [
   ['URLs / hostnames / browsing history bullet', /hostnames, or browsing history/i],
   ['Prompts / instructions bullet', /Prompts, instructions, task descriptions/i],
-  ['DOM / screenshots / page content bullet', /screenshots, page content/i],
+  ['DOM / screenshots / page content / site API payloads bullet', /screenshots, page content, site.*API.*payloads/i],
   ['Plaintext IP addresses bullet', /Plaintext.*IP.*addresses/i],
   ['Names / usernames / account handles bullet', /Names, usernames, account handles/i],
   ['Email addresses / phone numbers bullet', /Email addresses, phone numbers/i],

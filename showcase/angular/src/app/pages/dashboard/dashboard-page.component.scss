@@ -1656,15 +1656,6 @@
   transition: box-shadow 300ms ease, border-color 300ms ease;
 }
 
-.dash-preview-stage {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  min-height: 200px;
-  overflow: hidden;
-  background: #050505;
-}
-
 .dash-preview-automating {
   border-color: rgba(255, 140, 0, 0.6);
   box-shadow: 0 0 12px rgba(255, 140, 0, 0.4), 0 0 24px rgba(255, 140, 0, 0.2);
@@ -1676,10 +1667,7 @@
   50% { box-shadow: 0 0 20px rgba(255, 140, 0, 0.6), 0 0 40px rgba(255, 140, 0, 0.3); border-color: rgba(255, 140, 0, 0.8); }
 }
 
-.dash-preview-iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
+.dash-preview-viewer {
   width: 100%;
   height: 100%;
   border: none;
@@ -2131,17 +2119,13 @@
 
 /* Responsive: mobile */
 @media (max-width: 768px) {
-  .dash-preview,
-  .dash-preview-stage {
-    aspect-ratio: auto;
+  .dash-preview {
     min-height: 200px;
   }
 }
 
 @media (max-width: 480px) {
-  .dash-preview,
-  .dash-preview-stage {
-    aspect-ratio: auto;
+  .dash-preview {
     min-height: 200px;
   }
   .dash-preview-progress {
@@ -2153,46 +2137,14 @@
 .dash-preview-maximized {
   position: fixed !important;
   inset: 0 !important;
-  display: block !important;
   z-index: 100 !important;
-  aspect-ratio: auto !important;
   min-height: 100vh !important;
-  height: 100vh !important;
-  height: 100dvh !important;
   border-radius: 0 !important;
   margin: 0 !important;
   border: none !important;
-  background: #000 !important;
 }
 
-.dash-preview-maximized .dash-preview-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100% !important;
-  height: 100% !important;
-  flex: none;
-  aspect-ratio: auto !important;
-  min-height: 0;
-}
-
-.dash-preview-maximized .dash-preview-header {
-  z-index: 22;
-}
-
-.dash-preview-maximized .dash-preview-urlbar {
-  position: absolute;
-  top: 42px;
-  left: 12px;
-  right: 12px;
-  z-index: 21;
-  border: 1px solid rgba(255, 241, 232, 0.10);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
-}
-
-.dash-preview-maximized .dash-preview-btn,
-.dash-preview-maximized .dash-preview-toggle {
+.dash-preview-maximized .dash-preview-btn {
   opacity: 1;
 }
 
@@ -2216,16 +2168,11 @@ body.dash-layout-maximized #dash-task-progress {
   bottom: 16px !important;
   right: 16px !important;
   width: 400px !important;
-  aspect-ratio: auto !important;
   min-height: auto !important;
   z-index: 50 !important;
   border-radius: var(--radius-lg) !important;
   resize: both !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-}
-
-.dash-preview-pip .dash-preview-stage {
-  aspect-ratio: 16 / 10 !important;
 }
 
 .dash-preview-pip .dash-preview-btn {
@@ -2238,50 +2185,17 @@ body.dash-layout-maximized #dash-task-progress {
 
 /* --- Layout Mode: Fullscreen --- */
 .dash-preview:fullscreen {
-  position: relative;
-  display: block;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
   background: #000;
-  border: none;
-  border-radius: 0;
-  margin: 0;
 }
-.dash-preview:fullscreen .dash-preview-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100% !important;
-  height: 100% !important;
-  flex: none;
-  aspect-ratio: auto !important;
-  min-height: 0;
-}
-.dash-preview:fullscreen .dash-preview-iframe {
-  transform-origin: top left;
+.dash-preview:fullscreen .dash-preview-viewer {
+  transform-origin: center center;
 }
 .dash-preview:fullscreen .dash-preview-header {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 22;
-}
-.dash-preview:fullscreen .dash-preview-urlbar {
-  position: absolute;
-  top: 42px;
-  left: 12px;
-  right: 12px;
-  z-index: 21;
-  border: 1px solid rgba(255, 241, 232, 0.10);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
-}
-.dash-preview:fullscreen .dash-preview-btn,
-.dash-preview:fullscreen .dash-preview-toggle {
-  opacity: 1;
+  z-index: 20;
 }
 
 /* --- Fullscreen Exit Overlay --- */
@@ -2289,7 +2203,7 @@ body.dash-layout-maximized #dash-task-progress {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 24;
+  z-index: 20;
   opacity: 0;
   transition: opacity 300ms ease;
   pointer-events: auto;

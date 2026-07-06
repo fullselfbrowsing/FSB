@@ -1,0 +1,38 @@
+{
+  "slug": "gmaps.navigate_to_place",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "navigate a to place in gmaps",
+    "navigate to place in gmaps",
+    "navigate a to place in google maps",
+    "open a place on the map in gmaps"
+  ],
+  "description": "Navigate Google Maps to a specific place by name or address. Opens the place detail view showing information like hours, reviews, and photos.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Place name or address (e.g., \"Golden Gate Bridge\", \"1600 Amphitheatre Parkway\")"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/navigate-to-place.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

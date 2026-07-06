@@ -1,0 +1,40 @@
+{
+  "slug": "ytmusic.get_playlist",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "get a playlist in ytmusic",
+    "look up a playlist in ytmusic",
+    "fetch a single playlist in ytmusic",
+    "view one specific playlist in ytmusic",
+    "get playlist in ytmusic",
+    "get playlist tracks in ytmusic"
+  ],
+  "description": "Get playlist details and tracks. Pass a playlist ID — the \"VL\" prefix is added automatically. Returns the playlist title and all tracks with song metadata.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "Playlist ID (with or without \"VL\" prefix)"
+      }
+    },
+    "required": [
+      "playlist_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/get-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

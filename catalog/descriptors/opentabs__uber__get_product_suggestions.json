@@ -1,0 +1,40 @@
+{
+  "slug": "uber.get_product_suggestions",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get product suggestions in uber",
+    "look up product suggestions in uber",
+    "fetch a single product suggestions in uber",
+    "view one specific product suggestions in uber",
+    "get available uber products and services in uber"
+  ],
+  "description": "Get available Uber products and services (Ride, Reserve, Courier, Hourly, Rental Cars, Food, Grocery). Returns product names with descriptions and launch URLs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "description": "Suggestion type — DEFAULT shows all products, CUSTOM shows personalized order. Default DEFAULT.",
+        "type": "string",
+        "enum": [
+          "DEFAULT",
+          "CUSTOM"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-product-suggestions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

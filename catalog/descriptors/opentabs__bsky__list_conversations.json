@@ -1,0 +1,43 @@
+{
+  "slug": "bsky.list_conversations",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "list conversations in bsky",
+    "show me my conversations in bsky",
+    "view my conversations in bsky",
+    "see all my conversations in bsky",
+    "list conversations in bluesky",
+    "list dm conversations in bsky"
+  ],
+  "description": "List the authenticated user's direct message conversations. Returns conversations sorted by most recent activity.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of conversations to return (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

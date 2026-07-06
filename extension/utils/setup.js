@@ -15,7 +15,7 @@ class FSBSetup {
       captchaSolver: 'none',
       captchaApiKey: '',
       actionDelay: 1000,
-      maxIterations: 20,
+      maxIterations: 100,
       confirmSensitive: true,
       debugMode: false
     };

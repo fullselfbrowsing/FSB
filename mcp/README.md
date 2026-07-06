@@ -15,9 +15,9 @@
 
 **Control your browser from any MCP client.**
 
-*Manual browser tools, implicit visual badges, autopilot, vault, and observability for the FSB Chrome Extension.*
+*Manual browser tools, capabilities, trigger watchers, visual sessions, autopilot, vault, and observability for the FSB Chrome Extension.*
 
-[Quick Start](#quick-start) · [Tools](#tools-59-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
+[Quick Start](#quick-start) · [Trigger Watchers](#trigger-watchers) · [Tools](#tools-66-total) · [Diagnostics](#diagnostics) · [Architecture](#architecture)
 
 </div>
 
@@ -25,27 +25,60 @@
 
 ## What It Is
 
-`fsb-mcp-server` connects MCP clients such as Claude Desktop, Claude Code, Codex, Cursor, VS Code, Antigravity, Zed, Cline, Gemini CLI, Continue, and others to the FSB Chrome extension.
+`fsb-mcp-server` connects MCP clients such as Claude Desktop, Claude Code, Codex, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, Continue, and others to the FSB Chrome extension.
 
 The server supports two operating styles:
 
 - **Manual mode**: the MCP client chooses each step with tools such as `navigate`, `read_page`, `get_dom_snapshot`, `click`, `type_text`, `execute_js`, and `scroll`.
 - **Autopilot mode**: the MCP client calls `run_task`, and FSB's built-in AI loop decides the browser steps.
 
-It also supports implicit visual session badges, vault autofill tools, session logs, memory search, and diagnostic commands.
+It also supports trigger watchers, visible client-owned visual sessions, capability search/invoke, vault autofill tools, session logs, memory search, and diagnostic commands.
 
 Use this package when you want your AI client to drive the browser directly while still using FSB's DOM analysis, selector handling, visual overlay, action verification, session logging, memory, and vault boundaries.
 
-### Current Release Notes
+> **PhantomStream (FSB v0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
-`fsb-mcp-server@0.9.3` is the current in repo MCP package for FSB v0.9.72.
+### What's New In v0.10.0
 
-* Action tools use the implicit visual session contract. Callers include `visual_reason` and `client` on every action call, then set `is_final: true` on the last action when they want the overlay cleared immediately.
-* The older `start_visual_session` and `end_visual_session` names remain registered only as compatibility stubs. They return `TOOL_REMOVED` with migration guidance.
-* Multi agent tab ownership is enforced by the extension. Cross agent calls reject with `TAB_NOT_OWNED`, incognito tabs reject with `TAB_INCOGNITO_NOT_SUPPORTED`, and cross window calls reject with `TAB_OUT_OF_SCOPE`.
-* The `back` tool is the ownership gated browser history helper. It returns one of `ok`, `no_history`, `cross_origin`, `bf_cache`, or `fragment_only`.
-* `run_task` has a 600 second safety net and emits progress notifications for long automations.
-* Background agent management tools are retired. The `registerAgentTools` module now keeps the active `back` helper and preserves retired background agent code as commented compatibility history.
+This is the trigger watchers release. Full details live in `CHANGELOG.md`.
+
+- New MCP tools: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers`.
+- `trigger` watches one selector and condition in the caller's owned tab. It defaults to blocking mode with 30s progress heartbeats, a 120s timeout, and a 240s safety auto-detach ceiling.
+- `detached:true` returns immediately with a `trigger_id`; callers can poll with `get_trigger_status`, list with `list_triggers`, or cancel with `stop_trigger`.
+- Watch modes: `live-observe` uses in-page mutation observation without reload; `refresh-poll` reloads the owned tab in the background and coalesces same-tab due watches into one reload.
+- `rearm_on_fire:true` keeps a watch armed after fire, with hysteresis for numeric conditions. Default behavior remains fire once.
+- Trigger output is notify-only to the caller. FSB does not send desktop/browser/email/SMS/Slack push notifications and does not run auto-act workflows.
+
+### What's New In v0.8.0
+
+This is the FSB v0.9.60 milestone release. The headline change is the new multi-agent tab concurrency contract; full details live in `CHANGELOG.md`.
+
+- Multi-agent tab concurrency: per-session/task `agent_id` is FSB-issued (`crypto.randomUUID()`); MCP callers do not supply it.
+- Tab-ownership enforcement on every MCP tool dispatch. Cross-agent calls reject with `TAB_NOT_OWNED`. Incognito tabs reject with `TAB_INCOGNITO_NOT_SUPPORTED`. Cross-window tabs reject with `TAB_OUT_OF_SCOPE`.
+- Configurable concurrency cap (default 8, range 1-64) persisted in `chrome.storage.local`. The (N+1)th claim rejects with `AGENT_CAP_REACHED { cap, active }`.
+- Per-bindTab `ownership_token` (fresh `crypto.randomUUID()` per binding) prevents tab-ID-reuse exploitation when Chrome recycles a closed tab's ID.
+- Forced-new-tab pooling via `chrome.tabs.onCreated + openerTabId`: opening a forced-new tab does not consume a cap slot.
+- Lock release on task or session end, MCP client disconnect (after a 10s reconnect grace keyed by `connection_id`), or user closing the tab. There is no idle timeout.
+- Service-worker eviction recovery: agent registry mirrors to `chrome.storage.session` write-through; on SW wake, `hydrate()` reconciles persisted records against `chrome.tabs.query()` and reaps ghost records.
+- New `back` MCP tool: ownership-gated, single-step browser-history back. Returns one of five typed status codes: `ok`, `no_history`, `cross_origin`, `bf_cache`, `fragment_only`.
+- `run_task` now returns when the underlying automation actually completes (Phase 236 reborn). The 300s ceiling has been raised to a 600s safety net at both the server and the bridge.
+- 30s heartbeat ticks emitted via `notifications/progress` with rich fields under `params._meta` (`alive`, `step`, `elapsed_ms`, `current_url`, `ai_cycles`, `last_action`). MCP host clients no longer hit per-tool timeouts on long automations.
+- Task lifecycle persisted in `chrome.storage.session` keyed by `task_id`. On SW eviction the server emits a `partial_outcome` with `disposition: 'sw_evicted'` if the bridge cannot recover.
+- Background-tab execution: most tools no longer steal focus. Only tools that genuinely require focus opt in via the per-tool `_forceForeground` flag in `tool-definitions.js`. Today only `switch_tab` opts in.
+- UI: page overlay badge appends a short `agent_id` suffix; sidepanel and popup show a read-only "owned by Agent X" chip on owned tabs.
+- Dependencies: `@modelcontextprotocol/sdk` `^1.27.1` -> `^1.29.0`. Zod stays on `^3.x`.
+
+### What's New In v0.7.4
+
+- Bridge lifecycle reconnect across service worker wakes.
+- Hub/relay coordination for multiple MCP server instances.
+- Route-aware tool dispatch and centralized parameter mapping.
+- Layered diagnostics through `doctor` and `status --watch`.
+- Persistent visual session glow across content script reinjection.
+- Secure vault tools that avoid sending raw secrets over the bridge.
+- One-command installer coverage for 21 platforms.
+
+Background-agent MCP tools were retired with the extension's background-agent sunset. The agent registrar now only exposes `back` for ownership-gated history navigation.
 
 ---
 
@@ -61,7 +94,7 @@ Common file or CLI targets:
 | `--claude-code` | Claude Code |
 | `--cursor` | Cursor |
 | `--vscode` | VS Code |
-| `--windsurf` | Antigravity |
+| `--windsurf` | Windsurf |
 | `--cline` | Cline |
 | `--zed` | Zed |
 | `--codex` | Codex CLI / Codex IDE |
@@ -79,9 +112,9 @@ Instruction-only or UI-driven targets include JetBrains, ChatGPT, Claude.ai, and
 
 ### OpenClaw
 
-The fastest OpenClaw onboarding path is the direct ClawHub install at [clawhub.ai/lakshmanturlapati/full-selfbrowsing](https://clawhub.ai/lakshmanturlapati/full-selfbrowsing). If you need the manual fallback, the FSB skill in `skills/fsb/` still prints the canonical OpenClaw stdio config block and runs the doctor flow. The bare `--openclaw` install flag in this CLI stays manual because OpenClaw's MCP config schema is still unstable across builds. Automatic config writes are unsupported.
+The canonical OpenClaw onboarding path is the FSB skill at `skills/FSB Skill/` in the repo root. Loading the skill into a fresh OpenClaw runs the doctor flow, prints the canonical OpenClaw stdio config block for the user to paste into OpenClaw's MCP config, and offers confirmation-based install for any other MCP hosts detected on the same machine. The bare `--openclaw` install flag in this CLI stays manual / unsupported because OpenClaw's MCP config schema is still unstable across builds; the skill prints and the user pastes, never auto-writes the OpenClaw config.
 
-To build a reproducible publish artifact for ClawHub, run `npm run package:skill` from the repo root. It zips `skills/fsb/` into `dist/skill/FSB-Skill-<version>.zip` (version stamped from `SKILL.md` frontmatter; the zip filename is kept as `FSB-Skill-<version>.zip` for backwards compatibility with existing ClawHub publish consumers). Publishing is user-gated: `clawhub login` and then `clawhub publish "skills/fsb"`. See `.planning/v0.9.61-CLAWHUB-PUBLISH-QA.md` for the pre-publish QA checklist.
+To build a reproducible publish artifact for ClawHub, run `npm run package:skill` from the repo root. It zips `skills/FSB Skill/` into `dist/skill/FSB-Skill-<version>.zip` (version stamped from `SKILL.md` frontmatter). Publishing is user-gated: `clawhub login` and then `clawhub publish "skills/FSB Skill"`. See `.planning/v0.9.61-CLAWHUB-PUBLISH-QA.md` for the pre-publish QA checklist.
 
 ### Installer Behavior
 
@@ -184,7 +217,7 @@ VS Code uses the `servers` root key and requires `type: "stdio"`:
 }
 ```
 
-After editing config files, restart or reload the host client if tools do not appear. Claude Code is usually active immediately after `claude mcp add`; Cursor, Claude Desktop, VS Code, and Antigravity often need a restart, refresh, or trust/start action in their MCP UI.
+After editing config files, restart or reload the host client if tools do not appear. Claude Code is usually active immediately after `claude mcp add`; Cursor, Claude Desktop, VS Code, and Windsurf often need a restart, refresh, or trust/start action in their MCP UI.
 
 ### Local Streamable HTTP
 
@@ -236,7 +269,7 @@ npx -y fsb-mcp-server status --watch
 | Page reads fail | Make sure the active tab is a normal webpage, not `chrome://`, `edge://`, or the web store. |
 | Clicks do nothing | Refresh DOM refs with `get_dom_snapshot`, then try `click_at` or `execute_js` where appropriate. |
 | A task is stuck | Use `get_task_status`, then `stop_task` if it is still running. |
-| Visual overlay remains | Call the final action with `is_final: true`, wait for the 60 second idle clear, or reload the tab. |
+| Visual overlay remains | Send the last action with `is_final:true`, wait for the 60s idle auto-clear, or reload the tab. |
 
 For local development, run `npm --prefix mcp run build` after TypeScript changes. The root `npm run test:mcp-smoke` command builds the MCP package before exercising lifecycle and tool smoke tests.
 
@@ -260,13 +293,13 @@ Move to a normal `http` or `https` page before calling DOM tools such as `read_p
 
 ## Visual Session Lifecycle
 
-> **v0.9.0 breaking change:** The explicit `start_visual_session` and `end_visual_session` tools were removed in v0.9.0. Action tools now require `visual_reason` and `client` fields. The visual session is created implicitly on the first action call, refreshed on a sliding 60 second window, and cleared by `is_final: true` immediately or by 60 seconds of silence. Calling the removed tools returns the typed `TOOL_REMOVED` error. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before and after code.
+> **v0.9.0 breaking change** -- The explicit `start_visual_session` and `end_visual_session` tools were REMOVED in v0.9.0. Action tools now require `visual_reason` + `client` fields; the visual session is created implicitly on the first action call, refreshed on a sliding 60-second window, and cleared by `is_final: true` (immediate) or 60 seconds of silence (auto-clear). Calling the removed tools returns the typed `TOOL_REMOVED` error. See [CHANGELOG.md](./CHANGELOG.md#v0.9.0) for the migration recipe with concrete before/after code.
 
 Use the implicit visual session when your MCP client controls the browser and you still want FSB's visible trusted overlay. The session is per-tab and per-agent; the v0.9.60 ownership gate (`TAB_NOT_OWNED`) fires before any session state is touched.
 
-1. Call any action tool (`click`, `type_text`, `navigate`, ...) with the required field bundle: `visual_reason` (short human-readable string for the overlay) and `client` (allowlisted badge label such as `Codex`, `Claude`, `ChatGPT`, `Gemini`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, or `Perplexity`).
+1. Call any action tool (`click`, `type_text`, `navigate`, ...) with the required field bundle: `visual_reason` (short human-readable string for the overlay) and `client` (allowlisted badge label such as `Codex`, `Claude`, `ChatGPT`, `Gemini`, `Cursor`, `Windsurf`, `OpenCode`, `OpenClaw`, `Grok`, `Perplexity`, or `Antigravity`).
 2. Drive the page with subsequent action tools. Each call re-arms the 60-second sliding window so the overlay stays alive as long as actions keep arriving.
-3. On the last action of the task, set `is_final: true`. The overlay clears immediately after the action's `change_report` resolves, with no 60 second wait.
+3. On the LAST action of the task, set `is_final: true`. The overlay clears immediately after the action's `change_report` resolves -- no 60-second wait.
 
 Example:
 
@@ -276,11 +309,11 @@ click(selector="text=Checkout", visual_reason="Complete checkout", client="Codex
 type_text(selector="#email", text="user@example.com", visual_reason="Complete checkout", client="Codex", is_final=true)
 ```
 
-If the task ends without an explicit `is_final: true` signal, the overlay clears automatically after 60 seconds of no further carrying action calls. Read tools (`read_page`, `get_dom_snapshot`, `get_text`, ...) do not carry the field bundle and do not refresh the sliding window. Reads stay silent by design.
+If the task ends without an explicit `is_final: true` signal, the overlay auto-clears after 60 seconds of no further carrying action calls. Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, ...) do NOT carry the field bundle and do NOT re-arm the sliding window -- reads stay silent by design.
 
-Calling the removed `start_visual_session` or `end_visual_session` tools by name returns the typed `TOOL_REMOVED` error whose body names the new contract and points at this changelog entry. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`).
+Calling the removed `start_visual_session` or `end_visual_session` tools by name returns the typed `TOOL_REMOVED` error whose body names the new contract and points at this CHANGELOG entry. See `mcp/CHANGELOG.md` v0.9.0 for the full migration recipe and the typed-error catalogue (`VISUAL_FIELDS_REQUIRED`, `BADGE_NOT_ALLOWED`, `TOOL_REMOVED`).
 
-Use `run_task` only when the user explicitly wants FSB autopilot to decide and execute the steps. Autopilot manages its own overlay lifecycle internally and is not affected by the v0.9.0 implicit contract change.
+Use `run_task` only when the user explicitly wants FSB autopilot to decide and execute the steps -- autopilot manages its own overlay lifecycle internally and is NOT affected by the v0.9.0 implicit-contract change.
 
 ### Manual Tool Selection
 
@@ -304,7 +337,32 @@ Longer-running tools have timeout overrides. For example, spreadsheet operations
 
 ---
 
-## Multi Agent Contract (v0.8.0)
+## Trigger Watchers
+
+Trigger Watchers let an MCP caller watch one DOM element and condition while keeping the browser as the source of truth. They are useful for prices, availability text, counters, queue states, and other page values that should fire when a visible or extracted value changes.
+
+| Tool | Purpose |
+|------|---------|
+| `trigger` | Arm one selector plus condition on the caller's owned tab. |
+| `stop_trigger` | Cancel a watch and clear its lifecycle work. |
+| `get_trigger_status` | Read one watch snapshot, including current status and last event. |
+| `list_triggers` | List visible watches, defaulting to active and attention states. |
+
+Use `live-observe` when the page updates in place and you do not want a reload. It uses an in-page observer plus pulse feedback. Use `refresh-poll` when the value only changes after reload; FSB reloads the owned tab in the background by tab id, waits for readiness, reads the selector, and evaluates the condition. Same-tab due refresh-poll watches share one reload per batch, while watches on other tabs reload independently.
+
+`trigger` defaults to blocking mode. The MCP server pre-generates a `trigger_id`, emits 30s progress heartbeats while waiting, uses a 120s default timeout, and auto-detaches at a 240s safety ceiling. Pass `detached:true` to return immediately and poll later with `get_trigger_status` or `list_triggers`. Outcomes include `fired`, `timed_out`, `detached`, and typed errors.
+
+Default trigger behavior is fire-once. Pass `rearm_on_fire:true` to keep the watch armed after a fire; numeric threshold and percent-change conditions use hysteresis so a rearmed trigger does not repeatedly fire on the same satisfied edge. Snapshots also clean up on timeout, TTL expiry, tab close, explicit stop, and owner release after reconnect grace.
+
+Trigger Watchers are local and session-bound. Chrome and the FSB extension must stay open and connected; this is not server-side monitoring and it does not resume across browser restart. Results are notify-only to the MCP caller: FSB reports the event, and the caller decides whether to act. There is no desktop/browser/email/SMS/Slack push delivery and no auto-act-on-fire workflow engine.
+
+Restricted pages such as `chrome://` surfaces cannot be watched by content scripts. Those cases report structured blocked-page attention (`TRIGGER_PAGE_BLOCKED`) instead of staging page text. A tab cannot have active `live-observe` and `refresh-poll` watches at the same time; the opposite-mode request returns `TRIGGER_TAB_WATCH_CONFLICT`. Same-mode co-location is allowed.
+
+The extension enforces trigger concurrency with `fsbTriggerCap`, configurable in the control panel. Default is `8`, range is `1..64`. Active usage includes armed watches plus attention states such as `needs_attention` and `blocked`; terminal states such as `fired`, `timed_out`, and `stopped` do not count as active cap usage.
+
+---
+
+## Multi-Agent Contract (v0.8.0)
 
 Starting with `0.8.0`, FSB supports multiple concurrent MCP agents driving distinct tabs in the same Chrome profile. The contract is enforced inside the extension; MCP clients only need to know the rules.
 
@@ -363,30 +421,40 @@ Most tools execute on background tabs without stealing focus. Tools that genuine
 
 ---
 
-## Tools (59 Total)
+## Tools (66 Total)
 
-### Visual Session Compatibility Stubs (2)
+### Visual Sessions (2)
 
 | Tool | Purpose |
 |------|---------|
-| `start_visual_session` | Removed in v0.9.0. Calling returns `TOOL_REMOVED`. |
-| `end_visual_session` | Removed in v0.9.0. Calling returns `TOOL_REMOVED`. |
+| `start_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
+| `end_visual_session` | Removed in v0.9.0 -- see Visual Session Lifecycle section. Calling returns `TOOL_REMOVED`. |
 
-### Autopilot (3)
+### Autopilot And Agent Navigation (4)
 
 | Tool | Purpose |
 |------|---------|
 | `run_task` | Let FSB's AI perform a natural language browser task end to end. |
 | `stop_task` | Cancel the active automation task. |
 | `get_task_status` | Check task progress, phase, and ETA. |
+| `back` | Single-step browser-history back, ownership-gated. Returns `{ status, resultingUrl, historyDepth }`. |
 
-### Manual Browser Control (36)
+### Trigger Watchers (4)
+
+| Tool | Purpose |
+|------|---------|
+| `trigger` | Arm a one-element watch with blocking or detached reporting. |
+| `stop_trigger` | Stop an armed or attention-state trigger. |
+| `get_trigger_status` | Read one trigger snapshot and latest event. |
+| `list_triggers` | List visible triggers, defaulting to active and attention states. |
+
+### Manual Browser Control (37)
 
 | Group | Tools |
 |-------|-------|
 | Power | `execute_js` |
 | Navigation | `navigate`, `search`, `go_back`, `go_forward`, `refresh` |
-| Interaction | `click`, `type_text`, `press_enter`, `press_key`, `select_option`, `check_box`, `hover`, `right_click`, `double_click`, `select_text_range`, `drag_drop`, `drop_file`, `focus`, `clear_input` |
+| Interaction | `click`, `type_text`, `press_enter`, `press_key`, `select_option`, `check_box`, `hover`, `right_click`, `double_click`, `select_text_range`, `drag_drop`, `drop_file`, `upload_file`, `focus`, `clear_input` |
 | Scrolling | `scroll`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element` |
 | Tabs | `open_tab`, `switch_tab`, `close_tab` |
 | Spreadsheets | `fill_sheet` |
@@ -398,6 +466,7 @@ Notes:
 - `type_text` is preferred over setting `.value` manually for React, Angular, Vue, and similar controlled inputs.
 - `select_option` only targets native `<select>` elements; use click patterns for custom dropdowns.
 - `fill_sheet` can take longer than normal tools and uses a longer timeout.
+- `upload_file(selector, file_path, tab_id?)` sets an absolute local disk path on a real `<input type="file">`, including inputs hidden behind styled dropzones. It uses a sensitive-path denylist and audit record; use `drop_file` for synthetic drag/drop cases or pure drag-only zones without a file input.
 
 ### Read Only (8)
 
@@ -412,11 +481,14 @@ Notes:
 | `list_tabs` | List open tabs. |
 | `read_sheet` | Read spreadsheet ranges. |
 
-### Browser History Helper (1)
+### Capabilities (2)
 
 | Tool | Purpose |
 |------|---------|
-| `back` | Single step browser history back, ownership gated. Returns `{ status, resultingUrl, historyDepth }`. |
+| `search_capabilities` | Search the 128-app capability catalog by intent and return schema-on-hit results with readiness labels. |
+| `invoke_capability` | Invoke a selected verified T1/T1b capability in the authenticated browser session with validated params, origin denylist checks, recipe signatures, mutation serialization, and no-secrets audit records. Guarded or catalog-tail hits return typed pending/fallback responses rather than pretending to execute. |
+
+`search_capabilities` is broader than direct API execution. Results can be `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, or `discovery-pending`. Non-denied origins are allowed under Auto for ordinary invoke; sensitive origins are flagged and audited; network-capture discovery on sensitive origins still requires extra confirmation; denylisted origins remain blocked.
 
 ### Observability (5)
 
@@ -454,12 +526,14 @@ graph TD
     C -->|"DOM analysis + action execution"| D["Active Web Page"]
 
     subgraph Surface["Tool Surface"]
-      V["Visual badge stubs"]
+      V["Visual sessions"]
       M["Manual tools"]
       R["Read-only tools"]
       O["Observability"]
       P["Vault"]
+      C["Capabilities"]
       T["Autopilot"]
+      W["Trigger watchers"]
     end
 
     B --- Surface
@@ -516,7 +590,7 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.9.2`) because it is published independently from the extension release (`0.9.72`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+The MCP package has its own version (`0.10.0`) because it is published independently from the extension release (`0.9.90`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -527,15 +601,16 @@ Contract-sensitive changes should be covered by tests before publishing:
 - visual-session token lifecycle
 - vault redaction boundaries
 - multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens, `back` tool
+- trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
 
-### Publishing
+### Releasing 0.10.0
 
-Publishing is a user action via the existing tag driven release workflow. Autonomous docs or code cleanup should not run `npm publish`.
+This 0.10.0 build is release-prep ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
 
 To publish:
 
-- Preferred: run the user's tag driven release workflow for the intended release tag. The workflow handles `npm publish` from a clean working tree.
-- Manual fallback: from the release branch, run `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and the focused MCP regression tests pass.
+- Preferred: run the user's tag-driven release workflow (`git tag v0.10.0 && git push origin v0.10.0`); the workflow handles `npm publish` from a clean working tree.
+- Manual fallback: from the release branch, `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and the MCP smoke/parity/schema gates exit 0.
 
 Do not run `npm publish` from autonomous mode.
 

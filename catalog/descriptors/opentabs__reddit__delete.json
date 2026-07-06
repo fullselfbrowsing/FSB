@@ -1,0 +1,40 @@
+{
+  "slug": "reddit.delete",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "delete in reddit",
+    "remove in reddit",
+    "trash in reddit",
+    "permanently delete in reddit",
+    "delete a post or comment in reddit"
+  ],
+  "description": "Permanently delete a post or comment. Only the author can delete their own content. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Fullname of the post or comment to delete (e.g., \"t3_abc123\" for a post, \"t1_xyz\" for a comment)"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/delete.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

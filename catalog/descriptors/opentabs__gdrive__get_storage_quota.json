@@ -1,0 +1,32 @@
+{
+  "slug": "gdrive.get_storage_quota",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "get a storage quota in gdrive",
+    "look up a storage quota in gdrive",
+    "fetch a single storage quota in gdrive",
+    "view one specific storage quota in gdrive",
+    "get storage quota in gdrive",
+    "get drive storage usage and limits in gdrive"
+  ],
+  "description": "Get the current Google Drive storage quota including total limit, usage, usage in Drive, and usage in trash. All values are in bytes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/get-storage-quota.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

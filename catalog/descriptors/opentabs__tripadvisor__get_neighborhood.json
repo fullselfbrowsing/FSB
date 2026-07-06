@@ -1,0 +1,40 @@
+{
+  "slug": "tripadvisor.get_neighborhood",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get a neighborhood in tripadvisor",
+    "look up a neighborhood in tripadvisor",
+    "fetch a single neighborhood in tripadvisor",
+    "view one specific neighborhood in tripadvisor",
+    "get neighborhood in tripadvisor",
+    "get neighborhood info in tripadvisor"
+  ],
+  "description": "Get information about the neighborhood of a restaurant, hotel, or attraction on TripAdvisor including the neighborhood description. Extracted from the detail page SSR data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Detail page URL path of a restaurant, hotel, or attraction"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-neighborhood.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

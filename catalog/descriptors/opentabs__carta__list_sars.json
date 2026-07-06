@@ -1,0 +1,41 @@
+{
+  "slug": "carta.list_sars",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list sars in carta",
+    "show me my sars in carta",
+    "view my sars in carta",
+    "see all my sars in carta",
+    "list stock appreciation rights in carta"
+  ],
+  "description": "List all stock appreciation rights (SARs) for a company in the portfolio.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-sars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "shortcut.get_epic",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "get an epic in shortcut",
+    "look up an epic in shortcut",
+    "fetch a single epic in shortcut",
+    "view one specific epic in shortcut",
+    "get epic in shortcut",
+    "get an epic by id in shortcut"
+  ],
+  "description": "Get detailed information about a specific epic by its numeric ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "epic_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Epic numeric ID"
+      }
+    },
+    "required": [
+      "epic_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/get-epic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

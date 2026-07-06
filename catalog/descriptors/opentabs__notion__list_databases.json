@@ -1,0 +1,38 @@
+{
+  "slug": "notion.list_databases",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "list databases in notion",
+    "show me my databases in notion",
+    "view my databases in notion",
+    "see all my databases in notion",
+    "list databases in the workspace in notion"
+  ],
+  "description": "List all databases in the Notion workspace. Returns databases sorted by last edited time.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of databases to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/list-databases.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

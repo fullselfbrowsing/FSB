@@ -1,0 +1,41 @@
+{
+  "slug": "costco.geocode_location",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "geocode a location in costco",
+    "geocode location in costco",
+    "convert zip/city to coordinates in costco"
+  ],
+  "description": "Convert a ZIP code or city name to geographic coordinates. Useful for finding nearby warehouses.",
+  "actionVerb": "geocode",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "ZIP code or city name (e.g., \"95101\", \"San Jose\")"
+      },
+      "country": {
+        "description": "Country code (default \"USA\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/geocode-location.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "geocode"
+    }
+  }
+}

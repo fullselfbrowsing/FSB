@@ -1,0 +1,42 @@
+{
+  "slug": "redfin.get_property_parcel_info",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "get a property parcel info in redfin",
+    "look up a property parcel info in redfin",
+    "fetch a single property parcel info in redfin",
+    "view one specific property parcel info in redfin",
+    "get property parcel info in redfin",
+    "get parcel and assessor data in redfin"
+  ],
+  "description": "Get parcel information for a property, including FIPS code, APN (Assessor Parcel Number), and precise coordinates.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Redfin property ID"
+      }
+    },
+    "required": [
+      "property_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/get-property-parcel-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

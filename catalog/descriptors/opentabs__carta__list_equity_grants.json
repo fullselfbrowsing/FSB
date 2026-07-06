@@ -1,0 +1,41 @@
+{
+  "slug": "carta.list_equity_grants",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list equity grants in carta",
+    "show me my equity grants in carta",
+    "view my equity grants in carta",
+    "see all my equity grants in carta",
+    "list all equity grants in carta"
+  ],
+  "description": "List all equity grants (across all types) for a company. Provides a unified view of options, RSUs, SARs, and other grant types with totals.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-equity-grants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "stripe.get_customer",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get a customer in stripe",
+    "look up a customer in stripe",
+    "fetch a single customer in stripe",
+    "view one specific customer in stripe",
+    "get customer in stripe",
+    "get a customer by id in stripe"
+  ],
+  "description": "Get detailed information about a specific customer by their ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "description": "Customer ID (e.g., cus_xxx)"
+      }
+    },
+    "required": [
+      "customer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-customer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

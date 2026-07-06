@@ -1,0 +1,46 @@
+{
+  "slug": "discord.list_guilds",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "list guilds in discord",
+    "show me my guilds in discord",
+    "view my guilds in discord",
+    "see all my guilds in discord",
+    "list servers the user belongs to in discord"
+  ],
+  "description": "List all Discord guilds (servers) the authenticated user is a member of",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Max guilds to return (default 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "before": {
+        "description": "Get guilds before this guild ID (for pagination)",
+        "type": "string"
+      },
+      "after": {
+        "description": "Get guilds after this guild ID",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/list-guilds.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

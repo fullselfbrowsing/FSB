@@ -1,0 +1,49 @@
+{
+  "slug": "datadog.mute_host",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "mute a host in datadog",
+    "mute host in datadog",
+    "mute a host to suppress alerts in datadog"
+  ],
+  "description": "Mute a host to suppress all monitor alerts originating from it.",
+  "actionVerb": "mute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "host_name": {
+        "type": "string",
+        "description": "Host name to mute"
+      },
+      "end": {
+        "description": "POSIX timestamp when the mute should expire. Omit for indefinite.",
+        "type": "number"
+      },
+      "message": {
+        "description": "Reason for muting",
+        "type": "string"
+      },
+      "override": {
+        "description": "If true, replaces existing mute settings",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "host_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/mute-host.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "mute"
+    }
+  }
+}

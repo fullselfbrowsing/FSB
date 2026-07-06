@@ -1,0 +1,1 @@
+7a32b00cf3ad9691bb42660a06335f5e9a3b5af3 feat(providers): add Gemini provider adapter

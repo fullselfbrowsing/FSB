@@ -1,0 +1,50 @@
+{
+  "slug": "discord.remove_reaction",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "remove a reaction in discord",
+    "remove reaction in discord",
+    "remove an emoji reaction from a message in discord"
+  ],
+  "description": "Remove your emoji reaction from a message",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message ID to remove reaction from"
+      },
+      "emoji": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Emoji to remove — use Unicode emoji (e.g., \"👍\") or custom emoji format \"name:id\""
+      }
+    },
+    "required": [
+      "channel",
+      "message_id",
+      "emoji"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/remove-reaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "remove"
+    }
+  }
+}

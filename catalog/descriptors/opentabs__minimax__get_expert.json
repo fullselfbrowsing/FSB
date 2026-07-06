@@ -1,0 +1,40 @@
+{
+  "slug": "minimax.get_expert",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get an expert in minimax",
+    "look up an expert in minimax",
+    "fetch a single expert in minimax",
+    "view one specific expert in minimax",
+    "get expert in minimax",
+    "get expert details in minimax"
+  ],
+  "description": "Get detailed information about a specific AI expert/agent by ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "number",
+        "description": "Expert ID"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-expert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

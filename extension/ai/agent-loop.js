@@ -1,5 +1,5 @@
 /**
- * Agent Loop Engine for FSB v0.9.50
+ * Agent Loop Engine for FSB v0.9.90
  *
  * Core tool_use protocol loop that replaces startAutomationLoop.
  * Each iteration is a separate setTimeout callback (not a blocking while-loop)
@@ -101,6 +101,45 @@ var _extractUsage = (typeof extractUsage !== 'undefined') ? extractUsage : (_al_
 var _executeTool = (typeof executeTool !== 'undefined') ? executeTool : (_al_executor?.executeTool || (async () => ({ success: false, error: 'executeTool not available' })));
 var _UniversalProvider = (typeof UniversalProvider !== 'undefined') ? UniversalProvider : (_al_provider?.UniversalProvider || null);
 var _PROVIDER_CONFIGS = (typeof PROVIDER_CONFIGS !== 'undefined') ? PROVIDER_CONFIGS : (_al_provider?.PROVIDER_CONFIGS || {});
+var _al_calculateAdaptiveTimeout = (typeof calculateAdaptiveTimeout !== 'undefined')
+  ? calculateAdaptiveTimeout
+  : (_al_provider?.calculateAdaptiveTimeout || function(requestBody, modelName, attempt) {
+      var isReasoning = /reasoning|grok-4(?!.*(?:fast|mini))/.test(modelName || '');
+      var baseTimeout = isReasoning ? 45000 : 30000;
+      var maxTimeout = isReasoning ? 90000 : 60000;
+      var retryMultiplier = 1 + (Math.min(attempt || 0, 2) * 0.5);
+      try {
+        var estimatedChars = 0;
+        if (requestBody && Array.isArray(requestBody.messages)) {
+          for (var i = 0; i < requestBody.messages.length; i++) {
+            estimatedChars += String(requestBody.messages[i] && requestBody.messages[i].content || '').length;
+          }
+        } else {
+          estimatedChars = JSON.stringify(requestBody || {}).length;
+        }
+        var extra = Math.floor((estimatedChars / 4) / 5000) * 5000;
+        return Math.min(Math.round((baseTimeout + extra) * retryMultiplier), maxTimeout);
+      } catch (_e) {
+        return Math.min(Math.round(baseTimeout * retryMultiplier), maxTimeout);
+      }
+    });
+
+// LM Studio base URLs are normalized through the SAME helper universal-provider.js
+// uses (strips a pasted /v1 or /v1/chat/completions suffix before the bridge
+// re-appends /v1) -- hand-rolling only a trailing-slash strip turned the documented
+// http://localhost:1234/v1 setting into .../v1/v1/chat/completions.
+var _al_normalizeProviderBaseUrl = (typeof normalizeProviderBaseUrl !== 'undefined')
+  ? normalizeProviderBaseUrl
+  : (_al_provider?.normalizeProviderBaseUrl || function(provider, baseUrl) {
+      var fallback = provider === 'lmstudio' ? 'http://localhost:1234' : '';
+      if (!baseUrl) return fallback;
+      var url = String(baseUrl).trim()
+        .replace(/\/v1\/chat\/completions\/?$/, '')
+        .replace(/\/v1\/?$/, '')
+        .replace(/\/+$/, '');
+      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      return url;
+    });
 
 // Phase 156-158 module references
 var _al_estimateCost = (typeof estimateCost !== 'undefined') ? estimateCost : (_al_costTracker?.estimateCost || function() { return 0; });
@@ -706,6 +745,7 @@ CRITICAL RULES:
 - For data collection: scroll through ALL results, reading each page of content.
 - For Google Sheets entry: use fill_sheet tool with startCell and csvData parameters.
 - When on Google Sheets, call fill_sheet directly. Do NOT interact with Tables sidebar or any overlays.
+- Two capability tools exist for authenticated first-party actions: search_capabilities (find catalog capabilities for the current tab's site, including readinessStatus) and invoke_capability (run a verified t1-ready slug, or return a typed pending/fallback reason for guarded/catalog-tail slugs). Prefer t1-ready capability hits over DOM tools for first-party authenticated actions on the current origin; fall back to the DOM tools (click, type_text, read_page, etc.) when no t1-ready capability matches. If invoke_capability returns a reason of RECIPE_DOM_FALLBACK_PENDING, RECIPE_LEARN_PENDING, or RECIPE_EXPIRED, do NOT report failure and do NOT abandon the task: complete the SAME task using the DOM tools (run_task, click, type_text, read_page, get_page_snapshot, get_site_guide) on the current origin instead.
 - Execute autonomously. Do not ask the user questions.`;
 }
 
@@ -1041,7 +1081,31 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
     }
   }
 
-  return providerInstance.sendRequest(requestBody);
+  // Phase 7 (FINT-09): Lattice provider bridge is the UNCONDITIONAL
+  // provider call path. The Phase 6 feature flag has been removed; the
+  // legacy fallback to the providerInstance HTTP-send method is deleted.
+  // universal-provider.js stays on disk (Strategy B per Phase 7
+  // CONTEXT.md) to keep providerInstance.getEndpoint() logging at
+  // line ~1211 and the providerInstance.config / providerInstance.settings
+  // metadata reads below working. Physical archive deferred to v0.11.0+.
+  //
+  // Phase 6 WR-03 -- baseUrl is ONLY honored by the offscreen handler's
+  // computeUrl() for 'custom' and 'lmstudio'. For 'openai' (and the other
+  // first-party providers xai/anthropic/gemini/openrouter) computeUrl
+  // hardcodes the full URL and never reads config.baseUrl. Do not pass
+  // a baseUrl for those providers to avoid an unused-arg / silent-contract-
+  // mismatch footgun. If openai-proxy support is needed (Azure shim,
+  // llm-proxy, etc.), it must be added to computeUrl in a follow-on phase.
+  var _cfg = providerInstance.config || {};
+  var _settings = providerInstance.settings || {};
+  var timeoutMs = _al_calculateAdaptiveTimeout(requestBody, providerInstance.model, 0);
+  return executeViaBridge(providerKey, {
+    apiKey: _settings[_cfg.keyField] || '',
+    model: providerInstance.model,
+    baseUrl: providerKey === 'custom' ? _settings.customEndpoint
+           : providerKey === 'lmstudio' ? (_al_normalizeProviderBaseUrl('lmstudio', _settings.lmstudioBaseUrl) + '/v1')
+           : undefined,
+  }, requestBody, { mode: 'autopilot', timeoutMs: timeoutMs });
 }
 
 
@@ -1073,6 +1137,30 @@ async function callProviderWithTools(providerInstance, model, apiKey, messages, 
 // Phase 244 hardening should add a sync isOwnedBy check at iteration setup
 // using sessionData.agentId + sessionData.ownershipToken, and abort with a
 // typed tab_owned_by_other_agent error when the gate would have blocked.
+
+// Phase 9 FINT-15 -- module-level helper for runAgentLoop entry restore lookup.
+// Lists chrome.storage.session keys matching prefix fsb_lattice_snapshot_<sessionId>_,
+// sorts (ISO-8601 capturedAt suffix is chronological), returns latest value or null.
+// Safe against missing chrome / runtime.lastError. See 09-RESEARCH Section 5.
+async function _findLatestSnapshot(sessionId) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session) return null;
+  var prefix = 'fsb_lattice_snapshot_' + sessionId + '_';
+  return new Promise(function (resolve) {
+    try {
+      chrome.storage.session.get(null, function (all) {
+        if (chrome.runtime && chrome.runtime.lastError) return resolve(null);
+        var matches = Object.keys(all || {})
+          .filter(function (k) { return k.indexOf(prefix) === 0; })
+          .sort();
+        if (matches.length === 0) return resolve(null);
+        var latestKey = matches[matches.length - 1];
+        resolve(all[latestKey]);
+      });
+    } catch (_e) {
+      resolve(null);
+    }
+  });
+}
 
 /**
  * Entry point for the agent loop. Called from handleStartAutomation.
@@ -1188,6 +1276,37 @@ async function runAgentLoop(sessionId, options) {
       endpoint: providerInstance.getEndpoint()
     });
 
+    // Phase 9 FINT-15 -- check for prior SurvivabilityAdapter snapshot + invoke resume()
+    // classifier; ResumePolicy is logged only. Full per-policy CONSERVATIVE recovery
+    // dispatch is EXPLICITLY OUT OF SCOPE per Phase 5 D-22. The adapter instance is
+    // stashed on session._latticeAdapter so Plan 09-02's serialize sidecars at the
+    // 2 in-flight persist callsites reuse the single construction.
+    if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+        && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+        && typeof globalThis.FsbLatticeRuntimeAdapter !== 'undefined'
+        && typeof globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter === 'function') {
+      try {
+        var adapter = globalThis.FsbLatticeRuntimeAdapter.createFsbLatticeRuntimeAdapter({ sessionId: sessionId });
+        session._latticeAdapter = adapter;
+        var snapshot = await _findLatestSnapshot(sessionId);
+        if (snapshot) {
+          var deserialized = adapter.deserialize(snapshot);
+          var policy = await adapter.resume(snapshot);
+          // Branch behavior per CONTEXT.md D-03 (log + proceed for ALL 4 Lattice ResumePolicy
+          // literals: SAFE / RECOVERY_AMBIGUOUS / ON_ERROR_SW_EVICTION_MID_REQUEST /
+          // ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH). No 5th literal -- see RESEARCH Section 6.
+          console.log('[AgentLoop] lattice-runtime-adapter resume verdict:', {
+            sessionId: sessionId,
+            ResumePolicy: policy,
+            marker: deserialized && deserialized._currentStepName,
+            capturedAt: snapshot && snapshot.capturedAt
+          });
+        }
+      } catch (err) {
+        console.warn('[AgentLoop] lattice-runtime-adapter restore threw (non-fatal):', err && err.message);
+      }
+    }
+
     // Kick off the first iteration
     runAgentIteration(sessionId, options);
 
@@ -1217,6 +1336,28 @@ async function runAgentLoop(sessionId, options) {
  * @param {string} sessionId - Session identifier
  * @param {Object} options - Background.js callbacks (same as runAgentLoop)
  */
+// UAT-08 prep: resolve overlay detail text. Prefers caller-provided custom message,
+// then session.lastAiReasoning, then a human-readable mapping of the FINT-14
+// step marker (session._currentStepName written at extension/ai/agent-loop.js
+// BEFORE_API_REQUEST + BEFORE_TOOL_EXECUTION + BEFORE_NEXT_ITERATION_SCHEDULE sites
+// per Phase 9 Plan 09-02). Module-level placement keeps INV-04 BYTE-FROZEN
+// (no deferred-iteration token added; helper NOT inside any lambda body).
+var _al_STEP_MARKER_LABELS = {
+  'BEFORE_API_REQUEST': 'Calling model',
+  'BEFORE_TOOL_EXECUTION': 'Dispatching tool',
+  'BEFORE_NEXT_ITERATION_SCHEDULE': 'Scheduling next step'
+};
+function resolveOverlayDetail(session, customMsg) {
+  if (typeof customMsg === 'string' && customMsg.length > 0) return customMsg;
+  if (session && typeof session.lastAiReasoning === 'string' && session.lastAiReasoning.length > 0) {
+    return session.lastAiReasoning;
+  }
+  var marker = session && session._currentStepName;
+  if (marker && Object.prototype.hasOwnProperty.call(_al_STEP_MARKER_LABELS, marker)) {
+    return _al_STEP_MARKER_LABELS[marker];
+  }
+  return '…';
+}
 async function runAgentIteration(sessionId, options) {
   var activeSessions = options.activeSessions;
   var persist = options.persistSession;
@@ -1330,6 +1471,12 @@ async function runAgentIteration(sessionId, options) {
       var message = {
         action: terminal && terminal.outcome === 'error' ? 'automationError' : 'automationComplete',
         sessionId: sid,
+        // QT-uof-2 (BROADCAST-tabId-THREAD) -- thread tabId so the sidepanel
+        // automationComplete handler can route setIdleState to the OWNING
+        // tab without falling back to _activeTabIdSnapshot (which is wrong
+        // when the user is on a different tab while a background session
+        // completes). See .planning/debug/cluster1-routing.md.
+        tabId: (sess && typeof sess.tabId === 'number') ? sess.tabId : null,
         conversationId: sess.conversationId || null,
         historySessionId: sess.historySessionId || sid,
         result: terminal.resultText || 'Task completed.',
@@ -1406,6 +1553,26 @@ async function runAgentIteration(sessionId, options) {
   // Helper: full session finalization (overlays + logger + sidepanel + cleanup)
   async function finalizeSession(sid, sess, terminal) {
     saveToLogger(sid, sess, sess.status);
+    // QT-wnz Codex-3 -- background-side authoritative terminal persist
+    // BEFORE broadcast. Defends against sidepanel context fanout +
+    // ephemeral doc lifetime; the durable write must not depend on which
+    // sidepanel happens to be alive when the broadcast fires. The content
+    // chain (terminal.resultText -> sess.completionMessage -> default)
+    // mirrors notifySidepanel L1441 so what gets persisted MATCHES what
+    // notifySidepanel broadcasts as request.result; C4's dedupe correctly
+    // recognizes it as "the same message."
+    try {
+      var helperHost = (typeof globalThis !== 'undefined') ? globalThis : null;
+      if (helperHost && typeof helperHost.fsbPersistTerminalMessageToConversation === 'function') {
+        var _convId = sess && sess.conversationId;
+        var _content = (terminal && (terminal.resultText || terminal.summary))
+          || (sess && (sess.completionMessage || sess.result))
+          || 'Task completed.';
+        if (typeof _convId === 'string' && _convId.length > 0) {
+          await helperHost.fsbPersistTerminalMessageToConversation(_convId, sid, _content);
+        }
+      }
+    } catch (_e) { /* non-fatal */ }
     notifySidepanel(sid, sess, terminal);
     // Give the final overlay state a moment to render before cleanup clears it.
     await sleep(900);
@@ -1529,7 +1696,7 @@ async function runAgentIteration(sessionId, options) {
   session.iterationCount = iterNum;
 
   function buildOverlayStepDetail(detailText, fallbackPhase) {
-    var maxIter = session.maxIterations || 20;
+    var maxIter = session.maxIterations || 100;
     var prefix = 'Step ' + iterNum + '/' + maxIter;
     var detail = detailText ? String(detailText).trim() : '';
 
@@ -1559,7 +1726,7 @@ async function runAgentIteration(sessionId, options) {
       taskName: session.task,
       taskSummary: session.taskSummary || null,
       iteration: iterNum,
-      maxIterations: session.maxIterations || 20,
+      maxIterations: session.maxIterations || 100,
       statusText: buildOverlayStepDetail(detailText, phase),
       animatedHighlights: session.animatedActionHighlights
     };
@@ -1656,7 +1823,7 @@ async function runAgentIteration(sessionId, options) {
 
     await refreshCanonicalOverlay(
       'thinking',
-      session.lastAiReasoning || 'Thinking through the next browser step',
+      resolveOverlayDetail(session, null),
       { indeterminate: true, progressLabel: 'Planning' }
     );
 
@@ -1673,6 +1840,13 @@ async function runAgentIteration(sessionId, options) {
     }
     var response;
     try {
+      // Phase 9 FINT-14 -- mark in-flight API request boundary for SurvivabilityAdapter.
+      // Adapter resume() at lattice-runtime-adapter.js:244-256 maps this marker to
+      // ResumePolicy 'ON_ERROR_SW_EVICTION_MID_REQUEST'. Property write on session;
+      // FSB_LATTICE_RUNTIME_ADAPTER_ENABLED flag gates the DOWNSTREAM serialize sidecar
+      // at the end_turn + normal-iteration persist tails, not this property assignment
+      // (which is cheap + always-on).
+      session._currentStepName = 'BEFORE_API_REQUEST';
       response = await callProviderWithTools(
         providerInstance, model, null, turnMessages, session.tools, providerKey
       );
@@ -1815,6 +1989,18 @@ async function runAgentIteration(sessionId, options) {
       }
 
       await persist(sessionId, session);
+      // Phase 9 FINT-14 -- additive sidecar: SurvivabilityAdapter.serialize() at end_turn
+      // in-flight tail (Site A per 09-CONTEXT.md D-02). Reuses session._latticeAdapter
+      // stashed by Plan 09-01 at runAgentLoop entry. Defensive guard + try/catch
+      // fire-and-forget mirrors the Phase 8 sendLatticeStepTransition pattern.
+      if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+          && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+          && session._latticeAdapter
+          && typeof session._latticeAdapter.serialize === 'function') {
+        try {
+          session._latticeAdapter.serialize(session);
+        } catch (_e) { /* swallow - fire-and-forget per D-02 */ }
+      }
       await finalizeSession(sessionId, session, terminalOutcome);
 
       // Broadcast completion
@@ -1829,6 +2015,23 @@ async function runAgentIteration(sessionId, options) {
     // j. Push assistant message to history (BEFORE tool results, per Pitfall 5)
     var assistantMsg = _formatAssistantMessage(response, providerKey);
     session.messages.push(assistantMsg);
+
+    // Phase 8 FINT-11 -- emit step.transition at LLM_TURN boundary.
+    // Fire-and-forget per D-03; tracer call goes INSIDE iteration body BEFORE any
+    // deferred-iterator schedule per INV-04 + D-07 (08-RESEARCH Section 6 Pitfall 1).
+    // Payload follows Phase 5 D-16 wire shape exactly; runId equals sessionId per
+    // 08-RESEARCH Section 4 + Pitfall 3 (no new session._lattice* fields).
+    if (typeof sendLatticeStepTransition === 'function') {
+      try {
+        sendLatticeStepTransition({
+          runId: sessionId,
+          sessionId: sessionId,
+          stepName: 'LLM_TURN',
+          stepIndex: iterNum,
+          timestamp: new Date().toISOString()
+        });
+      } catch (_e) { /* swallow - producer is fire-and-forget */ }
+    }
 
     // k. Parse tool calls
     var toolCalls = _parseToolCalls(response, providerKey);
@@ -1884,6 +2087,37 @@ async function runAgentIteration(sessionId, options) {
       var call = toolCalls[ci];
       var result;
 
+      // Malformed/truncated JSON arguments (flagged by parseToolCalls): do NOT
+      // execute. Return a paired error result so the assistant tool_calls
+      // message already pushed at step j keeps a matching role:'tool' reply --
+      // an unpaired tool_call is a guaranteed provider 400 on the next turn.
+      // Mirrors the permission-denied skip path below.
+      if (call.argsParseError) {
+        result = {
+          success: false, hadEffect: false,
+          error: 'Tool arguments were malformed or truncated (' + call.argsParseError + '). Re-issue the tool call with valid, complete JSON arguments.',
+          navigationTriggered: false, result: null
+        };
+        toolResults.push({ callId: call.id, name: call.name, result: result });
+        // ADOPT-04: Use ActionHistory instance or fallback to raw array
+        if (session._actionHistory) {
+          session._actionHistory.push({
+            tool: call.name, params: call.args,
+            result: { success: false, hadEffect: false, error: result.error },
+            timestamp: Date.now(), iteration: iterNum
+          });
+          session.actionHistory = session._actionHistory.events; // backward compat sync
+        } else {
+          if (!session.actionHistory) session.actionHistory = [];
+          session.actionHistory.push(_al_createActionEvent({
+            tool: call.name, params: call.args,
+            result: { success: false, hadEffect: false, error: result.error },
+            timestamp: Date.now(), iteration: iterNum
+          }));
+        }
+        continue; // Skip to next tool
+      }
+
       if (call.name !== 'report_progress' && call.name !== 'complete_task' && call.name !== 'partial_task' && call.name !== 'fail_task') {
         lastNonProgressToolCall = call;
       }
@@ -1923,6 +2157,53 @@ async function runAgentIteration(sessionId, options) {
           }
           continue; // Skip to next tool
         }
+      }
+
+      // Phase 9 FINT-14 -- mark in-flight tool dispatch boundary. Adapter resume() maps
+      // this marker to ResumePolicy 'ON_ERROR_SW_EVICTION_MID_TOOL_DISPATCH'. Marker set
+      // OUTSIDE the Phase 8 TOOL_DISPATCH emission if-guard so denied tools also set it.
+      session._currentStepName = 'BEFORE_TOOL_EXECUTION';
+      // Phase 8 FINT-11 -- emit step.transition at TOOL_DISPATCH boundary.
+      // One event per tool call per D-01. Placed AFTER the permission/hook check
+      // so denied tools also emit a step.transition (observable in metadata via
+      // Phase 10 metrics consumer; Phase 8 keeps wire payload byte-frozen to
+      // Phase 5 D-16 shape). previousStepName threads back to the LLM_TURN that
+      // produced this tool call (linked-list per CheckpointHookContext semantics).
+      if (typeof sendLatticeStepTransition === 'function') {
+        try {
+          sendLatticeStepTransition({
+            runId: sessionId,
+            sessionId: sessionId,
+            stepName: 'TOOL_DISPATCH',
+            stepIndex: iterNum,
+            previousStepName: 'LLM_TURN',
+            timestamp: new Date().toISOString()
+          });
+        } catch (_e) { /* swallow - producer is fire-and-forget */ }
+      }
+
+      // Phase 10 FINT-16 -- emit visual-session tick at TOOL_DISPATCH boundary
+      // (CONTEXT D-03). One tick per tool call; fires immediately after the
+      // Phase 8 step.transition emission so Lattice telemetry + overlay
+      // telemetry land side-by-side for debugging. Driver discriminator
+      // distinguishes autopilot ticks from MCP-bridge ticks downstream.
+      // Fire-and-forget; defensive guard mirrors Phase 8 pattern.
+      // INV-04 preserved: call lives INSIDE the iteration body BEFORE any
+      // deferred-iterator schedule; comment text avoids the literal token.
+      if (typeof MCPVisualSessionLifecycleUtils !== 'undefined' &&
+          typeof MCPVisualSessionLifecycleUtils.recordVisualSessionTick === 'function') {
+        try {
+          MCPVisualSessionLifecycleUtils.recordVisualSessionTick(
+            session.tabId,
+            session.agentId,
+            {
+              client: 'FSB Autopilot',
+              visualReason: 'autopilot-tool-dispatch:' + call.name,
+              driver: 'autopilot',
+              isFinal: false
+            }
+          );
+        } catch (_e) { /* swallow - fire-and-forget */ }
       }
 
       // --- Local tool interception (Phase 138 on-demand context) ---
@@ -2186,7 +2467,7 @@ async function runAgentIteration(sessionId, options) {
         session.lastAiReasoning = msg;
         await refreshCanonicalOverlay(
           'thinking',
-          msg || 'Thinking through the next browser step',
+          resolveOverlayDetail(session, msg),
           { indeterminate: true, progressLabel: 'Planning' }
         );
         result = { success: true, hadEffect: false, error: null, navigationTriggered: false, result: { displayed: true } };
@@ -2218,6 +2499,43 @@ async function runAgentIteration(sessionId, options) {
       }
 
       toolResults.push({ callId: call.id, name: call.name, result: result });
+
+      // Phase 10 FINT-17/FINT-18 -- record autopilot dispatch row with
+      // driving-model attribution (CONTEXT D-04). Fires AFTER toolResults.push
+      // so result.success reflects the actual execution outcome.
+      // dispatcher_route literal 'autopilot' relies on the route allowlist
+      // extension landed in this plan's Task 1 (recorder lines 275-277).
+      // drivingModel is a NEW top-level row field (recorder pass-through).
+      // xAI reasoning_tokens edge case per FINT-08 / LSDK-16; non-xAI
+      // providers leave the field undefined (D-04 strict reading; OpenAI
+      // o1 extension is forward-compat for v0.11.0+ per RESEARCH Pitfall 4).
+      // INV-04 preserved: call lives INSIDE iteration body BEFORE any
+      // deferred-iterator schedule; comment text avoids the literal token.
+      if (typeof globalThis !== 'undefined' &&
+          globalThis.fsbMcpMetricsRecorder &&
+          typeof globalThis.fsbMcpMetricsRecorder.recordDispatch === 'function') {
+        try {
+          var _phase10ProviderKey = (session.providerConfig && session.providerConfig.providerKey) || null;
+          var _phase10ModelId = (session.providerConfig && session.providerConfig.model) || null;
+          var _phase10ReasoningTokens = undefined;
+          if (_phase10ProviderKey === 'xai' && typeof response !== 'undefined' &&
+              response && response.usage && response.usage.completion_tokens_details) {
+            _phase10ReasoningTokens = response.usage.completion_tokens_details.reasoning_tokens;
+          }
+          globalThis.fsbMcpMetricsRecorder.recordDispatch({
+            client: 'FSB Autopilot',
+            tool: call.name,
+            requestPayload: call.args,
+            success: result.success,
+            dispatcher_route: 'autopilot',
+            drivingModel: {
+              provider: _phase10ProviderKey,
+              model_id: _phase10ModelId,
+              reasoning_tokens: _phase10ReasoningTokens
+            }
+          });
+        } catch (_e) { /* swallow - recorder is fire-and-forget */ }
+      }
 
       // ADOPT-04: Use ActionHistory instance or fallback to raw array
       if (session._actionHistory) {
@@ -2413,6 +2731,17 @@ async function runAgentIteration(sessionId, options) {
 
     // o. Persist session state after every iteration (per SAFE-04, D-09)
     await persist(sessionId, session);
+    // Phase 9 FINT-14 -- additive sidecar: SurvivabilityAdapter.serialize() at normal-iteration
+    // in-flight tail (Site B per 09-CONTEXT.md D-02). Reuses session._latticeAdapter stashed
+    // by Plan 09-01. Defensive guard + try/catch fire-and-forget.
+    if (typeof FSB_LATTICE_RUNTIME_ADAPTER_ENABLED !== 'undefined'
+        && FSB_LATTICE_RUNTIME_ADAPTER_ENABLED
+        && session._latticeAdapter
+        && typeof session._latticeAdapter.serialize === 'function') {
+      try {
+        session._latticeAdapter.serialize(session);
+      } catch (_e) { /* swallow - fire-and-forget per D-02 */ }
+    }
 
     // ADOPT-03: Construct structured turn result for tool_calls iteration
     session.lastTurnResult = _al_createTurnResult({
@@ -2433,6 +2762,12 @@ async function runAgentIteration(sessionId, options) {
       durationMs: Date.now() - (session.agentState.startTime || Date.now())
     });
 
+    // Phase 9 FINT-14 -- mark boundary state just before iteration scheduling.
+    // Adapter resume() maps this marker to ResumePolicy 'SAFE' (no in-flight work;
+    // iteration completed cleanly). MUST be OUTSIDE the deferred-iterator schedule
+    // lambda body for INV-04 byte-freeze; awk-scan verifies zero _currentStepName
+    // tokens inside any deferred-iterator schedule callback body.
+    session._currentStepName = 'BEFORE_NEXT_ITERATION_SCHEDULE';
     // p. Schedule next iteration via setTimeout (per D-08, P4)
     // 100ms delay: fast enough for responsive automation,
     // long enough to yield the event loop and reset Chrome's execution timer

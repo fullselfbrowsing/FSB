@@ -1,0 +1,40 @@
+{
+  "slug": "x.delete_tweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "delete a tweet in x",
+    "remove a tweet in x",
+    "trash a tweet in x",
+    "permanently delete a tweet in x",
+    "delete tweet in x"
+  ],
+  "description": "Delete a tweet. Only works for tweets authored by the authenticated user.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to delete"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/delete-tweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

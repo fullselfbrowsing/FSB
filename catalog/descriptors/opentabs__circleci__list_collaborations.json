@@ -1,0 +1,31 @@
+{
+  "slug": "circleci.list_collaborations",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "list collaborations in circleci",
+    "show me my collaborations in circleci",
+    "view my collaborations in circleci",
+    "see all my collaborations in circleci",
+    "list your organizations in circleci"
+  ],
+  "description": "List all organizations and collaborations the current user belongs to. Returns org IDs, names, slugs, and VCS types.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/list-collaborations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "grafana.query_metrics",
+  "service": "grafana.com",
+  "intentSynonyms": [
+    "query metrics in grafana",
+    "query metrics on grafana in grafana",
+    "run a metric query against a grafana data source and return the timeseries result over a time range in grafana"
+  ],
+  "description": "Run a metric query against a Grafana data source and return the timeseries result over a time range.",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "datasource": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The data source UID or name to query"
+      },
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The query expression (e.g. a PromQL/Loki expression)"
+      },
+      "from": {
+        "description": "Range start (ISO timestamp or relative, e.g. now-6h)",
+        "type": "string"
+      },
+      "to": {
+        "description": "Range end (ISO timestamp or relative, e.g. now)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "datasource",
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/grafana/src/tools/query-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "query"
+    }
+  }
+}

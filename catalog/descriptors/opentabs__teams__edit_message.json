@@ -1,0 +1,50 @@
+{
+  "slug": "teams.edit_message",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "edit a message in teams",
+    "edit message in teams",
+    "edit a chat message in teams"
+  ],
+  "description": "Edit a message in a Teams chat conversation. Only messages sent by the current user can be edited.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message ID to edit"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New message content (supports HTML formatting)"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "message_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/edit-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "edit"
+    }
+  }
+}

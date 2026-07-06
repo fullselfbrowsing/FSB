@@ -1,8 +1,8 @@
-# FSB multi-agent contract (v0.8.0)
+# FSB multi-agent contract (current as of v0.9.90)
 
 This file documents the rules that make FSB's per-agent tab ownership work. Anyone calling FSB tools through MCP MUST follow these rules; breaking them produces typed errors that recover cleanly only when the caller knows the contract. The contract is small (six error names + the `agent_id` rule + the `back` tool), but every rule matters: bypassing one corrupts the ownership graph and the only recovery is closing the affected tab.
 
-## Tab ownership behavior (v0.8.0)
+## Tab ownership behavior (v0.8.0+)
 
 - Each agent owns its own tabs. `open_tab` defaults to `active: false` so it claims a tab without stealing the user's focus -- only pass `active: true` when the user explicitly needs to see that tab.
 - Do not foreground a tab unless the task requires it. `switch_tab` defaults to background; it foregrounds only when `active: true` is explicit.
@@ -65,7 +65,7 @@ Use the typed `back` tool (FSB v0.8.0+) for one-step history navigation. Do NOT 
 [GOOD] back({})
 ```
 
-Note: `go_back` (the existing tool in `mcp/ai/tool-definitions.cjs`) is the same surface; some FSB versions expose this as `back`, others as `go_back`. Both are typed, ownership-gated, and BF-cache aware. Use whichever is published by your FSB build; never fall back to `execute_js`.
+Note: `go_back` (`mcp/ai/tool-definitions.cjs`, part of the 37-tool action-tool field-bundle contract) and `back` (`mcp/src/tools/agents.ts`, outside that contract) are two distinct tools that coexist in the current build, not version alternates for the same surface. `go_back` carries the `visual_reason`/`client` field bundle like other action tools; `back` does not, but adds a richer `change_report` (URL, dialogs, node/attribute/input changes, focus shift) plus explicit `status` values (`ok`, `no_history`, `cross_origin`, `bf_cache`, `fragment_only`). Prefer `back` for its structured result. Both are typed, ownership-gated, and BF-cache aware; never fall back to `execute_js`.
 
 ## Why the contract matters
 

@@ -1,0 +1,41 @@
+{
+  "slug": "todoist.delete_task",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "delete a task in todoist",
+    "remove a task in todoist",
+    "trash a task in todoist",
+    "permanently delete a task in todoist",
+    "delete a to-do in todoist",
+    "delete a to-do item in todoist"
+  ],
+  "description": "Permanently delete a Todoist task by its ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task ID to delete"
+      }
+    },
+    "required": [
+      "task_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/delete-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

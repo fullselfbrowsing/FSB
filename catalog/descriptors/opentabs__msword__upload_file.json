@@ -1,0 +1,48 @@
+{
+  "slug": "msword.upload_file",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "upload a file in msword",
+    "upload file in msword",
+    "upload a file in microsoft word",
+    "upload a text file to onedrive in msword"
+  ],
+  "description": "Upload a text file to OneDrive. Creates a new file or overwrites existing. Specify the full path relative to drive root (e.g., \"Documents/report.txt\").",
+  "actionVerb": "upload",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File path relative to drive root (e.g., \"Documents/report.txt\")"
+      },
+      "content": {
+        "type": "string",
+        "description": "File content as text"
+      },
+      "content_type": {
+        "description": "MIME type (default \"text/plain\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "path",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/upload-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "upload"
+    }
+  }
+}

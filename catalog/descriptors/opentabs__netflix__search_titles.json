@@ -1,0 +1,43 @@
+{
+  "slug": "netflix.search_titles",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "search titles in netflix",
+    "search netflix movies and shows in netflix",
+    "search netflix for movies and tv shows by keyword in netflix"
+  ],
+  "description": "Search Netflix for movies and TV shows by keyword. Returns matching titles with metadata including type, rating, synopsis, and watch status. Use this to find specific content on Netflix.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (e.g., \"Stranger Things\", \"action movies\")"
+      },
+      "limit": {
+        "description": "Max results to return (default 10, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/search-titles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

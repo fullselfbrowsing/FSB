@@ -1,0 +1,41 @@
+{
+  "slug": "notion.get_block_children",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "get a block children in notion",
+    "look up a block children in notion",
+    "fetch a single block children in notion",
+    "view one specific block children in notion",
+    "get block children in notion",
+    "get child blocks of a block or page in notion"
+  ],
+  "description": "Get the child blocks of a specific block or page. Useful for reading nested content.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "block_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block or page ID (UUID) to get children of"
+      }
+    },
+    "required": [
+      "block_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/get-block-children.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

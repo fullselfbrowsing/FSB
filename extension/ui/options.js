@@ -1,4 +1,4 @@
-// FSB v0.9.50 - Modern Dashboard Control Panel Script
+// FSB v0.9.90 - Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
@@ -13,7 +13,7 @@ const defaultSettings = {
   openrouterApiKey: '',
   lmstudioBaseUrl: 'http://localhost:1234',
   speedMode: 'normal', // Legacy support
-  maxIterations: 20,
+  maxIterations: 100,
   debugMode: false,
   // DOM Optimization settings
   domOptimization: true,
@@ -21,20 +21,80 @@ const defaultSettings = {
   elementCacheSize: 200,
   prioritizeViewport: true,
   animatedActionHighlights: true,
-  showSidepanelProgress: false,
+  showSidepanelProgress: true,
   // Credential Manager (Beta)
   enableLogin: false,
   // CAPTCHA Solver
   captchaSolverEnabled: false,
   captchaApiKey: '',
+  // Speech-to-Text provider ('browser' | 'whisper'); read by ui/speech-to-text.js
+  sttProvider: 'browser',
   autoRefineSiteMaps: true,
-  // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, default 8).
+  // Phase 241 D-05 / POOL-05: max simultaneous agents (range 1-64, fallback 8).
   fsbAgentCap: 8,
+  // Max simultaneous trigger watches (range 1-64, default 8).
+  fsbTriggerCap: 8,
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
   fsbChangeReportsEnabled: true
 };
+
+let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
+
+function getAgentCapRecommendationModule() {
+  return (typeof globalThis !== 'undefined' && globalThis.FsbAgentCapRecommendation)
+    ? globalThis.FsbAgentCapRecommendation
+    : null;
+}
+
+function clampAgentCapValue(value, fallbackValue) {
+  const helper = getAgentCapRecommendationModule();
+  if (helper && typeof helper.clampAgentCap === 'function') {
+    return helper.clampAgentCap(value, fallbackValue);
+  }
+  let raw = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(raw)) raw = Number.isFinite(fallbackValue) ? fallbackValue : defaultSettings.fsbAgentCap;
+  raw = Math.floor(raw);
+  if (raw < 1) return 1;
+  if (raw > 64) return 64;
+  return raw;
+}
+
+async function resolveRecommendedAgentCap() {
+  const helper = getAgentCapRecommendationModule();
+  if (helper && typeof helper.getRecommendedAgentCap === 'function') {
+    try {
+      return clampAgentCapValue(await helper.getRecommendedAgentCap(), defaultSettings.fsbAgentCap);
+    } catch (_e) {
+      return defaultSettings.fsbAgentCap;
+    }
+  }
+  return defaultSettings.fsbAgentCap;
+}
+
+function updateAgentCapResetLabel() {
+  if (!elements.fsbAgentCapReset) return;
+  const text = 'Reset to recommended (' + fsbRecommendedAgentCap + ')';
+  // The button carries a leading <i> icon -- write into the inner label span
+  // so re-renders don't wipe it out via a bare .textContent = on the button.
+  const label = elements.fsbAgentCapReset.querySelector('.form-secondary-btn__label');
+  if (label) {
+    label.textContent = text;
+  } else {
+    elements.fsbAgentCapReset.textContent = text;
+  }
+}
+
+function setAgentCapControlValue(value) {
+  const capValue = clampAgentCapValue(value, fsbRecommendedAgentCap);
+  if (elements.fsbAgentCap) {
+    elements.fsbAgentCap.value = String(capValue);
+    refreshStepper(elements.fsbAgentCap);
+  }
+  if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = String(capValue);
+  updateAgentCapResetLabel();
+}
 
 // Available models - sourced from config.js (loaded before this script) with custom provider added
 const availableModels = {
@@ -49,7 +109,11 @@ const dashboardState = {
   currentSection: 'dashboard',
   hasUnsavedChanges: false,
   isApiTesting: false,
-  connectionStatus: 'checking'
+  connectionStatus: 'checking',
+  // Dashboard-relay WS connectivity, seeded by the getDashboardWebSocketStatus
+  // replay and kept live by the dashboardWsStatusChanged runtime push
+  // (initializeSyncSection). Read by _wsIsOpen() for the sync pill.
+  wsConnected: false
 };
 
 // Initialize analytics
@@ -80,10 +144,21 @@ function initializeDashboard() {
   
   // Setup event listeners
   setupEventListeners();
-  
+
+  // Wire up minus/value/plus numeric steppers
+  initFsbSteppers();
+
+  // Wire up sidebar magnetic-dock hover
+  initSidebarProximity();
+
   // Load saved settings
   loadSettings();
-  
+
+  // Replace native <select>s with the custom dropdown widget. Runs after
+  // loadSettings() so each select's current .value/.selected already
+  // reflects the persisted setting when the widget reads its initial state.
+  initFsbSelects();
+
   // Initialize sections
   initializeSections();
 
@@ -92,9 +167,6 @@ function initializeDashboard() {
   loadPaymentVaultStatus();
   initCredentialVaultListeners();
 
-  // Check API connection
-  checkApiConnection();
-  
   // Setup theme
   setupTheme();
   
@@ -125,16 +197,17 @@ function initializeDashboard() {
 function cacheElements() {
   // Header elements
   elements.connectionStatus = document.getElementById('connectionStatus');
-  elements.testApiBtn = document.getElementById('testApiBtn');
-  elements.exportBtn = document.getElementById('exportBtn');
-  elements.themeToggle = document.getElementById('themeToggle');
-  
+
+  // Theme mode (System/Dark/Light segmented control, Advanced Settings)
+  elements.themeModeToggle = document.getElementById('themeModeToggle');
+
   // Navigation
   elements.navItems = document.querySelectorAll('.nav-item');
   elements.contentSections = document.querySelectorAll('.content-section');
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
   elements.geminiApiKey = document.getElementById('geminiApiKey');
@@ -152,6 +225,7 @@ function cacheElements() {
   elements.elementCacheSize = document.getElementById('elementCacheSize');
   elements.elementCacheSizePreset = document.getElementById('elementCacheSizePreset');
   elements.elementCacheSizeCustom = document.getElementById('elementCacheSizeCustom');
+  elements.elementCacheSizeCustomWrap = document.getElementById('elementCacheSizeCustomWrap');
   elements.elementCacheSizeDisplay = document.getElementById('elementCacheSizeDisplay');
   // Phase 241 D-05 / POOL-05: Agent Concurrency cap card.
   elements.fsbAgentCap = document.getElementById('fsbAgentCap');
@@ -160,6 +234,12 @@ function cacheElements() {
   // Phase 243 Plan 04 / UI-03: validation hint + live current-active counter.
   elements.fsbAgentCapValidation = document.getElementById('fsbAgentCapValidation');
   elements.fsbAgentCapCurrentActive = document.getElementById('fsbAgentCapCurrentActive');
+  // Trigger Concurrency cap card.
+  elements.fsbTriggerCap = document.getElementById('fsbTriggerCap');
+  elements.fsbTriggerCapDisplay = document.getElementById('fsbTriggerCapDisplay');
+  elements.fsbTriggerCapReset = document.getElementById('fsbTriggerCapReset');
+  elements.fsbTriggerCapValidation = document.getElementById('fsbTriggerCapValidation');
+  elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
@@ -174,6 +254,9 @@ function cacheElements() {
   elements.captchaSolverEnabled = document.getElementById('captchaSolverEnabled');
   elements.captchaApiKey = document.getElementById('captchaApiKey');
   elements.toggleCaptchaApiKey = document.getElementById('toggleCaptchaApiKey');
+
+  // Speech-to-Text
+  elements.sttProvider = document.getElementById('sttProvider');
 
   // Button elements
   elements.toggleApiKey = document.getElementById('toggleApiKey');
@@ -206,6 +289,25 @@ function cacheElements() {
   elements.explorerMaxPages = document.getElementById('explorerMaxPages');
   elements.explorerCrawlers = document.getElementById('explorerCrawlers');
   elements.researchList = document.getElementById('researchList');
+
+  // Phase 30 (GOV-07/GOV-08): Consent & Audit section. These render/persist
+  // straight to the dedicated consent + audit stores (NOT defaultSettings / the
+  // Save bar). The segmented control + mutating toggle write FsbConsentPolicyStore;
+  // the audit table reads the redacted FsbAuditLog ring; the Sensitive/Blocked
+  // badges read FsbServiceDenylist.classify -- the SAME source the gate enforces.
+  elements.consentDefaultModeToggle = document.getElementById('consentDefaultModeToggle');
+  elements.consentOriginList = document.getElementById('consentOriginList');
+  elements.consentOriginEmptyState = document.getElementById('consentOriginEmptyState');
+  elements.consentOriginRowTemplate = document.getElementById('consentOriginRowTemplate');
+  elements.pendingRequestList = document.getElementById('pendingRequestList');
+  elements.pendingRequestEmptyState = document.getElementById('pendingRequestEmptyState');
+  elements.pendingRequestRowTemplate = document.getElementById('pendingRequestRowTemplate');
+  elements.pendingRequestCount = document.getElementById('pendingRequestCount');
+  elements.auditLogTable = document.getElementById('auditLogTable');
+  elements.auditLogBody = document.getElementById('auditLogBody');
+  elements.auditLogEmptyRow = document.getElementById('auditLogEmptyRow');
+  elements.auditExportBtn = document.getElementById('auditExportBtn');
+  elements.auditClearBtn = document.getElementById('auditClearBtn');
 }
 
 function setupEventListeners() {
@@ -214,11 +316,19 @@ function setupEventListeners() {
     item.addEventListener('click', () => switchSection(item.dataset.section));
   });
   
-  // Header buttons
-  elements.testApiBtn.addEventListener('click', testApiConnection);
-  elements.exportBtn.addEventListener('click', exportSettings);
-  elements.themeToggle.addEventListener('click', toggleTheme);
-  
+  // Theme mode segmented control (System/Dark/Light). Delegated click, same
+  // shape as the consentDefaultModeToggle wiring below.
+  if (elements.themeModeToggle) {
+    elements.themeModeToggle.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-theme-mode]') : null;
+      if (!btn) return;
+      const mode = btn.dataset.themeMode;
+      if (!mode) return;
+      setThemePreference(mode);
+      showToast(`${mode} theme`, 'info');
+    });
+  }
+
   // Form inputs change detection
   const formInputs = [
     elements.apiKey,
@@ -237,7 +347,8 @@ function setupEventListeners() {
     elements.showSidepanelProgress,
     elements.enableLogin,
     elements.captchaSolverEnabled,
-    elements.captchaApiKey
+    elements.captchaApiKey,
+    elements.sttProvider
   ];
 
   formInputs.forEach(input => {
@@ -272,10 +383,10 @@ function setupEventListeners() {
     elements.elementCacheSizePreset.addEventListener('change', (e) => {
       const value = e.target.value;
       if (value === 'custom') {
-        elements.elementCacheSizeCustom.style.display = 'block';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = '';
         elements.elementCacheSizeCustom.focus();
       } else {
-        elements.elementCacheSizeCustom.style.display = 'none';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = 'none';
         elements.elementCacheSize.value = value;
         if (elements.elementCacheSizeDisplay) {
           elements.elementCacheSizeDisplay.textContent = value;
@@ -301,7 +412,7 @@ function setupEventListeners() {
   }
 
   // Phase 241 D-05 / POOL-05 / POOL-06: Agent Concurrency cap input + reset.
-  // Real-time clamp: parseInt -> 1..64 integer; non-numeric -> default 8.
+  // Real-time clamp: parseInt -> 1..64 integer; non-numeric -> recommended default.
   // Defense-in-depth layer 2 (HTML min/max is layer 1; SW setCap is layer 3).
   if (elements.fsbAgentCap) {
     elements.fsbAgentCap.addEventListener('input', (e) => {
@@ -316,9 +427,7 @@ function setupEventListeners() {
       }
 
       let raw = parseInt(rawValue, 10);
-      if (!Number.isFinite(raw)) raw = 8;
-      if (raw < 1) raw = 1;
-      if (raw > 64) raw = 64;
+      raw = clampAgentCapValue(raw, fsbRecommendedAgentCap);
       if (e.target.value !== String(raw)) e.target.value = String(raw);
       if (elements.fsbAgentCapDisplay) {
         elements.fsbAgentCapDisplay.textContent = String(raw);
@@ -333,14 +442,54 @@ function setupEventListeners() {
   }
   if (elements.fsbAgentCapReset) {
     elements.fsbAgentCapReset.addEventListener('click', () => {
-      if (elements.fsbAgentCap) elements.fsbAgentCap.value = '8';
-      if (elements.fsbAgentCapDisplay) elements.fsbAgentCapDisplay.textContent = '8';
+      setAgentCapControlValue(fsbRecommendedAgentCap);
       // Phase 243 Plan 04 / UI-03: hide validation + refresh counter on reset.
       if (elements.fsbAgentCapValidation) {
         elements.fsbAgentCapValidation.style.display = 'none';
       }
       if (typeof refreshActiveAgentCount === 'function') {
         refreshActiveAgentCount();
+      }
+      markUnsavedChanges();
+    });
+  }
+
+  // Trigger Concurrency cap input + reset. Mirrors Agent Concurrency while
+  // keeping trigger storage/counter keys separate.
+  if (elements.fsbTriggerCap) {
+    elements.fsbTriggerCap.addEventListener('input', (e) => {
+      const rawValue = e.target.value;
+      const validationEl = elements.fsbTriggerCapValidation;
+      if (validationEl && typeof isCapInputInvalid === 'function') {
+        validationEl.style.display = isCapInputInvalid(rawValue) ? 'block' : 'none';
+      }
+
+      let raw = parseInt(rawValue, 10);
+      if (!Number.isFinite(raw)) raw = 8;
+      if (raw < 1) raw = 1;
+      if (raw > 64) raw = 64;
+      if (e.target.value !== String(raw)) e.target.value = String(raw);
+      if (elements.fsbTriggerCapDisplay) {
+        elements.fsbTriggerCapDisplay.textContent = String(raw);
+      }
+      if (typeof refreshActiveTriggerCount === 'function') {
+        refreshActiveTriggerCount();
+      }
+      markUnsavedChanges();
+    });
+  }
+  if (elements.fsbTriggerCapReset) {
+    elements.fsbTriggerCapReset.addEventListener('click', () => {
+      if (elements.fsbTriggerCap) {
+        elements.fsbTriggerCap.value = '8';
+        refreshStepper(elements.fsbTriggerCap);
+      }
+      if (elements.fsbTriggerCapDisplay) elements.fsbTriggerCapDisplay.textContent = '8';
+      if (elements.fsbTriggerCapValidation) {
+        elements.fsbTriggerCapValidation.style.display = 'none';
+      }
+      if (typeof refreshActiveTriggerCount === 'function') {
+        refreshActiveTriggerCount();
       }
       markUnsavedChanges();
     });
@@ -368,6 +517,94 @@ function setupEventListeners() {
         scheduleRefreshActiveAgentCount();
       } else if (area === 'local' && changes && changes.fsbAgentCap) {
         scheduleRefreshActiveAgentCount();
+      } else if (area === 'session' && changes && changes.fsbTriggerRegistry) {
+        scheduleRefreshActiveTriggerCount();
+      } else if (area === 'local' && changes && changes.fsbTriggerCap) {
+        scheduleRefreshActiveTriggerCount();
+      } else if (area === 'local' && changes
+          && (changes.fsbConsentPolicies || changes.fsbAuditLog)) {
+        // Phase 30 (GOV-07): re-render the Consent & Audit section when the
+        // consent envelope or the audit ring changes (e.g. the gate appended an
+        // outcome, or another control-panel tab edited a policy). Debounced.
+        scheduleRenderConsentAudit();
+      }
+    });
+  }
+
+  // Phase 30 (GOV-07): Consent & Audit wiring. Consent/audit state lives in its
+  // OWN stores (consent-policy-store.js, audit-log.js), NOT defaultSettings, so
+  // these controls deliberately do NOT join the formInputs Save-bar array -- they
+  // persist immediately on change. The per-origin rows + pending rows are cloned
+  // by renderConsentAudit(); their controls are wired via event delegation so
+  // dynamically-added rows are covered without re-binding.
+  if (elements.auditExportBtn) {
+    elements.auditExportBtn.addEventListener('click', exportAuditLog);
+  }
+  if (elements.auditClearBtn) {
+    elements.auditClearBtn.addEventListener('click', clearAuditLog);
+  }
+  // Per-origin Off/Ask/Auto segmented control (delegated): write the mode to the
+  // consent store for that exact origin only.
+  if (elements.consentOriginList) {
+    elements.consentOriginList.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-mode]') : null;
+      if (!btn || btn.disabled) return;
+      const row = btn.closest('.consent-origin-row');
+      const origin = row && row.dataset ? row.dataset.origin : '';
+      const mode = btn.dataset ? btn.dataset.mode : '';
+      if (!origin || !mode) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setOriginMode === 'function') {
+        Promise.resolve(store.setOriginMode(origin, mode)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+    // Per-origin elevated mutating opt-in (delegated change).
+    elements.consentOriginList.addEventListener('change', (e) => {
+      const input = e.target;
+      if (!input || !input.classList || !input.classList.contains('consent-mutating-input')) return;
+      const row = input.closest('.consent-origin-row');
+      const origin = row && row.dataset ? row.dataset.origin : '';
+      if (!origin) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setOriginMutating === 'function') {
+        Promise.resolve(store.setOriginMutating(origin, !!input.checked)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+  }
+  // Global "Default for new sites" segmented control (delegated): writes the
+  // global defaultMode to the consent store, then re-renders so per-origin
+  // effective modes update. Uses data-default-mode (distinct from the per-origin
+  // data-mode handler above).
+  if (elements.consentDefaultModeToggle) {
+    elements.consentDefaultModeToggle.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.detail-btn[data-default-mode]') : null;
+      if (!btn || btn.disabled) return;
+      const mode = btn.dataset ? btn.dataset.defaultMode : '';
+      if (!mode) return;
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+      if (store && typeof store.setDefaultMode === 'function') {
+        Promise.resolve(store.setDefaultMode(mode)).then(() => {
+          scheduleRenderConsentAudit();
+        });
+      }
+    });
+  }
+  // Pending Grant / Deny (delegated): Grant writes consent for that exact
+  // origin/scope only (T-30-16); Deny removes the row without granting.
+  if (elements.pendingRequestList) {
+    elements.pendingRequestList.addEventListener('click', (e) => {
+      const target = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (!target) return;
+      const row = target.closest('.pending-request-row');
+      if (!row) return;
+      if (target.classList.contains('pending-grant-btn')) {
+        grantPendingRequest(row);
+      } else if (target.classList.contains('pending-deny-btn')) {
+        denyPendingRequest(row);
       }
     });
   }
@@ -420,6 +657,14 @@ function setupEventListeners() {
       }
       ui.runDiscovery(provider, { force: true, previousSelection: elements.modelName?.value });
     });
+  }
+
+  // Unified model combobox: a searchable dropdown rendered over the (now
+  // hidden) #modelName select. It owns search/filter + selection, while the
+  // native select stays the value source of truth that discovery and the
+  // legacy provider flows keep writing into.
+  if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+    globalThis.FSBModelCombobox.init();
   }
   
   // Model name change
@@ -567,8 +812,8 @@ function setupEventListeners() {
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local') {
       if (changes.fsbUsageData || changes.fsbCurrentModel) {
-        // Only refresh if the analytics section is currently visible
-        if (dashboardState.currentSection !== 'analytics') return;
+        // Only refresh if the dashboard section is currently visible
+        if (dashboardState.currentSection !== 'dashboard') return;
 
         clearTimeout(_analyticsRefreshTimer);
         _analyticsRefreshTimer = setTimeout(() => {
@@ -607,19 +852,339 @@ function setupEventListeners() {
   });
 }
 
+// Wires every minus/value/plus numeric stepper (.fsb-stepper) on the page.
+// Each wrapper's data-min/data-max/data-step drive clamping; committing a
+// value dispatches a real bubbling 'input' event on the inner
+// .fsb-stepper__input so it flows through that field's own pre-existing
+// per-field listener exactly as native typing/dragging did before -- this
+// function never touches per-field save/validation logic directly.
+// Disables a stepper's -/+ buttons exactly at its data-min/data-max. Standalone
+// (not nested in initFsbSteppers()) so external code that sets a stepper's
+// value directly -- e.g. the Agent/Trigger Cap reset buttons -- can re-sync
+// the disabled state after bypassing nudge()/apply().
+function refreshStepper(input) {
+  const box = input.closest('.fsb-stepper');
+  if (!box) return;
+  const min = parseFloat(box.getAttribute('data-min'));
+  const max = parseFloat(box.getAttribute('data-max'));
+  const n = parseFloat(input.value);
+  const dec = box.querySelector('.fsb-stepper__btn--dec');
+  const inc = box.querySelector('.fsb-stepper__btn--inc');
+  if (dec) dec.disabled = !Number.isNaN(n) && !Number.isNaN(min) && n <= min;
+  if (inc) inc.disabled = !Number.isNaN(n) && !Number.isNaN(max) && n >= max;
+}
+
+function initFsbSteppers() {
+  document.querySelectorAll('.fsb-stepper').forEach((box) => {
+    const input = box.querySelector('.fsb-stepper__input');
+    if (!input) return;
+    const decBtn = box.querySelector('.fsb-stepper__btn--dec');
+    const incBtn = box.querySelector('.fsb-stepper__btn--inc');
+    let min = parseFloat(box.getAttribute('data-min')); if (Number.isNaN(min)) min = -Infinity;
+    let max = parseFloat(box.getAttribute('data-max')); if (Number.isNaN(max)) max = Infinity;
+    const step = parseFloat(box.getAttribute('data-step')) || 1;
+    let holdTimeout = null, holdInterval = null;
+
+    function clamp(v) {
+      if (Number.isNaN(v)) v = (min === -Infinity ? 0 : min);
+      return Math.min(max, Math.max(min, v));
+    }
+    function apply(v) {
+      input.value = String(clamp(v));
+      refreshStepper(input);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function stop() {
+      clearTimeout(holdTimeout); clearInterval(holdInterval);
+      holdTimeout = null; holdInterval = null;
+    }
+    function nudge(dir) {
+      let n = parseFloat(input.value); if (Number.isNaN(n)) n = (min === -Infinity ? 0 : min);
+      const next = clamp(n + dir * step);
+      apply(next);
+      if (next === n) stop();
+    }
+    function press(dir) {
+      return (e) => {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        e.preventDefault();
+        nudge(dir);
+        stop();
+        holdTimeout = setTimeout(() => {
+          holdInterval = setInterval(() => { nudge(dir); }, 90);
+        }, 420);
+      };
+    }
+    function key(dir) {
+      return (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); nudge(dir); }
+      };
+    }
+
+    if (decBtn) {
+      decBtn.addEventListener('mousedown', press(-1));
+      decBtn.addEventListener('touchstart', press(-1), { passive: false });
+      decBtn.addEventListener('keydown', key(-1));
+    }
+    if (incBtn) {
+      incBtn.addEventListener('mousedown', press(1));
+      incBtn.addEventListener('touchstart', press(1), { passive: false });
+      incBtn.addEventListener('keydown', key(1));
+    }
+    [decBtn, incBtn].forEach((b) => {
+      if (!b) return;
+      ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach((ev) => b.addEventListener(ev, stop));
+    });
+
+    // ArrowUp/ArrowDown on the input itself, digit-only filtering on every
+    // keystroke, and clamp-on-blur (not every keystroke, so the user can
+    // freely pass through intermediate values like "5" on the way to "50").
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); nudge(1); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); nudge(-1); }
+    });
+    input.addEventListener('input', () => {
+      const v = input.value.replace(/[^0-9]/g, '');
+      if (v !== input.value) input.value = v;
+      refreshStepper(input);
+    });
+    input.addEventListener('blur', () => {
+      const n = parseFloat(input.value);
+      if (input.value === '' || n !== clamp(n)) {
+        apply(Number.isNaN(n) ? (min === -Infinity ? 0 : min) : n);
+      } else {
+        refreshStepper(input);
+      }
+    });
+
+    refreshStepper(input);
+  });
+}
+
+// Magnetic-dock hover for the sidebar rail: the item under the cursor expands
+// fully, immediate neighbors partially expand, falling off with a Gaussian
+// curve. Inline styles are written with 'important' so they reliably win over
+// the resting :hover CSS while active, and are cleared on mouseleave so CSS
+// regains control of the (already-correct) resting/simple-hover states.
+function initSidebarProximity() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+  const items = Array.prototype.slice.call(document.querySelectorAll('.nav-item'));
+  if (!items.length) return;
+
+  // Wrap each label's own content so the text can fade on a stricter
+  // threshold than the pill it lives in (only the truly-hovered item should
+  // ever reveal readable text).
+  items.forEach((it) => {
+    const sp = it.querySelector('span');
+    if (!sp || sp.querySelector('.nav-label')) return;
+    const lab = document.createElement('span');
+    lab.className = 'nav-label';
+    while (sp.firstChild) { lab.appendChild(sp.firstChild); }
+    sp.appendChild(lab);
+  });
+
+  const COMPACT = 56, FULL = 232, SIGMA = 42, STEEP = 5;
+  let centers = [];
+  let raf = null;
+  let curY = null;
+
+  function measure() {
+    centers = items.map((it) => {
+      const r = it.getBoundingClientRect();
+      return { c: r.top + r.height / 2, top: r.top, bottom: r.bottom };
+    });
+  }
+
+  function render() {
+    raf = null;
+    if (curY == null) return;
+    measure();
+    let hi = -1;
+    for (let k = 0; k < centers.length; k++) {
+      if (curY >= centers[k].top && curY <= centers[k].bottom) { hi = k; break; }
+    }
+    items.forEach((it, i) => {
+      const d = Math.abs(curY - centers[i].c);
+      let f = Math.exp(-(d * d) / (2 * SIGMA * SIGMA));
+      if (i === hi) f = 1;
+      const w = COMPACT + Math.pow(f, STEEP) * (FULL - COMPACT);
+      const sp = it.querySelector('span');
+      const lab = sp && sp.querySelector('.nav-label');
+      if (sp) {
+        sp.style.setProperty('width', w.toFixed(1) + 'px', 'important');
+        sp.style.setProperty('opacity', (i === hi ? 1 : Math.min(1, f * 1.55)).toFixed(3), 'important');
+      }
+      if (lab) {
+        const lo = (i === hi) ? 1 : Math.max(0, (f - 0.86) / 0.14);
+        lab.style.setProperty('opacity', Math.min(1, lo).toFixed(3), 'important');
+      }
+      it.style.setProperty('z-index', String(100 + Math.round(f * 100)), 'important');
+    });
+  }
+
+  nav.addEventListener('mouseenter', measure);
+  nav.addEventListener('mousemove', (e) => {
+    if (!centers.length) measure();
+    curY = e.clientY;
+    if (raf == null) raf = requestAnimationFrame(render);
+  });
+  window.addEventListener('resize', () => { centers = []; });
+  nav.addEventListener('mouseleave', () => {
+    curY = null;
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    items.forEach((it) => {
+      const sp = it.querySelector('span');
+      const lab = sp && sp.querySelector('.nav-label');
+      if (sp) { sp.style.removeProperty('width'); sp.style.removeProperty('opacity'); }
+      if (lab) lab.style.removeProperty('opacity');
+      it.style.removeProperty('z-index');
+    });
+  });
+}
+
+// Guards the single document-level "close on outside click" listener below so
+// it's attached at most once, no matter how many times initFsbSelects() runs.
+let _fsbSelectOutsideClickBound = false;
+
+// Progressively enhances every native <select class="form-select">/
+// .chart-select> into a custom .fsb-select dropdown (styled button + custom
+// listbox). The native <select> stays in the DOM, hidden, as the source of
+// truth -- picking a custom option sets its .value and redispatches a real
+// 'change' event, so every existing change-listener elsewhere keeps working
+// untouched. modelName is excluded (it's the model-combobox's own hidden
+// native select, already driven by a separate custom combobox).
+// After loadSettings' async storage callback assigns `.value` on the underlying
+// native <select>s, call this to bring the wrapped custom-select labels back
+// into sync. Uses each select's already-attached `sync()` (stashed on the DOM
+// via `sel._fsbSyncLabel`), so no new listeners fire -- the alternative,
+// dispatching a synthetic `change` event, would also trigger the app-level
+// change handler at line ~607 which calls `markUnsavedChanges()`, incorrectly
+// dirtying the settings form on page load.
+function syncFsbSelectLabels() {
+  document.querySelectorAll('.form-select[data-enh="1"], .chart-select[data-enh="1"]').forEach((sel) => {
+    if (typeof sel._fsbSyncLabel === 'function') sel._fsbSyncLabel();
+  });
+}
+
+function initFsbSelects() {
+  document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
+    if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
+    sel.setAttribute('data-enh', '1');
+    sel.style.display = 'none';
+
+    const small = sel.classList.contains('small') || sel.classList.contains('chart-select');
+    const wrap = document.createElement('div');
+    wrap.className = 'fsb-select' + (small ? ' fsb-select--sm' : '');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fsb-select__btn';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    const lbl = document.createElement('span');
+    lbl.className = 'fsb-select__label';
+    const chev = document.createElement('i');
+    chev.className = 'fas fa-chevron-down fsb-select__chev';
+    btn.appendChild(lbl);
+    btn.appendChild(chev);
+    const menu = document.createElement('ul');
+    menu.className = 'fsb-select__menu';
+    menu.setAttribute('role', 'listbox');
+    menu.hidden = true;
+
+    function setOpen(open) {
+      menu.hidden = !open;
+      btn.classList.toggle('is-open', open);
+      chev.classList.toggle('fa-chevron-up', open);
+      chev.classList.toggle('fa-chevron-down', !open);
+    }
+    function sync() {
+      const v = sel.value;
+      Array.prototype.slice.call(menu.children).forEach((li) => {
+        li.classList.toggle('is-selected', li.getAttribute('data-value') === v);
+      });
+      const sl = menu.querySelector('.is-selected');
+      if (sl) lbl.textContent = sl.textContent;
+    }
+    // Stash sync() on the native <select> DOM node so an external caller
+    // (see syncFsbSelectLabels above) can re-run label reconciliation after
+    // an async `.value =` assignment without dispatching a `change` event.
+    sel._fsbSyncLabel = sync;
+    function pick(val) {
+      sel.value = val;
+      sync();
+      setOpen(false);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    Array.prototype.slice.call(sel.options).forEach((o) => {
+      const li = document.createElement('li');
+      li.className = 'fsb-select__opt';
+      li.setAttribute('role', 'option');
+      li.textContent = o.textContent;
+      li.setAttribute('data-value', o.value);
+      if (o.disabled) li.classList.add('is-disabled');
+      if (o.selected) { li.classList.add('is-selected'); lbl.textContent = o.textContent; }
+      li.addEventListener('click', () => { if (o.disabled) return; pick(o.value); });
+      menu.appendChild(li);
+    });
+    if (!lbl.textContent && sel.options[0]) lbl.textContent = sel.options[0].textContent;
+
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = menu.hidden;
+      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
+      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      setOpen(willOpen);
+    });
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); }
+      else if (e.key === 'Escape') { setOpen(false); }
+    });
+    sel.addEventListener('change', sync);
+  });
+
+  if (!_fsbSelectOutsideClickBound) {
+    _fsbSelectOutsideClickBound = true;
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w.contains(e.target)) return;
+        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
+        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
+        const c = w.querySelector('.fsb-select__chev');
+        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+      });
+    });
+  }
+}
+
 function switchSection(sectionId) {
   // Update navigation
   elements.navItems.forEach(item => {
     item.classList.toggle('active', item.dataset.section === sectionId);
   });
   
-  // Update content sections
+  // Update content sections. Consent & Audit is merged under Advanced Settings:
+  // when 'advanced' is active, #consent-audit is shown alongside #advanced.
   elements.contentSections.forEach(section => {
-    section.classList.toggle('active', section.id === sectionId);
+    const active = section.id === sectionId
+      || (sectionId === 'advanced' && section.id === 'consent-audit');
+    section.classList.toggle('active', active);
   });
   
   dashboardState.currentSection = sectionId;
-  
+
+  // Render the merged Consent & Audit cards when entering Advanced Settings (they
+  // read the consent envelope + audit ring + classify on demand). The stale
+  // '#consent-audit' hash also renders for back-compat.
+  if (sectionId === 'advanced' || sectionId === 'consent-audit') {
+    renderConsentAudit();
+  }
+
   // Update URL hash without scrolling
   history.replaceState(null, null, `#${sectionId}`);
 }
@@ -757,8 +1322,16 @@ function updateApiKeyVisibility(provider) {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(Object.keys(defaultSettings), (data) => {
+  chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
+    data = data || {};
+    fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
+    const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
+      && typeof data.fsbAgentCap === 'number'
+      && Number.isFinite(data.fsbAgentCap);
     const settings = { ...defaultSettings, ...data };
+    if (!hasStoredAgentCap) {
+      settings.fsbAgentCap = fsbRecommendedAgentCap;
+    }
     
     // Handle legacy speedMode to new model format
     if (!settings.modelProvider && settings.speedMode) {
@@ -792,12 +1365,21 @@ function loadSettings() {
       // Wait for options to be populated
       setTimeout(() => {
         elements.modelName.value = settings.modelName;
+        if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
+          globalThis.FSBModelCombobox.refresh();
+        }
         const models = availableModels[settings.modelProvider || 'xai'];
         const selectedModel = models.find(m => m.id === settings.modelName);
         if (selectedModel) {
           updateModelDescription(selectedModel.description);
         }
         updateApiKeyVisibility(settings.modelProvider || 'xai');
+        // Load-order fix: run the API-connection check inside this model-name timer.
+        // By the time it fires, the callback's synchronous body has already populated
+        // the apiKey + provider inputs and modelName was just applied above, so
+        // checkApiConnection reads populated inputs -- not the empty fields the old
+        // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
+        checkApiConnection();
       }, 100);
     }
     
@@ -824,7 +1406,7 @@ function loadSettings() {
     if (lmstudioBaseUrl) lmstudioBaseUrl.value = settings.lmstudioBaseUrl || 'http://localhost:1234';
 
     // Max iterations
-    const maxIter = settings.maxIterations || 20;
+    const maxIter = settings.maxIterations || 100;
     if (elements.maxIterations) elements.maxIterations.value = maxIter;
     if (elements.maxIterationsSlider) elements.maxIterationsSlider.value = maxIter;
     if (elements.maxIterationsDisplay) elements.maxIterationsDisplay.textContent = maxIter;
@@ -849,11 +1431,11 @@ function loadSettings() {
       const presetOption = elements.elementCacheSizePreset.querySelector(`option[value="${cacheSize}"]`);
       if (presetOption && cacheSize !== 'custom') {
         elements.elementCacheSizePreset.value = cacheSize;
-        if (elements.elementCacheSizeCustom) elements.elementCacheSizeCustom.style.display = 'none';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = 'none';
       } else {
         elements.elementCacheSizePreset.value = 'custom';
+        if (elements.elementCacheSizeCustomWrap) elements.elementCacheSizeCustomWrap.style.display = '';
         if (elements.elementCacheSizeCustom) {
-          elements.elementCacheSizeCustom.style.display = 'block';
           elements.elementCacheSizeCustom.value = cacheSize;
         }
       }
@@ -861,23 +1443,37 @@ function loadSettings() {
 
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Re-clamp on read in
     // case storage was tampered with (T-241-11) or set by an older build.
+    // If the key is absent, show the RAM-based recommendation.
     if (elements.fsbAgentCap) {
-      let capValue = (typeof settings.fsbAgentCap === 'number' && Number.isFinite(settings.fsbAgentCap))
+      const capValue = (typeof settings.fsbAgentCap === 'number' && Number.isFinite(settings.fsbAgentCap))
         ? settings.fsbAgentCap
-        : 8;
-      if (capValue < 1) capValue = 1;
-      if (capValue > 64) capValue = 64;
-      capValue = Math.floor(capValue);
-      elements.fsbAgentCap.value = String(capValue);
-      if (elements.fsbAgentCapDisplay) {
-        elements.fsbAgentCapDisplay.textContent = String(capValue);
-      }
+        : fsbRecommendedAgentCap;
+      setAgentCapControlValue(capValue);
     }
 
     // Phase 243 Plan 04 / UI-03: initial paint of the "X of M active" counter.
     // Subsequent updates flow through chrome.storage.onChanged.
     if (typeof refreshActiveAgentCount === 'function') {
       refreshActiveAgentCount();
+    }
+
+    // Trigger Concurrency cap. Re-clamp on read in case storage was tampered
+    // with or set by an older build.
+    if (elements.fsbTriggerCap) {
+      let triggerCapValue = (typeof settings.fsbTriggerCap === 'number' && Number.isFinite(settings.fsbTriggerCap))
+        ? settings.fsbTriggerCap
+        : 8;
+      if (triggerCapValue < 1) triggerCapValue = 1;
+      if (triggerCapValue > 64) triggerCapValue = 64;
+      triggerCapValue = Math.floor(triggerCapValue);
+      elements.fsbTriggerCap.value = String(triggerCapValue);
+      if (elements.fsbTriggerCapDisplay) {
+        elements.fsbTriggerCapDisplay.textContent = String(triggerCapValue);
+      }
+    }
+
+    if (typeof refreshActiveTriggerCount === 'function') {
+      refreshActiveTriggerCount();
     }
 
     if (elements.prioritizeViewport) {
@@ -912,6 +1508,22 @@ function loadSettings() {
     if (elements.autoRefineSiteMaps) {
       elements.autoRefineSiteMaps.checked = settings.autoRefineSiteMaps ?? true;
     }
+
+    // Speech-to-Text provider (checkbox maps to 'whisper' | 'browser')
+    if (elements.sttProvider) {
+      elements.sttProvider.checked = settings.sttProvider === 'whisper';
+    }
+
+    // Bring the custom-select widgets' visible labels back into sync with the
+    // now-populated native <select> values. initFsbSelects() runs synchronously
+    // at page init (before this async callback fires), so at wrap time the
+    // <select>s still hold their default first option and the widget labels
+    // freeze to that -- leaving e.g. modelProvider showing "xAI (Grok)" while
+    // the saved value has been quietly updated to gemini/openai/etc. This runs
+    // sync() on every enhanced select without dispatching a synthetic `change`
+    // event, so app-level change listeners (markUnsavedChanges + discovery)
+    // do not fire on page load.
+    if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
 
     addLog('info', 'Settings loaded successfully');
   });
@@ -974,18 +1586,59 @@ function refreshActiveAgentCount() {
   }
 }
 
+let _triggerCapCounterDebounceHandle = null;
+
+function scheduleRefreshActiveTriggerCount() {
+  if (_triggerCapCounterDebounceHandle !== null) {
+    clearTimeout(_triggerCapCounterDebounceHandle);
+  }
+  _triggerCapCounterDebounceHandle = setTimeout(() => {
+    _triggerCapCounterDebounceHandle = null;
+    refreshActiveTriggerCount();
+  }, 100);
+}
+
+function refreshActiveTriggerCount() {
+  const counterEl = elements.fsbTriggerCapCurrentActive;
+  if (!counterEl) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session
+      || typeof chrome.storage.session.get !== 'function') {
+    return;
+  }
+  try {
+    chrome.storage.session.get('fsbTriggerRegistry', (result) => {
+      if (chrome.runtime && chrome.runtime.lastError) {
+        return;
+      }
+      const envelope = result && result.fsbTriggerRegistry;
+      const active = (typeof computeActiveTriggerCount === 'function')
+        ? computeActiveTriggerCount(envelope)
+        : 0;
+      let cap = parseInt(elements.fsbTriggerCap && elements.fsbTriggerCap.value, 10);
+      if (!Number.isFinite(cap)) cap = 8;
+      const text = (typeof formatCounterText === 'function')
+        ? formatCounterText(active, cap)
+        : (active + ' of ' + cap + ' active');
+      counterEl.textContent = text;
+    });
+  } catch (_e) {
+    // Swallow — counter is purely informational and must never throw into
+    // the options page.
+  }
+}
+
 function saveSettings() {
   const settings = {
     modelProvider: elements.modelProvider?.value || 'xai',
     modelName: elements.modelName?.value || 'grok-4-1-fast',
-    apiKey: elements.apiKey?.value || '',
-    geminiApiKey: elements.geminiApiKey?.value || '',
-    openaiApiKey: document.getElementById('openaiApiKey')?.value || '',
-    anthropicApiKey: document.getElementById('anthropicApiKey')?.value || '',
-    customApiKey: document.getElementById('customApiKey')?.value || '',
-    customEndpoint: document.getElementById('customEndpoint')?.value || '',
-    openrouterApiKey: document.getElementById('openrouterApiKey')?.value || '',
-    lmstudioBaseUrl: document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234',
+    apiKey: (elements.apiKey?.value || '').trim(),
+    geminiApiKey: (elements.geminiApiKey?.value || '').trim(),
+    openaiApiKey: (document.getElementById('openaiApiKey')?.value || '').trim(),
+    anthropicApiKey: (document.getElementById('anthropicApiKey')?.value || '').trim(),
+    customApiKey: (document.getElementById('customApiKey')?.value || '').trim(),
+    customEndpoint: (document.getElementById('customEndpoint')?.value || '').trim(),
+    openrouterApiKey: (document.getElementById('openrouterApiKey')?.value || '').trim(),
+    lmstudioBaseUrl: (document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim(),
     maxIterations: parseInt(elements.maxIterations?.value) || 20,
     debugMode: elements.debugMode?.checked ?? false,
     // DOM Optimization settings
@@ -997,7 +1650,8 @@ function saveSettings() {
     showSidepanelProgress: elements.showSidepanelProgress?.checked ?? false,
     enableLogin: elements.enableLogin?.checked ?? false,
     captchaSolverEnabled: elements.captchaSolverEnabled?.checked ?? false,
-    captchaApiKey: elements.captchaApiKey?.value || '',
+    captchaApiKey: (elements.captchaApiKey?.value || '').trim(),
+    sttProvider: elements.sttProvider?.checked ? 'whisper' : 'browser',
     autoRefineSiteMaps: elements.autoRefineSiteMaps?.checked ?? true,
     // Phase 241 D-05 / POOL-05: Agent Concurrency cap. Defense-in-depth
     // layer 2 (input clamp = layer 1; SW setCap on storage.onChanged = layer 3).
@@ -1006,6 +1660,10 @@ function saveSettings() {
     // persist out-of-range cap values to chrome.storage.local.
     fsbAgentCap: (function() {
       var raw = parseInt(elements.fsbAgentCap?.value, 10);
+      return clampAgentCapValue(raw, fsbRecommendedAgentCap);
+    })(),
+    fsbTriggerCap: (function() {
+      var raw = parseInt(elements.fsbTriggerCap?.value, 10);
       if (!Number.isFinite(raw)) return 8;
       if (raw < 1) return 1;
       if (raw > 64) return 64;
@@ -1075,58 +1733,96 @@ function togglePasswordVisibility(fieldId) {
 }
 
 async function checkApiConnection() {
+  // Phase 6 Plan 06-04: rewritten to read from input fields directly (NOT from
+  // chrome.storage) and delegate to the Plan 06-03 bridge shim in test-connection
+  // mode. Closes the xai-key-rejected-400 P2 defect (stale storage read trap
+  // when user clicks Test before Save). Per-provider getter map trims input
+  // values defense-in-depth (also closes P1 even though Task 1 already trims at
+  // save time).
   dashboardState.connectionStatus = 'checking';
   updateConnectionStatus('checking', 'Checking connection...');
 
   try {
-    const settings = await getStoredSettings();
-    const provider = settings.modelProvider || 'xai';
+    const provider = elements.modelProvider?.value || 'xai';
+    const modelName = elements.modelName?.value || 'grok-4-1-fast';
 
-    // Check appropriate API key based on provider
-    const apiKeyMap = {
-      xai: settings.apiKey,
-      gemini: settings.geminiApiKey,
-      openai: settings.openaiApiKey,
-      anthropic: settings.anthropicApiKey,
-      custom: settings.customApiKey
+    const PROVIDER_KEY_GETTERS = {
+      xai:        function () { return (elements.apiKey?.value || '').trim(); },
+      gemini:     function () { return (elements.geminiApiKey?.value || '').trim(); },
+      openai:     function () { return (document.getElementById('openaiApiKey')?.value || '').trim(); },
+      anthropic:  function () { return (document.getElementById('anthropicApiKey')?.value || '').trim(); },
+      custom:     function () { return (document.getElementById('customApiKey')?.value || '').trim(); },
+      openrouter: function () { return (document.getElementById('openrouterApiKey')?.value || '').trim(); },
+      lmstudio:   function () { return ''; }
+    };
+    const PROVIDER_NAMES = {
+      xai: 'xAI',
+      gemini: 'Gemini',
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      custom: 'Custom',
+      openrouter: 'OpenRouter',
+      lmstudio: 'LM Studio'
     };
 
-    const apiKey = apiKeyMap[provider];
-
-    if (!apiKey) {
-      const providerNames = {
-        xai: 'xAI',
-        gemini: 'Gemini',
-        openai: 'OpenAI',
-        anthropic: 'Anthropic',
-        custom: 'Custom'
-      };
+    const apiKey = (PROVIDER_KEY_GETTERS[provider] || function () { return ''; })();
+    if (!apiKey && provider !== 'lmstudio') {
       updateConnectionStatus('disconnected', 'No API key configured');
-      updateApiStatusCard('disconnected', 'No API Key', `Configure your ${providerNames[provider]} API key to get started`);
+      updateApiStatusCard('disconnected', 'No API Key', 'Configure your ' + (PROVIDER_NAMES[provider] || provider) + ' API key to get started');
       return;
     }
 
-    // Use AI integration to test connection
-    const aiIntegration = new AIIntegration(settings);
+    const config = {
+      apiKey: apiKey,
+      model: modelName,
+      baseUrl: provider === 'custom' ? (document.getElementById('customEndpoint')?.value || '').trim()
+             // Strip a pasted /v1 or /v1/chat/completions suffix (the model-discovery
+             // normalization idiom above) before re-appending /v1, so the documented
+             // http://localhost:1234/v1 setting never becomes /v1/v1.
+             : provider === 'lmstudio' ? ((document.getElementById('lmstudioBaseUrl')?.value || 'http://localhost:1234').trim()
+                 .replace(/\/v1\/chat\/completions\/?$/, '')
+                 .replace(/\/v1\/?$/, '')
+                 .replace(/\/+$/, '') + '/v1')
+             : provider === 'openai' ? 'https://api.openai.com/v1'
+             : undefined
+    };
 
-    const result = await aiIntegration.testConnection();
-
-    if (result.ok) {
+    const startTime = Date.now();
+    try {
+      await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { action: 'lattice-test-connection', provider: provider, config: config },
+          function (response) {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            if (!response || !response.ok) {
+              reject(new Error((response && response.error) || 'Unknown bridge error'));
+              return;
+            }
+            resolve();
+          }
+        );
+      });
+      const responseTime = Date.now() - startTime;
       updateConnectionStatus('connected', 'Connected');
       // Hide status card on success - only show on errors
       if (elements.apiStatusCard) {
         elements.apiStatusCard.style.display = 'none';
       }
-      addLog('info', `API connection successful with model: ${result.model}`);
-    } else {
+      addLog('info', 'API connection successful (' + responseTime + 'ms) with model: ' + modelName);
+    } catch (err) {
+      const responseTime = Date.now() - startTime;
+      const errMsg = (err && err.message) ? err.message : 'Unknown error';
       updateConnectionStatus('disconnected', 'Connection failed');
-      updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Unknown error');
-      addLog('error', `API connection failed: ${result.error}`);
+      updateApiStatusCard('disconnected', 'Connection Failed', errMsg);
+      addLog('error', 'API connection failed (' + responseTime + 'ms): ' + errMsg);
     }
   } catch (error) {
     updateConnectionStatus('disconnected', 'Connection error');
     updateApiStatusCard('disconnected', 'Connection Error', error.message);
-    addLog('error', `API connection error: ${error.message}`);
+    addLog('error', 'API connection error: ' + error.message);
   }
 }
 
@@ -1164,11 +1860,15 @@ function updateApiStatusCard(status, title, detail) {
 
 async function testApiConnection() {
   if (dashboardState.isApiTesting) return;
-  
+
   dashboardState.isApiTesting = true;
-  elements.testApiBtn.disabled = true;
-  elements.testApiBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-  
+  // No header button in the current layout (reachable via Ctrl/Cmd+T only) --
+  // elements.testApiBtn is intentionally uncached, guard its UI updates.
+  if (elements.testApiBtn) {
+    elements.testApiBtn.disabled = true;
+    elements.testApiBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+  }
+
   try {
     await checkApiConnection();
     showToast('API test completed', 'success');
@@ -1176,8 +1876,10 @@ async function testApiConnection() {
     showToast('API test failed', 'error');
   } finally {
     dashboardState.isApiTesting = false;
-    elements.testApiBtn.disabled = false;
-    elements.testApiBtn.innerHTML = '<i class="fas fa-plug"></i> Test API';
+    if (elements.testApiBtn) {
+      elements.testApiBtn.disabled = false;
+      elements.testApiBtn.innerHTML = '<i class="fas fa-plug"></i> Test API';
+    }
   }
 }
 
@@ -1198,11 +1900,16 @@ async function runFullApiTest() {
       gemini: { key: settings.geminiApiKey, name: 'Gemini' },
       openai: { key: settings.openaiApiKey, name: 'OpenAI' },
       anthropic: { key: settings.anthropicApiKey, name: 'Anthropic' },
-      custom: { key: settings.customApiKey, name: 'Custom' }
+      custom: { key: settings.customApiKey, name: 'Custom' },
+      openrouter: { key: settings.openrouterApiKey, name: 'OpenRouter' },
+      lmstudio: { key: 'local', name: 'LM Studio' }
     };
 
     const providerInfo = apiKeyMap[provider];
-    if (!providerInfo.key) {
+    if (!providerInfo) {
+      throw new Error(`Unknown provider: ${provider}`);
+    }
+    if (provider !== 'lmstudio' && !providerInfo.key) {
       throw new Error(`${providerInfo.name} API key is required for testing`);
     }
 
@@ -1231,6 +1938,11 @@ async function runFullApiTest() {
     `;
 
     elements.testResults.classList.add('show');
+    if (result.ok) {
+      if (elements.apiStatusCard) elements.apiStatusCard.style.display = 'none';
+    } else {
+      updateApiStatusCard('disconnected', 'Connection Failed', result.error || 'Test failed');
+    }
     addLog(result.ok ? 'info' : 'error', `Full API test ${result.ok ? 'passed' : 'failed'}: ${result.error || 'Success'}`);
 
   } catch (error) {
@@ -1242,77 +1954,73 @@ async function runFullApiTest() {
     `;
     elements.testResults.classList.add('show');
     addLog('error', `Full API test error: ${error.message}`);
+    updateApiStatusCard('disconnected', 'Connection Error', error.message);
   } finally {
     elements.fullApiTest.disabled = false;
     elements.fullApiTest.innerHTML = '<i class="fas fa-flask"></i> Run Full API Test';
   }
 }
 
-function exportSettings() {
-  chrome.storage.local.get(Object.keys(defaultSettings), (data) => {
-    const settings = { ...defaultSettings, ...data };
+// Theme mode: 'system' | 'dark' | 'light', persisted under the same
+// localStorage key the old binary toggle used. 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+let _systemThemeMediaQuery = null;
+let _systemThemeChangeHandler = null;
 
-    // Remove sensitive data
-    const exportData = {
-      ...settings,
-      apiKey: settings.apiKey ? '[CONFIGURED]' : '',
-      geminiApiKey: settings.geminiApiKey ? '[CONFIGURED]' : '',
-      openaiApiKey: settings.openaiApiKey ? '[CONFIGURED]' : '',
-      anthropicApiKey: settings.anthropicApiKey ? '[CONFIGURED]' : '',
-      customApiKey: settings.customApiKey ? '[CONFIGURED]' : ''
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fsb-settings-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showToast('Settings exported successfully', 'success');
-    addLog('info', 'Settings exported to file');
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  return preference;
+}
+
+function renderThemeModeToggle(preference) {
+  const tg = elements.themeModeToggle;
+  if (!tg) return;
+  const btns = tg.querySelectorAll('.detail-btn[data-theme-mode]');
+  btns.forEach((btn) => {
+    const active = btn.dataset.themeMode === preference;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
   });
 }
 
+function updateSystemThemeListener(preference) {
+  if (_systemThemeMediaQuery) {
+    _systemThemeMediaQuery.removeEventListener('change', _systemThemeChangeHandler);
+    _systemThemeMediaQuery = null;
+    _systemThemeChangeHandler = null;
+  }
+  if (preference === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+    _systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    _systemThemeChangeHandler = () => applyTheme('system');
+    _systemThemeMediaQuery.addEventListener('change', _systemThemeChangeHandler);
+  }
+}
+
+function applyTheme(preference) {
+  const effective = resolveEffectiveTheme(preference);
+  document.documentElement.setAttribute('data-theme', effective);
+  renderThemeModeToggle(preference);
+  // No-ops naturally on the initial load's applyTheme() call, since the chart
+  // isn't created until analytics.initPromise resolves, later in startup.
+  if (window.analytics && window.analytics.chart) {
+    window.analytics.updateChartTheme();
+  }
+}
+
+function setThemePreference(preference) {
+  localStorage.setItem('fsb-theme', preference);
+  applyTheme(preference);
+  updateSystemThemeListener(preference);
+}
+
 function setupTheme() {
-  const savedTheme = localStorage.getItem('fsb-theme') || 'light';
-  applyTheme(savedTheme);
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-  applyTheme(newTheme);
-  localStorage.setItem('fsb-theme', newTheme);
-  showToast(`Switched to ${newTheme} theme`, 'info');
-}
-
-function updateFooterLogo(theme) {
-  const footerLogo = document.getElementById('footer-logo-img');
-  if (footerLogo) {
-    const logoSrc = theme === 'light'
-      ? '../assets/fsb_logo_light_footer.png'
-      : '../assets/fsb_logo_dark_footer.png';
-    footerLogo.src = logoSrc;
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
   }
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-
-  if (elements.themeToggle) {
-    const icon = elements.themeToggle.querySelector('i');
-    if (icon) {
-      icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-    }
-  }
-
-  // Update footer logo based on theme
-  updateFooterLogo(theme);
+  setThemePreference(preference);
 }
 
 function initializeLogs() {
@@ -1383,6 +2091,452 @@ function exportLogs() {
 
 function filterLogs() {
   updateLogsDisplay();
+}
+
+// ============================================================================
+// Phase 30 (GOV-07/GOV-08, D-13/D-14): Consent & Audit section render + actions.
+//
+// The UI is the user's control surface over the consent spine (Plans 02/03). It
+// is the ONLY surface that mutates consent from user intent; the GATE
+// (background.js, wrapping FsbCapabilityRouter.invoke) remains the authoritative
+// enforcement. Sensitive is informational for capability invokes under the
+// opt-out posture; the network-capture discovery path keeps its own sensitive
+// confirmation. Denylisted origins are rendered non-enableable.
+// ============================================================================
+
+let _consentAuditDebounceHandle = null;
+
+function scheduleRenderConsentAudit() {
+  // 100ms debounce (mirror the cap-counter scheduleRefresh) so a burst of audit
+  // appends during an automation run collapses to a single re-render.
+  if (_consentAuditDebounceHandle !== null) {
+    clearTimeout(_consentAuditDebounceHandle);
+  }
+  _consentAuditDebounceHandle = setTimeout(() => {
+    _consentAuditDebounceHandle = null;
+    renderConsentAudit();
+  }, 100);
+}
+
+// renderConsentAudit() -- reads the consent envelope + the redacted audit ring
+// and (re)paints the per-origin list + the audit table. Best-effort: a store
+// hiccup must never throw into the options page (it degrades to the empty state).
+function renderConsentAudit() {
+  // Only paint when the section exists in the DOM.
+  if (!elements.consentOriginList && !elements.auditLogBody) return;
+
+  const consentStore = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+
+  // One fetch feeds the per-origin list, the audit table AND the pending
+  // requests card (which needs envelope + entries together to decide what is
+  // still awaiting a user decision). Per-source catch so one store hiccup
+  // degrades that renderer only, never throws into the options page.
+  const envelopeP = (consentStore && typeof consentStore.readPolicies === 'function')
+    ? Promise.resolve(consentStore.readPolicies()).catch(() => null)
+    : Promise.resolve(null);
+  const originsP = (auditStore && typeof auditStore.getDistinctOrigins === 'function')
+    ? Promise.resolve(auditStore.getDistinctOrigins()).catch(() => [])
+    : Promise.resolve([]);
+  const entriesP = (auditStore && typeof auditStore.getEntries === 'function')
+    ? Promise.resolve(auditStore.getEntries())
+        .then((result) => (result && Array.isArray(result.entries)) ? result.entries : [])
+        .catch(() => [])
+    : Promise.resolve([]);
+
+  Promise.all([envelopeP, originsP, entriesP])
+    .then(([envelope, auditOrigins, entries]) => {
+      // ---- Per-origin consent list (merged from policies + audit-seen origins) ----
+      if (envelope) {
+        renderConsentOriginList(envelope, auditOrigins);
+        renderDefaultModeToggle(envelope.defaultMode);
+      }
+      // ---- Audit log table ----
+      renderAuditTable(entries);
+      // ---- Pending requests card ----
+      renderPendingRequests(envelope, entries);
+    })
+    .catch(() => { /* degrade silently; existing rows untouched */ });
+}
+
+// Paint the per-origin rows from the consent envelope. Applies
+// FsbServiceDenylist.classify(origin) for the Sensitive/Blocked friction.
+function renderConsentOriginList(envelope, auditOrigins) {
+  const list = elements.consentOriginList;
+  const tmpl = elements.consentOriginRowTemplate;
+  if (!list || !tmpl || !tmpl.content) return;
+
+  const policies = (envelope && envelope.policies && typeof envelope.policies === 'object')
+    ? envelope.policies : {};
+  const defaultMode = (envelope && typeof envelope.defaultMode === 'string') ? envelope.defaultMode : 'auto';
+
+  // Union: explicit-policy origins + audit-seen origins (so a blocked/attempted
+  // site surfaces for opt-out, not only stored policies).
+  const originSet = Object.create(null);
+  Object.keys(policies).forEach((o) => { originSet[o] = true; });
+  (Array.isArray(auditOrigins) ? auditOrigins : []).forEach((o) => {
+    if (typeof o === 'string' && o) originSet[o] = true;
+  });
+  const origins = Object.keys(originSet);
+
+  // Clear previously-rendered rows (keep the empty-state node).
+  const existing = list.querySelectorAll('.consent-origin-row');
+  existing.forEach((node) => node.remove());
+
+  if (origins.length === 0) {
+    if (elements.consentOriginEmptyState) elements.consentOriginEmptyState.style.display = '';
+    return;
+  }
+  if (elements.consentOriginEmptyState) elements.consentOriginEmptyState.style.display = 'none';
+
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbServiceDenylist : null;
+
+  origins.sort();
+  origins.forEach((origin) => {
+    const hasExplicit = Object.prototype.hasOwnProperty.call(policies, origin);
+    const policy = hasExplicit ? (policies[origin] || {}) : {};
+    const mode = (typeof policy.mode === 'string') ? policy.mode : defaultMode;
+    const mutating = !!policy.mutating;
+
+    const frag = tmpl.content.cloneNode(true);
+    const row = frag.querySelector('.consent-origin-row');
+    if (!row) return;
+    row.dataset.origin = origin;
+
+    const nameEl = row.querySelector('.consent-origin-name');
+    if (nameEl) nameEl.textContent = origin;
+
+    const radiogroup = row.querySelector('.consent-mode-toggle');
+    if (radiogroup) radiogroup.setAttribute('aria-label', 'Consent mode for ' + origin);
+
+    // classify() is the gate's source of truth. denied => Blocked + all controls
+    // disabled; sensitive => amber badge only for capability invokes.
+    let classified = { sensitive: false, denied: false };
+    if (denylist && typeof denylist.classify === 'function') {
+      try { classified = denylist.classify(origin) || classified; } catch (_e) { /* degrade */ }
+    }
+
+    const modeButtons = row.querySelectorAll('.detail-btn[data-mode]');
+    modeButtons.forEach((btn) => {
+      const isActive = btn.dataset.mode === mode;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      // Denylisted: every control disabled (non-enableable).
+      if (classified.denied) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+      }
+    });
+
+    const mutInput = row.querySelector('.consent-mutating-input');
+    if (mutInput) {
+      mutInput.checked = mutating;
+      // Mutating is meaningless when mode == Off; disabled then. Always disabled
+      // for a denylisted origin.
+      mutInput.disabled = classified.denied || mode === 'off';
+    }
+
+    const hint = row.querySelector('.consent-origin-hint');
+    const sensBadge = row.querySelector('.consent-sensitive-badge');
+    const blockBadge = row.querySelector('.consent-blocked-badge');
+    if (classified.denied) {
+      row.classList.add('consent-origin-denied');
+      row.style.opacity = '0.6';
+      if (blockBadge) blockBadge.style.display = '';
+      if (hint) {
+        hint.style.display = '';
+        hint.textContent = 'Automation prohibited for this origin. '
+          + (classified.reason || '');
+      }
+    } else if (classified.sensitive) {
+      if (sensBadge) sensBadge.style.display = '';
+      if (hint) {
+        hint.style.display = '';
+        hint.textContent = 'Sensitive origin. Capability invocations can run under Auto; network-capture discovery still requires confirmation.';
+      }
+    }
+
+    list.appendChild(frag);
+  });
+}
+
+// Paint the global "Default for new sites" segmented control from the envelope's
+// defaultMode (off/ask/auto). Best-effort: a missing toggle is a no-op.
+function renderDefaultModeToggle(defaultMode) {
+  const tg = elements.consentDefaultModeToggle;
+  if (!tg) return;
+  const mode = (typeof defaultMode === 'string' && defaultMode) ? defaultMode : 'auto';
+  const btns = tg.querySelectorAll('.detail-btn[data-default-mode]');
+  btns.forEach((btn) => {
+    const active = btn.dataset.defaultMode === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+// Paint the redacted audit rows (newest first). Renders ONLY the seven
+// whitelisted columns -- never args/tokens/cookies/bodies (GOV-06 at the UI layer;
+// the ring is already redacted by audit-log.js, this is defense in depth).
+function renderAuditTable(entries) {
+  const body = elements.auditLogBody;
+  if (!body) return;
+
+  // Remove prior data rows (keep the empty-row node reference).
+  const dataRows = body.querySelectorAll('tr.audit-entry-row');
+  dataRows.forEach((node) => node.remove());
+
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (list.length === 0) {
+    if (elements.auditLogEmptyRow) elements.auditLogEmptyRow.style.display = '';
+    return;
+  }
+  if (elements.auditLogEmptyRow) elements.auditLogEmptyRow.style.display = 'none';
+
+  // Newest first.
+  list.reverse();
+  list.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const tr = document.createElement('tr');
+    tr.className = 'log-entry audit-entry-row';
+    const outcome = String(entry.outcome || '');
+    // Failed-outcome rows get the error tint (mirror .log-entry.error).
+    if (/fail|error|block|deny|denied/i.test(outcome)) {
+      tr.classList.add('error');
+    }
+    const ts = (typeof entry.ts === 'number') ? new Date(entry.ts).toLocaleString() : '';
+    // STRICT whitelist: only these seven fields are ever read off the entry.
+    const cells = [
+      ts,
+      String(entry.origin || ''),
+      String(entry.slug || ''),
+      String(entry.method || ''),
+      String(entry.sideEffectClass || ''),
+      String(entry.consentDecision || ''),
+      outcome
+    ];
+    cells.forEach((value) => {
+      const td = document.createElement('td');
+      td.textContent = value;   // textContent, never innerHTML -- no injection
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+// Export the redacted audit ring as JSON (mirror exportLogs / diagnostics export).
+function exportAuditLog() {
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+  if (!auditStore || typeof auditStore.getEntries !== 'function') {
+    showToast('Audit log unavailable', 'error');
+    return;
+  }
+  Promise.resolve(auditStore.getEntries()).then((result) => {
+    const entries = (result && Array.isArray(result.entries)) ? result.entries : [];
+    const json = JSON.stringify({ exportedAt: Date.now(), entries: entries }, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fsb-audit-log-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Audit log exported', 'success');
+  }).catch(() => {
+    showToast('Audit log export failed', 'error');
+  });
+}
+
+// Clear the audit ring after a destructive confirm (mirror clearLogs but guarded).
+function clearAuditLog() {
+  const confirmed = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+    ? window.confirm('Clear audit log: This permanently deletes all local audit entries. Export first if you want a copy. Continue?')
+    : true;
+  if (!confirmed) return;
+  const auditStore = (typeof globalThis !== 'undefined') ? globalThis.FsbAuditLog : null;
+  if (!auditStore || typeof auditStore.getEntries !== 'function') {
+    showToast('Audit log unavailable', 'error');
+    return;
+  }
+  Promise.resolve(auditStore.getEntries({ clear: true })).then(() => {
+    renderAuditTable([]);
+    showToast('Audit log cleared', 'warning');
+  }).catch(() => {
+    showToast('Could not clear audit log', 'error');
+  });
+}
+
+// Origins dismissed via Deny this PAGE SESSION. Deny is deliberately
+// dismiss-only (no policy write -- a durable Off lives in the per-origin list
+// above); a reload brings the row back since the underlying audit entry still
+// awaits a decision.
+const _dismissedPendingOrigins = new Set();
+
+// Paint the Pending Requests card from the audit ring + the live consent
+// envelope (both already fetched by renderConsentAudit). An entry is pending
+// when its blocked outcome is still unresolved under the CURRENT policy:
+//   'ask'               -> origin's effective mode is still 'ask'
+//   'mutating_required' -> origin is 'auto' without the mutating opt-in
+// Denylist-'blocked' and 'off' decisions are never pending (non-grantable /
+// user already opted out). Deduped per origin: a mutating-scope entry outranks
+// read, a newer entry wins for display. Grant/Deny wiring is the delegated
+// click handler in setupEventListeners; data-scope must be 'mutating'|'read'
+// because grantPendingRequest keys setOriginMutating off scope === 'mutating'.
+function renderPendingRequests(envelope, entries) {
+  const list = elements.pendingRequestList;
+  const tmpl = elements.pendingRequestRowTemplate;
+  if (!list || !tmpl || !tmpl.content) return;
+
+  const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  const canEvaluate = !!(envelope && store && typeof store.getConsentForOrigin === 'function');
+
+  // origin -> { entry, scope }; ring is oldest -> newest, so a later entry
+  // replaces unless it would downgrade a mutating row to read.
+  const pendingByOrigin = Object.create(null);
+  if (canEvaluate && Array.isArray(entries)) {
+    entries.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      if (entry.outcome !== 'blocked') return;
+      const origin = (typeof entry.origin === 'string') ? entry.origin : '';
+      if (!origin || _dismissedPendingOrigins.has(origin)) return;
+
+      const decision = String(entry.consentDecision || '');
+      const consent = store.getConsentForOrigin(envelope, origin);
+      const stillPending =
+        (decision === 'ask' && consent.mode === 'ask')
+        || (decision === 'mutating_required' && consent.mode === 'auto' && !consent.mutating);
+      if (!stillPending) return;
+
+      const scope = (entry.sideEffectClass && entry.sideEffectClass !== 'read') ? 'mutating' : 'read';
+      const existing = pendingByOrigin[origin];
+      if (!existing || !(existing.scope === 'mutating' && scope === 'read')) {
+        pendingByOrigin[origin] = { entry: entry, scope: scope };
+      }
+    });
+  }
+
+  // Clear previously-rendered rows (keep the empty-state node) -- mirror
+  // renderConsentOriginList.
+  const existingRows = list.querySelectorAll('.pending-request-row');
+  existingRows.forEach((node) => node.remove());
+
+  Object.keys(pendingByOrigin).sort().forEach((origin) => {
+    const pending = pendingByOrigin[origin];
+    const frag = tmpl.content.cloneNode(true);
+    const row = frag.querySelector('.pending-request-row');
+    if (!row) return;
+    row.dataset.origin = origin;
+    row.dataset.scope = pending.scope;
+
+    const originEl = row.querySelector('.pending-request-origin');
+    if (originEl) originEl.textContent = origin;
+
+    const metaEl = row.querySelector('.pending-request-meta');
+    if (metaEl) {
+      // Same timestamp treatment as renderAuditTable (toLocaleString).
+      const ts = (typeof pending.entry.ts === 'number') ? new Date(pending.entry.ts).toLocaleString() : '';
+      metaEl.textContent = String(pending.entry.slug || '') + (ts ? ' - ' + ts : '');
+    }
+
+    if (pending.scope === 'mutating') {
+      const badge = row.querySelector('.pending-write-badge');
+      if (badge) badge.style.display = '';
+    }
+
+    list.appendChild(frag);
+  });
+
+  updatePendingCount();
+}
+
+// Grant a pending request: write consent for that EXACT origin/scope only
+// (T-30-16 -- never a global enable), remove the row, surface a toast.
+//
+// Grant classifies the origin first via FsbServiceDenylist.classify:
+//   - DENIED origin -> refuse the grant outright (the gate blocks it anyway;
+//                      writing any mode would be a dishonest stored policy).
+//   - otherwise     -> grant 'auto', including sensitive non-denied origins. The
+//                      invoke gate allows sensitive origins under Auto; discovery
+//                      keeps its separate sensitive-confirm path.
+function grantPendingRequest(row) {
+  if (!row || !row.dataset) return;
+  const origin = row.dataset.origin || '';
+  const scope = row.dataset.scope || '';
+  if (!origin) return;
+
+  const denylist = (typeof globalThis !== 'undefined') ? globalThis.FsbServiceDenylist : null;
+  let cls = { denied: false, sensitive: false };
+  if (denylist && typeof denylist.classify === 'function') {
+    try { cls = denylist.classify(origin) || cls; } catch (_e) { /* degrade to non-denied/non-sensitive */ }
+  }
+  if (cls.denied) {
+    // A denied origin can never be granted -- the gate blocks it regardless.
+    showToast('This origin is blocked from automation', 'error');
+    return;
+  }
+  const grantMode = 'auto';
+
+  const store = (typeof globalThis !== 'undefined') ? globalThis.FsbConsentPolicyStore : null;
+  if (store && typeof store.setOriginMode === 'function') {
+    const writes = [store.setOriginMode(origin, grantMode)];
+    // Retain the legacy mutating flag as compatibility metadata; under the
+    // opt-out posture the invoke gate allows writes whenever the origin is Auto.
+    if (scope === 'mutating' && grantMode === 'auto' && typeof store.setOriginMutating === 'function') {
+      writes.push(store.setOriginMutating(origin, true));
+    }
+    Promise.all(writes.map((p) => Promise.resolve(p))).then(() => {
+      row.remove();
+      updatePendingCount();
+      scheduleRenderConsentAudit();
+      showToast(cls.sensitive ? 'Access granted (sensitive origin)' : 'Access granted', 'success');
+    });
+  } else {
+    row.remove();
+    updatePendingCount();
+    showToast('Access granted', 'success');
+  }
+}
+
+// Deny a pending request: remove the row WITHOUT granting. Dismiss-only for
+// this page session (recorded so re-renders don't resurrect the row).
+function denyPendingRequest(row) {
+  if (!row) return;
+  const origin = (row.dataset && row.dataset.origin) ? row.dataset.origin : '';
+  if (origin) _dismissedPendingOrigins.add(origin);
+  row.remove();
+  updatePendingCount();
+  showToast('Request denied', 'warning');
+}
+
+// Refresh the "N pending" count pill + the empty-state from the live row count.
+// Draining the queue (count >0 -> 0) also clears the chrome.action badge (the
+// queue is what the badge surfaces). The clear is transition-guarded: routine
+// empty renders must not clobber the badge's other users (ws-client connection
+// state, error alerts).
+let _pendingCountLastSeen = 0;
+
+function updatePendingCount() {
+  const list = elements.pendingRequestList;
+  if (!list) return;
+  const count = list.querySelectorAll('.pending-request-row').length;
+  if (elements.pendingRequestCount) {
+    if (count > 0) {
+      elements.pendingRequestCount.textContent = count + ' pending';
+      elements.pendingRequestCount.style.display = '';
+    } else {
+      elements.pendingRequestCount.style.display = 'none';
+    }
+  }
+  if (elements.pendingRequestEmptyState) {
+    elements.pendingRequestEmptyState.style.display = count > 0 ? 'none' : '';
+  }
+  if (count === 0 && _pendingCountLastSeen > 0
+      && typeof chrome !== 'undefined' && chrome.action
+      && typeof chrome.action.setBadgeText === 'function') {
+    try { chrome.action.setBadgeText({ text: '' }); } catch (_e) { /* best-effort */ }
+  }
+  _pendingCountLastSeen = count;
 }
 
 let _toastTimer = null;
@@ -5032,7 +6186,7 @@ async function copyHashKey() {
 async function testServerConnection() {
   const serverUrl = document.getElementById('serverUrl')?.value?.trim();
   const hashKey = document.getElementById('serverHashKey')?.value?.trim();
-  const statusEl = document.getElementById('connectionStatus');
+  const statusEl = document.getElementById('syncConnectionStatus');
 
   if (!serverUrl || !hashKey) {
     showToast('Please enter server URL and hash key', 'error');
@@ -6304,12 +7458,38 @@ function initializeSyncSection() {
     _refreshSyncPill();
   }
 
-  // Live updates via runtime push from ws/ws-client.js _broadcastRemoteControlState (213-02)
+  // Seed the WS connectivity flag (the 'Connected' input to _deriveSyncPillState).
+  // The SW may be cold here: the query itself wakes it, it reports
+  // connected:false, and the 'dashboardWsStatusChanged' push below flips the
+  // pill once the socket reopens.
+  try {
+    chrome.runtime.sendMessage({ action: 'getDashboardWebSocketStatus' }, function (response) {
+      var lastErr = chrome.runtime.lastError; // suppress lastError surface noise
+      if (!lastErr && response && typeof response === 'object') {
+        dashboardState.wsConnected = response.connected === true;
+      }
+      _refreshSyncPill();
+    });
+  } catch (e) {
+    _refreshSyncPill();
+  }
+
+  // Live updates via runtime push from ws/ws-client.js: remote-control state
+  // (_broadcastRemoteControlState, 213-02) and relay WS connectivity
+  // (_broadcastDashboardWsStatus). Never return true here -- this listener
+  // never responds, and returning true would hold the message channel open.
   if (chrome.runtime && chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
     chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-      if (!request || request.action !== 'remoteControlStateChanged') return;
-      if (request.state && typeof request.state === 'object') {
-        _syncLastRemoteControlState = request.state;
+      if (!request) return;
+      if (request.action === 'remoteControlStateChanged') {
+        if (request.state && typeof request.state === 'object') {
+          _syncLastRemoteControlState = request.state;
+          _refreshSyncPill();
+        }
+        return;
+      }
+      if (request.action === 'dashboardWsStatusChanged') {
+        dashboardState.wsConnected = request.connected === true;
         _refreshSyncPill();
       }
     });
@@ -6345,6 +7525,8 @@ function initializeSyncSection() {
   // Per-provider debounce timers for API-key input handling.
   const _debounceTimers = {};
   const DEFAULT_DEBOUNCE_MS = 500;
+  let _currentModels = [];
+  let _currentSearchQuery = '';
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -6381,13 +7563,60 @@ function initializeSyncSection() {
     chip.removeAttribute('hidden');
   }
 
-  function renderModelDropdown(models, selectedId) {
+  function _normalizeModelSearchText(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function _tokenizeModelSearch(query) {
+    return _normalizeModelSearchText(query)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function _modelSearchText(model) {
+    if (!model) return '';
+    return _normalizeModelSearchText([
+      model.id,
+      model.displayName,
+      model.name,
+      model.description,
+      model.provider
+    ].filter(Boolean).join(' '));
+  }
+
+  function filterModelsForSearch(models, query) {
+    const list = Array.isArray(models) ? models : [];
+    const tokens = _tokenizeModelSearch(query);
+    if (!tokens.length) return list.slice();
+    return list.filter(model => {
+      const haystack = _modelSearchText(model);
+      return tokens.every(token => haystack.indexOf(token) !== -1);
+    });
+  }
+
+  function _renderModelDropdownOptions(models, selectedId) {
     const doc = _doc();
     if (!doc) return null;
     const sel = doc.getElementById('modelName');
     if (!sel) return null;
     sel.innerHTML = '';
     const list = models || [];
+    const hasSearch = _tokenizeModelSearch(_currentSearchQuery).length > 0;
+
+    if (!list.length) {
+      const opt = doc.createElement('option');
+      opt.value = '';
+      opt.textContent = hasSearch ? 'No models match search' : 'No models available';
+      opt.disabled = true;
+      sel.appendChild(opt);
+      sel.value = '';
+      sel.disabled = false;
+      return null;
+    }
 
     // Phase 232: sticky selection. If the user previously saved a model that's
     // not in the freshly-discovered list (preview model expired, provider
@@ -6415,6 +7644,22 @@ function initializeSyncSection() {
     sel.value = chosen || '';
     sel.disabled = false;
     return chosen;
+  }
+
+  function renderModelDropdown(models, selectedId) {
+    _currentModels = (Array.isArray(models) ? models : []).map(m => ({ ...m }));
+    // The unified combobox owns search/filtering as a view concern, so the
+    // native select always holds the full discovered list here.
+    return _renderModelDropdownOptions(_currentModels.slice(), selectedId);
+  }
+
+  function applyModelSearch(query, opts) {
+    const options = opts || {};
+    _currentSearchQuery = String(query || '');
+    return _renderModelDropdownOptions(
+      filterModelsForSearch(_currentModels, _currentSearchQuery),
+      options.previousSelection
+    );
   }
 
   function _setControlsDisabled(disabled) {
@@ -6461,7 +7706,8 @@ function initializeSyncSection() {
     const list = (fallbackTable[provider] || []).map(m => ({
       id: m.id,
       displayName: m.name || m.id,
-      description: m.description
+      description: m.description,
+      provider
     }));
     renderModelDropdown(list);
     _setControlsDisabled(false);
@@ -6536,7 +7782,10 @@ function initializeSyncSection() {
     if (result && result.ok) {
       const list = (result.models || []).map(m => ({
         id: m.id,
-        displayName: m.displayName || m.name || m.id
+        displayName: m.displayName || m.name || m.id,
+        name: m.name,
+        description: m.description,
+        provider
       }));
       const chosen = renderModelDropdown(list, options.previousSelection);
       _setControlsDisabled(false);
@@ -6585,10 +7834,370 @@ function initializeSyncSection() {
     runDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
-    renderModelDropdown
+    renderModelDropdown,
+    applyModelSearch,
+    filterModelsForSearch
   };
 
   global.FSBDiscoveryUI = api;
+})(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
+
+/**
+ * FSBModelCombobox — a searchable, keyboard-navigable dropdown rendered as a
+ * view over the native <select id="modelName"> (kept in the DOM but visually
+ * hidden as the value source of truth). It unifies the former separate search
+ * input + select into one control and highlights the matched search term in
+ * the result list.
+ *
+ * The native select stays canonical: discovery (FSBDiscoveryUI) and the legacy
+ * lmstudio/custom flow keep writing <option>s into it. A MutationObserver
+ * mirrors those changes into the popup; committing a pick writes back to the
+ * select and dispatches a native 'change' event so existing listeners fire.
+ */
+(function defineFSBModelCombobox(global) {
+  'use strict';
+
+  let _root = null;
+  let _input = null;
+  let _toggle = null;
+  let _listbox = null;
+  let _select = null;
+  let _observer = null;
+  let _initialized = false;
+
+  let _open = false;
+  let _searching = false;   // true once the user types; gates view-only filtering
+  let _activeIndex = -1;    // index into _optionEls
+  let _optionEls = [];      // rendered selectable <li> elements
+
+  function _doc() { return (typeof document !== 'undefined') ? document : null; }
+
+  function _normalize(value) {
+    return String(value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function _tokenize(query) {
+    return _normalize(query).trim().split(/\s+/).filter(Boolean);
+  }
+
+  function _escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // Wrap occurrences of the search tokens in <mark> for a subtle orange accent.
+  // Falls back to plain (escaped) text whenever normalization changes the
+  // string length, which would misalign match indices against the original.
+  function _highlight(text, tokens) {
+    const original = String(text || '');
+    if (!tokens.length) return _escapeHtml(original);
+    const norm = _normalize(original);
+    if (norm.length !== original.length) return _escapeHtml(original);
+
+    const ranges = [];
+    tokens.forEach((token) => {
+      if (!token) return;
+      let from = 0;
+      let idx;
+      while ((idx = norm.indexOf(token, from)) !== -1) {
+        ranges.push([idx, idx + token.length]);
+        from = idx + token.length;
+      }
+    });
+    if (!ranges.length) return _escapeHtml(original);
+
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    ranges.forEach((range) => {
+      const last = merged[merged.length - 1];
+      if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+      else merged.push(range.slice());
+    });
+
+    let out = '';
+    let cursor = 0;
+    merged.forEach((pair) => {
+      out += _escapeHtml(original.slice(cursor, pair[0]));
+      out += '<mark class="model-combobox__hl">' + _escapeHtml(original.slice(pair[0], pair[1])) + '</mark>';
+      cursor = pair[1];
+    });
+    out += _escapeHtml(original.slice(cursor));
+    return out;
+  }
+
+  function _selectedOption() {
+    if (!_select) return null;
+    const idx = _select.selectedIndex;
+    return idx >= 0 ? _select.options[idx] : null;
+  }
+
+  // Render the popup list from the native select's current options.
+  function _render() {
+    if (!_select || !_listbox) return;
+    const doc = _doc();
+    if (!doc) return;
+    const tokens = _searching ? _tokenize(_input.value) : [];
+    const options = Array.from(_select.options || []);
+
+    _listbox.innerHTML = '';
+    _optionEls = [];
+    let selectableShown = 0;
+
+    options.forEach((opt) => {
+      const value = opt.value;
+      const label = opt.textContent || '';
+      // Options with an empty value are status rows (loading / auth / empty
+      // states), not real choices. Show them only when not actively searching.
+      if (value === '') {
+        if (_searching) return;
+        const status = doc.createElement('li');
+        status.className = 'model-combobox__status';
+        status.setAttribute('role', 'presentation');
+        status.textContent = label;
+        _listbox.appendChild(status);
+        return;
+      }
+
+      if (tokens.length) {
+        const haystack = _normalize(label + ' ' + value);
+        if (!tokens.every((t) => haystack.indexOf(t) !== -1)) return;
+      }
+
+      const li = doc.createElement('li');
+      li.className = 'model-combobox__option';
+      li.setAttribute('role', 'option');
+      li.id = 'modelOption-' + _optionEls.length;
+      li.dataset.value = value;
+      li.innerHTML = _highlight(label, tokens);
+      const isSelected = value === _select.value;
+      li.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      if (isSelected) li.classList.add('is-selected');
+      _listbox.appendChild(li);
+      _optionEls.push(li);
+      selectableShown += 1;
+    });
+
+    if (_searching && selectableShown === 0) {
+      const empty = doc.createElement('li');
+      empty.className = 'model-combobox__status';
+      empty.setAttribute('role', 'presentation');
+      empty.textContent = 'No models match';
+      _listbox.appendChild(empty);
+    }
+
+    _setActive(_defaultActiveIndex());
+  }
+
+  function _defaultActiveIndex() {
+    const selectedIdx = _optionEls.findIndex((li) => li.dataset.value === _select.value);
+    if (selectedIdx !== -1) return selectedIdx;
+    return _optionEls.length ? 0 : -1;
+  }
+
+  function _setActive(index) {
+    _activeIndex = -1;
+    _optionEls.forEach((li, i) => {
+      const on = i === index;
+      li.classList.toggle('is-active', on);
+      if (on) {
+        _activeIndex = i;
+        if (_input) _input.setAttribute('aria-activedescendant', li.id);
+      }
+    });
+    if (_activeIndex === -1 && _input) _input.removeAttribute('aria-activedescendant');
+  }
+
+  function _moveActive(delta) {
+    if (!_optionEls.length) return;
+    let i = _activeIndex === -1 ? _defaultActiveIndex() : _activeIndex;
+    i = (i + delta + _optionEls.length) % _optionEls.length;
+    _setActive(i);
+    _scrollActiveIntoView();
+  }
+
+  function _scrollActiveIntoView() {
+    if (_activeIndex < 0) return;
+    const li = _optionEls[_activeIndex];
+    if (li && typeof li.scrollIntoView === 'function') li.scrollIntoView({ block: 'nearest' });
+  }
+
+  // Mirror the selected option's label into the input (display mode). Only runs
+  // when the popup is closed, so it never clobbers an in-progress search query.
+  function _syncDisplay() {
+    if (!_input || !_select || _open) return;
+    const opt = _selectedOption();
+    _input.value = (opt && opt.value !== '') ? (opt.textContent || '') : '';
+  }
+
+  function _syncDisabled() {
+    if (!_select || !_root) return;
+    const disabled = !!_select.disabled;
+    if (_input) _input.disabled = disabled;
+    if (_toggle) _toggle.disabled = disabled;
+    _root.classList.toggle('is-disabled', disabled);
+    if (disabled && _open) _close();
+  }
+
+  function _openList() {
+    if (_open || !_select || _select.disabled) return;
+    _open = true;
+    _searching = false;
+    if (_input) _input.value = ''; // clean search field; selection shown in-list + restored on close
+    _root.classList.add('is-open');
+    _listbox.hidden = false;
+    _input.setAttribute('aria-expanded', 'true');
+    _render();
+    _scrollActiveIntoView();
+  }
+
+  function _close() {
+    if (!_open) return;
+    _open = false;
+    _searching = false;
+    _root.classList.remove('is-open');
+    _listbox.hidden = true;
+    _input.setAttribute('aria-expanded', 'false');
+    _input.removeAttribute('aria-activedescendant');
+    _syncDisplay();
+  }
+
+  function _commit(value) {
+    if (value == null) return;
+    if (_select.value !== value) {
+      _select.value = value;
+      _select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    _close();
+  }
+
+  function _onKeydown(e) {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (!_open) _openList();
+        else _moveActive(1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (!_open) _openList();
+        else _moveActive(-1);
+        break;
+      case 'Enter':
+        if (_open && _activeIndex >= 0 && _optionEls[_activeIndex]) {
+          e.preventDefault();
+          _commit(_optionEls[_activeIndex].dataset.value);
+        }
+        break;
+      case 'Escape':
+        if (_open) {
+          e.preventDefault();
+          _close();
+        }
+        break;
+      case 'Home':
+        if (_open && _optionEls.length) {
+          e.preventDefault();
+          _setActive(0);
+          _scrollActiveIntoView();
+        }
+        break;
+      case 'End':
+        if (_open && _optionEls.length) {
+          e.preventDefault();
+          _setActive(_optionEls.length - 1);
+          _scrollActiveIntoView();
+        }
+        break;
+      case 'Tab':
+        if (_open) _close();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function _onMutation() {
+    _syncDisabled();
+    if (_open) _render();
+    else _syncDisplay();
+  }
+
+  function init() {
+    if (_initialized) return;
+    const doc = _doc();
+    if (!doc) return;
+    _root = doc.getElementById('modelCombobox');
+    _input = doc.getElementById('modelSearch');
+    _toggle = doc.getElementById('modelComboboxToggle');
+    _listbox = doc.getElementById('modelListbox');
+    _select = doc.getElementById('modelName');
+    if (!_root || !_input || !_listbox || !_select) return;
+    _initialized = true;
+
+    _input.addEventListener('focus', () => {
+      if (_select.disabled) return;
+      _openList();
+    });
+    _input.addEventListener('click', () => {
+      if (_select.disabled) return;
+      if (!_open) _openList();
+    });
+    _input.addEventListener('input', () => {
+      _searching = true;
+      if (!_open) _openList();
+      else _render();
+    });
+    _input.addEventListener('keydown', _onKeydown);
+    _input.addEventListener('blur', () => { _close(); });
+
+    // Keep focus on the input while interacting with the popup / chevron so the
+    // blur-to-close handler doesn't fire before a click can commit a choice.
+    _listbox.addEventListener('mousedown', (e) => { e.preventDefault(); });
+    _listbox.addEventListener('click', (e) => {
+      const li = e.target.closest ? e.target.closest('.model-combobox__option') : null;
+      if (!li || !_listbox.contains(li)) return;
+      _commit(li.dataset.value);
+    });
+
+    if (_toggle) {
+      _toggle.addEventListener('mousedown', (e) => { e.preventDefault(); });
+      _toggle.addEventListener('click', () => {
+        if (_select.disabled) return;
+        if (_open) {
+          _close();
+        } else {
+          _input.focus();
+          _openList();
+        }
+      });
+    }
+
+    _select.addEventListener('change', () => { if (!_searching) _syncDisplay(); });
+
+    if (typeof MutationObserver === 'function') {
+      _observer = new MutationObserver(_onMutation);
+      _observer.observe(_select, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+    }
+
+    _syncDisabled();
+    _syncDisplay();
+  }
+
+  // Re-sync the visible state after the select's value is set programmatically
+  // (e.g. loadSettings), which fires neither 'change' nor a DOM mutation.
+  function refresh() {
+    if (!_initialized) return;
+    _syncDisabled();
+    if (_open) _render();
+    else _syncDisplay();
+  }
+
+  global.FSBModelCombobox = { init, refresh };
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
 
 

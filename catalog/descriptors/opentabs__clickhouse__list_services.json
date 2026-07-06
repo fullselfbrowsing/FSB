@@ -1,0 +1,31 @@
+{
+  "slug": "clickhouse.list_services",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "list services in clickhouse",
+    "show me my services in clickhouse",
+    "view my services in clickhouse",
+    "see all my services in clickhouse",
+    "list all services in clickhouse"
+  ],
+  "description": "List all ClickHouse Cloud services in the current organization. Returns service details including state, endpoints, scaling configuration, and version.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/list-services.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

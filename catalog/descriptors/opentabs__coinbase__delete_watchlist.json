@@ -1,0 +1,39 @@
+{
+  "slug": "coinbase.delete_watchlist",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "delete a watchlist in coinbase",
+    "remove a watchlist in coinbase",
+    "trash a watchlist in coinbase",
+    "permanently delete a watchlist in coinbase",
+    "delete watchlist in coinbase"
+  ],
+  "description": "Delete a watchlist by its UUID. Use list_watchlists to find watchlist UUIDs.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "watchlist_uuid": {
+        "type": "string",
+        "description": "UUID of the watchlist to delete"
+      }
+    },
+    "required": [
+      "watchlist_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/delete-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

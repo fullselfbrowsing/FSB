@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_cycle",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a cycle in linear",
+    "look up a cycle in linear",
+    "fetch a single cycle in linear",
+    "view one specific cycle in linear",
+    "get cycle in linear",
+    "get details of a single cycle in linear"
+  ],
+  "description": "Get detailed information about a single cycle (sprint) by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cycle_id": {
+        "type": "string",
+        "description": "Cycle UUID"
+      }
+    },
+    "required": [
+      "cycle_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-cycle.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

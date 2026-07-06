@@ -1,0 +1,57 @@
+{
+  "slug": "retool.run_grpc",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "run a grpc in retool",
+    "run grpc in retool",
+    "run a grpc method call in retool"
+  ],
+  "description": "Execute a gRPC method call against a Retool gRPC resource and return the results. Use this to test gRPC resources, call service methods, or validate request/response formats. The resource can be specified by display name or internal UUID.",
+  "actionVerb": "run",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_name": {
+        "type": "string",
+        "description": "Resource display name (e.g., \"example.proto.service.v1.ExampleService\") or internal UUID"
+      },
+      "method_name": {
+        "type": "string",
+        "description": "gRPC method name (e.g., \"ListPlanGroups\", \"SimulatePlan\")"
+      },
+      "body": {
+        "type": "string",
+        "description": "JSON request body for the gRPC method"
+      },
+      "metadata": {
+        "description": "Optional gRPC metadata headers",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "resource_name",
+      "method_name",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/run-grpc.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "run"
+    }
+  }
+}

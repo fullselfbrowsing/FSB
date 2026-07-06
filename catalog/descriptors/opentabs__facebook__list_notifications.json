@@ -1,0 +1,50 @@
+{
+  "slug": "facebook.list_notifications",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "list notifications in facebook",
+    "show me my notifications in facebook",
+    "view my notifications in facebook",
+    "see all my notifications in facebook",
+    "list your facebook notifications in facebook"
+  ],
+  "description": "List Facebook notifications for the current user. Returns notification text, read status, timestamp, and associated actors. Use the cursor parameter to paginate through older notifications. Filter tokens: \"Cg8CZnQPA2FsbAE=\" for all notifications, \"Cg8CZnQPBnVucmVhZAE=\" for unread only.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of notifications to return (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "filter": {
+        "description": "Notification filter (default \"all\")",
+        "type": "string",
+        "enum": [
+          "all",
+          "unread"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/list-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

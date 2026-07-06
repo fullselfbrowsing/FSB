@@ -1,0 +1,40 @@
+{
+  "slug": "circleci.get_project",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get a project in circleci",
+    "look up a project in circleci",
+    "fetch a single project in circleci",
+    "view one specific project in circleci",
+    "get project in circleci",
+    "get project details by slug in circleci"
+  ],
+  "description": "Get project details by project slug. Returns project ID, name, organization, and VCS info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug (e.g., \"gh/org/repo\")"
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

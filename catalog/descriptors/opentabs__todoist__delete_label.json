@@ -1,0 +1,39 @@
+{
+  "slug": "todoist.delete_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "delete a label in todoist",
+    "remove a label in todoist",
+    "trash a label in todoist",
+    "permanently delete a label in todoist",
+    "delete label in todoist"
+  ],
+  "description": "Permanently delete a label. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "label_id": {
+        "type": "string",
+        "description": "The ID of the label to delete"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/delete-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

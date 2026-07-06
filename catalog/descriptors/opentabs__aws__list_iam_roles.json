@@ -1,0 +1,42 @@
+{
+  "slug": "aws.list_iam_roles",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list iam roles in aws",
+    "show me my iam roles in aws",
+    "view my iam roles in aws",
+    "see all my iam roles in aws",
+    "list iam roles in the account in aws"
+  ],
+  "description": "List IAM roles in the account. IAM is a global service. Returns role name, ID, ARN, and creation date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_items": {
+        "description": "Maximum roles to return (default 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "path_prefix": {
+        "description": "Filter by path prefix (e.g., /service-role/)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-iam-roles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

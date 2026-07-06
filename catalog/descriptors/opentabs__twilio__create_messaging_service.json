@@ -1,0 +1,51 @@
+{
+  "slug": "twilio.create_messaging_service",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "create a messaging service in twilio",
+    "add a messaging service in twilio",
+    "make a new messaging service in twilio",
+    "open a new messaging service in twilio",
+    "create messaging service in twilio"
+  ],
+  "description": "Create a new messaging service for sending SMS/MMS at scale.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "friendly_name": {
+        "type": "string",
+        "description": "Friendly name for the messaging service"
+      },
+      "inbound_request_url": {
+        "description": "URL to receive incoming message webhooks",
+        "type": "string"
+      },
+      "status_callback": {
+        "description": "URL to receive message status webhooks",
+        "type": "string"
+      },
+      "sticky_sender": {
+        "description": "Whether to enable sticky sender (keeps the same sender for a recipient)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "friendly_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/create-messaging-service.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

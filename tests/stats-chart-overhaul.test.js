@@ -1,20 +1,27 @@
 /**
  * stats-chart-overhaul -- regression guards for quick task 260515-kw1.
  *
- * Two suites pin the contract for the new /stats Easter-egg page chart views:
+ * Suite A -- commitPunchcard() bucketing (Task 1):
+ *   Re-implements the production algorithm locally and asserts it produces
+ *   the expected {x: hour, y: weekday, r: sqrt-clamped} cells. Also reads
+ *   the source file as text to confirm the production helper still exists
+ *   with the documented name + PunchcardPoint shape + sqrt scaling -- a
+ *   future refactor that renames or alters the algorithm fails CI loud.
  *
- *   Suite A -- commitPunchcard() bucketing (Task 1):
- *     Re-implements the production algorithm locally and asserts it produces
- *     the expected {x: hour, y: weekday, r: sqrt-clamped} cells. Also reads
- *     the source file as text to confirm the production helper still exists
- *     with the documented name + PunchcardPoint shape + sqrt scaling -- a
- *     future refactor that renames or alters the algorithm fails CI loud.
+ * (Suite B, the agentHistoryRing sparkline ring-buffer guard, was removed
+ * when the Phase 274 redesign trimmed the /stats tab list to 6 views and
+ * dropped 'fsb-agents-running' -- the ring buffer it guarded no longer
+ * exists in stats-page.component.ts.)
  *
- *   Suite B -- sparkline ring-buffer cap (Task 3):
- *     Re-implements the push-then-trim algorithm and asserts the
- *     AGENT_HISTORY_CAP = 288 invariant via push/shift behaviour for 100,
- *     290, and 1000 inputs. Also pins the source file's class field name
- *     + cap constant + shift() trim path.
+ * Suite B -- Active Now globe lifecycle:
+ *   Static guards for the Stats page globe: view switches defer redraw by one
+ *   animation frame, pending redraws are canceled on teardown, and the globe
+ *   requestAnimationFrame loop runs outside Angular change detection.
+ *
+ * Suite C -- globe service + sitemaps PRNG (review-fix guards):
+ *   Static guards that the coastline GeoJSON is cached across setupGlobe()
+ *   calls and that the sitemaps page draws region counts + node jitter from
+ *   one shared seed-719 stream (the pre-extraction draw order).
  *
  * Test is Node-only -- no test framework dependency. Mirrors the pattern of
  * tests/cumulative-commits-aggregator.test.js (text-parse + re-impl + run).
@@ -29,6 +36,8 @@ const path = require('path');
 
 const SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/stats/github-stats.service.ts');
 const COMPONENT_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/stats/stats-page.component.ts');
+const GLOBE_SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/globe/globe-visualization.service.ts');
+const SITEMAPS_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.ts');
 
 let passed = 0;
 let failed = 0;
@@ -195,60 +204,109 @@ function commitPunchcardLocal(commits) {
 }
 
 // -----------------------------------------------------------------------------
-// Suite B -- sparkline ring-buffer cap
+// Suite B -- Active Now globe lifecycle
 // -----------------------------------------------------------------------------
 
-const RING_CAP = 288; // 24h * 60min / 5min poll, mirrors AGENT_HISTORY_CAP.
-
-function pushTrim(ring, value, cap) {
-  ring.push(value);
-  if (ring.length > cap) ring.shift();
-  return ring;
-}
-
-// B1. 100 pushes -> length 100, last value at index 99.
-{
-  const ring = [];
-  for (let i = 0; i < 100; i++) pushTrim(ring, i, RING_CAP);
-  check('ring buffer: 100 pushes -> length 100, last=99',
-    ring.length === 100 && ring[99] === 99 && ring[0] === 0,
-    `expected length 100 first 0 last 99, got length ${ring.length} first ${ring[0]} last ${ring[ring.length - 1]}`);
-}
-
-// B2. 290 pushes -> length 288, first value is index 2 (oldest two evicted).
-{
-  const ring = [];
-  for (let i = 0; i < 290; i++) pushTrim(ring, i, RING_CAP);
-  check('ring buffer: 290 pushes -> length 288, first=2 (oldest 2 evicted)',
-    ring.length === RING_CAP && ring[0] === 2 && ring[RING_CAP - 1] === 289,
-    `expected length 288 first 2 last 289, got length ${ring.length} first ${ring[0]} last ${ring[ring.length - 1]}`);
-}
-
-// B3. 1000 pushes -> length 288, first value is index 712 (1000 - 288).
-{
-  const ring = [];
-  for (let i = 0; i < 1000; i++) pushTrim(ring, i, RING_CAP);
-  check('ring buffer: 1000 pushes -> length 288, first=712, last=999',
-    ring.length === RING_CAP && ring[0] === 712 && ring[RING_CAP - 1] === 999,
-    `expected length 288 first 712 last 999, got length ${ring.length} first ${ring[0]} last ${ring[ring.length - 1]}`);
-}
-
-// B4. Source snapshot -- production ring buffer still wired up.
 {
   let src = '';
   try { src = fs.readFileSync(COMPONENT_PATH, 'utf8'); } catch { /* swallow */ }
-  check('ring buffer: component source file readable',
+  const setViewStart = src.indexOf('  setView(');
+  const setViewEnd = src.indexOf('  onTabsEnter', setViewStart);
+  const setViewBlock = setViewStart >= 0 && setViewEnd > setViewStart
+    ? src.slice(setViewStart, setViewEnd)
+    : '';
+  const destroyStart = src.indexOf('  ngOnDestroy()');
+  const destroyEnd = src.indexOf('  setView(', destroyStart);
+  const destroyBlock = destroyStart >= 0 && destroyEnd > destroyStart
+    ? src.slice(destroyStart, destroyEnd)
+    : '';
+
+  check('stats globe: component source file readable',
     src.length > 0,
     `could not read ${COMPONENT_PATH}`);
-  check('ring buffer: AGENT_HISTORY_CAP = 288 present',
-    /AGENT_HISTORY_CAP\s*=\s*288\b/.test(src),
-    'AGENT_HISTORY_CAP = 288 not found in stats-page.component.ts');
-  check('ring buffer: agentHistoryRing field present',
-    /agentHistoryRing\s*:\s*number\[\]/.test(src),
-    'agentHistoryRing: number[] field declaration not found');
-  check('ring buffer: shift() trim call present',
-    /agentHistoryRing\.shift\(\)/.test(src),
-    'agentHistoryRing.shift() trim path not found -- did someone replace it?');
+  check('stats globe: NgZone is imported and injected',
+    /\bNgZone\b/.test(src) && /inject\(\s*NgZone\s*\)/.test(src),
+    'NgZone import/inject missing from stats-page.component.ts');
+  check('stats globe: setupGlobe runs outside Angular',
+    /zone\.runOutsideAngular\(\(\)\s*=>[\s\S]*globeService\.setupGlobe\(/.test(src),
+    'globeService.setupGlobe(...) is not wrapped in zone.runOutsideAngular(...)');
+  check('stats globe: setView schedules deferred redraw',
+    setViewBlock.includes('this.scheduleViewRedraw();'),
+    'setView(...) does not call scheduleViewRedraw()');
+  check('stats globe: setView no longer redraws synchronously',
+    !setViewBlock.includes('this.redrawChart();'),
+    'setView(...) still calls redrawChart() synchronously');
+  check('stats globe: scheduleViewRedraw uses requestAnimationFrame',
+    /pendingViewRedrawFrame\s*=\s*window\.requestAnimationFrame/.test(src),
+    'scheduleViewRedraw() does not use window.requestAnimationFrame');
+  check('stats globe: pending frame cancellation uses cancelAnimationFrame',
+    /window\.cancelAnimationFrame\(\s*this\.pendingViewRedrawFrame\s*\)/.test(src),
+    'cancelPendingViewRedraw() does not cancel pendingViewRedrawFrame');
+  check('stats globe: ngOnDestroy cancels pending view redraw',
+    destroyBlock.includes('this.cancelPendingViewRedraw();'),
+    'ngOnDestroy() does not call cancelPendingViewRedraw()');
+
+  // Review-fix guards -- globe lifecycle hardening + fan-picker state.
+  const rateStart = src.indexOf('  private applyRateLimit(');
+  const rateEnd = src.indexOf('  private scheduleViewRedraw', rateStart);
+  const rateBlock = rateStart >= 0 && rateEnd > rateStart ? src.slice(rateStart, rateEnd) : '';
+  check('stats globe: applyRateLimit stops a running globe before the ready template unmounts',
+    rateBlock.includes('this.stopGlobe?.();') && rateBlock.includes('this.stopGlobe = undefined;'),
+    'applyRateLimit() does not tear down the globe rAF loop');
+
+  const redrawStart = src.indexOf('  private redrawChart(');
+  const redrawEnd = src.indexOf('  private buildGlobeRegions', redrawStart);
+  const redrawBlock = redrawStart >= 0 && redrawEnd > redrawStart ? src.slice(redrawStart, redrawEnd) : '';
+  check('stats globe: redrawChart keeps the running globe when regions are unchanged',
+    /if\s*\(this\.stopGlobe\s*&&\s*key\s*===\s*this\.lastGlobeKey\)\s*return;/.test(redrawBlock),
+    'redrawChart() lacks the stopGlobe && key === lastGlobeKey early return');
+  check('stats globe: globe signature key derives from popular_regions',
+    redrawBlock.includes('JSON.stringify(this.latestFsbHeadline?.popular_regions ?? [])'),
+    'redrawChart() key is not JSON.stringify(latestFsbHeadline?.popular_regions ?? [])');
+  check('stats globe: no unconditional globe teardown ahead of the fsb-active-now branch',
+    redrawBlock.indexOf("selectedView === 'fsb-active-now'") !== -1 &&
+      redrawBlock.indexOf("selectedView === 'fsb-active-now'") < redrawBlock.indexOf('this.stopGlobe?.();'),
+    'redrawChart() stops the globe before checking whether the globe view is active');
+
+  // tabPulse=false / frozenView=null also appear in the pulseTimer callback,
+  // so this check must anchor on the early-return block specifically.
+  check('stats tabs: reselecting the active view clears pulse/frozen state',
+    /if\s*\(this\.selectedView\s*===\s*id\)\s*\{[^}]*this\.tabPulse\s*=\s*false;[^}]*this\.frozenView\s*=\s*null;[^}]*\}/.test(src),
+    'setView() early-return leaves tabPulse/frozenView sticky');
+}
+
+// -----------------------------------------------------------------------------
+// Suite C -- globe service coastline cache + shared PRNG stream
+// -----------------------------------------------------------------------------
+
+{
+  let gsrc = '';
+  let ssrc = '';
+  try { gsrc = fs.readFileSync(GLOBE_SERVICE_PATH, 'utf8'); } catch { /* swallow */ }
+  try { ssrc = fs.readFileSync(SITEMAPS_PATH, 'utf8'); } catch { /* swallow */ }
+
+  check('globe service: source file readable',
+    gsrc.length > 0,
+    `could not read ${GLOBE_SERVICE_PATH}`);
+  check('globe service: Natural Earth dots cached across setupGlobe calls',
+    /private\s+cachedLandDots\s*:\s*LandPoint\[\]\s*\|\s*null\s*=\s*null;/.test(gsrc) &&
+      gsrc.includes('this.cachedLandDots'),
+    'GlobeVisualizationService does not cache fetched land dots');
+  check('globe service: setupGlobe accepts a caller-supplied PRNG defaulting to seed 719',
+    /random:\s*\(\)\s*=>\s*number\s*=\s*createSeededRandom\(719\)/.test(gsrc),
+    'setupGlobe() signature lacks the random param with createSeededRandom(719) default');
+  check('globe service: setupGlobe body no longer re-seeds its own PRNG',
+    !/const\s+random\s*=\s*createSeededRandom\(719\);/.test(gsrc),
+    'setupGlobe() still constructs an internal createSeededRandom(719)');
+  check('sitemaps globe: source file readable',
+    ssrc.length > 0,
+    `could not read ${SITEMAPS_PATH}`);
+  check('sitemaps globe: counts and jitter share one per-visit PRNG stream',
+    /ngAfterViewInit\(\)[\s\S]*createSeededRandom\(719\)[\s\S]*setupGlobe\(canvas,\s*regions,\s*random\)/.test(ssrc),
+    'sitemaps ngAfterViewInit does not build regions + pass the same PRNG into setupGlobe');
+  check('sitemaps globe: module-scope PRNG removed',
+    !/^const random = createSeededRandom/m.test(ssrc),
+    'module-scope createSeededRandom(719) still draws counts at module load');
 }
 
 console.log(`\n=== stats-chart-overhaul results: ${passed} passed, ${failed} failed ===`);

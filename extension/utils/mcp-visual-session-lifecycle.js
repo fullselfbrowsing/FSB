@@ -364,7 +364,12 @@
         startedAt: Number.isFinite(existingEntry.startedAt) ? Number(existingEntry.startedAt) : now,
         lastTickAt: now,
         deadlineAt: deadlineAt,
-        isFinal: isFinal
+        isFinal: isFinal,
+        // Phase 10 FINT-16 -- driver discriminator (CONTEXT.md D-01). Preserves
+        // existing entry value when present (backward-compat with pre-Phase-10
+        // entries that lacked the field). Autopilot ticks pass driver: 'autopilot';
+        // MCP ticks omit the field and default to 'mcp'.
+        driver: existingEntry.driver || (fields.driver === 'autopilot' ? 'autopilot' : 'mcp')
       };
       action = 'updated';
     } else {
@@ -377,7 +382,9 @@
         startedAt: now,
         lastTickAt: now,
         deadlineAt: deadlineAt,
-        isFinal: isFinal
+        isFinal: isFinal,
+        // Phase 10 FINT-16 -- driver discriminator (CONTEXT.md D-01).
+        driver: fields.driver === 'autopilot' ? 'autopilot' : 'mcp'
       };
       action = 'created';
     }

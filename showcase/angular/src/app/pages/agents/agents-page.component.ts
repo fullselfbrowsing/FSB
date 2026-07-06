@@ -1,13 +1,20 @@
-import { Component, OnInit, OnDestroy, Renderer2, inject, DOCUMENT, LOCALE_ID, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Title, Meta } from '@angular/platform-browser';
+import { Component, OnDestroy, OnInit, PLATFORM_ID, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
 
 const ROUTE_PATH = '/agents';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@agents.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
+const AGENT_TOKENS = ['OpenClaw', 'Hermes'] as const;
+type AgentToken = typeof AGENT_TOKENS[number];
+
+const PROVIDER_MARKS: Record<AgentToken, { file: string; alt: string }> = {
+  OpenClaw: { file: 'openclaw.svg', alt: 'OpenClaw' },
+  Hermes: { file: 'hermes.png', alt: 'Hermes' },
+};
 
 @Component({
   selector: 'app-agents-page',
@@ -23,29 +30,26 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   private readonly localeId = inject(LOCALE_ID);
   private readonly platformId = inject(PLATFORM_ID);
 
-  // SSR-safe initial token: this literal is what the prerenderer emits.
-  currentToken: string = 'OpenClaw';
-  // Logo state -- only flips on settle, so the icon does NOT scramble.
-  // Decoupled from `currentToken` (which holds the in-flight scrambled string).
-  private currentMarkToken: 'OpenClaw' | 'Hermes' = 'OpenClaw';
-  // True only during a scramble window; template binds [class.is-morphing] to it.
-  // Public + initialized false so SSR prerender emits the <img> without the morph class.
-  morphing: boolean = false;
+  currentToken: string = AGENT_TOKENS[0];
+  markToken: AgentToken = AGENT_TOKENS[0];
+  morphing = false;
 
-  private static readonly MORPH_DURATION_MS = 700;
-  private readonly tokens = ['OpenClaw', 'Hermes'] as const;
-  private readonly tokenMarks: Record<string, { file: string; alt: string }> = {
-    OpenClaw: { file: 'openclaw.svg', alt: 'OpenClaw' },
-    Hermes:   { file: 'hermes.png',   alt: 'Hermes' },
-  };
-  // Points at the CURRENT displayed token; rotation advances to (tokenIndex + 1) % tokens.length.
   private tokenIndex = 0;
-  private cycleTimerId: ReturnType<typeof setInterval> | null = null;
+  private cycleTimer: number | null = null;
   private rafId: number | null = null;
   private visibilityHandler: (() => void) | null = null;
   private prefersReducedMotion = false;
-  // True while a scramble is in flight; prevents overlapping animations on visibility/interval races.
+  // True while a scramble is in flight; prevents overlapping animations on
+  // visibility/interval races.
   private isCycling = false;
+
+  get markFile(): string {
+    return PROVIDER_MARKS[this.markToken].file;
+  }
+
+  get markAlt(): string {
+    return PROVIDER_MARKS[this.markToken].alt;
+  }
 
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
@@ -53,10 +57,9 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB - Agents (OpenClaw Skill + MCP)`;
-    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. Install the FSB OpenClaw skill in 3 steps and use 50+ MCP tools to act, observe, verify.`;
+    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. FSB gives agents a polished OpenClaw skill and 66 MCP tools to act, observe, verify.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
-    this.injectInstallHowToJsonLd();
 
     if (isPlatformBrowser(this.platformId)) {
       this.startTokenCycle();
@@ -64,15 +67,15 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
     this.stopTokenCycle();
   }
 
-  get currentMark(): { file: string; alt: string } {
-    return this.tokenMarks[this.currentMarkToken];
-  }
-
   private startTokenCycle(): void {
-    // One-shot read at init is sufficient for this badge; we do not subscribe to media-query changes.
+    // One-shot read at init is sufficient for this badge; we do not subscribe
+    // to media-query changes.
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.visibilityHandler = () => this.handleVisibilityChange();
     this.doc.addEventListener('visibilitychange', this.visibilityHandler);
@@ -80,12 +83,12 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private stopTokenCycle(): void {
-    if (this.cycleTimerId !== null) {
-      clearInterval(this.cycleTimerId);
-      this.cycleTimerId = null;
+    if (this.cycleTimer !== null) {
+      window.clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
     }
     if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
+      window.cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
     if (this.visibilityHandler !== null) {
@@ -96,94 +99,81 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
   }
 
   private scheduleNextCycle(): void {
-    if (this.cycleTimerId !== null) {
+    if (this.cycleTimer !== null || this.doc.visibilityState === 'hidden') {
       return;
     }
-    if (this.doc.visibilityState === 'hidden') {
-      return;
-    }
-    this.cycleTimerId = setInterval(() => this.advanceToken(), 3000);
+    this.cycleTimer = window.setInterval(() => this.advanceToken(), 3000);
   }
 
   private handleVisibilityChange(): void {
     if (this.doc.visibilityState === 'hidden') {
-      if (this.cycleTimerId !== null) {
-        clearInterval(this.cycleTimerId);
-        this.cycleTimerId = null;
+      if (this.cycleTimer !== null) {
+        window.clearInterval(this.cycleTimer);
+        this.cycleTimer = null;
       }
       if (this.rafId !== null) {
-        cancelAnimationFrame(this.rafId);
+        window.cancelAnimationFrame(this.rafId);
         this.rafId = null;
       }
       this.isCycling = false;
       this.morphing = false;
       // If a scramble was mid-flight, snap visible text back to the settled
       // mark so icon + label stay consistent (cleaner than freezing garbled text).
-      this.currentToken = this.currentMarkToken;
-    } else if (this.cycleTimerId === null) {
+      this.currentToken = this.markToken;
+    } else if (this.cycleTimer === null) {
       this.scheduleNextCycle();
     }
   }
 
   private advanceToken(): void {
-    if (this.isCycling) {
+    if (this.isCycling || !isPlatformBrowser(this.platformId)) {
       return;
     }
-    const next = this.tokens[(this.tokenIndex + 1) % this.tokens.length];
+    const next = AGENT_TOKENS[(this.tokenIndex + 1) % AGENT_TOKENS.length];
     if (this.prefersReducedMotion) {
       this.currentToken = next;
-      this.currentMarkToken = next;
-      this.tokenIndex = (this.tokenIndex + 1) % this.tokens.length;
+      this.markToken = next;
+      this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
       return;
     }
-    this.scramble(next);
+    this.scrambleTo(next);
   }
 
-  private scramble(target: 'OpenClaw' | 'Hermes'): void {
+  private scrambleTo(target: AgentToken): void {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*+=<>';
+    const duration = 700;
+    const lockTimes = Array.from({ length: target.length }, (_, index) => ((index + 1) / target.length) * (duration * 0.85));
+    const start = performance.now();
+
     this.isCycling = true;
     this.morphing = true;
-    const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*+=<>';
-    const duration = AgentsPageComponent.MORPH_DURATION_MS;
-    // Lock schedule: character i locks at ((i + 1) / target.length) * (duration * 0.85),
-    // so all characters are locked by ~595ms, leaving ~105ms tail for the final settle frame.
-    const lockTimes: number[] = [];
-    for (let i = 0; i < target.length; i++) {
-      lockTimes.push(((i + 1) / target.length) * (duration * 0.85));
-    }
-    const start = performance.now();
+    const settle = (): void => {
+      this.tokenIndex = (this.tokenIndex + 1) % AGENT_TOKENS.length;
+      this.currentToken = target;
+      this.markToken = target;
+      this.morphing = false;
+      this.isCycling = false;
+      this.rafId = null;
+    };
     const tick = (now: number): void => {
-      // Abort cleanly if the tab went hidden mid-scramble.
+      // Abort cleanly if the tab went hidden mid-scramble: settle straight to
+      // the target so icon + label stay consistent when the tab returns.
       if (this.doc.visibilityState === 'hidden') {
-        this.currentToken = target;
-        this.currentMarkToken = target;
-        this.rafId = null;
-        this.tokenIndex = (this.tokenIndex + 1) % this.tokens.length;
-        this.morphing = false;
-        this.isCycling = false;
+        settle();
         return;
       }
       const elapsed = now - start;
       if (elapsed >= duration) {
-        this.currentToken = target;
-        this.currentMarkToken = target;
-        this.rafId = null;
-        this.tokenIndex = (this.tokenIndex + 1) % this.tokens.length;
-        this.morphing = false;
-        this.isCycling = false;
+        settle();
         return;
       }
-      let frame = '';
-      for (let i = 0; i < target.length; i++) {
-        if (elapsed >= lockTimes[i]) {
-          frame += target[i];
-        } else {
-          frame += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
-        }
-      }
-      this.currentToken = frame;
-      this.rafId = requestAnimationFrame(tick);
+
+      this.currentToken = Array.from(target, (char, index) =>
+        elapsed >= lockTimes[index] ? char : alphabet[Math.floor(Math.random() * alphabet.length)]
+      ).join('');
+      this.rafId = window.requestAnimationFrame(tick);
     };
-    this.rafId = requestAnimationFrame(tick);
+    this.rafId = window.requestAnimationFrame(tick);
   }
 
   private applyMeta(t: string, d: string, url: string): void {
@@ -214,11 +204,11 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       '@id': `${HOST}/agents#fsb-skill`,
-      name: 'FSB OpenClaw Skill',
+      name: $localize`:@@agents.schema.software.name:FSB OpenClaw Skill`,
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'macOS, Linux, Windows (via Node 18+)',
       url: `${HOST}/agents`,
-      description: 'Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.',
+      description: $localize`:@@agents.schema.software.description:Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.`,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       publisher: { '@id': `${HOST}/#org` },
       isPartOf: { '@id': `${HOST}/#site` },
@@ -232,45 +222,4 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     this.renderer.appendChild(this.doc.head, script);
   }
 
-  private injectInstallHowToJsonLd(): void {
-    if (this.doc.head.querySelector('script[data-ld="agents-howto"]')) {
-      return;
-    }
-    const payload = {
-      '@context': 'https://schema.org',
-      '@type': 'HowTo',
-      '@id': `${HOST}/agents#install-howto`,
-      name: 'Install FSB for OpenClaw and MCP clients',
-      description: 'Three-step install: Chrome extension, FSB MCP server config, doctor verification.',
-      totalTime: 'PT5M',
-      url: `${HOST}/agents`,
-      step: [
-        {
-          '@type': 'HowToStep',
-          position: 1,
-          name: 'Install the FSB Chrome extension',
-          text: 'Primary path: paste the Chrome Web Store URL into Chrome\u2019s address bar (chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk). Fallback: download the latest .zip from GitHub Releases and load unpacked at chrome://extensions with Developer mode on.',
-        },
-        {
-          '@type': 'HowToStep',
-          position: 2,
-          name: 'Install the FSB MCP server config',
-          text: 'Print the canonical OpenClaw stdio block with `node scripts/print-stdio.mjs` and paste it into your MCP host config. Or use the FSB CLI: `npx -y fsb-mcp-server install --list` to discover supported hosts, then `npx -y fsb-mcp-server install --claude-desktop` (or your host).',
-        },
-        {
-          '@type': 'HowToStep',
-          position: 3,
-          name: 'Verify with the doctor',
-          text: 'Run the six-layer diagnostic: `node scripts/doctor.mjs`. Expect [OK] on every layer. If any layer fails, the doctor prints a one-line next step; the full recovery table is in USAGE.md inside the skill.',
-        },
-      ],
-    };
-    const json = JSON.stringify(payload).replace(/</g, '\\u003c');
-    const script = this.renderer.createElement('script') as HTMLScriptElement;
-    this.renderer.setAttribute(script, 'type', 'application/ld+json');
-    this.renderer.setAttribute(script, 'data-ld', 'agents-howto');
-    const text = this.renderer.createText(json);
-    this.renderer.appendChild(script, text);
-    this.renderer.appendChild(this.doc.head, script);
-  }
 }

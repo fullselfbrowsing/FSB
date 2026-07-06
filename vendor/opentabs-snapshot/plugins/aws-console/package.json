@@ -1,0 +1,68 @@
+{
+  "name": "@opentabs-dev/opentabs-plugin-aws-console",
+  "description": "OpenTabs plugin for AWS Console",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.88",
+  "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "opentabs": {
+    "displayName": "AWS Console",
+    "description": "OpenTabs plugin for AWS Console",
+    "urlPatterns": [
+      "*://*.console.aws.amazon.com/*"
+    ],
+    "homepage": "https://console.aws.amazon.com",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><path d=\"M15.63 31.388l-7.135-2.56V18.373l7.135 2.43zm1.3 0l7.135-2.56V18.373l-7.135 2.432zm-7.7-13.8l7.2-2.033 6.696 2.16-6.696 2.273zm-2.092-.8L0 14.22V3.75l7.135 2.43zm1.307 0l7.135-2.56V3.75L8.443 6.192zm-7.7-13.8l7.2-2.043 6.696 2.16-6.696 2.273zm23.052 13.8l-7.135-2.56V3.75l7.135 2.43zm1.3 0l7.135-2.56V3.75l-7.135 2.43zm-7.7-13.8l7.2-2.033 6.696 2.16-6.696 2.273z\" fill=\"#f90\" fill-rule=\"evenodd\"/></svg>",
+    "iconDarkSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><path d=\"M15.63 31.388l-7.135-2.56V18.373l7.135 2.43zm1.3 0l7.135-2.56V18.373l-7.135 2.432zm-7.7-13.8l7.2-2.033 6.696 2.16-6.696 2.273zm-2.092-.8L0 14.22V3.75l7.135 2.43zm1.307 0l7.135-2.56V3.75L8.443 6.192zm-7.7-13.8l7.2-2.043 6.696 2.16-6.696 2.273zm23.052 13.8l-7.135-2.56V3.75l7.135 2.43zm1.3 0l7.135-2.56V3.75l-7.135 2.43zm-7.7-13.8l7.2-2.033 6.696 2.16-6.696 2.273z\" fill=\"#f90\" fill-rule=\"evenodd\"/></svg>"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/aws-console"
+  }
+}

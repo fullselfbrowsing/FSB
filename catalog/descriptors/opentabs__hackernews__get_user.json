@@ -1,0 +1,41 @@
+{
+  "slug": "hackernews.get_user",
+  "service": "news.ycombinator.com",
+  "intentSynonyms": [
+    "get an user in hackernews",
+    "look up an user in hackernews",
+    "fetch a single user in hackernews",
+    "view one specific user in hackernews",
+    "get user in hackernews",
+    "get a user profile by username in hackernews"
+  ],
+  "description": "Get a Hacker News user profile by username. Returns karma, creation date, and bio. Usernames are case-sensitive.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username (case-sensitive)"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hackernews/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

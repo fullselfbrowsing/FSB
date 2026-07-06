@@ -1,0 +1,29 @@
+{
+  "slug": "expedia.navigate_to_trips",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "navigate to trips in expedia",
+    "open the trips/bookings page in expedia",
+    "navigate the browser to the expedia trips page where the user can view and manage their bookings in expedia"
+  ],
+  "description": "Navigate the browser to the Expedia trips page where the user can view and manage their bookings.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/navigate-to-trips.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

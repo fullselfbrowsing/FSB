@@ -1,0 +1,42 @@
+{
+  "slug": "instacart.list_orders",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "list orders in instacart",
+    "show me my orders in instacart",
+    "view my orders in instacart",
+    "see all my orders in instacart",
+    "list recent orders in instacart"
+  ],
+  "description": "List recent Instacart orders with status, retailer, total, and item count. Supports cursor-based pagination. Returns orders sorted by most recent first.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "first": {
+        "description": "Number of orders to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

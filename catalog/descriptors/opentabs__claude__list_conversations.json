@@ -1,0 +1,31 @@
+{
+  "slug": "claude.list_conversations",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "list conversations in claude",
+    "show me my conversations in claude",
+    "view my conversations in claude",
+    "see all my conversations in claude",
+    "list all conversations in claude"
+  ],
+  "description": "List all chat conversations in the current Claude organization. Returns conversation metadata including name, model, timestamps, and starred status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

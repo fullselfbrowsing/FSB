@@ -1,796 +1,381 @@
-# Pitfalls Research -- v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix
+# Pitfalls Research
 
-**Domain:** Privacy-preserving telemetry from MV3 Chrome extension to Express + better-sqlite3 ingestion, plus diagnosis of a regressed WS DOM-streaming pipeline.
-**Researched:** 2026-05-14
-**Confidence:** HIGH on policy/regulatory claims (cited primary sources). MEDIUM on streaming-bug diagnosis (code-reading without runtime repro; specific failure modes identified by tracing the handshake but not exercised). HIGH on MV3 SW and SQLite patterns (Chromium docs + better-sqlite3 official docs).
+**Domain:** Bulk-importing the full ~119-app OpenTabs surface (2,523 ops) into FSB's existing capability catalog, UNDER the just-shipped opt-out "Auto" consent default (v0.9.99 Phase 30)
+**Researched:** 2026-06-23
+**Confidence:** HIGH (grounded in live `gh` inspection of `opentabs-dev/opentabs` @ HEAD — 119 plugins confirmed, real auth/op shapes read — cross-checked against FSB's shipped `service-denylist.json`, `docs/LEGAL.md`, and the v0.9.99 STATE.md risk register / Architectural Walls)
 
-**Scope:** Pitfalls specific to *adding* an anonymous telemetry pipeline + fixing the dashboard DOM stream. Generic browser-automation, AI prompting, and MCP host install pitfalls (already covered in `.planning/research/PITFALLS-PREV-MILESTONES.md`) are NOT duplicated here.
-
-**Source files inspected:**
-- `extension/manifest.json` (MV3 permissions; no `host_permissions` for the telemetry endpoint declared yet)
-- `extension/background.js:1753-1775` (SW keepalive), `:6105-6189` (DOM stream forwarding), `:12908-13012` (alarm + lifecycle), `:13015-13060` (`onInstalled` / `onStartup`)
-- `extension/ws/ws-client.js:845-899` (`_sendStateSnapshot`/`ext:page-ready` emit), `:901-1055` (`_resolveStreamCandidate` + `_handleDashboardStreamStart`), `:1061-1119` (`_handleMessage` switch), `:1356-1420` (`_forwardToContentScript` with reinject-retry)
-- `extension/content/dom-stream.js:967-1073` (content-script message router + `domStreamReady` ping)
-- `showcase/server/src/ws/handler.js:1-283` (full relay -- room-keyed, message-type-agnostic; relay drops only when no matching role is in the room)
-- `store-assets/chrome-web-store/listing-copy.md:1-80` (no privacy practices section, no privacy policy URL, no data-collection disclosure)
-- `.planning/PROJECT.md` v0.9.69 milestone goal block + v0.9.45rc1 carry-forward streaming work
+> **Scope note.** These are the mistakes SPECIFIC to *this* bulk import under *this* consent posture. The v0.9.99 risk register (STATE.md "Top Risks") already covers the single-app failure modes (interpreter-as-code, wrong-context fetch, recipe rot, search recall). Everything below is what changes when those failure modes are multiplied by 119 apps and run under an **opt-out** gate whose only hard floor is a **4-origin** denylist.
 
 ---
 
-## Severity Legend
+## THE HEADLINE PITFALL (read this first)
 
-- **BLOCKER** -- ship-stopper. Causes delisting, GDPR/CCPA exposure, data loss, or core feature broken. Must be addressed in-milestone.
-- **MAJOR** -- regression, abuse vector, or systemic privacy leak risk. Must be addressed in-milestone, can be addressed in late phase.
-- **MINOR** -- footgun, ergonomic, or cleanup. Document, gate via code review, fix opportunistically.
+### Pitfall 1: The security-ordering trap — opt-out Auto makes finance/health/social apps WRITABLE the moment their descriptor lands, BEFORE the denylist covers them
 
----
+**What goes wrong:**
+Consent flipped to **opt-out Auto** in v0.9.99 Phase 30 (`docs/LEGAL.md`: *"read-Auto implies write-Auto … side-effecting invocations (POST/PUT/PATCH/DELETE) run without a separate elevated opt-in"*). The **only** hard block is `extension/config/service-denylist.json`, which today denies exactly **four** origins: `chase.com`, `bankofamerica.com`, `wellsfargo.com`, `irs.gov`.
 
-## Section 1: Chrome Web Store Policy Gotchas (BLOCKER class)
+The OpenTabs set being imported contains **six finance/crypto/brokerage apps** — `stripe`, `coinbase`, `robinhood`, `fidelity`, `carta`, `ynab` — and **none** of them is on the denylist. The instant a Stripe descriptor is registered and resolvable through `search_capabilities` → `invoke_capability`, the gate's order of operations (`docs/LEGAL.md`: *"The denylist is consulted first, before the consent mode"*) finds Stripe **not denied**, mode **Auto**, and runs it with **no prompt** — including the destructive mutations that ship in the OpenTabs Stripe plugin, confirmed by source: `void_invoice` (`POST /v1/invoices/{id}/void`), `delete_customer`, `finalize_invoice`, `create_invoice`, `create_price`. The same applies to `coinbase`/`robinhood` (trades, transfers) and `fidelity` (brokerage). **Importing the descriptor IS the act of arming a credential-replay weapon against the user's real money, with no per-call consent.**
 
-### Primary sources (verify against current text at submission time)
+If descriptor import (Breadth) lands in a phase **before** denylist expansion, there is a window — even a single merged commit, even a single dev build loaded — where the catalog can move money via the logged-in session silently. This is the inverse of the "safe brand" the v0.9.99 register already flagged ("Credential-replay weapon / safe-brand inversion"), now triggered structurally by import ordering rather than by a missing per-origin default.
 
-- Chrome Web Store User Data Policy & "personal or sensitive user data" definition: <https://developer.chrome.com/docs/webstore/program-policies/user-data-faq>
-- Limited Use Policy: <https://developer.chrome.com/docs/webstore/program-policies/limited-use>
-- Privacy practices disclosures in CWS Developer Dashboard: required for every publish/update (see User Data Policy above).
+**Why it happens:**
+Three forces line up: (1) the natural roadmap instinct is "import the catalog first, harden later" (Breadth is the headline feature); (2) the denylist looks "done" because it shipped in Phase 30 — but it was sized for a **4-service head**, not a 119-app surface; (3) the opt-out default means "absence from the denylist" silently equals "fully writable," so a *gap* in a config file is indistinguishable from an *allow* decision. Nobody writes code that says "allow Stripe writes" — they just fail to add Stripe to a JSON array, and the opt-out posture does the rest.
 
-### 1.1 (BLOCKER) -- Listing currently makes ZERO data-collection disclosure
+**How to avoid:**
+- **Denylist expansion MUST be phase-sequenced FIRST** — before any finance/health/social descriptor is *reachable*. PROJECT.md already states the intent (*"Denylist expansion (lands FIRST) … before any finance/health/social app is reachable under the shipped opt-out Auto default"*); the roadmap must make this a **hard phase dependency**, not a parallel track. The very first v1.0.0 phase (Phase 35) is denylist expansion + the enforcement that makes it un-bypassable.
+- **Add an import-time gate, not just a runtime gate.** The build-time descriptor generator (`scripts/package-extension.mjs` → `recipe-index.generated.js`) should **refuse to emit** a descriptor whose origin/category is on a "must-be-classified" list unless that origin already appears in `service-denylist.json` (denied or sensitive) OR is explicitly marked `domOnly`/`readOnly`. This makes the ordering a **CI failure**, not a review-time hope: you physically cannot ship a Stripe descriptor before Stripe is classified.
+- **Classify by category, not by enumerating origins one-by-one.** The current denylist is host-pattern based and hand-curated. For 119 apps, derive a category map (finance, health, payments, brokerage, crypto) from the OpenTabs manifest set and expand `deniedOrigins`/`sensitiveOrigins` from it, so a *new* finance app added later inherits the floor. Cover at minimum: `dashboard.stripe.com`, `*.coinbase.com`, `robinhood.com`, `*.fidelity.com`, `*.carta.com`, `*.ynab` — plus health/insurance categories absent from the OpenTabs set today but likely in any catalog growth.
+- **Re-decide the write-Auto default for sensitive categories.** `docs/LEGAL.md` currently says sensitive-origin friction was *removed* from the invoke gate under Auto ("Sensitive-origin friction remains on discovery only"). At 119-app scale with real brokerages in the set, the roadmap should re-evaluate whether **mutating** invokes against `sensitiveOrigins` should re-acquire the elevated opt-in that the per-origin mutating flag already models in storage (it exists, it's just not enforced at the gate under Auto). This is a posture decision the roadmapper must surface, not silently inherit.
 
-**Status today:** `store-assets/chrome-web-store/listing-copy.md` describes only local-only operation: *"FSB asks for broad browser permissions because it needs to read and act on the pages you choose to automate. Model requests are sent to the provider you configure."*
+**Warning signs:**
+- A descriptor for any of {stripe, coinbase, robinhood, fidelity, carta, ynab} is resolvable via `search_capabilities` while the same origin is absent from `service-denylist.json`.
+- The roadmap has "import all 119 descriptors" and "expand denylist" in the same phase, or import earlier.
+- A new `deniedOrigins` entry is added by hand-editing JSON with no test asserting "every imported finance-category origin is denied-or-sensitive."
+- `git log` shows the descriptor-index regenerated in a commit that does not also touch `service-denylist.json`.
 
-**What goes wrong:** Once v0.9.69 ships, the extension will also send telemetry to an FSB-controlled server (`full-selfbrowsing.com`). This is "transfer of user data" under the Limited Use Policy. Publishing the v0.9.69 build without updating the Privacy practices section in the dashboard AND the listing copy is a direct policy violation -- Google's reviewers can (and do) reject updates or delist for material mismatch between declared and actual behavior.
-
-**What Google's policy classifies as "personally identifiable information":**
-
-Quoting the User Data FAQ:
-
-> "Personally identifiable information (including a person's name, address, telephone number, email address, and username. It also includes any type of identification number, such as a government issued number, driver's license number, or account number) ..."
-
-The exact category "any type of identification number" is broad and reviewers have historically applied it to per-install UUIDs when those UUIDs **persist** and **can be correlated across visits**. A per-install UUIDv4 stored in `chrome.storage.local` and sent on every beat IS a persistent identifier even though it carries no name/email -- treat it as a regulated "identification number" for declaration purposes, not as exempt.
-
-**Prevention:**
-
-1. Update the Developer Dashboard *Privacy practices* tab BEFORE publishing v0.9.69:
-   - Tick "Personally identifiable information" (the UUID).
-   - Tick "Web history" only if you log URLs -- this milestone forbids URL logging, so do NOT tick it.
-   - Provide a Privacy Policy URL hosted under `full-selfbrowsing.com/privacy` covering the telemetry payload, retention, opt-out mechanism, and Limited Use compliance.
-   - Tick "Limited Use" certification.
-2. Add a "Data collection" section to `store-assets/chrome-web-store/listing-copy.md` covering: UUID-per-install (not PII like name/email), MCP client label, model name, token counts, active-agent count, hashed IP (server-side), opt-out toggle in control panel.
-3. Block release tagging on a checklist item: `verify-store-listing.mjs` parity script that diffs declared categories vs telemetry payload fields.
-
-**Detection:**
-
-- CI gate -- new script `scripts/verify-store-listing.mjs` that reads listing-copy.md + an explicit telemetry-payload schema file (`extension/telemetry/payload-schema.json`) and fails if listed payload != schema fields.
-- Manual UAT -- screenshot the dashboard *Privacy practices* page during release; archive in `.planning/milestones/v0.9.69-RELEASE-EVIDENCE.md`.
-
-**Phase assignment:** Pre-collector phase (whichever stands up the schema) + final release-prep phase.
+**Phase to address:**
+**Phase 35 — Denylist Expansion + Import-Time Classification Gate (LANDS FIRST, hard dependency for every later import phase).** No descriptor-import phase may merge until this phase's CI gate (descriptor generator refuses unclassified sensitive origins) is green.
 
 ---
 
-### 1.2 (BLOCKER) -- Limited Use Policy compliance statement
+## Critical Pitfalls
 
-Quoting the Limited Use Policy: developers must provide *"an affirmative statement that your use of the data complies with the Limited Use restrictions ... disclosed on a website belonging to your extension"* with the canonical wording about Google APIs (FSB doesn't use Google APIs for telemetry, so the canonical sentence needs adjustment but the affirmation requirement still applies for any user data transfer).
+### Pitfall 2: Cloning the imperative model — the bundled head grows into per-app handler sprawl and trips MV3 "code fetched as data" / Web-Store ban at scale
 
-**Prevention:** Add to `full-selfbrowsing.com/privacy` an explicit section:
-- "FSB only collects: per-install UUID, MCP client name, model name, token counts (rounded), active-agent count, hashed IP. It never collects: URLs, page content, prompts, AI responses, clipboard contents, form values, names, emails, or any other PII."
-- "Use of the collected data is limited to: aggregate usage statistics displayed on /stats and internal product-health monitoring."
-- "Data is not sold, not shared with third parties, and not used for advertising or credit assessment."
+**What goes wrong:**
+Each of the 119 OpenTabs plugins is a **full npm package of imperative TypeScript** — confirmed by source: `plugins/stripe/src/tools/` alone holds **31 hand-written `.ts` handlers** (`void-invoice.ts`, `create-customer.ts`, …), each with a `handle: async params => { … fetch … }` body. That is the exact `npm-per-plugin` model FSB's v0.9.99 strategy explicitly rejects (PROJECT.md: *"port + learn, do NOT clone OpenTabs' npm-per-plugin model"*). The bulk-import temptation is to "just port the handlers" for breadth. Two failure modes follow at scale:
+1. **Web-Store-ban risk (Wall 1).** If breadth is achieved by *bundling thousands of imperative handlers*, the extension balloons and — more dangerously — pressure mounts to *stream* new handlers from FSB's server as the catalog grows (the long tail is the whole point). The moment a server-delivered blob carries control flow, FSB is shipping **remotely-hosted code as data** → MV3 violation → review rejection / store ban. The v0.9.99 CI guard (`verify-recipe-path-guard.mjs`) fails on `eval`/`new Function`/`import(` in the recipe path, but it only guards the **six-file recipe-path allowlist** — it does NOT stop someone adding a 120th `capability-<app>.js` imperative handler module to the *bundled head* and quietly normalizing per-app handlers as the growth pattern.
+2. **The head stops being curated.** v0.9.99's design is breadth = closed-vocab **descriptors** + tiered backing; depth = a **small curated head** (~15–30 hand-ported apps); tail = **learned** discovery. If "hand-port" creep turns the head into "port everything OpenTabs hand-wrote," the head becomes the 2,523-op imperative surface by another name.
 
-**Detection:** Link-check CI gate -- `/privacy` page must contain a stable HTML anchor `#telemetry-disclosure` that the listing-copy.md `Homepage URL` field references.
+**Why it happens:**
+The OpenTabs source is *right there* as MIT TypeScript, and copying a working `handle()` is faster than authoring a closed-vocab descriptor + recipe + (for the head) a careful `executeBoundSpec` handler. "Breadth" reads as "make all 2,523 ops work," when the milestone actually defines breadth as "make all 119 apps **discoverable** (descriptors return from search)," with invocation tiered.
 
----
+**How to avoid:**
+- **Hold the v0.9.99 architecture verbatim:** breadth = **descriptor import only** (slug, intent synonyms, action verb, side-effect class, params JSON-Schema) — *data*, generated build-time, NOT handlers. PROJECT.md is explicit: *"Breadth = descriptor import + tiered backing (NOT 2,523 hand-written code handlers)."* The roadmapper must keep the descriptor-import phase strictly free of new imperative modules.
+- **Cap and gate the head.** Depth is ~15–30 apps (PROJECT.md). Add a CI assertion on `HEAD_HANDLER_MODULES` count / an explicit allow-list of head apps so the head cannot silently grow past the curated set. Each head handler stays `executeBoundSpec`-only (Phase 29 D-12), targeting its **own first-party origin**, exactly like the existing github/slack/notion handlers.
+- **Extend the recipe-path CI guard's drift check to the head.** The Phase 26 guard already has an "allowlist-drift check [that] forces new `capability-*.js` modules onto the list." Make adding a head handler a **deliberate, reviewed** allowlist edit (it already is for the recipe path) AND assert no head handler contains server-fetched control flow — so growth is friction-ful and visible.
+- **The tail is learned, never streamed-as-code.** The long tail beyond the head is reached via Phase 31 network-capture discovery → **closed-vocab learned recipes** (data), never via server-delivered handlers. Keep that boundary; never let "we need the tail to work" become "stream a handler."
 
-### 1.3 (MAJOR) -- Specific real-world delisting antipatterns to avoid
+**Warning signs:**
+- A new `extension/utils/capability-<appname>.js` imperative handler appears for a long-tail app that should have been descriptor-only.
+- `HEAD_HANDLER_MODULES` grows beyond the curated ~15–30 without a milestone decision.
+- Any proposal to "fetch the handler for app X from the server" / a recipe field that smells like control flow (`steps[].then`, `transform`, `script`).
+- The generated descriptor index file starts carrying executable strings rather than pure descriptor metadata.
 
-Public delistings and policy-enforcement actions over 2024-2026 share patterns. Avoid every one of these:
-
-| Antipattern | Real-world outcome | Mitigation in v0.9.69 |
-|---|---|---|
-| Telemetry beats start firing BEFORE user has dismissed the first-run banner | Reviewers flag as "deceptive consent" -- the user hasn't accepted yet | Banner gates `telemetryEnabled = true`; collector reads the flag every batch; never send before flag is `true` AND `consentDecisionAt` timestamp is set in storage |
-| Opt-out toggle hidden 3+ clicks deep in settings | Treated as "dark pattern" -- counted against listing | Top-level toggle in control panel "MCP" or "Privacy" tab, visible without scroll on default control-panel viewport |
-| Privacy policy URL 404s or 301s to homepage | Hard-rejection during review | Server-side test: `tests/showcase-privacy-page.test.js` HEAD-requests `/privacy` and asserts 200 + literal "FSB Telemetry" string present |
-| Telemetry payload contains URL, query string, page title, or any DOM contents | Hard-removal under data-minimization policy | Schema-validation gate (see 5.2 below). Strict allowlist enforced server-side AND client-side |
-| Logging includes IP address in plaintext on disk | Hard-removal under "sensitive data" + cross-border data transfer concerns | Server hashes IP with daily salt BEFORE any write to SQLite; no Express access-log persisted in the same DB; if using `morgan`/access logs at the HTTP layer, redact `req.ip` on telemetry routes |
-| Extension auto-fires telemetry on install before any user interaction | "Collection prior to consent" -- escalates to delisting if a regulator complains | First beat fires only after first task completion (or, more conservatively, after first banner dismissal) |
-| Bundle minified/obfuscated code that hides the telemetry call site | Reviewers cannot audit -- soft-reject + re-review delay | No minification; `extension/telemetry/collector.js` remains readable; CI gate forbids `terser`/`uglify` on this file path |
-| Different beat payload to different installs (e.g. A/B feature gates) without disclosure | "Undisclosed data collection" delisting | Single payload schema, single endpoint, no per-install variants in v0.9.69 |
-| Sending telemetry from incognito sessions | Reviewers + users treat as severe trust break | Detect `chrome.extension.inIncognitoContext` (and per-tab `incognito: true` from `chrome.tabs.get`) and DO NOT log incognito events -- drop on the client before queueing |
-| No way for a user to wipe collected data | GDPR Article 17 problem (right to erasure) + reviewer flag | Add "Wipe my telemetry data" button in control panel that POSTs `{uuid}` to a `/api/telemetry/forget` endpoint that deletes all rows keyed on that UUID; respond 204 even on miss to avoid enumeration |
+**Phase to address:**
+**Phase 36 — Breadth: Descriptor Import (data-only, all 119)** keeps imperative code out of breadth; **Phase 37 — Depth: Curated Head Expansion** enforces the head cap + the recipe-path-guard drift gate. The Wall-1 CI guard from Phase 26 carries forward as the enforcement spine.
 
 ---
 
-## Section 2: GDPR / CCPA Exposure (BLOCKER class)
+### Pitfall 3: One-size codegen vs. per-app auth diversity → descriptors that bind to the wrong shape and silently return wrong/empty results
 
-### 2.1 (BLOCKER) -- A persistent UUID stored client-side IS personal data under GDPR
+**What goes wrong:**
+FSB's `authStrategy` enum is **locked at four members** (Phase 26 D-08, frozen). The OpenTabs apps do **not** share four auth shapes — they each hand-roll a bespoke one. Confirmed by reading three plugins' API layers:
+- **Stripe** (`stripe-api.ts`): scrapes **four** page-globals off `window` — `PRELOADED.session_api_key` (→ `Authorization: Bearer`), `PRELOADED.csrf_token` (→ custom `x-stripe-csrf-token` header), `PRELOADED.merchant.id` (→ `Stripe-Account` header), `STRIPE_VERSION` (→ `Stripe-Version` header) — then POSTs `application/x-www-form-urlencoded` to same-origin `/v1`.
+- **Linear** (`linear-api.ts`): GraphQL against a **separate subdomain** `client-api.linear.app` (NOT the page origin), relying on `SameSite=Strict` HttpOnly cookies carried by `credentials:'include'`, plus a non-HttpOnly `loggedIn` indicator cookie and `linear-client-id` / `organization` headers read from cache.
+- **Instagram** (`instagram-api.ts`): reads the **rotating** `csrftoken` cookie *fresh on every call* (→ `X-CSRFToken`), plus `X-IG-App-ID`, to same-origin `/api/v1`.
+- (For contrast, the apps FSB already hand-ported show the same spread: GitHub = persisted-query `/_graphql` + `from:'response'` CSRF scrape; Slack = split-token `xoxc` in body + `xoxd` HttpOnly cookie.)
 
-**Source:** GDPR Article 4(1) <https://gdpr-info.eu/art-4-gdpr/>:
+A descriptor codegen that maps every app to one of four generic auth strategies will produce a **bind that compiles and validates but is wrong**: missing the `Stripe-Account` header, sending to the wrong subdomain, using a stale CSRF token. The interpreter binds successfully, the fetch goes out, and the server returns **401/403, an empty list, or — worst — a 200 with a logged-out-shaped body**. Because there is no per-call prompt under Auto and the result is *shaped* like a valid response, the user/agent sees "0 results" or a confidently-wrong answer and never knows the bind was broken. At 119 apps this is not an edge case — it is the **default outcome** for every app whose real auth doesn't fit the enum.
 
-> *"'personal data' means any information relating to an identified or identifiable natural person ('data subject'); an identifiable natural person is one who can be identified, directly or indirectly, in particular by reference to an identifier such as a name, an identification number, location data, an online identifier or to one or more factors specific to ..."*
+**Why it happens:**
+Codegen from manifests is a mechanical mapping; auth is the one part that is *irreducibly bespoke per app* and lives in the imperative `*-api.ts` body, not in the manifest metadata. The enum was sized (correctly) for the **curated head**, where each app's auth is hand-verified. Extending descriptor *breadth* to 119 apps does not extend the enum's coverage — but it's easy to assume "descriptor generated = capability works."
 
-And GDPR Recital 30 <https://gdpr-info.eu/recitals/no-30/>:
+**How to avoid:**
+- **Decouple "discoverable" from "invocable" in the descriptor itself.** Every imported descriptor carries a backing-tier marker. Only apps with a **verified** auth path (hand-ported head, or a learned recipe that *replayed clean*) are marked invocable; the rest are **descriptor-only / discovery-pending** (see Pitfall 9). Codegen must NOT mint an invocable declarative recipe for an app whose auth shape was never confirmed.
+- **Do not auto-emit a declarative recipe from a guessed auth strategy.** A recipe is only minted for the tail via Phase 31 capture+synthesis, which **observes the real request** (real endpoint, real headers, real auth placement) and then *replays it to confirm* before promoting (Phase 31 `promoteAfterReplay` — *"promotes only on a clean injected replay"*). That observe-then-confirm loop is the only safe way to reach a bespoke auth shape declaratively. Guessing from a manifest is not.
+- **Cap the synthesizer to declarative-executable auth** (already a Phase 31 decision: *"NEVER emits `csrf.from:'response'`"*). Response-minted CSRF (GitHub-style) and multi-part page-global scrapes (Stripe-style) are **head-only** — they require an imperative handler. The descriptor for such an app stays discovery-only until hand-ported. Make this explicit so codegen doesn't silently downgrade a Stripe-shaped auth into a generic same-origin-cookie strategy.
+- **Add an "auth-shape coverage" report to the import.** For each imported app, classify its real auth (from the OpenTabs `*-api.ts`) into {fits-enum / head-only / learn-only / unsupported} and assert the descriptor's invocability marker matches. An app whose auth is "head-only" but marked invocable-declarative is a **build failure**.
 
-> *"Natural persons may be associated with online identifiers provided by their devices, applications, tools and protocols, such as internet protocol addresses, cookie identifiers or other identifiers such as radio frequency identification tags. This may leave traces which, in particular when combined with unique identifiers and other information received by the servers, may be used to create profiles of the natural persons and identify them."*
+**Warning signs:**
+- An app returns HTTP 200 with an empty collection or a logged-out body shape on first invoke (the silent-wrong signature).
+- A declarative recipe exists for stripe/linear/instagram (these are head-or-learn-only by auth shape; a hand-authored declarative recipe is almost certainly wrong).
+- The codegen maps >4 distinct real auth shapes onto the 4-member enum without a "head-only/learn-only/unsupported" escape hatch.
+- Invoke succeeds but the response fails the Phase 32 expected-shape assertion (this is rot-detection catching a never-worked bind, not a rotted one).
 
-**The line:** Anonymous in colloquial terms is NOT anonymous in GDPR terms unless re-identification is *"reasonably likely"* impossible. A persistent UUID linked to behavior (tokens, MCP client, model) IS an online identifier and IS personal data under the regulation. The fact that FSB never sees a name does not exempt it.
-
-**What this means concretely:**
-
-- The UUIDv4 is "personal data" -- a privacy policy is mandatory, not optional.
-- Hashing IP server-side reduces the surface but does NOT make the UUID itself non-personal. Both are processed.
-- Opt-out-by-default is acceptable in the US under CCPA (where opt-out is the standard for "sale/share"). In the EU/UK under GDPR + ePrivacy (Article 5(3) of the ePrivacy Directive <https://en.wikipedia.org/wiki/EPrivacy_Directive>), the safer posture is **opt-IN** for anything not strictly necessary to the user-requested service. Telemetry is NOT strictly necessary.
-
-**Prevention -- region-gating recommendation:**
-
-The milestone goal lists "Opt-out toggle + first-run privacy banner" (opt-out by default). This is the right posture for US users and a defensible posture globally **only if** the first-run banner is genuinely prominent and dismissal counts as informed action. To be conservative:
-
-1. Parse `Accept-Language` server-side at the telemetry endpoint (it's already parsed by the i18n middleware for `/`). If the requesting locale primary tag is in a hardcoded EU/UK list (`de`, `fr`, `it`, `es`, `pt`, `nl`, `pl`, `sv`, `da`, `fi`, `el`, `hu`, `cs`, `ro`, `bg`, `hr`, `sk`, `sl`, `et`, `lv`, `lt`, `mt`, `ga`, `en-GB`), the FIRST beat that arrives WITHOUT a `consentDecisionAt` timestamp gets rejected with `412 Precondition Required` -- forcing the extension to surface the banner before retrying.
-2. The extension's banner copy MUST be translated for those locales (carry-forward i18n note below in Section 9).
-3. Make the toggle binary `on`/`off`, not a granular per-field consent matrix -- granularity sounds privacy-friendly but expands the regulator-disclosed surface and confuses users.
-
-**Decision:** keep opt-out-by-default for the v0.9.69 MVP, but build in `consentDecisionAt` as a required precondition on the server side. This lets us tighten to opt-in later (per-locale, behind a feature flag) without a schema migration.
-
-### 2.2 (BLOCKER) -- Privacy Policy URL is mandatory and must cover specific items
-
-**Required content (verify each):**
-
-- Identity and contact of the controller (FSB project + maintainer email).
-- What categories of data are collected (UUID, tokens, MCP client, model, agent count, hashed IP).
-- What is NOT collected (URLs, prompts, page content, names, emails, clipboard, form data).
-- Legal basis for processing (legitimate interest in product health under GDPR Article 6(1)(f) is defensible if you also offer easy opt-out and never use the data for ads).
-- Retention period (rolling window; recommend 90-day retention for raw events, indefinite for aggregates; document this).
-- Right to access/erasure/portability/objection + how to exercise them (the `/api/telemetry/forget` button discussed in 1.3 + an email).
-- Cross-border transfer disclosure (Fly.io regions hosting the server).
-- DPO contact if applicable (small project usually exempt).
-- Cookie/storage disclosure (the UUID is stored via `chrome.storage.local`, not a cookie, but still a "tracker" under ePrivacy logic -- mention it).
-
-**Detection:** Snapshot the live `/privacy` page during release prep; archive as evidence.
-
-### 2.3 (MAJOR) -- CCPA "Do Not Sell or Share My Personal Information"
-
-Source: <https://oag.ca.gov/privacy/ccpa>. CCPA defines personal information broadly to include identifiers and "could reasonably be linked." A UUID-per-install plus model usage qualifies. FSB doesn't sell data, but the "share" prong covers sharing for advertising -- so explicit non-sharing posture must be stated.
-
-**Concretely:**
-
-- Add to `/privacy`: "FSB does not sell, share, or rent personal information to third parties. There is no Do Not Sell / Do Not Share link because FSB does not sell or share."
-- Don't add Google Analytics, Plausible-on-third-party-domain, Sentry, LogRocket, or any third-party analytics to `/stats` rendering or the telemetry server. Self-hosted only.
-- California Opt-Me-Out Act (AB 566) takes effect 2027-01-01 requiring browsers to ship a built-in opt-out signal. FSB should respect the GPC (Global Privacy Control) `Sec-GPC: 1` HTTP header on the telemetry endpoint if it arrives -- silently drop the event with 204 to be future-safe.
+**Phase to address:**
+**Phase 36 — Breadth (descriptor invocability markers, auth-shape coverage report)** sets the discoverable≠invocable contract; **Phase 38 — Discovery Seeding/Hardening** (extends Phase 31) is where the bespoke tail auth gets *observed and replayed-clean* rather than guessed. The Phase 32 expected-shape assertion is the runtime backstop.
 
 ---
 
-## Section 3: Fingerprinting Risks Despite UUID + Hashed IP (MAJOR class)
+### Pitfall 4: Descriptor-vs-recipe side-effect mismatch — a mis-authored side-effect class under-states a destructive op, at 2,523-op scale
 
-### 3.1 (MAJOR) -- Correlation deanonymization via low-prevalence combinations
+**What goes wrong:**
+Each descriptor carries a **side-effect class** (read / mutate / destructive) that the consent gate and search ranking depend on. v0.9.99 already guards the single-app case: Phase 28 D-02 cross-checks the *authored* `sideEffectClass` against the *recipe-method-derived* class and lets the **recipe win** so "a mis-authored descriptor cannot under-state a destructive search hit." But that guard derives the class from the **recipe's HTTP method** — which only exists for apps that have a recipe. For the **descriptor-only / discovery-pending** breadth tier (most of the 119), there is no recipe yet, so there is **nothing to cross-check against**, and the class is whatever the manifest-derived codegen guessed. The OpenTabs manifests do carry hints (Stripe's `void_invoice` description literally says "Void an open invoice"; the tool is named `void_invoice`), but a codegen that classifies by, say, HTTP verb or a keyword list will mis-class the long tail's GraphQL mutations (POST to `/graphql` looks like a "read" by method), persisted-query writes, and RPC-style endpoints (Notion's `/api/v3` is all POST). Under opt-out Auto, a destructive op **mis-labeled as read** is *fully writable with no friction* even on a sensitive origin (because the sensitive-origin friction also keys off classification).
 
-**Failure mode:** The payload `(uuid, hashed_ip, mcp_client, model, tokens, ts)` looks anonymous in isolation. In practice, low-prevalence combinations are uniquely identifying:
+**Why it happens:**
+Side-effect class is semantically obvious to a human reading "void invoice" but is **not** reliably derivable from HTTP method (GraphQL/RPC tunnel mutations through POST) or from manifest metadata that may not exist for every op. At 2,523 ops, manual classification is infeasible and codegen will be applied uniformly — so a single bad heuristic mis-classes thousands of ops at once.
 
-- "Codex client + GPT-5 model + 47k tokens at 14:23:01 UTC" -- if there are only 3 Codex users globally in that minute, the (model, token-bucket, minute) triple is a quasi-identifier and links to the UUID.
-- Hashed IP rotates daily but within a day, any UUID's hashed_ip is stable, so an observer of a single day's table can correlate distinct sessions of the same install across MCP clients.
-- Subsequent days: the UUID + the rough geographic footprint encoded in hashed_ip rotation patterns is enough to track an install across weeks even though the hash changes.
+**How to avoid:**
+- **Extend the Phase 28 cross-check to the descriptor-only tier.** Where there is no recipe to derive the method from, derive the class from the **OpenTabs tool metadata** that ships in the manifest — OpenTabs tools have stable signals (tool `name` verb: `create_`/`update_`/`delete_`/`void_`/`finalize_`/`get_`/`list_`/`search_`, and a `group`). Build a verb→class map and assert it; treat unknown verbs as `mutate` (fail-safe-high), never `read`.
+- **Default unknown/ambiguous to the MORE destructive class.** The cross-check's "recipe wins" rule is a *downgrade-prevention* rule; preserve that bias for the descriptor tier: if authored-class and derived-class disagree, take the **more** side-effecting of the two. Never let a guess *lower* an op's class.
+- **GraphQL/RPC/persisted-query endpoints cannot be classified by method.** For these (Linear, Notion, GitHub `_graphql`), the class must come from the operation name in the GraphQL document / tool name, not from "it's a POST." Flag any descriptor whose endpoint is a known GraphQL/RPC path so it can't be auto-classed `read` just because reads also POST there.
+- **Audit a sample against ground truth.** Pull the destructive ops from a handful of high-risk OpenTabs plugins (stripe `void_invoice`/`delete_customer`, coinbase/robinhood trade ops) and assert the generated descriptor classes them `destructive`. This is the concrete acceptance test for the classifier.
 
-**Prevention -- defense-in-depth reduction techniques:**
+**Warning signs:**
+- A `void_`/`delete_`/`cancel_`/`finalize_`/`transfer_`/`trade_` op anywhere in the catalog has `sideEffectClass: read`.
+- The classifier's only input is HTTP method, with no GraphQL/RPC carve-out.
+- A POST-to-`/graphql` descriptor is classed `read`.
+- Sensitive-origin friction (or future mutating opt-in) never triggers for an app you know has writes — a sign its writes are mis-classed read.
 
-| Technique | Where applied | Effect |
-|---|---|---|
-| Round timestamps to nearest 60s before write | Server-side in the `/api/telemetry/*` route after IP-hashing | Reduces timing-side-channel; tokens-per-minute granularity is sufficient for aggregate display |
-| Bucket token counts (e.g. round to nearest 1k, cap at 1M) | Client-side in collector OR server-side at insert | Reduces unique values; aggregate stats don't need exact counts |
-| Drop low-cardinality cells in aggregate queries (k-anonymity threshold) | Server-side at `/stats` aggregation | "Most popular MCP" only shows entries with >= 5 distinct UUIDs; cells below threshold are bucketed as "Other" |
-| Hash IP with a per-DAY salt (not per-hour, not static) | Server-side at ingress | Daily window prevents long-term tracking; not so short that legitimate same-install events split across rows |
-| Do NOT log User-Agent, Accept-Language, or any other HTTP header into the telemetry table | Server-side telemetry route handler | Eliminates passive browser fingerprint |
-| Strip request bodies from any error/access logs that touch this endpoint | Express `morgan` config | Prevents accidental payload echo |
-
-**Specific k-anonymity threshold recommendation:** k=5 for any cell exposed on `/stats`. Source: standard k-anonymity practice (<https://en.wikipedia.org/wiki/K-anonymity>); 5 is the common minimum for public dashboards (lower than the k=10 used for medical data, higher than k=2 which is trivial to break).
-
-**Detection:**
-- Server-side aggregation SQL must `HAVING COUNT(DISTINCT install_uuid) >= 5` on any GROUP BY query before exposing to `/stats`.
-- A `tests/telemetry-k-anonymity.test.js` test that seeds 4 distinct UUIDs all using a unique MCP client, runs the aggregation, and asserts that the unique client does NOT appear in `/stats` output.
-
-**Phase assignment:** Aggregate-computation phase; review with k-anonymity test in the verification block.
-
-### 3.2 (MAJOR) -- Active-agent count is a behavioral fingerprint
-
-A user who routinely runs 16 concurrent agents (cap is configurable up to 64 per v0.9.60) is rare. The combination of `(active_agent_count, mcp_client, hour_of_day)` can pin individual users.
-
-**Prevention:** Bucket `active_agent_count` into ranges before send: `{0, 1, 2-4, 5-8, 9-16, 17-32, 33+}`. Display the same buckets on `/stats`.
-
-### 3.3 (MINOR) -- Install date fingerprint
-
-The first time a UUID appears in the table is its install date. If install date is exposed on `/stats` as "users joined this week," combined with later activity it narrows the cohort.
-
-**Prevention:** Round `install_date` to week granularity in any query that joins to activity tables; never expose exact install-date per UUID.
+**Phase to address:**
+**Phase 36 — Breadth (descriptor side-effect classification + cross-check extension)**, with the verb→class map and the destructive-op sample test as the milestone gate. Feeds directly into Pitfall 1's import-time gate (sensitive + destructive = must-be-classified-before-shippable).
 
 ---
 
-## Section 4: MV3 Service-Worker Eviction + Telemetry Queue (BLOCKER class)
+### Pitfall 5: Token/secret leakage in logs and the audit trail, multiplied across 119 apps' bespoke auth material
 
-### 4.1 (BLOCKER) -- In-memory queue is lost on SW termination
+**What goes wrong:**
+The v0.9.99 invariant is absolute: tokens/CSRF/cookies **never** hit logs or the audit trail; head handlers scrape tokens *only* into the bound spec (Phase 29 T-29-08, T-29-09), and the audit schema is secret-free by construction (`docs/LEGAL.md`: *"never stores … cookies, tokens, CSRF values, bearer credentials"*; a test asserts no auth substring survives). That invariant was **verified against ~5 head apps with known auth field names**. Bulk import introduces **119 apps' worth of new, differently-named secret material** the redactor has never seen: Stripe's `session_api_key` / `csrf_token` / `merchant.id` page-globals, Instagram's `csrftoken`/`ds_user_id` cookies, Linear's `linear-client-id`, plus per-app bearer/nonce shapes. The leak risks specifically introduced by scale:
+1. **Discovery capture (Phase 31) sees raw requests for all 119 apps.** Network-capture observes real endpoints, headers, and payloads to learn recipes. Every new app is a new chance for a token to ride through into a persisted learned-recipe envelope or a diagnostic ring buffer if the redactor's *structural* exclusion misses an app-specific field.
+2. **The redactor is a denylist of known shapes, not a guarantee.** The audit "no auth substring survives" test asserts against *seeded* auth strings. New apps bring new substrings the test doesn't know to look for, so the test can stay green while a novel token leaks.
+3. **Error messages.** A failed Stripe invoke whose error echoes a header value, a rate-limit `Retry-After` path, or a 403 body could carry merchant/account identifiers into the secret-free-by-construction audit `error?` field.
 
-**Source:** Chrome SW lifecycle docs <https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle>. Standard SW idle timeout is 30s; even with `keepAliveInterval` (FSB has one at `extension/background.js:1755-1775`, ping every 20s), the worker terminates when no active session is running (`stopKeepAlive()` is called at `:1855-1864`).
+**Why it happens:**
+A redactor/audit schema validated against a small known set is implicitly an **allowlist of what we remembered to scrub**. Scale changes the threat from "scrub the 5 fields we know" to "guarantee no field we've never seen leaks." The discovery path (Phase 31) is the highest-risk surface because it deliberately reads raw traffic.
 
-**Failure mode in FSB context specifically:**
+**How to avoid:**
+- **Keep capture-time redaction STRUCTURAL, not value-matching.** Phase 31 already does this right: *"capture-time redaction uses structural exclusion (never reads header values/bodies/query); redactResponse keeps only {status, mimeType}."* The rule to enforce at scale: the capture/synthesis path must **never read a header value, body, or query string** — it keeps only structure (which headers exist, status, mime). A structural redactor is app-agnostic and therefore scales to 119 unknown apps for free. Any code that reads a *value* during capture is the bug.
+- **Learned recipes store SHAPE ONLY** (already a Phase 31 decision — the synthesizer caps `from:'response'` and stores descriptor shape, not captured secrets). Assert that a learned-recipe envelope can be serialized and contains no field sourced from a captured value.
+- **Strengthen the audit no-leak test from "known substrings" to "high-entropy / known-key-name" detection.** Add (a) a property-style check that no audit field matches common token patterns (long base64/hex, `Bearer `, `xox[a-z]-`, `eyJ`-JWT prefix, cookie-pair shapes), and (b) a generated list of *every* auth field name from the 119 OpenTabs `*-api.ts` files, asserting none appear in any persisted log/audit/ring-buffer entry. This converts "we scrubbed what we remembered" into "we scrubbed the known universe + anything token-shaped."
+- **Errors get name+message only** (already the LEGAL posture: *"errors to name and message only"*) — verify this holds for the *new* per-app `ToolError` shapes that bulk import introduces, since OpenTabs errors (e.g. `httpStatusToToolError`) may embed response detail.
 
-The existing `background.js` already disables `keepAliveInterval` when no `running` sessions exist. Telemetry must not depend on it. If the collector stages events in a top-level `let pendingEvents = []` array, every SW restart loses those events.
+**Warning signs:**
+- Any capture/synthesis code path reads `request.headers[x]` *value*, `request.postData`, or query string content (vs. just key presence/status/mime).
+- The audit no-leak test still asserts only against the original ~5 head apps' field names after 119 apps are imported.
+- A diagnostic ring-buffer entry or learned-recipe envelope contains a high-entropy string.
+- An invoke error surfaced to the user/audit contains a header value, account ID, or cookie fragment.
 
-**Prevention -- canonical pattern:**
-
-```js
-// extension/telemetry/collector.js -- pseudo-code
-
-const QUEUE_KEY = 'fsb_telemetry_queue_v1';
-
-async function enqueue(event) {
-  // 1. Read existing queue from chrome.storage.local
-  const { [QUEUE_KEY]: queue = [] } = await chrome.storage.local.get(QUEUE_KEY);
-  // 2. Append + cap (defensive against runaway growth)
-  queue.push(event);
-  if (queue.length > 500) queue.splice(0, queue.length - 500); // drop oldest
-  // 3. Write back atomically
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
-}
-
-async function flush() {
-  const { [QUEUE_KEY]: queue = [] } = await chrome.storage.local.get(QUEUE_KEY);
-  if (!queue.length) return;
-  // CRITICAL: snapshot + clear in same storage transaction to avoid double-send
-  const snapshot = queue.slice();
-  await chrome.storage.local.set({ [QUEUE_KEY]: [] });
-  try {
-    const res = await fetch(`${SERVER}/api/telemetry/batch`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ events: snapshot })
-    });
-    if (!res.ok && res.status >= 500) {
-      // server-side failure -- re-queue for next flush
-      await reenqueue(snapshot);
-    }
-    // 4xx (other than 412 consent-required): drop silently (validation failed)
-  } catch (netErr) {
-    // network failure -- re-queue
-    await reenqueue(snapshot);
-  }
-}
-
-async function reenqueue(events) {
-  const { [QUEUE_KEY]: current = [] } = await chrome.storage.local.get(QUEUE_KEY);
-  await chrome.storage.local.set({ [QUEUE_KEY]: [...events, ...current].slice(0, 500) });
-}
-```
-
-**Critical correctness properties:**
-
-1. The queue lives in `chrome.storage.local`, not in a SW global. Surviving SW death is the table-stakes property.
-2. `flush()` snapshots-and-clears atomically: read queue, write empty queue, then attempt send. If the SW dies mid-flush (after snapshot, before send), the events are LOST. This is acceptable for telemetry (data loss is preferable to double-send to avoid skew). If you want better-than-this, write the snapshot to a separate `IN_FLIGHT_KEY` first, attempt send, then clear `IN_FLIGHT_KEY` on success or re-merge on failure -- but this adds complexity and the simple variant is acceptable for v0.9.69.
-3. `chrome.storage.local.set` is async; concurrent `enqueue()` calls during a flush can interleave. Defense: use a top-level Promise chain to serialize:
-
-```js
-let queueLock = Promise.resolve();
-function withQueueLock(fn) {
-  const next = queueLock.then(fn).catch(e => console.warn('[FSB TELEMETRY]', e));
-  queueLock = next.then(() => {}, () => {});
-  return next;
-}
-// callers: withQueueLock(() => enqueue(event)); withQueueLock(() => flush());
-```
-
-The lock lives in SW memory; if the SW restarts mid-flush, the next wake re-reads storage which is the source of truth -- so the lock is for in-session correctness only, never for crash recovery.
-
-### 4.2 (BLOCKER) -- Reliable flush triggers
-
-**Question posed:** `chrome.alarms` vs `chrome.runtime.onStartup` vs storage event for restart triggers -- which is reliable?
-
-**Answer:**
-
-| Trigger | Reliability | When to use |
-|---|---|---|
-| `chrome.alarms.create('fsb-telemetry-flush', { periodInMinutes: 5 })` | HIGH -- persists across SW eviction, wakes the SW | Primary periodic flush. Mirror the existing pattern at `background.js:6130` for `fsb-domstream-watchdog` |
-| `chrome.runtime.onStartup` | MEDIUM -- fires only on browser session start, not after eviction recovery | Use for cleanup of stale `IN_FLIGHT_KEY` if you use that pattern; do NOT use as primary flush trigger |
-| `chrome.runtime.onInstalled` | LOW -- fires once on install/update | Use to write initial UUID + consent state; do not piggyback flushes here |
-| `chrome.runtime.onSuspend` | UNRELIABLE -- best-effort, can be skipped on forced eviction, gives < ~30s to finish | Do NOT rely on this for flushing. Documented as "may not run" |
-| `chrome.storage.onChanged` for queue size threshold | LOW for SW persistence -- fires only in pages/listeners that are alive | Useful in-session to trigger early flush when queue > N, not for restart triggers |
-| Reactively flushing on each event | HIGH bandwidth, no benefit | Don't -- defeats batching |
-
-**Recommended trigger combo:**
-
-```js
-// On install / extension load
-chrome.alarms.create('fsb-telemetry-flush', { periodInMinutes: 5 });
-
-// Alarm handler -- add to existing listener at background.js:12909
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'fsb-telemetry-flush') {
-    if (await isTelemetryEnabled()) {
-      await withQueueLock(() => flush());
-    }
-    return;
-  }
-  // ... existing handlers
-});
-
-// Optional: opportunistic flush when queue gets large
-async function enqueueWithMaybeFlush(event) {
-  await enqueue(event);
-  const { fsb_telemetry_queue_v1: q = [] } = await chrome.storage.local.get('fsb_telemetry_queue_v1');
-  if (q.length >= 50) {
-    // Don't await -- fire and forget
-    withQueueLock(() => flush());
-  }
-}
-```
-
-### 4.3 (BLOCKER) -- Common SW-lifecycle bugs to gate against
-
-| Bug | Symptom | Detection |
-|---|---|---|
-| Queue stored in SW memory only | Events appear during one SW lifetime then vanish | Test: simulate SW eviction via `chrome.runtime.reload()` between enqueue and flush; assert events preserved |
-| Double-send after eviction (flush sent then SW died before clearing queue) | Same event_id appears in DB twice | Mitigation: every event carries a client-minted `event_id` (UUIDv4); server uses `INSERT OR IGNORE INTO events(event_id, ...)` with UNIQUE constraint on `event_id` |
-| Missing events around install / first-run / banner-dismissal window | Telemetry never starts after fresh install because the alarm isn't created until first SW restart | Create the alarm in `chrome.runtime.onInstalled` AND in the SW top-level (`chrome.alarms.create` is idempotent) |
-| Missing events around browser shutdown | `onSuspend` doesn't fire reliably | Accept the loss; document; consider a small "send on visibility change" path in the options page IF the user happens to be in the control panel |
-| Telemetry payload accidentally captures circular references / large objects | `JSON.stringify` throws inside `enqueue` | Validate every event against a Zod-style schema BEFORE enqueue; on validation failure, log to ring buffer and drop (do NOT throw to caller -- telemetry must never crash the host code path) |
-| Alarms cleared by extension reload | After `chrome.runtime.reload()` (dev workflow) the alarm vanishes | Re-arm alarms in `chrome.runtime.onInstalled` (FSB already does this for MCP -- mirror at `background.js:13044` for telemetry) |
-
-**Phase assignment:** Collector phase + ingest phase (event_id constraint).
+**Phase to address:**
+**Phase 38 — Discovery Seeding/Hardening** (extends Phase 31's structural redactor + completeness test to the full 119-app field universe) is the primary owner; the audit no-leak test extension is a milestone gate spanning Phases 36–38.
 
 ---
 
-## Section 5: Public Ingestion Endpoint Abuse (BLOCKER class)
+### Pitfall 6: Catalog/search performance and SW startup degradation at thousands of descriptors
 
-### 5.1 (BLOCKER) -- Unauthenticated POST endpoint is a DDoS / fill-disk target
+**What goes wrong:**
+v0.9.99's catalog is a `minisearch` index over a *separate capability-descriptor doc*, snapshotted to `chrome.storage.local` under `fsbCapabilityIndex` with a `catalogVersion`, loaded at SW startup via `loadJSON` with a shared `INDEX_OPTIONS`. That was built and eval-gated (recall@5 = 1.000) at **~10 descriptors**. Scaling to **119 apps × up to ~30 ops each ≈ up to ~2,523 descriptors** (PROJECT.md: *"scale the build-time generator … from ~10 to thousands of descriptors"*) stresses three things the small index never tested:
+1. **SW cold-start latency.** MV3 service workers are **evicted aggressively and cold-start constantly**. If the full index is deserialized from `chrome.storage.local` and rehydrated synchronously on every SW wake, a thousands-descriptor `loadJSON` adds latency to the critical path of *every* capability call (and competes with the rest of FSB's documented ordered bootstrap). A 30 ms parse at 10 docs can become a multi-hundred-ms parse + index rebuild at 2,500 docs, on *every* wake.
+2. **Search recall/precision erosion.** Recall@5 = 1.000 on a ~10-doc near-neighbor fixture says nothing about precision at 2,500 docs where dozens of apps share verbs ("list invoices" exists for stripe AND quickbooks-likes; "send message" exists for slack/discord/telegram/whatsapp/teams). Near-neighbor collisions explode; a query can return 5 plausible-but-wrong-app hits, and under Auto a wrong-app *mutating* invoke is unprompted.
+3. **`catalogVersion` churn + storage size.** The `catalogVersion` is a content hash; a thousands-descriptor index plus per-app provenance/attribution may approach `chrome.storage.local` practical limits and makes every rebuild a large write.
 
-The endpoint is by design unauthenticated (anonymous telemetry). Without active mitigations a single bad actor can:
-- Fire 100k POSTs/sec with garbage payloads to fill disk (SQLite at WAL mode tolerates fast writes but disk is finite).
-- Submit one giant `events[]` array with 1M entries.
-- Replay valid-looking events from a captured beat to skew aggregates.
+**Why it happens:**
+The index design is correct but was **validated at toy scale**. The eval harness fixture is near-neighbor but small; the SW-startup cost is invisible until the index is large and the SW is evicted under real memory pressure. "It indexes fine at 10" silently assumes linear, cheap scaling.
 
-**Prevention stack (apply ALL):**
+**How to avoid:**
+- **Measure SW cold-start with the FULL index before shipping it.** Add a build/CI benchmark: rehydrate the thousands-descriptor `fsbCapabilityIndex` on a cold SW and assert load time stays under a budget. This is the analog of the Phase 211 DOM-stream perf gate ("1.67 ms < 200 ms on a 5 MB fixture") — a hard numeric ceiling, measured, not assumed.
+- **Lazy / deferred index hydration.** FSB already has an "ordered service-worker startup with deferred non-essential initialization" (Phase 160). The capability index is **non-essential to bootstrap** — defer its hydration off the critical path; first `search_capabilities` triggers load, subsequent calls reuse. Never block SW startup on a thousands-doc parse.
+- **Re-run the eval harness at FULL scale with cross-app near neighbors.** Regenerate the recall@k / wrong-invoke fixture to include the real cross-app collisions (every "send message" app, every "list X" app). The milestone gate must be wrong-invoke = 0 **at 2,523 descriptors**, not at 10. Bias ranking by owned-tab origin (already designed — `biasByOwnedOrigin`) is the main precision lever and must be load-bearing at scale.
+- **Snapshot, don't rebuild, on learned-recipe growth.** Phase 31 already does the right thing (*"mutates the ONE INDEX_OPTIONS index + re-snapshots with a bumped catalogVersion, never a fresh index"*). Keep that — a full rebuild at 2,500 docs on every learned recipe would be pathological.
+- **Watch `chrome.storage.local` budget.** Keep per-descriptor payload lean (intent synonyms + service + verb + class + provenance ref, not full schemas inline); store schema-on-hit, not schema-in-index (the design already does schema-on-hit).
 
-| Layer | Mitigation | Implementation |
-|---|---|---|
-| Express middleware | `express.json({ limit: '32kb' })` on the telemetry router | Caps body parse; oversized = 413 |
-| Express middleware | `express-rate-limit` keyed on `req.ip` (the raw IP, NOT the hash -- you need the hash for storage, but the rate limit uses pre-hash IP for accurate accounting); 60 req/min/IP | <https://www.npmjs.com/package/express-rate-limit>; ensure `trust proxy` is correctly configured for Fly.io |
-| Express middleware | Schema strict-validation -- reject events with unknown fields, wrong types, oversized strings (cap MCP client name at 64 chars, model at 128 chars). Use `zod` or hand-rolled validator. | Drop on validation failure with 400; don't even log to ring buffer if rate limit already covering |
-| App layer | Batch size cap: `events.length <= 50` per POST; reject 413 above that | Prevents one giant beat |
-| App layer | Schema-level allowlist: ONLY accept these fields per event: `event_id, install_uuid, ts, mcp_client, model, tokens_in, tokens_out, active_agent_count, event_type`. Reject any payload with extra fields | Closes "exfiltration via payload" vector |
-| App layer | Drop on overflow: if a per-IP burst exceeds rate limit, respond 429 and DO NOT write anything | Standard `express-rate-limit` default |
-| App layer | Heartbeat / write-rate alarm: if global writes/min exceeds N (set N to 10x normal baseline once you have a baseline), log + alert | Defensive against distributed flood |
-| App layer | Reject events with `ts` more than 5 minutes in the future OR more than 7 days in the past | Limits replay window |
-| App layer | Reject events from incognito-flagged installs (the extension promised not to send these; if server sees `incognito: true`, it's likely a spoofer) | Defense in depth |
+**Warning signs:**
+- First capability call after an SW wake has a visible multi-hundred-ms stall.
+- The eval harness fixture still has ~10–50 docs after the full import.
+- `search_capabilities` returns hits from the wrong app for a generic verb query.
+- `fsbCapabilityIndex` write size grows unbounded with learned recipes / provenance.
 
-### 5.2 (MAJOR) -- Replay attack handling
-
-**Failure mode:** Attacker captures a valid beat and replays it 1000x. With opaque `event_id` and `ts`, server can't easily distinguish.
-
-**Mitigation:** Server-side dedupe via `INSERT OR IGNORE INTO events(event_id, ...)` where `event_id` has a `UNIQUE` constraint. Replays of identical `event_id` are silently dropped at the SQL layer.
-
-For events with the same content but freshly minted `event_id` (so dedupe doesn't fire), the rate limit + 5-minute timestamp tolerance window bound the damage.
-
-A nonce field is NOT needed for v0.9.69; `event_id` + UNIQUE constraint covers it. Adding a server-issued nonce would require a handshake step that defeats the fire-and-forget batched-POST simplicity.
-
-### 5.3 (MAJOR) -- Disk fill via storage exhaustion
-
-**Failure mode:** Sustained 10k writes/sec for 24h on a flooded server fills the Fly.io volume. SQLite keeps inserting; eventually `disk full` error mid-transaction.
-
-**Prevention:**
-- Set a daily INSERT budget per (hashed_ip, install_uuid) at the application layer: drop after N events/day per UUID (recommend N=1000 -- normal usage is <100/day).
-- Periodic VACUUM and retention: cron-like setInterval at 24h delete rows older than 90 days (raw events) and re-aggregate.
-- Monitor disk usage: a simple `df -k` check inside `/api/health` and alert/refuse new writes at 90% disk.
-
-**Phase assignment:** Telemetry ingestion phase.
+**Phase to address:**
+**Phase 36 — Breadth** must include the full-scale eval-harness re-run + the SW cold-start benchmark as gates (you cannot import thousands of descriptors without proving search precision and startup cost at that scale). Deferred hydration is a Phase 36 implementation requirement.
 
 ---
 
-## Section 6: SQLite Write Throughput (better-sqlite3) (MAJOR class)
+### Pitfall 7: Recipe rot across 119 apps overwhelms self-heal — the designed steady state becomes a thundering herd
 
-### 6.1 (MAJOR) -- Correct pragma setup is non-negotiable
+**What goes wrong:**
+Recipe rot is FSB's **designed steady state** (STATE.md: *"the designed steady state"*) — internal endpoints, CSRF shapes, and persisted-query hashes drift, and Phase 32 self-heals (detect `RECIPE_EXPIRED` → DOM fallback → quarantine → consent-gated re-learn). That machinery was built and gated for a handful of recipes. At **119 apps**, rot is no longer occasional — it is **continuous**: across 2,523 ops on third-party internal APIs that the vendors change without notice, *something is always rotting*. The scale failure modes:
+1. **Re-learn thundering herd.** Phase 32's rot hook fires a *"fire-and-forget consent-gated `runDiscovery` re-learn"* on each broken verdict. If a vendor ships a site-wide change (e.g. Stripe rotates its dashboard API), **every Stripe op rots at once** and fires N concurrent discovery sessions, each attaching `chrome.debugger`, each consent-gated. Across multiple apps rotting simultaneously this is a CDP-attach storm that can disrupt the user's actual browsing and the Input-emulation the same debugger serves.
+2. **Quarantine cascade hides whole apps.** Quarantine is correct for one bad recipe, but a vendor change that rots every op of an app silently quarantines the *entire app's* fast path. Without app-level visibility, the catalog appears intact (descriptors still return from search) while every invoke falls back to slow DOM — "discoverable but effectively dead" (see Pitfall 9), with no signal that an app needs re-porting.
+3. **Self-heal masks systemic breakage as transient.** Phase 32's "transient blip never permanently demotes a bundled recipe; re-evaluated next SW session" is right for a blip but wrong for a *permanent* vendor change — the recipe is re-tried, re-rots, re-falls-back forever, burning a discovery session each time.
 
-**Sources:**
-- better-sqlite3 performance docs: <https://github.com/WiseLibs/better-sqlite3/blob/master/docs/performance.md>
-- SQLite WAL mode: <https://www.sqlite.org/wal.html>
-- Phiresky's tuning post: <https://phiresky.github.io/blog/2020/sqlite-performance-tuning/>
+**Why it happens:**
+Self-heal was designed and tested per-recipe; the *aggregate* behavior when many recipes rot together (correlated failures from one vendor change) was never load-tested. Each individual heal is cheap; N simultaneous heals × M apps is not.
 
-**Canonical pragma setup for the telemetry DB on startup:**
+**How to avoid:**
+- **Rate-limit and coalesce re-learn.** A single discovery-session budget (global, and per-origin) so that "every Stripe op rotted" triggers **one** discovery pass for the origin, not 30. FSB already has coalescing precedent (Phase 211 mutation/reload coalescing; Phase 240 reconnect grace) — apply the same discipline to re-learn. Back off exponentially on repeated failure for the same origin (don't re-discover a permanently-changed API every session).
+- **Promote app-level rot to a visible signal.** When >K ops of one app rot inside a window, surface an **app-level "needs re-port / degraded" state** in the control panel (not just per-recipe quarantine), so the maintainer knows app X needs head re-porting and the user knows X is on the slow path. This is the difference between "self-heal absorbed it" and "self-heal is silently papering over a dead app."
+- **Distinguish transient from systemic.** Track quarantine *recurrence*: a recipe that quarantines, re-learns, and re-quarantines within N sessions is **systemically broken**, not blipping — stop auto-re-learning it and escalate to the app-level degraded state. The Phase 32 detector already has a taxonomy; extend it with a recurrence counter.
+- **The DOM-fallback floor must actually exist for the imported tail.** Self-heal's safety net is "drop to DOM automation and still complete the task." That floor only holds for apps FSB's DOM engine + site guides actually handle. For 119 apps, verify the high-value ones have a working DOM path (or a site guide) so fallback isn't a dead end. Phase 29's note already flags this: *"the DOM-fallback floor (Phase 32, T3) is the rot backstop"* — at 119 apps that backstop needs coverage, not just existence.
 
-```js
-const db = new Database('telemetry.db');
-db.pragma('journal_mode = WAL');         // concurrent reader + writer
-db.pragma('synchronous = NORMAL');       // corruption-safe in WAL; ~10x faster than FULL
-db.pragma('busy_timeout = 5000');        // wait 5s on lock contention before erroring
-db.pragma('cache_size = -64000');        // 64MB page cache (negative = KB)
-db.pragma('temp_store = MEMORY');
-db.pragma('mmap_size = 30000000000');    // 30GB mmap if 64-bit; ignored if too large
-```
+**Warning signs:**
+- A burst of `chrome.debugger` attaches / discovery sessions correlated with one vendor's change.
+- An app's every op silently on DOM fallback with no surfaced "degraded" state.
+- The same recipe slug appears in quarantine logs every SW session (re-rot loop).
+- User reports "app X got slow/flaky" with no corresponding catalog alarm.
 
-**Footguns:**
-
-| Pragma | Mistake | Fix |
-|---|---|---|
-| `journal_mode` | Default is `delete` -- single-writer, blocks readers | Set `WAL` once at startup; persists in DB header |
-| `synchronous` | Default in some better-sqlite3 builds is FULL; FULL forces fsync on every commit | Set `NORMAL` -- corruption-safe in WAL mode per <https://www.sqlite.org/wal.html#performance_considerations> |
-| `busy_timeout` | Default 0 -- contended write throws `SQLITE_BUSY` immediately | Set to 5000ms (5s) |
-
-### 6.2 (MAJOR) -- Batched inserts via prepared statement + transaction
-
-```js
-const insert = db.prepare(`
-  INSERT OR IGNORE INTO events
-    (event_id, install_uuid, ts, mcp_client, model, tokens_in, tokens_out, active_agent_count, event_type, hashed_ip)
-  VALUES
-    (@event_id, @install_uuid, @ts, @mcp_client, @model, @tokens_in, @tokens_out, @active_agent_count, @event_type, @hashed_ip)
-`);
-
-const insertMany = db.transaction((events) => {
-  for (const e of events) insert.run(e);
-});
-
-// In the POST handler:
-insertMany(validatedEvents);
-```
-
-**Why:** Each `insert.run()` is a single round-trip; wrapping N inserts in one `transaction()` cuts WAL commits from N to 1. For a 50-event batch this is ~10x speedup.
-
-**Bugs to avoid:**
-
-| Bug | Symptom |
-|---|---|
-| Building INSERT strings via template literals instead of prepared statements | SQL injection (yes, even with anonymous data -- the `mcp_client` field could carry `'); DROP TABLE`); ~3x slower |
-| Calling `db.exec()` instead of prepared statement | No parameter binding, no plan cache reuse |
-| Forgetting `OR IGNORE` on the event_id UNIQUE constraint | Replays throw SQLITE_CONSTRAINT; 500 instead of silent drop |
-| Not running PRAGMAs (especially WAL) on every process start | Reset to default? No -- WAL persists; but the *connection* pragmas (`busy_timeout`, `cache_size`) are per-connection. Set on every new Database() |
-| Long-running open transactions during a query | Blocks writers behind the WAL writer | Keep transactions tiny; complete before next batch arrives |
-| Growing DB file forever | Disk fill | Daily retention cron: `DELETE FROM events WHERE ts < ?`; periodic `VACUUM` (note: VACUUM rewrites entire DB -- run during low-traffic window) |
-
-### 6.3 (MAJOR) -- Concurrent reader during write
-
-`/stats` requests need to query the DB while writes are happening. WAL mode lets a single writer and unlimited concurrent readers proceed. better-sqlite3 is single-threaded per Database instance but Node's worker can multiplex.
-
-**Concrete pattern:** ONE Database instance shared between the telemetry write path and the /stats read path; reads do not block writes in WAL mode. Do NOT open multiple Database instances on the same file -- that increases lock contention and gives no benefit.
-
-### 6.4 (MAJOR) -- Index recommendations for /stats aggregates
-
-The aggregate queries listed in `PROJECT.md`:
-- Total tokens (lifetime) -- `SELECT SUM(tokens_in + tokens_out) FROM events;` -- requires no index; full scan acceptable if cached.
-- Active users right now -- `SELECT COUNT(DISTINCT install_uuid) FROM events WHERE ts > ? ;` -- needs `INDEX (ts)`.
-- Most popular MCP -- `SELECT mcp_client, COUNT(DISTINCT install_uuid) FROM events GROUP BY mcp_client HAVING COUNT(DISTINCT install_uuid) >= 5 ORDER BY 2 DESC LIMIT 10;` -- needs `INDEX (mcp_client, install_uuid)`.
-- Most popular model -- similar; needs `INDEX (model, install_uuid)`.
-- Avg agents per user -- needs `INDEX (install_uuid, active_agent_count)` or pre-aggregated `user_rollup` table (recommended -- see 7.1).
-
-**Migration script:** versioned, idempotent. Apply on server start; gate via `PRAGMA user_version`.
+**Phase to address:**
+**Phase 39 — Catalog-Scale Self-Heal Hardening** (extends Phase 32): re-learn rate-limit/coalescing/back-off, app-level rot surfacing, recurrence-based systemic-vs-transient classification, and DOM-fallback coverage verification for high-value imported apps.
 
 ---
 
-## Section 7: Aggregate Computation Pitfalls (MAJOR class)
+### Pitfall 8: ToS / legal exposure — importing ToS-hostile app categories as invocable API capabilities
 
-### 7.1 (MAJOR) -- O(n) full-table scan on every /stats poll
+**What goes wrong:**
+The OpenTabs set includes apps whose Terms of Service are **actively hostile to automated/programmatic access**, confirmed present in the source: `netflix`, `tinder`, `instagram`, `onlyfans`, `whatsapp`, `tiktok`, `facebook`, `x`, `linkedin`, `spotify`, `discord`, `telegram`. Under opt-out Auto, importing an *invocable* descriptor for these means FSB ships a capability that drives the user's authenticated session against the vendor's private API — exactly the access pattern these vendors' ToS prohibit and actively detect/ban (Instagram/Meta and LinkedIn are notoriously aggressive about private-API automation; OnlyFans/WhatsApp carry additional content/abuse and account-safety exposure). FSB's posture is "operator is responsible for ToS" (`docs/LEGAL.md`), and OpenTabs disclaims the same (`DISCLAIMER.md`: *"You are responsible for complying with the terms of service of any third-party service"*) — but FSB *shipping the capability invocable-by-default* is a materially stronger stance than OpenTabs' "install a plugin per app." The risks: (a) account bans for users (reputational), (b) Chrome Web Store policy exposure (facilitating ToS-violating automation of named services can draw takedowns), (c) legal/abuse exposure for adult-content and messaging apps specifically.
 
-**Failure mode:** With visibility-aware 5-minute polling (per PROJECT.md, "reusing the existing 5-min visibility-aware polling primitive"), if 1000 dashboard viewers are open and the server runs a full COUNT(DISTINCT install_uuid) on a 10M-row events table, p99 latency spikes and SQLite gets hot.
+**Why it happens:**
+The MIT source makes all 119 apps equally easy to import, and the descriptor pipeline treats them uniformly. "We have a manifest for it" reads as "we should ship it." The denylist today is sized for *financial/government* harm (money/identity) and does **not** encode the *ToS-hostility* axis at all — so social/adult/messaging apps fall straight through into Auto-invocable.
 
-**Prevention -- rolling counter pattern:**
+**How to avoid:**
+- **Add a ToS-hostility classification axis, distinct from the finance/health sensitivity axis.** Categorize the 119 apps into: (1) **denylist** (do not ship invocable at all — adult content + apps with the most aggressive anti-automation ToS where even a per-origin enable is a liability); (2) **DOM-only** (discoverable + invocable *only* via the DOM engine / site guides, never the authenticated-API fast path — keeps FSB's "general-purpose browser automation" framing rather than "we built a private-API client for Instagram"); (3) **descriptor-only/discovery-pending**; (4) **fully invocable**. Most social/messaging apps belong in DOM-only or denylist.
+- **Default ToS-hostile apps to DOM-only, not API-invocable.** FSB's legitimate framing is "a human clicking, automated" (DOM). Driving a *private API* is the part that most directly contradicts these vendors' ToS. Routing ToS-hostile apps to T3-DOM (which already exists as the fallback floor) keeps the capability available *as browser automation* without FSB shipping a bespoke private-API client for them.
+- **Update `docs/LEGAL.md` and the denylist rationale to name the ToS axis.** Today LEGAL says the denylist is *financial/government*. Extend it to document the ToS-hostility category and which apps are denied/DOM-only on those grounds, so the posture is defensible and explicit (and so a reviewer sees a deliberate policy, not an oversight).
+- **Carry the OpenTabs disclaimer pattern forward** (not affiliated, operator-responsible) but recognize it does not neutralize the *shipping-invocable-by-default* delta — the mitigation is category routing, not just a disclaimer.
 
-1. Maintain a `daily_rollup` table: `(date, mcp_client, model, distinct_users, total_tokens, total_events, ...)`.
-2. On every insert to `events`, also UPSERT into `daily_rollup` for today's date (within the same transaction). Use SQL: `INSERT INTO daily_rollup ... ON CONFLICT(date, mcp_client) DO UPDATE SET ...`.
-3. `/stats` queries the rollup, NOT the raw `events` table -- bounded row count, fast scan.
-4. For "active users right now," maintain a separate `recent_active` table that the daily retention job prunes (events older than 30 minutes).
+**Warning signs:**
+- A fully-invocable authenticated-API descriptor exists for instagram/tiktok/linkedin/onlyfans/whatsapp.
+- The denylist still encodes only the finance/gov axis after import.
+- `docs/LEGAL.md` makes no mention of ToS-hostility as a categorization criterion.
+- No "DOM-only" tier marker on descriptors for social/adult/messaging apps.
 
-**Cost:** double-write per event. Acceptable; SQLite WAL handles it. With prepared statements + the same transaction the rollup UPSERT adds ~20% to insert latency, not double.
-
-### 7.2 (MAJOR) -- Cache invalidation + thundering herd
-
-**Failure mode:** When the 5-min poll fires across all open `/stats` viewers (visibility-aware means they all wake when their tab becomes visible), they request `/stats` simultaneously. Without server-side caching, the same aggregate query runs N times.
-
-**Prevention:**
-
-- Server-side LRU cache (e.g. `lru-cache` package) with 5-min TTL keyed on the route+params.
-- Jitter: add random `0..30s` to client poll interval to avoid global synchronization.
-- Stale-while-revalidate: serve cached response immediately even if expired; trigger background refresh.
-
-**Implementation:**
-
-```js
-const cache = new Map(); // simple Map is fine for low-cardinality keys
-const TTL_MS = 5 * 60 * 1000;
-
-async function getStats() {
-  const key = 'stats:v1';
-  const cached = cache.get(key);
-  const now = Date.now();
-  if (cached && now - cached.ts < TTL_MS) return cached.value;
-  const value = await computeStats(); // expensive
-  cache.set(key, { ts: now, value });
-  return value;
-}
-```
-
-For multi-instance Fly.io deployment (if applicable), this in-memory cache is per-instance. Acceptable jitter; do not introduce Redis just for this.
-
-### 7.3 (MINOR) -- "Active users right now" definition drift
-
-What does "right now" mean? Last 5 min? 15 min? 1 hour? Without a contract, the number jumps as the definition evolves.
-
-**Prevention:** Document a hard contract -- e.g. "Active users right now = distinct UUIDs with at least one event in the last 15 minutes." Store this as a constant in shared config (`showcase/server/src/telemetry/config.js` or similar) and unit-test the query.
+**Phase to address:**
+**Phase 35 — Denylist Expansion** owns the ToS-hostility classification (it's the same "classify before reachable" gate as Pitfall 1, second axis). The DOM-only routing marker is consumed by **Phase 36 — Breadth** (descriptor tiering) and enforced by the catalog/router (T3-DOM). `docs/LEGAL.md` update is part of Phase 35's deliverable.
 
 ---
 
-## Section 8: DOM-Streaming WS Bugs -- Architectural Diagnosis (BLOCKER class)
+### Pitfall 9: "Discoverable-but-uninvocable" dead descriptors — search returns an app that no tier can actually run
 
-### 8.1 (BLOCKER) -- Diagnosis of current breakage
+**What goes wrong:**
+Breadth imports **all 119 apps as descriptors** so they return from `search_capabilities`. But invocability requires a **backing tier**: T1a/T1b (hand-ported head), T2 (a learned recipe that replayed clean), or T3 (DOM fallback that actually works for that app). For the majority of imported apps — not in the curated ~15–30 head, not yet learned (Phase 31 needs a real authenticated visit to learn), and whose auth shape may be head-only (Pitfall 3) — there is **no working backing path on day one**. The result: `search_capabilities` confidently returns "stripe: void invoice", the agent picks it, `invoke_capability` runs, and it returns `RECIPE_LEARN_PENDING` / `RECIPE_DOM_FALLBACK_PENDING` / an empty result. The catalog *looks* like it has 2,523 capabilities; in practice a large fraction are **discoverable façades** with nothing behind them. This is corrosive to FSB's core value ("reliable single-attempt execution"): the agent is told a capability exists, commits to it, and it no-ops.
 
-**Code-reading observation (NOT verified by runtime test):** The streaming handshake `dash:dom-stream-start` -> `ext:page-ready` -> stream-begin chain has at least three latent failure modes I can identify from the source:
+**Why it happens:**
+The milestone's breadth metric is "every app returns from search" — which is satisfied by descriptors alone, *decoupled* from whether invoke works. The tier router already has the right stubs (`RECIPE_LEARN_PENDING`, `RECIPE_DOM_FALLBACK_PENDING` from Phase 29), but stubs are not *capabilities*. The gap between "descriptor exists" and "invoke works" is invisible in a search-only acceptance test.
 
-#### Failure mode A: race between `dash:dom-stream-start` arrival and content-script readiness
+**How to avoid:**
+- **Make invocability a first-class, queryable descriptor field, and reflect it in search.** Each descriptor carries a backing-status: `head` / `learned` / `dom-only` / `discovery-pending` / `unsupported`. `search_capabilities` should either (a) rank/annotate by backing-status so the agent knows "discoverable but not yet runnable — visit the site to learn it," or (b) for a *mutating* op with no working backing, decline rather than promise. Never return a confident invocable hit for a descriptor whose only backing is a pending stub.
+- **Return an honest, actionable result on the pending path — not a silent no-op.** `RECIPE_LEARN_PENDING` should surface as *"this capability isn't learned yet; open <origin> while logged in and FSB will learn it"* (the consent-gated discovery flow), not as an empty success. This converts a dead descriptor into a **discovery affordance**.
+- **Seed discovery so the tail becomes invocable predictably** (PROJECT.md: *"Seed the 119 origins + known endpoint hints so the Phase 31 network-capture discovery path reliably learns the tail that is not hand-ported"*). The endpoint hints harvested from the OpenTabs `*-api.ts` sources (real paths like Stripe `/v1/...`, Instagram `/api/v1/...`, Linear `client-api.linear.app/graphql`) seed the discovery synthesizer so the *first* authenticated visit learns the recipe, instead of leaving the descriptor dead until the user happens to trigger capture.
+- **Track and gate a "discoverable AND invocable" coverage number, separate from "discoverable."** The milestone acceptance must report: of 119 apps, how many are invocable on day one (head), how many become invocable on first authenticated visit (seeded discovery), how many are DOM-only, how many are dead. A large "dead" bucket is a milestone failure, not a deferred nicety.
 
-**Trace:**
+**Warning signs:**
+- `search_capabilities` returns an app whose invoke returns `*_PENDING` with no user-facing guidance.
+- Milestone acceptance measures only "all 119 return from search" with no invocability breakdown.
+- The agent selects a capability and gets an empty/no-op result with no "learn me" path.
+- Discovery seeding ships without the real endpoint hints from the OpenTabs sources (so the tail can't self-learn).
 
-1. Dashboard sends `dash:dom-stream-start` (`ws-client.js:1081`).
-2. `_handleDashboardStreamStart` (`ws-client.js:1029-1055`) calls `_resolveStreamCandidate()` which checks `chrome.tabs.get(preferredTabId)` and tests `_isStreamableTab(tab)` -- this checks the TAB URL but NOT whether the content script is actually injected and the `dom-stream.js` module has run its IIFE.
-3. If candidate is `ready: true`, the code calls `_forwardToContentScript('domStreamStart', payload)` (`ws-client.js:1054`).
-4. `_forwardToContentScript` (`ws-client.js:1356-1420`) calls `chrome.tabs.sendMessage(tabId, { action: 'domStreamStart', ...payload }, { frameId: 0 })`.
-5. If the content script is NOT yet injected (e.g., the tab just navigated, or it's a tab that never had FSB content scripts), `sendMessage` rejects.
-6. The reinject branch runs `chrome.scripting.executeScript({ ... files: [...content scripts...] })` and waits 300ms before retrying.
-
-**The bug:** The 300ms delay (`ws-client.js:1406`) is a heuristic, not a synchronization. `dom-stream.js`'s IIFE that registers the `chrome.runtime.onMessage` listener (`dom-stream.js:971`) may not have run if any earlier-listed content script (e.g. `content/init.js` or `content/utils.js`) is slow to parse. The retry `sendMessage` at line 1407 fires; if the listener still isn't registered, the second send also fails with no further retry. From that point on, the dashboard sees `streamStatus: 'ready'` from `_resolveStreamCandidate` but no DOM data ever arrives.
-
-**The smoking-gun symptom:** Console shows `[FSB WS] Content script not ready on tab N -- injecting and retrying domStreamStart` followed by `[FSB WS] Failed to inject content script` OR no further log -- and the dashboard stalls on "Waiting for page ready" indefinitely.
-
-**Fix:**
-- Replace the 300ms `setTimeout` with a readiness ping: after `executeScript`, poll `chrome.tabs.sendMessage(tabId, { action: 'pingDomStream' }, { frameId: 0 })` until it succeeds (with a 5s overall timeout). `dom-stream.js` needs to add a `case 'pingDomStream': sendResponse({ ready: true });` branch in its message listener.
-- Alternatively, have `dom-stream.js` send `chrome.runtime.sendMessage({ action: 'domStreamReady' })` on module load (which it ALREADY DOES at `dom-stream.js:1065`!) and have `background.js` handle that signal by re-checking the pending stream-start intent and forwarding `domStreamStart` then.
-
-#### Failure mode B: `domStreamReady` ping is sent but nothing in background.js handles it
-
-**Trace:** `dom-stream.js:1063-1070` clearly intends to signal readiness:
-
-```js
-// Signal background.js that this page has a DOM stream module ready
-// This triggers the ext:page-ready -> dash:dom-stream-start auto-start chain
-try {
-  chrome.runtime.sendMessage({ action: 'domStreamReady' }).catch(...);
-} catch (e) { /* ignore */ }
-```
-
-But searching `background.js`'s message router (`grep -n "domStreamReady"`) shows the action IS handled at `background.js:6179-6184` -- it just forwards `ext:dom-ready` to the relay. There is NO branch that re-arms the pending `dash:dom-stream-start` if one came in BEFORE the content script was ready.
-
-**The bug:** If the dashboard sends `dash:dom-stream-start` while the streamable tab is mid-navigation (content script not yet injected after the page load), `_handleDashboardStreamStart` either (1) returns early with `not-ready` if the URL hasn't loaded enough for `_isStreamableTab` to pass, or (2) attempts the reinject path. In case 1, the `dash:dom-stream-start` is lost -- the user must click "start streaming" again on the dashboard to retry. There is no automatic retry on the `domStreamReady` ping.
-
-**Fix:** Track a pending intent flag (`_pendingStreamStart = true`) when `_handleDashboardStreamStart` returns `not-ready`. When `domStreamReady` arrives, check the flag and call `_handleDashboardStreamStart(lastPayload)` again. Clear the flag on success or when the user explicitly stops.
-
-#### Failure mode C: `_resolveStreamCandidate` uses `_streamingTabId` but `_streamingTabId` is stale after navigation
-
-**Trace:** `_streamingTabId` (`ws-client.js:23-24, 882, 1048`) is set to the candidate's tab id when streaming starts. After the user navigates the streaming tab to a new URL:
-- The tab ID is unchanged.
-- The content script is reloaded (because it's a new page).
-- `_isStreamableTab` may now return true (new URL is streamable).
-- But the **content-script** `streaming` flag (`dom-stream.js:996, 1005`) is reset to `false` because the old content script was destroyed.
-- The next `dash:dom-stream-start` will call `_forwardToContentScript('domStreamStart', payload)` -- which DOES re-inject if `sendMessage` fails... but if the new page's content scripts loaded normally, `sendMessage` succeeds, and `dom-stream.js:973` correctly starts a new stream session.
-
-Actually this path looks correct. The issue is when there is NO new `dash:dom-stream-start` from the dashboard after navigation. The dashboard auto-restart logic (which I haven't inspected in the dashboard code) needs to detect navigation in the streamed tab and re-send `dash:dom-stream-start`. If it relies on `ext:dom-ready` messages from the new page to know to restart, but those messages are dropped somewhere along the relay (or the dashboard ignores them), the stream stalls.
-
-**Fix to verify in the dashboard side:** confirm the dashboard listens for `ext:dom-ready` and re-issues `dash:dom-stream-start` automatically. If it relies on `ext:page-ready` only, that signal is sent from the EXTENSION at `ws-client.js:883` from `_sendStateSnapshot` (which fires on `dash:request-status` and the connection-snapshot path) -- not on every page navigation. This gap is the most likely architectural source of "streaming is broken" after the user navigates.
-
-### 8.2 (BLOCKER) -- Common WS DOM-stream failure modes to gate
-
-| Failure mode | Symptom | Mitigation |
-|---|---|---|
-| Dropped frames after SW eviction | Dashboard preview freezes mid-task | The content script keeps streaming via its watchdog; SW comes back via `chrome.alarms` `fsb-domstream-watchdog` (`background.js:12937-12945`). Verify the alarm-fired branch actually does something other than `console.log` -- right now it only logs. Recommend: on watchdog fire, request a fresh `ext:snapshot` from the active streaming tab if `_streamingActive` is true |
-| Pair-handshake race | Streaming starts before dashboard subscribes; events dropped at relay | Server-side `handler.js:159-173` already notifies dashboards of `ext:status` on connect. The race is the OPPOSITE: extension may not know dashboard arrived. The fix is that the relay should ALSO emit `dash:online` to the extension side when a dashboard joins -- relevant `handler.js:166-173` notifies dashboards of `ext:status` but does NOT notify extensions of `dash:status` |
-| Backpressure not honored | Extension floods relay; server `ws.send` calls succeed silently; dashboard tab freezes parsing huge messages | Server `handler.js:74-80` doesn't check `ws.bufferedAmount`. Add: skip send if `client.bufferedAmount > 16MB` and increment a `backpressure-dropped` counter |
-| Binary vs text frame mismatch | Decompression branch silently fails | The `_lz: true` envelope path is text-only (base64). Verify the WS client never sends a Buffer/ArrayBuffer; always JSON.stringify |
-| CSP blocking the embed on `/stats` Easter-egg page | Iframe preview from streaming dashboard blocked by `frame-ancestors` | If `/stats` is going to embed a preview iframe of the dashboard, the showcase server must serve `Content-Security-Policy: frame-ancestors 'self'` on the embedded route. For v0.9.69 `/stats` only shows aggregates, NOT a preview iframe -- so this is moot for this milestone. Document it as out of scope |
-| Iframe sandbox restrictions | If the dashboard embeds the streamed DOM in a sandboxed iframe, JS in the cloned DOM cannot execute -- but FSB never wants the clone to execute JS, so this is intentional. Confirm the sandbox attr is `sandbox="allow-same-origin"` (NOT `allow-scripts`) | -- |
-| CORS / WSS cert issues | Extension cannot connect because of mixed-content or expired cert | Make `WS_URL` configurable in `extension/config.js`; default `wss://full-selfbrowsing.com/ws`; CI gate: `tests/ws-tls.test.js` openssl s_client check on prod cert expiry |
-
-### 8.3 (MAJOR) -- Recent FSB phases that may have regressed streaming
-
-From MILESTONES.md greps:
-
-| Phase | What it touched | Regression risk |
-|---|---|---|
-| Phase 211 (v0.9.45rc1) | Stream reliability hardening, `_lz` decompression, two-tier watchdog | HIGH -- changed the on-wire envelope and the watchdog wiring |
-| Phase 217 (v0.9.47) | Moved `background.js`, `ws/`, content scripts under `extension/` -- mechanical reorg | LOW -- mechanical only, but path-aware tests need to be re-checked |
-| Phase 164 (v0.9.25) | Dashboard reliability rebaseline: preview rejects stale DOM stream updates and resnapshots on divergence; remote control bounded coordinates; taskRunId binding across reconnect | MEDIUM -- introduced "reject stale update" logic which could be over-rejecting after navigation |
-| Phase 162.3 (v0.9.24) | Overlay lifecycle reliability: canonical overlay replay, heartbeats, dashboard resync | MEDIUM -- changed resync triggers |
-| Phase 254-260 (v0.9.62) | Implicit visual-session contract, sliding-window timeout, SW eviction replay | LOW for streaming, but the alarm-prefix routing (`background.js:12916-12925`) is adjacent and worth re-reading |
-| Phase 209-212 (v0.9.45rc1) | Remote control handlers (CDP click/key/scroll), QR pairing, agent sunset | MEDIUM -- 209's `ext:remote-control-state` and 210's pairing both share the same WS transport; agent-sunset commented out paths could have orphaned a `dash:agent-run-now` listener that the dashboard still calls (search dashboard code for that string) |
-
-**Recommended diagnostic checklist for the final dashboard-streaming phase:**
-
-1. Open dashboard + extension; verify `[WS]` connection logs show both extension and dashboard joining the same room.
-2. Send `dash:dom-stream-start` from dashboard; verify in server console: `[WS] dashboard->extension room=... type=dash:dom-stream-start delivered=1 dropped=0`.
-3. Verify in extension SW console: `[FSB WS] Received: dash:dom-stream-start` and subsequent `[FSB WS]` snapshot send.
-4. Verify content script receives `domStreamStart`: add a `[DOM Stream] Start requested` log check (it's already at `dom-stream.js:974`).
-5. Verify `ext:dom-snapshot` reaches relay then dashboard: server console `extension->dashboard ... type=ext:dom-snapshot delivered=1`.
-6. If step 4 fails: the message router in `dom-stream.js` isn't running -- likely failure mode A or B above.
-7. If step 5 fails delivered=0: relay has no dashboard in the room (room key mismatch / pairing hash drift).
-8. If step 5 succeeds but dashboard doesn't render: client-side stream-state handling in `showcase/angular/src/app/pages/dashboard/**` (out of scope for this research; flag for the streaming-fix phase).
-
-**Wire-format patterns to look for in `console.log` output (without running code):**
-
-- `[WS] dashboard->extension room=XXXX type=dash:dom-stream-start delivered=0 dropped=0` -- extension not in room (pairing problem).
-- `[WS] dashboard->extension room=XXXX type=dash:dom-stream-start delivered=1 dropped=0` then NO `[FSB WS] Received` line -- extension WS dropped the frame (parse error?). Check `handler.js:179-186` malformed-json branch and the extension-side parse path.
-- `[FSB WS] Content script not ready on tab N -- injecting and retrying domStreamStart` then `[FSB WS] Failed to inject content script on tab N` -- restricted page (chrome://), or content script execution denied. Match against `_isStreamableTab` allowlist.
-- `[FSB DOM] watchdog alarm fired (SW safety net)` AND no subsequent activity -- the watchdog fires but doesn't recover. This is the bug in `background.js:12942-12945` where the alarm handler only logs.
+**Phase to address:**
+**Phase 36 — Breadth** introduces the backing-status field + honest search annotation; **Phase 38 — Discovery Seeding/Hardening** harvests the OpenTabs endpoint hints and wires the "learn-on-first-visit" affordance so discovery-pending descriptors become invocable predictably; the invocability-coverage report is a milestone gate.
 
 ---
 
-## Section 9: i18n Leakage (MINOR class)
+## Technical Debt Patterns
 
-### 9.1 (MINOR) -- Control panel "MCP" tab new strings
+Shortcuts that seem reasonable but create long-term problems.
 
-The v0.9.69 milestone adds: MCP request log rows, cost + token tracking strings, opt-out toggle label, first-run privacy banner copy.
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Import all 119 descriptors first, expand denylist after | Fast "breadth done" demo; the headline feature lands | Opens a window where finance/brokerage apps are Auto-writable with no consent (Pitfall 1) — a credential-replay weapon shipped by ordering | **Never.** Denylist + import-time classification gate must precede reachability. |
+| Hand-port OpenTabs `handle()` bodies to get the tail working | Reuses working MIT code; fast invocability | Recreates the imperative npm-per-plugin model FSB rejects; pressures toward streamed-handlers → MV3 ban (Pitfall 2) | Only for the curated head (~15–30), as `executeBoundSpec` handlers, behind the recipe-path-guard drift gate. |
+| Map every app's auth onto the 4-member enum | Codegen "just works"; every descriptor gets a recipe | Silent wrong/empty invokes for every app whose real auth is bespoke (Pitfall 3); confidently-wrong under Auto | Only when the auth shape genuinely fits the enum *and* was verified by replay. Otherwise mark head-only/learn-only. |
+| Classify side-effect by HTTP method | Simple, mechanical | GraphQL/RPC mutations (POST to /graphql) mis-class as read → destructive ops Auto-writable with no friction (Pitfall 4) | Never as the sole signal; combine with tool-name verb map + GraphQL/RPC carve-out, fail-safe-high. |
+| Reuse the 10-doc eval fixture for the 2,523-doc index | Tests stay green; no fixture rework | Recall/precision claims are meaningless at scale; wrong-app mutating invokes (Pitfall 6) | Never. Re-generate the fixture at full scale with cross-app near neighbors. |
+| Fire a re-learn on every rotted op | Each heal is locally correct; reuses Phase 32 | Thundering herd of CDP attaches when a vendor changes site-wide (Pitfall 7) | Never unbounded; rate-limit + coalesce per-origin + back-off. |
+| Ship social/messaging apps as fully-invocable API capabilities | Uniform pipeline; bigger catalog number | Account bans, Web-Store policy exposure, abuse/legal exposure (Pitfall 8) | Route ToS-hostile apps to DOM-only or denylist; never API-invocable-by-default. |
+| Count "returns from search" as the breadth metric | Easy green; 2,523 capabilities "shipped" | A large fraction are dead descriptors that no-op on invoke (Pitfall 9), corroding core value | Never as the *sole* metric; gate on discoverable-AND-invocable coverage. |
 
-**Decision recommendation:** Control panel surface is already deferred from i18n per v0.9.63 closeout (`lint:i18n --ignore-pattern src/app/pages/dashboard/**` carry-forward). FSB control panel is in `extension/ui/control_panel.html` -- NOT inside `showcase/angular/` so the i18n pipeline doesn't currently cover it. **Defer all new control-panel strings to v0.9.65 i18n** (which is also already deferred from v0.9.63 close).
+## Integration Gotchas
 
-**Caveat:** If region-gating per Section 2.1 is implemented (forcing EU users to see the banner before telemetry starts), the banner copy MUST exist in all 6 supported locales (en/es/de/ja/zh-CN/zh-TW) OR the EU users get an untranslated banner = poor UX + arguably non-compliant under GDPR (consent must be informed, which means in a language the user understands). Two paths:
+Common mistakes when connecting to external services (grounded in the real OpenTabs source).
 
-1. **Conservative path:** translate the banner copy only (small surface: 1 paragraph + 1 button label + 1 toggle label), hand-fill the XLIFF entries in the extension, document a 1-off i18n mini-system in `extension/i18n.js` that reads `chrome.i18n.getUILanguage()` -- the standard Chrome extension i18n. No build-time XLIFF; use `_locales/<lang>/messages.json` per Chrome docs.
-2. **Aggressive path:** defer the banner translation; ship English-only; accept that EU first-run UX is degraded.
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| **Stripe** (`dashboard.stripe.com`) | Treat as generic bearer-token same-origin; ship a declarative recipe | 4-part page-global scrape (`PRELOADED.session_api_key`/`csrf_token`/`merchant.id` + `STRIPE_VERSION`) → Bearer + `x-stripe-csrf-token` + `Stripe-Account` + `Stripe-Version` headers. **Head-only** (page-global scrape isn't declarative). And: **deny/sensitive before reachable** (Pitfall 1); destructive ops present (`void_invoice`, `delete_customer`). |
+| **Linear** (`client-api.linear.app`) | Pin the recipe to the page origin (`linear.app`) | API is on a **separate subdomain**; relies on `SameSite=Strict` HttpOnly cookies via `credentials:'include'` + `linear-client-id`/`organization` headers. The origin-pin must allow the real API host, not the tab origin — verify the cookie actually crosses (it does here; do NOT assume it does generally — Phase 29 D-09 forbids the public separate-origin API for github/reddit because the cookie does *not* cross there). |
+| **Instagram** (`/api/v1`) | Cache the CSRF token | `csrftoken` **rotates** — read fresh from cookie on every call (→ `X-CSRFToken`), plus `X-IG-App-ID`. Also a ToS-hostile app → DOM-only/denylist candidate (Pitfall 8), not API-invocable-by-default. |
+| **GraphQL/RPC apps** (Linear, Notion `/api/v3`, GitHub `_graphql`) | Class side-effect by HTTP method | All mutations tunnel through POST; class by the GraphQL operation / tool name, not the verb (Pitfall 4). |
+| **Any imported app, generally** | Assume "descriptor generated" = "capability works" | Decouple discoverable from invocable; only head + replayed-clean-learned are invocable (Pitfalls 3, 9). |
 
-Recommend path 1 for the privacy banner specifically (Section 2.1 region-gate would otherwise force users into untranslated UX); defer all other new control-panel strings.
+## Performance Traps
 
-### 9.2 (MINOR) -- `/stats` page strings
+Patterns that work at small scale but fail as usage grows.
 
-`/stats` is part of `showcase/angular` -- IS covered by the i18n pipeline. The new "FSB Telemetry" toggle group + aggregate labels need `i18n` markers and translations. Cost: ~20-30 new trans-units.
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Synchronous full-index rehydrate on every SW wake | Multi-hundred-ms stall on first capability call after eviction | Deferred/lazy hydration off the bootstrap critical path (Phase 160 precedent); CI cold-start benchmark with the full index | Becomes visible in the hundreds-to-low-thousands of descriptors, on every MV3 SW eviction |
+| Eval harness fixture left at toy scale | Green tests, but `search_capabilities` returns wrong-app hits in the field | Regenerate fixture at 2,523 docs with cross-app near neighbors; gate wrong-invoke = 0 at full scale | At thousands of descriptors with shared verbs ("send message", "list invoices") |
+| Per-op re-learn on rot | CDP-attach storm when a vendor ships a site-wide change | Per-origin re-learn coalescing + global discovery-session budget + exponential back-off | When any one vendor changes an API used by an app with many ops (e.g. Stripe's ~30 ops) |
+| Full index rebuild on each learned recipe | Large `chrome.storage.local` write per learned capability | Incremental add to the ONE index + re-snapshot (Phase 31 already does this) | As learned recipes accumulate across 119 origins |
+| Inline schemas in the index | Index size + parse cost balloon | Schema-on-hit (already designed); keep per-descriptor payload lean | At thousands of descriptors with full JSON-Schemas inline |
 
-**Decision:** translate now -- `/stats` is public, fully part of the marketing surface, and `i18nMissingTranslation: error` will fail the build if strings are added without translations. Either AI-fill the 5 non-en locales (matching the v0.9.63 pattern) or wrap the whole telemetry block in a single feature flag that only renders for `en` locale until translations land. Recommend AI-fill in the same phase that ships `/stats`.
+## Security Mistakes
 
----
+Domain-specific security issues beyond general web security.
 
-## Section 10: Cross-Cutting Privacy-Disaster Antipatterns (BLOCKER class -- code review gate)
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Ship a finance/brokerage descriptor before its origin is on the denylist (opt-out Auto = writable) | Unprompted credential-replay against the user's real money (void invoices, trades, transfers) — **the headline risk** | Denylist + import-time classification gate lands FIRST as a hard dependency (Pitfall 1) |
+| Mis-class a destructive op as `read` (GraphQL/RPC) | Destructive op runs with no friction, even on a sensitive origin | Verb-map + GraphQL/RPC carve-out + fail-safe-high; sample-test destructive ops (Pitfall 4) |
+| Redactor/audit validated only against the original ~5 head apps' auth field names | A novel per-app token (Stripe `session_api_key`, etc.) leaks into a learned recipe / audit / ring buffer while the no-leak test stays green | Structural capture-time redaction (never read values) + token-shape + full-119-field-name no-leak test (Pitfall 5) |
+| Trust manifest-guessed auth and mint an invocable declarative recipe | Wrong/empty invoke that is *shaped* like success → confidently-wrong under Auto, no prompt to catch it | Observe-then-replay-clean (Phase 31) before invocable; head-only for bespoke auth (Pitfall 3) |
+| Origin-pin assumes session cookie never crosses subdomains | Either over-blocks (Linear's real cross-subdomain API) or, if loosened wrong, allows an off-origin send | Pin to the *verified* API host per app; default-forbid separate origins (Phase 29 D-09) and only allow where the cookie provably crosses (Linear) |
+| Ship ToS-hostile apps as API-invocable-by-default | User account bans + Web-Store policy takedown + abuse/legal exposure | ToS-hostility classification → DOM-only or denylist (Pitfall 8) |
 
-These are specific code paths that, if shipped, would constitute a privacy disaster. Each must be explicitly checked in PR review for v0.9.69.
+## UX Pitfalls
 
-### 10.1 -- The 10-item code-review checklist
+Common user experience mistakes in this domain.
 
-**1. Telemetry collector must NEVER touch `request.task`, `session.task`, `session.userMessage`, `conversationHistory`, `aiResponse`, or any field carrying user-typed text.**
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Search returns a capability that no-ops on invoke | Agent commits to a capability that silently does nothing → erodes "reliable single-attempt execution" core value | Backing-status on descriptors; honest "not learned yet — visit to learn" affordance instead of empty success (Pitfall 9) |
+| Whole app silently on slow DOM fallback after rot | "App X got flaky" with no explanation | App-level degraded/needs-re-port surfacing in the control panel (Pitfall 7) |
+| Finance app runs a write with no prompt under Auto | User is shocked their session moved money without confirmation | Re-evaluate mutating-write friction for sensitive categories; denylist covers the worst (Pitfall 1) |
+| 2,523 capabilities returned with no quality signal | Agent/user can't tell head (reliable) from discovery-pending (maybe) from DOM-only (slow) | Rank/annotate by backing-status + side-effect class (Pitfalls 4, 9) |
 
-- File path: `extension/telemetry/collector.js` (new file).
-- Variable allowlist: `event_id, install_uuid, ts, mcp_client, model, tokens_in, tokens_out, active_agent_count, event_type`. NOTHING ELSE.
-- Code review must grep the collector for `task`, `prompt`, `message`, `content`, `userMessage`, `messages` -- ZERO matches in source.
+## "Looks Done But Isn't" Checklist
 
-**2. Telemetry must NEVER capture URLs.**
+Things that appear complete but are missing critical pieces.
 
-- Code review grep targets in `extension/telemetry/`: `url`, `tab.url`, `window.location`, `document.URL`, `referrer`, `document.referrer`.
-- ZERO matches allowed.
+- [ ] **Denylist expansion:** Often "done" = a few origins added by hand — verify **every** imported finance/health/payments origin (stripe, coinbase, robinhood, fidelity, carta, ynab + categories) is denied-or-sensitive AND that the descriptor generator *refuses to emit* an unclassified sensitive descriptor (import-time gate, not just runtime).
+- [ ] **Descriptor import:** Often "done" = all 119 return from `search_capabilities` — verify the **discoverable-AND-invocable** coverage breakdown (head / learn-on-visit / DOM-only / dead), not just the search count.
+- [ ] **Side-effect classification:** Often "done" = a verb heuristic ran — verify the destructive-op sample (`void_invoice`, `delete_customer`, trade/transfer ops) is classed `destructive`, and GraphQL/RPC POSTs are not classed `read`.
+- [ ] **Auth coverage:** Often "done" = codegen emitted recipes — verify each app's real auth shape is classified {fits-enum / head-only / learn-only / unsupported} and the invocability marker matches (no declarative recipe for Stripe/Linear/Instagram-shaped auth).
+- [ ] **Secret redaction:** Often "done" = the old no-leak test is green — verify it asserts against the **full 119-app auth field-name universe** + token-shape patterns, and that capture reads structure only (no values).
+- [ ] **Search at scale:** Often "done" = recall@5 green — verify the eval fixture is **2,523 docs with cross-app near neighbors** and wrong-invoke = 0 at that scale, plus an SW cold-start benchmark with the full index.
+- [ ] **Self-heal at scale:** Often "done" = Phase 32 machinery exists — verify per-origin re-learn coalescing/back-off and app-level rot surfacing under a *correlated* (whole-app) rot scenario.
+- [ ] **ToS posture:** Often "done" = finance denylisted — verify the ToS-hostility axis is encoded (social/adult/messaging → DOM-only/denylist) and `docs/LEGAL.md` documents it.
+- [ ] **Provenance/attribution:** Often "done" = README acknowledgement — verify per-app MIT attribution/provenance ships with each imported descriptor (PROJECT.md requires it).
 
-**3. Telemetry must NEVER capture clipboard contents.**
+## Recovery Strategies
 
-- The extension HAS `clipboardWrite` permission per `manifest.json:17`.
-- Code review grep in `extension/telemetry/`: `clipboard`, `navigator.clipboard`, `chrome.clipboardWrite`, `execCommand('paste')`.
-- ZERO matches allowed.
+When pitfalls occur despite prevention, how to recover.
 
-**4. Telemetry must NEVER capture form values or DOM payloads.**
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Finance descriptor shipped Auto-writable before denylist (Pitfall 1) | **HIGH** | Hot-add the origin to `deniedOrigins` (renders non-enableable immediately, consulted before mode); audit the append-only log for any invoke against it; ship the import-time gate to prevent recurrence. The audit trail is the only forensic record (it's secret-free, so it shows *that* it ran, not the payload). |
+| Imperative-handler sprawl in the head (Pitfall 2) | MEDIUM | Demote non-head apps back to descriptor-only; restore the head cap + recipe-path-guard drift gate; the Wall-1 CI guard prevents the worst (streamed code) by construction. |
+| Wrong-auth declarative recipes shipped (Pitfall 3) | MEDIUM | Quarantine the bad recipes (Phase 32 mechanism); flip the apps to head-only/discovery-pending; the expected-shape assertion (Phase 32) flags them as broken so they fall back rather than confidently-wrong. |
+| Destructive op mis-classed read (Pitfall 4) | MEDIUM | Regenerate descriptors with the corrected classifier; the recipe-method-derived cross-check (Phase 28) auto-corrects any op that *has* a recipe; descriptor-only ops need the verb-map fix re-run. |
+| Token leak into audit/learned recipe (Pitfall 5) | HIGH | Clear the audit ring + learned-recipe store (export/clear control exists); patch the structural redactor; rotate any exposed credential is the *user's* action (FSB can't). Prevention >> recovery here. |
+| Search wrong-app hit at scale (Pitfall 6) | LOW–MEDIUM | Re-tune `INDEX_OPTIONS` + owned-origin bias; re-run the full-scale eval gate; no data migration needed (index regenerates from descriptors). |
+| Re-learn thundering herd (Pitfall 7) | LOW | Add per-origin coalescing + back-off; the herd is transient — once back-off lands the storm subsides. App-level surfacing turns the silent degradation visible. |
+| Dead descriptors corroding trust (Pitfall 9) | MEDIUM | Add backing-status + honest pending affordance; seed discovery with OpenTabs endpoint hints so the tail self-learns on first visit. |
 
-- The DOM-stream module (`extension/content/dom-stream.js`) sends full DOM trees over WS to the dashboard via ROOM-keyed pairing. This is FINE because the dashboard is the SAME user.
-- The telemetry collector must be in a SEPARATE module that has no access to DOM tree data. Specifically: `collector.js` must not `import` anything from `content/dom-stream.js`, `dom-snapshot.js`, or any selector/DOM module.
-- Code review grep in `extension/telemetry/`: `serializeDOM`, `domSnapshot`, `formData`, `input.value`, `.value`, `getElementsBy`.
-- ZERO matches allowed.
+## Pitfall-to-Phase Mapping
 
-**5. Server must NEVER write plaintext IP to any disk-backed log, table, or file.**
+How roadmap phases should address these pitfalls. (Phases continue from v0.9.99's Phase 34 → start at 35, batched by category; denylist lands first per PROJECT.md. Phase numbers below are the researcher's recommended structure, not yet roadmapped.)
 
-- File path: `showcase/server/src/telemetry/route.js` (new), `showcase/server/server.js`, any `morgan` config.
-- Code review grep: `req.ip`, `req.connection.remoteAddress`, `req.headers['x-forwarded-for']` -- if any of these appear, they MUST be wrapped in the hash function immediately and the raw value not retained beyond function scope.
-- Reject any access-log middleware that touches `/api/telemetry/*` and writes IP to disk.
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| **1. Security-ordering / denylist-first (HEADLINE)** | **Phase 35 — Denylist Expansion + Import-Time Classification Gate (LANDS FIRST)** | CI: descriptor generator fails on any unclassified finance/health/sensitive origin; test asserts every imported finance-category origin ∈ denied-or-sensitive; no descriptor-import phase merges until this is green |
+| 2. MV3 code-as-data / head sprawl | Phase 36 (descriptor-only breadth) + Phase 37 (head cap) | Recipe-path CI guard (Phase 26) green; `HEAD_HANDLER_MODULES` ≤ curated cap; no new long-tail imperative module; no streamed-handler field in recipes |
+| 3. Auth diversity → wrong/empty invoke | Phase 36 (invocability markers, auth-shape report) + Phase 38 (observe-then-replay) | Auth-shape coverage report; no declarative recipe for head-only-auth apps; Phase 31 `promoteAfterReplay` clean-replay gate |
+| 4. Side-effect mis-classification | Phase 36 (verb-map + cross-check extension) | Destructive-op sample test (`void_invoice` etc. = destructive); no `void_/delete_/trade_` op classed read; GraphQL/RPC POST not classed read |
+| 5. Token/secret leakage at scale | Phase 38 (structural redactor + full-field no-leak test) | Capture reads structure only; no-leak test covers all 119 apps' auth field names + token-shape patterns; learned envelope has no high-entropy field |
+| 6. Search perf + SW startup at scale | Phase 36 (full-scale eval + cold-start benchmark) | Eval fixture = 2,523 docs cross-app, wrong-invoke = 0; SW cold-start under budget with full index; deferred hydration off bootstrap path |
+| 7. Recipe rot overwhelms self-heal | Phase 39 — Catalog-Scale Self-Heal Hardening (extends Phase 32) | Per-origin re-learn coalescing/back-off under a whole-app rot scenario; app-level degraded surfacing; recurrence-based systemic-vs-transient split |
+| 8. ToS / legal exposure | Phase 35 (ToS-hostility axis) + Phase 36 (DOM-only routing) | ToS-hostile apps ∈ DOM-only/denied; no API-invocable descriptor for social/adult/messaging; `docs/LEGAL.md` documents the ToS axis |
+| 9. Discoverable-but-uninvocable dead descriptors | Phase 36 (backing-status + honest search) + Phase 38 (discovery seeding) | Discoverable-AND-invocable coverage report; pending invoke returns a "learn-on-visit" affordance, not empty success; discovery seeded with real OpenTabs endpoint hints |
 
-**6. Server must NEVER log the request body of `/api/telemetry/*` to disk.**
+## Sources
 
-- Code review: ensure no `console.log(req.body)`, no `fs.appendFile` in the route handler, no `winston`/`pino` logger that captures body on this route.
-- Allowed: in-memory ring buffer for diagnostics (similar to extension's `fsb_diagnostics_ring`) -- but only event metadata (count, type), NEVER content.
-
-**7. Daily IP salt rotation must use crypto-strong random + persist across process restarts.**
-
-- File path: `showcase/server/src/telemetry/salt.js` (new).
-- Salt must be stored encrypted-at-rest OR in a separate DB table not exposed via any endpoint.
-- Rotation cron: at UTC midnight, generate new salt; KEEP yesterday's salt for ~25 hours to handle clock-drift events with `ts` in the prior day.
-- Salt MUST be at least 32 bytes from `crypto.randomBytes(32)`.
-
-**8. UUID generation must be `crypto.randomUUID()` (uniform random), NOT timestamp-based.**
-
-- File path: `extension/telemetry/install-uuid.js` (new).
-- Code review: `crypto.randomUUID()` only. Reject `Math.random`, `Date.now()`, any hash-of-something pattern.
-- UUID must be stored in `chrome.storage.local`, NOT `chrome.storage.sync` (sync would propagate across user's Chrome accounts and create cross-device linkability).
-
-**9. Opt-out toggle must immediately stop ALL telemetry, including flushing the in-memory queue.**
-
-- File path: `extension/telemetry/collector.js` or `extension/ui/options.js`.
-- When user flips toggle to off: (a) immediately set `telemetryEnabled = false` in storage, (b) clear the queue (`chrome.storage.local.set({ fsb_telemetry_queue_v1: [] })`), (c) cancel the flush alarm (`chrome.alarms.clear('fsb-telemetry-flush')`).
-- DO NOT send a final "user opted out" event. That itself is a tracking event.
-
-**10. The "wipe my data" button (Section 1.3) must work without requiring re-auth and must respond to OPTIONS preflight without revealing whether the UUID exists.**
-
-- File path: `showcase/server/src/telemetry/forget.js` (new).
-- Always return 204 No Content regardless of whether the UUID had any rows.
-- Use `DELETE FROM events WHERE install_uuid = ?` + `DELETE FROM daily_rollup` aggregates indexed by UUID -- but the aggregate rollup may not be UUID-indexed if we use the 7.1 pattern. Decision: rollups are best-effort -- they're aggregate, k-anonymized, and don't contain the UUID. Document that "wipe" deletes raw events but cannot retroactively de-influence aggregates (they reflected the user's data at the time, but the aggregate row itself has no UUID).
-
-### 10.2 -- Additional disaster patterns to gate
-
-**11. Don't add any 3rd-party CDN script to `/stats`.** No Google Fonts (FOIT + IP leak), no Cloudflare Insights, no Plausible-on-cdn, no Sentry browser SDK. Self-host everything.
-
-**12. Don't read `chrome.identity.getProfileUserInfo` -- ever.** This is the user's Chrome account email. If FSB ever calls this (it doesn't today per a quick scan but worth gating), the entire "anonymous" claim collapses.
-
-**13. Don't broadcast the telemetry payload over the existing `fsbWebSocket` relay.** That relay is room-keyed to the dashboard pairing -- if telemetry data accidentally goes through it, it's exposed to whoever shares the user's dashboard hash. Use a SEPARATE HTTPS POST endpoint; never `fsbWebSocket.send('ext:telemetry-event', ...)`.
-
-**14. Don't include the FSB version string in the telemetry payload if it carries pre-release suffixes like `0.9.69-pr-foo`.** Pre-release versions are uniquely identifying for the developer running them. If you need version analytics, send only `MAJOR.MINOR.PATCH` (regex-stripped at client before send).
-
-**15. Don't log MCP-client raw strings without canonicalization.** A custom client name "MyCustomMCPClient_v3_for_user_lakshman" goes straight to /stats public dashboard. Server-side: only accept MCP client values from an allowlist (Claude, ClaudeCode, Codex, Cursor, OpenClaw, Continue, Windsurf, VSCode, Other). Reject and 400 on anything else.
-
----
-
-## Section 11: Phase-Specific Risk Allocation
-
-Suggested mapping of pitfalls to milestone phases (per build-order in PROJECT.md: extension logging -> pricing -> collector -> ingest -> aggregates -> stats page -> streaming fix):
-
-| Phase | Pitfalls to gate |
-|---|---|
-| MCP request logging in extension control panel | 9.1 (control panel i18n decision) -- decide & document |
-| API pricing module | Minor: pricing-source provenance gate (each entry must cite a URL + date); no telemetry implications |
-| Anonymous telemetry collector (extension) | 4.1 (storage-backed queue), 4.2 (alarm flush trigger), 4.3 (event_id UUID), 10.1 item 1-4 (payload allowlist), 10.1 item 8 (UUID source), 10.1 item 9 (opt-out semantics), 1.1 (listing copy update started here) |
-| Telemetry ingestion (showcase server) | 5.1 (rate limit + size cap + schema validation), 5.2 (event_id UNIQUE constraint), 5.3 (disk fill mitigation), 6.1 (pragma setup), 6.2 (prepared statement + transaction), 10.1 item 5-7 (IP hashing + salt), 10.1 item 10 (forget endpoint) |
-| Aggregation queries | 6.4 (index recommendations), 7.1 (rolling counter), 7.2 (caching + jitter), 7.3 (active-users definition), 3.1 (k-anonymity threshold k=5), 3.2 (active-agent bucketing), 3.3 (install-date weekly rounding) |
-| /stats page | 9.2 ( /stats i18n -- AI-fill at ship time), 1.2 (privacy policy URL deployment), 2.2 (privacy policy content), 1.3 (delisting antipatterns -- final listing review), 2.1 (region-gate decision + EU acceptance) |
-| Showcase dashboard streaming fix | 8.1 (failure modes A, B, C diagnosis -- pick the actual one with a runtime smoke), 8.2 (WS bug gates), 8.3 (regression-source phase review) |
-
-**Release prep (not a coding phase but a gate):**
-- 1.1 (CWS Privacy Practices declaration update)
-- 1.2 (Limited Use disclosure on /privacy)
-- 1.3 (full delisting-antipattern checklist)
-- 2.2 (privacy policy URL coverage)
-- 2.3 (CCPA non-sale statement)
-- All of Section 10 (code-review checklist applied to every PR)
+- **`opentabs-dev/opentabs` @ HEAD (live `gh` inspection, 2026-06-23)** — confirmed 119 plugins under `plugins/`; read real auth/op shapes: `plugins/stripe/src/stripe-api.ts` (4-part page-global scrape, destructive `void_invoice`/`delete_customer` ops in `plugins/stripe/src/tools/`), `plugins/linear/src/linear-api.ts` (cross-subdomain GraphQL + `credentials:'include'`), `plugins/instagram/src/instagram-api.ts` (rotating `csrftoken`). Confirmed the finance roster {stripe, coinbase, robinhood, fidelity, carta, ynab} and the ToS-hostile roster {netflix, tinder, instagram, onlyfans, whatsapp, tiktok, facebook, x, linkedin, spotify, discord, telegram}. `DISCLAIMER.md` (operator-responsible ToS posture). [HIGH]
+- **FSB `extension/config/service-denylist.json`** — current denylist = 4 deniedOrigins (chase, bankofamerica, wellsfargo, irs.gov); confirms NONE of the 6 imported finance apps are covered (the Pitfall-1 gap). [HIGH]
+- **FSB `docs/LEGAL.md`** — opt-out Auto posture; "read-Auto implies write-Auto"; denylist consulted first; sensitive-origin friction removed from the invoke gate under Auto (kept only on discovery). [HIGH]
+- **FSB `.planning/STATE.md`** — v0.9.99 "Top Risks" (interpreter-as-code, wrong-context fetch, credential-replay/safe-brand inversion, exfiltration/Limited-Use, recipe rot as designed steady state, search recall, SW-eviction mid-call) + "Architectural Walls" (Wall 1 closed-vocab data + CI guard; Wall 2 MAIN-world fetch) + Phase 26–32 decision log (authStrategy 4-member enum lock D-08; Phase 28 D-02 side-effect cross-check; Phase 29 D-09 separate-origin-forbidden, D-12 executeBoundSpec-only, T-29-08 no-token-logging; Phase 31 structural redaction + `promoteAfterReplay`; Phase 32 rot taxonomy + quarantine + fire-and-forget re-learn). [HIGH]
+- **FSB `.planning/PROJECT.md` (v1.0.0 framing)** — breadth = descriptor import (NOT 2,523 handlers); depth = curated ~15–30 head; denylist lands first; discovery seeding of 119 origins + endpoint hints; per-app MIT provenance; "port + learn, do NOT clone OpenTabs' npm-per-plugin model." [HIGH]
+- **MV3 remotely-hosted-code policy (Chrome Web Store program policy)** — the basis for Wall 1; the ban risk if server-delivered recipes carry control flow. [HIGH — established platform policy, also the documented basis of FSB's existing Wall 1]
 
 ---
-
-## Section 12: Detection / CI Gates Summary
-
-| Gate | What it checks | Where |
-|---|---|---|
-| `scripts/verify-store-listing.mjs` | listing-copy.md data-collection section matches telemetry payload schema | New script; run in `ci / all-green` |
-| `tests/telemetry-payload-schema.test.js` | Collector cannot stringify an event with extra fields; payload field allowlist locked | Root tests |
-| `tests/telemetry-k-anonymity.test.js` | Aggregate queries suppress cells with <5 distinct UUIDs | showcase/server tests |
-| `tests/telemetry-queue-persistence.test.js` | Queue survives simulated SW restart between enqueue and flush | extension tests |
-| `tests/telemetry-event-id-uniqueness.test.js` | Replayed event_id is silently dropped at SQL layer | showcase/server tests |
-| `tests/telemetry-rate-limit.test.js` | Burst of 100 POSTs/sec from one IP yields 429 after threshold | showcase/server tests |
-| `tests/telemetry-no-pii-leak.test.js` | grep collector source for forbidden tokens (url, prompt, task, clipboard, formData, .value) | Static check |
-| `tests/showcase-privacy-page.test.js` | `/privacy` returns 200 + contains literal disclosure strings | showcase/server tests |
-| `tests/showcase-stats-cache.test.js` | Two parallel /stats requests share one underlying aggregate query | showcase/server tests |
-| `tests/ws-dom-stream-handshake.test.js` | `dash:dom-stream-start` -> content-script -> snapshot loop completes < 2s on a fresh tab | integration test |
-
----
-
-## Confidence Calibration
-
-| Claim | Source | Confidence |
-|---|---|---|
-| CWS PII definition includes "any type of identification number" | Quoted verbatim from User Data FAQ (URL above) | HIGH |
-| CWS Limited Use requires affirmative statement on extension website | Quoted verbatim from Limited Use Policy | HIGH |
-| GDPR Article 4(1) includes "online identifier" in personal data definition | Quoted from gdpr-info.eu Art. 4 | HIGH |
-| GDPR Recital 30 confirms UUIDs / cookies / IPs are online identifiers | Quoted from gdpr-info.eu Recital 30 | HIGH |
-| ePrivacy Directive Article 5(3) sets opt-IN default for non-essential storage | Wikipedia summary + cross-referenced common practice | MEDIUM (recommend independent verification before EU rollout) |
-| CCPA classifies UUIDs as personal information | oag.ca.gov definition is "could reasonably be linked"; UUID + behavior qualifies | HIGH (general); MEDIUM (whether opt-out posture is sufficient -- depends on whether FSB qualifies as a "business" under CCPA's revenue/user thresholds) |
-| k=5 is a reasonable threshold for public dashboards | Common practice in published aggregate datasets; not a regulatory requirement | MEDIUM |
-| better-sqlite3 WAL + NORMAL synchronous is corruption-safe | better-sqlite3 docs + SQLite docs <https://www.sqlite.org/wal.html#performance_considerations> | HIGH |
-| chrome.alarms persists across SW eviction; storage.local queue is canonical pattern | Chrome dev docs + community pattern; FSB itself uses this pattern at background.js:12914 | HIGH |
-| Streaming failure modes A/B/C diagnosis | Code-reading only, NOT verified at runtime | MEDIUM (these are PLAUSIBLE failure modes consistent with the symptom "streaming is broken"; the actual bug may be one of these, all of these, or a different bug. The streaming-fix phase MUST start with a runtime smoke to confirm which) |
-| Phase 211 + 164 + 162.3 are the highest-regression-risk recent touches to streaming | MILESTONES.md grep + commit-message reading | MEDIUM |
-
----
-
-## Open Questions / Gaps for Phase-Specific Research
-
-- **Dashboard-side stream auto-restart on navigation:** I read the extension half only. The other half lives in `showcase/angular/src/app/pages/dashboard/**` and `showcase/server/`. Verify in the streaming-fix phase whether the dashboard listens for `ext:dom-ready` and re-issues `dash:dom-stream-start` automatically, or whether it depends on `ext:page-ready` which is only sent on `dash:request-status` from `_sendStateSnapshot`.
-- **Backpressure measurement:** is `ws.bufferedAmount` ever observed > 0 in production? If yes, the relay needs an explicit backpressure-drop policy; if no, defer.
-- **Pricing-table verification:** v0.9.69 hardcodes pricing per MCP client / model. Confirm 2026 Anthropic / OpenAI / xAI / Google prices at the pricing-module phase; document source URLs + retrieval date in the table comment.
-- **Fly.io disk volume size:** confirm current allocation; with 90-day retention and worst-case 10k events/day per UUID across N users, project storage needs.
-- **Whether existing showcase server has an access log that captures `/api/telemetry/*` POST bodies** (`morgan` is common). Find and audit before adding the route.
-
-Sources:
-- [Chrome Web Store User Data Policy & FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq)
-- [Chrome Web Store Limited Use Policy](https://developer.chrome.com/docs/webstore/program-policies/limited-use)
-- [Chrome extension service worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)
-- [GDPR Article 4 (definitions)](https://gdpr-info.eu/art-4-gdpr/)
-- [GDPR Recital 30 (online identifiers)](https://gdpr-info.eu/recitals/no-30/)
-- [CCPA -- California Attorney General overview](https://oag.ca.gov/privacy/ccpa)
-- [ePrivacy Directive (EU Cookie Law)](https://en.wikipedia.org/wiki/EPrivacy_Directive)
-- [better-sqlite3 performance docs](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/performance.md)
-- [SQLite WAL mode performance considerations](https://www.sqlite.org/wal.html#performance_considerations)
-- [SQLite performance tuning -- phiresky](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/)
-- [k-anonymity overview -- Wikipedia](https://en.wikipedia.org/wiki/K-anonymity)
-- [express-rate-limit npm package](https://www.npmjs.com/package/express-rate-limit)
-- [express-rate-limit troubleshooting proxy issues](https://github.com/express-rate-limit/express-rate-limit/wiki/Troubleshooting-Proxy-Issues)
-- [Building MV3 sync engines that survive service workers -- Stack Overflow blog](https://stackoverflow.blog/2026/05/12/building-a-google-drive-sync-engine-that-survives-mv3-service-workers)
+*Pitfalls research for: bulk OpenTabs (~119-app / 2,523-op) import into FSB under the opt-out Auto consent default*
+*Researched: 2026-06-23*

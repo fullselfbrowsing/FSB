@@ -9,6 +9,9 @@ import { mapFSBError } from '../errors.js';
 const MCP_VISUAL_CLIENT_LABELS: string[] = [
   'Claude', 'Codex', 'ChatGPT', 'Perplexity', 'Windsurf',
   'Cursor', 'Antigravity', 'OpenCode', 'OpenClaw', 'OpenClaw 🦀', 'Grok', 'Gemini', 'Hermes',
+  // Quick task 260608-6nm -- Tier-1 MCP clients (modelcontextprotocol.io clients + awesome-mcp-clients + Nimbalyst 2026)
+  'Cline', 'Continue', 'Zed', 'VS Code', 'Copilot',
+  'JetBrains', 'Xcode', 'Eclipse', 'Cody', 'Roo Code', 'Kiro', 'Goose',
 ];
 
 const CLIENT_LABEL_MAP: Record<string, string> = Object.create(null);

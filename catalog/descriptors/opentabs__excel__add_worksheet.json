@@ -1,0 +1,35 @@
+{
+  "slug": "excel.add_worksheet",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "add a worksheet in excel",
+    "add worksheet in excel",
+    "add a worksheet in excel online",
+    "add a new worksheet in excel"
+  ],
+  "description": "Add a new worksheet to the currently open Excel workbook. Optionally specify a name for the new worksheet.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Name for the new worksheet. Auto-generated if omitted.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/add-worksheet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

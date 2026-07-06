@@ -1,0 +1,38 @@
+{
+  "slug": "gdrive.trash_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "trash a file in gdrive",
+    "trash file in gdrive",
+    "trash a file in google drive",
+    "move a file to the trash in gdrive"
+  ],
+  "description": "Move a file or folder to the trash. Trashed files can be restored with restore_file or permanently deleted with empty_trash. Files in the trash are automatically deleted after 30 days.",
+  "actionVerb": "trash",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID to trash"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/trash-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "trash"
+    }
+  }
+}

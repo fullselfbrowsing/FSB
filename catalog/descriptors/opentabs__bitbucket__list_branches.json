@@ -1,0 +1,60 @@
+{
+  "slug": "bitbucket.list_branches",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "list branches in bitbucket",
+    "show me my branches in bitbucket",
+    "view my branches in bitbucket",
+    "see all my branches in bitbucket",
+    "list repository branches in bitbucket"
+  ],
+  "description": "List branches in a Bitbucket repository. Supports pagination and filtering.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "pagelen": {
+        "description": "Number of results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "query": {
+        "description": "Filter branches by name (Bitbucket query language)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/list-branches.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

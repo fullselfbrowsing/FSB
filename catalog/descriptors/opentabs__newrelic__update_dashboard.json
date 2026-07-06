@@ -1,0 +1,146 @@
+{
+  "slug": "newrelic.update_dashboard",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "update a dashboard in newrelic",
+    "edit a dashboard in newrelic",
+    "change the details of dashboard in newrelic",
+    "modify a dashboard in newrelic",
+    "update dashboard in newrelic",
+    "update an existing dashboard in newrelic"
+  ],
+  "description": "Update an existing dashboard. Replaces the entire dashboard definition — provide all pages and widgets, not just changes.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dashboard entity GUID"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New dashboard name"
+      },
+      "permissions": {
+        "description": "Permission level",
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "PUBLIC_READ_ONLY",
+          "PUBLIC_READ_WRITE"
+        ]
+      },
+      "pages": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Page name"
+            },
+            "widgets": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Widget title"
+                  },
+                  "nrql_query": {
+                    "description": "NRQL query for data-driven widgets (e.g., \"SELECT count(*) FROM Transaction SINCE 1 hour ago\")",
+                    "type": "string"
+                  },
+                  "markdown": {
+                    "description": "Markdown text for markdown widgets",
+                    "type": "string"
+                  },
+                  "visualization": {
+                    "description": "Visualization type (default viz.line for NRQL, viz.markdown for markdown)",
+                    "type": "string",
+                    "enum": [
+                      "viz.billboard",
+                      "viz.line",
+                      "viz.table",
+                      "viz.bar",
+                      "viz.pie",
+                      "viz.area",
+                      "viz.markdown"
+                    ]
+                  },
+                  "row": {
+                    "description": "Row position (default 1)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "column": {
+                    "description": "Column position (default 1)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "width": {
+                    "description": "Width in columns 1-12 (default 4)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "height": {
+                    "description": "Height in rows (default 3)",
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Widgets for this page"
+            }
+          },
+          "required": [
+            "name",
+            "widgets"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Dashboard pages (replaces all existing pages)"
+      },
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID for NRQL query context"
+      }
+    },
+    "required": [
+      "guid",
+      "name",
+      "pages",
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/update-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

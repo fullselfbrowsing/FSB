@@ -1,0 +1,49 @@
+{
+  "slug": "facebook.get_user_posts",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "get user posts in facebook",
+    "look up user posts in facebook",
+    "fetch a single user posts in facebook",
+    "view one specific user posts in facebook",
+    "get a user's timeline posts in facebook"
+  ],
+  "description": "Get posts from a Facebook user's timeline by their user ID. Returns post text, author, timestamp, attachments, and feedback IDs for reactions. Use the cursor parameter to paginate.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "Facebook user ID (numeric string)"
+      },
+      "count": {
+        "description": "Number of posts to return (default 5, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/get-user-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "starbucks.toggle_favorite_store",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "toggle a favorite store in starbucks",
+    "toggle favorite store in starbucks",
+    "add or remove a store from favorites in starbucks"
+  ],
+  "description": "Add or remove a Starbucks store from your favorites list. Use find_stores to discover store IDs.",
+  "actionVerb": "toggle",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_number": {
+        "type": "string",
+        "description": "Store number (the internal store ID, e.g., \"1028036\"). Available from find_stores results as store_id."
+      },
+      "favorite": {
+        "type": "boolean",
+        "description": "true to add to favorites, false to remove"
+      }
+    },
+    "required": [
+      "store_number",
+      "favorite"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/toggle-favorite-store.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "toggle"
+    }
+  }
+}

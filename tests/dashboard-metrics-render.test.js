@@ -48,10 +48,13 @@ assert(
   '[A2] showcase/dashboard.html still loads showcase/js/dashboard.js -- dual-write required'
 );
 
-console.log('\n--- Phase 223 MET-06: Angular component renders 4 metric groups ---');
+console.log('\n--- Phase 223 MET-06: Angular component renders 5 metric groups ---');
 
-['id="stat-runs-today"', 'id="stat-success-rate"', 'id="stat-total-cost"', 'id="stat-enabled"'].forEach(function (id) {
+['id="stat-runs-today"', 'id="stat-success-rate"', 'id="stat-total-cost"', 'id="stat-enabled"', 'id="stat-cost-saved"'].forEach(function (id) {
   assert(HTML.includes(id), '[MET-06] dashboard HTML retains stat card ' + id + ' (population target)');
+});
+['Total Tokens', 'Requests', 'Success Rate', 'Total Cost', 'Remote'].forEach(function (label) {
+  assert(HTML.includes(label) && SHELL.includes(label), '[MET-06] dashboard stat labels mirror control-panel metrics: ' + label);
 });
 
 assert(
@@ -73,6 +76,12 @@ const renderBody = renderFnMatch ? renderFnMatch[0] : '';
 assert(
   !/\.innerHTML\s*=/.test(renderBody),
   '[MET-06 / SEC] renderMetrics does NOT use .innerHTML (XSS guard on metrics payload)'
+);
+assert(
+  renderBody.includes('payload.usage || {}') &&
+  renderBody.includes('usage.totalTokens') &&
+  renderBody.includes('usage.totalRequests'),
+  '[MET-06] renderMetrics consumes stable ext:metrics usage payload'
 );
 
 console.log('\n--- Phase 223 MET-07: Disconnect clears metrics within one render cycle ---');
@@ -96,7 +105,7 @@ assert(
   '[MET-06 / A2] showcase/js/dashboard.js defines renderMetrics + clearMetrics (vanilla parity)'
 );
 
-const vOncloseMatch = VANILLA.match(/ws\.onclose\s*=\s*function\s*\([^)]*\)\s*\{[\s\S]*?\n  \};/);
+const vOncloseMatch = VANILLA.match(/ws\.onclose\s*=\s*function\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\};/);
 assert(!!vOncloseMatch, '[MET-07 / A2] vanilla ws.onclose locatable');
 assert(
   vOncloseMatch && /clearMetrics\s*\(/.test(vOncloseMatch[0]),

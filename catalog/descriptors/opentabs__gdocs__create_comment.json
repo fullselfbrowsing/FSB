@@ -1,0 +1,49 @@
+{
+  "slug": "gdocs.create_comment",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "create a comment in gdocs",
+    "add a comment in gdocs",
+    "make a new comment in gdocs",
+    "open a new comment in gdocs",
+    "create comment in gdocs",
+    "create a comment in google docs"
+  ],
+  "description": "Add a new comment to a Google Doc. Optionally anchor the comment to specific quoted text in the document. If quoted_text is provided, the comment appears as a margin note next to that text.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment text content"
+      },
+      "quoted_text": {
+        "description": "Document text to anchor the comment to. The comment appears next to this text in the margin.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "slug": "reddit.get_post",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "get a post in reddit",
+    "look up a post in reddit",
+    "fetch a single post in reddit",
+    "view one specific post in reddit",
+    "get post in reddit",
+    "get a post and its comments in reddit"
+  ],
+  "description": "Get a Reddit post and its comments by subreddit and post ID. Returns the post details and a flattened comment tree.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without r/ prefix"
+      },
+      "post_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Post ID without t3_ prefix (e.g., \"1ki00n1\")"
+      },
+      "comment_limit": {
+        "description": "Max number of top-level comments (default 50)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 500
+      },
+      "comment_depth": {
+        "description": "Max comment nesting depth (default 3)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "sort": {
+        "description": "Comment sort order (default \"confidence\")",
+        "type": "string",
+        "enum": [
+          "confidence",
+          "top",
+          "new",
+          "controversial",
+          "old",
+          "qa"
+        ]
+      }
+    },
+    "required": [
+      "subreddit",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

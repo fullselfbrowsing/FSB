@@ -1,0 +1,40 @@
+{
+  "slug": "gmaps.get_place_url",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "get a place url in gmaps",
+    "look up a place url in gmaps",
+    "fetch a single place url in gmaps",
+    "view one specific place url in gmaps",
+    "get place url in gmaps",
+    "generate a shareable place link in gmaps"
+  ],
+  "description": "Generate a Google Maps URL for a specific place that can be shared. Does not navigate — just returns the URL. Useful for embedding in messages, documents, or other contexts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Place name or address (e.g., \"Eiffel Tower\", \"123 Main St, Springfield, IL\")"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/get-place-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

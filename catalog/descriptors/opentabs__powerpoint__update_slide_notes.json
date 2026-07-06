@@ -1,0 +1,51 @@
+{
+  "slug": "powerpoint.update_slide_notes",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "update slide notes in powerpoint",
+    "edit slide notes in powerpoint",
+    "change the details of slide notes in powerpoint",
+    "modify slide notes in powerpoint",
+    "modify speaker notes on a slide in powerpoint"
+  ],
+  "description": "Update the speaker notes for a specific slide. Downloads the PPTX, modifies the notes XML, and re-uploads. The slide must already have a notes file.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the PowerPoint file"
+      },
+      "slide_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Slide number (1-indexed)"
+      },
+      "notes": {
+        "type": "string",
+        "description": "New speaker notes text"
+      }
+    },
+    "required": [
+      "item_id",
+      "slide_number",
+      "notes"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/update-slide-notes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

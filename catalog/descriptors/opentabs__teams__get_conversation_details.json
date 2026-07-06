@@ -1,0 +1,40 @@
+{
+  "slug": "teams.get_conversation_details",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "get conversation details in teams",
+    "look up conversation details in teams",
+    "fetch a single conversation details in teams",
+    "view one specific conversation details in teams",
+    "get chat details and members in teams"
+  ],
+  "description": "Get detailed information about a chat conversation including its members, topic, creator, and creation time.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/get-conversation-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

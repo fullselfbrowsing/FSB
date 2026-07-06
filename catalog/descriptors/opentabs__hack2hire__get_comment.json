@@ -1,0 +1,40 @@
+{
+  "slug": "hack2hire.get_comment",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get a comment in hack2hire",
+    "look up a comment in hack2hire",
+    "fetch a single comment in hack2hire",
+    "view one specific comment in hack2hire",
+    "get comment in hack2hire",
+    "get the full content of a comment in hack2hire"
+  ],
+  "description": "Get the full content of a single comment by ID, including its source code body (for code-snippet comments) or markdown text body (for prose comments). The list endpoints (`list_question_comments`, `list_comment_replies`) only return metadata — call this to read the actual content.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "commentId": {
+        "type": "string",
+        "description": "Comment ID — get this from list_question_comments or list_comment_replies."
+      }
+    },
+    "required": [
+      "commentId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

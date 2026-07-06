@@ -1,0 +1,32 @@
+{
+  "slug": "robinhood.get_current_user",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get a current user in robinhood",
+    "look up a current user in robinhood",
+    "fetch a single current user in robinhood",
+    "view one specific current user in robinhood",
+    "get current user in robinhood",
+    "get current robinhood user profile in robinhood"
+  ],
+  "description": "Get the authenticated Robinhood user profile including username, email, name, and account creation date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

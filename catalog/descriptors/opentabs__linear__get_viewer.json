@@ -1,0 +1,32 @@
+{
+  "slug": "linear.get_viewer",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a viewer in linear",
+    "look up a viewer in linear",
+    "fetch a single viewer in linear",
+    "view one specific viewer in linear",
+    "get viewer in linear",
+    "get the current user's profile in linear"
+  ],
+  "description": "Get the authenticated user's profile information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-viewer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

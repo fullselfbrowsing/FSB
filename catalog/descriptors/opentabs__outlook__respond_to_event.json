@@ -1,0 +1,55 @@
+{
+  "slug": "outlook.respond_to_event",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "respond a to event in outlook",
+    "respond to event in outlook",
+    "accept, decline, or tentatively accept in outlook"
+  ],
+  "description": "Respond to a meeting invitation by accepting, declining, or tentatively accepting. Optionally include a comment and choose whether to send a response back to the organizer.",
+  "actionVerb": "respond",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID of the meeting invitation"
+      },
+      "response": {
+        "type": "string",
+        "enum": [
+          "accept",
+          "decline",
+          "tentative"
+        ],
+        "description": "Your response to the invitation"
+      },
+      "comment": {
+        "description": "Optional comment to include with the response",
+        "type": "string"
+      },
+      "send_response": {
+        "description": "Whether to send the response to the organizer (default: true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "event_id",
+      "response"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/respond-to-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "respond"
+    }
+  }
+}

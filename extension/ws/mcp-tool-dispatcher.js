@@ -69,9 +69,14 @@ const MCP_PHASE199_TOOL_ROUTES = {
   start_visual_session: { routeFamily: 'visual-session', messageType: 'mcp:start-visual-session', handler: handleToolAliasRoute },
   end_visual_session: { routeFamily: 'visual-session', messageType: 'mcp:end-visual-session', handler: handleToolAliasRoute },
   execute_js: { routeFamily: 'browser', handler: handleExecuteJsRoute },
+  upload_file: { routeFamily: 'browser', handler: handleUploadFileRoute },
   run_task: { routeFamily: 'autopilot', messageType: 'mcp:start-automation', handler: handleToolAliasRoute },
   stop_task: { routeFamily: 'autopilot', messageType: 'mcp:stop-automation', handler: handleToolAliasRoute },
   get_task_status: { routeFamily: 'autopilot', messageType: 'mcp:get-status', handler: handleToolAliasRoute },
+  trigger: { routeFamily: 'trigger', messageType: 'mcp:trigger', handler: handleToolAliasRoute },
+  stop_trigger: { routeFamily: 'trigger', messageType: 'mcp:stop-trigger', handler: handleToolAliasRoute },
+  get_trigger_status: { routeFamily: 'trigger', messageType: 'mcp:get-trigger-status', handler: handleToolAliasRoute },
+  list_triggers: { routeFamily: 'trigger', messageType: 'mcp:list-triggers', handler: handleToolAliasRoute },
   get_site_guide: { routeFamily: 'read-only', messageType: 'mcp:get-site-guides', handler: handleToolAliasRoute },
   get_page_snapshot: { routeFamily: 'read-only', messageType: 'mcp:get-page-snapshot', handler: handleToolAliasRoute },
   list_sessions: { routeFamily: 'observability', messageType: 'mcp:list-sessions', handler: handleToolAliasRoute },
@@ -99,11 +104,33 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'mcp:start-automation': { routeFamily: 'autopilot', handler: handleStartAutomationRoute },
   'mcp:stop-automation': { routeFamily: 'autopilot', handler: handleStopAutomationRoute },
   'mcp:get-status': { routeFamily: 'autopilot', handler: handleGetStatusRoute },
+  'mcp:trigger': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:stop-trigger': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:get-trigger-status': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
+  'mcp:list-triggers': { routeFamily: 'trigger', handler: handleTriggerToolMessageRoute },
   'mcp:list-sessions': { routeFamily: 'observability', handler: handleListSessionsMessageRoute },
   'mcp:get-session': { routeFamily: 'observability', handler: handleGetSessionMessageRoute },
   'mcp:get-logs': { routeFamily: 'observability', handler: handleGetLogsMessageRoute },
   'mcp:search-memory': { routeFamily: 'observability', handler: handleSearchMemoryMessageRoute },
   'mcp:get-memory': { routeFamily: 'observability', handler: handleGetMemoryMessageRoute },
+  // Phase 28/29 (SURF-01/SURF-02 + CAT D-03): lean two-tool capability surface. capabilities-search
+  // is read-only (the owned-tab origin is resolved authoritatively SW-side, un-spoofable; D-11) and
+  // returns <=5 ranked schema-on-hit hits. capabilities-invoke now calls the shared
+  // FsbCapabilityRouter.invoke(...) -- the one engine both front doors hit (INV-02); the old
+  // routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the router's
+  // T1b tier. The reroute is INTERNAL-ONLY: these wire names and handler bindings are byte-unchanged,
+  // so the frozen INV-01 registry hash never moves. Typed RECIPE_* reasons surface verbatim via the
+  // existing errors.ts /^RECIPE_.+$/ passthrough (no errors.ts edit).
+  'mcp:capabilities-search': { routeFamily: 'capabilities', handler: handleCapabilitiesSearchMessageRoute },
+  'mcp:capabilities-invoke': { routeFamily: 'capabilities', handler: handleCapabilitiesInvokeMessageRoute },
+  // Phase 31 (DISC-01, D-01): the user-initiated, time-boxed discovery trigger. An
+  // INTERNAL-ONLY message route with SW-side tabId resolution; the consent-gated
+  // origin is read from the ACTUAL target tab (ME-02), not from payload.origin -- a
+  // supplied payload.origin must match the tab origin or the route rejects. It is a
+  // control surface, NOT an MCP tool schema -- it does NOT enter
+  // TOOL_REGISTRY / getPublicTools, so the frozen INV-01 tool-definitions parity hash
+  // is UNMOVED (gated by tool-definitions-parity + capability-mcp-surface).
+  'mcp:capabilities-discover': { routeFamily: 'capabilities', handler: handleCapabilitiesDiscoverMessageRoute },
   // Phase 242: single-step ownership-gated history back. handleBackRoute
   // performs history.length precheck, chrome.tabs.goBack, settle race,
   // 5-status classification, and bindTab parity (D-08). Background-tab
@@ -115,6 +142,13 @@ const MCP_PHASE199_MESSAGE_ROUTES = {
   'agent:register': { routeFamily: 'agent', handler: handleAgentRegisterRoute },
   'agent:release':  { routeFamily: 'agent', handler: handleAgentReleaseRoute },
   'agent:status':   { routeFamily: 'agent', handler: handleAgentStatusRoute }
+};
+
+const MCP_TRIGGER_MESSAGE_TO_TOOL_NAME = {
+  'mcp:trigger': 'trigger',
+  'mcp:stop-trigger': 'stop_trigger',
+  'mcp:get-trigger-status': 'get_trigger_status',
+  'mcp:list-triggers': 'list_triggers'
 };
 
 function createMcpRouteError(tool, routeFamily, recoveryHint = MCP_ROUTE_RECOVERY_HINT, extra = {}) {
@@ -551,7 +585,7 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
     return createMcpRouteError(type, 'message', MCP_ROUTE_RECOVERY_HINT);
   }
 
-  const restrictedReadResponse = await buildRestrictedResponseIfReadRoute({ type, client });
+  const restrictedReadResponse = await buildRestrictedResponseIfReadRoute({ type, client, payload });
   if (restrictedReadResponse) return restrictedReadResponse;
 
   // Phase 271 / v0.9.69 -- MCP analytics chokepoint (message surface). Same
@@ -642,8 +676,16 @@ function buildRestrictedMcpResponse({ currentUrl, pageType, tool, error }) {
   };
 }
 
-async function buildRestrictedResponseIfReadRoute({ type, client }) {
+async function buildRestrictedResponseIfReadRoute({ type, client, payload }) {
   if (type !== 'mcp:read-page' && type !== 'mcp:get-dom') return null;
+  const tool = type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot';
+
+  if (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function') {
+    return buildRestrictedResponseForResolvedTab({ tool, client, payload });
+  }
+
+  // No resolver wired up (e.g. isolated test harnesses) -- unchanged pre-fix
+  // behavior: check the OS-active tab.
   const activeTab = await getActiveTabFromClient(client).catch(() => null);
   const currentUrl = activeTab?.url || '';
   if (!isRestrictedMcpUrl(currentUrl)) return null;
@@ -651,7 +693,45 @@ async function buildRestrictedResponseIfReadRoute({ type, client }) {
   return buildRestrictedMcpResponse({
     currentUrl,
     pageType: getPageTypeDescriptionForMcp(currentUrl),
-    tool: type === 'mcp:read-page' ? 'read_page' : 'get_dom_snapshot',
+    tool,
+    error: 'Active tab is restricted'
+  });
+}
+
+// Checks restriction on the CALLER'S ACTUAL TARGET tab (via the same
+// resolveAgentTabOrError the real _handleGetDOM/_handleReadPage handlers use)
+// instead of Chrome's OS-focused tab. Any resolution failure defers to the
+// real handler (returns null) rather than guessing -- the real handler makes
+// the identical resolveAgentTabOrError call and already returns its error
+// shape verbatim, so duplicating that logic here would risk disagreeing with it.
+async function buildRestrictedResponseForResolvedTab({ tool, client, payload }) {
+  const agentId = (payload && payload.agentId) || null;
+  const params = (payload && payload.params) || payload || {}; // matches _handleGetDOM/_handleReadPage
+
+  let resolved;
+  try {
+    resolved = await globalThis.resolveAgentTabOrError(agentId, params, client);
+  } catch (_e) {
+    return null;
+  }
+  if (!resolved || resolved.success === false || !Number.isFinite(resolved.tabId)) {
+    return null;
+  }
+
+  let tab;
+  try {
+    tab = await getChromeTabsApi().get(resolved.tabId);
+  } catch (_e) {
+    return null;
+  }
+
+  const currentUrl = (tab && tab.url) || '';
+  if (!isRestrictedMcpUrl(currentUrl)) return null;
+
+  return buildRestrictedMcpResponse({
+    currentUrl,
+    pageType: getPageTypeDescriptionForMcp(currentUrl),
+    tool,
     error: 'Active tab is restricted'
   });
 }
@@ -1362,6 +1442,43 @@ async function handleOpenTabRoute({ params }) {
   }
 }
 
+// Phase 34: MCP front door for upload_file. Tab ownership is already enforced
+// by resolveAgentTabOrError + checkOwnershipGate before this runs; the shared
+// background helper (executeUploadFile) owns the denylist + audit chokepoint.
+async function handleUploadFileRoute({ params, tab }) {
+  const p = params || {};
+  const targetTabId = Number.isFinite(p.tabId)
+    ? p.tabId
+    : (tab && Number.isFinite(tab.id) ? tab.id : null);
+  if (!Number.isFinite(targetTabId)) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires a resolved tab');
+  }
+  if (typeof p.selector !== 'string' || !p.selector.trim()) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires a selector');
+  }
+  if (typeof p.file_path !== 'string' || !p.file_path.trim()) {
+    return createMcpInvalidParamsError('upload_file', 'upload_file requires file_path');
+  }
+  const uploadFn = (typeof globalThis !== 'undefined' && typeof globalThis.executeUploadFile === 'function')
+    ? globalThis.executeUploadFile
+    : null;
+  if (!uploadFn) {
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: 'upload handler unavailable' });
+  }
+  try {
+    const result = await uploadFn(targetTabId, p.selector, p.file_path);
+    if (result && result.success) {
+      return { success: true, tool: 'upload_file', method: result.method, selector: result.selector, file: result.file };
+    }
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, {
+      error: (result && result.error) || 'upload_file failed',
+      reason: result && result.reason
+    });
+  } catch (error) {
+    return createMcpRouteError('upload_file', 'browser', MCP_ROUTE_RECOVERY_HINT, { error: error.message || String(error) });
+  }
+}
+
 async function handleSwitchTabRoute({ params }) {
   const { agentId } = params || {};
   if (!Number.isFinite(params?.tabId)) {
@@ -1651,6 +1768,44 @@ async function handleToolAliasRoute({ params, client, route, _mcpMetricsSuppress
     client,
     _mcpMetricsSuppressInner
   });
+}
+
+async function handleTriggerToolMessageRoute({ type, payload = {}, route }) {
+  const toolName = MCP_TRIGGER_MESSAGE_TO_TOOL_NAME[type] || null;
+  if (!toolName) {
+    return createMcpRouteError(type, 'trigger', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'mcp_trigger_route_unknown',
+      error: `Unknown trigger route message type ${type}`
+    });
+  }
+
+  const dispatch = (typeof globalThis !== 'undefined') ? globalThis.fsbTriggerDispatchToolRequest : null;
+  if (typeof dispatch !== 'function') {
+    return createMcpRouteError(toolName, (route && route.routeFamily) || 'trigger', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'trigger_dispatch_unavailable',
+      error: 'fsbTriggerDispatchToolRequest unavailable'
+    });
+  }
+
+  const requestPayload = payload || {};
+  const normalizedPayload = {
+    ...requestPayload,
+    tabId: requestPayload.tabId ?? requestPayload.tab_id ?? requestPayload.target_tab_id
+  };
+  const gateResult = checkOwnershipGate({
+    tool: toolName,
+    params: normalizedPayload,
+    payload: normalizedPayload
+  });
+  if (gateResult) return gateResult;
+
+  const context = {
+    agentId: normalizedPayload.agentId,
+    ownershipToken: normalizedPayload.ownershipToken,
+    tabId: normalizedPayload.tabId,
+    source: 'mcp'
+  };
+  return dispatch(toolName, normalizedPayload, context);
 }
 
 async function handleStartVisualSessionRoute({ payload, client }) {
@@ -1969,7 +2124,7 @@ async function handleGetStatusRoute({ payload } = {}) {
     currentTask: firstSession?.task || null,
     currentStartTime: firstSession?.startTime || null,
     currentIterationCount: firstSession?.iterationCount || 0,
-    currentMaxIterations: firstSession?.maxIterations || 20,
+    currentMaxIterations: firstSession?.maxIterations || 100,
     currentActionCount: firstSession?.actionHistory?.length || 0
   };
 }
@@ -2204,6 +2359,279 @@ async function handleSearchMemoryMessageRoute({ payload }) {
     success: true,
     results: (Array.isArray(results) ? results : []).slice(0, options.topN).map(sanitizeMemoryEntry)
   };
+}
+
+// Phase 28 SURF-01: read-only capability search. Non-legacy MCP agents resolve
+// the owned tab before origin biasing (D-11); payload.origin is only an expected
+// origin hint on that path. Legacy/missing-agent callers keep active-tab/origin-
+// override compatibility. Returns { success:true, results } capped at <=5 hits.
+async function handleCapabilitiesSearchMessageRoute({ payload, client }) {
+  if (typeof FsbCapabilitySearch === 'undefined' || typeof FsbCapabilitySearch.search !== 'function') {
+    return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability search unavailable' });
+  }
+  payload = payload || {};
+  const { agentId } = payload;
+  const isLegacyOrMissingAgent = (typeof agentId !== 'string' || !agentId || agentId.startsWith('legacy:'));
+
+  let ownedOrigin = null;
+  if (isLegacyOrMissingAgent) {
+    ownedOrigin = payload.origin || null;
+    if (!ownedOrigin) {
+      const requestedTabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+      try {
+        const tab = requestedTabId !== null ? await chrome.tabs.get(requestedTabId) : await getActiveTabFromClient(client);
+        ownedOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
+      } catch (e) {
+        ownedOrigin = null;
+      }
+    }
+  } else {
+    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: resolved.code,
+        error: 'Tab resolution failed: ' + resolved.code,
+        agentId: resolved.agentId,
+        ...(resolved.tabIds ? { tabIds: resolved.tabIds } : {})
+      });
+    }
+    let tab = null;
+    try {
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_e) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_unavailable',
+        error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded'
+      });
+    }
+    try {
+      ownedOrigin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    } catch (_e) {
+      ownedOrigin = null;
+    }
+    if (payload.origin && ownedOrigin && payload.origin !== ownedOrigin) {
+      return createMcpRouteError('search_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'RECIPE_CONSENT_REQUIRED',
+        error: 'RECIPE_CONSENT_REQUIRED',
+        reason: 'supplied origin does not match the target tab origin'
+      });
+    }
+  }
+  const topN = boundedPositiveInt(payload.topN, 5, 5);
+  const results = FsbCapabilitySearch.search(payload.query || '', ownedOrigin, topN);
+  return { success: true, results };
+}
+
+// Phase 29 SURF/CAT D-03 (the internal-only reroute): invoke now calls the shared
+// FsbCapabilityRouter.invoke(...) -- the ONE engine both front doors hit (INV-02). The old
+// routerless body (getRecipeBySlug -> interpretRecipe -> executeBoundSpec) moved INTO the
+// router's T1b tier (Plan 02); this handler is now a single router call. The wire names and
+// the route table are byte-unchanged, so the frozen INV-01 registry hash never moves and the
+// two capability tools stay OUTSIDE TOOL_REGISTRY. The target tab is resolved
+// SW-side: non-legacy MCP agents must pass through the ownership-aware agent
+// resolver, while legacy/missing-agent callers preserve the active/explicit-tab
+// path. The origin is then derived from the ACTUAL resolved tab; payload.origin is
+// only accepted as a matching hint. The router routes but never re-targets -- the
+// two-point origin-pin still holds downstream in executeBoundSpec. Typed RECIPE_*
+// fall-through reasons (RECIPE_NOT_FOUND / RECIPE_LEARN_PENDING /
+// RECIPE_DOM_FALLBACK_PENDING) surface verbatim via the existing errors.ts
+// /^RECIPE_.+$/ passthrough (no errors.ts edit). The reroute is internal-only --
+// there is no second invoke path (INV-02).
+async function handleCapabilitiesInvokeMessageRoute({ payload, client }) {
+  if (typeof FsbCapabilityRouter === 'undefined' || typeof FsbCapabilityRouter.invoke !== 'function') {
+    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability router unavailable' });
+  }
+  payload = payload || {};
+  const { agentId } = payload;
+  const isLegacyOrMissingAgent = (typeof agentId !== 'string' || !agentId || agentId.startsWith('legacy:'));
+
+  let tab = null;
+  if (isLegacyOrMissingAgent) {
+    const requestedTabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+    try {
+      tab = requestedTabId !== null ? await chrome.tabs.get(requestedTabId) : await getActiveTabFromClient(client);
+    } catch (_e) {
+      tab = null;
+    }
+  } else {
+    const resolved = await (typeof globalThis !== 'undefined' && typeof globalThis.resolveAgentTabOrError === 'function'
+      ? globalThis.resolveAgentTabOrError(agentId, payload || {}, client)
+      : { success: false, code: 'AGENT_REGISTRY_UNAVAILABLE', agentId });
+    if (resolved.success === false) {
+      return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: resolved.code,
+        error: 'Tab resolution failed: ' + resolved.code,
+        agentId: resolved.agentId,
+        ...(resolved.tabIds ? { tabIds: resolved.tabIds } : {})
+      });
+    }
+    try {
+      tab = await chrome.tabs.get(resolved.tabId);
+    } catch (_e) {
+      return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+        errorCode: 'tab_unavailable',
+        error: 'Resolved tabId ' + resolved.tabId + ' could not be loaded'
+      });
+    }
+  }
+
+  const tabId = Number.isFinite(tab?.id) ? tab.id : null;
+  let origin = null;
+  try {
+    origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+  } catch (_e) {
+    origin = null;
+  }
+  if (payload.origin && origin && payload.origin !== origin) {
+    return createMcpRouteError('invoke_capability', 'capabilities', MCP_ROUTE_RECOVERY_HINT, {
+      errorCode: 'RECIPE_CONSENT_REQUIRED',
+      error: 'RECIPE_CONSENT_REQUIRED',
+      reason: 'supplied origin does not match the target tab origin'
+    });
+  }
+  // Capability-call overlay treatment: emit a distinct "calling" status
+  // before dispatch and a "guarded" status on a typed pending/blocked
+  // result, so the on-page overlay shows something other than the generic
+  // DOM-action phases for a first-party API call. capability-router.js
+  // itself stays untouched (pure module, no chrome.* access by charter) --
+  // this is presentation-layer instrumentation at the front door only.
+  // A cheap, side-effect-free resolve() preview (the same pure lookup
+  // invoke() performs internally) gives us descriptor/tier for the chip,
+  // without duplicating router dispatch logic.
+  if (tabId !== null) {
+    try {
+      var previewEntry = (typeof FsbCapabilityCatalog !== 'undefined' && FsbCapabilityCatalog
+        && typeof FsbCapabilityCatalog.resolve === 'function')
+        ? FsbCapabilityCatalog.resolve(payload.slug, origin)
+        : null;
+      var previewService = (previewEntry && previewEntry.descriptor && previewEntry.descriptor.service) || origin || '';
+      var previewReady = !!(previewEntry && (previewEntry.tier === 'T1a' || previewEntry.tier === 'T1b' || previewEntry.tier === 'T0'));
+      var previewStoppable = Array.from(getActiveSessionsMap().values()).some(function(s) { return s && s.tabId === tabId && s.status === 'running'; });
+      sendSessionStatus(tabId, {
+        phase: 'calling',
+        guarded: false,
+        capability: {
+          chipText: previewService + ' · ' + String(payload.slug || ''),
+          guarded: false,
+          readinessLabel: previewReady ? 'T1 ready' : 'Guarded',
+          readinessClass: previewReady ? 'ready' : 'guarded',
+          noteText: null
+        },
+        stoppable: previewStoppable
+      });
+    } catch (_previewErr) {
+      // Non-blocking: overlay preview is best-effort, never gates the real invoke.
+    }
+  }
+
+  var invokeResult = await FsbCapabilityRouter.invoke(payload.slug, payload.params || {}, {
+    origin,
+    tabId,
+    url: (tab && typeof tab.url === 'string') ? tab.url : ''
+  });
+
+  if (tabId !== null && invokeResult && invokeResult.success === false && invokeResult.code) {
+    try {
+      var guardedNoteText = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.mapCapabilityErrorToNote)
+        ? FSBOverlayStateUtils.mapCapabilityErrorToNote(invokeResult.code)
+        : null;
+      if (guardedNoteText) {
+        sendSessionStatus(tabId, {
+          phase: 'calling',
+          guarded: true,
+          capability: {
+            chipText: (origin || '') + ' · ' + String(payload.slug || ''),
+            guarded: true,
+            noteText: guardedNoteText
+          },
+          stoppable: false
+        });
+      }
+    } catch (_guardedErr) {
+      // Non-blocking: overlay status is best-effort, never alters the real result.
+    }
+  }
+
+  return invokeResult;
+}
+
+// Phase 31 DISC-01 / D-01: the user-initiated, time-boxed discovery trigger. This
+// INTERNAL-ONLY route resolves the attach target SW-side: tabId comes from explicit
+// payload.tab_id, else the active/owned tab. The session origin is then read from the
+// ACTUAL resolved tab (chrome.tabs.get -> new URL(tab.url).origin), NOT from
+// payload.origin (ME-02): because the debugger attaches to tabId and the consent gate
+// must apply to the origin that is actually attached, the gated origin is derived from
+// the un-spoofable tab origin (the D-11 pattern). A supplied payload.origin is a hint
+// that must MATCH the tab's real origin or the route rejects (RECIPE_CONSENT_REQUIRED)
+// -- a caller can no longer pair a consented origin with a different tab to land the
+// debugger banner on an un-gated origin. It then runs the promote-after-replay
+// discovery session (FsbDiscoverySession.runDiscovery), which itself enforces the
+// Phase-30 consent gate INSIDE FsbNetworkCapture.startSession BEFORE any debugger
+// attach (a default-OFF / denied / sensitive-unconfirmed origin returns a
+// RECIPE_CONSENT_* reason and NOTHING is captured). This route registers via the
+// message-route table ONLY -- it is NOT added to TOOL_REGISTRY and NOT to
+// getPublicTools (INV-01): the discovery trigger is a control surface, not an MCP
+// tool schema, so the frozen tool-definitions parity hash never moves. The session
+// bounds (maxMs/maxCount) fall back to the capture module's own defaults when absent;
+// confirmed_sensitive is threaded as the extra-confirm flag for a sensitive origin.
+async function handleCapabilitiesDiscoverMessageRoute({ payload }) {
+  if (typeof FsbDiscoverySession === 'undefined' || typeof FsbDiscoverySession.runDiscovery !== 'function') {
+    return createMcpRouteError('discover_capabilities', 'capabilities', MCP_ROUTE_RECOVERY_HINT, { error: 'Capability discovery unavailable' });
+  }
+  payload = payload || {};
+  // Resolve tabId SW-side: explicit payload.tab_id, else the active/owned tab.
+  let tabId = Number.isFinite(payload.tab_id) ? payload.tab_id : null;
+  if (tabId === null) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = tabs[0] ? tabs[0].id : null;
+    } catch (e) {
+      // active-tab lookup failed; leave tabId null. The consent gate + same-origin
+      // filter inside the capture session fail closed on a null origin/tabId.
+    }
+  }
+  // ME-02: resolve the AUTHORITATIVE origin from the ACTUAL resolved tab (the
+  // un-spoofable D-11 pattern the invoke path uses), NOT from payload.origin. The
+  // discovery session attaches the debugger to `tabId` and surfaces the "DevTools is
+  // debugging this tab" banner on it; the Phase-30 consent gate must therefore be
+  // evaluated against the origin that is actually attached. Taking the origin from a
+  // caller-supplied payload.origin verbatim let a caller pair origin=benign.com
+  // (consented, non-sensitive) with tab_id=<a bank.com tab>, so the gate passed for
+  // benign.com while the attach + banner landed on the un-gated bank.com. We read the
+  // real origin from the tab and gate THAT.
+  let origin = null;
+  if (tabId !== null) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      origin = (tab && tab.url) ? new URL(tab.url).origin : null;
+    } catch (e) {
+      // tab lookup/URL parse failed; leave origin null -> the gate fails closed.
+      origin = null;
+    }
+  }
+  // If the caller ALSO supplied payload.origin, it is a non-authoritative hint: it
+  // must MATCH the tab's real origin or we reject (the gated origin and the attach
+  // target must be the same value). A mismatch is a spoof attempt -> fail closed.
+  if (payload.origin && origin && payload.origin !== origin) {
+    return createMcpRouteError(
+      'discover_capabilities',
+      'capabilities',
+      MCP_ROUTE_RECOVERY_HINT,
+      { error: 'RECIPE_CONSENT_REQUIRED', reason: 'supplied origin does not match the target tab origin' }
+    );
+  }
+  // Session bounds: explicit numeric overrides only; otherwise undefined so the
+  // capture module applies its own DEFAULT_MAX_MS / DEFAULT_MAX_COUNT.
+  const maxMs = Number.isFinite(payload.max_ms) ? payload.max_ms : undefined;
+  const maxCount = Number.isFinite(payload.max_count) ? payload.max_count : undefined;
+  return await FsbDiscoverySession.runDiscovery(origin, {
+    tabId,
+    maxMs,
+    maxCount,
+    confirmedSensitive: !!payload.confirmed_sensitive
+  });
 }
 
 async function handleGetMemoryMessageRoute({ payload }) {

@@ -1,0 +1,50 @@
+{
+  "slug": "slack.send_message",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "send a message in slack",
+    "post a message in slack",
+    "write a new message in slack",
+    "send message in slack",
+    "send a message to a channel or thread in slack"
+  ],
+  "description": "Send a message to a Slack channel or thread",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to send the message to (e.g., C01234567)"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message text to send — supports Slack mrkdwn formatting"
+      },
+      "thread_ts": {
+        "description": "Thread timestamp to reply in a thread — pass the ts of the parent message",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "send"
+    }
+  }
+}

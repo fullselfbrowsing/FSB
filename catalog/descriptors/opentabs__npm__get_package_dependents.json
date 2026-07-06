@@ -1,0 +1,39 @@
+{
+  "slug": "npm.get_package_dependents",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get package dependents in npm",
+    "look up package dependents in npm",
+    "fetch a single package dependents in npm",
+    "view one specific package dependents in npm",
+    "get packages depending on a package in npm"
+  ],
+  "description": "Get packages that depend on this package. Returns the total count and a sample list of dependent package names.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Package name (e.g., \"express\")"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-package-dependents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

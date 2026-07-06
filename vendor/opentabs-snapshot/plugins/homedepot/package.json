@@ -1,0 +1,67 @@
+{
+  "name": "@opentabs-dev/opentabs-plugin-homedepot",
+  "description": "OpenTabs plugin for The Home Depot",
+  "version": "0.0.86",
+  "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "opentabs": {
+    "displayName": "Home Depot",
+    "description": "OpenTabs plugin for The Home Depot",
+    "urlPatterns": [
+      "*://*.homedepot.com/*"
+    ],
+    "homepage": "https://www.homedepot.com",
+    "iconSvg": "<svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M2 22V9.5L12 2L22 9.5V22H15V14H9V22H2Z\" fill=\"#F96302\"/> </svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M2 22V9.5L12 2L22 9.5V22H15V14H9V22H2Z\" fill=\"#F96302\"/> </svg>"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/homedepot"
+  }
+}

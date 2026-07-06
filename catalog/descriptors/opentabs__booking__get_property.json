@@ -1,0 +1,55 @@
+{
+  "slug": "booking.get_property",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "get a property in booking",
+    "look up a property in booking",
+    "fetch a single property in booking",
+    "view one specific property in booking",
+    "get property in booking",
+    "get property details by name and location in booking"
+  ],
+  "description": "Get detailed information about a specific property on Booking.com by searching for it. Provide the property name and city to find it, along with check-in/check-out dates for pricing.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_name": {
+        "type": "string",
+        "description": "Property name or partial name to search for"
+      },
+      "city": {
+        "type": "string",
+        "description": "City where the property is located"
+      },
+      "checkin": {
+        "type": "string",
+        "description": "Check-in date in YYYY-MM-DD format (for pricing)"
+      },
+      "checkout": {
+        "type": "string",
+        "description": "Check-out date in YYYY-MM-DD format (for pricing)"
+      }
+    },
+    "required": [
+      "property_name",
+      "city",
+      "checkin",
+      "checkout"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/get-property.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

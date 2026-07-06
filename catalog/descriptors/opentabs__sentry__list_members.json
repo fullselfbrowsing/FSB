@@ -1,0 +1,40 @@
+{
+  "slug": "sentry.list_members",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list members in sentry",
+    "show me my members in sentry",
+    "view my members in sentry",
+    "see all my members in sentry",
+    "list organization members in sentry"
+  ],
+  "description": "List all members of the current Sentry organization. Returns name, email, role, and join date for each member.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of members to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

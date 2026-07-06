@@ -1,0 +1,24 @@
+{
+  "slug": "grafana.create_dashboard",
+  "service": "grafana.com",
+  "description": "Create a new Grafana dashboard (MED-02 read-only-safe-origin gate fixture: a HYPOTHETICAL write op under grafana.com, the origin classified SAFE only because the vendored slice is read-only -- list_dashboards/get_dashboard/query_metrics).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "provenance": {
+    "source": "opentabs",
+    "sha": "0000000000000000000000000000000000000000",
+    "sourcePath": "plugins/grafana/src/tools/create-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiPost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  },
+  "_fixture": "MED-02 (38-REVIEW): a hypothetical grafana WRITE descriptor. grafana.com is classified SAFE (absent from service-denylist.json sensitiveOrigins) ONLY because the vendored grafana slice exposes read ops alone (list_dashboards/get_dashboard/query_metrics). checkReadOnlySafeOrigins() in verify-catalog-crosscheck.mjs MUST flag this descriptor (service grafana.com + sideEffectClass write) so a future re-vendor that adds a grafana write FAILS the build (forcing a re-classification to sensitive) rather than shipping it writable-under-Auto. _fixtures/ is excluded by readJsonDir non-recursion so it never ships and never reaches the CLI corpus sweep. (Re-pointed from reddit.com/submit_post in 39.5-04: the real reddit plugin gained write ops and was reclassified sensitive, so reddit is no longer a read-only-safe origin -- grafana is the still-read-only-safe stand-in that keeps this 'a write on a safe origin fails the build' proof valid.)"
+}

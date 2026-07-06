@@ -1,0 +1,54 @@
+{
+  "slug": "coinbase.create_price_alert",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "create a price alert in coinbase",
+    "add a price alert in coinbase",
+    "make a new price alert in coinbase",
+    "open a new price alert in coinbase",
+    "create price alert in coinbase",
+    "create a price alert for an asset in coinbase"
+  ],
+  "description": "Create a price alert for a cryptocurrency asset. You will be notified when the asset price crosses the target price in the specified direction. Use get_asset_by_symbol to find the asset UUID.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "asset_uuid": {
+        "type": "string",
+        "description": "Asset UUID to set the alert for"
+      },
+      "target_price": {
+        "type": "string",
+        "description": "Target price as a decimal string (e.g. \"75000.00\")"
+      },
+      "direction": {
+        "type": "string",
+        "enum": [
+          "ABOVE",
+          "BELOW"
+        ],
+        "description": "Alert direction — ABOVE to notify when price rises above target, BELOW when it drops below"
+      }
+    },
+    "required": [
+      "asset_uuid",
+      "target_price",
+      "direction"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/create-price-alert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

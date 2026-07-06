@@ -1,0 +1,47 @@
+{
+  "slug": "lyft.list_rides",
+  "service": "lyft.com",
+  "intentSynonyms": [
+    "list rides in lyft",
+    "show me my rides in lyft",
+    "view my rides in lyft",
+    "see all my rides in lyft",
+    "show me my lyft ride history in lyft"
+  ],
+  "description": "List your recent Lyft rides. Optionally filter by status (active, completed, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter rides by status",
+        "type": "string",
+        "enum": [
+          "active",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of rides to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lyft/src/tools/list-rides.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

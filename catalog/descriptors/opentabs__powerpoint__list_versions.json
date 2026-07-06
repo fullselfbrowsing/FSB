@@ -1,0 +1,39 @@
+{
+  "slug": "powerpoint.list_versions",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "list versions in powerpoint",
+    "show me my versions in powerpoint",
+    "view my versions in powerpoint",
+    "see all my versions in powerpoint",
+    "list version history of a file in powerpoint"
+  ],
+  "description": "List version history of a file. Returns all saved versions with modifier, timestamp, and size.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/list-versions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

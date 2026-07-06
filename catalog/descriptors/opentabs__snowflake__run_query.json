@@ -1,0 +1,59 @@
+{
+  "slug": "snowflake.run_query",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "run a query in snowflake",
+    "run query in snowflake",
+    "execute a sql query and return results in snowflake"
+  ],
+  "description": "Execute a SQL query in Snowflake via the web application session. Returns parsed results with columns and rows as named objects. For large results (multiple chunks), all chunks are automatically fetched and combined — no need to call get_query separately. Results are capped at maxRows (default 100). All row values are strings (including numbers and timestamps) per Snowflake JSON format.",
+  "actionVerb": "run",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "SQL query to execute"
+      },
+      "database": {
+        "description": "Database context for the query",
+        "type": "string"
+      },
+      "schema": {
+        "description": "Schema context for the query",
+        "type": "string"
+      },
+      "warehouse": {
+        "description": "Warehouse to use for execution",
+        "type": "string"
+      },
+      "role": {
+        "description": "Role to use (defaults to current session role)",
+        "type": "string"
+      },
+      "maxRows": {
+        "description": "Maximum rows to return (default 100). All chunks are auto-fetched up to this limit.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10000
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/run-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "run"
+    }
+  }
+}

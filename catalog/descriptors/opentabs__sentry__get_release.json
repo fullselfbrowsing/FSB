@@ -1,0 +1,40 @@
+{
+  "slug": "sentry.get_release",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "get a release in sentry",
+    "look up a release in sentry",
+    "fetch a single release in sentry",
+    "view one specific release in sentry",
+    "get release in sentry",
+    "get release details by version in sentry"
+  ],
+  "description": "Get detailed information about a specific release, including commit count, deploy count, authors, and first/last event timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "version": {
+        "type": "string",
+        "description": "The release version string (e.g., \"1.0.0\" or a commit SHA)"
+      }
+    },
+    "required": [
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/get-release.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

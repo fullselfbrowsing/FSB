@@ -1,0 +1,42 @@
+{
+  "slug": "notebooklm.rename_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "rename a notebook in notebooklm",
+    "rename notebook in notebooklm",
+    "rename a notebook by setting a new title in notebooklm"
+  ],
+  "description": "Rename a notebook by setting a new title.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "title": {
+        "type": "string",
+        "description": "New notebook title"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/rename-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "rename"
+    }
+  }
+}

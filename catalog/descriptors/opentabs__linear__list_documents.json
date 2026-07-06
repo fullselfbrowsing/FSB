@@ -1,0 +1,43 @@
+{
+  "slug": "linear.list_documents",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list documents in linear",
+    "show me my documents in linear",
+    "view my documents in linear",
+    "see all my documents in linear"
+  ],
+  "description": "List documents in the Linear workspace, optionally filtered by project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Filter by project UUID",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

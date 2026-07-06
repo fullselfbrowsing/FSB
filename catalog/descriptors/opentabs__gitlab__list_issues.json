@@ -1,0 +1,94 @@
+{
+  "slug": "gitlab.list_issues",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list issues in gitlab",
+    "show me my issues in gitlab",
+    "view my issues in gitlab",
+    "see all my issues in gitlab",
+    "list a ticket in gitlab",
+    "list issues for a project in gitlab"
+  ],
+  "description": "List issues for a project. By default returns opened issues sorted by creation date. Can filter by state, labels, assignee, milestone, and more.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "state": {
+        "description": "Issue state filter (default: opened)",
+        "type": "string",
+        "enum": [
+          "opened",
+          "closed",
+          "all"
+        ]
+      },
+      "labels": {
+        "description": "Comma-separated list of label names to filter by",
+        "type": "string"
+      },
+      "assignee_username": {
+        "description": "Filter by assignee username",
+        "type": "string"
+      },
+      "milestone": {
+        "description": "Milestone title to filter by, or \"None\" / \"Any\"",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search in title and description",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

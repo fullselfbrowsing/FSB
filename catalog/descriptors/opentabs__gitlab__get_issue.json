@@ -1,0 +1,48 @@
+{
+  "slug": "gitlab.get_issue",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "get an issue in gitlab",
+    "look up an issue in gitlab",
+    "fetch a single issue in gitlab",
+    "view one specific issue in gitlab",
+    "get issue in gitlab",
+    "get issue details in gitlab"
+  ],
+  "description": "Get detailed information about a specific issue.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "issue_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Issue IID (project-scoped ID)"
+      }
+    },
+    "required": [
+      "project",
+      "issue_iid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/get-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "target.search_products",
+  "service": "target.com",
+  "intentSynonyms": [
+    "search products in target",
+    "search for products on target in target",
+    "search the target product catalog by keyword in target"
+  ],
+  "description": "Search the Target product catalog by keyword. Returns product name, price, brand, rating, and image. Results are personalized to the user's preferred store for pricing and availability.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "Search keyword (e.g., \"airpods\", \"paper towels\")"
+      },
+      "count": {
+        "description": "Number of results (default 10, max 24)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 24
+      },
+      "offset": {
+        "description": "Result offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

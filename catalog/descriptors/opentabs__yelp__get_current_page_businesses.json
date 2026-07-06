@@ -1,0 +1,31 @@
+{
+  "slug": "yelp.get_current_page_businesses",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "get current page businesses in yelp",
+    "look up current page businesses in yelp",
+    "fetch a single current page businesses in yelp",
+    "view one specific current page businesses in yelp",
+    "extract businesses from the current search results page in yelp"
+  ],
+  "description": "Read the business listings from the currently displayed Yelp search results page. Must be called while the Yelp search results page is open in the browser. Returns all businesses shown on the current page with their details.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/get-current-page-businesses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

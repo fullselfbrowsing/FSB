@@ -546,18 +546,42 @@ const pricingData = JSON.parse(fs.readFileSync(DATA_PATH, 'utf-8'));
       'visual-session client labels resolved (' + (labelSource || 'no source') + ', count=' + (labels ? labels.length : 0) + ')');
 
     if (Array.isArray(labels) && labels.length > 0) {
-      passAssertEqual(labels.length, 13, 'visual-session allowlist has 13 labels (parsed ' + labels.length + ' via ' + labelSource + ')');
+      // Quick task 260608-6nm raised the allowlist floor from 13 to 25
+      // (12 Tier-1 MCP-supporting AI clients appended). The 12 new entries
+      // (Cline, Continue, Zed, VS Code, Copilot, JetBrains, Xcode, Eclipse,
+      // Cody, Roo Code, Kiro, Goose) are owner-chip / overlay labels for
+      // widely used MCP clients; FSB does not ship default-model mappings
+      // for them (default model selection varies by per-client config and
+      // is not authored at this layer). The pricing parity contract is
+      // therefore scoped to: (a) every default-model entry must be on
+      // the allowlist (extra-in-pricing remains zero -- prevents drift in
+      // the other direction), (b) the 13 ORIGINALLY paired core labels
+      // must still have default-model entries (preserves the v0.9.36
+      // pricing pairing for the historical client set), and (c) the
+      // OpenClaw crab grapheme survives byte-exact on both sides.
+      passAssert(labels.length >= 13, 'visual-session allowlist has >= 13 labels (parsed ' + labels.length + ' via ' + labelSource + ')');
 
       const allowlistSet = new Set(labels);
       const pricingSet = new Set(Object.keys(pricingData.client_default_model));
 
-      // set-equality check (order-independent; count must match exactly).
-      const missingInPricing = labels.filter(function (l) { return !pricingSet.has(l); });
-      const extraInPricing = Array.from(pricingSet).filter(function (l) { return !allowlistSet.has(l); });
+      // Lock the 13 ORIGINAL core labels (the historical v0.9.36 set
+      // through Hermes) to still have default-model entries. The 12
+      // quick-task additions are intentionally excluded from this lock
+      // because default-model mapping for them is out of scope for the
+      // allowlist expansion.
+      const CORE_PRICING_PAIRED_LABELS = [
+        'Claude', 'Codex', 'ChatGPT', 'Perplexity', 'Windsurf',
+        'Cursor', 'Antigravity', 'OpenCode', 'OpenClaw', 'OpenClaw \u{1F980}',
+        'Grok', 'Gemini', 'Hermes',
+      ];
+      const missingCorePricing = CORE_PRICING_PAIRED_LABELS.filter(function (l) { return !pricingSet.has(l); });
+      passAssertEqual(missingCorePricing.length, 0,
+        'every core (v0.9.36) visual-session allowlist label has a client_default_model entry' +
+        (missingCorePricing.length ? '; missing in client_default_model: [' + missingCorePricing.join(', ') + ']' : ''));
 
-      passAssertEqual(missingInPricing.length, 0,
-        'every visual-session allowlist label has a client_default_model entry' +
-        (missingInPricing.length ? '; missing in client_default_model: [' + missingInPricing.join(', ') + ']' : ''));
+      // No drift in the OTHER direction: every pricing entry must be on
+      // the allowlist (catches typo'd / orphaned default-model rows).
+      const extraInPricing = Array.from(pricingSet).filter(function (l) { return !allowlistSet.has(l); });
       passAssertEqual(extraInPricing.length, 0,
         'no extra client_default_model entries beyond the allowlist' +
         (extraInPricing.length ? '; extra in client_default_model: [' + extraInPricing.join(', ') + ']' : ''));

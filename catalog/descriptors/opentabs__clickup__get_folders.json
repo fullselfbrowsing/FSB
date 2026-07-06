@@ -1,0 +1,44 @@
+{
+  "slug": "clickup.get_folders",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get folders in clickup",
+    "look up folders in clickup",
+    "fetch a single folders in clickup",
+    "view one specific folders in clickup",
+    "list folders in a space in clickup"
+  ],
+  "description": "List all folders in a ClickUp space. Folders organize lists within a space. By default excludes archived folders.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "space_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Space ID to list folders for"
+      },
+      "include_archived": {
+        "description": "Whether to include archived folders (default: false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "space_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-folders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "notebooklm.get_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "get a notebook in notebooklm",
+    "look up a notebook in notebooklm",
+    "fetch a single notebook in notebooklm",
+    "view one specific notebook in notebooklm",
+    "get notebook in notebooklm",
+    "get notebook details in notebooklm"
+  ],
+  "description": "Get details of a specific notebook by ID, including title, source count, and timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/get-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "cockroachdb.get_credit_trial_status",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "get a credit trial status in cockroachdb",
+    "look up a credit trial status in cockroachdb",
+    "fetch a single credit trial status in cockroachdb",
+    "view one specific credit trial status in cockroachdb",
+    "get credit trial status in cockroachdb"
+  ],
+  "description": "Get the credit trial status for the current organization, including remaining credits and trial expiration.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/get-credit-trial-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "slug": "datadog.update_monitor",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "update a monitor in datadog",
+    "edit a monitor in datadog",
+    "change the details of monitor in datadog",
+    "modify a monitor in datadog",
+    "update monitor in datadog"
+  ],
+  "description": "Update an existing Datadog monitor. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Monitor ID to update"
+      },
+      "name": {
+        "description": "New monitor name",
+        "type": "string"
+      },
+      "query": {
+        "description": "New monitor query",
+        "type": "string"
+      },
+      "message": {
+        "description": "New notification message",
+        "type": "string"
+      },
+      "tags": {
+        "description": "New tags for the monitor",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "options": {
+        "description": "New monitor options"
+      }
+    },
+    "required": [
+      "monitor_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/update-monitor.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiput",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

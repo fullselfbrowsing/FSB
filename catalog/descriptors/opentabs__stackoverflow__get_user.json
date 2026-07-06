@@ -1,0 +1,42 @@
+{
+  "slug": "stackoverflow.get_user",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "get an user in stackoverflow",
+    "look up an user in stackoverflow",
+    "fetch a single user in stackoverflow",
+    "view one specific user in stackoverflow",
+    "get user in stackoverflow",
+    "get user profile by id in stackoverflow"
+  ],
+  "description": "Get a Stack Overflow user profile by their user ID. Returns reputation, badge counts, question/answer counts, and profile information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "User ID"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

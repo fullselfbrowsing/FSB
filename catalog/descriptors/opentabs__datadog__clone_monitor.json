@@ -1,0 +1,58 @@
+{
+  "slug": "datadog.clone_monitor",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "clone a monitor in datadog",
+    "clone monitor in datadog",
+    "clone a monitor with optional overrides in datadog"
+  ],
+  "description": "Clone an existing monitor to create a copy. Optionally override the name, query, message, or tags on the clone. The original monitor is not modified.",
+  "actionVerb": "clone",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "ID of the monitor to clone"
+      },
+      "name": {
+        "description": "Name for the cloned monitor. Defaults to \"Clone of <original name>\".",
+        "type": "string"
+      },
+      "query": {
+        "description": "Override the query on the clone",
+        "type": "string"
+      },
+      "message": {
+        "description": "Override the notification message on the clone",
+        "type": "string"
+      },
+      "tags": {
+        "description": "Override tags on the clone. If omitted, inherits from original.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "monitor_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/clone-monitor.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "clone"
+    }
+  }
+}

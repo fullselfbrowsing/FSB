@@ -1,0 +1,44 @@
+{
+  "slug": "azure.get_resource",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "get a resource in azure",
+    "look up a resource in azure",
+    "fetch a single resource in azure",
+    "view one specific resource in azure",
+    "get resource in azure",
+    "get a resource by id in azure"
+  ],
+  "description": "Get detailed information about a specific Azure resource by its full resource ID. The resource ID follows the format: /subscriptions/{sub}/resourceGroups/{rg}/providers/{provider}/{type}/{name}.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_id": {
+        "type": "string",
+        "description": "Full resource ID (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.Compute/virtualMachines/myVM)"
+      },
+      "api_version": {
+        "description": "API version for the resource provider (default: 2021-04-01)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "resource_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/get-resource.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

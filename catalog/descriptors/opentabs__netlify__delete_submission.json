@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.delete_submission",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "delete a submission in netlify",
+    "remove a submission in netlify",
+    "trash a submission in netlify",
+    "permanently delete a submission in netlify",
+    "delete submission in netlify",
+    "delete a form submission in netlify"
+  ],
+  "description": "Delete a form submission by its ID. This permanently removes the submission data. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "submission_id": {
+        "type": "string",
+        "description": "The submission ID to delete"
+      }
+    },
+    "required": [
+      "submission_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/delete-submission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

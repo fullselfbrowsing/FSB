@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.delete_site",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "delete a site in netlify",
+    "remove a site in netlify",
+    "trash a site in netlify",
+    "permanently delete a site in netlify",
+    "delete site in netlify",
+    "delete a site permanently in netlify"
+  ],
+  "description": "Permanently delete a Netlify site by its ID. This removes the site, all deploys, and associated configuration. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to delete"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/delete-site.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

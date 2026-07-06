@@ -1,0 +1,51 @@
+{
+  "slug": "linear.update_label",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "update a label in linear",
+    "edit a label in linear",
+    "change the details of label in linear",
+    "modify a label in linear",
+    "update label in linear"
+  ],
+  "description": "Update an existing Linear issue label. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "label_id": {
+        "type": "string",
+        "description": "Label UUID to update"
+      },
+      "name": {
+        "description": "New label name",
+        "type": "string"
+      },
+      "color": {
+        "description": "New color hex code",
+        "type": "string"
+      },
+      "description": {
+        "description": "New label description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/update-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -12,17 +12,16 @@
        not parsed. The brand identifier is protected via the canonical
        DO-NOT-TRANSLATE.md list and Phase 265's CI invariants. -->
   <title i18n="@@index.title">FSB</title>
-  <meta name="description" i18n-content="@@index.meta.description" content="FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser via natural language. Multi-model AI, 50+ browser actions, MCP-compatible for Claude Code, Codex, Cursor, and OpenClaw.">
+  <meta name="description" i18n-content="@@index.meta.description" content="FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser via natural language. Multi-model AI, a 66-tool MCP catalog, and compatibility for Claude Code, Codex, Cursor, and OpenClaw.">
   <base href="/">
   <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Prerender-safe theme bootstrap: guard requires `typeof localStorage !== 'undefined'` (PITFALLS.md P1, D-20) -->
+  <!-- Prerender-safe theme bootstrap: guard requires `typeof window.matchMedia !== 'function'` (PITFALLS.md P1, D-20) -->
   <script>
     (function initShowcaseTheme() {
-      if (typeof localStorage === 'undefined') return;
-      if (typeof localStorage.getItem !== 'function') return;
-      var saved = localStorage.getItem('fsb-showcase-theme');
-      if (saved === 'light') {
+      if (typeof window === 'undefined') return;
+      if (typeof window.matchMedia !== 'function') return;
+      if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
         document.documentElement.setAttribute('data-theme', 'light');
       }
     })();
@@ -39,5 +38,6 @@
        global, costing ~105 KB unused JS on every non-dashboard route. -->
   <!-- Dashboard runtime state helpers (preview surface, remote control, task recovery derivation) -->
   <script src="assets/dashboard-runtime-state.js"></script>
+  <script src="assets/phantom-stream-viewer.js"></script>
 </body>
 </html>

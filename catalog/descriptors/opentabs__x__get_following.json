@@ -1,0 +1,51 @@
+{
+  "slug": "x.get_following",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a following in x",
+    "look up a following in x",
+    "fetch a single following in x",
+    "view one specific following in x",
+    "get following in x",
+    "list accounts a user follows in x"
+  ],
+  "description": "Get accounts that a user follows by their numeric user ID. Returns a paginated list of users.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to get followers for"
+      },
+      "count": {
+        "description": "Number of followers (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-following.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

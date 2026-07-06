@@ -1,0 +1,52 @@
+{
+  "slug": "gcal.create_calendar",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "create a calendar in gcal",
+    "add a calendar in gcal",
+    "make a new calendar in gcal",
+    "open a new calendar in gcal",
+    "create calendar in gcal",
+    "create a calendar in google calendar"
+  ],
+  "description": "Create a new secondary calendar. The authenticated user becomes the owner of the new calendar.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Calendar title"
+      },
+      "description": {
+        "description": "Calendar description",
+        "type": "string"
+      },
+      "location": {
+        "description": "Geographic location",
+        "type": "string"
+      },
+      "time_zone": {
+        "description": "IANA time zone (e.g., \"America/Los_Angeles\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "summary"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/create-calendar.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

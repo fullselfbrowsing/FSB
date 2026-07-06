@@ -1,0 +1,48 @@
+{
+  "slug": "gdocs.reply_to_comment",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "reply a to comment in gdocs",
+    "reply to comment in gdocs",
+    "reply a to comment in google docs",
+    "reply to a comment thread in gdocs"
+  ],
+  "description": "Add a reply to an existing comment thread on a Google Doc.",
+  "actionVerb": "reply",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "comment_id": {
+        "type": "string",
+        "description": "Comment thread ID to reply to (from list_comments)"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reply text content"
+      }
+    },
+    "required": [
+      "comment_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/reply-to-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "reply"
+    }
+  }
+}

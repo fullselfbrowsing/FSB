@@ -1,0 +1,39 @@
+{
+  "slug": "powerpoint.get_slides",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get slides in powerpoint",
+    "look up slides in powerpoint",
+    "fetch a single slides in powerpoint",
+    "view one specific slides in powerpoint",
+    "list all slides with their text content in powerpoint"
+  ],
+  "description": "Get all slides from a PowerPoint presentation with their text content. Downloads the PPTX file, parses it, and extracts text from each slide.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the PowerPoint file"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-slides.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

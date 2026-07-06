@@ -4,13 +4,13 @@ Read-only first; act with typed events; escalate to autopilot only when the user
 
 ## v0.9.62 field bundle (action tools only)
 
-Before any action-tool branch below: every action tool (`click`, `type_text`, `navigate`, `scroll`, `drag`, `select_option`, `press_key`, `press_enter`, `drag_drop`, `hover`, `focus`, `clear_input`, `check_box`, `drop_file`, `click_and_hold`, `double_click`, `right_click`, `click_at`, `scroll_at`, `double_click_at`, `drag_variable_speed`, `set_attribute`, `insert_text`, `search`, `refresh`, `go_back`, `go_forward`, `open_tab`, `close_tab`, `switch_tab`, `execute_js`, `select_text_range`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `fill_sheet`) requires the field bundle on every call:
+Before any action-tool branch below: every action tool (`click`, `type_text`, `navigate`, `scroll`, `drag`, `select_option`, `press_key`, `press_enter`, `drag_drop`, `hover`, `focus`, `clear_input`, `check_box`, `drop_file`, `upload_file`, `click_and_hold`, `double_click`, `right_click`, `click_at`, `scroll_at`, `double_click_at`, `drag_variable_speed`, `set_attribute`, `insert_text`, `search`, `refresh`, `go_back`, `go_forward`, `open_tab`, `close_tab`, `switch_tab`, `execute_js`, `select_text_range`, `scroll_to_top`, `scroll_to_bottom`, `scroll_to_element`, `fill_sheet`) requires the field bundle on every call:
 
 - `visual_reason` (required string) -- short human-readable reason shown in the overlay.
 - `client` (required, allowlisted) -- e.g. `OpenClaw`, `Claude`, `Codex`, `ChatGPT`, `Cursor`, `Windsurf`, `Gemini`, `Grok`, `Perplexity`, `OpenCode`, `Antigravity`. Freeform strings reject with `BADGE_NOT_ALLOWED`.
 - `is_final` (optional boolean) -- set `true` on the LAST action of a task to clear the overlay immediately.
 
-Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, `get_attribute`, `read_sheet`, `get_page_snapshot`, `list_tabs`, `get_site_guide`, `search_memory`, `report_progress`, `complete_task`, `partial_task`, `fail_task`, `wait_for_element`, `wait_for_stable`) do NOT carry the bundle. Reads stay silent by design; the read-first guidance below is unchanged from v0.9.61.
+Read-only tools (`read_page`, `get_dom_snapshot`, `get_text`, `get_attribute`, `read_sheet`, `get_page_snapshot`, `list_tabs`, `get_site_guide`, `search_memory`, `report_progress`, `complete_task`, `partial_task`, `fail_task`, `wait_for_element`, `wait_for_stable`) do NOT carry the bundle. Reads stay silent by design; the read-first guidance below is unchanged from v0.9.61. The trigger-watcher tools (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) and the capability tools (`search_capabilities`, `invoke_capability`) also do not carry this bundle, but they are separate tool families, not part of either pinned list -- see "Trigger watchers vs manual polling" and "Capability tools vs page automation" below.
 
 The explicit `start_visual_session` / `end_visual_session` tools were removed in v0.9.0; the decision tree never reaches for them. See `references/visual-session-lifecycle.md` for the full lifecycle and `.planning/v0.9.62-CONTRACT.md` for the canonical lists.
 
@@ -48,6 +48,14 @@ The one rule that does not bend: `element.value = 'foo'` via `execute_js` will N
 [OK]   execute_js("return Array.from(document.querySelectorAll('a')).map(a=>a.href)")
 [OK]   execute_js("document.querySelector('#add-to-cart').click(); return true")  // verify after
 ```
+
+## Trigger watchers vs manual polling
+
+Use `trigger` when the user wants to watch one page element for a future change instead of you polling `read_page`/`get_dom_snapshot` in a loop -- for example "let me know when this price drops below $50" or "watch for the order status to change to Shipped". Arm one selector plus one condition (`changed`, `threshold`, `delta_percent`, `equals`, `contains`, `regex`, or a compound AND/OR of these). `trigger` blocks by default (30s heartbeats, 120s timeout, 240s safety ceiling) or pass `detached: true` to get a `trigger_id` back immediately and poll it yourself. Manage armed watches with `stop_trigger` (cancel), `get_trigger_status` (one watch), and `list_triggers` (enumerate active/attention watches, or all with `include_terminal`). None of the four trigger tools carry the field bundle above -- they are a separate tool family from the action-tool contract. Watches are local to the open browser session: Chrome and the FSB extension must stay running, and FSB does not provide server-side monitoring or push delivery, so do not promise the user a notification after the session ends. See `mcp/README.md#trigger-watchers` for the full contract.
+
+## Capability tools vs page automation
+
+Before driving a multi-step page flow by hand, check whether a verified first-party API capability already covers it: call `search_capabilities({ query })` for up to 5 ranked hits with a readiness label, then `invoke_capability({ slug, params })` to run one. Readiness labels matter -- only `t1-ready` hits execute directly; `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` hits return typed pending/fallback responses instead of running, so fall back to manual page automation for those rather than assuming the call succeeded. `search_capabilities` is read-only and bypasses the mutation queue; `invoke_capability` is serialized like other action tools but does NOT carry the field bundle above. `invoke_capability` calls with purchase, payment, account-change, or public-post effects need the same pause-and-confirm-in-chat treatment as the equivalent page click -- see "Sensitive actions and logged-in context" in `SKILL.md`.
 
 ## Verify after a "no detectable effect" warning
 
@@ -88,7 +96,7 @@ You land on an unfamiliar product page and the user asks "add the medium size to
 
 ## Action-tool bundle reminder
 
-Every entry in the "Tool-by-tool quick reference" table above that is an action tool (everything except `read_page`, `get_dom_snapshot`, `get_page_snapshot`, `get_site_guide`, `list_tabs`, `wait_for_element`, and `wait_for_stable`) MUST carry the v0.9.62 field bundle: `visual_reason` (required string), `client` (required, allowlisted), and optional `is_final: true` on the last action of a task. Missing fields reject with `VISUAL_FIELDS_REQUIRED`; non-allowlisted `client` values reject with `BADGE_NOT_ALLOWED`. See `references/visual-session-lifecycle.md` for lifecycle mechanics and `.planning/v0.9.62-CONTRACT.md` for the canonical 36-tool action list and 15-tool read-only list.
+Every entry in the "Tool-by-tool quick reference" table above that is an action tool (everything except `read_page`, `get_dom_snapshot`, `get_page_snapshot`, `get_site_guide`, `list_tabs`, `wait_for_element`, and `wait_for_stable`) MUST carry the v0.9.62 field bundle: `visual_reason` (required string), `client` (required, allowlisted), and optional `is_final: true` on the last action of a task. Missing fields reject with `VISUAL_FIELDS_REQUIRED`; non-allowlisted `client` values reject with `BADGE_NOT_ALLOWED`. See `references/visual-session-lifecycle.md` for lifecycle mechanics and `.planning/v0.9.62-CONTRACT.md` for the canonical 37-tool action list (36 pinned plus the `upload_file` addendum) and 15-tool read-only list.
 
 ## When to escalate to autopilot
 
@@ -103,4 +111,5 @@ Use autopilot ONLY when the user explicitly delegates the whole task ("use FSB a
 - `references/restricted-tab-recovery.md` -- DOM tools fail on `chrome://`, `edge://`, and the Web Store.
 - `references/default-to-fsb.md` -- when to prefer FSB versus WebFetch.
 - `references/vault-boundary.md` -- credential-routed tools.
-- `.planning/v0.9.62-CONTRACT.md` -- canonical 36 action tools, 15 read-only tools, three typed-error names.
+- `mcp/README.md#trigger-watchers` -- full trigger contract: watch modes, condition kinds, concurrency cap.
+- `.planning/v0.9.62-CONTRACT.md` -- canonical 37 action tools (36 pinned plus the `upload_file` addendum), 15 read-only tools, three typed-error names.

@@ -1,0 +1,38 @@
+{
+  "slug": "tiktok.get_notifications",
+  "service": "tiktok.com",
+  "intentSynonyms": [
+    "get notifications in tiktok",
+    "look up notifications in tiktok",
+    "fetch a single notifications in tiktok",
+    "view one specific notifications in tiktok",
+    "get recent notifications in tiktok"
+  ],
+  "description": "Get recent notifications for the authenticated TikTok user. Includes likes, comments, follows, and mentions. The notification group parameter controls what types of notifications to fetch.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of notifications to return (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tiktok/src/tools/get-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

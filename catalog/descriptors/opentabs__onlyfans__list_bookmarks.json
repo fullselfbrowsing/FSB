@@ -1,0 +1,42 @@
+{
+  "slug": "onlyfans.list_bookmarks",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list bookmarks in onlyfans",
+    "show me my bookmarks in onlyfans",
+    "view my bookmarks in onlyfans",
+    "see all my bookmarks in onlyfans",
+    "list your bookmarked posts in onlyfans"
+  ],
+  "description": "List your bookmarked/saved posts. Returns posts you have previously bookmarked.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of posts to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination marker from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-bookmarks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

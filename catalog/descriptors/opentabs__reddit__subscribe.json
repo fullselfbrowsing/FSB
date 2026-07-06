@@ -1,0 +1,47 @@
+{
+  "slug": "reddit.subscribe",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "subscribe in reddit",
+    "subscribe or unsubscribe from a subreddit in reddit",
+    "subscribe to or unsubscribe from a subreddit in reddit"
+  ],
+  "description": "Subscribe to or unsubscribe from a subreddit",
+  "actionVerb": "subscribe",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without r/ prefix"
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "sub",
+          "unsub"
+        ],
+        "description": "\"sub\" to subscribe, \"unsub\" to unsubscribe"
+      }
+    },
+    "required": [
+      "subreddit",
+      "action"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/subscribe.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditpost",
+      "httpMethod": null,
+      "opNameVerb": "subscribe"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.unblock_contact",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "unblock a contact in whatsapp",
+    "unblock contact in whatsapp",
+    "unblock a previously blocked whatsapp contact in whatsapp"
+  ],
+  "description": "Unblock a previously blocked WhatsApp contact. The contact will be able to send you messages again.",
+  "actionVerb": "unblock",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "contact_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Contact ID to unblock"
+      }
+    },
+    "required": [
+      "contact_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/unblock-contact.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "unblock"
+    }
+  }
+}

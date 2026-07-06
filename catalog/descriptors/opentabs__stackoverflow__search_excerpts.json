@@ -1,0 +1,85 @@
+{
+  "slug": "stackoverflow.search_excerpts",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "search excerpts in stackoverflow",
+    "search with highlighted excerpts in stackoverflow",
+    "search stack overflow questions and answers and return results with text excerpts containing highlighted matches in stackoverflow"
+  ],
+  "description": "Search Stack Overflow questions and answers and return results with text excerpts containing highlighted matches. Returns both question and answer results with their excerpts. Useful for getting a quick overview of search results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "tagged": {
+        "description": "Semicolon-delimited tags to filter by (e.g., \"javascript;react\")",
+        "type": "string"
+      },
+      "nottagged": {
+        "description": "Semicolon-delimited tags to exclude",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order (default: relevance)",
+        "type": "string",
+        "enum": [
+          "activity",
+          "creation",
+          "votes",
+          "relevance"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "accepted": {
+        "description": "Filter by whether the question has an accepted answer",
+        "type": "boolean"
+      },
+      "answers": {
+        "description": "Minimum number of answers",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/search-excerpts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

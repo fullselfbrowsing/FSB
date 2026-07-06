@@ -1,0 +1,42 @@
+{
+  "slug": "posthog.get_feature_flag",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get a feature flag in posthog",
+    "look up a feature flag in posthog",
+    "fetch a single feature flag in posthog",
+    "view one specific feature flag in posthog",
+    "get feature flag in posthog",
+    "get feature flag details in posthog"
+  ],
+  "description": "Get detailed information about a specific feature flag including its key, rollout configuration, and tags.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "flag_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Feature flag ID"
+      }
+    },
+    "required": [
+      "flag_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-feature-flag.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

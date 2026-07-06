@@ -1,0 +1,32 @@
+{
+  "slug": "mongodb.get_billing_plan",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "get a billing plan in mongodb",
+    "look up a billing plan in mongodb",
+    "fetch a single billing plan in mongodb",
+    "view one specific billing plan in mongodb",
+    "get billing plan in mongodb",
+    "get organization billing plan in mongodb"
+  ],
+  "description": "Get the billing plan for the current MongoDB Atlas organization including plan type, display name, and whether it is a paid plan.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/get-billing-plan.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

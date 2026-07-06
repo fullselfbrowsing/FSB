@@ -1,0 +1,51 @@
+{
+  "slug": "yelp.navigate_to_search",
+  "service": "www.yelp.com",
+  "intentSynonyms": [
+    "navigate a to search in yelp",
+    "navigate to search in yelp",
+    "open yelp search results in the browser in yelp"
+  ],
+  "description": "Navigate the browser to a Yelp search results page for a given query and location. Opens the search results in the current tab.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search keywords (e.g., \"pizza\", \"dentist\", \"coffee\")"
+      },
+      "location": {
+        "type": "string",
+        "description": "Location to search near (e.g., \"San Jose, CA\", \"New York, NY\")"
+      },
+      "sort_by": {
+        "description": "Sort order (default \"recommended\")",
+        "type": "string",
+        "enum": [
+          "recommended",
+          "rating",
+          "review_count"
+        ]
+      }
+    },
+    "required": [
+      "query",
+      "location"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/yelp/src/tools/navigate-to-search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

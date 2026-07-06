@@ -1,0 +1,83 @@
+{
+  "slug": "gitlab.update_merge_request",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "update a merge request in gitlab",
+    "edit a merge request in gitlab",
+    "change the details of merge request in gitlab",
+    "modify a merge request in gitlab",
+    "update merge request in gitlab"
+  ],
+  "description": "Update an existing merge request. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "merge_request_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Merge request IID (project-scoped ID)"
+      },
+      "title": {
+        "description": "New title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description in Markdown",
+        "type": "string"
+      },
+      "state_event": {
+        "description": "Transition the MR state",
+        "type": "string",
+        "enum": [
+          "close",
+          "reopen"
+        ]
+      },
+      "labels": {
+        "description": "Comma-separated list of label names (replaces existing)",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "User ID to assign",
+        "type": "number"
+      },
+      "target_branch": {
+        "description": "New target branch",
+        "type": "string"
+      },
+      "remove_source_branch": {
+        "description": "Delete source branch after merge",
+        "type": "boolean"
+      },
+      "squash": {
+        "description": "Squash commits when merging",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project",
+      "merge_request_iid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/update-merge-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

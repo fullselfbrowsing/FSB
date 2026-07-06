@@ -1,0 +1,37 @@
+{
+  "slug": "youtube.unsubscribe",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "unsubscribe in youtube",
+    "unsubscribe from a channel in youtube",
+    "unsubscribe from a youtube channel in youtube"
+  ],
+  "description": "Unsubscribe from a YouTube channel.",
+  "actionVerb": "unsubscribe",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel_id": {
+        "type": "string",
+        "description": "YouTube channel ID to unsubscribe from (starts with \"UC\")"
+      }
+    },
+    "required": [
+      "channel_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/unsubscribe.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "unsubscribe"
+    }
+  }
+}

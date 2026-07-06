@@ -1,0 +1,43 @@
+{
+  "slug": "circleci.get_workflow_jobs",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get workflow jobs in circleci",
+    "look up workflow jobs in circleci",
+    "fetch a single workflow jobs in circleci",
+    "view one specific workflow jobs in circleci",
+    "list jobs in a workflow in circleci"
+  ],
+  "description": "List all jobs in a workflow. Returns job names, statuses, types, and timing.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow UUID"
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-workflow-jobs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

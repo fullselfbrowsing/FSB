@@ -1,0 +1,32 @@
+{
+  "slug": "clickhouse.get_organization",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "get an organization in clickhouse",
+    "look up an organization in clickhouse",
+    "fetch a single organization in clickhouse",
+    "view one specific organization in clickhouse",
+    "get organization in clickhouse",
+    "get organization details in clickhouse"
+  ],
+  "description": "Get details about the current ClickHouse Cloud organization including billing status, tier, and trial info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

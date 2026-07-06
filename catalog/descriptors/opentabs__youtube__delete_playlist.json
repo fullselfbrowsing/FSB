@@ -1,0 +1,39 @@
+{
+  "slug": "youtube.delete_playlist",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "delete a playlist in youtube",
+    "remove a playlist in youtube",
+    "trash a playlist in youtube",
+    "permanently delete a playlist in youtube",
+    "delete playlist in youtube"
+  ],
+  "description": "Delete a YouTube playlist. This action cannot be undone. Does not work for system playlists like Watch Later (WL) or Liked Videos (LL).",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "Playlist ID to delete (not WL or LL)"
+      }
+    },
+    "required": [
+      "playlist_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/delete-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

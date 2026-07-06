@@ -1,0 +1,49 @@
+{
+  "slug": "teams.create_chat",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "create a chat in teams",
+    "add a chat in teams",
+    "make a new chat in teams",
+    "open a new chat in teams",
+    "create chat in teams",
+    "create a new chat conversation in teams"
+  ],
+  "description": "Create a new chat conversation with one or more users. Pass user MRIs (e.g., \"8:live:username\") as members. The current user is added automatically.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "members": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "User MRI identifiers to add to the chat (e.g., [\"8:live:username\"])"
+      },
+      "topic": {
+        "description": "Optional chat topic/title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "members"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/create-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

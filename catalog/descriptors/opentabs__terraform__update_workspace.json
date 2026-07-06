@@ -1,0 +1,64 @@
+{
+  "slug": "terraform.update_workspace",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "update a workspace in terraform",
+    "edit a workspace in terraform",
+    "change the details of workspace in terraform",
+    "modify a workspace in terraform",
+    "update workspace in terraform",
+    "update workspace settings in terraform"
+  ],
+  "description": "Update workspace settings. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      },
+      "name": {
+        "description": "New workspace name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "execution_mode": {
+        "description": "Execution mode: \"remote\", \"local\", or \"agent\"",
+        "type": "string"
+      },
+      "terraform_version": {
+        "description": "New Terraform version constraint",
+        "type": "string"
+      },
+      "auto_apply": {
+        "description": "Whether to auto-apply",
+        "type": "boolean"
+      },
+      "working_directory": {
+        "description": "New working directory",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/update-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "slug": "steam.generate_discovery_queue",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "generate a discovery queue in steam",
+    "generate discovery queue in steam",
+    "get personalized game recommendations in steam"
+  ],
+  "description": "Generate a new personalized discovery queue of game recommendations. Returns a list of app IDs tailored to the user's preferences and library. Use get_app_details to look up each app.",
+  "actionVerb": "generate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "queue_type": {
+        "description": "Queue type: 0 = new releases (default), 1 = popular upcoming, 2 = deals",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/generate-discovery-queue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "storepost",
+      "httpMethod": null,
+      "opNameVerb": "generate"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "zendesk.list_ticket_comments",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "list ticket comments in zendesk",
+    "show me my ticket comments in zendesk",
+    "view my ticket comments in zendesk",
+    "see all my ticket comments in zendesk",
+    "list comments on a ticket in zendesk"
+  ],
+  "description": "List all comments on a support ticket. Returns comments with author information, body text, creation timestamp, and public/private status. Supports pagination for tickets with many comments.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "The ID of the ticket to list comments for"
+      },
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Number of comments per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "ticket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/list-ticket-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

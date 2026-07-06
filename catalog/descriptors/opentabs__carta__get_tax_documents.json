@@ -1,0 +1,30 @@
+{
+  "slug": "carta.get_tax_documents",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get tax documents in carta",
+    "look up tax documents in carta",
+    "fetch a single tax documents in carta",
+    "view one specific tax documents in carta"
+  ],
+  "description": "Get tax documents (1099s, K-1s, etc.) available for the portfolio. Returns document metadata and download information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-tax-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

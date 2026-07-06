@@ -1,0 +1,56 @@
+{
+  "slug": "slack.read_messages",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "read messages in slack",
+    "read recent messages from a channel in slack",
+    "read recent messages from a slack channel with optional date-range filtering and pagination in slack"
+  ],
+  "description": "Read recent messages from a Slack channel with optional date-range filtering and pagination",
+  "actionVerb": "read",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to read messages from (e.g., C01234567)"
+      },
+      "limit": {
+        "description": "Maximum number of messages to return (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "oldest": {
+        "description": "Only return messages after this Unix timestamp (inclusive) — e.g., \"1234567890.123456\"",
+        "type": "string"
+      },
+      "latest": {
+        "description": "Only return messages before this Unix timestamp (inclusive) — e.g., \"1234567890.123456\"",
+        "type": "string"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response for fetching the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/read-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "read"
+    }
+  }
+}

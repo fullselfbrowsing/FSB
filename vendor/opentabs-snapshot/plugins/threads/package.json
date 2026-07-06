@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs threads plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream origin Threads serves on (*://www.threads.net/* -> service www.threads.net). www.threads.net is the EXACT origin Plan 38-01 classified SENSITIVE in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin (https://www.threads.net) and does NOT abort; the bare apex https://threads.net is NOT classified (would be unscreened), which is why the apex is NOT used here. The host-derived stem of www.threads.net is 'www' (WRONG); the vendored DIR NAME is exactly `threads` so it matches the STEM_OVERRIDES key ({threads:'threads'}) and the importer canonicalizes the stem to 'threads' (emitting opentabs__threads__*, NOT opentabs__www__*) -- the SAME dir-name canonicalization already used for cloudflare(dash.cloudflare.com)/datadog(app.datadoghq.com)/jira/confluence. defineTool/OpenTabsPlugin and the api/apiVoid transport helpers are resolved from local stubs (sdk-stub.ts, threads-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; create_thread is the sensitive social WRITE posture-B gates.",
+  "name": "@opentabs-dev/opentabs-plugin-threads",
+  "version": "0.0.12",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Threads",
+    "description": "OpenTabs plugin for Threads",
+    "urlPatterns": [
+      "*://www.threads.net/*"
+    ],
+    "homepage": "https://www.threads.net"
+  },
+  "license": "MIT"
+}

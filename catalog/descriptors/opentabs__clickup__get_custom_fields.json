@@ -1,0 +1,36 @@
+{
+  "slug": "clickup.get_custom_fields",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get custom fields in clickup",
+    "look up custom fields in clickup",
+    "fetch a single custom fields in clickup",
+    "view one specific custom fields in clickup",
+    "list workspace custom fields in clickup"
+  ],
+  "description": "List all custom fields defined in a ClickUp workspace. Custom fields add structured data to tasks (text, number, dropdown, checkbox, date, email, URL, etc.).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "description": "Workspace ID. Defaults to the current workspace.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-custom-fields.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

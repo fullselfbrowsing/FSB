@@ -1,0 +1,41 @@
+{
+  "slug": "newrelic.get_dashboard",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "get a dashboard in newrelic",
+    "look up a dashboard in newrelic",
+    "fetch a single dashboard in newrelic",
+    "view one specific dashboard in newrelic",
+    "get dashboard in newrelic",
+    "get dashboard details by guid in newrelic"
+  ],
+  "description": "Get detailed information about a specific dashboard by its GUID, including pages and widgets.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dashboard entity GUID"
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/get-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

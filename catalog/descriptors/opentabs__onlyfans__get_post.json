@@ -1,0 +1,42 @@
+{
+  "slug": "onlyfans.get_post",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get a post in onlyfans",
+    "look up a post in onlyfans",
+    "fetch a single post in onlyfans",
+    "view one specific post in onlyfans",
+    "get post in onlyfans",
+    "get a post by id in onlyfans"
+  ],
+  "description": "Get a single post by its ID. Returns the full post content including media attachments.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Post ID"
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

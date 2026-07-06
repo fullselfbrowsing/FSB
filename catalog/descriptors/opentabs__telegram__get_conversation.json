@@ -1,0 +1,40 @@
+{
+  "slug": "telegram.get_conversation",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get a conversation in telegram",
+    "look up a conversation in telegram",
+    "fetch a single conversation in telegram",
+    "view one specific conversation in telegram",
+    "open a conversation in telegram",
+    "get conversation in telegram"
+  ],
+  "description": "Get detailed information about a specific conversation (dialog), including unread count, top message, and peer info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation to get details for"
+      }
+    },
+    "required": [
+      "peer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

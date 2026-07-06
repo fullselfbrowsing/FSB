@@ -1,0 +1,39 @@
+{
+  "slug": "clickhouse.list_backups",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "list backups in clickhouse",
+    "show me my backups in clickhouse",
+    "view my backups in clickhouse",
+    "see all my backups in clickhouse",
+    "list service backups in clickhouse"
+  ],
+  "description": "List available backups for a ClickHouse Cloud service.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "string",
+        "description": "Service UUID"
+      }
+    },
+    "required": [
+      "service_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/list-backups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

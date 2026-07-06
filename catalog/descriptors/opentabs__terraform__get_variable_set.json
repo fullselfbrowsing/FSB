@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_variable_set",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get a variable set in terraform",
+    "look up a variable set in terraform",
+    "fetch a single variable set in terraform",
+    "view one specific variable set in terraform",
+    "get variable set in terraform",
+    "get variable set details in terraform"
+  ],
+  "description": "Get detailed information about a variable set.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "varset_id": {
+        "type": "string",
+        "description": "Variable set ID (e.g., \"varset-...\")"
+      }
+    },
+    "required": [
+      "varset_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-variable-set.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "mongodb.get_project",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "get a project in mongodb",
+    "look up a project in mongodb",
+    "fetch a single project in mongodb",
+    "view one specific project in mongodb",
+    "get project in mongodb",
+    "get current project details in mongodb"
+  ],
+  "description": "Get detailed information about the current MongoDB Atlas project (group) from the URL context, including state, cluster count, and data size.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

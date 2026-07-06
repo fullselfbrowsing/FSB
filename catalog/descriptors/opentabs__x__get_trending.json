@@ -1,0 +1,32 @@
+{
+  "slug": "x.get_trending",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a trending in x",
+    "look up a trending in x",
+    "fetch a single trending in x",
+    "view one specific trending in x",
+    "get trending in x",
+    "get trending topics in x"
+  ],
+  "description": "Get current trending topics and hashtags.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-trending.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

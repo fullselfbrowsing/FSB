@@ -1,0 +1,36 @@
+{
+  "slug": "ynab.list_categories",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "list categories in ynab",
+    "show me my categories in ynab",
+    "view my categories in ynab",
+    "see all my categories in ynab",
+    "list budget categories with balances in ynab"
+  ],
+  "description": "List category groups and categories in the active YNAB plan. Returns budgeted amounts, activity, and available balances for the current month. Hidden and deleted categories are excluded by default — pass include_hidden=true to also see hidden categories (useful for editing budgets on hidden categories).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "include_hidden": {
+        "description": "Include hidden categories (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/list-categories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

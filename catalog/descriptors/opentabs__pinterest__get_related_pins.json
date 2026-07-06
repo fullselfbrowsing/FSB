@@ -1,0 +1,49 @@
+{
+  "slug": "pinterest.get_related_pins",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get related pins in pinterest",
+    "look up related pins in pinterest",
+    "fetch a single related pins in pinterest",
+    "view one specific related pins in pinterest",
+    "get pins related to a specific pin in pinterest"
+  ],
+  "description": "Get pins related to a specific pin. Useful for discovering similar content and recommendations. Supports pagination via bookmark cursor.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pin_id": {
+        "type": "string",
+        "description": "Pin ID to find related pins for"
+      },
+      "page_size": {
+        "description": "Number of results (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pin_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-related-pins.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

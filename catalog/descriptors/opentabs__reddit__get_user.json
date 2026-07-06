@@ -1,0 +1,41 @@
+{
+  "slug": "reddit.get_user",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "get an user in reddit",
+    "look up an user in reddit",
+    "fetch a single user in reddit",
+    "view one specific user in reddit",
+    "get user in reddit",
+    "get a user profile in reddit"
+  ],
+  "description": "Get public profile information for a Reddit user by username",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reddit username (without u/ prefix)"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

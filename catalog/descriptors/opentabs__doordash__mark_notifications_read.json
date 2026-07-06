@@ -1,0 +1,41 @@
+{
+  "slug": "doordash.mark_notifications_read",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "mark a notifications read in doordash",
+    "mark notifications read in doordash",
+    "mark notifications as read in doordash"
+  ],
+  "description": "Mark one or more DoorDash notifications as read by their IDs.",
+  "actionVerb": "mark",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notification_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of notification IDs to mark as read"
+      }
+    },
+    "required": [
+      "notification_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/mark-notifications-read.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "mark"
+    }
+  }
+}

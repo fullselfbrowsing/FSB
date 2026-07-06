@@ -1,0 +1,55 @@
+{
+  "slug": "airtable.create_comment",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "create a comment in airtable",
+    "add a comment in airtable",
+    "make a new comment in airtable",
+    "open a new comment in airtable",
+    "create comment in airtable",
+    "add a comment to a record in airtable"
+  ],
+  "description": "Add a comment to a record. Comments are visible to all collaborators on the base.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix)"
+      },
+      "table_id": {
+        "type": "string",
+        "description": "Table ID (tbl prefix)"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "Record ID (rec prefix)"
+      },
+      "text": {
+        "type": "string",
+        "description": "Comment text"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id",
+      "record_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

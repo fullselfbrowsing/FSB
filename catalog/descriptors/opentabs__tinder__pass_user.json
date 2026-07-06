@@ -1,0 +1,45 @@
+{
+  "slug": "tinder.pass_user",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "pass an user in tinder",
+    "pass user in tinder",
+    "pass on a user in tinder"
+  ],
+  "description": "Pass (swipe left on) a user, skipping them from recommendations.",
+  "actionVerb": "pass",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID to pass on"
+      },
+      "content_hash": {
+        "type": "string",
+        "description": "Content hash from get_recommendations"
+      },
+      "s_number": {
+        "type": "number",
+        "description": "S number from get_recommendations"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/pass-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "pass"
+    }
+  }
+}

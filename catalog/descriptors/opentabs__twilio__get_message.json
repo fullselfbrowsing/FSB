@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.get_message",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "get a message in twilio",
+    "look up a message in twilio",
+    "fetch a single message in twilio",
+    "view one specific message in twilio",
+    "get message in twilio"
+  ],
+  "description": "Get a specific SMS/MMS message by its SID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Message SID (e.g., SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/get-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

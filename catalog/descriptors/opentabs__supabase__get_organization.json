@@ -1,0 +1,41 @@
+{
+  "slug": "supabase.get_organization",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get an organization in supabase",
+    "look up an organization in supabase",
+    "fetch a single organization in supabase",
+    "view one specific organization in supabase",
+    "get organization in supabase",
+    "get organization details in supabase"
+  ],
+  "description": "Get detailed information about a specific organization by its slug.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Organization slug"
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

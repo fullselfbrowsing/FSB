@@ -1,0 +1,48 @@
+{
+  "slug": "starbucks.find_stores",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "find stores in starbucks",
+    "find nearby starbucks stores by coordinates in starbucks",
+    "find starbucks stores near a given latitude/longitude in starbucks"
+  ],
+  "description": "Find Starbucks stores near a given latitude/longitude. Returns stores sorted by distance with hours, address, amenities, and mobile ordering availability. Use limit to control result count (default 10).",
+  "actionVerb": "find",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "lat": {
+        "type": "number",
+        "description": "Latitude coordinate"
+      },
+      "lng": {
+        "type": "number",
+        "description": "Longitude coordinate"
+      },
+      "limit": {
+        "description": "Maximum number of stores to return (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "lat",
+      "lng"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/find-stores.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "find"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "slug": "tumblr.reblog_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "reblog a post in tumblr",
+    "reblog post in tumblr",
+    "reblog a post to your tumblr blog, optionally adding a comment in tumblr"
+  ],
+  "description": "Reblog a post to your Tumblr blog, optionally adding a comment.",
+  "actionVerb": "reblog",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Your blog name to reblog to"
+      },
+      "parent_blog_name": {
+        "type": "string",
+        "description": "Source blog name where the post originated"
+      },
+      "parent_post_id": {
+        "type": "string",
+        "description": "Post ID of the original post to reblog"
+      },
+      "reblog_key": {
+        "type": "string",
+        "description": "Reblog key for the post (from post data)"
+      },
+      "comment": {
+        "description": "Optional text comment to add to the reblog",
+        "type": "string"
+      }
+    },
+    "required": [
+      "blog_name",
+      "parent_blog_name",
+      "parent_post_id",
+      "reblog_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/reblog-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "reblog"
+    }
+  }
+}

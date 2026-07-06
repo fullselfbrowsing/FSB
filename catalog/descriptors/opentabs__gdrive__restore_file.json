@@ -1,0 +1,38 @@
+{
+  "slug": "gdrive.restore_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "restore a file in gdrive",
+    "restore file in gdrive",
+    "restore a file in google drive",
+    "restore a file from the trash in gdrive"
+  ],
+  "description": "Restore a file or folder from the trash back to its original location.",
+  "actionVerb": "restore",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID to restore from trash"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/restore-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "restore"
+    }
+  }
+}

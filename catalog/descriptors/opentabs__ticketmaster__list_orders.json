@@ -1,0 +1,47 @@
+{
+  "slug": "ticketmaster.list_orders",
+  "service": "www.ticketmaster.com",
+  "intentSynonyms": [
+    "list orders in ticketmaster",
+    "show me my orders in ticketmaster",
+    "view my orders in ticketmaster",
+    "see all my orders in ticketmaster",
+    "show me my ticketmaster orders in ticketmaster"
+  ],
+  "description": "List your Ticketmaster ticket orders. Optionally filter by status (upcoming, past, cancelled).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter orders by status",
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "past",
+          "cancelled"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of orders to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ticketmaster/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

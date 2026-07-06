@@ -1,0 +1,41 @@
+{
+  "slug": "slack.get_user_profile",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "get an user profile in slack",
+    "look up an user profile in slack",
+    "fetch a single user profile in slack",
+    "view one specific user profile in slack",
+    "get user profile in slack",
+    "get a user's profile information in slack"
+  ],
+  "description": "Retrieve a Slack user's profile information by user ID",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to retrieve the profile for (e.g., U01234567)"
+      }
+    },
+    "required": [
+      "user"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "netlify.restore_deploy",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "restore a deploy in netlify",
+    "restore deploy in netlify",
+    "restore a previous deploy in netlify"
+  ],
+  "description": "Restore a previous deploy by creating a new deploy with the same content. The restored deploy becomes the published version for the site.",
+  "actionVerb": "restore",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID the deploy belongs to"
+      },
+      "deploy_id": {
+        "type": "string",
+        "description": "The deploy ID to restore"
+      }
+    },
+    "required": [
+      "site_id",
+      "deploy_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/restore-deploy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "restore"
+    }
+  }
+}

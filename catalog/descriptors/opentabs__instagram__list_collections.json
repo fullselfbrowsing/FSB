@@ -1,0 +1,31 @@
+{
+  "slug": "instagram.list_collections",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "list collections in instagram",
+    "show me my collections in instagram",
+    "view my collections in instagram",
+    "see all my collections in instagram",
+    "list saved collections in instagram"
+  ],
+  "description": "List saved post collections. Collections organize saved posts into custom groups (e.g., \"Travel\", \"Recipes\").",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/list-collections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

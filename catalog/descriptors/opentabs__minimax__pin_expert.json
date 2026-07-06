@@ -1,0 +1,42 @@
+{
+  "slug": "minimax.pin_expert",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "pin an expert in minimax",
+    "pin expert in minimax",
+    "pin or unpin an expert in minimax"
+  ],
+  "description": "Pin or unpin an AI expert/agent. Pinned experts appear at the top of the list.",
+  "actionVerb": "pin",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "number",
+        "description": "Expert ID"
+      },
+      "is_pinned": {
+        "type": "boolean",
+        "description": "Whether to pin (true) or unpin (false)"
+      }
+    },
+    "required": [
+      "id",
+      "is_pinned"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/pin-expert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "pin"
+    }
+  }
+}

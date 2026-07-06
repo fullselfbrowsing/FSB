@@ -1,0 +1,32 @@
+{
+  "slug": "npm.get_current_user",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get a current user in npm",
+    "look up a current user in npm",
+    "fetch a single current user in npm",
+    "view one specific current user in npm",
+    "get current user in npm",
+    "get the authenticated npm user profile in npm"
+  ],
+  "description": "Get the profile of the currently authenticated npm user including username and avatar.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

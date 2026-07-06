@@ -1,0 +1,51 @@
+{
+  "slug": "newrelic.run_nrql_query",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "run a nrql query in newrelic",
+    "run nrql query in newrelic",
+    "execute a nrql query in newrelic"
+  ],
+  "description": "Execute a NRQL (New Relic Query Language) query against an account. Returns raw query results. Examples: \"SELECT count(*) FROM Transaction SINCE 1 hour ago\", \"SELECT average(duration) FROM Transaction FACET appName SINCE 1 day ago\", \"SHOW EVENT TYPES\".",
+  "actionVerb": "run",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID to query"
+      },
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "NRQL query string"
+      },
+      "timeout": {
+        "description": "Query timeout in seconds (default 30)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "account_id",
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/run-nrql-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "run"
+    }
+  }
+}

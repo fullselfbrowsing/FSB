@@ -1,0 +1,40 @@
+{
+  "slug": "starbucks.get_store_menu",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get a store menu in starbucks",
+    "look up a store menu in starbucks",
+    "fetch a single store menu in starbucks",
+    "view one specific store menu in starbucks",
+    "get store menu in starbucks",
+    "get menu categories for a store in starbucks"
+  ],
+  "description": "Get the menu categories and subcategories for a specific Starbucks store. Returns the top-level categories (e.g., Drinks, Food) with their subcategories and product counts. Use find_stores to get a store number first.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "store_number": {
+        "type": "string",
+        "description": "Store number (e.g., \"53646-283069\"). Use find_stores to discover store numbers."
+      }
+    },
+    "required": [
+      "store_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-store-menu.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "slug": "clickup.get_goals",
+  "service": "app.clickup.com",
+  "intentSynonyms": [
+    "get goals in clickup",
+    "look up goals in clickup",
+    "fetch a single goals in clickup",
+    "view one specific goals in clickup",
+    "list workspace goals in clickup"
+  ],
+  "description": "List all goals in a ClickUp workspace. Goals track high-level objectives and can contain key results. Returns goal name, description, completion percentage, and owner.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "description": "Workspace ID. Defaults to the current workspace.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickup/src/tools/get-goals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

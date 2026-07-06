@@ -1,0 +1,39 @@
+{
+  "slug": "snowflake.get_object_details",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "get object details in snowflake",
+    "look up object details in snowflake",
+    "fetch a single object details in snowflake",
+    "view one specific object details in snowflake",
+    "get column details for a table or view in snowflake"
+  ],
+  "description": "Get column-level schema details for a Snowflake table or view using DESCRIBE TABLE. Returns column names, data types, nullability, defaults, and key constraints. The objectName must be fully qualified: DATABASE.SCHEMA.TABLE (e.g., \"MY_DB.PUBLIC.MY_TABLE\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "objectName": {
+        "type": "string",
+        "description": "Fully qualified object name: DATABASE.SCHEMA.TABLE (e.g., \"MY_DB.PUBLIC.MY_TABLE\")"
+      }
+    },
+    "required": [
+      "objectName"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/get-object-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

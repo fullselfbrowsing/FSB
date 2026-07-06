@@ -1,0 +1,42 @@
+{
+  "slug": "shortcut.get_story",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "get a story in shortcut",
+    "look up a story in shortcut",
+    "fetch a single story in shortcut",
+    "view one specific story in shortcut",
+    "get story in shortcut",
+    "get a story by id in shortcut"
+  ],
+  "description": "Get detailed information about a specific story by its numeric ID. Returns full story data including labels, story links, comment IDs, and task IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Story numeric ID"
+      }
+    },
+    "required": [
+      "story_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/get-story.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

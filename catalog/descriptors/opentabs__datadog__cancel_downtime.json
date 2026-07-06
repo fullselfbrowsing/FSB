@@ -1,0 +1,37 @@
+{
+  "slug": "datadog.cancel_downtime",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "cancel a downtime in datadog",
+    "cancel downtime in datadog",
+    "cancel a scheduled downtime in datadog"
+  ],
+  "description": "Cancel a scheduled downtime by ID. This resumes alerting for the affected monitors.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "downtime_id": {
+        "type": "string",
+        "description": "Downtime ID to cancel"
+      }
+    },
+    "required": [
+      "downtime_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/cancel-downtime.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apidelete",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "onlyfans.list_subscriptions",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list subscriptions in onlyfans",
+    "show me my subscriptions in onlyfans",
+    "view my subscriptions in onlyfans",
+    "see all my subscriptions in onlyfans",
+    "list your active subscriptions in onlyfans"
+  ],
+  "description": "List your active subscriptions to other creators. Shows who you are currently subscribed to.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of subscriptions to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "type": {
+        "description": "Subscription type filter (default \"active\")",
+        "type": "string",
+        "enum": [
+          "active",
+          "expired",
+          "all"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-subscriptions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

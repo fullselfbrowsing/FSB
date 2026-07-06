@@ -1,0 +1,79 @@
+{
+  "slug": "cloudflare.update_dns_record",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "update a dns record in cloudflare",
+    "edit a dns record in cloudflare",
+    "change the details of dns record in cloudflare",
+    "modify a dns record in cloudflare",
+    "update dns record in cloudflare"
+  ],
+  "description": "Update an existing DNS record. Requires the zone ID and record ID. All fields are overwritten.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "DNS record ID"
+      },
+      "type": {
+        "type": "string",
+        "description": "Record type (A, AAAA, CNAME, MX, TXT, NS, SRV, etc.)"
+      },
+      "name": {
+        "type": "string",
+        "description": "DNS record name"
+      },
+      "content": {
+        "type": "string",
+        "description": "Record content"
+      },
+      "ttl": {
+        "description": "TTL in seconds (1 for automatic)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "proxied": {
+        "description": "Whether to proxy traffic through Cloudflare",
+        "type": "boolean"
+      },
+      "priority": {
+        "description": "Priority for MX and SRV records",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "comment": {
+        "description": "Optional comment for the record",
+        "type": "string"
+      }
+    },
+    "required": [
+      "zone_id",
+      "record_id",
+      "type",
+      "name",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/update-dns-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

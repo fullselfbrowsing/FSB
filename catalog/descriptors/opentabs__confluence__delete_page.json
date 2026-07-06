@@ -1,0 +1,41 @@
+{
+  "slug": "confluence.delete_page",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "delete a page in confluence",
+    "remove a page in confluence",
+    "trash a page in confluence",
+    "permanently delete a page in confluence",
+    "delete page in confluence",
+    "delete a page by id in confluence"
+  ],
+  "description": "Delete a Confluence page by its ID. The page is moved to trash and can be restored.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to delete"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/delete-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

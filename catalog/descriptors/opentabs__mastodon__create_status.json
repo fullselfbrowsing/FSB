@@ -1,0 +1,59 @@
+{
+  "slug": "mastodon.create_status",
+  "service": "mastodon.social",
+  "intentSynonyms": [
+    "create a status in mastodon",
+    "add a status in mastodon",
+    "make a new status in mastodon",
+    "open a new status in mastodon",
+    "publish a status in mastodon",
+    "share a status in mastodon"
+  ],
+  "description": "Publish a new status (toot) to Mastodon. Posts the text to your account at the chosen visibility; this is visible to your audience. Optionally reply to an existing status.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The text content of the status to publish"
+      },
+      "visibility": {
+        "description": "Status visibility",
+        "type": "string",
+        "enum": [
+          "public",
+          "unlisted",
+          "private",
+          "direct"
+        ]
+      },
+      "in_reply_to_id": {
+        "description": "Status ID to reply to (omit to start a new status)",
+        "type": "string"
+      },
+      "spoiler_text": {
+        "description": "Content-warning text shown above the status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mastodon/src/tools/create-status.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

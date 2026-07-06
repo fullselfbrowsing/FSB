@@ -1,0 +1,39 @@
+{
+  "slug": "todoist.list_collaborators",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list collaborators in todoist",
+    "show me my collaborators in todoist",
+    "view my collaborators in todoist",
+    "see all my collaborators in todoist",
+    "list project collaborators in todoist"
+  ],
+  "description": "List all collaborators on a shared project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "The ID of the project to list collaborators for"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-collaborators.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

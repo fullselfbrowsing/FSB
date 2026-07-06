@@ -1,0 +1,50 @@
+{
+  "slug": "discord.list_members",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "list members in discord",
+    "show me my members in discord",
+    "view my members in discord",
+    "see all my members in discord",
+    "list members in a server in discord"
+  ],
+  "description": "List members in a Discord guild (server)",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guild_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Guild (server) ID to list members for"
+      },
+      "limit": {
+        "description": "Max members to return (default 100, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "after": {
+        "description": "Get members after this user ID (for pagination)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "guild_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/list-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "excel.clear_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "clear a range in excel",
+    "clear range in excel",
+    "clear a range in excel online",
+    "clear cell contents or formatting in excel"
+  ],
+  "description": "Clear the contents, formatting, or both from a range of cells. Use apply_to to control what is cleared: \"All\" clears everything, \"Contents\" clears values and formulas only, \"Formats\" clears formatting only.",
+  "actionVerb": "clear",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address in A1 notation (e.g., \"A1:C10\")"
+      },
+      "apply_to": {
+        "description": "What to clear (default \"All\")",
+        "type": "string",
+        "enum": [
+          "All",
+          "Contents",
+          "Formats"
+        ]
+      }
+    },
+    "required": [
+      "worksheet",
+      "address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/clear-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "clear"
+    }
+  }
+}

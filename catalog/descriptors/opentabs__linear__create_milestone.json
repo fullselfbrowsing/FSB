@@ -1,0 +1,53 @@
+{
+  "slug": "linear.create_milestone",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a milestone in linear",
+    "add a milestone in linear",
+    "make a new milestone in linear",
+    "open a new milestone in linear",
+    "create milestone in linear",
+    "create a new project milestone in linear"
+  ],
+  "description": "Create a new milestone in a Linear project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID to create the milestone in"
+      },
+      "name": {
+        "type": "string",
+        "description": "Milestone name"
+      },
+      "description": {
+        "description": "Milestone description",
+        "type": "string"
+      },
+      "target_date": {
+        "description": "Target date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-milestone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

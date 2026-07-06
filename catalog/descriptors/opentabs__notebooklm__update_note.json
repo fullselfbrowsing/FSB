@@ -1,0 +1,49 @@
+{
+  "slug": "notebooklm.update_note",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "update a note in notebooklm",
+    "edit a note in notebooklm",
+    "change the details of note in notebooklm",
+    "modify a note in notebooklm",
+    "update note in notebooklm"
+  ],
+  "description": "Update the content of an existing note.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "note_id": {
+        "type": "string",
+        "description": "Note UUID to update"
+      },
+      "content": {
+        "type": "string",
+        "description": "New note content (supports markdown)"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "note_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/update-note.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "msword.restore_version",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "restore a version in msword",
+    "restore version in msword",
+    "restore a version in microsoft word",
+    "restore a file version in msword"
+  ],
+  "description": "Restore a file to a previous version.",
+  "actionVerb": "restore",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File ID"
+      },
+      "version_id": {
+        "type": "string",
+        "description": "Version ID to restore"
+      }
+    },
+    "required": [
+      "item_id",
+      "version_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/restore-version.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "restore"
+    }
+  }
+}

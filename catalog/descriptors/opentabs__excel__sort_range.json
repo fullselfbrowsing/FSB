@@ -1,0 +1,72 @@
+{
+  "slug": "excel.sort_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "sort a range in excel",
+    "sort range in excel",
+    "sort a range in excel online",
+    "sort data in a range by columns in excel"
+  ],
+  "description": "Sort data in a range by one or more columns. Each sort field specifies a zero-based column index and sort direction. Multiple fields create multi-level sorts (primary, secondary, etc.).",
+  "actionVerb": "sort",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address to sort (e.g., \"A1:C10\")"
+      },
+      "fields": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Zero-based column index to sort by"
+            },
+            "ascending": {
+              "description": "Sort ascending (default true)",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Sort fields in priority order"
+      },
+      "has_headers": {
+        "description": "Whether the first row is a header row (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "worksheet",
+      "address",
+      "fields"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/sort-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "sort"
+    }
+  }
+}

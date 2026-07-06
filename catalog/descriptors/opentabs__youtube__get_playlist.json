@@ -1,0 +1,40 @@
+{
+  "slug": "youtube.get_playlist",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a playlist in youtube",
+    "look up a playlist in youtube",
+    "fetch a single playlist in youtube",
+    "view one specific playlist in youtube",
+    "get playlist in youtube",
+    "get playlist videos in youtube"
+  ],
+  "description": "Get videos in a YouTube playlist. Returns the playlist title and its video contents. Use \"WL\" for Watch Later or \"LL\" for Liked Videos.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "Playlist ID (use \"WL\" for Watch Later, \"LL\" for Liked Videos)"
+      }
+    },
+    "required": [
+      "playlist_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

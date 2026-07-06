@@ -1,0 +1,31 @@
+{
+  "slug": "pinterest.get_notification_counts",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get notification counts in pinterest",
+    "look up notification counts in pinterest",
+    "fetch a single notification counts in pinterest",
+    "view one specific notification counts in pinterest",
+    "get notification badge counts in pinterest"
+  ],
+  "description": "Get unread notification and unseen message counts for the authenticated user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-notification-counts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

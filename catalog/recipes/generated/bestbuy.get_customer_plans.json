@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "bestbuy.get_customer_plans",
+  "origin": "https://www.bestbuy.com",
+  "endpoint": "/profile/rest/customerplans/carouselplans",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

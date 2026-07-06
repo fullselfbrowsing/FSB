@@ -1,0 +1,29 @@
+{
+  "slug": "homedepot.navigate_to_checkout",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "navigate a to checkout in homedepot",
+    "navigate to checkout in homedepot",
+    "navigate to the checkout page in homedepot"
+  ],
+  "description": "Navigate the browser to the Home Depot cart/checkout page so the user can review items and complete their purchase.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

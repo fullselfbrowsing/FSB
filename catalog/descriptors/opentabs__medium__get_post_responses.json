@@ -1,0 +1,49 @@
+{
+  "slug": "medium.get_post_responses",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get post responses in medium",
+    "look up post responses in medium",
+    "fetch a single post responses in medium",
+    "view one specific post responses in medium",
+    "get comments on a post in medium"
+  ],
+  "description": "Get responses (comments) on a Medium post. Returns the response count, response posts, and an opaque next_cursor. Pass next_cursor back as cursor to fetch the next page — this is the only way to retrieve responses past the first page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "string",
+        "description": "Medium post ID"
+      },
+      "limit": {
+        "description": "Maximum responses to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      },
+      "cursor": {
+        "description": "Opaque pagination cursor from a previous response (next_cursor). Omit to fetch the first page.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-post-responses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

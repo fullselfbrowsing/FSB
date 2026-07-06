@@ -1,0 +1,51 @@
+{
+  "slug": "asana.get_tasks_for_section",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "get a tasks for section in asana",
+    "look up a tasks for section in asana",
+    "fetch a single tasks for section in asana",
+    "view one specific tasks for section in asana",
+    "get tasks for section in asana",
+    "list tasks in a section in asana"
+  ],
+  "description": "List tasks in a project section. Supports pagination with limit and offset.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Section GID to list tasks for"
+      },
+      "limit": {
+        "description": "Maximum number of tasks to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "section_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/get-tasks-for-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

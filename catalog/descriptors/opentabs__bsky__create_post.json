@@ -1,0 +1,57 @@
+{
+  "slug": "bsky.create_post",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "create a post in bsky",
+    "add a post in bsky",
+    "make a new post in bsky",
+    "open a new post in bsky",
+    "publish a post in bsky",
+    "publish a post in bluesky"
+  ],
+  "description": "Create a new Bluesky post. Supports plain text. For replies, provide the parent and root post URIs and CIDs.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "maxLength": 300,
+        "description": "The text content of the post (max 300 characters)"
+      },
+      "reply_to_uri": {
+        "description": "AT URI of the parent post to reply to",
+        "type": "string"
+      },
+      "reply_to_cid": {
+        "description": "CID of the parent post to reply to",
+        "type": "string"
+      },
+      "root_uri": {
+        "description": "AT URI of the root post in the thread (defaults to reply_to_uri for direct replies)",
+        "type": "string"
+      },
+      "root_cid": {
+        "description": "CID of the root post in the thread (defaults to reply_to_cid for direct replies)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/create-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

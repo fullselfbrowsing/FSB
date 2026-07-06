@@ -1,0 +1,31 @@
+{
+  "slug": "shortcut.list_epics",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "list epics in shortcut",
+    "show me my epics in shortcut",
+    "view my epics in shortcut",
+    "see all my epics in shortcut",
+    "list all epics in shortcut"
+  ],
+  "description": "List all epics in the workspace. Returns epics with name, state, and associated labels.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/list-epics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

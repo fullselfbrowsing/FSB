@@ -1,0 +1,32 @@
+{
+  "slug": "facebook.get_current_user",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "get a current user in facebook",
+    "look up a current user in facebook",
+    "fetch a single current user in facebook",
+    "view one specific current user in facebook",
+    "get current user in facebook",
+    "get the logged-in user profile in facebook"
+  ],
+  "description": "Get the currently authenticated Facebook user profile including user ID, full name, and short name. Reads from the page session — no API call.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "chatgpt.star_conversation",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "star a conversation in chatgpt",
+    "star conversation in chatgpt",
+    "star a chatgpt conversation to mark it as important in chatgpt"
+  ],
+  "description": "Star a ChatGPT conversation to mark it as important.",
+  "actionVerb": "star",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "description": "Conversation ID (UUID)"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/star-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "star"
+    }
+  }
+}

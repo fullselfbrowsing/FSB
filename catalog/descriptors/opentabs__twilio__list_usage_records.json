@@ -1,0 +1,49 @@
+{
+  "slug": "twilio.list_usage_records",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list usage records in twilio",
+    "show me my usage records in twilio",
+    "view my usage records in twilio",
+    "see all my usage records in twilio"
+  ],
+  "description": "List account usage records. Optionally filter by category (e.g., sms, calls) and date range.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of records to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "category": {
+        "description": "Filter by usage category (e.g., sms, calls, phonenumbers)",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "Filter usage starting from this date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "Filter usage up to this date (YYYY-MM-DD)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-usage-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

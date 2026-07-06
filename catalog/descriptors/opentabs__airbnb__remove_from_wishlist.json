@@ -1,0 +1,42 @@
+{
+  "slug": "airbnb.remove_from_wishlist",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "remove a from wishlist in airbnb",
+    "remove from wishlist in airbnb",
+    "remove listings from wishlists in airbnb"
+  ],
+  "description": "Remove one or more listings from wishlists by wishlist item IDs. Get wishlist item IDs from the save_to_wishlist response or by listing wishlists.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "wishlist_item_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Array of wishlist item IDs to remove (e.g., [\"11005458471314\"])"
+      }
+    },
+    "required": [
+      "wishlist_item_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/remove-from-wishlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

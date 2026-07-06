@@ -1,0 +1,66 @@
+{
+  "slug": "newrelic.add_entity_tags",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "add entity tags in newrelic",
+    "add tags to an entity in newrelic",
+    "add entity tag in the newrelic app",
+    "use newrelic to add a entity tag"
+  ],
+  "description": "Add tags to an entity. Each tag is a key-value pair. Adding a tag with an existing key appends the value.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Entity GUID"
+      },
+      "tags": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Tag key"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag values"
+            }
+          },
+          "required": [
+            "key",
+            "values"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Tags to add"
+      }
+    },
+    "required": [
+      "guid",
+      "tags"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/add-entity-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

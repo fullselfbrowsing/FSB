@@ -1,0 +1,41 @@
+{
+  "slug": "onenote.get_section",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "get a section in onenote",
+    "look up a section in onenote",
+    "fetch a single section in onenote",
+    "view one specific section in onenote",
+    "get section in onenote",
+    "get a section by id in onenote"
+  ],
+  "description": "Get detailed information about a specific OneNote section by its ID. Returns section metadata including name, parent notebook, and creation date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Section ID"
+      }
+    },
+    "required": [
+      "section_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/get-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

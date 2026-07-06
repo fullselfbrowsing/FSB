@@ -1,0 +1,31 @@
+{
+  "slug": "cloudflare.list_queues",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list queues in cloudflare",
+    "show me my queues in cloudflare",
+    "view my queues in cloudflare",
+    "see all my queues in cloudflare",
+    "list cloudflare queues in cloudflare"
+  ],
+  "description": "List Cloudflare Queues in the account. Queues provide reliable message delivery between Workers.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-queues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

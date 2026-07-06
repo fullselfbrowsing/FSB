@@ -1,0 +1,48 @@
+{
+  "slug": "azure.list_activity_logs",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list activity logs in azure",
+    "show me my activity logs in azure",
+    "view my activity logs in azure",
+    "see all my activity logs in azure",
+    "query activity log events in azure"
+  ],
+  "description": "Query activity log events for a subscription. Use the filter parameter with OData syntax to filter by time range, resource group, or status. Example filter: \"eventTimestamp ge '2024-01-01T00:00:00Z' and eventTimestamp le '2024-01-31T23:59:59Z'\".",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "filter": {
+        "type": "string",
+        "description": "OData filter expression (required). Must include eventTimestamp filter, e.g., \"eventTimestamp ge '2024-01-01'\""
+      },
+      "select": {
+        "description": "Comma-separated list of fields to return (e.g., \"eventTimestamp,operationName,status\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "filter"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-activity-logs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

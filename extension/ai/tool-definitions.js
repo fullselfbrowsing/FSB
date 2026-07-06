@@ -1208,6 +1208,198 @@ const TOOL_REGISTRY = [
   },
 
   // =========================================================================
+  // TRIGGER TOOLS (4 tools)
+  // =========================================================================
+
+  {
+    name: 'trigger',
+    description: 'Arm a reactive DOM trigger on one selector. Use this when the user wants to watch an element until it changes, crosses a threshold, equals or matches a value, or contains text. The watch is owned by the background trigger runtime and persisted across service-worker eviction. Pass one selector and one condition object; runtime validation checks the nested condition details before arming. Use stop_trigger to cancel, get_trigger_status to inspect one watcher, and list_triggers to enumerate watchers.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector or stable element selector to watch.'
+        },
+        condition: {
+          type: 'object',
+          description: 'Trigger condition object validated by the trigger manager. Supported kinds include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR conditions.',
+          additionalProperties: true
+        },
+        trigger_id: {
+          type: 'string',
+          description: 'Optional caller-supplied trigger correlation id. MCP callers may omit it; the server generates one before arming.'
+        },
+        detached: {
+          type: 'boolean',
+          description: 'When true, arm and return trigger_id immediately instead of blocking.'
+        },
+        timeout_ms: {
+          type: 'number',
+          description: 'Blocking wait timeout in ms. Default 120000. Timeout returns timed_out.'
+        },
+        safety_ceiling_ms: {
+          type: 'number',
+          description: 'Maximum blocking wait before auto-detach. Default/max 240000.'
+        },
+        rearm_on_fire: {
+          type: 'boolean',
+          description: 'When true, keep watching after a fire and expose fire_count/last_event through status.'
+        },
+        watch: {
+          type: 'string',
+          enum: ['live-observe', 'refresh-poll'],
+          description: 'Optional watch mechanism. live-observe uses in-page mutation observation; refresh-poll periodically reloads the trigger-owned tab and reads the selector.'
+        },
+        tab_id: {
+          type: 'number',
+          description: 'Optional. Tab id to arm the trigger against. Alias of target_tab_id for callers that use ordinary tool tab targeting.'
+        },
+        target_tab_id: {
+          type: 'number',
+          description: 'Optional. Explicit target tab id for the watched page.'
+        },
+        extract: {
+          type: 'string',
+          enum: ['text', 'number', 'attribute'],
+          description: 'Optional value extraction mode. Defaults are selected by the trigger runtime from the condition.'
+        },
+        attribute: {
+          type: 'string',
+          description: 'Optional attribute name when extract is attribute.'
+        },
+        attrName: {
+          type: 'string',
+          description: 'Optional alias for attribute when content-side trigger readers use attrName.'
+        },
+        poll_interval_ms: {
+          type: 'number',
+          description: 'Optional refresh-poll interval in milliseconds. The background runtime enforces its minimum floor.'
+        },
+        locale: {
+          type: 'string',
+          description: 'Optional locale hint for numeric parsing, such as en-US or de-DE.'
+        },
+        decimal_separator: {
+          type: 'string',
+          description: 'Optional decimal separator override for numeric parsing.'
+        }
+      },
+      required: ['selector', 'condition']
+    },
+    _route: 'background',
+    _readOnly: false,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
+
+  {
+    name: 'stop_trigger',
+    description: 'Cancel a trigger by id. This is cancellation-critical and bypass-class: it must be callable promptly even if a trigger or another mutation is pending. Missing or already terminal triggers are handled idempotently by the background trigger runtime.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trigger_id: {
+          type: 'string',
+          description: 'Trigger id returned by trigger.'
+        },
+        tab_id: {
+          type: 'number',
+          description: 'Optional. Tab id associated with the trigger when needed for scoped cleanup.'
+        }
+      },
+      required: ['trigger_id']
+    },
+    _route: 'background',
+    _readOnly: true,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
+
+  {
+    name: 'get_trigger_status',
+    description: 'Read the persisted status for one trigger by id. Returns storage-of-truth trigger state including status, watch mode, condition, target tab, owner, current value, timing, and attention details when available.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trigger_id: {
+          type: 'string',
+          description: 'Trigger id returned by trigger.'
+        },
+        tab_id: {
+          type: 'number',
+          description: 'Optional. Tab id used to disambiguate scoped trigger access.'
+        }
+      },
+      required: ['trigger_id']
+    },
+    _route: 'background',
+    _readOnly: true,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
+
+  {
+    name: 'list_triggers',
+    description: 'List persisted trigger snapshots. By default, returns active and attention-state watchers; include_terminal can include fired and stopped triggers for audit or cleanup workflows.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['armed', 'needs_attention', 'blocked', 'fired', 'timed_out', 'stopped'],
+          description: 'Optional status filter.'
+        },
+        include_terminal: {
+          type: 'boolean',
+          description: 'Optional. When true, include terminal fired or stopped triggers in the listing.'
+        },
+        tab_id: {
+          type: 'number',
+          description: 'Optional. Limit results to a target tab when supported by the background route.'
+        }
+      },
+      required: []
+    },
+    _route: 'background',
+    _readOnly: true,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: false
+  },
+
+  // =========================================================================
+  // FILE UPLOAD TOOL (1 tool) -- Phase 34
+  // =========================================================================
+
+  withVisualSessionFields({
+    name: 'upload_file',
+    description: 'Upload a real file from a local disk path to a file input on the page. Sets the file directly on the target <input type="file"> via the browser DevTools protocol (DOM.setFileInputFiles), so it works for real binaries -- images, PDFs, documents -- that page JavaScript cannot upload. This is different from drop_file, which only fakes inline text content onto a dropzone; prefer upload_file whenever you know the file path on disk. Provide a CSS selector for the <input type="file"> (or a container/dropzone that wraps a hidden one) and an ABSOLUTE file path. The browser reads the file and fires the input/change events natively. When to use: any web form upload where the file already exists on disk. For pure drag-only dropzones with no underlying file input, fall back to drop_file. Security: a sensitive-path denylist blocks secrets (~/.ssh, ~/.aws, .env, private keys, the FSB vault) and every upload is audit-logged. Related: drop_file (synthetic dropzone content), get_dom_snapshot (find the input[type=file] selector), read_page (verify the upload took). Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64). Pass tab_id only when this agent owns multiple tabs; auto-resolves otherwise.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'CSS selector for the <input type="file"> element, or a container/dropzone that holds a hidden one (e.g. "#avatar", "input[type=file]", ".dropzone")' },
+        file_path: { type: 'string', description: 'Absolute path to the file on disk (e.g. "/Users/me/Documents/resume.pdf"). Relative or ~ paths are rejected; the file must be readable by the browser.' },
+        tab_id: { type: 'number', description: 'Optional. Tab id this action targets. Omit when the calling agent owns exactly one tab; pass to disambiguate when the agent owns multiple. Single-tab agents and legacy popup/sidepanel/autopilot do not need to pass this.' }
+      },
+      required: ['selector', 'file_path']
+    },
+    _route: 'background',
+    _readOnly: false,
+    _contentVerb: null,
+    _cdpVerb: null,
+    _forceForeground: false,
+    _emitChangeReport: true
+  }),
+
+  // =========================================================================
   // VAULT FILL TOOLS -- registered separately via vault.ts (security boundary)
   // Tools: list_credentials, fill_credential, list_payment_methods, use_payment_method
   // NOT in this registry to avoid duplicate registration errors.

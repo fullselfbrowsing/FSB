@@ -1,0 +1,50 @@
+{
+  "slug": "fidelity.get_investment_news",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get investment news in fidelity",
+    "look up investment news in fidelity",
+    "fetch a single investment news in fidelity",
+    "view one specific investment news in fidelity",
+    "news for your portfolio holdings in fidelity"
+  ],
+  "description": "Get recent news articles related to specific ticker symbols in your portfolio. Returns headlines with source and date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbols": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Ticker symbols to get news for (e.g., [\"AAPL\", \"VOO\"])"
+      },
+      "count": {
+        "description": "Number of articles to return (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "symbols"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-investment-news.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

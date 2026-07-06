@@ -1,0 +1,41 @@
+{
+  "slug": "airbnb.get_user_thumbnail",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get an user thumbnail in airbnb",
+    "look up an user thumbnail in airbnb",
+    "fetch a single user thumbnail in airbnb",
+    "view one specific user thumbnail in airbnb",
+    "get user thumbnail in airbnb",
+    "get a user thumbnail image by user id in airbnb"
+  ],
+  "description": "Get a user thumbnail image URL by their numeric user ID. Returns both standard and medium-sized thumbnails.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Numeric user ID"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-user-thumbnail.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

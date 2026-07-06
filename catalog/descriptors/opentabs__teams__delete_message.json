@@ -1,0 +1,47 @@
+{
+  "slug": "teams.delete_message",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "delete a message in teams",
+    "remove a message in teams",
+    "trash a message in teams",
+    "permanently delete a message in teams",
+    "delete message in teams",
+    "delete a chat message in teams"
+  ],
+  "description": "Delete a message from a Teams chat conversation. Only messages sent by the current user can be deleted.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message ID to delete"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

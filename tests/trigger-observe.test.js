@@ -1,0 +1,513 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+let passed = 0;
+let failed = 0;
+
+function check(label, fn) {
+  try {
+    fn();
+    passed++;
+    console.log('  PASS:', label);
+  } catch (err) {
+    failed++;
+    console.error('  FAIL:', label);
+    console.error('    ', err && err.message ? err.message : err);
+  }
+}
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function listenerCaptureMode(options) {
+  return options === true || !!(options && options.capture === true);
+}
+
+function makeNode(opts) {
+  opts = opts || {};
+  const attrs = Object.assign({}, opts.attrs || {});
+  const eventListeners = {};
+  const node = {
+    tagName: (opts.tag || 'div').toUpperCase(),
+    textContent: opts.text || '',
+    value: opts.value || '',
+    id: opts.id || '',
+    dataset: Object.assign({}, opts.dataset || {}),
+    attributes: attrs,
+    _eventListeners: eventListeners,
+    parentElement: null,
+    parentNode: null,
+    _isConnected: opts.connected !== false,
+    get isConnected() { return this._isConnected; },
+    set isConnected(v) { this._isConnected = !!v; },
+    getAttribute(name) {
+      if (name === 'role' && opts.role) return opts.role;
+      if (name === 'data-testid' && opts.testid) return opts.testid;
+      return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : null;
+    },
+    addEventListener(type, fn, options) {
+      if (!eventListeners[type]) eventListeners[type] = [];
+      eventListeners[type].push({ fn, capture: listenerCaptureMode(options) });
+    },
+    removeEventListener(type, fn, options) {
+      const listeners = eventListeners[type] || [];
+      const capture = listenerCaptureMode(options);
+      const index = listeners.findIndex((entry) => entry.fn === fn && entry.capture === capture);
+      if (index !== -1) listeners.splice(index, 1);
+    },
+    listenerCount(type) {
+      return (eventListeners[type] || []).length;
+    },
+    contains(candidate) {
+      for (let cur = candidate; cur; cur = cur.parentElement || cur.parentNode || null) {
+        if (cur === node) return true;
+      }
+      return false;
+    },
+    dispatchEvent(event) {
+      if (!event || !event.type) throw new Error('event.type is required');
+      if (!event.target) event.target = node;
+
+      const path = [];
+      for (let cur = node; cur; cur = cur.parentElement || cur.parentNode || null) {
+        path.push(cur);
+      }
+      if (typeof event.composedPath !== 'function') {
+        event.composedPath = () => path.slice();
+      }
+
+      let stopped = false;
+      const originalStopPropagation = event.stopPropagation;
+      event.stopPropagation = function() {
+        stopped = true;
+        event.cancelBubble = true;
+        if (typeof originalStopPropagation === 'function') {
+          originalStopPropagation.call(event);
+        }
+      };
+
+      const dispatchTo = (current, capture) => {
+        const listeners = (current._eventListeners[event.type] || [])
+          .filter((entry) => entry.capture === capture)
+          .slice();
+        listeners.forEach((entry) => {
+          if (!stopped) entry.fn.call(current, event);
+        });
+      };
+
+      path.slice().reverse().forEach((current) => {
+        if (!stopped) dispatchTo(current, true);
+      });
+      if (!stopped) dispatchTo(node, false);
+      if (event.bubbles !== false) {
+        path.slice(1).forEach((current) => {
+          if (!stopped) dispatchTo(current, false);
+        });
+      }
+      return true;
+    }
+  };
+  if (opts.parent) {
+    node.parentElement = opts.parent;
+    node.parentNode = opts.parent;
+  }
+  return node;
+}
+
+const windowListeners = {};
+const sendMessages = [];
+let timerSeq = 0;
+let timers = new Map();
+let queryResolver = () => null;
+let queryCalls = 0;
+let observeCount = 0;
+let disconnectCount = 0;
+const observerInstances = [];
+
+function resetRuntime() {
+  sendMessages.length = 0;
+  timers = new Map();
+  timerSeq = 0;
+  queryCalls = 0;
+  observeCount = 0;
+  disconnectCount = 0;
+  observerInstances.length = 0;
+}
+
+function flushTimers() {
+  const batch = Array.from(timers.entries());
+  timers.clear();
+  batch.forEach(([, fn]) => fn());
+}
+
+function StubObserver(callback) {
+  this.callback = callback;
+  this.observeCalls = [];
+  this.disconnectCalls = 0;
+  observerInstances.push(this);
+}
+StubObserver.prototype.observe = function(target, options) {
+  observeCount++;
+  this.observeCalls.push({ target, options });
+};
+StubObserver.prototype.disconnect = function() {
+  disconnectCount++;
+  this.disconnectCalls++;
+};
+
+const FSB = {
+  _modules: {},
+  elementCache: new Map(),
+  logger: { info() {}, warn() {}, error() {}, debug() {} },
+  sanitizeSelector(selector) { return selector; },
+  querySelectorWithShadow(selector) {
+    queryCalls++;
+    return queryResolver(selector);
+  }
+};
+
+const sandbox = {
+  window: {
+    FSB,
+    __FSB_SKIP_INIT__: false,
+    addEventListener(type, fn) {
+      if (!windowListeners[type]) windowListeners[type] = [];
+      windowListeners[type].push(fn);
+    }
+  },
+  chrome: {
+    runtime: {
+      sendMessage(payload) {
+        sendMessages.push(payload);
+        return { catch() {} };
+      }
+    }
+  },
+  MutationObserver: StubObserver,
+  setTimeout(fn) {
+    timerSeq++;
+    timers.set(timerSeq, fn);
+    return timerSeq;
+  },
+  clearTimeout(id) {
+    timers.delete(id);
+  },
+  module: { exports: {} },
+  Map,
+  Set,
+  Array,
+  Object,
+  String,
+  Number,
+  Boolean,
+  Date,
+  Math,
+  Error,
+  console
+};
+sandbox.globalThis = sandbox;
+sandbox.self = sandbox;
+
+const modulePath = path.join(__dirname, '..', 'extension', 'content', 'trigger-observe.js');
+vm.runInContext(fs.readFileSync(modulePath, 'utf8'), vm.createContext(sandbox), {
+  filename: 'trigger-observe.js'
+});
+
+const triggerObserve = sandbox.module.exports;
+const messagingPath = path.join(__dirname, '..', 'extension', 'content', 'messaging.js');
+const messagingSource = fs.readFileSync(messagingPath, 'utf8');
+
+function triggerReadBlock() {
+  const caseIndex = messagingSource.indexOf("case 'triggerRead':");
+  assert.notEqual(caseIndex, -1, 'triggerRead case exists in messaging.js');
+  const returnIndex = messagingSource.indexOf('return true;', caseIndex);
+  assert.notEqual(returnIndex, -1, 'triggerRead case keeps async return true');
+  return messagingSource.slice(caseIndex, returnIndex + 'return true;'.length);
+}
+
+function invokeWindowEvent(type, event) {
+  (windowListeners[type] || []).forEach((fn) => fn(event || {}));
+}
+
+console.log('--- Phase 16 Plan 01: trigger-observe content module ---');
+
+check('triggerRead returns ELEMENT_NOT_FOUND before value extraction', () => {
+  const block = triggerReadBlock();
+  const missingIndex = block.indexOf('ELEMENT_NOT_FOUND');
+  const readIndex = block.indexOf('readValue');
+  assert.notEqual(missingIndex, -1, 'ELEMENT_NOT_FOUND branch present');
+  assert.match(block, /reason\s*:\s*['"]element_not_found['"]/, 'typed element_not_found reason present');
+  assert.notEqual(readIndex, -1, 'readValue call still present for successful reads');
+  assert.ok(missingIndex < readIndex, 'missing-element branch appears before readValue extraction');
+  assert.match(block, /success\s*:\s*true/, 'success path remains typed as success true');
+  assert.match(block, /ok\s*:\s*true/, 'success path remains typed as ok true');
+});
+
+check('triggerRead returns TRIGGER_PAGE_BLOCKED before selector/value extraction', () => {
+  const block = triggerReadBlock();
+  const blockedIndex = block.indexOf('TRIGGER_PAGE_BLOCKED');
+  const queryIndex = block.indexOf('querySelectorWithShadow');
+  const readIndex = block.indexOf('readValue');
+  assert.notEqual(blockedIndex, -1, 'TRIGGER_PAGE_BLOCKED branch present');
+  assert.notEqual(queryIndex, -1, 'selector resolution remains present');
+  assert.notEqual(readIndex, -1, 'readValue call still present for successful reads');
+  assert.ok(blockedIndex < queryIndex, 'blocked-page branch appears before selector resolution');
+  assert.ok(blockedIndex < readIndex, 'blocked-page branch appears before value extraction');
+  assert.match(block, /blocked_reason/, 'blocked response includes blocked_reason');
+  assert.match(block, /url/, 'blocked response includes page url');
+});
+
+check('optsFor text/number observes childList + characterData + subtree only', () => {
+  assert.deepEqual(plain(triggerObserve.optsFor('text')), { childList: true, characterData: true, subtree: true });
+  assert.deepEqual(plain(triggerObserve.optsFor('number')), { childList: true, characterData: true, subtree: true });
+});
+
+check('optsFor attribute uses attributeFilter and subtree', () => {
+  assert.deepEqual(plain(triggerObserve.optsFor('attribute', 'data-price')), {
+    attributes: true,
+    attributeFilter: ['data-price'],
+    subtree: true
+  });
+});
+
+check('readValue emits the locked text and attribute shapes', () => {
+  const textNode = makeNode({ text: '  $42  ' });
+  assert.deepEqual(plain(triggerObserve.readValue(textNode, 'text')), { text: '$42' });
+  const input = makeNode({ tag: 'input', value: '  17  ' });
+  assert.deepEqual(plain(triggerObserve.readValue(input, 'number')), { text: '17' });
+  const attrNode = makeNode({ attrs: { 'data-price': '  99  ' } });
+  assert.deepEqual(plain(triggerObserve.readValue(attrNode, 'attribute', 'data-price')), {
+    text: '99',
+    attributes: { 'data-price': '99' }
+  });
+});
+
+check('one mutation burst coalesces to one triggerValueChanged report', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'price-card' });
+  const leaf = makeNode({ text: '  $12  ', parent: container });
+  queryResolver = () => leaf;
+  const started = triggerObserve.start('trg_burst', '#price', 'text');
+  assert.equal(started.ok, true);
+  observerInstances[0].callback([{ type: 'characterData' }]);
+  observerInstances[0].callback([{ type: 'childList' }, { type: 'childList' }]);
+  assert.equal(sendMessages.length, 0);
+  flushTimers();
+  assert.equal(sendMessages.length, 1);
+  assert.equal(sendMessages[0].action, 'triggerValueChanged');
+  assert.equal(sendMessages[0].trigger_id, 'trg_burst');
+  assert.deepEqual(plain(sendMessages[0].value), { text: '$12' });
+});
+
+check('form value events report only the watched leaf value', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'form-root' });
+  const leaf = makeNode({ tag: 'input', value: 'old', parent: container });
+  const other = makeNode({ tag: 'input', value: 'ignored', parent: container });
+  queryResolver = () => leaf;
+
+  const started = triggerObserve.start('trg_form', '#field', 'text');
+  assert.equal(started.ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  assert.equal(container.listenerCount('change'), 1);
+
+  other.value = 'ignored update';
+  other.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(timers.size, 0);
+  assert.equal(sendMessages.length, 0);
+
+  leaf.value = '  updated value  ';
+  leaf.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(sendMessages.length, 0);
+  assert.equal(timers.size, 1);
+  flushTimers();
+
+  assert.equal(sendMessages.length, 1);
+  assert.equal(sendMessages[0].action, 'triggerValueChanged');
+  assert.equal(sendMessages[0].trigger_id, 'trg_form');
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'updated value' });
+
+  triggerObserve.stop('trg_form');
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+});
+
+check('capture form value listeners survive stopped bubbling input events', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'capture-form-root' });
+  const leaf = makeNode({ tag: 'input', value: 'old', parent: container });
+  queryResolver = () => leaf;
+
+  assert.equal(triggerObserve.start('trg_capture_form', '#capture-field', 'text').ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  leaf.addEventListener('input', (event) => {
+    event.stopPropagation();
+  });
+
+  leaf.value = '  captured update  ';
+  leaf.dispatchEvent({ type: 'input', bubbles: true });
+  assert.equal(sendMessages.length, 0);
+  assert.equal(timers.size, 1);
+  flushTimers();
+
+  assert.equal(sendMessages.length, 1);
+  assert.equal(sendMessages[0].trigger_id, 'trg_capture_form');
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'captured update' });
+
+  triggerObserve.stop('trg_capture_form');
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+});
+
+check('disconnectAll removes delegated form value listeners', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'disconnect-form-root' });
+  const leaf = makeNode({ tag: 'select', value: 'a', parent: container });
+  queryResolver = () => leaf;
+
+  assert.equal(triggerObserve.start('trg_select', '#select', 'text').ok, true);
+  assert.equal(container.listenerCount('input'), 1);
+  assert.equal(container.listenerCount('change'), 1);
+  triggerObserve.disconnectAll();
+  assert.equal(container.listenerCount('input'), 0);
+  assert.equal(container.listenerCount('change'), 0);
+  assert.equal(triggerObserve.registry.size, 0);
+});
+
+check('idempotent start disconnects prior observer before re-observe', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ role: 'status' });
+  const leaf = makeNode({ text: 'one', parent: container });
+  queryResolver = () => leaf;
+  assert.equal(triggerObserve.start('trg_same', '#same', 'text').ok, true);
+  const first = observerInstances[0];
+  assert.equal(triggerObserve.start('trg_same', '#same', 'text').ok, true);
+  assert.equal(first.disconnectCalls, 1);
+  assert.equal(observerInstances.length, 2);
+  assert.equal(triggerObserve.registry.size, 1);
+});
+
+check('stale armed dataset marker does not block a fresh observer start', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ role: 'status' });
+  const leaf = makeNode({
+    text: 'fresh',
+    parent: container,
+    dataset: { fsbTriggerArmed: 'trg_stale' }
+  });
+  queryResolver = () => leaf;
+
+  const started = triggerObserve.start('trg_stale', '#stale', 'text');
+  assert.equal(started.ok, true);
+  assert.equal(started.already, undefined);
+  assert.equal(observerInstances.length, 1);
+  assert.equal(triggerObserve.registry.size, 1);
+});
+
+check('leak test: disconnectAll pairs every observe with disconnect and empties registry', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const nodes = {
+    '#a': makeNode({ text: 'a', parent: makeNode({ id: 'a-root' }) }),
+    '#b': makeNode({ text: 'b', parent: makeNode({ id: 'b-root' }) }),
+    '#c': makeNode({ text: 'c', parent: makeNode({ id: 'c-root' }) })
+  };
+  queryResolver = (selector) => nodes[selector];
+  assert.equal(triggerObserve.start('trg_a', '#a', 'text').ok, true);
+  assert.equal(triggerObserve.start('trg_b', '#b', 'text').ok, true);
+  assert.equal(triggerObserve.start('trg_c', '#c', 'text').ok, true);
+  assert.equal(observeCount, 3);
+  triggerObserve.disconnectAll();
+  assert.equal(disconnectCount, observeCount);
+  assert.equal(triggerObserve.registry.size, 0);
+});
+
+check('persisted pagehide keeps observers; non-persisted pagehide and beforeunload disconnect', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'cache-root' });
+  const leaf = makeNode({ text: 'cache', parent: container });
+  queryResolver = () => leaf;
+  triggerObserve.start('trg_cache', '#cache', 'text');
+  invokeWindowEvent('pagehide', { persisted: true });
+  assert.equal(disconnectCount, 0);
+  assert.equal(triggerObserve.registry.size, 1);
+  invokeWindowEvent('pagehide', { persisted: false });
+  assert.equal(disconnectCount, 1);
+  assert.equal(triggerObserve.registry.size, 0);
+
+  triggerObserve.start('trg_unload', '#cache', 'text');
+  invokeWindowEvent('beforeunload', {});
+  assert.equal(triggerObserve.registry.size, 0);
+  assert.equal(disconnectCount, 2);
+});
+
+check('flush re-resolves each batch and retries after a stale disconnected cache hit', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'swap-root' });
+  const initial = makeNode({ text: 'old', parent: container });
+  queryResolver = () => initial;
+  assert.equal(triggerObserve.start('trg_swap', '#swap', 'text').ok, true);
+
+  const stale = makeNode({ text: 'stale', parent: container, connected: false });
+  const fresh = makeNode({ text: 'fresh', parent: container });
+  FSB.elementCache.set('#swap', stale);
+  let sequence = [stale, fresh];
+  queryCalls = 0;
+  queryResolver = () => sequence.shift() || fresh;
+  observerInstances[0].callback([{ type: 'childList' }]);
+  flushTimers();
+
+  assert.equal(queryCalls, 2);
+  assert.equal(sendMessages.length, 1);
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'fresh' });
+});
+
+check('flush during transient DOM detach suppresses the report (no fabricated empty text)', () => {
+  triggerObserve.disconnectAll();
+  resetRuntime();
+  const container = makeNode({ id: 'detach-root' });
+  const leaf = makeNode({ text: 'live', parent: container });
+  queryResolver = () => leaf;
+  assert.equal(triggerObserve.start('trg_detach', '#detach', 'text').ok, true);
+
+  // Mid-swap: the selector resolves to nothing. A pre-fix flush reported
+  // {text:''}, spuriously satisfying a 'changed' condition.
+  queryResolver = () => null;
+  observerInstances[0].callback([{ type: 'childList' }]);
+  flushTimers();
+  assert.equal(sendMessages.length, 0);
+
+  // Re-attach: the next mutation reports the settled value, not ''.
+  const reattached = makeNode({ text: 'settled', parent: container });
+  queryResolver = () => reattached;
+  observerInstances[0].callback([{ type: 'childList' }]);
+  flushTimers();
+  assert.equal(sendMessages.length, 1);
+  assert.deepEqual(plain(sendMessages[0].value), { text: 'settled' });
+});
+
+check('source invariants: setTimeout debounce, no rAF, no document.body target', () => {
+  const src = fs.readFileSync(modulePath, 'utf8');
+  assert(src.includes('setTimeout'), 'setTimeout debounce present');
+  assert(!src.includes('requestAnimationFrame'), 'requestAnimationFrame absent');
+  assert(!/\.observe\(document\.body/.test(src), 'document.body is not the observe target');
+  assert(src.includes('if (!e.persisted) disconnectAll();'), 'BF-cache persisted pagehide keeps observers');
+});
+
+console.log('\n--- trigger-observe summary ---');
+console.log('  passed:', passed);
+console.log('  failed:', failed);
+process.exit(failed > 0 ? 1 : 0);

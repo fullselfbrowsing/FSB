@@ -1,0 +1,63 @@
+{
+  "slug": "gitlab.create_note",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "create a note in gitlab",
+    "add a note in gitlab",
+    "make a new note in gitlab",
+    "open a new note in gitlab",
+    "create note in gitlab",
+    "add a comment to an issue or mr in gitlab"
+  ],
+  "description": "Add a comment (note) to an issue or merge request.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "noteable_type": {
+        "type": "string",
+        "enum": [
+          "issues",
+          "merge_requests"
+        ],
+        "description": "Type of the noteable: \"issues\" or \"merge_requests\""
+      },
+      "noteable_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "IID of the issue or merge request"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Note body in Markdown"
+      }
+    },
+    "required": [
+      "project",
+      "noteable_type",
+      "noteable_iid",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/create-note.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

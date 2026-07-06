@@ -1,0 +1,32 @@
+{
+  "slug": "vercel.get_user",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "get an user in vercel",
+    "look up an user in vercel",
+    "fetch a single user in vercel",
+    "view one specific user in vercel",
+    "get user in vercel",
+    "get current user profile in vercel"
+  ],
+  "description": "Get the profile of the currently authenticated Vercel user.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

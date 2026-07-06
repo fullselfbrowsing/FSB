@@ -1,0 +1,32 @@
+{
+  "slug": "chipotle.get_last_restaurant",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get a last restaurant in chipotle",
+    "look up a last restaurant in chipotle",
+    "fetch a single last restaurant in chipotle",
+    "view one specific last restaurant in chipotle",
+    "get last restaurant in chipotle",
+    "get the last restaurant ordered from in chipotle"
+  ],
+  "description": "Get the last Chipotle restaurant the user ordered from. Returns the restaurant ID which can be used with get_restaurant for full details.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-last-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

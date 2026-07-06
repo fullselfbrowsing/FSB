@@ -1,0 +1,70 @@
+{
+  "slug": "shortcut.create_iteration",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create an iteration in shortcut",
+    "add an iteration in shortcut",
+    "make a new iteration in shortcut",
+    "open a new iteration in shortcut",
+    "create iteration in shortcut",
+    "create a new iteration in shortcut"
+  ],
+  "description": "Create a new iteration (sprint). Requires name, start date, and end date.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Iteration name"
+      },
+      "start_date": {
+        "type": "string",
+        "description": "Start date in YYYY-MM-DD format"
+      },
+      "end_date": {
+        "type": "string",
+        "description": "End date in YYYY-MM-DD format"
+      },
+      "description": {
+        "description": "Iteration description",
+        "type": "string"
+      },
+      "label_ids": {
+        "description": "Label IDs to attach",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "group_ids": {
+        "description": "Team UUIDs to associate",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "name",
+      "start_date",
+      "end_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-iteration.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

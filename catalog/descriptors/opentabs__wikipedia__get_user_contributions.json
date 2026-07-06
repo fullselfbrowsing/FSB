@@ -1,0 +1,45 @@
+{
+  "slug": "wikipedia.get_user_contributions",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get user contributions in wikipedia",
+    "look up user contributions in wikipedia",
+    "fetch a single user contributions in wikipedia",
+    "view one specific user contributions in wikipedia",
+    "list edits made by a user in wikipedia"
+  ],
+  "description": "Get recent edits made by a Wikipedia user. Returns edited articles, revision IDs, timestamps, edit summaries, and page sizes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Wikipedia username"
+      },
+      "limit": {
+        "description": "Maximum number of contributions to return (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-user-contributions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

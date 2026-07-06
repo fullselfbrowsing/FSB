@@ -1,0 +1,59 @@
+{
+  "slug": "telegram.get_chat_members",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "get chat members in telegram",
+    "look up chat members in telegram",
+    "fetch a single chat members in telegram",
+    "view one specific chat members in telegram",
+    "list members of a group or channel in telegram"
+  ],
+  "description": "Get the member list of a group chat or channel. For channels/supergroups, set is_channel=true and optionally filter by query text.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Chat or channel numeric ID"
+      },
+      "is_channel": {
+        "description": "Whether this is a channel/supergroup (default false — regular group)",
+        "type": "boolean"
+      },
+      "query": {
+        "description": "Filter members by name (channels/supergroups only)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of members to return (default 50, max 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "peer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/get-chat-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

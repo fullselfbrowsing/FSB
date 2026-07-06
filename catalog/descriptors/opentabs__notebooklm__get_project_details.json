@@ -1,0 +1,39 @@
+{
+  "slug": "notebooklm.get_project_details",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "get project details in notebooklm",
+    "look up project details in notebooklm",
+    "fetch a single project details in notebooklm",
+    "view one specific project details in notebooklm",
+    "get notebook sharing details in notebooklm"
+  ],
+  "description": "Get sharing details and collaborators for a notebook, including the owner and permission level.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/get-project-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

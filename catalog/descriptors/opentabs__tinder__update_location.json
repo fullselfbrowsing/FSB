@@ -1,0 +1,45 @@
+{
+  "slug": "tinder.update_location",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "update a location in tinder",
+    "edit a location in tinder",
+    "change the details of location in tinder",
+    "modify a location in tinder",
+    "update location in tinder",
+    "update your location in tinder"
+  ],
+  "description": "Update your current location for Tinder discovery. This changes where you appear to other users and affects which profiles you see.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "lat": {
+        "type": "number",
+        "description": "Latitude coordinate"
+      },
+      "lon": {
+        "type": "number",
+        "description": "Longitude coordinate"
+      }
+    },
+    "required": [
+      "lat",
+      "lon"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/update-location.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

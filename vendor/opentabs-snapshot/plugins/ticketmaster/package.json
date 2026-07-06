@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs ticketmaster plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://www.ticketmaster.com/* -> service www.ticketmaster.com). www.ticketmaster.com derives the host stem 'www', so the dir-name STEM_OVERRIDES {ticketmaster:'ticketmaster'} canonicalizes the slug to opentabs__ticketmaster__* (the same first-label-isn't-the-app-name canonicalization as cloudflare/datadog/threads/doordash/opentable). www.ticketmaster.com is classified SENSITIVE (Phase 39-05, the payment/money-movement axis: buying tickets moves money) in extension/config/service-denylist.json, so the merge-time classifyGate sees a screened origin and does NOT abort. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, ticketmaster-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing; buy_tickets is the PAYMENT op (api {method:'POST'}). buy_tickets is a payment op (verbPrefix 'buy' is in the guard's PAYMENT_VERBS set AND 'buy_tickets' is in PAYMENT_OP_NAMES) DOM-only on the sensitive ticketmaster origin -> the payment-op CI guard PASSES (not safe-and-API-invocable; NO weakening -- DOM-only-on-sensitive).",
+  "name": "@opentabs-dev/opentabs-plugin-ticketmaster",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Ticketmaster",
+    "description": "OpenTabs plugin for Ticketmaster",
+    "urlPatterns": [
+      "*://www.ticketmaster.com/*"
+    ],
+    "homepage": "https://www.ticketmaster.com"
+  },
+  "license": "MIT"
+}

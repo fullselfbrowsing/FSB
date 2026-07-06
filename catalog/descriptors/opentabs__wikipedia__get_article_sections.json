@@ -1,0 +1,39 @@
+{
+  "slug": "wikipedia.get_article_sections",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get article sections in wikipedia",
+    "look up article sections in wikipedia",
+    "fetch a single article sections in wikipedia",
+    "view one specific article sections in wikipedia",
+    "get the table of contents of an article in wikipedia"
+  ],
+  "description": "Get the table of contents (section headings) of a Wikipedia article. Returns section index, heading level, heading text, and anchor. Use the section index with get_section_content to read individual sections.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\")"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-article-sections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

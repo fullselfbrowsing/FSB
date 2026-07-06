@@ -1,0 +1,40 @@
+{
+  "slug": "twitch.get_user_profile",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get an user profile in twitch",
+    "look up an user profile in twitch",
+    "fetch a single user profile in twitch",
+    "view one specific user profile in twitch",
+    "get user profile in twitch",
+    "get a twitch user profile by login name in twitch"
+  ],
+  "description": "Get a Twitch user profile by their login name. Returns display name, bio, follower count, partner/affiliate status, profile image, and account creation date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "login": {
+        "type": "string",
+        "description": "Twitch login name (e.g., \"shroud\", \"ninja\")"
+      }
+    },
+    "required": [
+      "login"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

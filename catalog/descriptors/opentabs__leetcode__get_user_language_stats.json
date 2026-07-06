@@ -1,0 +1,39 @@
+{
+  "slug": "leetcode.get_user_language_stats",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get user language stats in leetcode",
+    "look up user language stats in leetcode",
+    "fetch a single user language stats in leetcode",
+    "view one specific user language stats in leetcode",
+    "get language usage stats in leetcode"
+  ],
+  "description": "Get the programming languages a user has used for solving problems, with the number of problems solved in each language.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-user-language-stats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

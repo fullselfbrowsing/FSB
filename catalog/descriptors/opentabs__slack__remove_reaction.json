@@ -1,0 +1,50 @@
+{
+  "slug": "slack.remove_reaction",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "remove a reaction in slack",
+    "remove reaction in slack",
+    "remove an emoji reaction from a message in slack"
+  ],
+  "description": "Remove an emoji reaction from a Slack message",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the message to remove the reaction from — serves as the unique message ID (e.g., 1234567890.123456)"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Emoji name without colons (e.g., thumbsup, heart, rocket)"
+      }
+    },
+    "required": [
+      "channel",
+      "ts",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/remove-reaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

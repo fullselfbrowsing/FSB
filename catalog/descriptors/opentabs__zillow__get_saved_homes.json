@@ -1,0 +1,31 @@
+{
+  "slug": "zillow.get_saved_homes",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "get saved homes in zillow",
+    "look up saved homes in zillow",
+    "fetch a single saved homes in zillow",
+    "view one specific saved homes in zillow",
+    "get saved/favorited home zpids in zillow"
+  ],
+  "description": "Get the list of Zillow property IDs (zpids) that the current user has saved to their favorites. Returns the zpid list and total count. Use search_by_address or search_for_sale with specific zpids to get full property details for saved homes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/get-saved-homes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

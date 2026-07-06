@@ -1,0 +1,53 @@
+{
+  "slug": "retool.update_app_from_toolscript_archive",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "update an app from toolscript archive in retool",
+    "edit an app from toolscript archive in retool",
+    "change the details of app from toolscript archive in retool",
+    "modify an app from toolscript archive in retool",
+    "update app from toolscript archive in retool",
+    "update a retool app from a toolscript zip in retool"
+  ],
+  "description": "Overwrite an existing Retool app with a base64-encoded Toolscript ZIP archive. The tool uses Retool's own browser-side Toolscript compiler to produce a Transit appState string, fetches the latest page save ID for optimistic locking, then calls Retool's save API. The target app type must match the archive type when Retool exposes type metadata.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "UUID of the existing Retool app to overwrite"
+      },
+      "base64_zip": {
+        "type": "string",
+        "description": "Base64-encoded Toolscript ZIP archive"
+      },
+      "file_name": {
+        "description": "Optional archive file name used for Retool parser diagnostics",
+        "type": "string"
+      },
+      "branch_name": {
+        "description": "Optional source-control branch name for direct saves. Defaults to the branch in the targeted editor URL, if present.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_uuid",
+      "base64_zip"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/update-app-from-toolscript-archive.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

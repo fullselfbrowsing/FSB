@@ -60,6 +60,21 @@
                 "glob": "dashboard-runtime-state.js",
                 "input": "../js",
                 "output": "assets"
+              },
+              {
+                "glob": "fsb-knowledge-data.js",
+                "input": "../js",
+                "output": "assets"
+              },
+              {
+                "glob": "knowledge-graph.js",
+                "input": "../js",
+                "output": "assets"
+              },
+              {
+                "glob": "phantom-stream-viewer.js",
+                "input": "../js",
+                "output": "assets"
               }
             ],
             "styles": [

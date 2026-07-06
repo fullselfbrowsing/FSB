@@ -1,0 +1,68 @@
+{
+  "name": "@opentabs-dev/opentabs-plugin-vercel",
+  "description": "OpenTabs plugin for Vercel",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.87",
+  "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "opentabs": {
+    "displayName": "Vercel",
+    "description": "OpenTabs plugin for Vercel",
+    "urlPatterns": [
+      "*://vercel.com/*"
+    ],
+    "homepage": "https://vercel.com/dashboard",
+    "iconSvg": "<svg viewBox=\"0 0 74 74\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M37.5896 5.25L74.5396 69.25H0.639648L37.5896 5.25Z\" fill=\"black\"/> </svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 74 74\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <path d=\"M37.5896 5.25L74.5396 69.25H0.639648L37.5896 5.25Z\" fill=\"#ffffff\"/> </svg>"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "@biomejs/biome": "2.4.6",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/vercel"
+  }
+}

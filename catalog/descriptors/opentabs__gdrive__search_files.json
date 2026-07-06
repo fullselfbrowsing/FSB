@@ -1,0 +1,55 @@
+{
+  "slug": "gdrive.search_files",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "search files in gdrive",
+    "search files in google drive",
+    "search files by name or content in gdrive"
+  ],
+  "description": "Search for files and folders in Google Drive by name or full-text content. The query searches file names and document content. Use mime_type to filter by type (e.g., \"application/vnd.google-apps.folder\" for folders, \"application/vnd.google-apps.document\" for Docs, \"application/vnd.google-apps.spreadsheet\" for Sheets). Trashed files are excluded by default.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text to match against file names and content"
+      },
+      "mime_type": {
+        "description": "Filter by MIME type (e.g., \"application/vnd.google-apps.folder\", \"application/vnd.google-apps.document\", \"application/vnd.google-apps.spreadsheet\", \"application/pdf\")",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Maximum number of results (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "page_token": {
+        "description": "Page token for pagination",
+        "type": "string"
+      },
+      "include_trashed": {
+        "description": "Include trashed files (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/search-files.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "figma.trash_file",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "trash a file in figma",
+    "trash file in figma",
+    "move a file to the trash in figma"
+  ],
+  "description": "Move a Figma file to the trash. Trashed files can be restored.",
+  "actionVerb": "trash",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File key to trash"
+      }
+    },
+    "required": [
+      "file_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/trash-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "trash"
+    }
+  }
+}

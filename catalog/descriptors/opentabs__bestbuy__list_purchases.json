@@ -1,0 +1,38 @@
+{
+  "slug": "bestbuy.list_purchases",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "list purchases in bestbuy",
+    "show me my purchases in bestbuy",
+    "view my purchases in bestbuy",
+    "see all my purchases in bestbuy",
+    "list purchase history in bestbuy"
+  ],
+  "description": "List purchase history from Best Buy. Returns all orders including in-store purchases and online orders. Each order includes order ID, channel (store/online), date, total amount, and line items with product details. Optionally filter by year (e.g., 2024). By default returns the past 3 years of purchases. Negative totals indicate returns.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "year": {
+        "description": "Filter by year (e.g., 2024). Omit for past 3 years.",
+        "type": "integer",
+        "minimum": 2010,
+        "maximum": 2030
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/list-purchases.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

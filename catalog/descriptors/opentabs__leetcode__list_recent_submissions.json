@@ -1,0 +1,45 @@
+{
+  "slug": "leetcode.list_recent_submissions",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "list recent submissions in leetcode",
+    "show me my recent submissions in leetcode",
+    "view my recent submissions in leetcode",
+    "see all my recent submissions in leetcode",
+    "list recent accepted submissions in leetcode"
+  ],
+  "description": "List a user recent accepted submissions. Returns the most recent accepted solutions with problem title, language, and timestamp.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      },
+      "limit": {
+        "description": "Number of submissions to return (default 10, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/list-recent-submissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "notebooklm.delete_sources",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "delete sources in notebooklm",
+    "remove sources in notebooklm",
+    "trash sources in notebooklm",
+    "permanently delete sources in notebooklm"
+  ],
+  "description": "Delete one or more sources from a notebook.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "source_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of source UUIDs to delete"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "source_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/delete-sources.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

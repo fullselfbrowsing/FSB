@@ -1,0 +1,45 @@
+{
+  "slug": "azure.list_resource_providers",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list resource providers in azure",
+    "show me my resource providers in azure",
+    "view my resource providers in azure",
+    "see all my resource providers in azure",
+    "list resource providers in a subscription in azure"
+  ],
+  "description": "List all resource providers and their registration states for a subscription. Shows which providers are registered (available for use) vs not registered.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "top": {
+        "description": "Maximum number of results to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-resource-providers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

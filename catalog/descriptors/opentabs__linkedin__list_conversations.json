@@ -1,0 +1,31 @@
+{
+  "slug": "linkedin.list_conversations",
+  "service": "linkedin.com",
+  "intentSynonyms": [
+    "list conversations in linkedin",
+    "show me my conversations in linkedin",
+    "view my conversations in linkedin",
+    "see all my conversations in linkedin",
+    "list messaging conversations in linkedin"
+  ],
+  "description": "List recent messaging conversations from the LinkedIn inbox. Returns conversations with participant names, last message preview, and read status. Results are ordered by most recent activity.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linkedin/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

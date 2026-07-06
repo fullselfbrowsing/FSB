@@ -1,0 +1,32 @@
+{
+  "slug": "wikipedia.get_current_user",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get a current user in wikipedia",
+    "look up a current user in wikipedia",
+    "fetch a single current user in wikipedia",
+    "view one specific current user in wikipedia",
+    "get current user in wikipedia",
+    "get the logged-in user profile in wikipedia"
+  ],
+  "description": "Get the profile of the currently logged-in Wikipedia user including username, edit count, registration date, and user groups.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

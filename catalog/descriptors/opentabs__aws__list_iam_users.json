@@ -1,0 +1,42 @@
+{
+  "slug": "aws.list_iam_users",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list iam users in aws",
+    "show me my iam users in aws",
+    "view my iam users in aws",
+    "see all my iam users in aws",
+    "list iam users in the account in aws"
+  ],
+  "description": "List IAM users in the account. IAM is a global service. Returns user name, ID, ARN, and creation date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_items": {
+        "description": "Maximum users to return (default 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "path_prefix": {
+        "description": "Filter by path prefix (e.g., /division_abc/)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-iam-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

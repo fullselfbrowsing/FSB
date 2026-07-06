@@ -1,0 +1,53 @@
+{
+  "slug": "minimax.list_gallery_feed",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list a gallery feed in minimax",
+    "show me my gallery feed in minimax",
+    "view my gallery feed in minimax",
+    "see all my gallery feed in minimax",
+    "list gallery feed in minimax",
+    "browse gallery feed in minimax"
+  ],
+  "description": "Browse the gallery feed with pagination. Optionally filter by category and subcategory.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_num": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "category": {
+        "description": "Category name to filter by",
+        "type": "string"
+      },
+      "sub_category": {
+        "description": "Subcategory name to filter by",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-gallery-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

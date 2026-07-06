@@ -1,0 +1,13 @@
+{
+  "slug": "shopcorp.place_order",
+  "service": "checkout.shopcorp.example",
+  "description": "Place a paid order and checkout the cart (BRDTH-02 commerce/payment batch-gate fixture: a checkout/cart brand origin the widened finance/payment heuristic flags but that is NOT classified denied/sensitive)",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "_fixture": "BRDTH-02 (Phase 39): this commerce/payment origin trips the WIDENED finance/payment sensitivity axis (host 'checkout', slug 'place_order', description 'checkout the cart') but is absent from extension/config/service-denylist.json -> the merge-time classifyGate batch-coverage gate MUST reject it (the build aborts), proving the per-batch gate fails closed on an unclassified commerce/payment batch origin (distinct from the Phase-37 finance fixture batch-unclassified-origin.fixture.json [wallet/send_funds] and the Phase-38 social fixture batch-unclassified-social-origin.fixture.json [messenger]). _fixtures/ is excluded by readJsonDir non-recursion so it never ships."
+}

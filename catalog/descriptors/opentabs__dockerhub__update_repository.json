@@ -1,0 +1,57 @@
+{
+  "slug": "dockerhub.update_repository",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "update a repository in dockerhub",
+    "edit a repository in dockerhub",
+    "change the details of repository in dockerhub",
+    "modify a repository in dockerhub",
+    "update repository in dockerhub",
+    "update a repository in docker hub"
+  ],
+  "description": "Update a Docker Hub repository. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Namespace (user or organization)"
+      },
+      "repository": {
+        "type": "string",
+        "description": "Repository name"
+      },
+      "description": {
+        "description": "New short description",
+        "type": "string"
+      },
+      "full_description": {
+        "description": "New full description in Markdown",
+        "type": "string"
+      },
+      "is_private": {
+        "description": "Change visibility",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "namespace",
+      "repository"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/update-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

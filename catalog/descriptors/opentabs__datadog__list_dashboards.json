@@ -1,0 +1,36 @@
+{
+  "slug": "datadog.list_dashboards",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list dashboards in datadog",
+    "show me my dashboards in datadog",
+    "view my dashboards in datadog",
+    "see all my dashboards in datadog",
+    "list all datadog dashboards in datadog"
+  ],
+  "description": "List all dashboards in the Datadog organization. Returns dashboard summaries with titles, authors, and URLs.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "filter_shared": {
+        "description": "Filter to only shared dashboards",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-dashboards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

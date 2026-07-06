@@ -1,0 +1,30 @@
+{
+  "slug": "gdrive.empty_trash",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "empty a trash in gdrive",
+    "empty trash in gdrive",
+    "empty a trash in google drive",
+    "permanently delete all trashed files in gdrive"
+  ],
+  "description": "Permanently delete all files in the trash. This action cannot be undone. All trashed files will be permanently removed.",
+  "actionVerb": "empty",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/empty-trash.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "empty"
+    }
+  }
+}

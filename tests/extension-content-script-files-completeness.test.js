@@ -52,6 +52,9 @@ for (const entry of required) {
   assert(contentScriptFiles.includes(entry), 'CONTENT_SCRIPT_FILES includes ' + entry);
 }
 
+const duplicateEntries = contentScriptFiles.filter((entry, index) => contentScriptFiles.indexOf(entry) !== index);
+assert(duplicateEntries.length === 0, 'CONTENT_SCRIPT_FILES has no duplicate entries (found: ' + duplicateEntries.join(', ') + ')');
+
 const domStreamSource = fs.readFileSync(path.join(repoRoot, 'extension', 'content', 'dom-stream.js'), 'utf8');
 assert(/case 'pingDomStream'/.test(domStreamSource), 'dom-stream.js registers pingDomStream');
 assert(/domStreamReady/.test(domStreamSource), 'dom-stream.js emits domStreamReady');
@@ -62,5 +65,7 @@ assert(helperBody, '_getContentScriptFilesForInjection body found');
 for (const entry of required) {
   assert(helperBody[0].includes("'" + entry + "'"), 'fallback injection bundle includes ' + entry);
 }
+const helperDomStreamCount = (helperBody[0].match(/'content\/dom-stream\.js'/g) || []).length;
+assert(helperDomStreamCount === 1, 'fallback injection bundle lists dom-stream.js exactly once');
 
 console.log('All content script injection bundle checks passed.');

@@ -1,0 +1,52 @@
+{
+  "slug": "excel.insert_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "insert a range in excel",
+    "insert range in excel",
+    "insert a range in excel online",
+    "insert cells and shift existing data in excel"
+  ],
+  "description": "Insert new blank cells at a range address, shifting existing cells down or to the right. Use shift=\"Down\" to push cells down or shift=\"Right\" to push cells right.",
+  "actionVerb": "insert",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address where new cells are inserted (e.g., \"A2:A5\")"
+      },
+      "shift": {
+        "type": "string",
+        "enum": [
+          "Down",
+          "Right"
+        ],
+        "description": "Direction to shift existing cells: \"Down\" or \"Right\""
+      }
+    },
+    "required": [
+      "worksheet",
+      "address",
+      "shift"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/insert-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "insert"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "slug": "jira.create_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "create an issue in jira",
+    "add an issue in jira",
+    "make a new issue in jira",
+    "open a new issue in jira",
+    "file a bug in jira",
+    "log a bug in jira"
+  ],
+  "description": "Create a new Jira issue in a project. Requires a project key, summary, and issue type.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "type": "string",
+        "description": "Project key to create the issue in (e.g. \"KAN\")"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Issue summary/title"
+      },
+      "issue_type": {
+        "description": "Issue type name (e.g. \"Task\", \"Story\", \"Bug\", \"Epic\"). Defaults to \"Task\"",
+        "type": "string"
+      },
+      "description": {
+        "description": "Issue description in plain text",
+        "type": "string"
+      },
+      "priority": {
+        "description": "Priority name (e.g. \"Highest\", \"High\", \"Medium\", \"Low\", \"Lowest\")",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "Assignee account ID (use search_users to find IDs)",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Labels to apply to the issue",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "parent_key": {
+        "description": "Parent issue key for creating a subtask or child issue (e.g. \"KAN-1\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_key",
+      "summary"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/create-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

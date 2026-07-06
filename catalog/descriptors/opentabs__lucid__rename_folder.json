@@ -1,0 +1,42 @@
+{
+  "slug": "lucid.rename_folder",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "rename a folder in lucid",
+    "rename folder in lucid",
+    "rename an existing folder by its folder entry id in lucid"
+  ],
+  "description": "Rename an existing folder by its folder entry ID.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "entry_id": {
+        "type": "string",
+        "description": "Folder entry ID to rename"
+      },
+      "name": {
+        "type": "string",
+        "description": "New folder name"
+      }
+    },
+    "required": [
+      "entry_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/rename-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "rename"
+    }
+  }
+}

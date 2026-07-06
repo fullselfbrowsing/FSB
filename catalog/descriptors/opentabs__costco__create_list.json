@@ -1,0 +1,44 @@
+{
+  "slug": "costco.create_list",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "create a list in costco",
+    "add a list in costco",
+    "make a new list in costco",
+    "open a new list in costco",
+    "create list in costco",
+    "create a new shopping list in costco"
+  ],
+  "description": "Create a new shopping list (wishlist) on the Costco account.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Title for the new list"
+      },
+      "description": {
+        "description": "Description for the list",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/create-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

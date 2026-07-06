@@ -1,0 +1,45 @@
+{
+  "slug": "glama.get_server",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "get a server in glama",
+    "look up a server in glama",
+    "fetch a single server in glama",
+    "view one specific server in glama",
+    "get server in glama",
+    "get detailed information about an mcp server in glama"
+  ],
+  "description": "Get detailed information about a specific MCP server, including its description, scores, integrations, tools, and discussion comment count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Owner/namespace slug of the server"
+      },
+      "slug": {
+        "type": "string",
+        "description": "Server slug"
+      }
+    },
+    "required": [
+      "namespace",
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/get-server.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

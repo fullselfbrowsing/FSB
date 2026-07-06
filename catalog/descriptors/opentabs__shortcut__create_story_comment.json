@@ -1,0 +1,47 @@
+{
+  "slug": "shortcut.create_story_comment",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create a story comment in shortcut",
+    "add a story comment in shortcut",
+    "make a new story comment in shortcut",
+    "open a new story comment in shortcut",
+    "create story comment in shortcut",
+    "add a comment to a story in shortcut"
+  ],
+  "description": "Add a comment to a story. Supports Markdown formatting.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Story numeric ID"
+      },
+      "text": {
+        "type": "string",
+        "description": "Comment body in Markdown"
+      }
+    },
+    "required": [
+      "story_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-story-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

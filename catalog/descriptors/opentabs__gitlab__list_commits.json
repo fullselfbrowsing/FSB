@@ -1,0 +1,68 @@
+{
+  "slug": "gitlab.list_commits",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list commits in gitlab",
+    "show me my commits in gitlab",
+    "view my commits in gitlab",
+    "see all my commits in gitlab",
+    "list commits for a project in gitlab"
+  ],
+  "description": "List commits for a project. Can filter by branch, path, and date range.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "ref_name": {
+        "description": "Branch or tag name (defaults to the default branch)",
+        "type": "string"
+      },
+      "path": {
+        "description": "File or directory path to filter commits",
+        "type": "string"
+      },
+      "since": {
+        "description": "Only commits after this ISO 8601 date",
+        "type": "string"
+      },
+      "until": {
+        "description": "Only commits before this ISO 8601 date",
+        "type": "string"
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-commits.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

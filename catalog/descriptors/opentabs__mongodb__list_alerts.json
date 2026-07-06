@@ -1,0 +1,31 @@
+{
+  "slug": "mongodb.list_alerts",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "list alerts in mongodb",
+    "show me my alerts in mongodb",
+    "view my alerts in mongodb",
+    "see all my alerts in mongodb",
+    "list project alerts in mongodb"
+  ],
+  "description": "List all active alerts for the current MongoDB Atlas project including event type, status, and affected cluster.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/list-alerts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

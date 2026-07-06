@@ -1,0 +1,31 @@
+{
+  "slug": "fidelity.list_accounts",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "list accounts in fidelity",
+    "show me my accounts in fidelity",
+    "view my accounts in fidelity",
+    "see all my accounts in fidelity",
+    "list all accounts with balances in fidelity"
+  ],
+  "description": "List all Fidelity accounts with balances, types, and gain/loss. Includes brokerage, retirement, workplace, and external linked accounts. Hidden accounts are included with is_hidden=true.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/list-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

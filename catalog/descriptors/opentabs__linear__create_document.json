@@ -1,0 +1,52 @@
+{
+  "slug": "linear.create_document",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a document in linear",
+    "add a document in linear",
+    "make a new document in linear",
+    "open a new document in linear",
+    "create document in linear",
+    "create a new document in linear"
+  ],
+  "description": "Create a new document in Linear, optionally associated with a project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Document title"
+      },
+      "content": {
+        "description": "Document content in markdown",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Project UUID to associate the document with",
+        "type": "string"
+      },
+      "icon": {
+        "description": "Icon emoji for the document",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

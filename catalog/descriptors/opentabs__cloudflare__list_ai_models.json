@@ -1,0 +1,52 @@
+{
+  "slug": "cloudflare.list_ai_models",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list ai models in cloudflare",
+    "show me my ai models in cloudflare",
+    "view my ai models in cloudflare",
+    "see all my ai models in cloudflare",
+    "list workers ai models in cloudflare"
+  ],
+  "description": "Search and list Workers AI models available in the account. Returns model names, descriptions, task types, and properties. Supports filtering by name and task.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "search": {
+        "description": "Search query to filter models by name",
+        "type": "string"
+      },
+      "task": {
+        "description": "Filter by task type (e.g., \"Text Generation\", \"Image Classification\")",
+        "type": "string"
+      },
+      "per_page": {
+        "description": "Results per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-ai-models.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

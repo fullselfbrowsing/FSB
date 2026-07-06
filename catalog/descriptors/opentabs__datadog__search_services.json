@@ -1,0 +1,43 @@
+{
+  "slug": "datadog.search_services",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search services in datadog",
+    "search the service catalog in datadog",
+    "search services in the service catalog by name, team, or other attributes in datadog"
+  ],
+  "description": "Search services in the service catalog by name, team, or other attributes.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query to filter services by name or attributes"
+      },
+      "page_size": {
+        "description": "Results per page",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-services.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

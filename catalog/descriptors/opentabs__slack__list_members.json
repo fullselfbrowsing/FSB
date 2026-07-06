@@ -1,0 +1,50 @@
+{
+  "slug": "slack.list_members",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "list members in slack",
+    "show me my members in slack",
+    "view my members in slack",
+    "see all my members in slack",
+    "list members of a channel in slack"
+  ],
+  "description": "List member user IDs of a Slack channel with optional pagination. Returns user IDs only — use get_user_profile to resolve a specific user ID to a name/profile, or list_users to get all workspace users with names.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to list members for (e.g., C01234567)"
+      },
+      "limit": {
+        "description": "Maximum number of members to return (default 100, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response for fetching the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/list-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

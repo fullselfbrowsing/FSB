@@ -1,0 +1,47 @@
+{
+  "slug": "linear.list_attachments",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list attachments in linear",
+    "show me my attachments in linear",
+    "view my attachments in linear",
+    "see all my attachments in linear",
+    "list attachments on an issue in linear"
+  ],
+  "description": "List attachments (linked PRs, documents, URLs) on a Linear issue.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to list attachments for"
+      },
+      "limit": {
+        "description": "Maximum number of attachments to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-attachments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

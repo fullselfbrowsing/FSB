@@ -1,0 +1,51 @@
+{
+  "slug": "opentable.get_restaurant",
+  "service": "www.opentable.com",
+  "intentSynonyms": [
+    "get a restaurant in opentable",
+    "look up a restaurant in opentable",
+    "fetch a single restaurant in opentable",
+    "view one specific restaurant in opentable",
+    "get restaurant in opentable",
+    "look up an opentable restaurant in opentable"
+  ],
+  "description": "Get the details, menu, and available time slots of a single OpenTable restaurant by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant ID to fetch"
+      },
+      "date": {
+        "description": "Reservation date (YYYY-MM-DD) for live availability",
+        "type": "string"
+      },
+      "party_size": {
+        "description": "Party size for live availability",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/opentable/src/tools/get-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

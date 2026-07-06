@@ -1,0 +1,40 @@
+{
+  "slug": "retool.delete_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "delete a folder in retool",
+    "remove a folder in retool",
+    "trash a folder in retool",
+    "permanently delete a folder in retool",
+    "delete folder in retool",
+    "delete an empty folder in retool"
+  ],
+  "description": "Permanently delete a folder. The folder must be empty (no apps or subfolders). Use list_apps to find folder IDs.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "number",
+        "description": "Folder ID to delete"
+      }
+    },
+    "required": [
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/delete-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

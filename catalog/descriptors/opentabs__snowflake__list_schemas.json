@@ -1,0 +1,39 @@
+{
+  "slug": "snowflake.list_schemas",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "list schemas in snowflake",
+    "show me my schemas in snowflake",
+    "view my schemas in snowflake",
+    "see all my schemas in snowflake",
+    "list schemas in a database in snowflake"
+  ],
+  "description": "List schemas in a Snowflake database. Returns schema names, owners, and creation timestamps. Use browse_data to find available database names first.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "database": {
+        "type": "string",
+        "description": "Database name to list schemas for"
+      }
+    },
+    "required": [
+      "database"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/list-schemas.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

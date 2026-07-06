@@ -1,0 +1,36 @@
+{
+  "slug": "tinder.get_updates",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "get updates in tinder",
+    "look up updates in tinder",
+    "fetch a single updates in tinder",
+    "view one specific updates in tinder",
+    "get recent activity updates in tinder"
+  ],
+  "description": "Get recent activity updates including new matches, messages, and blocks since a given date. Pass an empty string for last_activity_date to get all recent updates.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "last_activity_date": {
+        "description": "ISO 8601 date to get updates since, empty for all recent",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/get-updates.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

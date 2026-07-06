@@ -1,0 +1,84 @@
+{
+  "slug": "outlook.create_draft",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "create a draft in outlook",
+    "add a draft in outlook",
+    "make a new draft in outlook",
+    "open a new draft in outlook",
+    "create draft in outlook",
+    "create a draft email in outlook"
+  ],
+  "description": "Create a draft email message in the Drafts folder. The user can review and send it manually from Outlook.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Recipient email addresses"
+      },
+      "subject": {
+        "type": "string",
+        "description": "Email subject"
+      },
+      "body": {
+        "type": "string",
+        "description": "Email body content"
+      },
+      "body_type": {
+        "description": "Body content type (default: text)",
+        "type": "string",
+        "enum": [
+          "text",
+          "html"
+        ]
+      },
+      "cc": {
+        "description": "CC recipient email addresses",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "bcc": {
+        "description": "BCC recipient email addresses",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "importance": {
+        "description": "Importance level",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high"
+        ]
+      }
+    },
+    "required": [
+      "to",
+      "subject",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/create-draft.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

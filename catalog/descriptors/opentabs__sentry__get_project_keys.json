@@ -1,0 +1,39 @@
+{
+  "slug": "sentry.get_project_keys",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "get project keys in sentry",
+    "look up project keys in sentry",
+    "fetch a single project keys in sentry",
+    "view one specific project keys in sentry",
+    "list dsn keys for a project in sentry"
+  ],
+  "description": "List client keys (DSNs) for a Sentry project. The DSN is needed to initialize the Sentry SDK in your application. Returns the public DSN, key name, and active status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug to retrieve keys for"
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/get-project-keys.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

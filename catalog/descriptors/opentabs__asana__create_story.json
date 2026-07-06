@@ -1,0 +1,47 @@
+{
+  "slug": "asana.create_story",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "create a story in asana",
+    "add a story in asana",
+    "make a new story in asana",
+    "open a new story in asana",
+    "create story in asana",
+    "add a comment to a task in asana"
+  ],
+  "description": "Add a comment to a task.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to add the comment to"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment text to post on the task"
+      }
+    },
+    "required": [
+      "task_gid",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/create-story.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

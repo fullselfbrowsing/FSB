@@ -1,0 +1,58 @@
+{
+  "slug": "etsy.search_listings",
+  "service": "www.etsy.com",
+  "intentSynonyms": [
+    "search listings in etsy",
+    "search listings on etsy in etsy",
+    "search etsy handmade and vintage marketplace listings by keyword in etsy"
+  ],
+  "description": "Search Etsy handmade and vintage marketplace listings by keyword. Optionally filter by category and sort the results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search keywords (item name, material, or style)"
+      },
+      "category": {
+        "description": "Category to filter by",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Result ordering",
+        "type": "string",
+        "enum": [
+          "relevance",
+          "price_low_to_high",
+          "price_high_to_low",
+          "newest"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of listings to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/etsy/src/tools/search-listings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

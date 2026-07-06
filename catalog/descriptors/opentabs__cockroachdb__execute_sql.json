@@ -1,0 +1,49 @@
+{
+  "slug": "cockroachdb.execute_sql",
+  "service": "cockroachlabs.cloud",
+  "intentSynonyms": [
+    "execute a sql in cockroachdb",
+    "execute sql in cockroachdb",
+    "execute sql statements on a cluster in cockroachdb"
+  ],
+  "description": "Execute one or more SQL statements against a CockroachDB cluster. Returns column names and row data for each statement. The cluster must be in CREATED state and have available capacity.",
+  "actionVerb": "execute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cluster_id": {
+        "type": "string",
+        "description": "Cluster UUID"
+      },
+      "statements": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "SQL statements to execute"
+      },
+      "database": {
+        "description": "Database name to use (defaults to defaultdb)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "cluster_id",
+      "statements"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cockroachdb/src/tools/execute-sql.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "execute"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "slug": "notion.loadPage",
+  "service": "app.notion.com",
+  "intentSynonyms": [
+    "load a notion page",
+    "open a notion page",
+    "read a notion page",
+    "fetch a notion page",
+    "show a notion page"
+  ],
+  "description": "Load a Notion page (T1a /api/v3 RPC handler, read)",
+  "actionVerb": "load",
+  "sideEffectClass": "read",
+  "backing": "handler",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pageId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "type": "object"
+      }
+    },
+    "required": ["pageId"],
+    "additionalProperties": false
+  }
+}

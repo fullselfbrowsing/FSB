@@ -1,0 +1,37 @@
+{
+  "slug": "glama.search_tools",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "search tools in glama",
+    "search for mcp tools across all servers in glama",
+    "search for mcp tools across all servers in the glama directory in glama"
+  ],
+  "description": "Search for MCP tools across all servers in the Glama directory. Returns matching tools with their parent server information.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query to find MCP tools"
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/search-tools.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

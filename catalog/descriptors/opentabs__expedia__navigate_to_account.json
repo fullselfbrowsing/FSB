@@ -1,0 +1,29 @@
+{
+  "slug": "expedia.navigate_to_account",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "navigate a to account in expedia",
+    "navigate to account in expedia",
+    "open the account settings page in expedia"
+  ],
+  "description": "Navigate the browser to the Expedia account settings page where the user can manage their profile, OneKey rewards, payment methods, and preferences.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/navigate-to-account.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

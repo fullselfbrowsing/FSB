@@ -1,0 +1,39 @@
+{
+  "slug": "retool.delete_resource_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "delete a resource folder in retool",
+    "remove a resource folder in retool",
+    "trash a resource folder in retool",
+    "permanently delete a resource folder in retool",
+    "delete resource folder in retool"
+  ],
+  "description": "Delete a resource folder. The folder must be empty (no resources inside).",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_folder_id": {
+        "type": "number",
+        "description": "Resource folder ID to delete"
+      }
+    },
+    "required": [
+      "resource_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/delete-resource-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

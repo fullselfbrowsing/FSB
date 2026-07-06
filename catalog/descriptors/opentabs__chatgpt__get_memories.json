@@ -1,0 +1,31 @@
+{
+  "slug": "chatgpt.get_memories",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "get memories in chatgpt",
+    "look up memories in chatgpt",
+    "fetch a single memories in chatgpt",
+    "view one specific memories in chatgpt",
+    "get your chatgpt memories in chatgpt"
+  ],
+  "description": "Get all ChatGPT memories. Memories are facts ChatGPT remembers about you across conversations. Returns the memory list and token usage.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/get-memories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

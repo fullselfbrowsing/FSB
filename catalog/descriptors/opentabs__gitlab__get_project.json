@@ -1,0 +1,41 @@
+{
+  "slug": "gitlab.get_project",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "get a project in gitlab",
+    "look up a project in gitlab",
+    "fetch a single project in gitlab",
+    "view one specific project in gitlab",
+    "get project in gitlab",
+    "get project details in gitlab"
+  ],
+  "description": "Get detailed information about a specific project by its path (e.g., \"group/project\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      }
+    },
+    "required": [
+      "project"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

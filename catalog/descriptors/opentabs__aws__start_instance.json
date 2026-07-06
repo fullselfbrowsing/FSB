@@ -1,0 +1,38 @@
+{
+  "slug": "aws.start_instance",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "start an instance in aws",
+    "start instance in aws",
+    "start a stopped ec2 instance in aws"
+  ],
+  "description": "Start a stopped EC2 instance. The instance must be in the \"stopped\" state. Returns the previous and current state of the instance.",
+  "actionVerb": "start",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instance_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "EC2 instance ID to start (e.g., i-1234567890abcdef0)"
+      }
+    },
+    "required": [
+      "instance_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/start-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "start"
+    }
+  }
+}

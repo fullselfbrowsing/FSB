@@ -1,0 +1,44 @@
+{
+  "slug": "claude.create_project",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "create a project in claude",
+    "add a project in claude",
+    "make a new project in claude",
+    "open a new project in claude",
+    "create project in claude",
+    "create a new project in claude"
+  ],
+  "description": "Create a new project in the current organization.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Project name"
+      },
+      "description": {
+        "description": "Project description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/create-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

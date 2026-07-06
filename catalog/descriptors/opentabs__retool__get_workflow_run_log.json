@@ -1,0 +1,40 @@
+{
+  "slug": "retool.get_workflow_run_log",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get a workflow run log in retool",
+    "look up a workflow run log in retool",
+    "fetch a single workflow run log in retool",
+    "view one specific workflow run log in retool",
+    "get workflow run log in retool",
+    "get execution logs for a workflow run in retool"
+  ],
+  "description": "Get execution logs for a workflow run. Each log entry captures a step in the workflow execution, useful for debugging failures and understanding execution flow.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "run_id": {
+        "type": "string",
+        "description": "Workflow run ID"
+      }
+    },
+    "required": [
+      "run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-workflow-run-log.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

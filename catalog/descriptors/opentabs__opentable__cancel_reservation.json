@@ -1,0 +1,42 @@
+{
+  "slug": "opentable.cancel_reservation",
+  "service": "www.opentable.com",
+  "intentSynonyms": [
+    "cancel a reservation in opentable",
+    "cancel reservation in opentable",
+    "cancel my opentable reservation in opentable"
+  ],
+  "description": "Cancel an OpenTable reservation by its ID. A late cancellation may incur a charge per the restaurant policy.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "reservation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The reservation ID to cancel"
+      },
+      "reason": {
+        "description": "Optional cancellation reason",
+        "type": "string"
+      }
+    },
+    "required": [
+      "reservation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/opentable/src/tools/cancel-reservation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "wikipedia.get_article_links",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get article links in wikipedia",
+    "look up article links in wikipedia",
+    "fetch a single article links in wikipedia",
+    "view one specific article links in wikipedia",
+    "list internal links from an article in wikipedia"
+  ],
+  "description": "Get the internal Wikipedia links from an article. Returns titles of all linked articles. Useful for exploring related topics.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\")"
+      },
+      "limit": {
+        "description": "Maximum number of links to return (default 50, max 500)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-article-links.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

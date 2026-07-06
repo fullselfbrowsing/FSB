@@ -1,0 +1,40 @@
+{
+  "slug": "instacart.get_order",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "get an order in instacart",
+    "look up an order in instacart",
+    "fetch a single order in instacart",
+    "view one specific order in instacart",
+    "get order in instacart",
+    "get order details in instacart"
+  ],
+  "description": "Get details of a specific order by its delivery ID. Returns status, retailer name, total, and item count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "Order delivery ID (from list_orders)"
+      }
+    },
+    "required": [
+      "order_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/get-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "priceline.get_favorite_hotels",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get favorite hotels in priceline",
+    "look up favorite hotels in priceline",
+    "fetch a single favorite hotels in priceline",
+    "view one specific favorite hotels in priceline",
+    "get your saved hotels in a city in priceline"
+  ],
+  "description": "Get the user's favorite (saved) hotels in a specific city. Returns hotel IDs and names that the user has previously marked as favorites.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "city_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Priceline city ID (numeric)"
+      }
+    },
+    "required": [
+      "city_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-favorite-hotels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "airbnb.list_message_threads",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "list message threads in airbnb",
+    "show me my message threads in airbnb",
+    "view my message threads in airbnb",
+    "see all my message threads in airbnb",
+    "list message threads from inbox in airbnb"
+  ],
+  "description": "List message threads from the user's inbox. Supports filtering by category (all, traveling, support).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of threads to return (default 15)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "filter": {
+        "description": "Inbox filter category (default all)",
+        "type": "string",
+        "enum": [
+          "all",
+          "traveling",
+          "support"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/list-message-threads.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

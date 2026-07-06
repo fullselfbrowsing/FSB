@@ -1,0 +1,41 @@
+{
+  "slug": "shortcut.list_iteration_stories",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "list iteration stories in shortcut",
+    "show me my iteration stories in shortcut",
+    "view my iteration stories in shortcut",
+    "see all my iteration stories in shortcut",
+    "list stories in an iteration in shortcut"
+  ],
+  "description": "List all stories that belong to a specific iteration (sprint).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "iteration_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Iteration numeric ID"
+      }
+    },
+    "required": [
+      "iteration_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/list-iteration-stories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

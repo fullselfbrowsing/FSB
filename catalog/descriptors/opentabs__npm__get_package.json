@@ -1,0 +1,40 @@
+{
+  "slug": "npm.get_package",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get a package in npm",
+    "look up a package in npm",
+    "fetch a single package in npm",
+    "view one specific package in npm",
+    "get package in npm",
+    "get npm package details in npm"
+  ],
+  "description": "Get detailed information about an npm package including version, description, maintainers, dist-tags, download stats, dependencies, and star status. Use the exact package name including scope (e.g., \"@types/node\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Package name (e.g., \"express\", \"@types/node\")"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-package.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

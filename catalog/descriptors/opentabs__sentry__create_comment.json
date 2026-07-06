@@ -1,0 +1,45 @@
+{
+  "slug": "sentry.create_comment",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "create a comment in sentry",
+    "add a comment in sentry",
+    "make a new comment in sentry",
+    "open a new comment in sentry",
+    "create comment in sentry",
+    "add a comment to an issue in sentry"
+  ],
+  "description": "Add a comment (note) to a Sentry issue. The comment is posted as the authenticated user.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "The issue ID to comment on"
+      },
+      "text": {
+        "type": "string",
+        "description": "Comment text content"
+      }
+    },
+    "required": [
+      "issue_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

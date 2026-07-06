@@ -1,0 +1,37 @@
+{
+  "slug": "pandaexpress.cancel_order",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "cancel an order in pandaexpress",
+    "cancel order in pandaexpress",
+    "cancel a pending order in pandaexpress"
+  ],
+  "description": "Cancel a previously submitted order. Only works for orders that have not yet been prepared. The order ID can be obtained from get_recent_orders.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "Order ID to cancel (from get_recent_orders)"
+      }
+    },
+    "required": [
+      "order_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/cancel-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "cancel"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_menu_groups",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get menu groups in chipotle",
+    "look up menu groups in chipotle",
+    "fetch a single menu groups in chipotle",
+    "view one specific menu groups in chipotle",
+    "get menu categories from local page state in chipotle"
+  ],
+  "description": "Get menu group categories (e.g. \"Burrito\", \"Bowl\", \"Tacos\") from the locally cached Vuex store. No API call is made — reads from the current page state.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-menu-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

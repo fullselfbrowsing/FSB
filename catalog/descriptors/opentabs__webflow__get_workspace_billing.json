@@ -1,0 +1,40 @@
+{
+  "slug": "webflow.get_workspace_billing",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get a workspace billing in webflow",
+    "look up a workspace billing in webflow",
+    "fetch a single workspace billing in webflow",
+    "view one specific workspace billing in webflow",
+    "get workspace billing in webflow",
+    "get workspace billing plan in webflow"
+  ],
+  "description": "Get the billing plan details for a Webflow workspace including plan name, price, and billing period. Returns empty fields for free-tier workspaces.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-workspace-billing.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

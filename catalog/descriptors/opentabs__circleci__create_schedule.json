@@ -1,0 +1,139 @@
+{
+  "slug": "circleci.create_schedule",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "create a schedule in circleci",
+    "add a schedule in circleci",
+    "make a new schedule in circleci",
+    "open a new schedule in circleci",
+    "create schedule in circleci",
+    "create a scheduled trigger in circleci"
+  ],
+  "description": "Create a scheduled pipeline trigger for a project. Requires a timetable specifying when to run.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "name": {
+        "type": "string",
+        "description": "Schedule name"
+      },
+      "description": {
+        "description": "Schedule description",
+        "type": "string"
+      },
+      "attribution_actor": {
+        "type": "string",
+        "enum": [
+          "current",
+          "system"
+        ],
+        "description": "Who the pipeline runs as (\"current\" for your user, \"system\" for system)"
+      },
+      "timetable": {
+        "type": "object",
+        "properties": {
+          "per_hour": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "Triggers per hour (1-60)"
+          },
+          "hours_of_day": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            "description": "Hours of day to run (0-23)"
+          },
+          "days_of_week": {
+            "description": "Days of week",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MON",
+                "TUE",
+                "WED",
+                "THU",
+                "FRI",
+                "SAT",
+                "SUN"
+              ]
+            }
+          },
+          "days_of_month": {
+            "description": "Days of month (1-31)",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31
+            }
+          },
+          "months": {
+            "description": "Months of year",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "JAN",
+                "FEB",
+                "MAR",
+                "APR",
+                "MAY",
+                "JUN",
+                "JUL",
+                "AUG",
+                "SEP",
+                "OCT",
+                "NOV",
+                "DEC"
+              ]
+            }
+          }
+        },
+        "required": [
+          "per_hour",
+          "hours_of_day"
+        ],
+        "additionalProperties": false,
+        "description": "Schedule timetable"
+      },
+      "parameters": {
+        "description": "Pipeline parameters",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "project_slug",
+      "name",
+      "attribution_actor",
+      "timetable"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/create-schedule.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

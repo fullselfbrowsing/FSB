@@ -499,6 +499,42 @@ async function runVisualSessionRouteCase() {
   assertEqual(ended.cleared, true, 'visual-session end returns the clear result');
 }
 
+async function runTriggerMessageRouteCase() {
+  console.log('\n--- trigger message route dispatch ---');
+
+  const dispatched = [];
+  const harness = buildClientHarness({
+    dispatchMcpMessageRoute: async ({ type, payload, mcpMsgId }) => {
+      dispatched.push({ type, payload, mcpMsgId });
+      return { success: true, routed: type };
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+
+  const cases = [
+    ['mcp:trigger', { selector: '#price', condition: { kind: 'changed' }, target_tab_id: 7 }],
+    ['mcp:stop-trigger', { trigger_id: 'trg_1', tab_id: 7 }],
+    ['mcp:get-trigger-status', { trigger_id: 'trg_1', tab_id: 7 }],
+    ['mcp:list-triggers', { status: 'armed', tab_id: 7 }]
+  ];
+
+  for (let i = 0; i < cases.length; i++) {
+    const [type, payload] = cases[i];
+    const result = await client._routeMessage(type, payload, `mcp-msg-trigger-${i}`);
+    assertDeepEqual(
+      toPlainObject(result),
+      { success: true, routed: type },
+      `${type} returns dispatcher response`,
+    );
+  }
+
+  assertDeepEqual(
+    toPlainObject(dispatched),
+    cases.map(([type, payload], i) => ({ type, payload, mcpMsgId: `mcp-msg-trigger-${i}` })),
+    'trigger MCP messages route through dispatchMcpMessageRoute',
+  );
+}
+
 function runBackgroundArmingSourceCase() {
   console.log('\n--- background wake arming source ---');
 
@@ -546,6 +582,7 @@ async function run() {
   await runAutomationLifecycleBusCase();
   await runBackgroundLifecycleBroadcasterSourceCase();
   await runVisualSessionRouteCase();
+  await runTriggerMessageRouteCase();
   runBackgroundArmingSourceCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

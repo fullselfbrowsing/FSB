@@ -1,0 +1,40 @@
+{
+  "slug": "expedia.list_trips",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "list trips in expedia",
+    "show me my trips in expedia",
+    "view my trips in expedia",
+    "see all my trips in expedia",
+    "list booked or planned trips in expedia"
+  ],
+  "description": "List the user's trips on Expedia. Reads trip data from the currently loaded trips page. If not on the trips page, navigates to it first. Filter by trip type: \"BOOKED\" for confirmed bookings, \"PLANNED\" for saved/planned trips.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "trip_type": {
+        "description": "Trip type filter (default \"BOOKED\")",
+        "type": "string",
+        "enum": [
+          "BOOKED",
+          "PLANNED"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/list-trips.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

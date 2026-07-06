@@ -1,0 +1,44 @@
+{
+  "slug": "airtable.list_records",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "list records in airtable",
+    "show me my records in airtable",
+    "view my records in airtable",
+    "see all my records in airtable",
+    "list all records in a table in airtable"
+  ],
+  "description": "List all records (rows) in a table. Returns record IDs, creation times, and cell values keyed by field ID. Use get_base_schema first to learn the field IDs and their types.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "base_id": {
+        "type": "string",
+        "description": "Base ID (app prefix)"
+      },
+      "table_id": {
+        "type": "string",
+        "description": "Table ID (tbl prefix)"
+      }
+    },
+    "required": [
+      "base_id",
+      "table_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/list-records.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "retool.create_app",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "create an app in retool",
+    "add an app in retool",
+    "make a new app in retool",
+    "open a new app in retool",
+    "create app in retool",
+    "create a new retool web app in retool"
+  ],
+  "description": "Create a new Retool web app (page). The app is created in the specified folder. Returns the initial save record.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new app"
+      },
+      "folder_id": {
+        "type": "number",
+        "description": "Folder ID to create the app in (use list_apps to find folder IDs)"
+      },
+      "is_mobile_app": {
+        "description": "Whether to create a mobile app (default false)",
+        "type": "boolean"
+      },
+      "is_global_widget": {
+        "description": "Whether to create a module/global widget (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name",
+      "folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/create-app.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

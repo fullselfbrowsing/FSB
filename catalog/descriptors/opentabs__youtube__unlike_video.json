@@ -1,0 +1,37 @@
+{
+  "slug": "youtube.unlike_video",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "unlike a video in youtube",
+    "unlike video in youtube",
+    "remove a like from a video in youtube"
+  ],
+  "description": "Remove a like from a YouTube video.",
+  "actionVerb": "unlike",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID to unlike"
+      }
+    },
+    "required": [
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/unlike-video.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "unlike"
+    }
+  }
+}

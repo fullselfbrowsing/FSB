@@ -1,0 +1,37 @@
+{
+  "slug": "stripe.finalize_invoice",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "finalize an invoice in stripe",
+    "finalize invoice in stripe",
+    "finalize a draft invoice in stripe"
+  ],
+  "description": "Finalize a draft invoice, transitioning it to open status. After finalization, the invoice can be sent to the customer or paid automatically.",
+  "actionVerb": "finalize",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "invoice_id": {
+        "type": "string",
+        "description": "Invoice ID to finalize (e.g., in_xxx)"
+      }
+    },
+    "required": [
+      "invoice_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/finalize-invoice.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "finalize"
+    }
+  }
+}

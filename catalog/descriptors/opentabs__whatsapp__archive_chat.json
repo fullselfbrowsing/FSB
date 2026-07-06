@@ -1,0 +1,43 @@
+{
+  "slug": "whatsapp.archive_chat",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "archive a chat in whatsapp",
+    "archive chat in whatsapp",
+    "archive or unarchive a chat in whatsapp"
+  ],
+  "description": "Archive or unarchive a WhatsApp chat. Archived chats are hidden from the main chat list.",
+  "actionVerb": "archive",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID"
+      },
+      "archive": {
+        "type": "boolean",
+        "description": "True to archive, false to unarchive"
+      }
+    },
+    "required": [
+      "chat_id",
+      "archive"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/archive-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "archive"
+    }
+  }
+}

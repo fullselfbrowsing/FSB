@@ -1,0 +1,51 @@
+{
+  "slug": "whatsapp.create_group",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "create a group in whatsapp",
+    "add a group in whatsapp",
+    "make a new group in whatsapp",
+    "open a new group in whatsapp",
+    "create group in whatsapp",
+    "create a new group chat in whatsapp"
+  ],
+  "description": "Create a new WhatsApp group with a subject and list of participant phone number IDs. Participant IDs should be in the format \"15551234567@c.us\".",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Group name/subject"
+      },
+      "participant_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Participant phone number IDs (e.g., [\"15551234567@c.us\"])"
+      }
+    },
+    "required": [
+      "subject",
+      "participant_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/create-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "id": "example.get-thing-v2",
+  "origin": "https://example.com",
+  "endpoint": "/api/{id}",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" }
+    },
+    "required": ["id"]
+  },
+  "request": {
+    "query": { "id": "{id}" }
+  },
+  "extract": "data.items[*].name",
+  "capturedAt": "2026-06-23T00:00:00.000Z",
+  "expectedShape": "@"
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "circleci.get_workflow_runs",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get workflow runs in circleci",
+    "look up workflow runs in circleci",
+    "fetch a single workflow runs in circleci",
+    "view one specific workflow runs in circleci",
+    "get recent runs of a workflow in circleci"
+  ],
+  "description": "Get recent runs of a specific workflow including status, duration, and branch. Useful for monitoring workflow health.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "workflow_name": {
+        "type": "string",
+        "description": "Workflow name"
+      },
+      "branch": {
+        "description": "Filter by branch name",
+        "type": "string"
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_slug",
+      "workflow_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-workflow-runs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

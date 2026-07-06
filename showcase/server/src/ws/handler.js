@@ -1,15 +1,13 @@
 const WebSocket = require('ws');
+const {
+  BACKPRESSURE_BUFFER_LIMIT_BYTES,
+  RELAY_PER_MESSAGE_LIMIT_BYTES,
+  checkRelayFrameLimit,
+  classifyRelayFrame,
+  normalizeFsbRelayRole
+} = require('./phantomstream-relay-compat');
 
 const ROOM_DIAGNOSTIC_LIMIT = 100;
-
-// Phase 276 STREAM-DEFENSIVE-06: backpressure drop threshold. Frames bound for
-// a client whose ws.bufferedAmount exceeds this byte ceiling are dropped
-// rather than queued. 16 MiB is conservative -- real-world dashboard sessions
-// rarely exceed a few hundred KB of buffered data, so crossing this line
-// implies the receiver is wedged. Dropping the frame here is preferable to
-// growing an unbounded queue (which eventually OOMs the Node process or
-// triggers the V8 string-length cap).
-const BACKPRESSURE_BUFFER_LIMIT_BYTES = 16 * 1024 * 1024; // 16 MiB
 
 // Phase 276 STREAM-DEFENSIVE-06: module-level counter of frames dropped due
 // to backpressure. Surfaced via getBackpressureDroppedCount() for tests and
@@ -242,9 +240,26 @@ function setupWSHandler(wss) {
     }
 
     ws.on('message', (data) => {
+      const rawMessage = data.toString();
+      const frameLimit = checkRelayFrameLimit(rawMessage, {
+        roomId: hashKey,
+        role: normalizeFsbRelayRole(role)
+      });
+      if (!frameLimit.ok) {
+        incrementRoomCounter(hashKey, 'receivedByType', frameLimit.type, 1);
+        incrementRoomCounter(hashKey, 'droppedByType', frameLimit.type, 1);
+        pushRoomDiagnosticEvent(hashKey, Object.assign({
+          event: 'message-too-large',
+          role,
+          hashKey
+        }, frameLimit));
+        console.warn(`[WS] dropped oversized frame room=${hashKey.substring(0, 8)} role=${role} type=${frameLimit.type} bytes=${frameLimit.byteSize}/${frameLimit.capBytes}`);
+        return;
+      }
+
       let msg;
       try {
-        msg = JSON.parse(data);
+        msg = JSON.parse(rawMessage);
       } catch {
         pushRoomDiagnosticEvent(hashKey, {
           event: 'malformed-json',
@@ -254,9 +269,7 @@ function setupWSHandler(wss) {
         return;
       }
 
-      const messageType = typeof msg.type === 'string'
-        ? msg.type
-        : (msg && msg._lz ? 'compressed-envelope' : 'unknown');
+      const messageType = classifyRelayFrame(rawMessage).type;
 
       if (messageType === 'ping') {
         ws.send(JSON.stringify({ type: 'pong', ts: Date.now() }));
@@ -267,7 +280,7 @@ function setupWSHandler(wss) {
       // TEMP DEBUG (Phase 212 diagnosis): log message types flowing through the relay
       // so we can see whether dash:dom-stream-start, ext:snapshot, ext:page-ready,
       // ext:dom-snapshot, ext:stream-state are firing in the expected order.
-      const result = relayToRoom(hashKey, ws, data.toString(), messageType);
+      const result = relayToRoom(hashKey, ws, rawMessage, messageType);
       console.log(`[WS] ${role}->${role === 'extension' ? 'dashboard' : 'extension'} room=${hashKey.substring(0, 8)} type=${messageType} delivered=${result?.deliveredCount || 0} dropped=${result?.droppedCount || 0}`);
     });
 
@@ -363,5 +376,8 @@ module.exports = {
   sendToClients,
   getBackpressureDroppedCount,
   _resetBackpressureDroppedCount,
+  RELAY_PER_MESSAGE_LIMIT_BYTES,
+  classifyRelayFrame,
+  checkRelayFrameLimit,
   BACKPRESSURE_BUFFER_LIMIT_BYTES
 };

@@ -1,0 +1,40 @@
+{
+  "slug": "sentry.get_project",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "get a project in sentry",
+    "look up a project in sentry",
+    "fetch a single project in sentry",
+    "view one specific project in sentry",
+    "get project in sentry",
+    "get details for a specific project in sentry"
+  ],
+  "description": "Get detailed information about a specific Sentry project by its slug. Returns platform, status, date created, and access information.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "The project slug to retrieve"
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

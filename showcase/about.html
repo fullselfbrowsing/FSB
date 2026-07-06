@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/recreations.css">
   <link rel="stylesheet" href="css/about.css">
   <script>
-  (function(){if(localStorage.getItem('fsb-showcase-theme')==='light'){document.documentElement.setAttribute('data-theme','light')}})();
+  (function(){if(window.matchMedia&&!window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.setAttribute('data-theme','light')}})();
   </script>
 </head>
 <body>
@@ -330,7 +330,7 @@
               </div>
             </div>
             <div class="rec-sp-footer">
-              <span>Powered by FSB v0.9.22</span>
+              <span>Powered by FSB v0.9.90</span>
             </div>
           </div>
         </div>
@@ -837,7 +837,7 @@
               </div>
             </div>
             <div class="rec-sp-footer">
-              <span>Powered by FSB v0.9.22</span>
+              <span>Powered by FSB v0.9.90</span>
             </div>
           </div>
         </div>
@@ -1101,14 +1101,10 @@
       </div>
       <div class="footer-bottom">
         <p>Made by Lakshman Turlapati</p>
-        <p>FSB v9.0.2</p>
+        <p>FSB v0.9.90</p>
       </div>
     </div>
   </footer>
-
-  <button class="theme-toggle-btn" aria-label="Toggle theme">
-    <i class="ph ph-sun"></i>
-  </button>
 
   <script src="js/main.js"></script>
   <script src="js/recreations.js"></script>

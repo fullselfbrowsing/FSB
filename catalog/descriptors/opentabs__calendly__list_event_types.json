@@ -1,0 +1,38 @@
+{
+  "slug": "calendly.list_event_types",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "list event types in calendly",
+    "show me my event types in calendly",
+    "view my event types in calendly",
+    "see all my event types in calendly",
+    "list your scheduling event types in calendly"
+  ],
+  "description": "List all event types for the current user. Event types define the scheduling templates (e.g. \"30 Minute Meeting\", \"Discovery Call\"). Returns paginated results with up to 10 event types per page.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/list-event-types.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

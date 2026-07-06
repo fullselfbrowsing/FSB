@@ -1,0 +1,31 @@
+{
+  "slug": "supabase.list_projects",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "list projects in supabase",
+    "show me my projects in supabase",
+    "view my projects in supabase",
+    "see all my projects in supabase",
+    "list all supabase projects in supabase"
+  ],
+  "description": "List all Supabase projects for the authenticated user. Returns project IDs, names, regions, and status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

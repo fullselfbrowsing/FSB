@@ -1,0 +1,41 @@
+{
+  "slug": "mongodb.add_ip_access_entry",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "add an ip access entry in mongodb",
+    "add ip access entry in mongodb",
+    "add an ip to the access list in mongodb"
+  ],
+  "description": "Add an IP address or CIDR block to the access list for the current MongoDB Atlas project, allowing network access from that address.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ip_address": {
+        "type": "string",
+        "description": "IP address or CIDR block to allow (e.g., \"192.168.1.0/24\")"
+      },
+      "comment": {
+        "description": "Optional description for this entry",
+        "type": "string"
+      }
+    },
+    "required": [
+      "ip_address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/add-ip-access-entry.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

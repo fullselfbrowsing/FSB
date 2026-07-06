@@ -1,0 +1,40 @@
+{
+  "slug": "starbucks.delete_favorite_product",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "delete a favorite product in starbucks",
+    "remove a favorite product in starbucks",
+    "trash a favorite product in starbucks",
+    "permanently delete a favorite product in starbucks",
+    "delete favorite product in starbucks",
+    "remove a product from favorites in starbucks"
+  ],
+  "description": "Remove a product from the user's favorites list. Use get_favorite_products to find the favorite ID.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "favorite_product_id": {
+        "type": "string",
+        "description": "Favorite product ID to remove (from get_favorite_products)"
+      }
+    },
+    "required": [
+      "favorite_product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/delete-favorite-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

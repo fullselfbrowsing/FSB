@@ -1,0 +1,31 @@
+{
+  "slug": "snowflake.list_warehouses",
+  "service": "app.snowflake.com",
+  "intentSynonyms": [
+    "list warehouses in snowflake",
+    "show me my warehouses in snowflake",
+    "view my warehouses in snowflake",
+    "see all my warehouses in snowflake",
+    "list available warehouses in snowflake"
+  ],
+  "description": "List all warehouses accessible to the current role. Returns warehouse names, sizes, states (STARTED, SUSPENDED), auto-suspend/resume settings, and running/queued query counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/snowflake/src/tools/list-warehouses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

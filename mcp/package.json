@@ -1,6 +1,6 @@
 {
   "name": "fsb-mcp-server",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "FSB Browser Automation MCP Server",
   "license": "BUSL-1.1",
   "author": "Lakshman Turlapati",

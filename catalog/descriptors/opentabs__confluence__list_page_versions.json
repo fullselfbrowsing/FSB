@@ -1,0 +1,50 @@
+{
+  "slug": "confluence.list_page_versions",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list page versions in confluence",
+    "show me my page versions in confluence",
+    "view my page versions in confluence",
+    "see all my page versions in confluence",
+    "list page version history in confluence"
+  ],
+  "description": "List version history of a Confluence page. Shows who edited the page and when.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to list versions for"
+      },
+      "limit": {
+        "description": "Maximum number of versions to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-page-versions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

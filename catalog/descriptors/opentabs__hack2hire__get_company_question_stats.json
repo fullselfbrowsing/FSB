@@ -1,0 +1,39 @@
+{
+  "slug": "hack2hire.get_company_question_stats",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get company question stats in hack2hire",
+    "look up company question stats in hack2hire",
+    "fetch a single company question stats in hack2hire",
+    "view one specific company question stats in hack2hire",
+    "question count breakdown for a company in hack2hire"
+  ],
+  "description": "Get the breakdown of tracked questions for a specific company — the total count plus a count per question type (ALGORITHM, SD, ML_SD, BLOG). Also returns the count for every curated collection. Useful for showing how many questions are available before drilling into a list.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "company": {
+        "type": "string",
+        "description": "Company key in uppercase (e.g. \"PINTEREST\", \"AMAZON\"). Use list_companies to discover keys."
+      }
+    },
+    "required": [
+      "company"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-company-question-stats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

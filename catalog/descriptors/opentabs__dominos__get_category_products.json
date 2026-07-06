@@ -1,0 +1,43 @@
+{
+  "slug": "dominos.get_category_products",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get category products in dominos",
+    "look up category products in dominos",
+    "fetch a single category products in dominos",
+    "view one specific category products in dominos",
+    "list products in a menu category in dominos"
+  ],
+  "description": "List all products (menu items) within a menu category. Use the category_id from get_menu_categories. Common categories: BuildYourOwn, Specialty, Bread, Tots, Wings, Dessert, Pasta, Sandwich, GSalad, Drinks, Sides.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category_id": {
+        "type": "string",
+        "description": "Category ID (e.g., \"Specialty\", \"Wings\", \"Dessert\", \"Drinks\")"
+      },
+      "store_id": {
+        "description": "Store ID for store-specific pricing and availability",
+        "type": "string"
+      }
+    },
+    "required": [
+      "category_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-category-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

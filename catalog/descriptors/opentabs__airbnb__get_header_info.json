@@ -1,0 +1,32 @@
+{
+  "slug": "airbnb.get_header_info",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get a header info in airbnb",
+    "look up a header info in airbnb",
+    "fetch a single header info in airbnb",
+    "view one specific header info in airbnb",
+    "get header info in airbnb",
+    "get header navigation and unread counts in airbnb"
+  ],
+  "description": "Get the Airbnb header navigation data including menu items, avatar URL, and unread message count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-header-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

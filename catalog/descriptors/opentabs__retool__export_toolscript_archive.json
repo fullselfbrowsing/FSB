@@ -1,0 +1,53 @@
+{
+  "slug": "retool.export_toolscript_archive",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "export a toolscript archive in retool",
+    "export toolscript archive in retool",
+    "export a retool app as a toolscript zip in retool"
+  ],
+  "description": "Export a Retool app as a Toolscript ZIP archive using Retool's own browser-side archive serializer. Returns the ZIP as base64 so callers can save, unzip, edit, and later pass it to create_app_from_toolscript_archive or update_app_from_toolscript_archive. Optionally also starts a normal browser download.",
+  "actionVerb": "export",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID to export"
+      },
+      "file_name": {
+        "description": "Optional ZIP file name. Defaults to the Retool app name.",
+        "type": "string"
+      },
+      "branch_name": {
+        "description": "Optional source-control branch name to export. Defaults to the branch in the targeted editor URL, if present.",
+        "type": "string"
+      },
+      "per_page_position_json_files": {
+        "description": "Whether to emit per-page position JSON files in the archive (default true).",
+        "type": "boolean"
+      },
+      "download_to_browser": {
+        "description": "Whether to also start a browser download of the ZIP archive (default false).",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/export-toolscript-archive.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "export"
+    }
+  }
+}

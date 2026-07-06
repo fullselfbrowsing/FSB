@@ -1,0 +1,65 @@
+{
+  "slug": "stripe.update_customer",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "update a customer in stripe",
+    "edit a customer in stripe",
+    "change the details of customer in stripe",
+    "modify a customer in stripe",
+    "update customer in stripe"
+  ],
+  "description": "Update an existing customer. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "description": "Customer ID to update (e.g., cus_xxx)"
+      },
+      "email": {
+        "description": "New email address",
+        "type": "string"
+      },
+      "name": {
+        "description": "New name",
+        "type": "string"
+      },
+      "phone": {
+        "description": "New phone number",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "metadata": {
+        "description": "New metadata (replaces existing)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "customer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/update-customer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

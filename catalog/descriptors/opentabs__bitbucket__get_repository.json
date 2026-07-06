@@ -1,0 +1,45 @@
+{
+  "slug": "bitbucket.get_repository",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "get a repository in bitbucket",
+    "look up a repository in bitbucket",
+    "fetch a single repository in bitbucket",
+    "view one specific repository in bitbucket",
+    "get repository in bitbucket",
+    "get repository details in bitbucket"
+  ],
+  "description": "Get detailed information about a specific Bitbucket repository.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/get-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

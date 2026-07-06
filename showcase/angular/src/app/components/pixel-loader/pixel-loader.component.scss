@@ -1,0 +1,30 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.pixel-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  line-height: 0;
+}
+
+.pixel-loader-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 12px);
+  grid-auto-rows: 12px;
+  gap: 3px;
+}
+
+.pixel-loader-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 1px;
+  background: #fb923c;
+  opacity: 0.14;
+  will-change: opacity, transform;
+}

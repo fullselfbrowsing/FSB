@@ -1,0 +1,32 @@
+{
+  "slug": "instacart.get_current_user",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "get a current user in instacart",
+    "look up a current user in instacart",
+    "fetch a single current user in instacart",
+    "view one specific current user in instacart",
+    "get current user in instacart",
+    "get your instacart profile in instacart"
+  ],
+  "description": "Get the authenticated Instacart user profile including name, email, order count, and avatar.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

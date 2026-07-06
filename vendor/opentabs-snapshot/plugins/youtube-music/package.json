@@ -1,0 +1,71 @@
+{
+  "name": "@opentabs-dev/opentabs-plugin-youtube-music",
+  "description": "OpenTabs plugin for YouTube Music",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.86",
+  "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "opentabs": {
+    "displayName": "YouTube Music",
+    "description": "OpenTabs plugin for YouTube Music",
+    "urlPatterns": [
+      "*://music.youtube.com/*"
+    ],
+    "excludePatterns": [
+      "*://music.youtube.com/youtubei/*"
+    ],
+    "homepage": "https://music.youtube.com",
+    "iconSvg": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"#FF0000\" d=\"M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228s6.228-2.796 6.228-6.228S15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z\"/></svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path fill=\"#FF0000\" d=\"M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228s6.228-2.796 6.228-6.228S15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z\"/></svg>"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "@biomejs/biome": "2.4.6",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/youtube-music"
+  }
+}

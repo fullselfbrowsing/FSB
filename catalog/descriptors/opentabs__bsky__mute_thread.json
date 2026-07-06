@@ -1,0 +1,37 @@
+{
+  "slug": "bsky.mute_thread",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "mute a thread in bsky",
+    "mute thread in bsky",
+    "mute a thread in bluesky"
+  ],
+  "description": "Mute a thread. Notifications from this thread will be suppressed.",
+  "actionVerb": "mute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "root": {
+        "type": "string",
+        "description": "AT URI of the root post of the thread to mute"
+      }
+    },
+    "required": [
+      "root"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/mute-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "mute"
+    }
+  }
+}

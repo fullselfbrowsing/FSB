@@ -1,0 +1,86 @@
+{
+  "slug": "retool.add_component",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "add a component in retool",
+    "add component in retool",
+    "add a ui widget to an app in retool"
+  ],
+  "description": "Add a UI widget component to a Retool app. Handles Transit JSON manipulation internally — you only need to specify the component type, properties, and position. Common types: TextWidget (markdown text), ButtonWidget2 (button), TextInputWidget (input field), TableWidget2 (data table), SelectWidget (dropdown), NumberInputWidget (number input), CheckboxWidget (checkbox), ContainerWidget (container/frame).",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID"
+      },
+      "component_id": {
+        "type": "string",
+        "description": "Unique component ID (e.g., \"text1\", \"submitButton\", \"usersTable\")"
+      },
+      "component_type": {
+        "type": "string",
+        "description": "Widget subtype: TextWidget, ButtonWidget2, TextInputWidget, NumberInputWidget, SelectWidget, TableWidget2, CheckboxWidget, ContainerWidget, DateTimeWidget, ImageWidget, JSONExplorerWidget, StatisticWidget"
+      },
+      "properties": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Template properties for the widget. TextWidget: { value, format }. ButtonWidget2: { text, styleVariant }. TextInputWidget: { label, placeholder }. TableWidget2: { data }. SelectWidget: { values, labels }."
+      },
+      "position": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "number",
+            "description": "Grid row (0-based)"
+          },
+          "col": {
+            "type": "number",
+            "description": "Grid column (0-11, 12 columns total)"
+          },
+          "width": {
+            "type": "number",
+            "description": "Width in grid columns (1-12)"
+          },
+          "height": {
+            "type": "number",
+            "description": "Height in grid rows"
+          }
+        },
+        "required": [
+          "row",
+          "col",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false,
+        "description": "Grid position for the component"
+      }
+    },
+    "required": [
+      "page_uuid",
+      "component_id",
+      "component_type",
+      "properties",
+      "position"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/add-component.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

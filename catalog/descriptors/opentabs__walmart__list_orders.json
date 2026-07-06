@@ -1,0 +1,31 @@
+{
+  "slug": "walmart.list_orders",
+  "service": "walmart.com",
+  "intentSynonyms": [
+    "list orders in walmart",
+    "show me my orders in walmart",
+    "view my orders in walmart",
+    "see all my orders in walmart",
+    "list recent purchase history in walmart"
+  ],
+  "description": "List recent Walmart purchase history. Returns orders with items, status, and delivery information.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/walmart/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

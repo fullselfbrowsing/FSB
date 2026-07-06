@@ -18,6 +18,8 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  LOCALE_ID,
+  NgZone,
   OnDestroy,
   OnInit,
   PLATFORM_ID,
@@ -27,16 +29,15 @@ import {
 } from '@angular/core';
 import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { APP_VERSION } from '../../core/seo/version';
 import { GitHubStatsService } from '../../core/stats/github-stats.service';
 import {
   CommitEvent,
   DatasetState,
-  ForkEvent,
   IssueEvent,
-  PullEvent,
-  ReleaseEvent,
   StarEvent,
   StatsViewId,
   WeeklyDelta,
@@ -47,17 +48,16 @@ import {
   FSBTelemetryHeadline,
   FSBTelemetrySeries,
 } from '../../core/stats/fsb-telemetry.types';
+import { regionCentroid } from '../../core/stats/region-geo';
+import { GlobeVisualizationService } from '../../core/globe/globe-visualization.service';
+import { GlobeRegion } from '../../core/globe/globe-visualization.types';
 
-// Phase 274 / STATS-01 -- 6 new view ids. Local union widening so we do NOT
-// have to touch github-stats.types.ts (which describes the GitHub dataset
-// shape, a different concern). The view selector + chart switch operate on
-// AnyViewId, while existing GitHub helpers continue to take StatsViewId.
-export type FSBViewId =
-  | 'fsb-active-now'
-  | 'fsb-tokens'
-  | 'fsb-agents-running'
-  | 'fsb-popular-mcp'
-  | 'fsb-avg-agents-per-user';
+// Phase 274 / STATS-01 -- FSB view ids shown on this page. Local union
+// widening so we do NOT have to touch github-stats.types.ts (which describes
+// the GitHub dataset shape, a different concern). The view selector + chart
+// switch operate on AnyViewId, while existing GitHub helpers continue to
+// take StatsViewId.
+export type FSBViewId = 'fsb-active-now' | 'fsb-tokens' | 'fsb-popular-mcp';
 export type AnyViewId = StatsViewId | FSBViewId;
 
 interface ViewOption {
@@ -65,40 +65,50 @@ interface ViewOption {
   label: string;
 }
 
+interface TabMetric {
+  label: string;
+  value: string;
+}
+
+// Redesigned fan-picker tab item -- `dy` is a vertical arc offset (px) so the
+// non-active tabs read as a fanned-out arc rather than a flat list.
+interface FanItem {
+  id: AnyViewId;
+  label: string;
+  dy: number;
+}
+
 @Component({
   selector: 'app-stats-page',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterLink],
   templateUrl: './stats-page.component.html',
   styleUrl: './stats-page.component.scss',
 })
 export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly localeId = inject(LOCALE_ID);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly statsService = inject(GitHubStatsService);
   // Phase 274 / STATS-03 -- FSB telemetry stream alongside GitHub stats.
   private readonly fsbService = inject(FSBTelemetryService);
+  private readonly globeService = inject(GlobeVisualizationService);
+  private readonly zone = inject(NgZone);
+
+  readonly appVersion = APP_VERSION;
+  readonly fallbackErrorMessage = $localize`:@@stats.error.default:Network or parse error.`;
 
   @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('globeCanvas') globeCanvasRef?: ElementRef<HTMLCanvasElement>;
 
   readonly views: readonly ViewOption[] = [
-    { id: 'stars-cumulative', label: 'Cumulative stars' },
-    { id: 'stars-weekly', label: 'Weekly stars' },
-    { id: 'issues-open-vs-closed', label: 'Issues' },
-    { id: 'forks-growth', label: 'Forks' },
-    { id: 'prs-opened-vs-merged', label: 'Pull requests' },
-    { id: 'commits-cumulative', label: 'Commits' },
-    { id: 'maintenance', label: 'Maintenance' },
-    // Phase 274 / STATS-01 -- 6 new FSB telemetry views appended. Only the
-    // FSB-prefixed view labels are i18n-marked; the legacy GitHub view labels
-    // remain English-only to match the page's pre-274 baseline (the /stats
-    // route is an Easter egg, deliberately invisible to most users).
+    { id: 'stars-cumulative', label: $localize`:@@stats.view.cumulativeStars:Cumulative stars` },
+    { id: 'issues-open-vs-closed', label: $localize`:@@stats.view.issues:Issues` },
+    { id: 'commits-cumulative', label: $localize`:@@stats.view.cumulativeCommits:Cumulative commits` },
     { id: 'fsb-active-now', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW:Active right now` },
     { id: 'fsb-tokens', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_TOKENS:Tokens` },
-    { id: 'fsb-agents-running', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_AGENTS_RUNNING:Agents running` },
-    { id: 'fsb-popular-mcp', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_POPULAR_AGENTS:Popular agents` },
-    { id: 'fsb-avg-agents-per-user', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_AVG_AGENTS:Average agents per user` },
+    { id: 'fsb-popular-mcp', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP:Popular MCP clients` },
   ];
 
   selectedView: AnyViewId = 'stars-cumulative';
@@ -106,16 +116,24 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   rateLimitedUntil: Date | null = null;
   errorMessage = '';
 
+  // Fan-picker UI state (redesign) -- fanOpen drives the hover-expanded side
+  // menus, tabPulse is a brief "pop" on the newly-selected center pill, and
+  // frozenView keeps the fan's split stable while it collapses so it doesn't
+  // visibly reshuffle to the new selection's neighbors mid-fade.
+  fanOpen = false;
+  tabPulse = false;
+  private frozenView: AnyViewId | null = null;
+  private tabsHoverTimer?: ReturnType<typeof setTimeout>;
+  private tabsCloseTimer?: ReturnType<typeof setTimeout>;
+  private pulseTimer?: ReturnType<typeof setTimeout>;
+
   // Latest dataset snapshots, populated from subject subscriptions. We keep
   // these as fields (not signals) because the redraw cycle is driven by
   // setView() / new dataset arrival, not by Angular change-detection ticks.
   private latestStars: StarEvent[] = [];
   private latestWeeklyStars: WeeklyDelta[] = [];
   private latestIssues: IssueEvent[] = [];
-  private latestForks: ForkEvent[] = [];
-  private latestPrs: PullEvent[] = [];
   private latestCommits: CommitEvent[] = [];
-  private latestReleases: ReleaseEvent[] = [];
 
   // Phase 274 / STATS-02 + STATS-03 -- FSB telemetry snapshots; template
   // reads `fsbHeadline` getter for the live headline row above the chart card.
@@ -126,135 +144,93 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.latestFsbHeadline;
   }
 
-  /**
-   * Tab-aware metrics for the LHS of the headline row. Returns 2 cells
-   * computed from the currently loaded dataset relevant to selectedView.
-   * Empty arrays produce 0s / em-dashes; the row is always rendered so the
-   * layout does not jump as data arrives. Labels are English-only to match
-   * the page's pre-274 baseline (GitHub view labels are also English-only).
-   */
-  get tabMetrics(): ReadonlyArray<{ label: string; value: string }> {
-    const dayMs = 86_400_000;
-    const sinceDays = (n: number): number => Date.now() - n * dayMs;
-    const fh = this.latestFsbHeadline;
-
+  get tabMetrics(): readonly TabMetric[] {
+    const headline = this.latestFsbHeadline;
     switch (this.selectedView) {
       case 'stars-cumulative': {
-        const cutoff = sinceDays(7);
-        const last7 = this.latestStars.filter(
-          (s) => !Number.isNaN(Date.parse(s.starred_at)) && Date.parse(s.starred_at) >= cutoff
-        ).length;
+        const cumulative = this.statsService.cumulativeStarsSeries(this.latestStars);
+        const weekly = this.latestWeeklyStars.length
+          ? this.latestWeeklyStars
+          : this.statsService.weeklyStarsDelta(this.latestStars);
         return [
-          { label: 'total stars', value: this.formatNum(this.latestStars.length) },
-          { label: 'last 7 days', value: this.formatNum(last7) },
-        ];
-      }
-      case 'stars-weekly': {
-        const last = this.latestWeeklyStars.at(-1);
-        const delta = last?.deltaPct ?? null;
-        const deltaStr =
-          delta === null || delta === undefined
-            ? '—'
-            : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}%`;
-        return [
-          { label: 'this week', value: this.formatNum(last?.count ?? 0) },
-          { label: 'vs last week', value: deltaStr },
+          { label: $localize`:@@stats.metric.totalStars:total stars`, value: this.fmtNum(cumulative.at(-1)?.y ?? 0) },
+          { label: $localize`:@@stats.metric.last7Days:last 7 days`, value: this.fmtNum(weekly.at(-1)?.count ?? 0) },
         ];
       }
       case 'issues-open-vs-closed': {
-        const issues = this.latestIssues.filter((i) => !i.pull_request);
-        const open = issues.filter((i) => !i.closed_at).length;
-        const closed = issues.length - open;
+        const { opened, closed } = this.statsService.issuesOpenVsClosed(this.latestIssues);
+        const openedTotal = sumPoints(opened);
+        const closedTotal = sumPoints(closed);
         return [
-          { label: 'open', value: this.formatNum(open) },
-          { label: 'closed', value: this.formatNum(closed) },
-        ];
-      }
-      case 'forks-growth': {
-        const cutoff = sinceDays(30);
-        const last30 = this.latestForks.filter(
-          (f) => !Number.isNaN(Date.parse(f.created_at)) && Date.parse(f.created_at) >= cutoff
-        ).length;
-        return [
-          { label: 'total forks', value: this.formatNum(this.latestForks.length) },
-          { label: 'last 30 days', value: this.formatNum(last30) },
-        ];
-      }
-      case 'prs-opened-vs-merged': {
-        const merged = this.latestPrs.filter((p) => p.merged_at).length;
-        const open = this.latestPrs.filter((p) => !p.closed_at && !p.merged_at).length;
-        return [
-          { label: 'merged', value: this.formatNum(merged) },
-          { label: 'open', value: this.formatNum(open) },
+          { label: $localize`:@@stats.metric.open:open`, value: this.fmtNum(Math.max(0, openedTotal - closedTotal)) },
+          { label: $localize`:@@stats.metric.closed:closed`, value: this.fmtNum(closedTotal) },
         ];
       }
       case 'commits-cumulative': {
-        const cutoff = sinceDays(30);
-        const recent = this.latestCommits.filter((c) => {
-          const t = Date.parse(c?.commit?.author?.date ?? '');
-          return !Number.isNaN(t) && t >= cutoff;
-        }).length;
+        const cumulative = this.statsService.cumulativeCommitsSeries(this.latestCommits);
         return [
-          { label: 'total commits', value: this.formatNum(this.latestCommits.length) },
-          { label: 'last 30 days', value: this.formatNum(recent) },
-        ];
-      }
-      case 'maintenance': {
-        const latest = this.latestReleases[0];
-        const ts = latest ? Date.parse(latest.published_at) : NaN;
-        const daysAgo = Number.isNaN(ts) ? null : Math.floor((Date.now() - ts) / dayMs);
-        return [
-          { label: 'latest release', value: latest?.tag_name ?? '—' },
-          { label: 'released', value: daysAgo === null ? '—' : `${daysAgo}d ago` },
+          { label: $localize`:@@stats.metric.totalCommits:total commits`, value: this.fmtNum(cumulative.at(-1)?.y ?? this.latestCommits.length) },
+          { label: $localize`:@@stats.metric.last30Days:last 30 days`, value: this.fmtNum(countRecentCommits(this.latestCommits, 30)) },
         ];
       }
       case 'fsb-active-now':
         return [
-          { label: 'active agents', value: this.formatNum(fh?.active_agents_now ?? 0) },
-          { label: 'avg per user', value: (fh?.avg_agents_per_user ?? 0).toFixed(1) },
+          { label: $localize`:@@stats.metric.activeAgents:active agents`, value: this.fmtNum(headline?.active_agents_now ?? 0) },
+          { label: $localize`:@@stats.metric.avgPerUser:avg per user`, value: (headline?.avg_agents_per_user ?? 0).toFixed(1) },
         ];
       case 'fsb-tokens':
         return [
-          { label: 'tokens lifetime', value: this.formatBig(fh?.tokens_total_lifetime ?? 0) },
-          { label: 'tokens 24h', value: this.formatBig(fh?.tokens_24h ?? 0) },
-        ];
-      case 'fsb-agents-running':
-        return [
-          { label: 'active agents', value: this.formatNum(fh?.active_agents_now ?? 0) },
-          { label: 'lifetime agents', value: this.formatNum(fh?.total_agents_lifetime ?? 0) },
+          { label: $localize`:@@stats.metric.tokensLifetime:tokens lifetime`, value: this.fmtBig(headline?.tokens_total_lifetime ?? 0) },
+          { label: $localize`:@@stats.metric.tokens24h:tokens 24h`, value: this.fmtBig(headline?.tokens_24h ?? 0) },
         ];
       case 'fsb-popular-mcp': {
-        const arr = fh?.popular_mcp_clients ?? [];
-        const top = arr[0];
+        const list = headline?.popular_mcp_clients ?? [];
+        const top = list[0];
         return [
-          { label: 'tracked agents', value: this.formatNum(arr.length) },
-          { label: top ? `top: ${top.label}` : 'top', value: this.formatNum(top?.uniq ?? 0) },
-        ];
-      }
-      case 'fsb-avg-agents-per-user': {
-        const delta = this.avgAgentsDelta;
-        const deltaStr =
-          delta === null
-            ? '—'
-            : `${delta > 0 ? '+' : ''}${delta.toFixed(2)}`;
-        return [
-          { label: 'avg agents', value: (fh?.avg_agents_per_user ?? 0).toFixed(1) },
-          { label: 'delta', value: deltaStr },
+          { label: $localize`:@@stats.metric.trackedClients:tracked clients`, value: this.fmtNum(list.length) },
+          { label: top ? $localize`:@@stats.metric.topNamed:top: ${top.label}:entityLabel:` : $localize`:@@stats.metric.topClient:top client`, value: top ? this.fmtNum(top.uniq) : '0' },
         ];
       }
       default:
+        // Every other StatsViewId member is no longer reachable via `views`
+        // (Phase 274 redesign trimmed the tab list to 6) but the type itself
+        // still spans github-stats.types.ts's full StatsViewId union.
         return [];
     }
   }
 
-  private formatNum(n: number): string {
-    return new Intl.NumberFormat('en-US').format(Math.round(n));
+  get formattedFsbActive(): string {
+    return this.fmtNum(this.latestFsbHeadline?.active_users_now ?? 0);
   }
 
-  private formatBig(n: number): string {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
-    return this.formatNum(n);
+  get formattedFsbTotal(): string {
+    return this.fmtNum(this.latestFsbHeadline?.total_users ?? 0);
+  }
+
+  get formattedFsbTokens(): string {
+    return this.fmtBig(this.latestFsbHeadline?.tokens_24h ?? 0);
+  }
+
+  get activeViewLabel(): string {
+    return this.views.find((v) => v.id === this.selectedView)?.label ?? '';
+  }
+
+  // Redesign: whether the "Active now" globe has at least one geolocatable
+  // region to glow. k>=5-anonymity-floored entries like 'unknown'/'Other'
+  // (see region-geo.ts) don't count -- the annotation caption falls back to
+  // an explicit "still gathering data" message when this is false rather
+  // than silently showing a globe with no nodes.
+  get hasPlottableRegions(): boolean {
+    const regions = this.latestFsbHeadline?.popular_regions ?? [];
+    return regions.some((r) => regionCentroid(r.label) !== null);
+  }
+
+  get fanItemsLeft(): readonly FanItem[] {
+    return this.computeFanSplit().left;
+  }
+
+  get fanItemsRight(): readonly FanItem[] {
+    return this.computeFanSplit().right;
   }
 
   // Chart.js Chart class -- captured from the dynamic import inside
@@ -262,24 +238,21 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // server bundle.
   private ChartCtor: any = null;
   private chartInstance: any = null;
-
-  // Quick task 260515-kw1 (stats chart overhaul) -- ring buffer + plugin + delta.
-  //
-  //   * agentHistoryRing: rolling 288-sample (~24h at 5-min poll) buffer of
-  //     active_agents_now snapshots pushed from onFsbHeadlineUpdate. Powers the
-  //     sparkline view. Capped strictly so the page can run for days without
-  //     unbounded memory growth.
-  //   * centerTextPluginRegistered: idempotent guard so the local fsbCenterText
-  //     plugin is registered exactly once with the global Chart class.
-  //   * priorAvgAgentsPerUser + avgAgentsDelta: snapshot-pair used by the
-  //     big-number tile's delta arrow (no chart canvas involved).
-  private agentHistoryRing: number[] = [];
-  private static readonly AGENT_HISTORY_CAP = 288; // 24h * 60min / 5min poll
-  private centerTextPluginRegistered = false;
-  private priorAvgAgentsPerUser: number | null = null;
-  avgAgentsDelta: number | null = null;
+  // Cleanup for the "Active now" globe, set while it's running (see
+  // GlobeVisualizationService.setupGlobe's return value).
+  private stopGlobe?: () => void;
+  // JSON snapshot of the popular_regions list backing the running globe --
+  // lets redrawChart() keep the globe spinning across redraws that don't
+  // change the region data. Meaningful only while stopGlobe is set.
+  private lastGlobeKey = '';
+  private pendingViewRedrawFrame: number | null = null;
 
   private subs: Subscription[] = [];
+  // Set by ngOnDestroy so the async bootstrap() can tell when it lost the
+  // race against a route change (see the guard after the chart.js import).
+  private destroyed = false;
+  private themeMedia: MediaQueryList | null = null;
+  private readonly onThemeChange = () => this.redrawChart();
 
   constructor() {
     afterNextRender(() => {
@@ -287,12 +260,19 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       // and wire up subscriptions. We re-render on every dataset update and
       // on view switches.
       void this.bootstrap();
+      // readChartTokens() reads live CSS custom properties, so it already
+      // tracks the OS theme; the chart itself still needs an explicit
+      // redraw when those tokens change underneath it.
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        this.themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+        this.themeMedia.addEventListener('change', this.onThemeChange);
+      }
     });
   }
 
   ngOnInit(): void {
     // Runs on server + browser. Static head-only work: title + robots noindex.
-    this.title.setTitle('FSB · Stats');
+    this.title.setTitle($localize`:@@stats.meta.title:FSB · Stats`);
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
   }
 
@@ -303,11 +283,16 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.statsService.stop();
     // Phase 274 / STATS-03 -- mirror lifecycle for the FSB telemetry service.
     this.fsbService.stop();
     for (const s of this.subs) s.unsubscribe();
     this.subs = [];
+    if (this.themeMedia) {
+      this.themeMedia.removeEventListener('change', this.onThemeChange);
+      this.themeMedia = null;
+    }
     if (this.chartInstance) {
       try {
         this.chartInstance.destroy();
@@ -316,17 +301,113 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.chartInstance = null;
     }
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
+    this.cancelPendingViewRedraw();
+    clearTimeout(this.tabsHoverTimer);
+    clearTimeout(this.tabsCloseTimer);
+    clearTimeout(this.pulseTimer);
   }
 
   setView(id: AnyViewId): void {
-    if (this.selectedView === id) return;
+    clearTimeout(this.tabsHoverTimer);
+    clearTimeout(this.tabsCloseTimer);
+    clearTimeout(this.pulseTimer);
+    if (this.selectedView === id) {
+      // Re-selecting the active view is only reachable from the collapsing
+      // fan while frozenView is set; the pulseTimer just cleared above was
+      // due to reset that state, so reset it here or the fan stays keyed on
+      // the stale frozenView until the next real view change.
+      this.fanOpen = false;
+      this.tabPulse = false;
+      this.frozenView = null;
+      return;
+    }
+    this.frozenView = this.selectedView;
     this.selectedView = id;
-    // Redraw from latest data; no refetch (data is shared across views).
-    this.redrawChart();
+    this.fanOpen = false;
+    this.tabPulse = true;
+    this.pulseTimer = setTimeout(() => {
+      this.tabPulse = false;
+      this.frozenView = null;
+    }, 360);
+    // Defer one frame so Angular can apply the active globe/tab classes before
+    // canvas measurements run.
+    this.scheduleViewRedraw();
+  }
+
+  onTabsEnter(): void {
+    clearTimeout(this.tabsCloseTimer);
+    clearTimeout(this.tabsHoverTimer);
+    this.tabsHoverTimer = setTimeout(() => {
+      this.fanOpen = true;
+    }, 100);
+  }
+
+  onTabsLeave(): void {
+    clearTimeout(this.tabsHoverTimer);
+    clearTimeout(this.tabsCloseTimer);
+    this.tabsCloseTimer = setTimeout(() => {
+      this.fanOpen = false;
+    }, 250);
+  }
+
+  onTabsToggle(): void {
+    clearTimeout(this.tabsHoverTimer);
+    clearTimeout(this.tabsCloseTimer);
+    this.fanOpen = !this.fanOpen;
   }
 
   trackByView(_index: number, opt: ViewOption): string {
     return opt.id;
+  }
+
+  trackByMetric(index: number, metric: TabMetric): string {
+    return `${metric.label}:${index}`;
+  }
+
+  // Balanced circular split: walks outward from the active view in both
+  // directions so both fans stay roughly even regardless of which of the 6
+  // views is active, instead of dumping everything on one side when the
+  // active tab sits at either end of the list. Keyed on frozenView while a
+  // selection is collapsing so the folding list keeps its old tiles rather
+  // than reshuffling to the new selection's neighbors mid-fade.
+  private computeFanSplit(): { left: readonly FanItem[]; right: readonly FanItem[] } {
+    const activeId = this.frozenView ?? this.selectedView;
+    const idx = this.views.findIndex((v) => v.id === activeId);
+    const n = this.views.length;
+    const leftViews: ViewOption[] = [];
+    const rightViews: ViewOption[] = [];
+    for (let d = 1; d <= Math.floor(n / 2); d += 1) {
+      const rightIdx = (idx + d) % n;
+      const leftIdx = (((idx - d) % n) + n) % n;
+      rightViews.push(this.views[rightIdx]);
+      if (leftIdx !== rightIdx) leftViews.push(this.views[leftIdx]);
+    }
+    const maxLen = Math.max(leftViews.length, rightViews.length, 1);
+    const toFanItems = (list: ViewOption[]): FanItem[] =>
+      list.map((v, i) => this.fanItem(v, maxLen > 1 ? i / (maxLen - 1) : 0));
+    return { left: toFanItems(leftViews), right: toFanItems(rightViews) };
+  }
+
+  private fanItem(v: ViewOption, t: number): FanItem {
+    const ANGLE = Math.PI * 0.42;
+    const ARC = 20;
+    return { id: v.id, label: v.label, dy: -Math.round((1 - Math.cos(t * ANGLE)) * ARC) };
+  }
+
+  private fmtNum(value: number): string {
+    return new Intl.NumberFormat(this.localeId).format(Math.round(value || 0));
+  }
+
+  private fmtBig(value: number): string {
+    if (value >= 1_000) {
+      return new Intl.NumberFormat(this.localeId, {
+        maximumFractionDigits: 1,
+        notation: 'compact',
+      }).format(value);
+    }
+    return this.fmtNum(value);
   }
 
   private async bootstrap(): Promise<void> {
@@ -335,61 +416,27 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       // Dynamic import -- never bundled into the SSR pass.
       const chartMod = await import('chart.js/auto');
       this.ChartCtor = chartMod.default ?? chartMod;
-
-      // Local fsbCenterText plugin -- registered exactly once, only inside
-      // afterNextRender (which never runs on the server). Used by the
-      // fsb-active-now radial-gauge case to render the headline number in the
-      // doughnut hole. Generic by design (opts in via options.plugins.fsbCenterText.enabled)
-      // so other cases can reuse it without enabling it.
-      if (!this.centerTextPluginRegistered) {
-        const ChartNamed: any = (chartMod as any).Chart ?? (chartMod as any).default;
-        const centerTextPlugin = {
-          id: 'fsbCenterText',
-          afterDraw: (chart: any) => {
-            const optsAny = chart?.config?.options as any;
-            if (optsAny?.plugins?.fsbCenterText?.enabled !== true) return;
-            const { ctx, chartArea } = chart;
-            if (!ctx || !chartArea) return;
-            const text = String(optsAny.plugins.fsbCenterText.value ?? '0');
-            ctx.save();
-            ctx.fillStyle = optsAny.plugins.fsbCenterText.color ?? '#fff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = '600 28px ui-sans-serif, system-ui, sans-serif';
-            const cx = (chartArea.left + chartArea.right) / 2;
-            // For a half-doughnut (rotation -90 + circumference 180), the
-            // visible arc sits in the upper half; place text ~25% up from the
-            // bottom of chartArea so it reads as the gauge's centerline.
-            const cy = chartArea.bottom - (chartArea.bottom - chartArea.top) * 0.25;
-            ctx.fillText(text, cx, cy);
-            ctx.restore();
-          },
-        };
-        try {
-          ChartNamed?.register?.(centerTextPlugin);
-          this.centerTextPluginRegistered = true;
-        } catch {
-          // Non-fatal: the gauge view will still render without center text.
-        }
-      }
     } catch (err) {
       console.warn('[stats-page] failed to load chart.js', err);
       this.viewState = 'error';
-      this.errorMessage = 'Could not load chart library.';
+      this.errorMessage = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
       return;
     }
 
+    // Route change can destroy this component while the chart.js import
+    // above is in flight; starting the services then would orphan their
+    // pollers for the rest of the SPA session.
+    if (this.destroyed) return;
+
     this.statsService.start();
 
-    // Wire all 8 dataset subjects. Any "rate-limited" state flips the whole
-    // page into the rate-limit card; any "error" updates the inline message.
+    // Wire the 4 dataset subjects the remaining views need. Any
+    // "rate-limited" state flips the whole page into the rate-limit card;
+    // any "error" updates the inline message.
     this.subs.push(this.statsService.stars$.subscribe((s) => this.onDatasetUpdate('stars', s)));
     this.subs.push(this.statsService.weeklyStars$.subscribe((s) => this.onDatasetUpdate('weeklyStars', s)));
     this.subs.push(this.statsService.issues$.subscribe((s) => this.onDatasetUpdate('issues', s)));
-    this.subs.push(this.statsService.forks$.subscribe((s) => this.onDatasetUpdate('forks', s)));
-    this.subs.push(this.statsService.prs$.subscribe((s) => this.onDatasetUpdate('prs', s)));
     this.subs.push(this.statsService.commits$.subscribe((s) => this.onDatasetUpdate('commits', s)));
-    this.subs.push(this.statsService.releases$.subscribe((s) => this.onDatasetUpdate('releases', s)));
     // repoSummary subscription is intentionally omitted from per-update redraw
     // because no chart view depends on it directly; we still surface its
     // rate-limit state for UI.
@@ -413,27 +460,6 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private onFsbHeadlineUpdate(state: FSBDatasetState<FSBTelemetryHeadline>): void {
     if (state.kind === 'ready') {
       this.latestFsbHeadline = state.data;
-
-      // Quick task 260515-kw1 -- agents-running sparkline ring buffer.
-      // Push every snapshot's active_agents_now onto a 288-sample (24h * 12)
-      // FIFO. shift() trim keeps the buffer bounded so multi-day sessions do
-      // not leak memory.
-      const agents = state.data?.active_agents_now ?? 0;
-      this.agentHistoryRing.push(agents);
-      if (this.agentHistoryRing.length > StatsPageComponent.AGENT_HISTORY_CAP) {
-        this.agentHistoryRing.shift();
-      }
-
-      // Quick task 260515-kw1 -- big-number tile delta arrow.
-      // Compute (curr - prior) rounded to 2 dp so the displayed delta does
-      // not flicker with float noise. First sample produces a null delta
-      // (no prior to compare against).
-      const curr = state.data?.avg_agents_per_user ?? 0;
-      if (this.priorAvgAgentsPerUser !== null) {
-        this.avgAgentsDelta = +(curr - this.priorAvgAgentsPerUser).toFixed(2);
-      }
-      this.priorAvgAgentsPerUser = curr;
-
       if (this.viewState !== 'rate-limited') {
         this.viewState = 'ready';
         this.errorMessage = '';
@@ -457,7 +483,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onDatasetUpdate(
-    key: 'stars' | 'weeklyStars' | 'issues' | 'forks' | 'prs' | 'commits' | 'releases',
+    key: 'stars' | 'weeklyStars' | 'issues' | 'commits',
     state: DatasetState<unknown>
   ): void {
     if (state.kind === 'rate-limited') {
@@ -484,17 +510,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'issues':
         this.latestIssues = state.data as IssueEvent[];
         break;
-      case 'forks':
-        this.latestForks = state.data as ForkEvent[];
-        break;
-      case 'prs':
-        this.latestPrs = state.data as PullEvent[];
-        break;
       case 'commits':
         this.latestCommits = state.data as CommitEvent[];
-        break;
-      case 'releases':
-        this.latestReleases = state.data as ReleaseEvent[];
         break;
     }
     if (this.viewState !== 'rate-limited') {
@@ -505,13 +522,74 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyRateLimit(resetAt: number): void {
+    // Leaving 'ready' unmounts the @if template branch that owns the globe
+    // canvas; stop the globe's rAF loop so it doesn't keep rendering to the
+    // detached canvas (no redraw runs while rate-limited to stop it later).
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
     this.viewState = 'rate-limited';
     this.rateLimitedUntil = new Date(resetAt);
+  }
+
+  private scheduleViewRedraw(): void {
+    this.cancelPendingViewRedraw();
+    if (
+      !isPlatformBrowser(this.platformId) ||
+      typeof window === 'undefined' ||
+      typeof window.requestAnimationFrame !== 'function'
+    ) {
+      this.redrawChart();
+      return;
+    }
+    this.pendingViewRedrawFrame = window.requestAnimationFrame(() => {
+      this.pendingViewRedrawFrame = null;
+      this.redrawChart();
+    });
+  }
+
+  private cancelPendingViewRedraw(): void {
+    if (
+      this.pendingViewRedrawFrame !== null &&
+      typeof window !== 'undefined' &&
+      typeof window.cancelAnimationFrame === 'function'
+    ) {
+      window.cancelAnimationFrame(this.pendingViewRedrawFrame);
+    }
+    this.pendingViewRedrawFrame = null;
   }
 
   private redrawChart(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     if (!this.ChartCtor) return;
+
+    if (this.selectedView === 'fsb-active-now') {
+      const key = JSON.stringify(this.latestFsbHeadline?.popular_regions ?? []);
+      // Globe already running on the same region data (poll ticks re-emit
+      // unchanged aggregates; theme flips are read per frame by the draw
+      // loop): keep it spinning instead of resetting rotation + refetching
+      // coastlines. The key is order-sensitive -- a server-side reorder just
+      // costs one harmless rebuild.
+      if (this.stopGlobe && key === this.lastGlobeKey) return;
+      this.stopGlobe?.();
+      this.stopGlobe = undefined;
+      if (this.chartInstance) {
+        try { this.chartInstance.destroy(); } catch { /* swallow */ }
+        this.chartInstance = null;
+      }
+      this.clearSankeySvg();
+      const globeCanvas = this.globeCanvasRef?.nativeElement;
+      if (globeCanvas) {
+        this.lastGlobeKey = key;
+        this.stopGlobe = this.zone.runOutsideAngular(() =>
+          this.globeService.setupGlobe(globeCanvas, this.buildGlobeRegions())
+        );
+      }
+      return;
+    }
+
+    // Any chart view: tear down a globe left over from the globe view.
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
 
     const canvasRef = this.chartCanvas;
     if (!canvasRef) return; // template not yet in `ready` branch.
@@ -551,6 +629,30 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  // Redesign -- maps the k>=5-anonymity-floored popular_regions breakdown
+  // (see fsb-telemetry.types.ts) to globe node clusters. Labels that can't be
+  // geolocated (unmapped, or the literal 'unknown'/'Other' k-floor buckets)
+  // are skipped rather than guessed. `count` is a coarse, capped scale of
+  // `uniq` (the k-floor already guarantees uniq >= 5 for any real entry) so
+  // one dominant region can't visually swamp the globe; `spread` is a fixed
+  // moderate jitter radius since we only have a single centroid per label,
+  // not a real distribution.
+  private buildGlobeRegions(): GlobeRegion[] {
+    const list = this.latestFsbHeadline?.popular_regions ?? [];
+    const regions: GlobeRegion[] = [];
+    for (const { label, uniq } of list) {
+      const centroid = regionCentroid(label);
+      if (!centroid) continue;
+      regions.push({
+        lon: centroid.lon,
+        lat: centroid.lat,
+        spread: 6,
+        count: Math.min(16, Math.max(2, Math.round(uniq / 5))),
+      });
+    }
+    return regions;
+  }
+
   /**
    * Quick task 260515-kw1 -- inline-SVG Sankey renderer for
    * issues-open-vs-closed. Two nodes (Opened on the left, Closed on the right)
@@ -575,8 +677,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const VB_W = 600;
     const VB_H = 240;
     const nodeW = 18;
-    const leftX = 110;
-    const rightX = VB_W - 110 - nodeW;
+    const leftX = 60;
+    const rightX = VB_W - 60 - nodeW;
     const maxBar = VB_H - 60;
     const oH = O > 0 ? maxBar : 0;
     const total = closedFlow + backlog || 1;
@@ -594,7 +696,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     svg.setAttribute('viewBox', `0 0 ${VB_W} ${VB_H}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', `Sankey: ${O} opened, ${closedFlow} closed, ${backlog} still open`);
+    svg.setAttribute(
+      'aria-label',
+      $localize`:@@stats.chart.issuesSankey.aria:Sankey: ${O}:openedCount: opened, ${closedFlow}:closedCount: closed, ${backlog}:backlogCount: still open`
+    );
 
     const mkPath = (y1: number, h1: number, y2: number, h2: number, fill: string): SVGPathElement => {
       const sx = leftX + nodeW;
@@ -650,10 +755,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       t.textContent = content;
       return t;
     };
-    svg.appendChild(mkText(leftX - 8, oY - 8, 'end', tokens.text, `Opened (${O})`));
-    svg.appendChild(mkText(rightX + nodeW + 8, closedY + Math.max(closedH, 12) / 2, 'start', tokens.text, `Closed (${closedFlow})`));
+    svg.appendChild(mkText(leftX - 8, oY - 8, 'end', tokens.text, $localize`:@@stats.chart.issuesSankey.opened:Opened (${O}:openedCount:)`));
+    svg.appendChild(mkText(rightX + nodeW + 8, closedY + Math.max(closedH, 12) / 2, 'start', tokens.text, $localize`:@@stats.chart.issuesSankey.closed:Closed (${closedFlow}:closedCount:)`));
     if (backlog > 0) {
-      svg.appendChild(mkText(rightX + nodeW + 8, backlogY + Math.max(backlogH, 12) / 2, 'start', tokens.muted, `Still open (${backlog})`));
+      svg.appendChild(mkText(rightX + nodeW + 8, backlogY + Math.max(backlogH, 12) / 2, 'start', tokens.muted, $localize`:@@stats.chart.issuesSankey.stillOpen:Still open (${backlog}:backlogCount:)`));
     }
 
     mount.appendChild(svg);
@@ -701,50 +806,12 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels: series.map((p) => p.t),
             datasets: [
               {
-                label: 'Cumulative stars',
+                label: $localize`:@@stats.chart.cumulativeStars.legend:Cumulative stars`,
                 data: series.map((p) => p.y),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
                 fill: true,
                 tension: 0.2,
-              },
-            ],
-          },
-          options: baseOpts,
-        };
-      }
-      case 'stars-weekly': {
-        // Quick task 260515-kw1 -- LOLLIPOP via mixed chart:
-        // bar dataset draws thin stems (barThickness 2), scatter-like point
-        // dataset draws dots at the same indexes via labels-aligned data.
-        // Both use the categorical x axis so no scale collision occurs.
-        const series = this.latestWeeklyStars.length
-          ? this.latestWeeklyStars
-          : this.statsService.weeklyStarsDelta(this.latestStars);
-        const counts = series.map((p) => p.count);
-        return {
-          type: 'bar',
-          data: {
-            labels: series.map((p) => p.weekStart),
-            datasets: [
-              {
-                type: 'bar',
-                label: 'Stars per week',
-                data: counts,
-                backgroundColor: tokens.primary,
-                borderColor: tokens.primary,
-                borderWidth: 0,
-                barThickness: 2,
-              },
-              {
-                type: 'scatter',
-                label: 'Weekly star count',
-                data: counts,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                pointBackgroundColor: tokens.primary,
-                pointBorderColor: tokens.primary,
-                showLine: false,
               },
             ],
           },
@@ -757,127 +824,6 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         // We still need a `case` arm so the switch is exhaustive over AnyViewId.
         return null;
       }
-      case 'forks-growth': {
-        // Quick task 260515-kw1 -- DUAL-AXIS: cumulative line on the left, monthly
-        // bars on the right. Labels = union of both x-axis keys, sorted.
-        const cumulative = this.statsService.forksGrowth(this.latestForks);
-        const monthly = this.statsService.monthlyForks(this.latestForks);
-        const labels = unionLabels(cumulative.map((p) => p.t), monthly.map((p) => p.t));
-        return {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              {
-                type: 'line',
-                label: 'Cumulative forks',
-                data: labels.map((t) => valueAt(cumulative, t)),
-                borderColor: tokens.primary,
-                backgroundColor: tokens.primarySoft,
-                fill: false,
-                tension: 0.2,
-                yAxisID: 'yLeft',
-                pointRadius: 0,
-                borderWidth: 2,
-              },
-              {
-                type: 'bar',
-                label: 'Forks (per month bucket)',
-                data: labels.map((t) => valueAt(monthly, t)),
-                backgroundColor: tokens.primarySoft,
-                borderColor: tokens.primary,
-                borderWidth: 1,
-                yAxisID: 'yRight',
-              },
-            ],
-          },
-          options: {
-            ...baseOpts,
-            scales: {
-              x: {
-                ticks: { color: tokens.muted },
-                grid: { color: tokens.border },
-              },
-              yLeft: {
-                type: 'linear',
-                position: 'left',
-                beginAtZero: true,
-                ticks: { color: tokens.muted },
-                grid: { color: tokens.border },
-              },
-              yRight: {
-                type: 'linear',
-                position: 'right',
-                beginAtZero: true,
-                ticks: { color: tokens.muted },
-                grid: { display: false },
-              },
-            },
-          },
-        };
-      }
-      case 'prs-opened-vs-merged': {
-        // Quick task 260515-kw1 -- STREAMGRAPH (center-baseline). Opened plots
-        // positive, merged plots negative; tooltip + tick callbacks display
-        // Math.abs(value) so the readout stays intuitive.
-        const { opened, merged } = this.statsService.prsOpenedVsMerged(this.latestPrs);
-        const labels = unionLabels(opened.map((p) => p.t), merged.map((p) => p.t));
-        return {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: 'Opened',
-                data: labels.map((t) => +valueAt(opened, t)),
-                borderColor: tokens.primary,
-                backgroundColor: tokens.primarySoft,
-                fill: 'origin',
-                tension: 0.4,
-                pointRadius: 0,
-              },
-              {
-                label: 'Merged',
-                data: labels.map((t) => -valueAt(merged, t)),
-                borderColor: tokens.muted,
-                backgroundColor: 'rgba(148,163,184,0.18)',
-                fill: 'origin',
-                tension: 0.4,
-                pointRadius: 0,
-              },
-            ],
-          },
-          options: {
-            ...baseOpts,
-            plugins: {
-              ...baseOpts.plugins,
-              tooltip: {
-                enabled: true,
-                callbacks: {
-                  label: (ctx: any) => {
-                    const label = ctx.dataset?.label ?? '';
-                    const y = ctx.parsed?.y ?? 0;
-                    return `${label}: ${Math.abs(y)}`;
-                  },
-                },
-              },
-            },
-            scales: {
-              x: {
-                ticks: { color: tokens.muted },
-                grid: { color: tokens.border },
-              },
-              y: {
-                ticks: {
-                  color: tokens.muted,
-                  callback: (v: number) => Math.abs(v) === 0 ? '' : Math.abs(v).toString(),
-                },
-                grid: { color: tokens.border },
-              },
-            },
-          },
-        };
-      }
       case 'commits-cumulative': {
         const series = this.statsService.cumulativeCommitsSeries(this.latestCommits);
         return {
@@ -886,7 +832,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels: series.map((p) => p.t),
             datasets: [
               {
-                label: 'Cumulative commits',
+                label: $localize`:@@stats.chart.cumulativeCommits.legend:Cumulative commits`,
                 data: series.map((p) => p.y),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
@@ -898,112 +844,13 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           options: baseOpts,
         };
       }
-      case 'maintenance': {
-        // Quick task 260515-kw1 -- GANTT TIMELINE STRIP. Every point sits at
-        // y=0 on a hidden y axis; x is a continuous linear timestamp. When the
-        // repo has releases we plot one point per release with the tag name +
-        // date in the tooltip; otherwise we fall back to commits (mirrors the
-        // pre-overhaul fallback behaviour but as a strip, not a bar chart).
-        const hasReleases = this.latestReleases.length > 0;
-        const points = hasReleases
-          ? this.latestReleases
-              .filter((r) => r?.published_at && !Number.isNaN(Date.parse(r.published_at)))
-              .map((r) => ({ x: Date.parse(r.published_at), y: 0, _tag: r.tag_name, _date: r.published_at }))
-          : this.latestCommits
-              .filter((c) => c?.commit?.author?.date && !Number.isNaN(Date.parse(c.commit.author.date)))
-              .map((c) => ({ x: Date.parse(c.commit.author.date), y: 0, _sha: c.sha.slice(0, 7), _date: c.commit.author.date }));
-        return {
-          type: 'scatter',
-          data: {
-            datasets: [
-              {
-                label: hasReleases ? 'Releases' : 'Commits (no releases yet)',
-                data: points,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: tokens.primary,
-                pointBorderColor: tokens.primary,
-                showLine: false,
-              },
-            ],
-          },
-          options: {
-            ...baseOpts,
-            plugins: {
-              ...baseOpts.plugins,
-              tooltip: {
-                enabled: true,
-                callbacks: {
-                  label: (ctx: any) => {
-                    const raw = ctx?.raw ?? {};
-                    if (raw._tag) return `${raw._tag} (${String(raw._date).slice(0, 10)})`;
-                    if (raw._sha) return `${raw._sha} @ ${String(raw._date).slice(0, 10)}`;
-                    return '';
-                  },
-                },
-              },
-            },
-            scales: {
-              x: {
-                type: 'linear',
-                ticks: {
-                  color: tokens.muted,
-                  callback: (v: number) => {
-                    try { return new Date(v).toISOString().slice(0, 10); } catch { return ''; }
-                  },
-                },
-                grid: { color: tokens.border },
-              },
-              y: { display: false },
-            },
-          },
-        };
-      }
       // -----------------------------------------------------------------
-      // Phase 274 / STATS-01 -- 6 FSB telemetry chart views.
-      // Each renders an empty axis when the data hasn't arrived yet so
-      // Chart.js never crashes on null inputs.
+      // Phase 274 / STATS-01 -- FSB telemetry chart views. Each renders an
+      // empty axis when the data hasn't arrived yet so Chart.js never
+      // crashes on null inputs. fsb-active-now has no arm here -- it's
+      // rendered as the region globe (redrawChart() returns before reaching
+      // buildChartConfig for that view).
       // -----------------------------------------------------------------
-      case 'fsb-active-now': {
-        // Quick task 260515-kw1 -- RADIAL HALF-DOUGHNUT GAUGE with center text.
-        // `v` is the live active-users count; `max` adapts so the gauge sits
-        // mid-range early on (Math.max(10, v * 2)). Half-doughnut via the
-        // rotation: -90 + circumference: 180 trick; the locally-registered
-        // fsbCenterText plugin draws the number in the doughnut hole.
-        const v = this.latestFsbHeadline?.active_users_now ?? 0;
-        const max = Math.max(10, v * 2);
-        const filler = Math.max(0, max - v);
-        return {
-          type: 'doughnut',
-          data: {
-            labels: [
-              $localize`:@@SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW:Active users right now`,
-              'Headroom',
-            ],
-            datasets: [
-              {
-                label: $localize`:@@SHOWCASE_STATS_FSB_CHART_ACTIVE_NOW_LEGEND:Active users (5 min window)`,
-                data: [v, filler],
-                backgroundColor: [tokens.primary, tokens.border],
-                borderColor: tokens.primary,
-                borderWidth: 0,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '75%',
-            rotation: -90,
-            circumference: 180,
-            plugins: {
-              legend: { display: false },
-              tooltip: { enabled: false },
-              fsbCenterText: { enabled: true, value: String(v), color: tokens.text },
-            },
-          },
-        };
-      }
       case 'fsb-tokens': {
         const pts = this.latestFsbSeries?.d30 ?? [];
         return {
@@ -1024,68 +871,6 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           options: baseOpts,
         };
       }
-      case 'fsb-agents-running': {
-        // Quick task 260515-kw1 -- SPARKLINE from agentHistoryRing (capped at
-        // 288 samples = 24h @ 5-min poll). slice() copies so Chart.js can't
-        // mutate the canonical buffer. Axes hidden so the line reads as a
-        // sparkline; bucket label still appears in the legend for context.
-        //
-        // First-paint warmup (bug fix 260527): the ring buffer starts empty
-        // and only grows by one sample per 5-min poll. A 1-point line dataset
-        // with pointRadius:0 draws NOTHING -- Chart.js needs >=2 points to
-        // stroke a line, and we hide point markers for the sparkline aesthetic.
-        // Result: the canvas was visually empty for ~5 minutes after page load
-        // until the second poll arrived. Fix: when ring.length < 2 AND we have
-        // a real FSB headline, synthesize a 2-point flat-line dataset at the
-        // current `active_agents_now` value so the chart immediately reads as
-        // "currently N agents" and gains real shape as the ring fills.
-        //
-        // Gate on `headline` (per Codex P2 review): GitHub datasets can flip
-        // viewState to 'ready' before the FSB headline endpoint resolves (or
-        // when it errors). Without this gate, the fallback would draw a
-        // misleading [0, 0] flat-zero line during that window -- as if there
-        // were genuinely zero active agents. Better to render an empty canvas
-        // (honest "no data yet") until at least one real FSB sample arrives.
-        // Note: onFsbHeadlineUpdate assigns `latestFsbHeadline` and pushes onto
-        // the ring atomically, so `headline !== null` implies `ring.length >= 1`.
-        const headline = this.latestFsbHeadline;
-        const bucket = headline?.active_agents_bucket ?? '0';
-        const ring = this.agentHistoryRing.slice();
-        const live = headline?.active_agents_now ?? 0;
-        const data = !headline
-          ? []
-          : ring.length >= 2 ? ring : [live, live];
-        return {
-          type: 'line',
-          data: {
-            labels: data.map((_, i) => String(i)),
-            datasets: [
-              {
-                label: $localize`:@@SHOWCASE_STATS_FSB_CHART_AGENTS_RUNNING_LEGEND:Active agents (10 min window)` + ` [${bucket}]`,
-                data,
-                borderColor: tokens.primary,
-                backgroundColor: tokens.primarySoft,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0,
-                borderWidth: 2,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { enabled: false },
-            },
-            scales: {
-              x: { display: false },
-              y: { display: false, beginAtZero: true },
-            },
-          },
-        };
-      }
       case 'fsb-popular-mcp': {
         const raw = this.latestFsbHeadline?.popular_mcp_clients ?? [];
         const list = raw.length > 0
@@ -1097,7 +882,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
             labels: list.map((x) => x.label),
             datasets: [
               {
-                label: $localize`:@@SHOWCASE_STATS_FSB_CHART_POPULAR_AGENTS_LEGEND:Popular agents`,
+                label: $localize`:@@SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND:Popular MCP clients`,
                 data: list.map((x) => x.uniq),
                 backgroundColor: [
                   tokens.primary, tokens.primarySoft, tokens.muted,
@@ -1109,43 +894,12 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
           options: baseOpts,
         };
       }
-      case 'fsb-avg-agents-per-user': {
-        // Quick task 260524-06b -- replaces the prior big-number tile path
-        // (which overflowed .chart-mount into the footer) with a time-series
-        // line chart mirroring the fsb-tokens arm structurally. Per-day avg
-        // agents per active user = agents_active / unique_installs; guarded
-        // for divide-by-zero by emitting 0 when unique_installs is 0 for that
-        // day. toFixed(2) keeps the line smooth without float jitter.
-        const pts = this.latestFsbSeries?.d30 ?? [];
-        const series = pts.map((p) => ({
-          t: p.day_utc,
-          y: p.unique_installs > 0
-            ? +(p.agents_active / p.unique_installs).toFixed(2)
-            : 0,
-        }));
-        return {
-          type: 'line',
-          data: {
-            labels: series.map((p) => p.t),
-            datasets: [
-              {
-                label: $localize`:@@SHOWCASE_STATS_FSB_CHART_AVG_AGENTS_LEGEND:Avg agents per active user (last 30 days)`,
-                data: series.map((p) => p.y),
-                borderColor: tokens.primary,
-                backgroundColor: tokens.primarySoft,
-                fill: true,
-                tension: 0.2,
-              },
-            ],
-          },
-          options: baseOpts,
-        };
-      }
+      default:
+        // Every other AnyViewId member is no longer reachable via `views`
+        // (Phase 274 redesign trimmed the tab list to 6; fsb-active-now is
+        // handled before this method is ever called for that view).
+        return null;
     }
-    // TypeScript exhaustiveness: every case in the AnyViewId union is handled
-    // above. The fall-through return is unreachable in practice but satisfies
-    // the implicit `void` return analysis.
-    return null;
   }
 }
 
@@ -1179,12 +933,14 @@ function readChartTokens(): ChartTokens {
   };
 }
 
-function unionLabels(a: string[], b: string[]): string[] {
-  const set = new Set<string>([...a, ...b]);
-  return [...set].sort((x, y) => (x < y ? -1 : 1));
+function sumPoints(points: ReadonlyArray<{ y: number }>): number {
+  return points.reduce((total, point) => total + (Number.isFinite(point.y) ? point.y : 0), 0);
 }
 
-function valueAt(series: { t: string; y: number }[], label: string): number {
-  const hit = series.find((p) => p.t === label);
-  return hit ? hit.y : 0;
+function countRecentCommits(commits: readonly CommitEvent[], days: number): number {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return commits.filter((commit) => {
+    const date = Date.parse(commit.commit?.author?.date ?? '');
+    return Number.isFinite(date) && date >= cutoff;
+  }).length;
 }

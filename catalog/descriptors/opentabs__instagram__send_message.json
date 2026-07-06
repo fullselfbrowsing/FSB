@@ -1,0 +1,44 @@
+{
+  "slug": "instagram.send_message",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "send a message in instagram",
+    "post a message in instagram",
+    "write a new message in instagram",
+    "send message in instagram",
+    "send a direct message in instagram"
+  ],
+  "description": "Send a direct message to an existing conversation thread. Use list_conversations to find thread IDs.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thread_id": {
+        "type": "string",
+        "description": "Conversation thread ID"
+      },
+      "text": {
+        "type": "string",
+        "description": "Message text to send"
+      }
+    },
+    "required": [
+      "thread_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "spotify.get_currently_playing",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get a currently playing in spotify",
+    "look up a currently playing in spotify",
+    "fetch a single currently playing in spotify",
+    "view one specific currently playing in spotify",
+    "get currently playing in spotify",
+    "get the currently playing track in spotify"
+  ],
+  "description": "Get the track that is currently playing on the user’s active device.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-currently-playing.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

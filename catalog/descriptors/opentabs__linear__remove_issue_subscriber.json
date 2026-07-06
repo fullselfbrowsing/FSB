@@ -1,0 +1,42 @@
+{
+  "slug": "linear.remove_issue_subscriber",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "remove an issue subscriber in linear",
+    "remove issue subscriber in linear",
+    "unsubscribe a user from an issue in linear"
+  ],
+  "description": "Unsubscribe a user from notifications for a Linear issue.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to unsubscribe from"
+      },
+      "subscriber_id": {
+        "type": "string",
+        "description": "User UUID to unsubscribe"
+      }
+    },
+    "required": [
+      "issue_id",
+      "subscriber_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/remove-issue-subscriber.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

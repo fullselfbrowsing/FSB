@@ -1,0 +1,39 @@
+{
+  "slug": "msword.list_shared_with_me",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "list a shared with me in msword",
+    "show me my shared with me in msword",
+    "view my shared with me in msword",
+    "see all my shared with me in msword",
+    "list shared with me in msword",
+    "list a shared with me in microsoft word"
+  ],
+  "description": "List files and folders shared with the current user.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "top": {
+        "description": "Max results (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/list-shared-with-me.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

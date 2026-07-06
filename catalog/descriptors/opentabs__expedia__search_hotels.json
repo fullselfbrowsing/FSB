@@ -1,0 +1,73 @@
+{
+  "slug": "expedia.search_hotels",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search hotels in expedia",
+    "search for hotels by destination and dates in expedia",
+    "search for hotels in a destination in expedia"
+  ],
+  "description": "Search for hotels in a destination. Requires a region ID from search_locations. Returns hotel names and pricing. Results are sorted by \"RECOMMENDED\" by default.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region_id": {
+        "type": "string",
+        "description": "Gaia region ID from search_locations (e.g. \"178293\" for New York)"
+      },
+      "check_in_date": {
+        "type": "string",
+        "description": "Check-in date in YYYY-MM-DD format"
+      },
+      "check_out_date": {
+        "type": "string",
+        "description": "Check-out date in YYYY-MM-DD format"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 14
+      },
+      "children_ages": {
+        "description": "Ages of children (empty array if none)",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 17
+        }
+      },
+      "sort": {
+        "description": "Sort order (default \"RECOMMENDED\")",
+        "type": "string",
+        "enum": [
+          "RECOMMENDED",
+          "PRICE_LOW_TO_HIGH",
+          "PRICE_HIGH_TO_LOW",
+          "DISTANCE",
+          "REVIEW"
+        ]
+      }
+    },
+    "required": [
+      "region_id",
+      "check_in_date",
+      "check_out_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-hotels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

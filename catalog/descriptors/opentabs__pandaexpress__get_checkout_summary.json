@@ -1,0 +1,40 @@
+{
+  "slug": "pandaexpress.get_checkout_summary",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get a checkout summary in pandaexpress",
+    "look up a checkout summary in pandaexpress",
+    "fetch a single checkout summary in pandaexpress",
+    "view one specific checkout summary in pandaexpress",
+    "get checkout summary in pandaexpress",
+    "review order totals before checkout in pandaexpress"
+  ],
+  "description": "Validate and get the checkout summary for a basket. Returns the total, tax, and estimated ready time. Call this before submitting an order to review the final totals.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID)"
+      }
+    },
+    "required": [
+      "basket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-checkout-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

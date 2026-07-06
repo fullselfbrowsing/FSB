@@ -1,0 +1,54 @@
+{
+  "slug": "retool.create_app_from_toolscript_archive",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "create an app from toolscript archive in retool",
+    "add an app from toolscript archive in retool",
+    "make a new app from toolscript archive in retool",
+    "open a new app from toolscript archive in retool",
+    "create app from toolscript archive in retool",
+    "create a retool app from a toolscript zip in retool"
+  ],
+  "description": "Create a new Retool app from a base64-encoded Toolscript ZIP archive. The tool uses Retool's own browser-side Toolscript compiler to turn the ZIP into a Transit appState string, then calls Retool's create page API. The archive determines whether the result is a web app, mobile app, or module.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new Retool app"
+      },
+      "folder_id": {
+        "type": "number",
+        "description": "Folder ID to create the app in (use list_apps to find folder IDs)"
+      },
+      "base64_zip": {
+        "type": "string",
+        "description": "Base64-encoded Toolscript ZIP archive"
+      },
+      "file_name": {
+        "description": "Optional archive file name used for Retool parser diagnostics",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "folder_id",
+      "base64_zip"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/create-app-from-toolscript-archive.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

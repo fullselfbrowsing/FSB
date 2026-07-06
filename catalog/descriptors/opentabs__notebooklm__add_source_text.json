@@ -1,0 +1,47 @@
+{
+  "slug": "notebooklm.add_source_text",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "add a source text in notebooklm",
+    "add source text in notebooklm",
+    "add text as a source in notebooklm"
+  ],
+  "description": "Add plain text as a source to a notebook. Use this to provide custom content for NotebookLM to analyze.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "title": {
+        "type": "string",
+        "description": "Title for the text source"
+      },
+      "text": {
+        "type": "string",
+        "description": "Text content to add as a source"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "title",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/add-source-text.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

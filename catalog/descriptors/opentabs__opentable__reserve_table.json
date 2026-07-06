@@ -1,0 +1,57 @@
+{
+  "slug": "opentable.reserve_table",
+  "service": "www.opentable.com",
+  "intentSynonyms": [
+    "reserve a table in opentable",
+    "reserve table in opentable",
+    "reserve a table on opentable in opentable"
+  ],
+  "description": "Reserve a table at an OpenTable restaurant for a date, time, and party size. This holds your card against the reservation (a no-show or late cancellation may be charged) -- a money-adjacent action.",
+  "actionVerb": "reserve",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant to reserve at"
+      },
+      "date": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reservation date (YYYY-MM-DD)"
+      },
+      "time": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Reservation time (HH:MM, 24h)"
+      },
+      "party_size": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Number of diners"
+      }
+    },
+    "required": [
+      "restaurant_id",
+      "date",
+      "time",
+      "party_size"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/opentable/src/tools/reserve-table.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "reserve"
+    }
+  }
+}

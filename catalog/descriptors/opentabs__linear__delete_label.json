@@ -1,0 +1,39 @@
+{
+  "slug": "linear.delete_label",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "delete a label in linear",
+    "remove a label in linear",
+    "trash a label in linear",
+    "permanently delete a label in linear",
+    "delete label in linear"
+  ],
+  "description": "Delete a Linear issue label. Labels will be removed from all issues that use them.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "label_id": {
+        "type": "string",
+        "description": "Label UUID to delete"
+      }
+    },
+    "required": [
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/delete-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

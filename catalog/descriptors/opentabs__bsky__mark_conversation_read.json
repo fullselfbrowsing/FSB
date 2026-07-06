@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.mark_conversation_read",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "mark a conversation read in bsky",
+    "mark conversation read in bsky",
+    "mark a conversation read in bluesky",
+    "mark a conversation as read in bsky"
+  ],
+  "description": "Mark a conversation as read.",
+  "actionVerb": "mark",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      }
+    },
+    "required": [
+      "convo_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/mark-conversation-read.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "mark"
+    }
+  }
+}

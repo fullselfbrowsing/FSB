@@ -1,0 +1,44 @@
+{
+  "slug": "outlook.get_event",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "get an event in outlook",
+    "look up an event in outlook",
+    "fetch a single event in outlook",
+    "view one specific event in outlook",
+    "get event in outlook",
+    "get event details in outlook"
+  ],
+  "description": "Get the full details of a single calendar event, including body, attendees and their responses, location, reminders, and recurrence status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "description": "The event ID (from list_events or get_calendar_view)"
+      },
+      "time_zone": {
+        "description": "Time zone to return start/end times in (e.g. \"Eastern Standard Time\"). Defaults to UTC.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/get-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

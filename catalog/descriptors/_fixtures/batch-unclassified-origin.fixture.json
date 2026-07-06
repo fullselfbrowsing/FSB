@@ -1,0 +1,13 @@
+{
+  "slug": "acme-wallet.send_funds",
+  "service": "wallet.acme-pay.example",
+  "description": "Send funds from the user's wallet (BRDTH-02 batch-gate fixture: a finance/payment batch origin the heuristic flags but that is NOT classified denied/sensitive)",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "_fixture": "BRDTH-02: this origin trips the finance/payment sensitivity axis (wallet/pay/funds) but is absent from extension/config/service-denylist.json -> the merge-time classifyGate batch-coverage gate MUST reject it (build aborts), proving the per-batch gate Phases 38/39 inherit fails closed on an unclassified batch origin. _fixtures/ is excluded by readJsonDir non-recursion so it never ships."
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "carta.get_entities",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get entities in carta",
+    "look up entities in carta",
+    "fetch a single entities in carta",
+    "view one specific entities in carta",
+    "get portfolio entity details in carta"
+  ],
+  "description": "Get detailed entity information for all companies in the portfolio, including security requirements and available features.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-entities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

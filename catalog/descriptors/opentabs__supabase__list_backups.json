@@ -1,0 +1,40 @@
+{
+  "slug": "supabase.list_backups",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "list backups in supabase",
+    "show me my backups in supabase",
+    "view my backups in supabase",
+    "see all my backups in supabase",
+    "list database backups in supabase"
+  ],
+  "description": "List all database backups for a Supabase project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/list-backups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

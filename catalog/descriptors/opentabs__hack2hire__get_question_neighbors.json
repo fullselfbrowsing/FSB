@@ -1,0 +1,63 @@
+{
+  "slug": "hack2hire.get_question_neighbors",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get question neighbors in hack2hire",
+    "look up question neighbors in hack2hire",
+    "fetch a single question neighbors in hack2hire",
+    "view one specific question neighbors in hack2hire",
+    "get prev/next questions in a list in hack2hire"
+  ],
+  "description": "Get the previous and next questions relative to a given post within a filtered, sorted list. Pass the same `company`, `type`, and `sortedBy` you would use in `list_questions` so the navigation matches the UI ordering. The previous or next field has empty values when the post is at the start or end of the list.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "postId": {
+        "type": "string",
+        "description": "Post ID to anchor navigation around."
+      },
+      "company": {
+        "description": "Company key in uppercase (e.g. \"PINTEREST\"). Match the list_questions call you used.",
+        "type": "string"
+      },
+      "type": {
+        "description": "Post type filter.",
+        "type": "string",
+        "enum": [
+          "ALGORITHM",
+          "SD",
+          "ML_SD",
+          "BLOG"
+        ]
+      },
+      "sortedBy": {
+        "description": "Sort order. Defaults to \"isLocked\" — match the list_questions sortBy you used.",
+        "type": "string",
+        "enum": [
+          "isLocked",
+          "frequency",
+          "difficulty",
+          "createdDate"
+        ]
+      }
+    },
+    "required": [
+      "postId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-question-neighbors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

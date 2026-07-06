@@ -1,0 +1,32 @@
+{
+  "slug": "fiverr.get_current_page_context",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "get a current page context in fiverr",
+    "look up a current page context in fiverr",
+    "fetch a single current page context in fiverr",
+    "view one specific current page context in fiverr",
+    "get current page context in fiverr",
+    "identify the logged-in user and current page in fiverr"
+  ],
+  "description": "Get the logged-in Fiverr account identity and the page currently open in the browser tab. Returns the username, numeric user ID, account currency/country/locale, Pro status, and the current page URL and title. Use this to confirm who is logged in and what they are looking at before taking further actions. Reads page state only — makes no network request.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/get-current-page-context.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

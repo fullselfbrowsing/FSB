@@ -1,591 +1,276 @@
-# Technology Stack — v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix
+# Technology Stack — v1.0.0 Full App Catalog (OpenTabs Parity)
 
 **Project:** FSB (Full Self-Browsing)
-**Milestone:** v0.9.69 — Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix
-**Researched:** 2026-05-14
-**Confidence:** HIGH (pricing from primary sources; runtime stack already validated in prior milestones)
+**Milestone:** v1.0.0 — Full App Catalog (OpenTabs Parity): take the bundled head from 4 services to the full ~119-app OpenTabs surface via build-time descriptor codegen + a scaled minisearch catalog + a hand-ported depth tier.
+**Domain:** Build-time catalog codegen (extract per-op descriptor metadata from 119 `@opentabs-dev/plugin-sdk` plugins, ~2,400 ops) into FSB's existing `recipe-index.generated.js`; scale the minisearch index to thousands of descriptors without blowing SW startup/memory; hand-port ~15-30 apps as T1a/T1b handlers.
+**Researched:** 2026-06-23
+**Confidence:** HIGH — extraction shape verified directly against the real OpenTabs repo (`github.com/opentabs-dev/opentabs`, MIT, `pushed_at 2026-06-21`); every claim about op shape / manifest serialization / Zod usage is quoted from inspected source. Versions verified via npm + Context7 on 2026-06-23.
 
-> **Note:** This file supersedes the prior v0.9.61 STACK research. The earlier v0.9.61 OpenClaw-skill stack notes are archived under `.planning/milestones/v0.9.61-*`.
-
----
-
-## Executive Summary
-
-v0.9.69 is an **additive** milestone on a fully validated existing stack. The only new server-side dependency required is `express-rate-limit` (telemetry-endpoint DoS protection). Everything else — UUID generation, IP hashing, SQLite, batched POST + WS — is satisfied by Node built-ins (`crypto`) and the already-installed deps (`better-sqlite3@^11.0.0`, `express@^4.21.0`, `ws@^8.19.0`). On the extension side, `chrome.storage.local` is the correct primitive for both the install UUID and the batched event queue; `unlimitedStorage` is already in `manifest.json`. **No third-party analytics SDKs** are introduced (PostHog / Segment / Mixpanel / Datadog explicitly excluded by privacy mandate).
-
-The new MCP-pricing module is **pure data** — a code-only `MCP_MODEL_PRICING` table mirroring the existing `extension/ai/cost-tracker.js` `MODEL_PRICING` pattern, refreshed to May 2026 rates. The existing `cost-tracker.js` is reusable as the cost-estimation engine; this milestone augments its lookup table with MCP-default-model rows and a new per-client → per-model resolution function.
+> **Note:** This file supersedes the prior **v0.9.99** STACK research (Native Capability Catalog, dated 2026-06-19). The v0.9.99 architecture it described is now the FIXED substrate this milestone extends; recover the earlier notes from git history / the v0.9.99 milestone archive. This document covers ONLY the NEW v1.0.0 build-time codegen + scaling stack.
 
 ---
 
-## 1. MCP Model Pricing (May 2026, USD per 1M tokens)
+## TL;DR (for the roadmapper + requirements step)
 
-> All rates are **non-batch, non-cache-hit standard list price** unless otherwise noted. Batch / cache-hit discounts are documented per-provider below; the FSB cost estimator records the raw standard rate and may optionally apply a multiplier in a future milestone.
-
-### 1a. Anthropic — Confirmed via `platform.claude.com/docs/en/about-claude/pricing` (fetched 2026-05-14)
-
-| Model | Input ($/MTok) | Output ($/MTok) | 5m Cache Write | 1h Cache Write | Cache Hit | Batch Input | Batch Output |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| **claude-opus-4-7** | $5.00 | $25.00 | $6.25 | $10.00 | $0.50 | $2.50 | $12.50 |
-| claude-opus-4-6 | $5.00 | $25.00 | $6.25 | $10.00 | $0.50 | $2.50 | $12.50 |
-| claude-opus-4-5 | $5.00 | $25.00 | $6.25 | $10.00 | $0.50 | $2.50 | $12.50 |
-| claude-opus-4-1 | $15.00 | $75.00 | $18.75 | $30.00 | $1.50 | $7.50 | $37.50 |
-| **claude-sonnet-4-6** | $3.00 | $15.00 | $3.75 | $6.00 | $0.30 | $1.50 | $7.50 |
-| claude-sonnet-4-5 | $3.00 | $15.00 | $3.75 | $6.00 | $0.30 | $1.50 | $7.50 |
-| **claude-haiku-4-5** | $1.00 | $5.00 | $1.25 | $2.00 | $0.10 | $0.50 | $2.50 |
-
-**Caveats Anthropic flags directly:**
-- Opus 4.7 uses a **new tokenizer that consumes up to 35% more tokens** for the same input text vs 4.6. Per-token rate is unchanged but effective cost-per-request can rise ~35%. Note this in code comments for the pricing table.
-- `inference_geo: "us"` adds a 1.1× multiplier on 4.5+ models. Not relevant unless we ever proxy MCP calls server-side — we don't.
-- 1M-token context window included at standard pricing on Opus 4.7, Opus 4.6, Sonnet 4.6 — no over-context surcharge.
-
-**Source:** [Claude API Pricing docs (platform.claude.com)](https://platform.claude.com/docs/en/about-claude/pricing) — confirmed live 2026-05-14. Confidence: **HIGH** (primary source).
-
-### 1b. OpenAI — Confirmed via OpenRouter mirror (platform.openai.com behind 403 to WebFetch)
-
-| Model | Input ($/MTok) | Cached Input | Output ($/MTok) | Source confidence |
-|---|---:|---:|---:|---|
-| **gpt-5** | $1.25 | $0.13 | $10.00 | HIGH (OpenRouter primary mirror + multi-source agree) |
-| **gpt-5-mini** | $0.25 | — | $2.00 | HIGH (OpenRouter primary mirror + multi-source agree) |
-| gpt-5-nano | $0.05 | — | $0.40 | MEDIUM (DevTk + GPTBreeze + AI Cost Check agree) |
-| gpt-5.1 | n/a published | — | n/a published | LOW — newer family, retain manual refresh |
-| gpt-5.2 | $1.75 | — | $14.00 | MEDIUM (IntuitionLabs Feb 2026 snapshot) |
-| gpt-5.4 | $2.50 | — | $15.00 | MEDIUM (multi May 2026 third-party comps) |
-| **gpt-5.5** (current flagship Apr 2026+) | $5.00 | — | $30.00 | MEDIUM (multi May 2026 third-party comps) |
-| **gpt-5.5-codex** (Codex CLI default) | (inherits gpt-5.5 rates) | — | (inherits gpt-5.5 rates) | MEDIUM |
-
-**Note:** OpenAI's public pricing page (`https://platform.openai.com/docs/pricing/` and `https://openai.com/api/pricing/`) currently returns **HTTP 403 to non-browser fetch**, so OpenAI's official prices could not be **directly** verified. The numbers above are confirmed from **two independent third-party trackers** (OpenRouter and AI Cost Check), which agree to the cent for GPT-5 / GPT-5-mini. Confidence is **HIGH for GPT-5/mini/nano** (multiple agreeing sources + OpenRouter primary mirror), **MEDIUM for the GPT-5.x family** (single-tier verification only).
-
-**Sources:**
-- [OpenRouter GPT-5 model page](https://openrouter.ai/openai/gpt-5) — confirmed 2026-05-14
-- [OpenRouter GPT-5 mini model page](https://openrouter.ai/openai/gpt-5-mini) — confirmed 2026-05-14
-- [DevTk 2026 OpenAI Pricing Guide](https://devtk.ai/en/blog/openai-api-pricing-guide-2026/)
-- [The Register: GPT-5.5 cost analysis (2026-05-08)](https://www.theregister.com/ai-and-ml/2026/05/08/gpt-55-may-burn-fewer-tokens-but-it-always-burns-more-cash/5237498)
-
-### 1c. Google Gemini — Confirmed via `ai.google.dev/gemini-api/docs/pricing` (fetched 2026-05-14)
-
-| Model | Input (≤200k) | Input (>200k) | Output (≤200k) | Output (>200k) | Batch Input | Batch Output |
-|---|---:|---:|---:|---:|---:|---:|
-| **gemini-2.5-pro** | $1.25 | $2.50 | $10.00 | $15.00 | $0.625 / $1.25 | $5.00 / $7.50 |
-| **gemini-2.5-flash** | $0.30 (text/image/video) / $1.00 (audio) | — | $2.50 | — | $0.15 / $0.50 | $1.25 |
-| gemini-2.5-flash-lite | $0.10 (text/image/video) / $0.30 (audio) | — | $0.40 | — | $0.05 / $0.15 | $0.20 |
-
-**Context caching (Gemini 2.5 Pro):** $0.125 (≤200k) / $0.25 (>200k) per 1M tokens, plus $4.50 / 1M tokens / hour storage.
-
-**Source:** [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) — confirmed live 2026-05-14. Confidence: **HIGH** (primary source).
-
-### 1d. xAI Grok — Confirmed via `docs.x.ai/developers/models` (fetched 2026-05-14)
-
-| Model | Input ($/MTok) | Output ($/MTok) | Notes |
-|---|---:|---:|---|
-| **grok-4.3** | $1.25 | $2.50 | Current flagship (May 2026); 1M context; **>200k token requests billed at higher tier** (exact higher rate not published on docs.x.ai) |
-| grok-4.20-0309-reasoning | $1.25 | $2.50 | |
-| grok-4.20-0309-non-reasoning | $1.25 | $2.50 | |
-| grok-4.20-multi-agent-0309 | $1.25 | $2.50 | |
-| **grok-4.1-fast-reasoning** | $0.20 | $0.50 | |
-| grok-4.1-fast-non-reasoning | $0.20 | $0.50 | |
-| grok-4-fast | $0.20 | $0.50 | 2M context (per mem0 March snapshot) |
-| grok-4 (deprecated) | $3.00 | $15.00 | **Retiring May 15, 2026** — requests redirect to grok-4.3 pricing |
-| grok-3 | $3.00 | $15.00 | 131k context |
-| grok-3-mini | $0.30 | $0.50 | 131k context |
-
-**Caveat:** Grok 4.3 has tiered pricing at the **200k-token boundary** (similar shape to Gemini 2.5 Pro), but `docs.x.ai` does not publish the exact >200k rate as of fetch time. Treat the $1.25/$2.50 number as the ≤200k rate and **TODO-flag** the upper-tier number for refresh.
-
-**Source:** [docs.x.ai/developers/models](https://docs.x.ai/developers/models) — confirmed live 2026-05-14. Confidence: **HIGH** for ≤200k pricing; **MEDIUM** for the >200k upper tier (acknowledged-but-unpublished).
-
-### 1e. DeepSeek — Confirmed via `api-docs.deepseek.com` (fetched 2026-05-14)
-
-| Model | Input (cache hit) | Input (cache miss) | Output |
-|---|---:|---:|---:|
-| deepseek-v4-flash | $0.0028 | $0.14 | $0.28 |
-| **deepseek-v4-pro** | $0.003625 | $0.435 | $0.87 (75% promo discount applied; promo ends 2026-05-31) |
-
-**Caveats:**
-- DeepSeek V3 and DeepSeek-R1 are **no longer listed** on the official pricing docs as of 2026-05-14; V4-Flash / V4-Pro have replaced them.
-- DeepSeek-V4-Pro has a **time-bounded 75% discount expiring 2026-05-31** — flag for refresh at next milestone.
-
-**Source:** [api-docs.deepseek.com/quick_start/pricing](https://api-docs.deepseek.com/quick_start/pricing) — confirmed live 2026-05-14. Confidence: **HIGH** (primary source).
-
-### 1f. Fallback / "Unknown Client" Policy
-
-**When a client label or model is not in `MCP_MODEL_PRICING`:**
-
-1. **Unknown client label** but known to be in the visual-session allowlist: fall back to the family-of-origin's **mid-tier model** (e.g. Sonnet 4.6 for any Anthropic-flavored unknown). Mark cost rows with `pricing_confidence: "fallback"`.
-2. **Truly unknown client + truly unknown model**: record the call with **`cost_usd = null`** rather than $0 (false zero distorts aggregates). On the stats page, display these calls as "uncounted" with a tooltip.
-3. **Estimator never throws**: it returns `{ cost: null, source: "unknown" }` rather than failing.
-
-This mirrors the current `estimateCost()` graceful-fallback pattern in `extension/ai/cost-tracker.js:69-93`, which falls back to `grok-4-1-fast-reasoning` pricing for any unknown model. **For the new MCP pricing table, change that final fallback to `null` rather than a default model row** — $0 falsely suggests "free call" in telemetry aggregates, and the existing cost-tracker fallback was for AI-provider calls (which we always know we're paying for); MCP calls come from external clients where we may genuinely not know the model.
-
-### 1g. Per-Request Pricing (Edge Cases)
-
-| Provider | Per-request charges that aren't per-token |
-|---|---|
-| Anthropic | Web search: $10 / 1,000 searches. Code execution: $0.05/hour after free 1,550 hours. Fast mode (Opus 4.6/4.7 preview): **6× standard rates** ($30/$150 per MTok). |
-| Google | Grounding with Google Search: $35 / 1,000 grounded prompts after free tier. |
-| OpenAI | Tool calls priced by underlying tokens; no flat per-request surcharge in standard pricing. |
-| xAI | Text models priced per-token only; image/voice models have per-second / per-minute rates (not relevant for MCP). |
-
-**Decision:** MCP pricing table is **token-only**. Per-request surcharges are out of scope for v0.9.69 (they would require parsing usage envelopes per-tool, which the MCP server does not surface in the response shape today). Document as a TODO under "future telemetry enrichment."
+- **OpenTabs op metadata IS extractable at build time — but NOT by static parsing alone.** Each op is `defineTool({ name, displayName, description, summary, icon, group, input: z.object({...}), output: z.object({...}), handle })`. `input`/`output` are **Zod 4 schemas** that import shared schemas from a sibling `schemas.ts` and helpers from the SDK, so a single-file regex/AST scrape cannot resolve a complete param schema. The robust path is **load + evaluate the Zod** (transpile TS on the fly → `import()` the plugin module → `z.toJSONSchema(tool.input)`) — exactly what OpenTabs' own `opentabs-plugin build` does (`platform/plugin-tools/src/commands/build.ts:416`).
+- **There is NO prebuilt manifest in the repo to consume.** OpenTabs writes `dist/tools.json`, but `dist/` is `.gitignore`d. FSB must run the Zod→JSON-Schema conversion itself.
+- **`z.toJSONSchema` is a Zod-4-only top-level API** (verified Zod 4.4.3 via Context7 `/websites/zod_dev_v4`). SDK declares `peerDependencies.zod: "^4.4.3"`; plugins pin `zod ^4.3.6`. → **Zod 4 is the one genuinely new build-time dependency.**
+- **NEW build deps (devDependencies ONLY):** `zod@^4.4.3` + a TS-on-the-fly evaluator (`tsx@^4.22` recommended; `jiti@^2.7` is the OpenTabs-native equivalent). esbuild is already a FSB devDep and backs the evaluator.
+- **REUSE at runtime, unchanged:** `minisearch ^7.2.0`, `@cfworker/json-schema ^4.1.1`, `jmespath ^0.16.0` — all already FSB deps and already vendored at `extension/lib/*.min.js`. FSB's target descriptor shape (`{slug, service, intentSynonyms, description, actionVerb, sideEffectClass, params}`) maps cleanly onto the OpenTabs manifest fields + **one inferred field** (`sideEffectClass` — OpenTabs has NO side-effect annotation; confirmed below).
+- **Scaling to thousands of descriptors:** keep the existing build-time-prebuilt + `loadJSON` minisearch pattern (SURF-04), but (a) **index searchable text only, hold the `params` JSON Schema out-of-band** (schema-on-hit), (b) **shard the generated catalog by service + lazy-hydrate payloads**, (c) ship the **prebuilt serialized index** so SW wake is `loadJSON` not re-index. Concrete budget below.
+- **MUST NOT ADD (Wall 1):** No runtime dependency on `@opentabs-dev/plugin-sdk`, `@opentabs-dev/plugin-tools`, `@opentabs-dev/shared`, any `@opentabs-dev/opentabs-plugin-*`, or `zod` **shipped into the extension**. Those + Zod live **only inside the Node build script**; the extension ships pure-data descriptors. No remote/eval'd code; no new `importScripts` of a plugin runtime; `verify-recipe-path-guard.mjs` stays green because nothing eval-able is added to the recipe path.
 
 ---
 
-## 2. MCP Client → Default-Model Mapping
+## How the OpenTabs op metadata is shaped (verified against the real repo)
 
-The visual-session allowlist (single source of truth at `mcp/src/tools/visual-session.ts:9-12`) is:
+Source: `github.com/opentabs-dev/opentabs` (MIT, `default_branch: main`, `pushed_at: 2026-06-21`). 119 plugin dirs under `plugins/` confirmed. **2,406** op files counted via `git/trees/main?recursive=1` filtered to `^plugins/[^/]+/src/tools/.*\.ts$` minus `schemas.ts`/`.test.ts` (the milestone's "2,523" includes schema/inline-tool variants). Op-count spot checks: linear **59**, github **37**, stripe 8+ in `tools/`.
 
-> `Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Windsurf`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `OpenClaw 🦀`, `Grok`, `Gemini`, `Hermes`
+### Per-op definition — `defineTool(...)` (verified across github, stripe, linear)
 
-### Confirmed Mappings
-
-| Client Label | Default Model (May 2026) | Confidence | Source |
-|---|---|---|---|
-| **Claude** (Claude Code) | `claude-opus-4-7` (Apr 23, 2026 change for Enterprise PAYG + API users) | HIGH | [Claude Code Model Config docs](https://code.claude.com/docs/en/model-config); confirmed in Anthropic changelog |
-| **Codex** (OpenAI Codex CLI/IDE) | `gpt-5.5` (recommended default since April 2026; falls back to `gpt-5.5-codex` for coding-specific flows) | HIGH | [OpenAI Codex Models docs](https://developers.openai.com/codex/models) |
-| **ChatGPT** (API consumers labeled this way) | `gpt-5` (the cheapest current default; previous-gen flagship still GA) | MEDIUM | No canonical "ChatGPT" CLI; Codex docs default to 5.5; conservative choice keeps it on standard-tier |
-| **Perplexity** (Comet Agent / Pro) | `claude-sonnet-4-6` (Comet Agent default for Pro users since 2026 Q1) | MEDIUM | [Perplexity Changelog Feb 6, 2026](https://www.perplexity.ai/changelog/what-we-shipped---february-6th-2026); Computer agent moved to GPT-5.5 in May |
-| **Windsurf** (Cascade) | `SWE-1.5` (Codeium-proprietary, **NO published per-token price**) → conservative fallback: `claude-sonnet-4-6` | LOW | [Windsurf docs](https://docs.windsurf.com/windsurf/cascade/cascade); SWE-1.5 has no public token price |
-| **Cursor** | **Auto** mode (router across GPT-5.4 / Claude Sonnet 4.6 / Opus 4.6 / Gemini 3.1 Pro) — **no fixed default**; conservative fallback: `claude-sonnet-4-6` | MEDIUM | [Cursor models docs](https://cursor.com/help/models-and-usage/available-models) |
-| **Antigravity** (Google IDE) | `gemini-3.1-pro` (default; Flash optional) | HIGH | [Google Cloud Blog: Antigravity vs Gemini CLI](https://cloud.google.com/blog/topics/developers-practitioners/choosing-antigravity-or-gemini-cli) |
-| **OpenCode** (SST OpenCode CLI) | **No fixed default** — user-configured via `model` in `opencode.json`; conservative fallback: `claude-sonnet-4-6` (the example in OpenCode docs) | MEDIUM | [opencode.ai/docs/config](https://opencode.ai/docs/config/) |
-| **OpenClaw** / **OpenClaw 🦀** | `claude-sonnet-4-6` (per OpenClaw docs primary-agent default) | HIGH | [OpenClaw config docs](https://docs.openclaw.ai/cli/mcp); haimaker.ai blog on OpenClaw + Sonnet 4.6 |
-| **Grok** (xAI grok CLI / OpenRouter) | `grok-4.3` (current flagship May 2026; replaces deprecated `grok-4` on May 15) | HIGH | docs.x.ai models page |
-| **Gemini** (Gemini CLI) | `gemini-2.5-pro` (Gemini 3.x family rollout is documented for Antigravity; Gemini CLI still defaults to 2.5 Pro) | MEDIUM | Conservative — 3.x Pro is documented for Antigravity, 2.5 Pro is the safer Gemini CLI assumption |
-| **Hermes** (Nous Research Hermes Agent) | **No fixed default** — Hermes Agent lets the user wire OpenRouter / Nemotron / Mimo / etc. Conservative fallback: `claude-sonnet-4-6` (no Hermes-side single price-able default exists) | LOW | [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/) |
-
-### Recommended Code Shape (TypeScript-ready since the MCP server is TS)
+`plugins/github/src/tools/create-issue.ts` (verbatim head):
 
 ```typescript
-// mcp/src/tools/pricing.ts (NEW)
-export const MCP_CLIENT_DEFAULT_MODEL: Record<string, string> = {
-  Claude: 'claude-opus-4-7',
-  Codex: 'gpt-5.5',
-  ChatGPT: 'gpt-5',
-  Perplexity: 'claude-sonnet-4-6',
-  Windsurf: 'claude-sonnet-4-6',          // conservative fallback; SWE-1.5 unpriced
-  Cursor: 'claude-sonnet-4-6',            // conservative fallback; Auto-mode router
-  Antigravity: 'gemini-3.1-pro',
-  OpenCode: 'claude-sonnet-4-6',          // conservative; user-configurable
-  OpenClaw: 'claude-sonnet-4-6',
-  'OpenClaw 🦀': 'claude-sonnet-4-6',
-  Grok: 'grok-4.3',
-  Gemini: 'gemini-2.5-pro',
-  Hermes: 'claude-sonnet-4-6',            // conservative fallback
-};
-```
+import { defineTool, ToolError } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+import { getMutationId, graphql, turboData } from '../github-api.js';
+import { issueSchema } from './schemas.js';
 
-### Confidence Discipline
-
-The current code shape forces each client label to **one** assumed model. In reality, callers may override (Cursor Auto routes anywhere; OpenCode lets you pin any model). Recommend **two fields per telemetry event** rather than just one:
-
-- `mcp_client` — the trusted allowlist label (already enforced).
-- `assumed_model` — the default we mapped to (the lookup above).
-- *(Future enrichment, NOT this milestone)*: an optional `actual_model` if the MCP request envelope ever carries it.
-
-This keeps the pricing module honest about its assumption boundaries.
-
----
-
-## 3. Server Stack — Confirmations and Additions
-
-Current `showcase/server/package.json` (HIGH confidence — read directly):
-
-```json
-{
-  "name": "fsb-server",
-  "version": "0.9.50",
-  "dependencies": {
-    "better-sqlite3": "^11.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.0",
-    "express": "^4.21.0",
-    "ws": "^8.19.0"
-  }
-}
-```
-
-### 3a. Already Present (No Changes Needed)
-
-| Library | Pinned | Role in v0.9.69 | Status |
-|---|---|---|---|
-| `better-sqlite3` | `^11.0.0` | Telemetry tables (events, daily rollups, salt) — same DB file (`fsb-data.db`) | KEEP. v11 is fine; v12.10.0 exists but is **NOT recommended** to upgrade in this milestone (Node 24 build instability per WiseLibs#1376, #1411). |
-| `express` | `^4.21.0` | New `/api/telemetry/*` routes mount alongside existing `/api/agents`, `/api/auth`, `/api/pair` | KEEP. |
-| `ws` | `^8.19.0` | Dashboard streaming fix uses existing `/ws` handler; no library change | KEEP. |
-| `cors` | `^2.8.5` | Telemetry endpoint accepts chrome-extension origin | KEEP. `cors({ origin: true })` already echoes the request origin — works for chrome-extension origins. |
-| `dotenv` | `^16.4.0` | Existing env loading | KEEP. |
-| `body-parser` (via `express.json`) | bundled in Express 4.21 | Telemetry POST bodies (UUID + event batch) — current `app.use(express.json({ limit: '1mb' }))` covers it | KEEP. Consider **raising limit to `2mb`** for batched payloads (50 events × ~10KB headroom). |
-
-### 3b. NEW Dependency: `express-rate-limit`
-
-**Add to `showcase/server/package.json`:**
-
-```json
-"dependencies": {
-  "express-rate-limit": "^8.3.0"
-}
-```
-
-**Why:**
-- Telemetry endpoint will be a public `POST /api/telemetry/events` accepting anonymous batches from millions of installs. **No authentication** — adding one would create a tracking vector. Without rate-limiting, a single malicious actor can write-amplify the SQLite DB.
-- **MUST be `^8.3.0`** — versions before 8.0.2/8.1.1/8.2.2/8.3.0 are vulnerable to **CVE-2026-30827**: a default-keyGenerator bug collapses **all IPv4 traffic into a single rate-limit bucket** on dual-stack servers. Fly.io (FSB's deploy target per v0.9.6/P40) is dual-stack. v8.3.0+ ships the patched keyGenerator.
-- **Custom `keyGenerator` REQUIRED** even on 8.3.0: rate-limit by the IP-hash we already compute (HMAC-SHA256(IP, daily-salt)), not raw IP. This ensures the rate-limiter sees the same identifier the rest of the system sees, and avoids handing the rate-limiter raw IPs at all.
-
-```javascript
-// showcase/server/src/middleware/telemetry-rate-limit.js (NEW)
-const rateLimit = require('express-rate-limit');
-const { hashIp } = require('../utils/telemetry-hash');
-
-module.exports = (db) => rateLimit({
-  windowMs: 60_000,                              // 1-minute window
-  max: 30,                                       // 30 batches/minute/IP-hash
-  keyGenerator: (req) => hashIp(req.ip, db),     // already-hashed IP, never raw
-  standardHeaders: 'draft-7',                    // RFC 9239 RateLimit-* headers
-  legacyHeaders: false,
-  message: { error: 'too_many_requests' },
+export const createIssue = defineTool({
+  name: 'create_issue',
+  displayName: 'Create Issue',
+  description: 'Create a new issue in a repository.',
+  summary: 'Create a new issue in a repository',
+  icon: 'plus-circle',
+  group: 'Issues',
+  input: z.object({
+    owner: z.string().min(1).describe('Repository owner (user or org)'),
+    repo: z.string().min(1).describe('Repository name'),
+    title: z.string().min(1).describe('Issue title'),
+    body: z.string().optional().describe('Issue body in Markdown'),
+  }),
+  output: z.object({ issue: issueSchema.describe('The created issue') }),
+  handle: async params => { /* GraphQL mutation against github.com — imperative */ },
 });
 ```
 
-**Trust-proxy setup:** Express MUST `app.set('trust proxy', 1)` so `req.ip` returns the **client** IP, not Fly.io's proxy. This is **not** currently set in `server.js` — must be added near the top of the file, right after `app = express()`. Without this, ALL telemetry collapses into one synthetic user (the proxy).
+Same shape in `plugins/stripe/src/tools/create-customer.ts` (`input: z.object({ email: z.string().optional()..., metadata: z.record(z.string(), z.string()).optional() })`, `handle` calls `api('/customers', { method: 'POST', body })`) and uniformly across `plugins/linear`. **One `defineTool({...})` export per file**, aggregated in the plugin's `index.ts`.
 
-**Source:** [express-rate-limit CVE-2026-30827 advisory](https://advisories.gitlab.com/pkg/npm/express-rate-limit/CVE-2026-30827/) ; [GitHub security advisory GHSA-46wh-pxpv-q5gq](https://github.com/express-rate-limit/express-rate-limit/security/advisories/GHSA-46wh-pxpv-q5gq).
+`defineTool` is an **identity function** (`platform/plugin-sdk/src/index.ts`): `export const defineTool = (config) => config;`. No decorators, no reflection, no side effects — metadata is plain object-literal props + Zod schema objects.
 
-### 3c. UUID Generation — Decision: Node Built-in `crypto.randomUUID()`
+### The `ToolDefinition` interface (the extraction contract) — `platform/plugin-sdk/src/index.ts`
 
-**Do NOT add `nanoid` or `uuid` to dependencies.** Use Node 20+ built-in `crypto.randomUUID()`.
-
-| Approach | Verdict | Reason |
-|---|---|---|
-| **`crypto.randomUUID()`** (Node 20+, MV3 service worker via `globalThis.crypto`) | **RECOMMENDED** | Zero deps. RFC 4122 v4 compliant. ~3× faster than npm `uuid@v9.x` (350ns vs 1030ns per UUID per dev.to benchmark). Already used in FSB extension at multiple sites (v0.9.60 agent IDs minted via `crypto.randomUUID()`, per PROJECT.md line 305) and server-side in `showcase/server/src/utils/hash.js:7` (`crypto.randomBytes(32)`). |
-| `nanoid` | REJECTED | Adds dep. Non-RFC ergonomics. Mixing v4 UUIDs (Chrome side) with nanoid IDs (server side) creates a needless inconsistency. |
-| `uuid` (npm) | REJECTED | Adds dep. Slower than native. Pre-Node 14 holdover; obsolete for Node 20+. |
-
-**Code shape (extension side, MV3 service worker):**
-```javascript
-// extension/telemetry/install-uuid.js (NEW)
-async function getOrCreateInstallId() {
-  const { fsb_install_uuid } = await chrome.storage.local.get('fsb_install_uuid');
-  if (fsb_install_uuid) return fsb_install_uuid;
-  const id = globalThis.crypto.randomUUID();   // Available in MV3 SW since Chrome 92
-  await chrome.storage.local.set({ fsb_install_uuid: id });
-  return id;
+```typescript
+export interface ToolDefinition<TInput extends z.ZodObject<z.ZodRawShape>, TOutput extends z.ZodType> {
+  name: string;          // build auto-prefixes: 'send_message' → 'slack__send_message' (delimiter '__')
+  displayName?: string;  // derived from name when omitted
+  description: string;
+  summary?: string;
+  icon?: LucideIconName;
+  group?: string;
+  input: TInput;         // Zod schema
+  output: TOutput;       // Zod schema
+  handle(params, context?): Promise<...>;  // imperative; endpoint + auth live HERE, not in metadata
 }
 ```
 
-**Code shape (server side):**
-```javascript
-// showcase/server/src/utils/telemetry-id.js (NEW)
-const { randomUUID } = require('crypto');
-exports.newEventId = () => randomUUID();
-```
+### Plugin-level metadata — `index.ts extends OpenTabsPlugin` + `package.json.opentabs`
 
-**Source:** [MDN Crypto.randomUUID()](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID); [dev.to crypto-randomuuid vs uuid v4 benchmark](https://dev.to/galkin/crypto-randomuuid-vs-uuid-v4-47i5).
+`plugins/github/src/index.ts`:
 
----
-
-## 4. IP Hashing — `crypto.createHmac('sha256')` + Daily-Rotated Salt
-
-**Pattern adopted:** Plausible / Fathom / Litlyx — `hash(daily_salt + ip [+ optional UA])`, salt is regenerated and **destroyed** every 24h.
-
-### 4a. Hash Function — Use HMAC-SHA256, Not Plain SHA-256
-
-```javascript
-// showcase/server/src/utils/telemetry-hash.js (NEW)
-const crypto = require('crypto');
-const { getCurrentSalt } = require('./telemetry-salt');
-
-function hashIp(ip, db) {
-  if (!ip) return null;
-  const salt = getCurrentSalt(db);                         // rotated daily
-  return crypto.createHmac('sha256', salt)
-    .update(ip)
-    .digest('hex');
-}
-
-module.exports = { hashIp };
-```
-
-**Why HMAC-SHA256 over plain `createHash('sha256').update(salt + ip)`:**
-- HMAC is the textbook construction for "secret + message" hashing. It is **immune to length-extension attacks** on Merkle-Damgård hashes (Plausible et al. use the plain construction — fine in practice, but HMAC is one line of code and strictly safer).
-- Output is still 64 hex chars (256 bits) — fits comfortably in SQLite TEXT.
-
-**Why SHA-256 over SHA-1 / MD5:** SHA-1 is deprecated; MD5 is broken. SHA-256 is the analytics-industry-standard.
-
-### 4b. Daily Salt Storage and Rotation
-
-**Storage layer:** SQLite table, not env var, not config file. Reasons:
-- Future-proofs against multiple Express processes (Fly autoscale) needing the **same** salt for the day.
-- The salt must be **destroyed** at end of day — easier as a delete-row than a config rewrite.
-- Audit-friendly: a single SQL query verifies "no salt older than 24h exists."
-- An env-var salt would be **forever-leaked** if `.env` ever exposes — SQLite rotation cleans up after itself.
-
-**Schema (additive to existing `showcase/server/src/db/schema.js`):**
-```sql
-CREATE TABLE IF NOT EXISTS telemetry_daily_salt (
-  utc_day TEXT PRIMARY KEY,            -- 'YYYY-MM-DD'
-  salt    TEXT NOT NULL,               -- 64 hex chars = 32 bytes, single-day use
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-```
-
-**Rotation cadence:**
-- **One salt per UTC day.** Rotation is automatic on day boundary (lazy: `getCurrentSalt()` checks today's UTC date, inserts a new row if missing, returns it). No cron job needed.
-- **Cleanup of old salts:** Lazy cleanup in the same `getCurrentSalt()` call deletes rows where `utc_day < today - 1 day`. We keep today + yesterday transiently (covers late-arriving cross-midnight batches), then nuke older.
-- **Salt generation:** `crypto.randomBytes(32).toString('hex')` (32 bytes = 256 bits entropy; matches the existing hash-key pattern in `utils/hash.js:7`).
-
-**Code shape:**
-```javascript
-// showcase/server/src/utils/telemetry-salt.js (NEW)
-const crypto = require('crypto');
-
-let saltCache = { day: null, salt: null };  // process-local memo
-
-function getCurrentSalt(db) {
-  const today = new Date().toISOString().slice(0, 10);  // 'YYYY-MM-DD' UTC
-  if (saltCache.day === today && saltCache.salt) return saltCache.salt;
-
-  let row = db.prepare('SELECT salt FROM telemetry_daily_salt WHERE utc_day = ?').get(today);
-  if (!row) {
-    const salt = crypto.randomBytes(32).toString('hex');
-    db.prepare('INSERT INTO telemetry_daily_salt (utc_day, salt) VALUES (?, ?)').run(today, salt);
-    // Lazy cleanup: drop anything older than yesterday
-    db.prepare("DELETE FROM telemetry_daily_salt WHERE utc_day < date('now', '-1 day')").run();
-    row = { salt };
-  }
-  saltCache = { day: today, salt: row.salt };
-  return row.salt;
-}
-
-module.exports = { getCurrentSalt };
-```
-
-**Note on UTC vs local:** Use **UTC** for the day boundary so that all server processes (Fly may move workloads across regions) agree on when "today" starts. Drift across time zones would create a brief window where two valid salts exist — not a security issue, but a correctness one for aggregation.
-
-**Source:** [Plausible Data Policy](https://plausible.io/data-policy) (canonical published pattern); [Fathom anonymization writeup](https://usefathom.com/blog/anonymization); [Litlyx Data Policy](https://litlyx.com/data-policy).
-
-### 4c. Trust-Proxy Reminder
-
-Without `app.set('trust proxy', ...)`, `req.ip` returns the **Fly.io proxy** IP for every request, collapsing all telemetry into a single "user." This is the **single most critical Express config item** for telemetry. Add to `server.js` right after `const app = express()`:
-
-```javascript
-// Fly.io injects X-Forwarded-For; trust one hop.
-app.set('trust proxy', 1);
-```
-
-Phase 1 plans should treat this as a **first** code change before any telemetry route lands.
-
----
-
-## 5. Extension Storage — `chrome.storage.local`
-
-**Decision: `chrome.storage.local` for both install UUID and the batched event queue.**
-
-| Option | Verdict | Reason |
-|---|---|---|
-| **`chrome.storage.local`** | **RECOMMENDED for both UUID and queue** | Survives SW eviction. Survives extension restart (UUID must be stable across these). 10MB quota by default; **FSB has `unlimitedStorage` already in `manifest.json:9`** — quota effectively unbounded. Async, MV3-native, works in SW context. |
-| `chrome.storage.sync` | REJECTED for UUID | Cross-device sync would merge UUIDs across the same Google account → ambiguous user counting. We want one UUID per **install** (one extension on one device), not one per Google account. |
-| `chrome.storage.sync` | REJECTED for queue | 100KB / 8KB-per-key quota → events overflow in minutes. |
-| `chrome.storage.session` | REJECTED | In-memory only since Chrome 102 — wiped on SW restart. UUID must persist. |
-| `IndexedDB` | NOT NEEDED | Overkill for this payload shape. Whole event queue is small JSON blobs; chrome.storage.local serializes JSON natively. IndexedDB adds boilerplate without benefit. |
-| `localStorage` | UNAVAILABLE | Not exposed in MV3 service workers. |
-
-### 5a. Install UUID Pattern
-
-```javascript
-// extension/telemetry/install-uuid.js (NEW)
-async function getOrCreateInstallId() {
-  const { fsb_install_uuid } = await chrome.storage.local.get('fsb_install_uuid');
-  if (fsb_install_uuid) return fsb_install_uuid;
-  const id = globalThis.crypto.randomUUID();
-  await chrome.storage.local.set({ fsb_install_uuid: id });
-  return id;
+```typescript
+class GitHubPlugin extends OpenTabsPlugin {
+  readonly name = 'github';
+  override readonly displayName = 'GitHub';
+  readonly urlPatterns = ['*://github.com/*'];
+  override readonly homepage = 'https://github.com';
+  readonly tools: ToolDefinition[] = [ listRepos, getRepo, createRepo, /* ... */ ];
 }
 ```
 
-### 5b. Batched Event Queue with Offline Retry
+`plugins/github/package.json` carries a parallel `opentabs` block (`displayName`, `urlPatterns: ["*://github.com/*"]`, `homepage: "https://github.com"`, optional `configSchema`), typed in `platform/shared/src/manifest.ts` (`PluginOpentabsField`). **`urlPatterns`/`homepage` are FSB's source for `service`/origin** (`*://github.com/*` → `github.com`). `package.json.dependencies` declares `@opentabs-dev/plugin-sdk ^0.0.113`; `peerDependencies.zod ^4.0.0`; plugin devDeps pin `zod ^4.3.6`, `jiti ^2.6.1`, `typescript ^6.0.3`.
 
-```javascript
-// extension/telemetry/queue.js (NEW; shape only)
-const QUEUE_KEY = 'fsb_telemetry_queue';
-const MAX_QUEUE_BYTES = 256 * 1024;          // 256KB cap; well under unlimitedStorage
-const FLUSH_INTERVAL_MS = 5 * 60 * 1000;     // 5 minutes
-const MAX_BATCH_SIZE = 50;
+### The OpenTabs build output `dist/tools.json` (what FSB conceptually re-derives)
 
-async function enqueue(event) { /* read, append, write back, drop oldest on cap overflow */ }
-async function flush() { /* POST batch; on success drop; on failure keep with backoff */ }
+`platform/plugin-tools/src/commands/build.ts` = the `opentabs-plugin build` command. It `tsc`-compiles to `dist/`, dynamically `import()`s the compiled module (`pathToFileURL` + cache-busting query), then serializes each tool. The schema conversion (build.ts:414-439, verbatim):
 
-// Wake schedule via chrome.alarms (MV3 SW-safe):
-chrome.alarms.create('fsb-telemetry-flush', { periodInMinutes: 5 });
-chrome.alarms.onAlarm.addListener(a => { if (a.name === 'fsb-telemetry-flush') flush(); });
+```typescript
+const convertToolSchemas = (tool: ToolDefinition) => {
+  let inputSchema = z.toJSONSchema(tool.input) as Record<string, unknown>;   // ← Zod 4 NATIVE
+  let outputSchema = z.toJSONSchema(tool.output) as Record<string, unknown>;
+  delete inputSchema.$schema;
+  delete outputSchema.$schema;
+  return { inputSchema, outputSchema };
+};
 ```
 
-**Wake mechanism:** Use **`chrome.alarms`** with a 5-minute period, not `setInterval` (which dies with the SW). FSB already uses `chrome.alarms` extensively (manifest permissions line 17 + Phase 211 watchdog pattern). **Minimum period for MV3 alarms is 30 seconds.**
+Emitted `ManifestTool` (`platform/shared/src/index.ts:157-176` + `generateToolsManifest` build.ts:646):
 
-**Cap behavior:** When queue exceeds 256KB, drop **oldest** events first (newest are most valuable for "active right now" metrics). Record a counter `dropped_count` in storage so the next successful flush can include it as a sentinel.
+```typescript
+export interface ManifestTool {
+  name: string; displayName: string; description: string; summary?: string;
+  icon: string; group?: string;
+  input_schema: Record<string, unknown>;   // standard JSON Schema
+  output_schema: Record<string, unknown>;
+}
+```
 
-**Source:** [Chrome storage API docs](https://developer.chrome.com/docs/extensions/reference/api/storage); [MV3 service worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle).
+**Decisive facts for FSB's extractor:**
+1. **It's Zod 4's `z.toJSONSchema()`, not the `zod-to-json-schema` npm lib.** FSB must use the same call → **Zod 4 required at build.**
+2. **`input_schema` is standard JSON Schema** (draft 2020-12; `$schema` stripped) → directly consumable by FSB's existing `@cfworker/json-schema` validator and by minisearch; **no schema-dialect translation.**
+3. The serializer **throws on `.transform()`/`.pipe()`/`.preprocess()`** (build.ts:419-422) → every op's `input` is guaranteed pure-structural JSON Schema. FSB inherits that guarantee.
+4. `.describe('...')` text is preserved into JSON Schema `description` (verified Context7) → **free human-readable param descriptions** for FSB's descriptor + `intentSynonyms` seeding.
+5. **No side-effect / mutation / destructive / readOnly annotation** exists anywhere in `ToolDefinition` or `ManifestTool`. FSB's `sideEffectClass` (`read`|`write`) **must be inferred** — the op `name` verb prefix is the signal (`list_`/`get_`/`search_`/`compare_` → read; `create_`/`update_`/`delete_`/`merge_`/`add_`/`remove_`/`archive_`/`finalize_`/`batch_`/`move_` → write), with a per-op override table for the long tail.
 
----
+### Why static parsing alone is insufficient (the strategy decision)
 
-## 6. Libraries to AVOID
+`input`/`output` routinely reference **shared Zod schemas** imported from a sibling file — `import { issueSchema } from './schemas.js'` (github), `import { customerSchema } from './schemas.js'` (stripe), defined in `plugins/<app>/src/tools/schemas.ts` (`export const issueSchema = z.object({ number: z.number()..., labels: z.array(z.string())..., ... })`). A regex/AST scrape of one op file sees `output: z.object({ issue: issueSchema })` with `issueSchema` unresolved. Fully realizing the schema requires **module resolution + Zod evaluation**:
 
-Per the privacy mandate, **none of the following may be added** to extension or server:
-
-| Library / SDK | Why excluded |
-|---|---|
-| **PostHog SDK** (`posthog-js`, `posthog-node`) | Third-party hosted analytics ingest. Even self-hosted PostHog defaults send to `app.posthog.com`. Contradicts "no PII, ever, no third-party trackers." |
-| **Segment** (`@segment/analytics-node`, `analytics-js`) | Event-router-to-vendors model — by design a fanout vector to third parties. |
-| **Mixpanel** (`mixpanel-browser`, `mixpanel`) | Hosted analytics, IP-correlated by default. |
-| **Datadog** (`@datadog/browser-rum`, `dd-trace`) | Sends to Datadog SaaS, user-session-bound. |
-| **Google Analytics** (`gtag.js`, `ga4`) | Cookies + Google-side IP retention. |
-| **Sentry** | Even error-only beacons carry breadcrumbs / IP / user context by default — wrong primitive for **anonymous** telemetry. |
-| **Amplitude** | Same fanout-to-vendor concern as Segment/Mixpanel. |
-| `node-cron` | Not needed — `chrome.alarms` covers extension; server uses lazy-on-request rotation (no daemon needed). |
-| `uuid` npm package | Native `crypto.randomUUID()` is faster and dep-free (see §3c). |
-| `nanoid` | Same reason as `uuid` — adds dep with no benefit. |
-| `node-fetch` | Node 18+ has `fetch` global. Not used in this milestone anyway. |
-| `lodash` | No new lodash usage. Server doesn't depend on it; extension is vanilla JS per the no-build-system constraint (PROJECT.md:467-471). |
-| `axios` | Server uses native; extension uses `fetch`. No need. |
-
-**Decision rule for any new lib proposal during phase planning:**
-1. Is it a privacy / analytics vendor SDK? → **reject.**
-2. Does Node ≥20 or Chrome MV3 already cover it natively? → **reject.**
-3. Is it the minimum addition that solves a security issue (e.g. `express-rate-limit`)? → **accept with pinned version.**
+- ❌ **Static parse only (regex/`@babel/parser`/`ts-morph`, single file):** brittle; can't resolve cross-file `schemas.ts`/SDK refs; re-implements Zod→JSON-Schema by hand; high drift risk. Rejected.
+- ❌ **Standalone `tsc --emit` then read `dist/`:** heavier than needed; replicates OpenTabs' gitignored `dist/`; tsconfig wrangling across 119 packages. Rejected as default.
+- ✅ **Load + evaluate at build time (RECOMMENDED):** a Node script transpiles each plugin's TS on the fly (`tsx`/`jiti`, no emit), `import()`s the plugin module, walks `plugin.tools[]`, calls `z.toJSONSchema(tool.input)` — the identical operation `build.ts` performs. Deterministic; mirrors upstream exactly; ~10 lines of conversion logic. **`handle` bodies are never executed** (we read only `.input`/`.name`/`.description`/etc. metadata), so the imperative `fetchFromPage`/`graphql`/`document.*` code never runs at build.
 
 ---
 
-## Recommended Stack — Final Summary Table
+## Recommended Stack
 
-### Core Framework (no changes)
+### Core Technologies (BUILD-TIME ONLY — a Node script run before/by `scripts/package-extension.mjs`)
 
-| Technology | Version | Purpose | Status |
-|---|---|---|---|
-| Node.js | ≥20 (current runtime) | Server-side; `crypto.randomUUID()` requires 14.17+, present | UNCHANGED |
-| Express | `^4.21.0` | HTTP server | UNCHANGED |
-| Chrome MV3 | manifest_version 3 | Extension | UNCHANGED |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| **zod** | `^4.4.3` (current 4.4.3) | `z.toJSONSchema()` to convert each op's `input` Zod schema → JSON Schema at build time | The **exact** API OpenTabs' `build.ts:416` uses; matches SDK peer `zod ^4.4.3` + plugin pins `zod ^4.3.6`. `z.toJSONSchema` is Zod-4-only. **Pin the same major as the plugins** to guarantee schema-output parity. **devDependency ONLY — never bundled into the extension.** |
+| **tsx** | `^4.22.4` (current 4.22.4) | Transpile-and-run the OpenTabs TS plugin modules so the build script can `import()` them without a separate `tsc` emit | Zero-config ESM/TS loader built on esbuild (already a FSB devDep). `node --import tsx ./scripts/import-opentabs-catalog.mjs`. Handles the plugins' `.js`-extension ESM imports + Zod. Mature, purpose-fit for "evaluate TS at build." |
+| **@opentabs-dev/plugin-sdk** | `^0.0.113` (**devDependency**) | Resolve `import { defineTool, OpenTabsPlugin } from '@opentabs-dev/plugin-sdk'` when loading a plugin module | Required so plugin TS resolves at build. **CRITICAL: devDependency only — metadata-extraction scaffolding, never shipped.** `defineTool` is identity; `OpenTabsPlugin` is an abstract class — loading them is inert. (Hardening alternative: vendor a ~30-line stub — see Variant.) |
 
-### Database (no changes)
+### Supporting Libraries (RUNTIME — all ALREADY FSB deps, REUSED unchanged)
 
-| Technology | Version | Purpose | Status |
-|---|---|---|---|
-| better-sqlite3 | `^11.0.0` | telemetry tables co-located in `fsb-data.db` | UNCHANGED — DO NOT upgrade to v12 in this milestone (Node 24 build instability per WiseLibs#1376, #1411) |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| **minisearch** | `^7.2.0` (dep; vendored `extension/lib/minisearch.min.js`) | The capability search index over thousands of descriptors | SURF-04 substrate. Same `INDEX_OPTIONS` at build + `loadJSON`. Scaling guidance below. |
+| **@cfworker/json-schema** | `^4.1.1` (dep; vendored `extension/lib/cfworker-json-schema.min.js`) | Validate `invoke_capability` params against imported JSON-Schema `params` in the SW (eval-free) | OpenTabs `input_schema` is standard JSON Schema → drops straight into the existing CAP-03 validator. **No new validator.** |
+| **jmespath** | `^0.16.0` (dep; vendored `extension/lib/jmespath.min.js`) | Recipe `extract` expression engine (existing) | Unchanged; the descriptor import does not touch the recipe `extract` path. |
+| **esbuild** | `^0.24.0` (devDep; current 0.28.1) | Backs `tsx`; also FSB's offscreen bundler | No bump needed for tsx (it vendors its own esbuild). FSB's `esbuild ^0.24.0` is independent. |
 
-### Infrastructure (no changes)
+### Development Tools
 
-| Technology | Version | Purpose | Status |
-|---|---|---|---|
-| `ws` | `^8.19.0` | dashboard streaming fix (existing `/ws` handler) | UNCHANGED |
-| `cors` | `^2.8.5` | telemetry POST accepts chrome-extension origin | UNCHANGED |
-| `dotenv` | `^16.4.0` | env loading | UNCHANGED |
-
-### NEW Supporting Libraries
-
-| Library | Version | Purpose | Why this version |
-|---|---|---|---|
-| **`express-rate-limit`** | **`^8.3.0`** | telemetry-endpoint DoS protection on `/api/telemetry/events` | **MUST be ≥ 8.3.0** to avoid CVE-2026-30827 IPv4-mapped collision. Custom keyGenerator required. |
-
-### Built-ins We Newly Rely On (zero new deps)
-
-| Primitive | Where | Purpose |
-|---|---|---|
-| `crypto.randomUUID()` | Node + MV3 SW | UUID v4 generation for install ID and event IDs |
-| `crypto.randomBytes(32)` | Node server | Daily salt generation (already used in `utils/hash.js:7`) |
-| `crypto.createHmac('sha256', salt).update(ip).digest('hex')` | Node server | IP hashing |
-| `chrome.storage.local` | MV3 SW | Install UUID + batched event queue persistence |
-| `chrome.alarms` | MV3 SW | 5-minute periodic flush wakeup |
-| `fetch` (global) | MV3 SW | POST telemetry batches to server |
-
----
-
-## Alternatives Considered (Brief)
-
-| Category | Recommended | Alternative | Why Not |
-|---|---|---|---|
-| Rate-limit lib | `express-rate-limit ^8.3.0` | `rate-limiter-flexible` | Heavier API surface; we don't need Redis-backed multi-process counting yet (single Fly process). |
-| UUID gen | `crypto.randomUUID()` | `nanoid`, `uuid` | Adds deps; native is faster and stable. |
-| Salt storage | SQLite row, rotated daily | Env var (`TELEMETRY_SALT`) | Env-var salts are **forever-leaked** if `.env` exposes; SQLite rotation cleans up after itself. |
-| IP hash | HMAC-SHA256 | SHA-1 / MD5 / SHA-256 plain | SHA-1/MD5 too weak; HMAC over plain SHA-256 is marginally safer (no length-ext vector) at zero cost. |
-| Extension storage | `chrome.storage.local` | `chrome.storage.sync`, IndexedDB | sync conflates accounts; IndexedDB overkill for KB-scale JSON. |
-| Cost-tracker engine | Extend existing `extension/ai/cost-tracker.js` | Build new module | Pattern is already shipped, tested, and used in dashboard analytics — reuse the `MODEL_PRICING` schema and add MCP rows + a new resolver function. |
-
----
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| **Node `>=24`** | Run the codegen script | Already FSB's `engines.node` floor (v0.10.0). Native ESM + `import()` + top-level await. |
+| **Pinned OpenTabs source (git checkout / submodule / tarball)** | Acquire plugin sources at build time | Plugins are NOT importable from npm as source — `package.json.files: ["dist"]`. **Vendor `plugins/` + `platform/plugin-sdk/src` via a pinned commit** (record SHA, like `.planning/LATTICE-PIN.md`), OR generate once and **commit** `recipe-index.generated.js`. Codegen is a **maintainer build step, not an end-user install step.** |
+| **`scripts/package-extension.mjs`** | The existing generator to extend | Today reads `catalog/descriptors/*.json` + `catalog/recipes/*.json` → inlines into `recipe-index.generated.js`. The new importer produces those descriptor JSONs (or feeds the generator directly). See Integration. |
 
 ## Installation
 
-**Server side (`showcase/server/`):**
 ```bash
-cd showcase/server
-npm install express-rate-limit@^8.3.0
+# NEW build-time deps (devDependencies ONLY — must NEVER appear in `dependencies`)
+npm install -D zod@^4.4.3 tsx@^4.22.4 @opentabs-dev/plugin-sdk@^0.0.113
+
+# (Variant: skip @opentabs-dev/plugin-sdk; vendor a ~30-line defineTool/OpenTabsPlugin stub instead)
+
+# Runtime deps — ALREADY PRESENT, no install:
+#   minisearch ^7.2.0, @cfworker/json-schema ^4.1.1, jmespath ^0.16.0  (vendored in extension/lib/)
+#   esbuild ^0.24.0 (devDep, backs tsx)
 ```
 
-**Extension side:** **No new npm install.** All extension code uses Chrome MV3 + Node built-ins.
+## Integration with `scripts/package-extension.mjs` (the generator to scale)
 
-**MCP side:** **No new npm install.** Pricing module is a TypeScript file added to `mcp/src/tools/pricing.ts`.
+Today (`package-extension.mjs:51-89`): `readJsonDir(catalog/descriptors)` + `readJsonDir(catalog/recipes)` → `JSON.stringify({recipes, descriptors})` → inlined into the dual-export IIFE `extension/catalog/recipe-index.generated.js` (~10 descriptors). The djb2 `catalogVersion` content-hashes whatever descriptors are present.
 
----
+Proposed v1.0.0 flow (NEW importer is a **separate Node module run before / invoked by** `package-extension.mjs`):
 
-## Pre-Submission Confidence Audit
+1. **`scripts/import-opentabs-catalog.mjs`** (NEW, run under `tsx`): for each `plugins/<app>` in the pinned OpenTabs checkout —
+   - Read `package.json.opentabs` → `service` (derive `github.com` from `urlPatterns`/`homepage`), provenance (`name`, `version`, MIT).
+   - `import()` `plugins/<app>/src/index.ts` → read the plugin instance's `tools[]` (or import each `src/tools/*.ts` named export).
+   - Per op: `slug` (FSB convention, e.g. `<service-stem>.<camelCased name>`; OpenTabs uses `app__op` — map deterministically), `params = z.toJSONSchema(tool.input)` then `delete params.$schema`, `description = tool.description`, `actionVerb`+`sideEffectClass` inferred from the `name` verb (override table), `intentSynonyms` seeded from `displayName`/`summary`/`description` (+ curated synonyms for top apps).
+   - Emit one descriptor JSON per app (or per op) into `catalog/descriptors/opentabs/<app>.json`, **stamped with provenance** (`{ source: "opentabs", sourceVersion, license: "MIT" }`).
+2. **`package-extension.mjs`** picks them up via the existing `readJsonDir` (extend it to recurse one level, or point it at the new subdir) and inlines them — **no change to the IIFE shape or `catalogVersion` hashing.**
+3. Hand-ported T1a/T1b handlers (`catalog/handlers/<app>.js`) continue through the existing `package-extension.mjs:101-115` copy step **unchanged**.
 
-| Area | Confidence | Verification |
-|---|---|---|
-| Anthropic pricing (Opus 4.7, Sonnet 4.6, Haiku 4.5) | **HIGH** | platform.claude.com docs fetched live + cross-checked vs BenchLM + MetaCTO (3 sources agree to the cent) |
-| Google Gemini pricing (2.5 Pro, 2.5 Flash, 2.5 Flash-Lite) | **HIGH** | ai.google.dev/gemini-api/docs/pricing fetched live |
-| xAI Grok pricing (4.3, 4.1-fast) | **HIGH** for ≤200k; **MEDIUM** for >200k upper tier | docs.x.ai fetched live; upper-tier rate not published |
-| OpenAI pricing (GPT-5, GPT-5 mini, GPT-5.5) | **HIGH** for 5/5-mini (OpenRouter + multi-source); **MEDIUM** for 5.x family | platform.openai.com returns 403; cross-verified via OpenRouter + AI Cost Check + DevTk |
-| DeepSeek pricing (V4-Flash, V4-Pro) | **HIGH** for current; **TIME-BOUNDED** — V4-Pro discount expires 2026-05-31 | api-docs.deepseek.com fetched live |
-| Client default-model mapping | **HIGH** Claude/Codex/Antigravity/OpenClaw/Grok; **MEDIUM** Perplexity/ChatGPT/Gemini; **LOW** Windsurf/Cursor/OpenCode/Hermes (router-based or user-configurable) | Per-client docs fetched/searched; LOW-confidence rows use family-of-origin fallback |
-| Server runtime deps (Express, ws, better-sqlite3, cors, dotenv) | **HIGH** | Read from `package.json` directly |
-| `express-rate-limit` ≥8.3.0 requirement | **HIGH** | NIST + GitHub advisory directly confirmed CVE-2026-30827 and fixed-version list |
-| `crypto.randomUUID()` native availability | **HIGH** | Node 14.17+; MDN-confirmed for MV3 SW (Chrome 92+) |
-| `chrome.storage.local` for UUID + queue | **HIGH** | Chrome dev docs + MV3 lifecycle docs |
-| Daily-salt rotation pattern | **HIGH** | Plausible / Fathom / Litlyx all publish this exact pattern (3 independent sources) |
-| Trust-proxy requirement on Fly.io | **HIGH** | Standard Express deployment guidance + Fly.io's dual-stack reality |
+The import stays a pure metadata transform: the generated artifact remains **pure data** (Wall 1 intact); `verify-recipe-path-guard.mjs` is unaffected (nothing eval-able added to the recipe path).
 
-**Refresh policy for pricing:** Embed a `PRICING_SOURCE_DATE: "2026-05-14"` constant alongside `MCP_MODEL_PRICING`. On every milestone version bump, the release checklist re-verifies the pricing-page URLs above and updates the date stamp. Pricing volatility is high in this market (DeepSeek V4-Pro 75% discount expires May 31; Grok 4 retires May 15).
+## Hand-porting ~15-30 apps as T1a/T1b (reuse the existing handler pattern — NO new stack)
 
----
+Template = `extension/catalog/handlers/github.js` verbatim:
+- Each handler is a **dual-export IIFE** (`global.FsbHandler<App>` + `module.exports`), self-registering slugs into `FsbCapabilityCatalog.registerHandler` at load, calling `ctx.executeBoundSpec(spec, ctx.tabId)` against the app's **own first-party origin** (Wall 2 cookie scoping), `params` as inline JSON Schema (validated by `@cfworker/json-schema`), tokens never logged, ASCII-only.
+- OpenTabs is the **reference for endpoint + auth shape only** — its `<app>-api.ts` documents the real first-party transport (github: `getMetaContent('user-login')` auth, CSRF from `input[name="authenticity_token"]`, `turboData`/`graphql` against `github.com`; stripe: `api('/customers', {method:'POST'})`). FSB **hand-ports** that knowledge into a bound-spec handler; it does NOT ship OpenTabs' `handle` code. Endpoints flagged `[ASSUMED]` until live-captured, exactly like the current github handler.
+- Top hand-port candidates by op-richness/value (from verified counts): linear (59), github (37), stripe, vercel, datadog, jira, notion, slack (last few already partly bundled).
 
-## Open Questions Flagged for Phase Planning
+## Scaling `recipe-index.generated.js` + minisearch to thousands of descriptors
 
-1. **Cursor / Windsurf default-model accounting:** Both run router architectures with no single pinned default. Phase 1 plan should decide whether to (a) accept the conservative fallback (Sonnet 4.6) and live with some over/under-estimation, or (b) emit `null` cost for these clients and surface them as "uncounted" on the stats page.
-2. **Grok >200k tier:** docs.x.ai doesn't publish the upper-tier number. Either email xAI for the rate or treat any request crossing 200k as a `pricing_confidence: "estimated"` row.
-3. **Opus 4.7 35% tokenizer drift:** If FSB ever stops trusting MCP-reported token counts and starts retokenizing locally, this drift matters. For v0.9.69 we accept reported tokens at face value.
-4. **OpenAI pricing-page 403:** Future automated refresh script should hit OpenRouter as the OpenAI mirror, not platform.openai.com directly. Document this in the refresh-checklist.
-5. **GPT-5.5 vs GPT-5 for Codex telemetry:** Codex CLI defaults to 5.5 since April 2026. We should pin `Codex → gpt-5.5`, but earlier installs may still be on 5.0; consider whether to allow a `release_window` tag.
+**Problem:** ~2,400 ops × (slug + synonyms + description + `params` JSON Schema) inlined into ONE IIFE string that `importScripts` parses on every SW cold start, plus a serialized minisearch index hydrated via `loadJSON`. Naive inlining risks (a) a multi-MB JS file parsed on every MV3 SW wake, (b) index hydration latency, (c) memory.
 
----
+**Recommended approach (build-time prebuilt, lazy + sharded — NO new runtime dep):**
+
+1. **Split searchable text from payload.** The index needs only the *searchable* fields (`slug`, `service`, `intentSynonyms`, `actionVerb`, `sideEffectClass`, `description`) — **NOT** the `params` JSON Schema. Keep `params` in a **separate slug-keyed map** looked up only on a search hit (the SURF-01 "schema-on-hit" pattern already does this). Params schemas are the byte-bulk; removing them from the index is the biggest single shrink.
+2. **Prebuild the minisearch index at build time; ship the serialized form** (already the SURF-04 contract via `INDEX_OPTIONS` + `loadJSON`). `MiniSearch.loadJSON(serialized, options)` rehydrates without re-indexing — O(load) not O(reindex). Biggest SW-startup win; already FSB's pattern — the task is keeping it healthy at ~100× the document count.
+3. **Shard by service + lazy-hydrate.** Instead of one giant IIFE, emit per-service (or per-category) chunks (`recipe-index.<service>.generated.js`) + a small **always-loaded manifest** (slug→service + the prebuilt index). Load a service's params payload only when a slug from that service is invoked (`importScripts` on demand). Cold-start cost becomes "manifest + index," not "all 2,400 param schemas." Validate lazy-`importScripts`-after-wake ergonomics during the phase; fall back to a single chunk if unreliable (the index, not the payloads, is the hot path).
+4. **Bound index size via field selection + `storeFields` discipline.** Index `intentSynonyms`/`description`/`slug`; `storeFields: ['slug','service','sideEffectClass']` (enough to render a result + route to the payload map). Do NOT store `params`/full `description` in the index.
+5. **Catalog version + integrity unchanged.** The djb2 `catalogVersion` content hash → `chrome.storage.local` snapshot keeps working; bump on any descriptor change so a stale index is detected/rebuilt.
+6. **Performance budget to gate in the phase:** target serialized index < ~1-2 MB and `loadJSON` + first `search` < ~50-100 ms on SW wake. Extend the existing SURF-06 eval harness (already measures recall@k / wrong-invoke) with **index-size + load-time assertions**. minisearch handles 100k+ small docs; ~2,400 short descriptors is comfortably in range — the real risk is **inlined-payload bytes**, which (1)+(3) remove from the hot path.
+
+minisearch `^7.2.0` is current and sufficient. **No index-engine change** (no FlexSearch/lunr/Orama swap) is warranted — scaling here is a data-layout problem, not an engine-capability problem, and a swap risks INV-01/SURF-04.
+
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| **Load+evaluate Zod via `tsx`** | `jiti@^2.7` (OpenTabs' own devDep for module loading) | For byte-for-byte parity with OpenTabs' loader (plugins list `jiti ^2.6.1`). Equally valid; `tsx` is preferred only for the esbuild reuse + simpler `--import`. |
+| **Load+evaluate Zod** | Standalone `tsc --emit` then `import()` `dist/` | Only if a plugin's `index.ts` has type-only constructs the transpiler mishandles (not observed). Heavier; replicates gitignored `dist/`. |
+| **Load+evaluate Zod** | Static AST parse (`@babel/parser`/`ts-morph`) + hand-rolled Zod→JSON-Schema | Only to avoid executing ANY OpenTabs/Zod code at build (unnecessary — reading `.input` is inert). Rejected: can't resolve cross-file `schemas.ts`; re-implements `z.toJSONSchema`; drift risk. |
+| **Real `@opentabs-dev/plugin-sdk` devDep** | **Vendored ~30-line SDK stub** (`defineTool = c=>c`, abstract `OpenTabsPlugin`, no-op DOM/fetch helper exports) | Hardening: a stub keeps `node_modules` free of the SDK's DOM/fetch transitive surface and makes the build hermetic. Use the real SDK to validate the consumed surface first, then replace (it's tiny). |
+| **minisearch (reuse)** | FlexSearch / Orama / lunr | None for this milestone. minisearch already ships + has the prebuilt+`loadJSON` integration + handles the scale. Swapping is unjustified risk vs INV-01/SURF-04. |
+| **Commit the generated catalog** | Regenerate on every CI build | Commit `recipe-index.generated.js` (or per-service chunks) so CI/end-users build without the OpenTabs tree or build deps. Regenerate only on OpenTabs pin bump (audit trail like `.planning/LATTICE-PIN.md`). Mirrors FSB's current committed-generated-file practice. |
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| **`@opentabs-dev/plugin-sdk` / `plugin-tools` / `shared` / `@opentabs-dev/opentabs-plugin-*` as a runtime `dependency` or `importScripts`** | **MV3 Wall 1** — these are code; the extension ships closed-vocabulary DATA only. A plugin runtime = remotely-hosted/eval-class code; fails MV3 policy + the spirit of `verify-recipe-path-guard.mjs`. | Import them **only inside the Node build script** (`devDependencies`); ship the resulting pure-data descriptors. |
+| **`zod` in `dependencies` / bundled into the extension** | Same Wall 1 concern; Zod is large; the extension never needs Zod at runtime — params are validated by the vendored `@cfworker/json-schema`. | `zod` as a **devDependency**; convert to JSON Schema at build; validate at runtime with `@cfworker/json-schema`. |
+| **`zod-to-json-schema` (the separate npm lib)** | OpenTabs uses Zod 4's **native** `z.toJSONSchema`. A different converter risks output drift vs the upstream manifest (`$ref`/`additionalProperties`/format handling). | `z.toJSONSchema()` from `zod@^4` — identical to upstream. |
+| **Zod 3** | `z.toJSONSchema` is not a Zod 3 top-level API; SDK peer-deps Zod 4. | `zod@^4.4.3`. |
+| **Static regex/AST-only extraction of op schemas** | Op `input`/`output` import shared schemas from `schemas.ts` + SDK helpers; single-file scrape can't resolve them; brittle across 2,400 ops. | Load+evaluate the module and call `z.toJSONSchema`. |
+| **Executing op `handle()` at build** | `handle` runs imperative `fetchFromPage`/`graphql`/`document.querySelector` against a live page — meaningless + side-effectful in Node. | Read only **metadata** (`name`, `description`, `input`, `group`); never call `handle`. |
+| **Inlining all ~2,400 param schemas into one IIFE parsed on every SW wake** | Multi-MB JS parsed on every MV3 cold start = startup/memory regression. | Split searchable-text (indexed) from params-payload (slug-keyed, lazy); shard by service; ship prebuilt `loadJSON` index. |
+| **Trusting OpenTabs endpoints/auth as verified for FSB handlers** | OpenTabs `handle` bodies encode first-party transport knowledge but are not FSB-validated; internal endpoints drift. | Hand-port as bound-spec T1a/T1b with `[ASSUMED]` flags + live capture, exactly like the current `github.js`. |
+| **Swapping the search engine to gain scale** | The bottleneck is inlined-payload bytes + index serialization, not engine capability. | Keep minisearch; fix the data layout (split/shard/prebuilt index). |
+
+## Stack Patterns by Variant
+
+**If the build must be fully hermetic / no OpenTabs `node_modules`:**
+- Vendor a ~30-line `defineTool`/`OpenTabsPlugin`/SDK-helper stub + a pinned copy of `plugins/` + `platform/plugin-sdk/src` under e.g. `vendor/opentabs/` with a recorded commit SHA.
+- Because every op `input` is plain Zod and `defineTool` is identity, the stub suffices to `import()` + `z.toJSONSchema` each op. Only `zod` + `tsx` remain real devDeps.
+
+**If breadth must ship without the OpenTabs source at install time (recommended default):**
+- Run the importer once at maintainer-time; **commit** the generated descriptor chunks + prebuilt index. CI/end-users build with **zero** new deps. Re-run only on OpenTabs pin bumps (audit trail like `.planning/LATTICE-PIN.md`).
+
+**If an op uses `z.record`/`z.enum`/nested objects (e.g. stripe `metadata: z.record(z.string(), z.string())`, github `state: z.enum(['open','closed','all'])`):**
+- `z.toJSONSchema` emits valid JSON Schema for these (verified shapes); `@cfworker/json-schema` validates them. No special handling — but include them in the SURF-06-style fixture set to guarantee round-trip validation at scale.
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `zod@^4.4.3` (FSB build) | OpenTabs SDK peer `zod ^4.4.3`; plugin pins `zod ^4.3.6` | **Use the same Zod major as the plugins** so `z.toJSONSchema` output matches the upstream manifest exactly. Any `4.x` ≥ the plugins' pin is safe. |
+| `tsx@^4.22.4` | Node `>=24`; esbuild (vendored by tsx) | FSB runs Node ≥24; tsx ships its own esbuild, independent of FSB's `esbuild ^0.24.0`. |
+| `@cfworker/json-schema@^4.1.1` (runtime) | JSON Schema draft 2020-12 emitted by `z.toJSONSchema` (default target) | Already FSB's validator; the imported `input_schema` (post `$schema` strip) validates without translation. If a specific draft is required, pass `{ target: 'draft-2020-12' }` to `z.toJSONSchema` in the importer. |
+| `minisearch@^7.2.0` (runtime) | Existing `INDEX_OPTIONS` + `loadJSON` (SURF-04) | No API change at scale; `loadJSON` rehydrate is the supported large-index path. |
+| `@opentabs-dev/plugin-sdk@^0.0.113` (build) | `@opentabs-dev/shared@^0.0.113` (transitive) | Pre-1.0 — **pin exact** in the build pin file; treat any minor as potentially breaking the op shape; re-verify importer fixtures on bump. |
 
 ## Sources
 
-### Primary (HIGH confidence)
-- [Claude API Pricing (platform.claude.com)](https://platform.claude.com/docs/en/about-claude/pricing) — Anthropic official, fetched 2026-05-14
-- [Gemini API Pricing (ai.google.dev)](https://ai.google.dev/gemini-api/docs/pricing) — Google official, fetched 2026-05-14
-- [xAI Grok Models (docs.x.ai)](https://docs.x.ai/developers/models) — xAI official, fetched 2026-05-14
-- [DeepSeek Pricing (api-docs.deepseek.com)](https://api-docs.deepseek.com/quick_start/pricing) — DeepSeek official, fetched 2026-05-14
-- [OpenRouter GPT-5](https://openrouter.ai/openai/gpt-5) and [OpenRouter GPT-5 mini](https://openrouter.ai/openai/gpt-5-mini) — primary mirror (platform.openai.com returns 403)
-- [OpenAI Codex Models](https://developers.openai.com/codex/models) — confirms Codex CLI default = GPT-5.5
-- [Claude Code Model Config](https://code.claude.com/docs/en/model-config) — confirms Claude Code default = Opus 4.7 (April 23, 2026)
-- [Chrome Storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) — quota + MV3 semantics
-- [MDN Crypto.randomUUID()](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID) — native UUID availability
-- [express-rate-limit CVE-2026-30827 advisory](https://advisories.gitlab.com/pkg/npm/express-rate-limit/CVE-2026-30827/) — required-version baseline
-- [GHSA-46wh-pxpv-q5gq](https://github.com/express-rate-limit/express-rate-limit/security/advisories/GHSA-46wh-pxpv-q5gq) — fixed-versions list
+- **OpenTabs repo (PRIMARY, HIGH)** `github.com/opentabs-dev/opentabs` @ `pushed_at 2026-06-21`, inspected via authenticated `gh api`:
+  - `plugins/github/src/tools/{create-issue,list-issues}.ts`, `plugins/stripe/src/tools/create-customer.ts`, `plugins/linear/src/index.ts` — op `defineTool` shape (quoted).
+  - `plugins/github/src/{index.ts,github-api.ts,tools/schemas.ts}`, `plugins/github/package.json` — plugin metadata + shared-schema imports + imperative `handle` transport + dep pins.
+  - `platform/plugin-sdk/src/index.ts` — `ToolDefinition`, `defineTool` (identity fn), `OpenTabsPlugin` (quoted); `platform/plugin-sdk/package.json` (`peerDependencies.zod ^4.4.3`).
+  - `platform/plugin-tools/src/commands/build.ts:414-439, 646-658` — `z.toJSONSchema` conversion + `generateToolsManifest` + `.transform/.pipe/.preprocess` rejection (quoted).
+  - `platform/shared/src/{index.ts:137-176,manifest.ts}` — `PluginManifest`/`ManifestTool` shape; **no side-effect field** (quoted).
+  - `.gitignore` (`dist/`) — confirms no prebuilt `tools.json` committed.
+  - `git/trees/main?recursive=1` counts — 119 plugins; 2,406 op files; linear 59, github 37.
+- **npm registry (HIGH)** verified 2026-06-23: `zod 4.4.3`, `tsx 4.22.4`, `jiti 2.7.0`, `esbuild 0.28.1`, `typescript 6.0.3`.
+- **Context7 `/websites/zod_dev_v4` (HIGH)** — `z.toJSONSchema()` documented top-level Zod 4 API; preserves `.describe()`/`.meta()` into JSON Schema.
+- **FSB repo (PRIMARY, HIGH)** — `package.json` (deps `@cfworker/json-schema ^4.1.1`, `jmespath ^0.16.0`, `minisearch ^7.2.0`; devDep `esbuild ^0.24.0`; `engines.node >=24`); `extension/lib/{minisearch,jmespath,cfworker-json-schema}.min.js` (vendored runtime libs); `scripts/package-extension.mjs` (generator); `extension/catalog/recipe-index.generated.js` (descriptor target shape); `extension/catalog/handlers/github.js` (T1a template); `.planning/PROJECT.md` (Walls, INV-01..04, v1.0.0 framing, SURF-01/04/06).
 
-### Secondary (MEDIUM confidence; multi-source cross-checked)
-- [BenchLM Claude Pricing (April 2026)](https://benchlm.ai/blog/posts/claude-api-pricing)
-- [MetaCTO Claude API Pricing (May 12, 2026)](https://www.metacto.com/blogs/anthropic-api-pricing-a-full-breakdown-of-costs-and-integration)
-- [IntuitionLabs AI API Pricing Comparison (Feb 28, 2026)](https://intuitionlabs.ai/articles/ai-api-pricing-comparison-grok-gemini-openai-claude)
-- [mem0 xAI Grok API Pricing (March 5, 2026)](https://mem0.ai/blog/xai-grok-api-pricing)
-- [DevTk OpenAI API Pricing Guide 2026](https://devtk.ai/en/blog/openai-api-pricing-guide-2026/)
-- [The Register: GPT-5.5 cost analysis (2026-05-08)](https://www.theregister.com/ai-and-ml/2026/05/08/gpt-55-may-burn-fewer-tokens-but-it-always-burns-more-cash/5237498)
-- [Cursor Available Models](https://cursor.com/help/models-and-usage/available-models)
-- [OpenCode Config docs](https://opencode.ai/docs/config/)
-- [Antigravity / Gemini CLI (Google Cloud Blog)](https://cloud.google.com/blog/topics/developers-practitioners/choosing-antigravity-or-gemini-cli)
-- [OpenClaw config / Claude Sonnet 4.6 (haimaker.ai)](https://haimaker.ai/blog/claude-sonnet-4-6-openclaw/)
-- [Perplexity Changelog Feb 6, 2026](https://www.perplexity.ai/changelog/what-we-shipped---february-6th-2026)
-- [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/)
-
-### Privacy / Hashing Pattern (HIGH — pattern confirmed by multiple analytics vendors)
-- [Plausible Data Policy](https://plausible.io/data-policy) — canonical daily-salt + SHA-256 pattern
-- [Fathom anonymization writeup](https://usefathom.com/blog/anonymization)
-- [Litlyx Data Policy](https://litlyx.com/data-policy)
-
-### Performance / Benchmarks
-- [crypto.randomUUID() vs uuid v4 benchmark](https://dev.to/galkin/crypto-randomuuid-vs-uuid-v4-47i5)
-- [WiseLibs/better-sqlite3 Node 24 compat issue #1376](https://github.com/WiseLibs/better-sqlite3/issues/1376) — reason to stay on v11
+---
+*Stack research for: build-time OpenTabs op-metadata codegen + MV3 thousands-descriptor catalog scaling + T1a/T1b hand-port reuse (FSB v1.0.0 OpenTabs Parity)*
+*Researched: 2026-06-23*

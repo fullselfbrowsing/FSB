@@ -1,0 +1,45 @@
+{
+  "slug": "claude.update_conversation",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "update a conversation in claude",
+    "edit a conversation in claude",
+    "change the details of conversation in claude",
+    "modify a conversation in claude",
+    "update conversation in claude",
+    "rename a conversation in claude"
+  ],
+  "description": "Update a conversation name by UUID. Renames the conversation to the specified name.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_uuid": {
+        "type": "string",
+        "description": "UUID of the conversation to update"
+      },
+      "name": {
+        "type": "string",
+        "description": "New name for the conversation"
+      }
+    },
+    "required": [
+      "conversation_uuid",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/update-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

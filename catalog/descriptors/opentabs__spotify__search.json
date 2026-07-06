@@ -1,0 +1,49 @@
+{
+  "slug": "spotify.search",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "search in spotify",
+    "search spotify catalog in spotify",
+    "search spotify for tracks, artists, albums, and playlists by keyword in spotify"
+  ],
+  "description": "Search Spotify for tracks, artists, albums, and playlists by keyword. Returns results across all content types.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query text"
+      },
+      "limit": {
+        "description": "Maximum number of results per type (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Result offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

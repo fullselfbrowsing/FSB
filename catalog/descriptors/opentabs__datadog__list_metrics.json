@@ -1,0 +1,43 @@
+{
+  "slug": "datadog.list_metrics",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list metrics in datadog",
+    "show me my metrics in datadog",
+    "view my metrics in datadog",
+    "see all my metrics in datadog",
+    "list available metric names in datadog"
+  ],
+  "description": "List metric names available in Datadog. Filter by prefix to narrow results.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Metric name prefix to filter (e.g., \"system.cpu\", \"aws.ec2\"). Use \"*\" for all."
+      },
+      "from": {
+        "description": "Only return metrics active since this POSIX epoch (seconds). Defaults to 1 hour ago.",
+        "type": "number"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

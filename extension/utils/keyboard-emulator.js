@@ -214,18 +214,53 @@ class KeyboardEmulator {
     }
 
     this.attachPromise = new Promise(async (resolve) => {
-      try {
-        await chrome.debugger.attach({ tabId }, '1.3');
-        this.debuggerAttached = true;
-        this.attachedTabId = tabId;
-        console.log(`[FSB KeyboardEmulator] Debugger attached to tab ${tabId}`);
-        resolve(true);
-      } catch (error) {
-        console.error('[FSB KeyboardEmulator] Failed to attach debugger:', error);
-        this.debuggerAttached = false;
-        this.attachedTabId = null;
-        resolve(false);
+      // Bounded retry for transient navigation races. The force-detach-and-retry
+      // on "Another debugger is already attached" counts as its own recovery; this
+      // backoff is only for transient attach failures during navigation. Never an
+      // unbounded loop, and we never hold the debugger persistently.
+      const MAX_ATTEMPTS = 3;
+      let lastError = null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          // Mirror background.js cdpInsertText/cdpMouseClick: if a stale debugger is
+          // already attached, force-detach (swallowing errors -- the other debugger
+          // may not be ours) then retry the attach once.
+          try {
+            await chrome.debugger.attach({ tabId }, '1.3');
+          } catch (attachErr) {
+            if (attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
+              console.log(`[FSB KeyboardEmulator] Stale debugger detected on tab ${tabId}, force-detaching and retrying`);
+              try {
+                await chrome.debugger.detach({ tabId });
+              } catch (forceDetachErr) {
+                // Ignore -- the "other debugger" may not be ours
+              }
+              await chrome.debugger.attach({ tabId }, '1.3');
+            } else {
+              throw attachErr;
+            }
+          }
+          this.debuggerAttached = true;
+          this.attachedTabId = tabId;
+          console.log(`[FSB KeyboardEmulator] Debugger attached to tab ${tabId}`);
+          resolve(true);
+          return;
+        } catch (error) {
+          lastError = error;
+          if (attempt < MAX_ATTEMPTS) {
+            // Short backoff between transient attempts.
+            await new Promise((r) => setTimeout(r, 150));
+          }
+        }
       }
+
+      // All attempts exhausted -- clear the memoized promise so the NEXT keystroke
+      // retries a real attach instead of returning this cached false forever.
+      console.error('[FSB KeyboardEmulator] Failed to attach debugger:', lastError);
+      this.debuggerAttached = false;
+      this.attachedTabId = null;
+      this.attachPromise = null;
+      resolve(false);
     });
 
     return await this.attachPromise;
@@ -258,6 +293,26 @@ class KeyboardEmulator {
    */
   isAttachedTo(tabId) {
     return this.debuggerAttached && this.attachedTabId === tabId;
+  }
+
+  /**
+   * Reconcile internal state after a Chrome-initiated debugger detach (navigation,
+   * canceled_by_user banner dismissal, target crash/close) on our attached tab.
+   * Called from a background.js chrome.debugger.onDetach listener so a detach we did
+   * not initiate does not leave stale debuggerAttached/attachedTabId/attachPromise
+   * that would poison the next attach. No-op when the detach is for a different tab.
+   * @param {number} tabId - Tab ID that Chrome detached the debugger from
+   * @returns {boolean} True if this emulator's state was reset for tabId
+   */
+  handleExternalDetach(tabId) {
+    if (this.attachedTabId !== tabId) {
+      return false;
+    }
+    console.log(`[FSB KeyboardEmulator] External detach on tab ${tabId}, resetting state`);
+    this.debuggerAttached = false;
+    this.attachedTabId = null;
+    this.attachPromise = null;
+    return true;
   }
 
   /**

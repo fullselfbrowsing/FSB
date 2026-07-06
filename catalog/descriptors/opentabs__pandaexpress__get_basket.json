@@ -1,0 +1,40 @@
+{
+  "slug": "pandaexpress.get_basket",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get a basket in pandaexpress",
+    "look up a basket in pandaexpress",
+    "fetch a single basket in pandaexpress",
+    "view one specific basket in pandaexpress",
+    "get basket in pandaexpress",
+    "view basket contents and totals in pandaexpress"
+  ],
+  "description": "Get the current contents and totals of an order basket including all products, quantities, and prices.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID from create_basket)"
+      }
+    },
+    "required": [
+      "basket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-basket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

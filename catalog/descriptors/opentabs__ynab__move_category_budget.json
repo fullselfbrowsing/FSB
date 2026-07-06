@@ -1,0 +1,52 @@
+{
+  "slug": "ynab.move_category_budget",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "move a category budget in ynab",
+    "move category budget in ynab",
+    "move money between budget categories in ynab"
+  ],
+  "description": "Move budgeted money between categories or to/from Ready to Assign for a specific month. Omit from_category_id to move money out of Ready to Assign; omit to_category_id to move money back to Ready to Assign. Both null is invalid.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "month": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+        "description": "Month in YYYY-MM format (e.g. 2026-03)"
+      },
+      "amount": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "description": "Amount to move in currency units (e.g. 50 for $50)"
+      },
+      "from_category_id": {
+        "description": "Source category ID. Omit to move from Ready to Assign.",
+        "type": "string"
+      },
+      "to_category_id": {
+        "description": "Destination category ID. Omit to move to Ready to Assign.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "month",
+      "amount"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/move-category-budget.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "move"
+    }
+  }
+}

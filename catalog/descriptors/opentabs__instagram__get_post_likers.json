@@ -1,0 +1,39 @@
+{
+  "slug": "instagram.get_post_likers",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get post likers in instagram",
+    "look up post likers in instagram",
+    "fetch a single post likers in instagram",
+    "view one specific post likers in instagram",
+    "get users who liked a post in instagram"
+  ],
+  "description": "Get users who liked a post. Returns a list of user profiles and total like count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "media_id": {
+        "type": "string",
+        "description": "Media numeric pk"
+      }
+    },
+    "required": [
+      "media_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-post-likers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

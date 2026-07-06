@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.list_hotels",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "list hotels in tripadvisor",
+    "show me my hotels in tripadvisor",
+    "view my hotels in tripadvisor",
+    "see all my hotels in tripadvisor",
+    "list hotels in an area in tripadvisor"
+  ],
+  "description": "List hotels in a city or area on TripAdvisor. Returns a page of hotel listings. Uses the geo-based hotel listing page URL.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Hotel listing page URL path (e.g., \"/Hotels-g60713-San_Francisco_California-Hotels.html\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/list-hotels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

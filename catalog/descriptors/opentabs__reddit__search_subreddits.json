@@ -1,0 +1,49 @@
+{
+  "slug": "reddit.search_subreddits",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "search subreddits in reddit",
+    "search for subreddits by name or topic in reddit",
+    "search subreddit in the reddit app",
+    "use reddit to search a subreddit"
+  ],
+  "description": "Search for subreddits by name or topic",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query"
+      },
+      "limit": {
+        "description": "Number of results (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "after": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/search-subreddits.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

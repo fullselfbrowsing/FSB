@@ -1,0 +1,42 @@
+{
+  "slug": "confluence.list_spaces",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list spaces in confluence",
+    "show me my spaces in confluence",
+    "view my spaces in confluence",
+    "see all my spaces in confluence",
+    "list available spaces in confluence"
+  ],
+  "description": "List Confluence spaces with optional pagination",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of spaces to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-spaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

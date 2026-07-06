@@ -1,0 +1,42 @@
+{
+  "slug": "bsky.list_notifications",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "list notifications in bsky",
+    "show me my notifications in bsky",
+    "view my notifications in bsky",
+    "see all my notifications in bsky",
+    "list notifications in bluesky"
+  ],
+  "description": "List the authenticated user's notifications including likes, reposts, follows, mentions, replies, and quotes. Supports cursor-based pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of notifications to return (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/list-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

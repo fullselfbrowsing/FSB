@@ -7,9 +7,9 @@
 | Path | Purpose |
 |------|---------|
 | `angular/` | Angular 20 app with static prerender for `/`, `/about`, `/privacy`, and `/support`. |
-| `server/` | Express + better-sqlite3 + ws backend for pairing, auth, relay, and dashboard data. |
-| `assets/` | Images, logos, icons, and provider artwork copied into the Angular build. |
-| `css/`, `js/`, `*.html` | Legacy static surfaces still kept beside the Angular app. |
+| `server/` | Express + better-sqlite3 + ws backend for pairing, auth, PhantomStream-compatible relay, and dashboard data. |
+| `assets/` | Images, logos, provider artwork, OpenTabs art, and Lattice artwork copied into the Angular build. |
+| `css/`, `js/`, `*.html` | Legacy static surfaces plus shared runtime visualizations still kept beside the Angular app. |
 | `dist/` | Build output, populated as `showcase/dist/showcase-angular/`. |
 
 ## Develop
@@ -37,7 +37,13 @@ The Angular build prerenders the static routes and runs `scripts/build-crawler-f
 
 Production assets are emitted under `showcase/dist/showcase-angular/`.
 
-The Angular config copies `showcase/assets/` into the built `/assets` path and includes the public crawler files from `angular/public/`.
+The Angular config copies `showcase/assets/` into the built `/assets` path and includes the public crawler files from `angular/public/`. It also copies the homepage knowledge graph runtime scripts from `showcase/js/` into `/assets`:
+
+- `fsb-knowledge-data.js`
+- `knowledge-graph.js`
+- `site-graph.js`
+
+The Angular homepage uses those scripts for the interactive site-knowledge graph and uses the copied provider, OpenTabs, and Lattice artwork for the public marketing surfaces.
 
 ## Routes
 
@@ -70,11 +76,19 @@ The Express backend handles:
 
 - dashboard pairing
 - authenticated dashboard routes
-- WebSocket relay behavior
+- WebSocket relay behavior, including PhantomStream-compatible stream frame classification and limits
 - SQLite persistence for paired dashboard state
 - serving prerendered Angular assets in production
 
-Post-deploy crawler checks:
+The static and Angular dashboard preview surfaces use the shared PhantomStream viewer wrapper for snapshot rendering and mutation application. FSB host code still owns dashboard state, pairing, task/status traffic, progress/client badges, frozen overlays, and remote-control affordances.
+
+Local CI crawler smoke serves the built static output and runs the route checks against localhost:
+
+```bash
+npm run showcase:smoke
+```
+
+Production post-deploy crawler checks:
 
 ```bash
 curl -A GPTBot -sI https://full-selfbrowsing.com/ | head -1

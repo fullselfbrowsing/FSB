@@ -1,0 +1,57 @@
+{
+  "slug": "bitbucket.create_pr_comment",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "create a pr comment in bitbucket",
+    "add a pr comment in bitbucket",
+    "make a new pr comment in bitbucket",
+    "open a new pr comment in bitbucket",
+    "create pr comment in bitbucket",
+    "add a comment to a pull request in bitbucket"
+  ],
+  "description": "Add a comment to a pull request.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "pull_request_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Pull request ID"
+      },
+      "content": {
+        "type": "string",
+        "description": "Comment content in Markdown"
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "pull_request_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/create-pr-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

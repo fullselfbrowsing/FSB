@@ -1,0 +1,49 @@
+{
+  "slug": "pinterest.list_followers",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "list followers in pinterest",
+    "show me my followers in pinterest",
+    "view my followers in pinterest",
+    "see all my followers in pinterest",
+    "list followers of a user in pinterest"
+  ],
+  "description": "List followers of a Pinterest user by username. Supports pagination via bookmark cursor.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Pinterest username"
+      },
+      "page_size": {
+        "description": "Number of followers per page (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/list-followers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

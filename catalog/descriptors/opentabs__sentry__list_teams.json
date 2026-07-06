@@ -1,0 +1,40 @@
+{
+  "slug": "sentry.list_teams",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list teams in sentry",
+    "show me my teams in sentry",
+    "view my teams in sentry",
+    "see all my teams in sentry",
+    "list teams in the organization in sentry"
+  ],
+  "description": "List all teams in the current Sentry organization. Returns team name, slug, member count, and creation date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of teams to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

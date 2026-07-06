@@ -1,0 +1,32 @@
+{
+  "slug": "newrelic.get_organization",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "get an organization in newrelic",
+    "look up an organization in newrelic",
+    "fetch a single organization in newrelic",
+    "view one specific organization in newrelic",
+    "get organization in newrelic",
+    "get organization details in newrelic"
+  ],
+  "description": "Get the current New Relic organization details including ID and name.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "sentry.list_issue_tags",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list issue tags in sentry",
+    "show me my issue tags in sentry",
+    "view my issue tags in sentry",
+    "see all my issue tags in sentry",
+    "list tag distributions for an issue in sentry"
+  ],
+  "description": "List tag distributions for a Sentry issue. Shows which browsers, operating systems, releases, environments, and other tags are associated with the issue, along with the top values and their counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "The issue ID to list tags for"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-issue-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

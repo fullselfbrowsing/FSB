@@ -1,0 +1,67 @@
+{
+  "slug": "confluence.update_page",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "update a page in confluence",
+    "edit a page in confluence",
+    "change the details of page in confluence",
+    "modify a page in confluence",
+    "update page in confluence",
+    "update an existing page in confluence"
+  ],
+  "description": "Update an existing Confluence page. Requires the current version number (get it from get_page). The body uses Confluence storage format (HTML).",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to update"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New page title"
+      },
+      "body": {
+        "type": "string",
+        "description": "New page body in storage format (HTML)"
+      },
+      "version_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Current version number of the page — the update increments this by 1"
+      },
+      "version_message": {
+        "description": "Optional message describing the changes",
+        "type": "string"
+      },
+      "status": {
+        "description": "Page status: \"current\" (default) or \"draft\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id",
+      "title",
+      "body",
+      "version_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/update-page.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

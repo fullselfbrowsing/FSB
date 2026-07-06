@@ -1,0 +1,42 @@
+{
+  "slug": "etsy.checkout",
+  "service": "www.etsy.com",
+  "intentSynonyms": [
+    "checkout in etsy",
+    "checkout my etsy cart in etsy",
+    "check out your etsy cart in etsy"
+  ],
+  "description": "Check out your Etsy cart: submit the cart for payment to a shipping address. This charges your saved payment method and commits the order -- a real money-moving action.",
+  "actionVerb": "checkout",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "shipping_address": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The address to ship to"
+      },
+      "payment_method_id": {
+        "description": "Optional saved payment method ID to charge",
+        "type": "string"
+      }
+    },
+    "required": [
+      "shipping_address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/etsy/src/tools/checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "checkout"
+    }
+  }
+}

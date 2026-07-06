@@ -1,0 +1,67 @@
+{
+  "slug": "meticulous.search_sessions",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "search sessions in meticulous",
+    "search recorded sessions by query string within a project in meticulous",
+    "search session in the meticulous app",
+    "use meticulous to search a session"
+  ],
+  "description": "Search recorded sessions by query string within a project.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project ID to search within"
+      },
+      "query": {
+        "type": "string",
+        "description": "Search query string"
+      },
+      "count": {
+        "default": 50,
+        "description": "Number of results to return",
+        "type": "number"
+      },
+      "offset": {
+        "default": 0,
+        "description": "Offset for pagination",
+        "type": "number"
+      },
+      "include_empty_sessions": {
+        "default": false,
+        "description": "Include sessions with no user events",
+        "type": "boolean"
+      },
+      "include_automated_sessions": {
+        "default": false,
+        "description": "Include automated/bot sessions",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project_id",
+      "query",
+      "count",
+      "offset",
+      "include_empty_sessions",
+      "include_automated_sessions"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/search-sessions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

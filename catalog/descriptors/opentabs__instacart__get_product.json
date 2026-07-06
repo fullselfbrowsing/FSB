@@ -1,0 +1,49 @@
+{
+  "slug": "instacart.get_product",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "get a product in instacart",
+    "look up a product in instacart",
+    "fetch a single product in instacart",
+    "view one specific product in instacart",
+    "get product in instacart",
+    "get product details by item id in instacart"
+  ],
+  "description": "Get detailed information about a product by its item ID. The item ID format is \"items_{shopId}-{productId}\" (e.g. \"items_121560-7079\"). Requires a shop ID for pricing context.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Item IDs to look up (format: items_{shopId}-{productId})"
+      },
+      "shop_id": {
+        "type": "string",
+        "description": "Shop ID for pricing context"
+      }
+    },
+    "required": [
+      "item_ids",
+      "shop_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

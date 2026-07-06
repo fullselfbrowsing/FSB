@@ -1,0 +1,56 @@
+{
+  "slug": "newrelic.create_alert_policy",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "create an alert policy in newrelic",
+    "add an alert policy in newrelic",
+    "make a new alert policy in newrelic",
+    "open a new alert policy in newrelic",
+    "create alert policy in newrelic"
+  ],
+  "description": "Create a new alert policy. The incident preference controls how incidents are grouped: PER_POLICY (one incident per policy), PER_CONDITION (one per condition), or PER_CONDITION_AND_TARGET (one per condition and target).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Policy name"
+      },
+      "incident_preference": {
+        "description": "Incident grouping preference (default PER_POLICY)",
+        "type": "string",
+        "enum": [
+          "PER_POLICY",
+          "PER_CONDITION",
+          "PER_CONDITION_AND_TARGET"
+        ]
+      }
+    },
+    "required": [
+      "account_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/create-alert-policy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

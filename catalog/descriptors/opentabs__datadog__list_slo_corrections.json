@@ -1,0 +1,30 @@
+{
+  "slug": "datadog.list_slo_corrections",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list slo corrections in datadog",
+    "show me my slo corrections in datadog",
+    "view my slo corrections in datadog",
+    "see all my slo corrections in datadog"
+  ],
+  "description": "List all SLO status corrections in the Datadog organization.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-slo-corrections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

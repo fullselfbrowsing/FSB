@@ -1,0 +1,61 @@
+{
+  "slug": "bestbuy.get_product_reviews",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get product reviews in bestbuy",
+    "look up product reviews in bestbuy",
+    "fetch a single product reviews in bestbuy",
+    "view one specific product reviews in bestbuy",
+    "get product reviews by sku id in bestbuy"
+  ],
+  "description": "Get customer reviews for a Best Buy product by SKU ID. Returns review summary and individual reviews with ratings and text. Use search_products or get_product to find SKU IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sku_id": {
+        "type": "string",
+        "description": "Best Buy SKU ID (e.g., \"6612975\")"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Reviews per page (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "sort": {
+        "description": "Sort order (default \"BEST_REVIEW\")",
+        "type": "string",
+        "enum": [
+          "BEST_REVIEW",
+          "MOST_RECENT",
+          "HIGHEST_RATING",
+          "LOWEST_RATING"
+        ]
+      }
+    },
+    "required": [
+      "sku_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-product-reviews.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

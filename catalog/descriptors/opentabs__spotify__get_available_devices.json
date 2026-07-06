@@ -1,0 +1,31 @@
+{
+  "slug": "spotify.get_available_devices",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get available devices in spotify",
+    "look up available devices in spotify",
+    "fetch a single available devices in spotify",
+    "view one specific available devices in spotify",
+    "list available spotify playback devices in spotify"
+  ],
+  "description": "List all devices available for Spotify playback. Returns device names, types, active status, and volume levels. Use a device ID from the results with transfer_playback or other playback tools.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-available-devices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

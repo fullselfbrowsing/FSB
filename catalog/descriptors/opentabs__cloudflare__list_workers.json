@@ -1,0 +1,31 @@
+{
+  "slug": "cloudflare.list_workers",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list workers in cloudflare",
+    "show me my workers in cloudflare",
+    "view my workers in cloudflare",
+    "see all my workers in cloudflare",
+    "list workers scripts in cloudflare"
+  ],
+  "description": "List all Workers scripts in the account. Returns script names, modification dates, usage models, and compatibility dates.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-workers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

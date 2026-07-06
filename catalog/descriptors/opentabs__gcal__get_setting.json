@@ -1,0 +1,40 @@
+{
+  "slug": "gcal.get_setting",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "get a setting in gcal",
+    "look up a setting in gcal",
+    "fetch a single setting in gcal",
+    "view one specific setting in gcal",
+    "get setting in gcal",
+    "get a specific user setting in gcal"
+  ],
+  "description": "Get a specific user setting by ID. Common settings: \"timezone\", \"locale\", \"dateFieldOrder\", \"format24HourTime\", \"weekStart\", \"showDeclinedEvents\", \"autoAddHangouts\".",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "setting_id": {
+        "type": "string",
+        "description": "Setting ID (e.g., \"timezone\", \"locale\", \"weekStart\")"
+      }
+    },
+    "required": [
+      "setting_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/get-setting.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

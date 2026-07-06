@@ -1,0 +1,83 @@
+{
+  "slug": "gitlab.create_merge_request",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "create a merge request in gitlab",
+    "add a merge request in gitlab",
+    "make a new merge request in gitlab",
+    "open a new merge request in gitlab",
+    "create merge request in gitlab",
+    "create a new merge request in gitlab"
+  ],
+  "description": "Create a new merge request in a project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merge request title"
+      },
+      "source_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Source branch name"
+      },
+      "target_branch": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Target branch name"
+      },
+      "description": {
+        "description": "MR description in Markdown",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Comma-separated list of label names",
+        "type": "string"
+      },
+      "assignee_id": {
+        "description": "User ID to assign",
+        "type": "number"
+      },
+      "milestone_id": {
+        "description": "Milestone ID",
+        "type": "number"
+      },
+      "remove_source_branch": {
+        "description": "Delete source branch after merge",
+        "type": "boolean"
+      },
+      "squash": {
+        "description": "Squash commits when merging",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project",
+      "title",
+      "source_branch",
+      "target_branch"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/create-merge-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "instagram.search_hashtags",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "search hashtags in instagram",
+    "search for hashtags in instagram",
+    "search for instagram hashtags by keyword in instagram"
+  ],
+  "description": "Search for Instagram hashtags by keyword. Returns matching hashtags with post counts.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Hashtag search query (without #)"
+      },
+      "count": {
+        "description": "Number of results to return (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/search-hashtags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "slug": "whatsapp.revoke_message",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "revoke a message in whatsapp",
+    "revoke message in whatsapp",
+    "unsend messages for everyone in whatsapp"
+  ],
+  "description": "Revoke (unsend) messages in a WhatsApp chat. Revoked messages are deleted for everyone in the chat. Only messages sent by the current user can be revoked.",
+  "actionVerb": "revoke",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID containing the messages"
+      },
+      "message_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Message IDs to revoke (must be messages you sent)"
+      }
+    },
+    "required": [
+      "chat_id",
+      "message_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/revoke-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "revoke"
+    }
+  }
+}

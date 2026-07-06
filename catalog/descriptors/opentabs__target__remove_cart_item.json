@@ -1,0 +1,37 @@
+{
+  "slug": "target.remove_cart_item",
+  "service": "target.com",
+  "intentSynonyms": [
+    "remove a cart item in target",
+    "remove cart item in target",
+    "remove an item from the cart in target"
+  ],
+  "description": "Remove an item from the Target shopping cart. Get cart_item_id from get_cart.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cart_item_id": {
+        "type": "string",
+        "description": "Cart item ID to remove (from get_cart)"
+      }
+    },
+    "required": [
+      "cart_item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/remove-cart-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "remove"
+    }
+  }
+}

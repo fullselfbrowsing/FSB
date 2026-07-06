@@ -1,0 +1,37 @@
+{
+  "slug": "minimax.remove_mcp_server",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "remove a mcp server in minimax",
+    "remove mcp server in minimax",
+    "remove an mcp server in minimax"
+  ],
+  "description": "Remove an MCP server from the MiniMax Agent workspace by its ID.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "MCP server ID to remove"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/remove-mcp-server.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "remove"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 /**
- * Universal AI Provider for FSB v0.9.50
+ * Universal AI Provider for FSB v0.9.90
  * A model-agnostic provider that works with any OpenAI-compatible API
  */
 
@@ -725,6 +725,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     UniversalProvider,
     PROVIDER_CONFIGS,
+    calculateAdaptiveTimeout,
     normalizeProviderBaseUrl,
     buildProviderModelsEndpoint,
     parseOpenAICompatibleModelList

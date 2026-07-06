@@ -1,0 +1,51 @@
+{
+  "slug": "bsky.get_list_feed",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get a list feed in bsky",
+    "look up a list feed in bsky",
+    "fetch a single list feed in bsky",
+    "view one specific list feed in bsky",
+    "get list feed in bsky",
+    "get posts from a user list in bsky"
+  ],
+  "description": "Get posts from a user list. Requires the list AT URI.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list": {
+        "type": "string",
+        "minLength": 1,
+        "description": "AT URI of the list (e.g., at://did/app.bsky.graph.list/rkey)"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of posts to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "list"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-list-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

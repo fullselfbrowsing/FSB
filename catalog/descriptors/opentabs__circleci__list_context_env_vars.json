@@ -1,0 +1,42 @@
+{
+  "slug": "circleci.list_context_env_vars",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "list context env vars in circleci",
+    "show me my context env vars in circleci",
+    "view my context env vars in circleci",
+    "see all my context env vars in circleci"
+  ],
+  "description": "List environment variables in a context. Values are not returned for security.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "context_id": {
+        "type": "string",
+        "description": "Context UUID"
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "context_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/list-context-env-vars.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "notebooklm.delete_notes",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "delete notes in notebooklm",
+    "remove notes in notebooklm",
+    "trash notes in notebooklm",
+    "permanently delete notes in notebooklm"
+  ],
+  "description": "Delete one or more notes from a notebook.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "note_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of note UUIDs to delete"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "note_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/delete-notes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

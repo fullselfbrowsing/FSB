@@ -130,13 +130,29 @@ function parseToolCalls(response, provider) {
       // Location: response.choices[0].message.tool_calls
       // PITFALL: arguments is a JSON STRING, must JSON.parse it
       const calls = response.choices?.[0]?.message?.tool_calls || [];
-      return calls.map(c => ({
-        id: c.id,
-        name: c.function.name,
-        args: typeof c.function.arguments === 'string'
-          ? JSON.parse(c.function.arguments)
-          : (c.function.arguments || {})
-      }));
+      return calls.map(c => {
+        let args = c.function.arguments || {};
+        let argsParseError = null;
+        if (typeof c.function.arguments === 'string') {
+          try {
+            args = JSON.parse(c.function.arguments);
+          } catch (err) {
+            // Truncated/malformed arguments (e.g. finish_reason 'length'). The
+            // assistant message carrying this tool_call is already in history,
+            // so the call must stay in the returned array -- an unpaired
+            // tool_call is a guaranteed provider 400 on the next request.
+            args = {};
+            argsParseError = (err && err.message ? err.message : 'invalid JSON')
+              + '; raw length ' + c.function.arguments.length;
+            console.warn('[ToolUseAdapter] Failed to parse tool call arguments; substituting {}', {
+              id: c.id, name: c.function.name, error: argsParseError
+            });
+          }
+        }
+        const call = { id: c.id, name: c.function.name, args };
+        if (argsParseError) call.argsParseError = argsParseError;
+        return call;
+      });
     }
   }
 }

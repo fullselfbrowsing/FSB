@@ -1,0 +1,40 @@
+{
+  "slug": "webflow.get_workspace",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get a workspace in webflow",
+    "look up a workspace in webflow",
+    "fetch a single workspace in webflow",
+    "view one specific workspace in webflow",
+    "get workspace in webflow",
+    "get workspace details in webflow"
+  ],
+  "description": "Get detailed information about a specific Webflow workspace by its URL slug. Returns workspace name, seat usage, and billing details.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug (e.g., \"my-workspace-abc123\")"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-workspace.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

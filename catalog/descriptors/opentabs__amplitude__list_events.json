@@ -1,0 +1,44 @@
+{
+  "slug": "amplitude.list_events",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "list events in amplitude",
+    "show me my events in amplitude",
+    "view my events in amplitude",
+    "see all my events in amplitude",
+    "get event properties for an event type in amplitude"
+  ],
+  "description": "List event properties for a specific event type in a project/app. Use get_org_data first to find the app ID, then provide the event type name (e.g., '[Amplitude] Element Clicked').",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "app_id": {
+        "type": "string",
+        "description": "App/project ID (from get_org_data apps list)"
+      },
+      "event_type": {
+        "type": "string",
+        "description": "Event type name (e.g., '[Amplitude] Element Clicked')"
+      }
+    },
+    "required": [
+      "app_id",
+      "event_type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/list-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

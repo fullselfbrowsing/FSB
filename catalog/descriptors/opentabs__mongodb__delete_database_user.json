@@ -1,0 +1,43 @@
+{
+  "slug": "mongodb.delete_database_user",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "delete a database user in mongodb",
+    "remove a database user in mongodb",
+    "trash a database user in mongodb",
+    "permanently delete a database user in mongodb",
+    "delete database user in mongodb"
+  ],
+  "description": "Delete a database user from the current MongoDB Atlas project by username and authentication database.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Username of the database user to delete"
+      },
+      "database": {
+        "description": "Authentication database (defaults to \"admin\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/delete-database-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

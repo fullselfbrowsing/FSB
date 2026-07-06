@@ -1,0 +1,42 @@
+{
+  "slug": "retool.rename_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "rename a folder in retool",
+    "rename folder in retool",
+    "rename an app or workflow folder in retool"
+  ],
+  "description": "Rename an existing folder. Use list_apps to find folder IDs.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "type": "number",
+        "description": "Folder ID to rename"
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New name for the folder"
+      }
+    },
+    "required": [
+      "folder_id",
+      "new_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/rename-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "rename"
+    }
+  }
+}

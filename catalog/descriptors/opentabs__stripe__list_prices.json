@@ -1,0 +1,58 @@
+{
+  "slug": "stripe.list_prices",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list prices in stripe",
+    "show me my prices in stripe",
+    "view my prices in stripe",
+    "see all my prices in stripe",
+    "list prices with pagination in stripe"
+  ],
+  "description": "List prices in your Stripe account. Optionally filter by product. Returns prices sorted by creation date (newest first).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of prices to return (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Price ID cursor — fetch prices created after this ID",
+        "type": "string"
+      },
+      "product": {
+        "description": "Filter by product ID",
+        "type": "string"
+      },
+      "active": {
+        "description": "Filter by active status",
+        "type": "boolean"
+      },
+      "type": {
+        "description": "Filter by price type",
+        "type": "string",
+        "enum": [
+          "one_time",
+          "recurring"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-prices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "claude.delete_conversation",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "delete a conversation in claude",
+    "remove a conversation in claude",
+    "trash a conversation in claude",
+    "permanently delete a conversation in claude",
+    "delete conversation in claude"
+  ],
+  "description": "Delete a conversation by UUID. This action is permanent and cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_uuid": {
+        "type": "string",
+        "description": "UUID of the conversation to delete"
+      }
+    },
+    "required": [
+      "conversation_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/delete-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

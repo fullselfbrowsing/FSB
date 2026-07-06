@@ -1,0 +1,32 @@
+{
+  "slug": "shortcut.get_current_user",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "get a current user in shortcut",
+    "look up a current user in shortcut",
+    "fetch a single current user in shortcut",
+    "view one specific current user in shortcut",
+    "get current user in shortcut",
+    "get current user profile in shortcut"
+  ],
+  "description": "Get the profile of the currently authenticated Shortcut user including name, role, and workspace info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "slug": "datadog.create_monitor",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "create a monitor in datadog",
+    "add a monitor in datadog",
+    "make a new monitor in datadog",
+    "open a new monitor in datadog",
+    "create monitor in datadog",
+    "create a new monitor in datadog"
+  ],
+  "description": "Create a new Datadog monitor. Supports metric, service check, event, log, process, synthetics, and other monitor types.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Monitor name"
+      },
+      "type": {
+        "type": "string",
+        "description": "Monitor type (e.g., \"metric alert\", \"service check\", \"event alert\", \"log alert\", \"process alert\", \"synthetics alert\")"
+      },
+      "query": {
+        "type": "string",
+        "description": "Monitor query string"
+      },
+      "message": {
+        "description": "Notification message (supports @mentions and markdown)",
+        "type": "string"
+      },
+      "tags": {
+        "description": "Tags to associate with the monitor",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "options": {
+        "description": "Monitor options (thresholds, notify_no_data, etc.)"
+      }
+    },
+    "required": [
+      "name",
+      "type",
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/create-monitor.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

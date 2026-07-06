@@ -1,0 +1,29 @@
+{
+  "slug": "walmart.navigate_to_checkout",
+  "service": "walmart.com",
+  "intentSynonyms": [
+    "navigate a to checkout in walmart",
+    "navigate to checkout in walmart",
+    "navigate to checkout page in walmart"
+  ],
+  "description": "Navigate the browser to the Walmart checkout page so the user can review the cart and complete payment.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/walmart/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

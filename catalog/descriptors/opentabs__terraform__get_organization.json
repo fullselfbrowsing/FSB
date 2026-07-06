@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_organization",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get an organization in terraform",
+    "look up an organization in terraform",
+    "fetch a single organization in terraform",
+    "view one specific organization in terraform",
+    "get organization in terraform",
+    "get organization details in terraform"
+  ],
+  "description": "Get detailed information about a specific organization by name.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      }
+    },
+    "required": [
+      "organization"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

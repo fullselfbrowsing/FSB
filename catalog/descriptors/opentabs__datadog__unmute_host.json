@@ -1,0 +1,37 @@
+{
+  "slug": "datadog.unmute_host",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "unmute a host in datadog",
+    "unmute host in datadog",
+    "unmute a previously muted host to resume alerting in datadog"
+  ],
+  "description": "Unmute a previously muted host to resume alerting.",
+  "actionVerb": "unmute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "host_name": {
+        "type": "string",
+        "description": "Host name to unmute"
+      }
+    },
+    "required": [
+      "host_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/unmute-host.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "unmute"
+    }
+  }
+}

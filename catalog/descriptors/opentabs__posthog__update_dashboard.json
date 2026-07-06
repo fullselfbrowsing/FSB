@@ -1,0 +1,60 @@
+{
+  "slug": "posthog.update_dashboard",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "update a dashboard in posthog",
+    "edit a dashboard in posthog",
+    "change the details of dashboard in posthog",
+    "modify a dashboard in posthog",
+    "update dashboard in posthog"
+  ],
+  "description": "Update an existing dashboard. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "dashboard_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Dashboard ID"
+      },
+      "name": {
+        "description": "New name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "pinned": {
+        "description": "Whether to pin",
+        "type": "boolean"
+      },
+      "tags": {
+        "description": "New tags",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "dashboard_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/update-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

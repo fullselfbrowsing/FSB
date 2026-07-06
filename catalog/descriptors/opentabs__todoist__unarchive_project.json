@@ -1,0 +1,37 @@
+{
+  "slug": "todoist.unarchive_project",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "unarchive a project in todoist",
+    "unarchive project in todoist",
+    "restore an archived todoist project in todoist"
+  ],
+  "description": "Restore an archived Todoist project. The project and its tasks become visible again.",
+  "actionVerb": "unarchive",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "The ID of the project to unarchive"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/unarchive-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "unarchive"
+    }
+  }
+}

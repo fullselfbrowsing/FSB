@@ -1,0 +1,36 @@
+{
+  "slug": "aws.list_subnets",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list subnets in aws",
+    "show me my subnets in aws",
+    "view my subnets in aws",
+    "see all my subnets in aws",
+    "list vpc subnets in the current region in aws"
+  ],
+  "description": "List VPC subnets in the current region. Optionally filter by VPC ID. Returns subnet ID, CIDR block, availability zone, and available IP count.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "vpc_id": {
+        "description": "Filter by VPC ID",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-subnets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "terraform.list_organizations",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list organizations in terraform",
+    "show me my organizations in terraform",
+    "view my organizations in terraform",
+    "see all my organizations in terraform",
+    "list your organizations in terraform"
+  ],
+  "description": "List all organizations the current user belongs to. Returns organization name, plan, and resource count.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-organizations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

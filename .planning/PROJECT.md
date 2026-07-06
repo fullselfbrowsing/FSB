@@ -10,9 +10,14 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last shipped:** v0.9.70 streaming/viewport slice -- 2026-05-18. Dashboard DOM streaming now reaches the showcase preview after the canonical content bundle injects `content/dom-stream.js`; the preview pane is fixed at 16:10 for inline desktop/PiP; maximized and browser-fullscreen modes fit the actual viewer surface without stretching the streamed DOM. PR #73 merged and Fly deployment passed. Earlier v0.9.69 shipped the anonymous telemetry pipeline, public `/stats` aggregates, privacy/CWS disclosure guard, server-side GitHub stats cache, MCP numeric-parameter coercion, extension v0.9.67 zip, and `fsb-mcp-server@0.9.2`.
+**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
 
 **Recent shipping cadence:**
+- v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
+- v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
+- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
+- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
+- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
 - v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
 - v0.9.63 Showcase i18n -- shipped 2026-05-13
 - v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
@@ -24,30 +29,119 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v0.9.47 Workspace Reorganization -- shipped 2026-05-02
 - v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.9.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
+**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone: v0.9.70 Showcase Dashboard Reliability (Streaming + Sync + Viewport)
+## Current Milestone
 
-**Goal:** Make the showcase dashboard preview pane actually work — diagnose and fix the broken DOM-streaming pipeline, restore the broken Sync-tab remote-control flow, and lock the preview pane to a fixed 16:10 desktop viewport.
+No active milestone is currently defined. Start the next cycle with `$gsd-new-milestone` after choosing the next product goal.
+
+## Last Milestone: v1.1.0 T1 App Execution Expansion
+
+**Status:** Archived on 2026-06-30. Audit passed; automated milestone gates met. Archive files live under `.planning/milestones/v1.1.0-*`.
+
+**Outcome:** FSB converted the v1.0.0 catalog tail from undifferentiated search/discovery support into an explicit readiness and terminal-state model. The milestone added reusable port contracts, same-origin read ports, bridge decision gates, guarded-write evidence gates, terminal-state reporting, and a write/destructive UAT ledger.
+
+**Final counts:** 2,314 descriptors; 1,267 executable T1-ready rows; 556 guarded fail-closed rows; 5 bridge-needed rows; 141 UAT-needed rows; 123 blocked rows; 222 degraded/discovery-pending rows.
+
+**Accepted closeout caveats:** v1.1.0 does not claim all apps are T1-ready. Remaining rows are non-invocable until their documented proof requirements are satisfied. Backlog side phase `999.1 MCP tool gaps -- click heuristics` remains outside the milestone.
+
+## Last Milestone: v1.0.0 Full App Catalog (OpenTabs Parity)
+
+**Status:** Archived on 2026-06-29. Audit passed; automated milestone gate met. Archive files live under `.planning/milestones/v1.0.0-*`.
+
+**Outcome:** FSB imported the full allowed OpenTabs-derived catalog surface into existing capability tiers: 2,314 descriptors across 128 app stems / 129 services, with side-effect classification, backing-status annotation, denylist/sensitive-origin gating, discovery seeding, scale gates, and selected T1 heads. The milestone deliberately did not hand-port every descriptor; that T1 expansion debt is now the explicit v1.1.0 milestone.
+
+## Last Milestone: v0.9.99 Native Capability Catalog (FSB API Execution)
+
+**Goal:** Give FSB first-class authenticated-API execution as a fast path alongside DOM automation -- match OpenTabs' "call APIs through your authenticated session" capability with zero plugin installs and no MCP tool bloat, backed by FSB's DOM engine as a self-healing fallback.
 
 **Target features:**
-- **Dashboard DOM-streaming fix. COMPLETE.** Root cause was the canonical content-script bundle missing `content/dom-stream.js`, so the source tab never registered the `pingDomStream` readiness handler. The merged fix injects the module and the user verified live streaming works.
-- **Preview viewport fit. COMPLETE.** Inline desktop and PiP preview surfaces are fixed at 16:10. Maximized and browser-fullscreen modes now size to the actual viewer surface and preserve DOM scale without stretching. Mobile layout remains intentionally untouched.
-- **Sync tab remote control fix. ACTIVE.** Investigate why the showcase dashboard "Sync" tab (the v0.9.45rc1 remote-from-website pairing surface that pairs a browser session to an extension install) is currently broken; restore pairing + remote-command dispatch end-to-end on `full-selfbrowsing.com`.
+- Lean dispatcher surface: keep the existing ~63 MCP tools byte-stable; add a small handful (e.g. `search_capabilities` + `invoke_capability`) using progressive disclosure (search -> invoke) so the catalog never bloats the MCP context.
+- Capability runtime in the extension: authenticated same-origin fetch primitive (FSB already holds `debugger` + `<all_urls>` + `execute_js`) plus a fixed bundled interpreter that executes capability definitions.
+- MV3-safe code/data split: bundled imperative handlers compiled into the extension for the hard/popular head; server-delivered DECLARATIVE recipes (data, not code -- MV3 prohibits remotely-hosted code) interpreted locally for the easy long tail.
+- Network-capture discovery: use the existing CDP/`debugger` permission to observe a page's real API calls (endpoint, auth, headers, payload) to learn capabilities.
+- Learned recipes via memory: promote successful calls into FSB procedural memory as reusable per-origin recipes that auto-grow the catalog.
+- Self-healing fallback: when a recipe breaks, drop to DOM automation and still complete the task.
+- Consent governance: per-origin Off/Ask/Auto gating + audit log + default-off for authenticated API replay (FSB stays supervised/safe).
+- Out-of-box + optional install: popular capabilities ship bundled; long tail streams from FSB's server; optional explicit install via MCP command or control panel.
 
-**Key constraints:**
-- Streaming and viewport fixes are closed unless regression testing proves otherwise; do not reopen them while working the Sync-tab fix.
-- Mobile dashboard layout remains out of scope for the already-shipped aspect-ratio work.
-- Carry-forward telemetry-follow-up backlog (sparklines, first-run banner, "View what we send", region-gated opt-in, public API docs, geo heatmap) **deferred again** — not in this milestone.
-- Carry-forward v0.9.64 (picker-cookie short-circuit) and v0.9.65 (dashboard i18n) also **deferred again**.
-- Server-side extension where needed continues to extend `showcase/server/` (Express + SQLite); no new microservice.
+**Key context:**
+- Carry hard invariants: INV-01 MCP wire contracts untouched, INV-02 autopilot/MCP tool-surface parity, INV-03 parity across all 7 providers, INV-04 MV3-survivability preserved.
+- Content strategy = port + learn, NOT re-derive ~2,769 service tools from scratch; do not clone OpenTabs' npm-per-plugin model.
+- DOM automation + site guides remain as the universal fallback -- not removed.
 
-**Other deferred candidates (not in this milestone, but on deck):**
-- Telemetry follow-up surface (first-run banner, "View what we send", "Reset anonymous ID", "Wipe my data", region-gated EU opt-IN, public versioned `/api/public-stats` docs, sparklines, geo heatmap).
-- v0.9.64 carry-forward — WARNING-02 picker-cookie short-circuit on bare-`/` Accept-Language redirect.
-- v0.9.65 carry-forward — translate `showcase/angular/src/app/pages/dashboard/**` (currently `--ignore-pattern`'d in `lint:i18n`).
+## Last Milestone: v0.12.0 PhantomStream Package Migration
+
+**Status:** Completed on 2026-06-17. Automated gates passed; live Chrome-extension UAT remains `human_needed`.
+
+**Outcome:** FSB replaced duplicate in-house generic DOM stream engines with the pinned PhantomStream package. The content-side capture adapter, shared static/Angular dashboard viewer wrapper, service-worker protocol bridge, server relay compatibility adapter, and remote-control mapping now preserve FSB product behavior while delegating generic browser mirroring to PhantomStream.
+
+**Architecture notes:**
+- Installed package: `@full-self-browsing/phantom-stream@0.1.0` from npm. Verified exports include `./protocol`, `./capture`, `./renderer`, `./relay`, `./transport/websocket`, and adapters listed in `.planning/phases/21-package-intake-contract-mapping/21-PACKAGE-SURFACE.md`.
+- Rejected package: `@fullselfbrowsing/phantom-stream` returned `E404` on 2026-06-17. Do not use it in active docs or code except to explain the correction.
+- FSB has two dashboard surfaces (`showcase/js/dashboard.js` and Angular dashboard). Both consume the shared `window.FSBPhantomStreamViewer` wrapper to prevent renderer drift.
+
+## Last Milestone: v0.11.0 Trigger Tool (Reactive DOM Monitoring)
+
+**Status:** Completed on 2026-06-17. Release actions and live-browser/composed trigger UAT remain user-gated.
+
+**Outcome:** FSB gained a storage-backed trigger tool family across autopilot and MCP: `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers`; live-observe and refresh-poll watch modes; fire-condition/value-extraction logic; blocking/detached reporting; trigger-cap UI; conflict/reload coalescing; and documentation. All 39 v1 requirements were mapped and completed across Phases 14-20, with browser UAT debt recorded rather than fabricated.
+
+## Last Milestone: v0.10.0 Autopilot via Lattice SDK
+
+**Status:** Shipped and archived on 2026-06-15. FSB no longer depends on the gitignored local `./lattice` checkout for runtime consumption. The active dependency is the public npm package `@full-self-browsing/lattice@1.3.0`, installed under the existing `lattice` import alias, with `@full-self-browsing/lattice-cli@1.3.0` added for receipt verification workflows. The package requires Node `>=24`, so the root `engines.node` floor is now `>=24.0.0`. `.planning/LATTICE-PIN.md` is now a package pin as well as source-tag audit trail: source tag `v1.3.0`, tag commit `069c9aea4b5875393c96ad7e6ffeec4afbe70f34`, package integrity `sha512-w7cm8b+FFLcN9e1kRWDL0LaDZunAdMhlBFOrsIrryYV5cQifBKfjd0mlStYqwaHYhgm1TQvyw8BIac0lN4JszA==`.
+
+**Goal:** Keep FSB's production import surface stable (`import ... from "lattice"`) while replacing the local clone dependency with the stable public Lattice package available today. The milestone now validates the package boundary directly: package metadata, lockfile integrity, public runtime exports, CLI availability, receipt schema `lattice-receipt/v1.2`, provider factories, checkpoint hooks, survivability adapter, bridge wiring, and the existing offscreen bundle path.
+
+**Why this matters (vs attempt-1):** v0.10.0-attempt-1 invented hook + receipt + step-marker + resumption primitives inside FSB and planned to port them to Lattice later via separate PRs (LAT-05 only IDENTIFIED port candidates). That created duplication risk (FSB's checkpoint-hook + Lattice's signed-receipt are conceptually the same shape but live in two repos) and deferred Lattice round-trip validation. Attempt-2 inverts: Lattice owns the primitives, FSB consumes; the Lattice round-trip happens continuously.
+
+**Lattice integration model:**
+- FSB consumes Lattice through package.json alias `"lattice": "npm:@full-self-browsing/lattice@1.3.0"`.
+- FSB pins the public CLI as dev tooling: `"@full-self-browsing/lattice-cli": "1.3.0"`.
+- `package-lock.json` must resolve `node_modules/lattice` to `@full-self-browsing/lattice@1.3.0` with the registry integrity recorded in `.planning/LATTICE-PIN.md`.
+- Runtime code keeps the bare `lattice` specifier; esbuild still bundles the offscreen host from that alias.
+- Historical Phase 1-12 references to `./lattice` remain audit history, but active verification no longer requires a local Lattice checkout.
+
+**Lattice SDK extension candidates (to be scoped during phase discussion):**
+- Receipt-shaped state envelopes for any agent-loop runtime (not just Lattice's own server-side runtime); MV3-survivable encoding
+- Tripwire / hook primitive with priority bands (SAFETY > OBSERVABILITY > EXTENSION) + matcher regex + race-with-log per-handler budget + frozen contexts + mid-session registration freeze
+- Universal-provider adapters for the 7 FSB providers (Anthropic, OpenAI, xAI, Gemini, LM Studio, OpenRouter, custom OpenAI-compatible)
+- Task-delegation primitive (parent-child loops with summary-return + cache-prefix sharing + rate-limit-group coordination) -- pending Lattice-policy discussion on multi-agent scope
+- MV3-survivability adapter contract (Lattice has no existing concept; FSB may be the first runtime with this constraint)
+- Observability / step-marker primitive
+
+**Hard invariants (non-negotiable, carried over from attempt-1):**
+- **INV-01 MCP wire contracts UNTOUCHED.** Tool schemas, semantics, request/response shapes of every existing MCP-exposed tool stay byte-identical.
+- **INV-02 Tool surface parity.** FSB's autopilot loop uses the SAME tool registry that MCP exposes. No parallel "autopilot-only" tool stack.
+- **INV-03 Provider parity.** Every improvement works equally across all 7 `universal-provider.js` targets.
+- **INV-04 MV3-survivability preserved.** The existing `setTimeout`-chained iterator pattern at `agent-loop.js:1824/2418/2487/2497` is load-bearing. Lattice integration is additive runtime adaptation, NOT iterator replacement.
+- **INV-05 No resurrection of deprecated modules.** `extension/agents/agent-executor.js` / `agent-manager.js` / `agent-scheduler.js` stay frozen.
+- **INV-06 (UPDATED) Public Lattice package stays pinned and audited.** FSB consumes Lattice through the public npm package alias, and `.planning/LATTICE-PIN.md` + `package-lock.json` + `tests/lattice-public-package.test.js` must agree on package name, version, integrity, source tag, and source SHA. FSB-side code remains integration glue and does not re-implement primitives that belong in Lattice.
+
+**Parallel work on `main` (this branch diverges):** v0.9.70 Showcase Dashboard Reliability (streaming fix, Sync-tab restore, 16:10 viewport) continues on `main` and is NOT this milestone's work. Merge reconciliation between branches deferred until both ship.
+
+**Reference frameworks (patterns only, not dependencies):** Lattice (the SDK FSB is integrating with); Claude Agent SDK hooks (vocabulary baseline); LangGraph (state-graph carve-out vocabulary).
+
+**Other deferred candidates (not in this milestone):**
+- Skills primitive (full domain-specific tool+prompt loading) -- moved to v0.11.0+ per PITFALLS (MCP wire-contract drift, site-matcher security, mid-session hook registration vs. freeze).
+- Receipt signing (Ed25519 + RFC 8785 JCS) -- already exists in Lattice's v1.1 Capability Receipts; FSB integration may unlock signing for free.
+- Lattice contribution PRs (FSB-driven SDK additions ported to Lattice mainline) -- happens AFTER FSB integration validates the additions; lands in Lattice repo as separate milestones.
+- Public benchmark publication (WebArena / WebVoyager / Mind2Web).
+- All carry-forward backlog from v0.9.69 (telemetry follow-up surface, v0.9.64 picker-cookie, v0.9.65 dashboard i18n).
+
+## Previous Milestone: v0.10.0-attempt-1 (FSB-first, abandoned 2026-05-24)
+
+**Status:** Pivoted before milestone completion. Phases 1-2 shipped FSB-side code (hooks-foundation + state-inspectability-carve-out, 617/617 tests green) before the team re-evaluated and chose to pivot to the Lattice-first approach. All work preserved on `pre-pivot-archive/v0.10.0-fsb-first` branch and under `.planning/milestones/v0.10.0-attempt-1-pre-pivot/` on disk.
+
+**Recoverable artifacts from attempt-1:** Phase 1 hook-pipeline extensions (priority bands, matcher, race-with-log, freeze, lockBand, 5 new lifecycle events, 4 hook factories including loop-detection + telemetry); Phase 2 LIFECYCLE_EVENTS.STEP_TRANSITION + checkpoint-hook.js + 12 step markers in runAgentIteration + additive persistSession schema + sidepanel Agent State Inspector UI + full MV3 SW eviction resumption with CONSERVATIVE recovery (ON_ERROR for mid-API-request, RECOVERY_AMBIGUOUS for mid-tool-dispatch, SAFE replay for boundary states). The patterns themselves are intellectually correct; in attempt-2 they live in Lattice instead of FSB.
+
+**Next milestone candidates (deferred to a future cycle):**
+- **v0.9.70 (telemetry follow-up)** -- first-run banner, "View what we send" preview, "Reset anonymous ID" button, in-extension "Wipe my data" UI, region-gated opt-IN for EU/UK/CA.
+- **v0.9.70 (streaming)** -- full dashboard streaming rewrite if STREAM-07 5-attempt cap is hit during Phase 276 browser repro.
+- **v0.9.64 (UX, carry-forward)** -- picker-cookie short-circuit on bare-`/` Accept-Language redirect.
+- **v0.9.65 (dashboard i18n, carry-forward)** -- translate `showcase/angular/src/app/pages/dashboard/**`.
 
 ## Previous Milestone: v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix (shipped 2026-05-14)
 
@@ -260,6 +354,7 @@ Carry-forward backlog candidates:
 - ✓ Tool-aware system prompt with TOOL SELECTION GUIDE, canvas task type detection, PRIORITY TOOLS conditional injection, and text-selection/file-upload sub-pattern hints -- v0.9.8/P98
 - ✓ 500+ v0.9.7 diagnostic recommendations embedded as prepended strategy hints in 49 site guide files across 5 categories (canvas, micro, scroll, context, dark) -- v0.9.8/P99
 - ✓ Procedural memory extraction from successful sessions and RECOMMENDED APPROACH injection into autopilot prompts with per-domain cap of 5 -- v0.9.8/P100
+- ✓ Refresh-poll trigger watch with 30s alarm floor, owned-tab background reload, typed missing/blocked attention states, lifecycle-seam evaluation, and pulse reassertion -- v0.11.0 Phase 17
 - ✓ Autonomous memory intelligence: auto-consolidation (10-session/80% triggers), cross-domain strategy transfer with taskType matching, domain-change memory refresh, dead episodic code removed -- v0.9.8/P101
 - ✓ Robustness hardening: viewport bounds validation for CDP tools, bidirectional stuck recovery, 3-stage progressive prompt trimming, 2-stage CLI parse retry with simplified hint -- v0.9.8/P102
 - ✓ Validation test harness with 50 autopilot-adapted edge case prompts, results tracking, and milestone gate metrics (VALID-02/03/04) -- v0.9.8/P103 (harness built, manual execution pending)
@@ -320,7 +415,21 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.62 Implicit Visual Session Contract in scoping -- requirements pending REQUIREMENTS.md generation.)
+(Milestone v1.1.0 T1 App Execution Expansion -- requirements and roadmap defined on 2026-06-29; phases continue from v1.0.0's Phase 43 -> start at Phase 44. v1.0.0 Full App Catalog is archived with 2,314 searchable descriptors, 26 T1/T1b descriptors, and 2,288 DOM/discovery-tail descriptors carried forward as explicit T1 expansion work.)
+
+### Validated (v0.9.99)
+
+- [x] CAP-01: A versioned closed-vocabulary recipe JSON Schema defines a recipe as pure data; out-of-vocabulary/forbidden (script/expr/transform/code/fn/js) fields are rejected with a typed RECIPE_* error -- Phase 26
+- [x] CAP-02: The fixed bundled interpreter binds a validated recipe to a closed four-member auth-strategy enum and emits a bound request spec, never via eval/new Function/import(), and STOPS before any network call (the MAIN-world fetch is Phase 27) -- Phase 26
+- [x] CAP-03: Recipes + invocation params are validated in the service worker by the eval-free `@cfworker/json-schema` validator; invalid/unknown-opcode input is rejected with a typed error (interpreter never throws, even on hostile `$ref` params) -- Phase 26
+- [x] CAP-04: A Node CI guard (`scripts/verify-recipe-path-guard.mjs`, chained into `validate:extension` -> `ci/all-green`) fails the build on any eval/new Function/import( reachable from the six-file recipe-path allowlist, runs accept/reject fixtures, and self-asserts the three sanctioned `execute_js` sites are excluded; an allowlist-drift check forces new `capability-*.js` modules onto the list -- Phase 26
+- [x] CAP-05: The interpreter + three vendored eval-free libraries (`@cfworker/json-schema` IIFE, `minisearch`, `jmespath`) ship inside the extension via additive `importScripts`, with no remotely-hosted code and no manifest/permission change -- Phase 26
+- [x] SURF-01: `search_capabilities` returns ranked, schema-on-hit results (<=5) for an intent query, biased by the owned tab's origin resolved authoritatively SW-side -- Phase 28
+- [x] SURF-02: `invoke_capability` executes a selected capability via the direct routerless path (slug -> `interpretRecipe` -> `executeBoundSpec`) with SW-side param validation and returns a structured result; unknown slug surfaces `RECIPE_NOT_FOUND` verbatim -- Phase 28
+- [x] SURF-03: Both tools register OUTSIDE `TOOL_REGISTRY` via `server.tool()` (vault precedent), keeping the existing ~63 MCP tool schemas byte-identical -- INV-01 proven (frozen `EXPECTED_NON_TRIGGER_REGISTRY_HASH` unmoved; 65 tools on the wire = 63 + 2) -- Phase 28
+- [x] SURF-04: A persisted `minisearch` index over a separate capability-descriptor doc (intent synonyms + service + action verb + side-effect class; the locked recipe schema untouched) snapshots to `chrome.storage.local` under `fsbCapabilityIndex` with a `catalogVersion` stamp; one shared `INDEX_OPTIONS` is reused at build and `loadJSON` -- Phase 28
+- [x] SURF-05: `search_capabilities` is read-only and bypasses the mutation queue (joins `readOnlyTools`); `invoke_capability` is serialized through it -- Phase 28
+- [x] SURF-06: An eval harness measures recall@k + wrong-invoke over a seeded near-neighbor fixture set and gates the build (recall@5=1.000, wrong-invoke=0; a naive index provably fails the gate). Live MCP-client end-to-end smoke recorded as `human_needed` UAT -- Phase 28
 
 ### Validated (v0.9.60)
 
@@ -571,4 +680,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-16 -- milestone v0.9.70 Showcase Dashboard Reliability (Streaming + Sync + Viewport) STARTED; goals: diagnose-first stream fix, Sync-tab remote control restoration, 16:10 desktop viewport for preview pane*
+*Last updated: 2026-06-29 -- v1.0.0 Full App Catalog archived; v1.1.0 T1 App Execution Expansion started. Phases continue at 44.*

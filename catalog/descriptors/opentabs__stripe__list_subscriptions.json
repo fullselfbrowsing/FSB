@@ -1,0 +1,61 @@
+{
+  "slug": "stripe.list_subscriptions",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list subscriptions in stripe",
+    "show me my subscriptions in stripe",
+    "view my subscriptions in stripe",
+    "see all my subscriptions in stripe",
+    "list subscriptions with pagination in stripe"
+  ],
+  "description": "List subscriptions in your Stripe account. Returns subscriptions sorted by creation date (newest first).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Subscription ID cursor for pagination",
+        "type": "string"
+      },
+      "customer": {
+        "description": "Filter by customer ID",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by subscription status (default active)",
+        "type": "string",
+        "enum": [
+          "incomplete",
+          "incomplete_expired",
+          "trialing",
+          "active",
+          "past_due",
+          "canceled",
+          "unpaid",
+          "paused",
+          "all"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-subscriptions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

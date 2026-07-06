@@ -1,0 +1,42 @@
+{
+  "slug": "calendly.get_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get an event type in calendly",
+    "look up an event type in calendly",
+    "fetch a single event type in calendly",
+    "view one specific event type in calendly",
+    "get event type in calendly",
+    "get event type details by id in calendly"
+  ],
+  "description": "Get detailed information about a specific event type by its numeric ID. Returns full configuration including duration, location settings, custom intake fields, and availability.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

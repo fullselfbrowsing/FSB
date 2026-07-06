@@ -6,18 +6,213 @@
 
 const FSB_SERVER_URL = 'https://full-selfbrowsing.com';
 var FSB_TRANSPORT_DIAGNOSTIC_LIMIT = 100;
-var FSB_TRANSPORT_TRACKED_TYPES = {
-  'dash:request-status': true,
-  'dash:dom-stream-start': true,
-  'ext:snapshot': true,
-  'ext:page-ready': true,
-  'ext:stream-state': true,
-  'ext:dom-snapshot': true,
-  'ext:dom-mutations': true,
-  'ext:dom-scroll': true,
-  'ext:dom-overlay': true,
-  'ext:dom-dialog': true
+var FSB_PHANTOMSTREAM_STREAM_FALLBACK = {
+  SNAPSHOT: 'ext:dom-snapshot',
+  MUTATIONS: 'ext:dom-mutations',
+  SCROLL: 'ext:dom-scroll',
+  OVERLAY: 'ext:dom-overlay',
+  DIALOG: 'ext:dom-dialog',
+  READY: 'ext:dom-ready',
+  REQUEST_SNAPSHOT: 'ext:request-snapshot',
+  STATE: 'ext:stream-state',
+  SUBTREE_RESPONSE: 'ext:ps-subtree-response'
 };
+var FSB_PHANTOMSTREAM_CONTROL_FALLBACK = {
+  START: 'dash:dom-stream-start',
+  STOP: 'dash:dom-stream-stop',
+  PAUSE: 'dash:dom-stream-pause',
+  RESUME: 'dash:dom-stream-resume',
+  SUBTREE_REQUEST: 'dash:ps-subtree-request'
+};
+var FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK = {
+  REQUEST: 'dash:ps-control-request',
+  STOP: 'dash:ps-control-stop',
+  CLICK: 'dash:ps-control-click',
+  TEXT: 'dash:ps-control-text',
+  KEY: 'dash:ps-control-key',
+  SCROLL: 'dash:ps-control-scroll',
+  STATE: 'ext:ps-control-state'
+};
+var FSB_PHANTOMSTREAM_REMOTE_CONTROL_STATE_FALLBACK = {
+  LOCKED: 'locked',
+  REQUESTING: 'requesting',
+  ACTIVE: 'active',
+  DENIED: 'denied',
+  STOPPED: 'stopped'
+};
+var FSB_TRANSPORT_TRACKED_TYPES = {};
+FSB_TRANSPORT_TRACKED_TYPES['dash:request-status'] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.START] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.STOP] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.PAUSE] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_CONTROL_FALLBACK.RESUME] = true;
+FSB_TRANSPORT_TRACKED_TYPES['ext:snapshot'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['ext:page-ready'] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.STATE] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.REQUEST_SNAPSHOT] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.SNAPSHOT] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.MUTATIONS] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.SCROLL] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.OVERLAY] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_STREAM_FALLBACK.DIALOG] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.REQUEST] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.STOP] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.CLICK] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.TEXT] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.KEY] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.SCROLL] = true;
+FSB_TRANSPORT_TRACKED_TYPES[FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK.STATE] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-control-start'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-control-stop'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-click'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-key'] = true;
+FSB_TRANSPORT_TRACKED_TYPES['dash:remote-scroll'] = true;
+
+function getFSBPhantomStreamProtocol() {
+  var bridge = globalThis.FSBPhantomStreamProtocol;
+  return bridge && typeof bridge === 'object' ? bridge : {};
+}
+
+function getFSBProtocolGroup(name, fallback) {
+  var bridge = getFSBPhantomStreamProtocol();
+  var group = bridge && bridge[name];
+  return group && typeof group === 'object' ? group : fallback;
+}
+
+function getFSBStreamTypes() {
+  return getFSBProtocolGroup('STREAM', FSB_PHANTOMSTREAM_STREAM_FALLBACK);
+}
+
+function getFSBControlTypes() {
+  return getFSBProtocolGroup('CONTROL', FSB_PHANTOMSTREAM_CONTROL_FALLBACK);
+}
+
+function getFSBRemoteControlTypes() {
+  return getFSBProtocolGroup('REMOTE_CONTROL', FSB_PHANTOMSTREAM_REMOTE_CONTROL_FALLBACK);
+}
+
+function getFSBRemoteControlStateTypes() {
+  return getFSBProtocolGroup('REMOTE_CONTROL_STATE', FSB_PHANTOMSTREAM_REMOTE_CONTROL_STATE_FALLBACK);
+}
+
+function getFSBLZStringCodec() {
+  return (typeof LZString !== 'undefined' && LZString) ? LZString : null;
+}
+
+function isFSBCompressedEnvelope(envelope) {
+  var protocol = getFSBPhantomStreamProtocol();
+  if (typeof protocol.isCompressedEnvelope === 'function') {
+    return protocol.isCompressedEnvelope(envelope);
+  }
+  return !!envelope && envelope._lz === true && typeof envelope.d === 'string';
+}
+
+function encodeFSBWebSocketEnvelope(message) {
+  var raw = JSON.stringify(message);
+  var lz = getFSBLZStringCodec();
+  if (raw.length <= 1024 || !lz || typeof lz.compressToBase64 !== 'function') {
+    return {
+      wire: raw,
+      rawLength: raw.length,
+      encodedLength: raw.length,
+      compressed: false
+    };
+  }
+
+  var protocol = getFSBPhantomStreamProtocol();
+  var encoded = typeof protocol.encodeEnvelope === 'function'
+    ? protocol.encodeEnvelope(message, lz, 1024)
+    : JSON.stringify({ _lz: true, d: lz.compressToBase64(raw) });
+
+  var encodedEnvelope = null;
+  try {
+    encodedEnvelope = JSON.parse(encoded);
+  } catch (_e) {
+    encodedEnvelope = null;
+  }
+
+  if (isFSBCompressedEnvelope(encodedEnvelope) && encoded.length < raw.length) {
+    return {
+      wire: encoded,
+      rawLength: raw.length,
+      encodedLength: encoded.length,
+      compressed: true
+    };
+  }
+
+  return {
+    wire: raw,
+    rawLength: raw.length,
+    encodedLength: encoded ? encoded.length : raw.length,
+    compressed: false
+  };
+}
+
+function decodeFSBWebSocketEnvelope(wire) {
+  var protocol = getFSBPhantomStreamProtocol();
+  var lz = getFSBLZStringCodec();
+  if (typeof protocol.decodeEnvelope === 'function') {
+    return protocol.decodeEnvelope(wire, lz);
+  }
+
+  var outer;
+  try {
+    outer = JSON.parse(wire);
+  } catch (_e) {
+    return { ok: false, error: 'json-parse-failed' };
+  }
+
+  if (!isFSBCompressedEnvelope(outer)) {
+    return { ok: true, msg: outer };
+  }
+
+  if (!lz || typeof lz.decompressFromBase64 !== 'function') {
+    return { ok: false, error: 'decompress-unavailable' };
+  }
+  var decoded = lz.decompressFromBase64(outer.d);
+  if (!decoded) {
+    return { ok: false, error: 'decompress-failed' };
+  }
+  try {
+    return { ok: true, msg: JSON.parse(decoded) };
+  } catch (_err) {
+    return { ok: false, error: 'inner-json-parse-failed' };
+  }
+}
+
+function inspectFSBWireEnvelope(wire) {
+  var detail = {
+    compressed: false,
+    len: typeof wire === 'string' ? wire.length : 0
+  };
+  try {
+    var outer = JSON.parse(wire);
+    if (isFSBCompressedEnvelope(outer)) {
+      detail.compressed = true;
+      detail.len = outer.d.length;
+    }
+  } catch (_e) { /* best-effort diagnostics only */ }
+  return detail;
+}
+
+function describeFSBEnvelopeDecodeError(error) {
+  if (error === 'decompress-unavailable') return 'LZString not loaded before ws-client.js';
+  if (error === 'decompress-failed') return 'LZString.decompressFromBase64 returned null/empty';
+  if (error === 'inner-json-parse-failed') return 'compressed payload decoded but inner JSON parse failed';
+  if (error === 'json-parse-failed') return 'WebSocket frame is not valid JSON';
+  return error || 'WebSocket envelope decode failed';
+}
+
+function recordFSBEnvelopeDecodeFailure(error, wire) {
+  var inspected = inspectFSBWireEnvelope(wire);
+  recordFSBTransportFailure(error || 'envelope-decode-failed', {
+    target: 'inbound',
+    type: inspected.compressed ? '_lz' : 'wire',
+    tabId: getCurrentTransportTabId(),
+    error: describeFSBEnvelopeDecodeError(error),
+    len: inspected.len
+  });
+}
 
 function getCurrentTransportTabId() {
   if (typeof _streamingTabId !== 'undefined' && typeof _streamingTabId === 'number') {
@@ -294,17 +489,193 @@ function _getRemoteControlTabId() {
   return getCurrentTransportTabId();
 }
 
-function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId) {
+function normalizeFSBRemoteControlForValidation(type, payload) {
+  var remoteControlTypes = getFSBRemoteControlTypes();
+  var p = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+
+  if (type === 'dash:remote-control-start') {
+    return { type: remoteControlTypes.REQUEST, payload: {} };
+  }
+  if (type === 'dash:remote-control-stop') {
+    return { type: remoteControlTypes.STOP, payload: {} };
+  }
+  if (type === 'dash:remote-click') {
+    return {
+      type: remoteControlTypes.CLICK,
+      payload: {
+        x: p.x,
+        y: p.y,
+        button: p.button || 'left',
+        clickCount: p.clickCount == null ? 1 : p.clickCount,
+        modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+      }
+    };
+  }
+  if (type === 'dash:remote-key') {
+    if (p.type === 'insertText') {
+      return {
+        type: remoteControlTypes.TEXT,
+        payload: {
+          text: typeof p.text === 'string' ? p.text : (typeof p.key === 'string' ? p.key : ''),
+          modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+        }
+      };
+    }
+    return {
+      type: remoteControlTypes.KEY,
+      payload: {
+        event: p.type,
+        key: typeof p.key === 'string' ? p.key : '',
+        code: typeof p.code === 'string' ? p.code : '',
+        text: typeof p.text === 'string' ? p.text : '',
+        modifiers: typeof p.modifiers === 'number' ? p.modifiers : 0
+      }
+    };
+  }
+  if (type === 'dash:remote-scroll') {
+    return {
+      type: remoteControlTypes.SCROLL,
+      payload: {
+        x: p.x,
+        y: p.y,
+        deltaX: p.deltaX == null ? 0 : p.deltaX,
+        deltaY: p.deltaY == null ? 0 : p.deltaY
+      }
+    };
+  }
+
+  return { type: type, payload: p };
+}
+
+function validateFSBRemoteControlFallback(type, payload) {
+  var remoteControlTypes = getFSBRemoteControlTypes();
+  var p = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+  if (type === remoteControlTypes.REQUEST) return { ok: true, action: { type: type, kind: 'request' } };
+  if (type === remoteControlTypes.STOP) return { ok: true, action: { type: type, kind: 'stop' } };
+  if (type === remoteControlTypes.CLICK) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    var button = p.button == null ? 'left' : p.button;
+    if (button !== 'left' && button !== 'middle' && button !== 'right') return { ok: false, error: 'remote-button-invalid' };
+    var clickCount = p.clickCount == null ? 1 : p.clickCount;
+    if (!Number.isFinite(clickCount) || clickCount <= 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    return { ok: true, action: { type: type, kind: 'click', x: p.x, y: p.y, button: button, clickCount: Math.max(1, Math.floor(clickCount)) } };
+  }
+  if (type === remoteControlTypes.TEXT) {
+    if (typeof p.text !== 'string') return { ok: false, error: 'remote-type-unsupported' };
+    if (p.text.length > 4096) return { ok: false, error: 'remote-text-too-long' };
+    return { ok: true, action: { type: type, kind: 'text', text: p.text } };
+  }
+  if (type === remoteControlTypes.KEY) {
+    var event = p.event === 'down' || p.event === 'keyDown' ? 'down' : (p.event === 'up' || p.event === 'keyUp' ? 'up' : null);
+    if (!event || typeof p.key !== 'string' || p.key.length === 0) return { ok: false, error: 'remote-key-event-invalid' };
+    return { ok: true, action: { type: type, kind: 'key', key: p.key, event: event } };
+  }
+  if (type === remoteControlTypes.SCROLL) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.y < 0) return { ok: false, error: 'remote-coordinate-invalid' };
+    var deltaX = p.deltaX == null ? 0 : p.deltaX;
+    var deltaY = p.deltaY == null ? 0 : p.deltaY;
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return { ok: false, error: 'remote-coordinate-invalid' };
+    return { ok: true, action: { type: type, kind: 'scroll', x: p.x, y: p.y, deltaX: deltaX, deltaY: deltaY } };
+  }
+  return { ok: false, error: 'remote-type-unsupported' };
+}
+
+function validateFSBRemoteControlMessage(type, payload) {
+  var normalized = normalizeFSBRemoteControlForValidation(type, payload);
+  var protocol = getFSBPhantomStreamProtocol();
+  var result = typeof protocol.validateRemoteControlMessage === 'function'
+    ? protocol.validateRemoteControlMessage(normalized.type, normalized.payload)
+    : validateFSBRemoteControlFallback(normalized.type, normalized.payload);
+
+  if (!result || result.ok !== true) {
+    return {
+      ok: false,
+      sourceType: type,
+      type: normalized.type,
+      payload: normalized.payload,
+      error: result && result.error ? result.error : 'remote-type-unsupported'
+    };
+  }
+  return {
+    ok: true,
+    sourceType: type,
+    type: normalized.type,
+    payload: normalized.payload,
+    action: result.action
+  };
+}
+
+function summarizeFSBRemoteControlAction(type, payload) {
+  var normalized = normalizeFSBRemoteControlForValidation(type, payload);
+  var protocol = getFSBPhantomStreamProtocol();
+  if (typeof protocol.summarizeRemoteControlAction === 'function') {
+    return protocol.summarizeRemoteControlAction(normalized.type, normalized.payload);
+  }
+  var result = validateFSBRemoteControlFallback(normalized.type, normalized.payload);
+  if (!result.ok) return { type: normalized.type || '', kind: 'unsupported', error: result.error };
+  var action = result.action;
+  if (action.kind === 'request' || action.kind === 'stop') return { type: action.type, kind: action.kind };
+  if (action.kind === 'click') return { type: action.type, kind: action.kind, x: action.x, y: action.y, button: action.button, clickCount: action.clickCount };
+  if (action.kind === 'text') return { type: action.type, kind: action.kind, chars: action.text.length };
+  if (action.kind === 'key') return { type: action.type, kind: action.kind, key: action.key, event: action.event };
+  if (action.kind === 'scroll') return { type: action.type, kind: action.kind, x: action.x, y: action.y, deltaX: action.deltaX, deltaY: action.deltaY };
+  return { type: action.type, kind: action.kind };
+}
+
+function createFSBRemoteControlStateEvent(enabled, reason, details) {
+  var remoteStateTypes = getFSBRemoteControlStateTypes();
+  var state = enabled
+    ? remoteStateTypes.ACTIVE
+    : (reason === 'user-stop' ? remoteStateTypes.STOPPED : remoteStateTypes.DENIED);
+  var protocol = getFSBPhantomStreamProtocol();
+  var event = typeof protocol.createRemoteControlStateEvent === 'function'
+    ? protocol.createRemoteControlStateEvent(state, reason || (enabled ? 'ready' : 'user-stop'), {})
+    : { state: state, reason: reason || (enabled ? 'ready' : 'user-stop') };
+  details = details || {};
+  if (typeof details.tabId === 'number') event.tabId = details.tabId;
+  if (typeof details.ownership === 'string') event.ownership = details.ownership;
+  return event;
+}
+
+function classifyFSBRemoteControlDispatchFailure(error) {
+  var message = '';
+  if (typeof error === 'string') message = error;
+  else if (error && typeof error.message === 'string') message = error.message;
+  if (/another debugger|debugger.*attached|debugger/i.test(message)) return 'debugger-blocked';
+  if (/no tab|tab.*closed|target.*closed|cannot access|restricted/i.test(message)) return 'retarget-required';
+  return 'dispatch-failed';
+}
+
+function recordFSBRemoteControlFailure(eventName, type, payload, error, reason, tabId) {
+  var summary = summarizeFSBRemoteControlAction(type, payload);
+  recordFSBTransportFailure(eventName, {
+    type: type,
+    target: 'remote-control',
+    tabId: typeof tabId === 'number' ? tabId : _getRemoteControlTabId(),
+    readyState: reason || 'dispatch-failed',
+    error: typeof error === 'string' ? error : (error && error.message ? error.message : String(error || 'remote control failed')),
+    action: summary
+  });
+}
+
+function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId, ownershipOverride) {
   var state = {
     enabled: !!enabled,
     attached: !!enabled,
     tabId: typeof tabId === 'number' ? tabId : null,
     reason: reason || (enabled ? 'ready' : 'user-stop'),
-    ownership: enabled ? 'dashboard' : 'none'
+    ownership: ownershipOverride || (enabled ? 'dashboard' : 'none')
   };
   _lastRemoteControlState = state;
   if (wsInstance && typeof wsInstance.send === 'function') {
     wsInstance.send('ext:remote-control-state', state);
+    var remoteControlTypes = getFSBRemoteControlTypes();
+    if (remoteControlTypes.STATE && remoteControlTypes.STATE !== 'ext:remote-control-state') {
+      wsInstance.send(remoteControlTypes.STATE, createFSBRemoteControlStateEvent(state.enabled, state.reason, {
+        tabId: state.tabId,
+        ownership: state.ownership
+      }));
+    }
   }
   // Phase 213 D-17: parallel runtime push so the Sync tab pill (and any
   // other extension contexts) can subscribe to live state changes.
@@ -323,7 +694,25 @@ function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId) {
     // Per Phase 211 LOG-01, route through [FSB SYNC] prefix if logging is enabled.
     try { console.warn('[FSB SYNC] runtime push failed', e && e.message ? e.message : 'unknown'); } catch (_e) { /* ignore */ }
   }
+  try { _broadcastMetrics(wsInstance, wsInstance && wsInstance.serverHashKey); } catch (_e) { /* defensive */ }
   return state;
+}
+
+// Runtime push of dashboard-relay WebSocket connectivity so the Sync tab pill
+// can show Connected without polling (_wsIsOpen in ui/options.js reads
+// dashboardState.wsConnected). Mirrors the _broadcastRemoteControlState
+// runtime push above: fire-and-forget, lastError swallowed -- no extension
+// page listening is benign and expected at SW cold start.
+function _broadcastDashboardWsStatus(connected) {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+      chrome.runtime.sendMessage({ action: 'dashboardWsStatusChanged', connected: !!connected }, function () {
+        var _ = chrome.runtime.lastError;
+      });
+    }
+  } catch (e) {
+    try { console.warn('[FSB SYNC] ws status push failed', e && e.message ? e.message : 'unknown'); } catch (_e) { /* ignore */ }
+  }
 }
 
 // =====================================================================
@@ -331,6 +720,56 @@ function _broadcastRemoteControlState(wsInstance, enabled, reason, tabId) {
 // ext:remote-control-state -- Phase 209 payload shape preserved).
 // Mirror of _broadcastRemoteControlState pattern. Fire-and-forget.
 // =====================================================================
+
+var _metricsBroadcastTimer = null;
+var _metricsStorageListenerInstalled = false;
+
+function _getCurrentWsInstance() {
+  return globalThis.__fsbWsInstance || null;
+}
+
+function _refreshAnalyticsThenBroadcast(reason) {
+  var wsInstance = _getCurrentWsInstance();
+  if (!wsInstance || typeof wsInstance.send !== 'function') return;
+
+  function emit() {
+    try { _broadcastMetrics(wsInstance, wsInstance.serverHashKey); } catch (_e) { /* defensive */ }
+  }
+
+  try {
+    if (typeof analytics !== 'undefined' && analytics && typeof analytics.loadStoredData === 'function') {
+      var result = analytics.loadStoredData();
+      if (result && typeof result.then === 'function') {
+        result.then(emit).catch(emit);
+        return;
+      }
+    }
+  } catch (_e) {
+    // Fall through to a best-effort emit with the in-memory analytics state.
+  }
+
+  emit();
+}
+
+function _scheduleMetricsBroadcast(reason) {
+  if (_metricsBroadcastTimer) clearTimeout(_metricsBroadcastTimer);
+  _metricsBroadcastTimer = setTimeout(function () {
+    _metricsBroadcastTimer = null;
+    _refreshAnalyticsThenBroadcast(reason || 'scheduled');
+  }, 250);
+}
+
+function _installMetricsStorageListener() {
+  if (_metricsStorageListenerInstalled) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.onChanged) return;
+  if (typeof chrome.storage.onChanged.addListener !== 'function') return;
+  _metricsStorageListenerInstalled = true;
+  chrome.storage.onChanged.addListener(function (changes, namespace) {
+    if (namespace !== 'local') return;
+    if (!changes || (!changes.fsbUsageData && !changes.fsbCurrentModel)) return;
+    _scheduleMetricsBroadcast('storage-change');
+  });
+}
 
 function _broadcastMetrics(wsInstance, serverHashKey) {
   if (!wsInstance || typeof wsInstance.send !== 'function') return;
@@ -355,6 +794,11 @@ function _broadcastMetrics(wsInstance, serverHashKey) {
   var totalRequests = typeof stats.totalRequests === 'number' ? stats.totalRequests : 0;
   var successfulRequests = typeof stats.successfulRequests === 'number' ? stats.successfulRequests : 0;
   var errorCount = Math.max(0, totalRequests - successfulRequests);
+  var totalCost = typeof stats.totalCost === 'number' ? stats.totalCost : 0;
+  var totalTokens = typeof stats.totalTokens === 'number' ? stats.totalTokens : 0;
+  var successRate = typeof stats.successRate === 'number'
+    ? stats.successRate
+    : (totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0);
 
   var pairedClient = '';
   if (typeof serverHashKey === 'string' && serverHashKey.length > 0) {
@@ -373,8 +817,16 @@ function _broadcastMetrics(wsInstance, serverHashKey) {
       errorCount: errorCount
     },
     cost: {
-      totalCost: typeof stats.totalCost === 'number' ? stats.totalCost : 0,
-      totalTokens: typeof stats.totalTokens === 'number' ? stats.totalTokens : 0
+      totalCost: totalCost,
+      totalTokens: totalTokens
+    },
+    usage: {
+      timeRange: '24h',
+      totalTokens: totalTokens,
+      totalCost: totalCost,
+      totalRequests: totalRequests,
+      successfulRequests: successfulRequests,
+      successRate: successRate
     }
   };
 
@@ -472,6 +924,7 @@ async function handleRemoteClick(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Click failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   // Decompose dashboard bitmask modifiers into boolean flags for cdpClickAt.
@@ -490,9 +943,29 @@ async function handleRemoteClick(payload) {
     }, tabId);
     if (!result || !result.success) {
       console.warn('[FSB RC] Click CDP dispatch failed:', result && result.error);
+      var clickReason = classifyFSBRemoteControlDispatchFailure(result && result.error);
+      _remoteControlActive = false;
+      _broadcastRemoteControlState(
+        globalThis.__fsbWsInstance,
+        false,
+        clickReason,
+        tabId,
+        clickReason === 'debugger-blocked' ? 'external-debugger' : undefined
+      );
+      recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-click', payload, result && result.error, clickReason, tabId);
     }
   } catch (err) {
     console.error('[FSB RC] Click error:', err && err.message ? err.message : err);
+    var clickErrReason = classifyFSBRemoteControlDispatchFailure(err);
+    _remoteControlActive = false;
+    _broadcastRemoteControlState(
+      globalThis.__fsbWsInstance,
+      false,
+      clickErrReason,
+      tabId,
+      clickErrReason === 'debugger-blocked' ? 'external-debugger' : undefined
+    );
+    recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-click', payload, err, clickErrReason, tabId);
   }
 }
 
@@ -508,6 +981,7 @@ async function handleRemoteKey(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Key failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   var mods = typeof payload.modifiers === 'number' ? payload.modifiers : 0;
@@ -521,6 +995,16 @@ async function handleRemoteKey(payload) {
       }, tabId);
       if (!insertResult || !insertResult.success) {
         console.warn('[FSB RC] InsertText CDP dispatch failed:', insertResult && insertResult.error);
+        var insertReason = classifyFSBRemoteControlDispatchFailure(insertResult && insertResult.error);
+        _remoteControlActive = false;
+        _broadcastRemoteControlState(
+          globalThis.__fsbWsInstance,
+          false,
+          insertReason,
+          tabId,
+          insertReason === 'debugger-blocked' ? 'external-debugger' : undefined
+        );
+        recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, insertResult && insertResult.error, insertReason, tabId);
       }
     } else if (payload.type === 'keyDown' || payload.type === 'keyUp') {
       // executeCDPToolDirect does not expose a keyDown/keyUp verb, so we
@@ -535,8 +1019,10 @@ async function handleRemoteKey(payload) {
           await chrome.debugger.attach({ tabId: tabId }, '1.3');
         } catch (attachErr) {
           if (attachErr && attachErr.message && attachErr.message.includes('Another debugger is already attached')) {
-            try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
-            await chrome.debugger.attach({ tabId: tabId }, '1.3');
+            _remoteControlActive = false;
+            _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'debugger-blocked', tabId, 'external-debugger');
+            recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, attachErr, 'debugger-blocked', tabId);
+            return;
           } else {
             throw attachErr;
           }
@@ -555,6 +1041,16 @@ async function handleRemoteKey(payload) {
         debuggerAttached = false;
       } catch (keyErr) {
         console.warn('[FSB RC] Key', payload.type, 'CDP dispatch failed:', keyErr && keyErr.message ? keyErr.message : keyErr);
+        var keyReason = classifyFSBRemoteControlDispatchFailure(keyErr);
+        _remoteControlActive = false;
+        _broadcastRemoteControlState(
+          globalThis.__fsbWsInstance,
+          false,
+          keyReason,
+          tabId,
+          keyReason === 'debugger-blocked' ? 'external-debugger' : undefined
+        );
+        recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-key', payload, keyErr, keyReason, tabId);
       } finally {
         if (debuggerAttached) {
           try { await chrome.debugger.detach({ tabId: tabId }); } catch (_e) { /* ignore */ }
@@ -580,6 +1076,7 @@ async function handleRemoteScroll(payload) {
   var tabId = _getRemoteControlTabId();
   if (!tabId) {
     console.warn('[FSB RC] Scroll failed: no active tab');
+    _broadcastRemoteControlState(globalThis.__fsbWsInstance, false, 'no-tab', null);
     return;
   }
   var deltaX = Number.isFinite(payload.deltaX) ? payload.deltaX : 0;
@@ -591,9 +1088,102 @@ async function handleRemoteScroll(payload) {
     }, tabId);
     if (!result || !result.success) {
       console.warn('[FSB RC] Scroll CDP dispatch failed:', result && result.error);
+      var scrollReason = classifyFSBRemoteControlDispatchFailure(result && result.error);
+      _remoteControlActive = false;
+      _broadcastRemoteControlState(
+        globalThis.__fsbWsInstance,
+        false,
+        scrollReason,
+        tabId,
+        scrollReason === 'debugger-blocked' ? 'external-debugger' : undefined
+      );
+      recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-scroll', payload, result && result.error, scrollReason, tabId);
     }
   } catch (err) {
     console.error('[FSB RC] Scroll error:', err && err.message ? err.message : err);
+    var scrollErrReason = classifyFSBRemoteControlDispatchFailure(err);
+    _remoteControlActive = false;
+    _broadcastRemoteControlState(
+      globalThis.__fsbWsInstance,
+      false,
+      scrollErrReason,
+      tabId,
+      scrollErrReason === 'debugger-blocked' ? 'external-debugger' : undefined
+    );
+    recordFSBRemoteControlFailure('remote-control-dispatch-failed', 'dash:remote-scroll', payload, err, scrollErrReason, tabId);
+  }
+}
+
+function handlePhantomRemoteControl(type, payload) {
+  var validated = validateFSBRemoteControlMessage(type, payload);
+  if (!validated.ok) {
+    console.warn('[FSB RC] Remote control rejected:', validated.error);
+    recordFSBRemoteControlFailure('remote-control-rejected', type, payload, validated.error, 'validation-failed', _getRemoteControlTabId());
+    return;
+  }
+
+  var action = validated.action || {};
+  var normalizedPayload = validated.payload || {};
+  var sourcePayload = payload && Object(payload) === payload && !Array.isArray(payload) ? payload : {};
+
+  recordFSBTransportEvent('remote-control-action', {
+    type: type,
+    action: summarizeFSBRemoteControlAction(type, payload),
+    tabId: _getRemoteControlTabId()
+  });
+
+  if (action.kind === 'request') {
+    handleRemoteControlStart();
+    return;
+  }
+  if (action.kind === 'stop') {
+    handleRemoteControlStop();
+    return;
+  }
+  if (action.kind === 'click') {
+    handleRemoteClick({
+      x: action.x,
+      y: action.y,
+      button: action.button || normalizedPayload.button || sourcePayload.button || 'left',
+      clickCount: action.clickCount || normalizedPayload.clickCount || sourcePayload.clickCount || 1,
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'text') {
+    handleRemoteKey({
+      type: 'insertText',
+      key: action.text,
+      text: action.text,
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'key') {
+    handleRemoteKey({
+      type: action.event === 'up' ? 'keyUp' : 'keyDown',
+      key: action.key,
+      code: typeof normalizedPayload.code === 'string' ? normalizedPayload.code : (sourcePayload.code || ''),
+      text: action.event === 'down'
+        ? (typeof normalizedPayload.text === 'string' ? normalizedPayload.text : (sourcePayload.text || ''))
+        : '',
+      modifiers: typeof normalizedPayload.modifiers === 'number'
+        ? normalizedPayload.modifiers
+        : (typeof sourcePayload.modifiers === 'number' ? sourcePayload.modifiers : 0)
+    });
+    return;
+  }
+  if (action.kind === 'scroll') {
+    handleRemoteScroll({
+      x: action.x,
+      y: action.y,
+      deltaX: action.deltaX,
+      deltaY: action.deltaY
+    });
   }
 }
 
@@ -797,55 +1387,31 @@ class FSBWebSocket {
       recordFSBTransportReconnect('ws-open', {
         readyState: this.ws ? this.ws.readyState : null
       });
+      _installMetricsStorageListener();
       this._sendStateSnapshot('connect');
       // Phase 223 MET-01: push metrics on connect (not polling).
       try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
       this._updateBadge(true);
+      _broadcastDashboardWsStatus(true);
       console.log('[FSB WS] Connected');
     };
 
     this.ws.onmessage = (event) => {
-      try {
-        var raw = JSON.parse(event.data);
-        // Self-identifying _lz envelope: { _lz: true, d: <base64> }.
-        // Mirrors showcase/js/dashboard.js:3517-3528. Stateless per-frame.
-        // Do NOT introduce permessage-deflate or alternative deflate libraries
-        // (PITFALLS.md P9 -- sliding-window corruption on bad frame requires
-        // reconnect to recover).
-        if (raw && raw._lz === true && typeof raw.d === 'string') {
-          if (typeof LZString === 'undefined') {
-            recordFSBTransportFailure('decompress-unavailable', {
-              target: 'inbound',
-              type: '_lz',
-              tabId: getCurrentTransportTabId(),
-              error: 'LZString not loaded (importScripts may have failed at background.js:37)',
-              len: raw.d.length
-            });
-            return;
-          }
-          var decoded = LZString.decompressFromBase64(raw.d);
-          if (!decoded) {
-            recordFSBTransportFailure('decompress-failed', {
-              target: 'inbound',
-              type: '_lz',
-              tabId: getCurrentTransportTabId(),
-              error: 'LZString.decompressFromBase64 returned null/empty',
-              len: raw.d.length
-            });
-            return;
-          }
-          raw = JSON.parse(decoded);
-        }
-        this._handleMessage(raw);
-      } catch (err) {
-        console.warn('[FSB WS] Failed to parse message:', err && err.message ? err.message : err);
+      var decoded = decodeFSBWebSocketEnvelope(event.data);
+      if (!decoded || decoded.ok !== true) {
+        var decodeError = decoded && decoded.error ? decoded.error : 'envelope-decode-failed';
+        recordFSBEnvelopeDecodeFailure(decodeError, event.data);
+        console.warn('[FSB WS] Failed to parse message:', describeFSBEnvelopeDecodeError(decodeError));
+        return;
       }
+      this._handleMessage(decoded.msg);
     };
 
     this.ws.onclose = (event) => {
       this.connected = false;
       this._stopKeepalive();
       this._updateBadge(false);
+      _broadcastDashboardWsStatus(false);
       recordFSBTransportReconnect('ws-close', {
         readyState: this.ws ? this.ws.readyState : null,
         closeCode: event && typeof event.code === 'number' ? event.code : null,
@@ -899,27 +1465,19 @@ class FSBWebSocket {
     }
 
     // _lz envelope contract (round-trip):
-    //   Outbound: { _lz: true, d: LZString.compressToBase64(JSON.stringify({type, payload, ts})) }
-    //             emitted when raw > 1024 bytes AND compressed.length < raw.length.
-    //   Inbound:  symmetric branch in onmessage at lines 515-522 above. Self-identifying.
+    //   Outbound uses PhantomStream encodeEnvelope({type, payload, ts}, LZString, 1024)
+    //             and only sends the encoded envelope when the full wire string is smaller.
+    //   Inbound uses PhantomStream decodeEnvelope(wire, LZString). Self-identifying.
     //   Stateless per-frame. Do NOT replace LZString with stateful deflate compression
     //   -- per-connection stateful compression (RFC 7692 permessage-deflate) corrupts the
     //   sliding window on any bad frame and forces a full WebSocket reconnect to recover
     //   (PITFALLS.md P9).
     try {
-      var raw = JSON.stringify({ type, payload, ts: Date.now() });
-      // Compress payloads larger than 1KB to avoid relay message size limits
-      if (raw.length > 1024 && typeof LZString !== 'undefined') {
-        var compressed = LZString.compressToBase64(raw);
-        // Only use compression if it actually reduces size
-        if (compressed.length < raw.length) {
-          console.log('[FSB WS] Compressed ' + type + ': ' + raw.length + ' -> ' + compressed.length + ' bytes (' + Math.round(compressed.length / raw.length * 100) + '%)');
-          this.ws.send(JSON.stringify({ _lz: true, d: compressed }));
-          recordFSBTransportCount('sentByType', type);
-          return true;
-        }
+      var encoded = encodeFSBWebSocketEnvelope({ type, payload, ts: Date.now() });
+      if (encoded.compressed) {
+        console.log('[FSB WS] Compressed ' + type + ': ' + encoded.rawLength + ' -> ' + encoded.encodedLength + ' bytes (' + Math.round(encoded.encodedLength / encoded.rawLength * 100) + '%)');
       }
-      this.ws.send(raw);
+      this.ws.send(encoded.wire);
       recordFSBTransportCount('sentByType', type);
       return true;
     } catch (err) {
@@ -1186,6 +1744,7 @@ class FSBWebSocket {
   _emitStreamState(status, reason, details) {
     var payload = details || {};
     var source = payload.source || 'ws-client';
+    var streamTypes = getFSBStreamTypes();
 
     // Phase 212 / STREAM-06: enrich restricted-tab states with pageType so the
     // dashboard can render a friendly placeholder ("New Tab", "Chrome Settings",
@@ -1209,7 +1768,7 @@ class FSBWebSocket {
       _rememberStreamState(status, reason, payload.tabId, payload.url || '', source);
     }
 
-    this.send('ext:stream-state', {
+    this.send(streamTypes.STATE, {
       status: status,
       reason: reason || '',
       streamIntentActive: (typeof _streamingActive !== 'undefined') && !!_streamingActive,
@@ -1302,7 +1861,10 @@ class FSBWebSocket {
    * @param {Object} msg - Parsed message { type, payload, ts }
    */
   _handleMessage(msg) {
+    if (!msg || typeof msg !== 'object') { return; }
     recordFSBTransportCount('receivedByType', msg && msg.type);
+    var controlTypes = getFSBControlTypes();
+    var remoteControlTypes = getFSBRemoteControlTypes();
 
     switch (msg.type) {
       case 'pong':
@@ -1316,39 +1878,58 @@ class FSBWebSocket {
         break;
       case 'dash:request-status':
         this._sendStateSnapshot('dash:request-status');
+        try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
         break;
       // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
       // case 'dash:agent-run-now':
       //   this._handleAgentRunNow(msg.payload);
       //   break;
-      case 'dash:dom-stream-start':
+      case controlTypes.START:
         if (typeof _streamingActive !== 'undefined') _streamingActive = true;
         this._handleDashboardStreamStart(msg.payload);
         break;
-      case 'dash:dom-stream-stop':
+      case controlTypes.STOP:
         if (typeof _streamingActive !== 'undefined') _streamingActive = false;
         this._forwardToContentScript('domStreamStop', msg.payload);
         break;
-      case 'dash:dom-stream-pause':
+      case controlTypes.PAUSE:
         this._forwardToContentScript('domStreamPause', msg.payload);
         break;
-      case 'dash:dom-stream-resume':
+      case controlTypes.RESUME:
         this._forwardToContentScript('domStreamResume', msg.payload);
         break;
+      case remoteControlTypes.REQUEST:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.STOP:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.CLICK:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.TEXT:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.KEY:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
+      case remoteControlTypes.SCROLL:
+        handlePhantomRemoteControl(msg.type, msg.payload);
+        break;
       case 'dash:remote-control-start':
-        handleRemoteControlStart();
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-control-stop':
-        handleRemoteControlStop();
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-click':
-        handleRemoteClick(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-key':
-        handleRemoteKey(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:remote-scroll':
-        handleRemoteScroll(msg.payload);
+        handlePhantomRemoteControl(msg.type, msg.payload);
         break;
       case 'dash:navigate':
         handleRemoteNavigate(msg.payload);
@@ -1460,12 +2041,39 @@ class FSBWebSocket {
         return;
       }
       _dashboardTaskTabId = tabId;
-      chrome.runtime.sendMessage({
-        action: 'startAutomation',
-        task: task,
-        tabId: tabId,
-        source: 'dashboard'
-      });
+      // chrome.runtime.sendMessage() does NOT loop back to onMessage listeners
+      // in this same service-worker context (background.js importScripts this
+      // file), so call the background handler directly -- same pattern as
+      // _handleStopTask() below.
+      handleStartAutomation(
+        {
+          action: 'startAutomation',
+          task: task,
+          tabId: tabId,
+          source: 'dashboard'
+        },
+        { id: chrome.runtime.id },
+        (result) => {
+          if (result && result.success) {
+            console.log('[FSB WS] Dashboard task started, session:', result.sessionId);
+            return;
+          }
+          // Start failed before a session existed -- background.js will never
+          // send a completion for it, so report failure here to unblock the
+          // dashboard. Success completions are sent by background.js when the
+          // task actually finishes.
+          this.send('ext:task-complete', {
+            success: false,
+            error: (result && result.error) || 'Failed to start automation',
+            elapsed: 0,
+            taskRunId: '',
+            taskStatus: 'failed',
+            taskSource: 'live',
+            updatedAt: Date.now(),
+            lastAction: ''
+          });
+        }
+      );
     } catch (err) {
       this.send('ext:task-complete', {
         success: false,

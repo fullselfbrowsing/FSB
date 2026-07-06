@@ -1,0 +1,37 @@
+{
+  "slug": "netlify.unlock_deploy",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "unlock a deploy in netlify",
+    "unlock deploy in netlify",
+    "unlock a deploy to re-enable auto-publish in netlify"
+  ],
+  "description": "Unlock a previously locked deploy, re-enabling auto-publishing. New deploys will be published automatically again.",
+  "actionVerb": "unlock",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deploy_id": {
+        "type": "string",
+        "description": "The deploy ID to unlock"
+      }
+    },
+    "required": [
+      "deploy_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/unlock-deploy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unlock"
+    }
+  }
+}

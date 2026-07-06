@@ -1,0 +1,42 @@
+{
+  "slug": "azure.list_policy_assignments",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list policy assignments in azure",
+    "show me my policy assignments in azure",
+    "view my policy assignments in azure",
+    "see all my policy assignments in azure"
+  ],
+  "description": "List all Azure Policy assignments for a subscription. Shows which policies are applied, their enforcement mode, and scope.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "filter": {
+        "description": "OData filter expression",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-policy-assignments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

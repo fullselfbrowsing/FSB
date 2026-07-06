@@ -1,0 +1,42 @@
+{
+  "slug": "meticulous.compare_replays",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "compare replays in meticulous",
+    "compare replays in a test run in meticulous",
+    "compare a head replay against its base replay within a test run in meticulous"
+  ],
+  "description": "Compare a head replay against its base replay within a test run. Returns screenshot diffs with base/head/diff image URLs, divergences, and replay metadata. Use the base_replay_id from get_test_run_diffs results.",
+  "actionVerb": "compare",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "base_replay_id": {
+        "type": "string",
+        "description": "Base replay ID (from get_test_run_diffs base_replay.id)"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "base_replay_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/compare-replays.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "compare"
+    }
+  }
+}

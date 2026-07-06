@@ -1,0 +1,45 @@
+{
+  "slug": "powerpoint.copy_item",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "copy an item in powerpoint",
+    "copy item in powerpoint",
+    "copy a file to a new location in powerpoint"
+  ],
+  "description": "Create a copy of a file in OneDrive. Optionally specify a new name and destination folder. The copy operation runs asynchronously.",
+  "actionVerb": "copy",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file to copy"
+      },
+      "name": {
+        "description": "Name for the copy (defaults to \"original name (copy)\")",
+        "type": "string"
+      },
+      "destination_folder_id": {
+        "description": "Destination folder item ID — defaults to same folder",
+        "type": "string"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/copy-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "copy"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "gdrive.delete_file",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "delete a file in gdrive",
+    "remove a file in gdrive",
+    "trash a file in gdrive",
+    "permanently delete a file in gdrive",
+    "delete file in gdrive",
+    "delete a file in google drive"
+  ],
+  "description": "Permanently delete a file or folder. This bypasses the trash — the file cannot be recovered. For a safer alternative, use trash_file to move it to trash first.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID to permanently delete"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/delete-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

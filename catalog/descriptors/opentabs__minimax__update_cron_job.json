@@ -1,0 +1,58 @@
+{
+  "slug": "minimax.update_cron_job",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "update a cron job in minimax",
+    "edit a cron job in minimax",
+    "change the details of cron job in minimax",
+    "modify a cron job in minimax",
+    "update cron job in minimax",
+    "update a scheduled job in minimax"
+  ],
+  "description": "Update an existing scheduled (cron) job. Only provided fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Cron job ID to update"
+      },
+      "name": {
+        "description": "New name for the job",
+        "type": "string"
+      },
+      "prompt": {
+        "description": "New prompt to execute",
+        "type": "string"
+      },
+      "cron_expression": {
+        "description": "New cron expression e.g. \"0 9 * * *\"",
+        "type": "string"
+      },
+      "status": {
+        "description": "Job status (0=paused, 1=active)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/update-cron-job.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -15,18 +15,58 @@ const ANGULAR_ROOT = resolve(__dirname, '..');
 const REPO_ROOT = resolve(ANGULAR_ROOT, '..', '..');
 const PUBLIC_DIR = join(ANGULAR_ROOT, 'public');
 const SCRIPTS_DIR = __dirname;
+const SERVER_ROUTES_PATH = join(ANGULAR_ROOT, 'src', 'app', 'app.routes.server.ts');
 
 const HOST = 'https://full-selfbrowsing.com';
 // PRE-03 locked, /dashboard excluded. changefreq/priority hint relative importance
 // to crawlers; lastmod is regenerated per build (see generateSitemap).
 const ROUTES = [
-  { path: '/',        changefreq: 'weekly',  priority: '1.0' },
-  { path: '/about',   changefreq: 'weekly',  priority: '0.9' },
-  { path: '/agents',  changefreq: 'weekly',  priority: '0.9' },
-  { path: '/support', changefreq: 'monthly', priority: '0.7' },
-  { path: '/privacy', changefreq: 'yearly',  priority: '0.5' },
+  { path: '/',               changefreq: 'weekly',  priority: '1.0' },
+  { path: '/about',          changefreq: 'weekly',  priority: '0.9' },
+  { path: '/agents',         changefreq: 'weekly',  priority: '0.9' },
+  { path: '/support',        changefreq: 'monthly', priority: '0.7' },
+  { path: '/privacy',        changefreq: 'yearly',  priority: '0.5' },
+  { path: '/lattice',        changefreq: 'weekly',  priority: '0.8' },
+  { path: '/phantom-stream', changefreq: 'weekly',  priority: '0.8' },
+  { path: '/prometheus',     changefreq: 'weekly',  priority: '0.8' },
+  { path: '/sitemaps',       changefreq: 'monthly', priority: '0.6' },
 ];
 const MAX_LLMS_FULL_BYTES = 256000;
+
+function normalizeRoutePath(path) {
+  if (!path || path === '/') return '/';
+  return '/' + String(path).replace(/^\/+/, '');
+}
+
+function loadPrerenderRoutePaths() {
+  const source = readFileSync(SERVER_ROUTES_PATH, 'utf8');
+  const routes = [];
+  const routeRe = /\{\s*path:\s*'([^']*)'[\s\S]*?renderMode:\s*RenderMode\.Prerender[\s\S]*?\}/g;
+  let match;
+  while ((match = routeRe.exec(source)) !== null) {
+    const raw = match[1];
+    if (!raw.includes('*') && !raw.includes(':')) {
+      routes.push(normalizeRoutePath(raw));
+    }
+  }
+  return [...new Set(routes)].sort((a, b) => a.localeCompare(b));
+}
+
+function assertSitemapRoutesMatchPrerenderRoutes() {
+  const sitemapRoutes = [...new Set(ROUTES.map((route) => normalizeRoutePath(route.path)))]
+    .sort((a, b) => a.localeCompare(b));
+  const prerenderRoutes = loadPrerenderRoutePaths();
+
+  const missing = prerenderRoutes.filter((route) => !sitemapRoutes.includes(route));
+  const extra = sitemapRoutes.filter((route) => !prerenderRoutes.includes(route));
+  if (missing.length > 0 || extra.length > 0) {
+    const details = [];
+    if (missing.length > 0) details.push(`missing from sitemap ROUTES: ${missing.join(', ')}`);
+    if (extra.length > 0) details.push(`not prerendered in serverRoutes: ${extra.join(', ')}`);
+    throw new Error(`sitemap route drift (${details.join('; ')})`);
+  }
+  console.log(`[build-crawler-files] sitemap route drift check passed (${sitemapRoutes.length} routes)`);
+}
 
 function todayIsoDate() {
   // Build-date lastmod per D-07: ISO 8601 short form YYYY-MM-DD, UTC.
@@ -100,6 +140,7 @@ function writeVersion() {
 }
 
 async function main() {
+  assertSitemapRoutesMatchPrerenderRoutes();
   generateSitemap();
   copyLlmsFull();
   writeVersion();

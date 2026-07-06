@@ -1,0 +1,42 @@
+{
+  "slug": "todoist.rename_shared_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "rename a shared label in todoist",
+    "rename shared label in todoist",
+    "rename a shared label across all projects that use it in todoist"
+  ],
+  "description": "Rename a shared label across all projects that use it.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Current name of the shared label"
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New name for the shared label"
+      }
+    },
+    "required": [
+      "name",
+      "new_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/rename-shared-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "rename"
+    }
+  }
+}

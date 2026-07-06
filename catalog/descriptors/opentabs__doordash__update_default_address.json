@@ -1,0 +1,40 @@
+{
+  "slug": "doordash.update_default_address",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "update a default address in doordash",
+    "edit a default address in doordash",
+    "change the details of default address in doordash",
+    "modify a default address in doordash",
+    "update default address in doordash",
+    "set your default delivery address in doordash"
+  ],
+  "description": "Set a saved address as the default delivery address on DoorDash. Use list_addresses to find available address IDs.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address_id": {
+        "type": "string",
+        "description": "Address record ID to set as default (the \"id\" field from list_addresses)"
+      }
+    },
+    "required": [
+      "address_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/update-default-address.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "slug": "gdocs.list_comments",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "list comments in gdocs",
+    "show me my comments in gdocs",
+    "view my comments in gdocs",
+    "see all my comments in gdocs",
+    "list comments in google docs",
+    "list comments on a document in gdocs"
+  ],
+  "description": "List comment threads on a Google Doc, including replies, resolution status, and the quoted document text each comment is anchored to. Returns comments ordered by creation time. By default, only open (unresolved) comments are returned — use the status parameter to include resolved or all comments. Orphaned comments (anchored to text that was deleted from the document) are excluded by default.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by comment status: \"open\" (default) returns only unresolved comments that need attention, \"resolved\" returns only resolved/closed comments, \"all\" returns both",
+        "type": "string",
+        "enum": [
+          "open",
+          "resolved",
+          "all"
+        ]
+      },
+      "include_orphaned": {
+        "description": "Include orphaned comments whose anchored text no longer exists in the document (default false). Orphaned comments are typically left over from previous revisions of the document and are hidden by the Google Docs UI.",
+        "type": "boolean"
+      },
+      "page_size": {
+        "description": "Maximum number of comments to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_token": {
+        "description": "Page token from a previous list_comments call",
+        "type": "string"
+      },
+      "include_deleted": {
+        "description": "Include deleted comments (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/list-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

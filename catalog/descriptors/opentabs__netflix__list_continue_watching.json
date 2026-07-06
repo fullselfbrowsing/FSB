@@ -1,0 +1,39 @@
+{
+  "slug": "netflix.list_continue_watching",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "list a continue watching in netflix",
+    "show me my continue watching in netflix",
+    "view my continue watching in netflix",
+    "see all my continue watching in netflix",
+    "list continue watching in netflix",
+    "get in-progress titles in netflix"
+  ],
+  "description": "Get titles the user has started but not finished watching. Returns movies and shows with their bookmark positions. Useful for resuming playback or seeing what the user was recently watching.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Max results to return (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/list-continue-watching.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

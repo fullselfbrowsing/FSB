@@ -1,0 +1,37 @@
+{
+  "slug": "bsky.mute_conversation",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "mute a conversation in bsky",
+    "mute conversation in bsky",
+    "mute a conversation in bluesky"
+  ],
+  "description": "Mute a conversation to stop receiving notifications from it.",
+  "actionVerb": "mute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "convo_id": {
+        "type": "string",
+        "description": "Conversation ID"
+      }
+    },
+    "required": [
+      "convo_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/mute-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "mute"
+    }
+  }
+}

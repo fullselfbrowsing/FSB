@@ -1,0 +1,30 @@
+{
+  "slug": "cloudflare.list_alerting_policies",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list alerting policies in cloudflare",
+    "show me my alerting policies in cloudflare",
+    "view my alerting policies in cloudflare",
+    "see all my alerting policies in cloudflare"
+  ],
+  "description": "List notification/alerting policies for the account. Policies define triggers (DDoS attacks, certificate expiry, origin health, etc.) and notification destinations (email, webhook, PagerDuty).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-alerting-policies.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

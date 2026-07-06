@@ -1,0 +1,51 @@
+{
+  "slug": "x.create_list",
+  "service": "x.com",
+  "intentSynonyms": [
+    "create a list in x",
+    "add a list in x",
+    "make a new list in x",
+    "open a new list in x",
+    "create list in x",
+    "create a new list in x"
+  ],
+  "description": "Create a new list.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 25,
+        "description": "List name (max 25 characters)"
+      },
+      "description": {
+        "description": "List description (max 100 characters)",
+        "type": "string",
+        "maxLength": 100
+      },
+      "is_private": {
+        "description": "Whether the list is private (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/create-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

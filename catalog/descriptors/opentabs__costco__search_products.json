@@ -1,0 +1,36 @@
+{
+  "slug": "costco.search_products",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "search products in costco",
+    "extract and enrich products from the current search page in costco",
+    "search for products on costco by reading the current search results page and enriching with full product details from the api in costco"
+  ],
+  "description": "Search for products on Costco by reading the current search results page and enriching with full product details from the API. The browser must already be on a Costco search results page — call navigate_to_search first to navigate to the search page, wait for it to load, then call this tool to extract and enrich the results.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "max_results": {
+        "description": "Maximum number of results to return (default 10, max 24)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 24
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

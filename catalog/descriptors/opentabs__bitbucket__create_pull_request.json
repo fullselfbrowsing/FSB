@@ -1,0 +1,74 @@
+{
+  "slug": "bitbucket.create_pull_request",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "create a pull request in bitbucket",
+    "add a pull request in bitbucket",
+    "make a new pull request in bitbucket",
+    "open a new pull request in bitbucket",
+    "create pull request in bitbucket",
+    "create a new pull request in bitbucket"
+  ],
+  "description": "Create a new pull request in a Bitbucket repository.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "title": {
+        "type": "string",
+        "description": "Pull request title"
+      },
+      "source_branch": {
+        "type": "string",
+        "description": "Source branch name"
+      },
+      "destination_branch": {
+        "description": "Destination branch name (defaults to the repository default branch)",
+        "type": "string"
+      },
+      "description": {
+        "description": "Pull request description in Markdown",
+        "type": "string"
+      },
+      "close_source_branch": {
+        "description": "Whether to delete the source branch after merge",
+        "type": "boolean"
+      },
+      "reviewers": {
+        "description": "Array of reviewer UUIDs to request reviews from",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug",
+      "title",
+      "source_branch"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/create-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

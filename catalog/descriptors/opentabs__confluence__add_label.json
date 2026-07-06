@@ -1,0 +1,44 @@
+{
+  "slug": "confluence.add_label",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "add a label in confluence",
+    "add label in confluence",
+    "add a label to a page in confluence"
+  ],
+  "description": "Add a label to a Confluence page",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to add the label to"
+      },
+      "label": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Label name to add (e.g., \"meeting-notes\")"
+      }
+    },
+    "required": [
+      "page_id",
+      "label"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/add-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

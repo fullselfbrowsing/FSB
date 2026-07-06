@@ -1,4 +1,4 @@
-// Modern Chat Interface Script for FSB v0.9.50
+// Modern Chat Interface Script for FSB v0.9.90
 
 // Phase 243 plan 03 (UI-02): the popup's surface id (matches the legacy:popup
 // agent synthesized by ensureLegacyPopupAgent below). When the active tab is
@@ -72,10 +72,22 @@ const chatMessages = document.getElementById('chatMessages');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
 
-// Apply theme based on settings
+// Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
+// (set by the options page's Advanced Settings); 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  return preference;
+}
+
 function applyTheme() {
-  const savedTheme = localStorage.getItem('fsb-theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
+  }
+  document.documentElement.setAttribute('data-theme', resolveEffectiveTheme(preference));
 }
 
 // Listen for theme changes from options page
@@ -84,6 +96,11 @@ window.addEventListener('storage', (e) => {
     applyTheme();
   }
 });
+
+// Live-follow OS theme changes while the preference is 'system'
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+}
 
 // Initialize analytics for popup context
 let popupAnalytics = null;
@@ -204,23 +221,43 @@ async function refreshOwnerChip() {
       return;
     }
 
-    const formatter = (typeof FsbAgentRegistry !== 'undefined'
-      && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
-      ? FsbAgentRegistry.formatAgentIdForDisplay
-      : null;
-    // Quick task 260524-7n9: prefer the canonical MCP client name (Claude,
-    // Codex, Cursor, ...) from the dispatcher-written labels map; fall back
-    // to the legacy 'agent_<hex>' formatter when no label has been observed
-    // yet for this owner (very first agent:register before any action tool
-    // dispatch fires). The clientLabelFor existence check is a
-    // forward-compatibility guard in case the helper has not been re-loaded
-    // after a hot extension reload.
-    const clientLabel = (typeof FSBOwnerChip.clientLabelFor === 'function')
-      ? FSBOwnerChip.clientLabelFor(ownerAgentId, labelsMap)
-      : null;
-    const fallbackLabel = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
-    const displayLabel = clientLabel || fallbackLabel;
-    chipEl.textContent = FSBOwnerChip.buildChipText(displayLabel);
+    // Merged client-label resolution (Phase 11 FINT-19 three-tier + Quick task
+    // 260524-7n9 canonical MCP client name). In priority order:
+    // Tier 1: legacy:* literal (e.g., legacy:sidepanel, legacy:autopilot).
+    // Tier 2: canonical MCP client name (Claude, Codex, Cursor, ...) from the
+    //         dispatcher-written fsbAgentClientLabels map, keyed by ownerAgentId.
+    // Tier 3: friendly client name from the visual-session lifecycle entry
+    //         (Phase 10 D-01 allowlist; e.g., OpenClaw, Claude, FSB Autopilot).
+    // Tier 4: formatAgentIdForDisplay short-prefix fallback for raw-FSB-tool
+    //         agents that never tick the visual-session pipeline.
+    // The clientLabelFor existence check is a forward-compatibility guard in case
+    // the helper has not been re-loaded after a hot extension reload.
+    let label;
+    if (ownerAgentId.indexOf('legacy:') === 0) {
+      label = ownerAgentId;
+    } else {
+      const clientLabel = (typeof FSBOwnerChip.clientLabelFor === 'function')
+        ? FSBOwnerChip.clientLabelFor(ownerAgentId, labelsMap)
+        : null;
+      if (clientLabel) {
+        label = clientLabel;
+      } else {
+        const friendly = await FSBOwnerChip.lookupClientLabel(
+          tab.id,
+          (key) => chrome.storage.session.get(key)
+        );
+        if (friendly) {
+          label = friendly;
+        } else {
+          const formatter = (typeof FsbAgentRegistry !== 'undefined'
+            && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
+            ? FsbAgentRegistry.formatAgentIdForDisplay
+            : null;
+          label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+        }
+      }
+    }
+    chipEl.textContent = FSBOwnerChip.buildChipText(label);
     chipEl.style.display = 'inline-flex';
     // Quick task 260524-7n9: chip is visible -- lock the chat input + send
     // button so the user cannot type into / submit on a tab being actively
@@ -231,7 +268,7 @@ async function refreshOwnerChip() {
     // `.disabled` property does NOT block typing on contenteditable elements.
     _chatLockedByOwnerChip = true;
     chatInput.setAttribute('contenteditable', 'false');
-    chatInput.title = 'Disabled while tab is owned by ' + displayLabel;
+    chatInput.title = 'Disabled while tab is owned by ' + label;
     updateSendButtonState();
   } catch (_e) {
     // Chip is best-effort -- never poison popup boot.
@@ -733,7 +770,7 @@ function updateStatusMessage(text, progressData) {
       if (container && fill && label) {
         container.classList.remove('hidden');
         fill.style.width = (progressData.progressPercent || 0) + '%';
-        label.textContent = `Step ${progressData.iteration}/${progressData.maxIterations || 20}`;
+        label.textContent = `Step ${progressData.iteration}/${progressData.maxIterations || 100}`;
       }
     }
   }
@@ -1041,7 +1078,7 @@ chatInput.addEventListener('input', adjustInputHeight);
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => e.preventDefault());
 
-console.log('FSB v0.9.50 chat interface loaded');
+console.log(`FSB v${chrome.runtime.getManifest().version} chat interface loaded`);
 
 // ==========================================
 // /agent Slash Command Handler

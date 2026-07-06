@@ -1,0 +1,39 @@
+{
+  "slug": "hack2hire.list_question_coding_problems",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "list question coding problems in hack2hire",
+    "show me my question coding problems in hack2hire",
+    "view my question coding problems in hack2hire",
+    "see all my question coding problems in hack2hire",
+    "list coding problems for a post in hack2hire"
+  ],
+  "description": "List the coding problems associated with a post. Each post can have one or more coding problems — for example a multi-part interview question. Returns each coding problem ID and its type (SINGLE_STEP or MULTI_STEP). Use the returned IDs with `list_question_comments` to read comments anchored to the coding problem itself.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "postId": {
+        "type": "string",
+        "description": "Post ID — get this from list_questions or get_question."
+      }
+    },
+    "required": [
+      "postId"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/list-question-coding-problems.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

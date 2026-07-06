@@ -1,0 +1,59 @@
+{
+  "slug": "dockerhub.list_repositories",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "list repositories in dockerhub",
+    "show me my repositories in dockerhub",
+    "view my repositories in dockerhub",
+    "see all my repositories in dockerhub",
+    "list repositories in docker hub",
+    "list repositories in a namespace in dockerhub"
+  ],
+  "description": "List Docker Hub repositories in a namespace (user or organization). Defaults to the current user. Supports filtering by name and sorting.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Namespace (user or org). Defaults to the authenticated user.",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "ordering": {
+        "description": "Sort order (default: last_updated descending)",
+        "type": "string",
+        "enum": [
+          "name",
+          "-name",
+          "last_updated",
+          "-last_updated"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/list-repositories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

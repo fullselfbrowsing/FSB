@@ -1,0 +1,40 @@
+{
+  "slug": "tiktok.get_user_profile",
+  "service": "tiktok.com",
+  "intentSynonyms": [
+    "get an user profile in tiktok",
+    "look up an user profile in tiktok",
+    "fetch a single user profile in tiktok",
+    "view one specific user profile in tiktok",
+    "get user profile in tiktok",
+    "get a user profile by username in tiktok"
+  ],
+  "description": "Get a TikTok user profile by their username. Returns profile details including bio, follower counts, video count, and verification status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "TikTok username without the @ prefix (e.g., \"charlidamelio\")"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tiktok/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

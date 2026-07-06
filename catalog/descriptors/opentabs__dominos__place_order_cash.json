@@ -1,0 +1,29 @@
+{
+  "slug": "dominos.place_order_cash",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "place an order cash in dominos",
+    "place order cash in dominos",
+    "place your order and pay cash at pickup in dominos"
+  ],
+  "description": "Place the current order with Cash payment (pay at pickup). This navigates to checkout, selects Cash, and submits the order. The AI should always confirm with the user before calling this tool.",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/place-order-cash.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "place"
+    }
+  }
+}

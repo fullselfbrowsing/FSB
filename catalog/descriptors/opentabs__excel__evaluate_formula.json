@@ -1,0 +1,43 @@
+{
+  "slug": "excel.evaluate_formula",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "evaluate a formula in excel",
+    "evaluate formula in excel",
+    "evaluate a formula in excel online",
+    "evaluate a formula and return the result in excel"
+  ],
+  "description": "Evaluate a formula expression without writing it to a cell. The formula is evaluated in the context of a specific worksheet. Returns the computed result. Useful for calculations, lookups, and data analysis without modifying the workbook.",
+  "actionVerb": "evaluate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name for formula context (e.g., \"Sheet1\")"
+      },
+      "formula": {
+        "type": "string",
+        "description": "Formula to evaluate (e.g., \"=SUM(A1:A10)\", \"=AVERAGE(B2:B100)\")"
+      }
+    },
+    "required": [
+      "worksheet",
+      "formula"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/evaluate-formula.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PATCH",
+      "opNameVerb": "evaluate"
+    }
+  }
+}

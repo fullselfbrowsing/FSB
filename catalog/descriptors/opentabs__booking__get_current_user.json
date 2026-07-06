@@ -1,0 +1,32 @@
+{
+  "slug": "booking.get_current_user",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "get a current user in booking",
+    "look up a current user in booking",
+    "fetch a single current user in booking",
+    "view one specific current user in booking",
+    "get current user in booking",
+    "get the logged-in user profile in booking"
+  ],
+  "description": "Get the authenticated Booking.com user profile including user ID, email, name, Genius loyalty status, and country.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

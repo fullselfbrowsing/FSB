@@ -1,6 +1,6 @@
 # FSB Chrome Extension
 
-`extension/` is the unpacked Chrome extension package for FSB v0.9.72. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
+`extension/` is the unpacked Chrome extension package for FSB v0.9.90. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
 
 ## Load Unpacked
 
@@ -20,10 +20,10 @@ After code changes, reload the extension from `chrome://extensions` and refresh 
 | `manifest.json` | MV3 manifest, permissions, entry points, and web-accessible resources. |
 | `background.js` | Service worker for sessions, model calls, MCP bridge handling, storage, and orchestration. |
 | `canvas-interceptor.js` | MAIN-world content script loaded at `document_start`. |
-| `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and DOM streaming. |
-| `ui/` | Side panel, control panel, unlock screens, and shared UI behavior. |
+| `content/` | DOM analysis, action execution, messaging, lifecycle, visual feedback, and PhantomStream-backed DOM streaming. |
+| `ui/` | Popup, side panel, control panel, unlock screens, and shared UI behavior. |
 | `ai/` | Provider integration, model discovery, tool registry, agent loop, transcripts, and state emitters. |
-| `ws/` | WebSocket bridge client and MCP tool dispatcher. |
+| `ws/` | WebSocket bridge client, PhantomStream protocol bridge, remote-control mapping, and MCP tool dispatcher. |
 | `lib/` | Vendored libraries plus memory and visualization subsystems. |
 | `site-guides/` | Domain and category-specific automation guidance. |
 | `config/` | Defaults, migration, and secure encrypted configuration. |
@@ -39,6 +39,22 @@ npm test
 ```
 
 `validate:extension` checks manifest sanity and JavaScript syntax across the extension tree. The Node test suite covers extension modules that can run outside Chrome, including analytics, costs, transcript storage, tool routing, MCP bridge contracts, and regression cases.
+
+## DOM Streaming Boundary
+
+FSB uses `@full-self-browsing/phantom-stream@0.2.1` for generic browser mirroring and reference-mode media mirroring. `content/dom-stream.js` is an FSB adapter around the bundled PhantomStream capture bridge; `ws/ws-client.js` uses the PhantomStream protocol bridge for stream/control envelopes while preserving FSB task/status traffic and remote-control ownership diagnostics. Progressive `<video>` and `<audio>` nodes can mirror through the media side channel; adaptive HLS/DASH discovery remains deferred because enabling it would require a new `webRequest` permission.
+
+## Trigger Watchers
+
+FSB can arm a reactive watch on one page element and report when a condition is met. MCP clients drive this through the `trigger`, `stop_trigger`, `get_trigger_status`, and `list_triggers` tools; the extension owns the watch lifecycle:
+
+- **`live-observe`** runs an in-page mutation observer in the content script and reports changes without reloading the tab.
+- **`refresh-poll`** reloads the owned tab in the background, reads the selector once the page is ready, and coalesces same-tab due watches into a single reload.
+- Watches persist in `chrome.storage` and re-arm after MV3 service-worker eviction; they clean up on TTL expiry, tab close, explicit stop, timeout, or owner release.
+- Conditions support `changed`, `threshold`, `delta_percent`, `equals`, `contains`, `regex`, and compound AND/OR, with hysteresis on numeric edges. A watch moves through the statuses `armed`, `needs_attention`, `blocked`, `fired`, `timed_out`, and `stopped`.
+- Concurrency is bounded by `fsbTriggerCap` in the control panel (default 8, range 1–64). Armed and attention states count toward the cap; terminal states do not.
+
+Triggers are local and notify-only: the browser and extension must stay open, and FSB sends no desktop/email/SMS push. See the [MCP server README](../mcp/README.md#trigger-watchers) for the full tool contract.
 
 ## Debugging
 

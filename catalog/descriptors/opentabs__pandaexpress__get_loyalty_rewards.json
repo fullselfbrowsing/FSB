@@ -1,0 +1,31 @@
+{
+  "slug": "pandaexpress.get_loyalty_rewards",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get loyalty rewards in pandaexpress",
+    "look up loyalty rewards in pandaexpress",
+    "fetch a single loyalty rewards in pandaexpress",
+    "view one specific loyalty rewards in pandaexpress",
+    "view available loyalty rewards in pandaexpress"
+  ],
+  "description": "Get available Panda Express loyalty rewards that can be redeemed with points. Reads from the local app state — requires the user to be logged in with an active rewards account.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-loyalty-rewards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

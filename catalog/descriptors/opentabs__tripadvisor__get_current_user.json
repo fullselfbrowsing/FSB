@@ -1,0 +1,32 @@
+{
+  "slug": "tripadvisor.get_current_user",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "get a current user in tripadvisor",
+    "look up a current user in tripadvisor",
+    "fetch a single current user in tripadvisor",
+    "view one specific current user in tripadvisor",
+    "get current user in tripadvisor",
+    "get your tripadvisor profile in tripadvisor"
+  ],
+  "description": "Get the authenticated TripAdvisor user profile including display name, avatar, and inbox status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

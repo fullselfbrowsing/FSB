@@ -1,0 +1,47 @@
+{
+  "slug": "gcloud.stop_instance",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "stop an instance in gcloud",
+    "stop instance in gcloud",
+    "stop an instance in google cloud",
+    "stop a running vm instance in gcloud"
+  ],
+  "description": "Stop a running Compute Engine VM instance. The instance must be in RUNNING state.",
+  "actionVerb": "stop",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone": {
+        "type": "string",
+        "description": "Zone (e.g., \"us-central1-a\")"
+      },
+      "instance_name": {
+        "type": "string",
+        "description": "Instance name"
+      },
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "zone",
+      "instance_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/stop-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "stop"
+    }
+  }
+}

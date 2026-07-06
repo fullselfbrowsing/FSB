@@ -1,0 +1,59 @@
+{
+  "slug": "excel.create_chart",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "create a chart in excel",
+    "add a chart in excel",
+    "make a new chart in excel",
+    "open a new chart in excel",
+    "create chart in excel",
+    "create a chart in excel online"
+  ],
+  "description": "Create a new chart in a worksheet from a data range. Supports chart types like ColumnClustered, Line, Pie, Bar, Area, and more. The source_data range should include headers.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name to create the chart in"
+      },
+      "type": {
+        "type": "string",
+        "description": "Chart type (e.g., \"ColumnClustered\", \"Line\", \"Pie\", \"Bar\", \"Area\", \"XYScatter\", \"Doughnut\")"
+      },
+      "source_data": {
+        "type": "string",
+        "description": "Source data range in A1 notation (e.g., \"A1:C10\")"
+      },
+      "series_by": {
+        "description": "How data series are organized (default \"Auto\")",
+        "type": "string",
+        "enum": [
+          "Auto",
+          "Columns",
+          "Rows"
+        ]
+      }
+    },
+    "required": [
+      "worksheet",
+      "type",
+      "source_data"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/create-chart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

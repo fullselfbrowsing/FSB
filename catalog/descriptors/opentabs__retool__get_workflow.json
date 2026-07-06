@@ -1,0 +1,44 @@
+{
+  "slug": "retool.get_workflow",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get a workflow in retool",
+    "look up a workflow in retool",
+    "fetch a single workflow in retool",
+    "view one specific workflow in retool",
+    "get workflow in retool",
+    "get workflow details by id in retool"
+  ],
+  "description": "Get the full definition of a Retool workflow including its blocks (steps), configuration, and trigger settings. Optionally specify a source control branch to view that version.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      },
+      "branch_name": {
+        "description": "Source control branch name (for versioned workflows)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-workflow.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "powerpoint.get_preview_url",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get a preview url in powerpoint",
+    "look up a preview url in powerpoint",
+    "fetch a single preview url in powerpoint",
+    "view one specific preview url in powerpoint",
+    "get preview url in powerpoint",
+    "get an embeddable preview url in powerpoint"
+  ],
+  "description": "Get an embeddable preview URL for a file. The URL can be used to embed a read-only preview of the presentation in an iframe.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-preview-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

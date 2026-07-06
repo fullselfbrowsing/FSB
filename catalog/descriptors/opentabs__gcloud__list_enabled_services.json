@@ -1,0 +1,47 @@
+{
+  "slug": "gcloud.list_enabled_services",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list enabled services in gcloud",
+    "show me my enabled services in gcloud",
+    "view my enabled services in gcloud",
+    "see all my enabled services in gcloud",
+    "list enabled services in google cloud",
+    "list enabled api services in gcloud"
+  ],
+  "description": "List GCP API services enabled in the project. Each service represents an API that has been activated.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max results per page (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-enabled-services.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

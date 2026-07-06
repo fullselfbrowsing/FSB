@@ -1,0 +1,41 @@
+{
+  "slug": "aws.get_function",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "get a function in aws",
+    "look up a function in aws",
+    "fetch a single function in aws",
+    "view one specific function in aws",
+    "get function in aws",
+    "get details of a specific lambda function in aws"
+  ],
+  "description": "Get detailed configuration of a specific Lambda function by name or ARN. Returns runtime, handler, memory, timeout, state, and description.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "function_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Function name or ARN"
+      }
+    },
+    "required": [
+      "function_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/get-function.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

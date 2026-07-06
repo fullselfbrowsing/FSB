@@ -1,0 +1,46 @@
+{
+  "slug": "whatsapp.list_messages",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "list messages in whatsapp",
+    "show me my messages in whatsapp",
+    "view my messages in whatsapp",
+    "see all my messages in whatsapp",
+    "list messages in a chat in whatsapp"
+  ],
+  "description": "List recent messages in a WhatsApp chat. Messages are returned in chronological order (oldest first). Loads earlier messages from the server if needed.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Chat ID to read messages from"
+      },
+      "limit": {
+        "description": "Maximum number of messages to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/list-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "meticulous.get_replay_screenshots",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get replay screenshots in meticulous",
+    "look up replay screenshots in meticulous",
+    "fetch a single replay screenshots in meticulous",
+    "view one specific replay screenshots in meticulous",
+    "get screenshots for a replay in meticulous"
+  ],
+  "description": "Get all screenshots captured during a specific replay.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "replay_id": {
+        "type": "string",
+        "description": "Replay ID"
+      }
+    },
+    "required": [
+      "replay_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-replay-screenshots.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

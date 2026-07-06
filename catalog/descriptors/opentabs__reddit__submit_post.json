@@ -1,0 +1,77 @@
+{
+  "slug": "reddit.submit_post",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "submit a post in reddit",
+    "submit post in reddit",
+    "submit a new post in reddit"
+  ],
+  "description": "Submit a new text or link post to a subreddit. Note: some subreddits may require captcha for new or low-karma accounts.",
+  "actionVerb": "submit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without r/ prefix"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Post title"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "self",
+          "link"
+        ],
+        "description": "\"self\" for a text post, \"link\" for a link post"
+      },
+      "text": {
+        "description": "Post body text for self/text posts (supports Reddit markdown)",
+        "type": "string"
+      },
+      "url": {
+        "description": "URL for link posts",
+        "type": "string"
+      },
+      "flair_id": {
+        "description": "Flair ID to apply to the post",
+        "type": "string"
+      },
+      "flair_text": {
+        "description": "Custom flair text",
+        "type": "string"
+      },
+      "nsfw": {
+        "description": "Mark as NSFW",
+        "type": "boolean"
+      },
+      "spoiler": {
+        "description": "Mark as spoiler",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "subreddit",
+      "title",
+      "kind"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/submit-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditpost",
+      "httpMethod": null,
+      "opNameVerb": "submit"
+    }
+  }
+}

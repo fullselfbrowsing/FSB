@@ -1,0 +1,31 @@
+{
+  "slug": "retool.list_playground_queries",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list playground queries in retool",
+    "show me my playground queries in retool",
+    "view my playground queries in retool",
+    "see all my playground queries in retool",
+    "list saved playground queries in retool"
+  ],
+  "description": "List all saved playground queries for the current user and the organization. The playground allows running ad-hoc queries against connected resources.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-playground-queries.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

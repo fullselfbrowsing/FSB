@@ -1,0 +1,40 @@
+{
+  "slug": "chatgpt.delete_conversation",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "delete a conversation in chatgpt",
+    "remove a conversation in chatgpt",
+    "trash a conversation in chatgpt",
+    "permanently delete a conversation in chatgpt",
+    "delete conversation in chatgpt",
+    "delete a conversation permanently in chatgpt"
+  ],
+  "description": "Permanently delete a ChatGPT conversation. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "description": "Conversation ID (UUID)"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/delete-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "delete"
+    }
+  }
+}

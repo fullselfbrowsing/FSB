@@ -1,0 +1,45 @@
+{
+  "slug": "dockerhub.get_repository",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "get a repository in dockerhub",
+    "look up a repository in dockerhub",
+    "fetch a single repository in dockerhub",
+    "view one specific repository in dockerhub",
+    "get repository in dockerhub",
+    "get detailed repository information in dockerhub"
+  ],
+  "description": "Get detailed information about a Docker Hub repository including description, pull count, star count, permissions, categories, and full README.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Namespace (user or organization, e.g., \"library\" for official images)"
+      },
+      "repository": {
+        "type": "string",
+        "description": "Repository name (e.g., \"nginx\")"
+      }
+    },
+    "required": [
+      "namespace",
+      "repository"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/get-repository.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

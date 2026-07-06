@@ -1,0 +1,51 @@
+{
+  "slug": "eventbrite.register_for_event",
+  "service": "www.eventbrite.com",
+  "intentSynonyms": [
+    "register a for event in eventbrite",
+    "register for event in eventbrite",
+    "register for an event on eventbrite in eventbrite"
+  ],
+  "description": "Register for an Eventbrite event by selecting a ticket type and quantity. For paid events this charges your saved payment method and issues the tickets -- a money-movement action.",
+  "actionVerb": "register",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The event to register for"
+      },
+      "ticket_type_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The ticket type to purchase"
+      },
+      "quantity": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Number of tickets to register"
+      }
+    },
+    "required": [
+      "event_id",
+      "ticket_type_id",
+      "quantity"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/eventbrite/src/tools/register-for-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "register"
+    }
+  }
+}

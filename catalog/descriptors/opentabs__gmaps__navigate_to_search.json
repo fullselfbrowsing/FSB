@@ -1,0 +1,52 @@
+{
+  "slug": "gmaps.navigate_to_search",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "navigate a to search in gmaps",
+    "navigate to search in gmaps",
+    "navigate a to search in google maps",
+    "open search results on the map in gmaps"
+  ],
+  "description": "Open Google Maps search results for a query at a specific location. The map shows search results pinned on the map with a list panel. Optionally provide coordinates to search near a specific location.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (e.g., \"restaurants\", \"hotels near airport\", \"Starbucks\")"
+      },
+      "lat": {
+        "description": "Latitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "lng": {
+        "description": "Longitude for search center. Uses current map center if omitted.",
+        "type": "number"
+      },
+      "zoom": {
+        "description": "Zoom level (1-21, default 15)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 21
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/navigate-to-search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

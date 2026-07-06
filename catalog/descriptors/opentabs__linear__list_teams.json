@@ -1,0 +1,31 @@
+{
+  "slug": "linear.list_teams",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list teams in linear",
+    "show me my teams in linear",
+    "view my teams in linear",
+    "see all my teams in linear",
+    "list teams in the workspace in linear"
+  ],
+  "description": "List all teams in the Linear workspace that the current user can access.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

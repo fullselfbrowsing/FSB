@@ -1,0 +1,32 @@
+{
+  "slug": "gcloud.get_current_project",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "get a current project in gcloud",
+    "look up a current project in gcloud",
+    "fetch a single current project in gcloud",
+    "view one specific current project in gcloud",
+    "get current project in gcloud",
+    "get the active project from the console url in gcloud"
+  ],
+  "description": "Get the currently active GCP project from the console URL. Returns the project ID the user is currently viewing.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/get-current-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

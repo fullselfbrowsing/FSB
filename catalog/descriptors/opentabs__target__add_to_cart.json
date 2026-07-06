@@ -1,0 +1,43 @@
+{
+  "slug": "target.add_to_cart",
+  "service": "target.com",
+  "intentSynonyms": [
+    "add a to cart in target",
+    "add to cart in target",
+    "add a product to the cart in target"
+  ],
+  "description": "Add a product to the Target shopping cart by its TCIN (Target item number). Use search_products to find TCINs. Returns the updated cart item count and total.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tcin": {
+        "type": "string",
+        "description": "Target item number (TCIN) of the product to add"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "tcin"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/add-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

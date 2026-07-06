@@ -1,0 +1,70 @@
+{
+  "slug": "gitlab.create_issue",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "create an issue in gitlab",
+    "add an issue in gitlab",
+    "make a new issue in gitlab",
+    "open a new issue in gitlab",
+    "file a bug in gitlab",
+    "log a bug in gitlab"
+  ],
+  "description": "Create a new issue in a project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Issue title"
+      },
+      "description": {
+        "description": "Issue description in Markdown",
+        "type": "string"
+      },
+      "labels": {
+        "description": "Comma-separated list of label names",
+        "type": "string"
+      },
+      "assignee_ids": {
+        "description": "User IDs to assign",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "milestone_id": {
+        "description": "Milestone ID",
+        "type": "number"
+      },
+      "confidential": {
+        "description": "Whether the issue is confidential",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/create-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

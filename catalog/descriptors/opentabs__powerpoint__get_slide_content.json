@@ -1,0 +1,47 @@
+{
+  "slug": "powerpoint.get_slide_content",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get a slide content in powerpoint",
+    "look up a slide content in powerpoint",
+    "fetch a single slide content in powerpoint",
+    "view one specific slide content in powerpoint",
+    "get slide content in powerpoint",
+    "get text and notes for a specific slide in powerpoint"
+  ],
+  "description": "Get detailed text content and speaker notes for a specific slide by number (1-indexed). Downloads the PPTX file and extracts all text and notes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the PowerPoint file"
+      },
+      "slide_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Slide number (1-indexed)"
+      }
+    },
+    "required": [
+      "item_id",
+      "slide_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-slide-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

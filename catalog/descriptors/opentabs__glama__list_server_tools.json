@@ -1,0 +1,44 @@
+{
+  "slug": "glama.list_server_tools",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list server tools in glama",
+    "show me my server tools in glama",
+    "view my server tools in glama",
+    "see all my server tools in glama",
+    "list tools provided by an mcp server in glama"
+  ],
+  "description": "List all tools provided by a specific MCP server. Returns tool names, descriptions, and parent server metadata.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "description": "Owner/namespace slug of the server"
+      },
+      "slug": {
+        "type": "string",
+        "description": "Server slug"
+      }
+    },
+    "required": [
+      "namespace",
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-server-tools.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

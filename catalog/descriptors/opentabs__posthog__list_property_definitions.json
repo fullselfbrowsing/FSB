@@ -1,0 +1,57 @@
+{
+  "slug": "posthog.list_property_definitions",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "list property definitions in posthog",
+    "show me my property definitions in posthog",
+    "view my property definitions in posthog",
+    "see all my property definitions in posthog",
+    "list tracked property definitions in posthog"
+  ],
+  "description": "List all property definitions (event properties, person properties, or group properties) in the current PostHog project. Returns property names and types. Use type filter to scope: \"event\" for event properties, \"person\" for person properties.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Results per page (default 100, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "type": {
+        "description": "Property type filter: \"event\" (default), \"person\", or \"group\"",
+        "type": "string",
+        "enum": [
+          "event",
+          "person",
+          "group"
+        ]
+      },
+      "search": {
+        "description": "Search property names by substring",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/list-property-definitions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

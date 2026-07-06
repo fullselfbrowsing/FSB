@@ -1,0 +1,42 @@
+{
+  "slug": "zendesk.delete_ticket",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "delete a ticket in zendesk",
+    "remove a ticket in zendesk",
+    "trash a ticket in zendesk",
+    "permanently delete a ticket in zendesk",
+    "delete ticket in zendesk",
+    "delete a ticket permanently in zendesk"
+  ],
+  "description": "Permanently delete a support ticket by its ID. This action cannot be undone. The ticket and all its comments will be removed from Zendesk.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ticket_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "The ID of the ticket to delete"
+      }
+    },
+    "required": [
+      "ticket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/delete-ticket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

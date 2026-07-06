@@ -1,0 +1,99 @@
+{
+  "slug": "shortcut.create_story",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create a story in shortcut",
+    "add a story in shortcut",
+    "make a new story in shortcut",
+    "open a new story in shortcut",
+    "create story in shortcut",
+    "create a new story in shortcut"
+  ],
+  "description": "Create a new story in Shortcut. Requires a name and story type. Optionally set description, workflow state, epic, iteration, owners, labels, estimate, and deadline.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Story title"
+      },
+      "story_type": {
+        "description": "Story type (default: feature)",
+        "type": "string",
+        "enum": [
+          "feature",
+          "bug",
+          "chore"
+        ]
+      },
+      "description": {
+        "description": "Story description in Markdown",
+        "type": "string"
+      },
+      "workflow_state_id": {
+        "description": "Workflow state ID to place the story in",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "epic_id": {
+        "description": "Epic ID to associate",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "iteration_id": {
+        "description": "Iteration ID to associate",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "group_id": {
+        "description": "Team (group) UUID to assign",
+        "type": "string"
+      },
+      "owner_ids": {
+        "description": "Member UUIDs to set as owners",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "label_ids": {
+        "description": "Label IDs to attach",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "estimate": {
+        "description": "Story point estimate",
+        "type": "number"
+      },
+      "deadline": {
+        "description": "Deadline in ISO 8601 format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-story.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

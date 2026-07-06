@@ -1,0 +1,42 @@
+{
+  "slug": "gdocs.resolve_comment",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "resolve a comment in gdocs",
+    "resolve comment in gdocs",
+    "resolve a comment in google docs",
+    "resolve a comment thread in gdocs"
+  ],
+  "description": "Mark a comment thread as resolved (done). In the Drive API, resolving is done by creating a reply with action \"resolve\".",
+  "actionVerb": "resolve",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "description": "Google Docs document ID. Defaults to the document open in the current editor tab.",
+        "type": "string"
+      },
+      "comment_id": {
+        "type": "string",
+        "description": "Comment thread ID to resolve (from list_comments)"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/resolve-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "resolve"
+    }
+  }
+}

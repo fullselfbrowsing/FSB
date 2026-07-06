@@ -1,0 +1,560 @@
+(function(global) {
+  'use strict';
+
+  /**
+   * Phase 31 plan 02 (v0.9.99 -- DISC-02 / DISC-04; D-01/D-02/D-03/D-04/D-05/D-08)
+   * -- network-capture.js
+   *
+   * The consent-gated CDP Network capture session. It rides the EXISTING
+   * Input-domain chrome.debugger attachment (D-02 -- NO manifest change), adds
+   * the Network domain, and observes same-origin XHR/Fetch API calls, redacting
+   * each AT the event handler (D-05) into an in-memory ObservedCall list. It is
+   * the SW-side session manager behind the user-initiated, time-boxed AND
+   * count-bounded discovery action (D-01).
+   *
+   * Surface (the LOCKED interface, 31-01-PLAN.md):
+   *   startSession(origin, opts) -> Promise<{ ok, reason?, sessionId? }>
+   *     opts = { tabId, maxMs, maxCount, confirmedSensitive }
+   *   endSession(reason) -> ObservedCall[]   (the collected redacted calls)
+   *   _onCdpEvent(source, method, params)     -- method-dispatched handler
+   *   _filterResourceType(type) -> bool       -- XHR/Fetch only (D-04)
+   *   _getObservedCalls() -> ObservedCall[]    -- test hook over the live session
+   *
+   * THE GATE (RESEARCH Pattern 3, BEFORE any attach -- so a default-OFF / denied
+   * origin never attaches the debugger):
+   *   1. FsbServiceDenylist.isDenied(origin).denied -> RECIPE_CONSENT_DENIED
+   *   2. getConsentForOrigin(readPolicies(), origin).mode === 'off'
+   *        -> RECIPE_CONSENT_REQUIRED
+   *   3. FsbServiceDenylist.classify(origin).sensitive && !opts.confirmedSensitive
+   *        -> RECIPE_CONSENT_SENSITIVE_UNCONFIRMED
+   * Ask / Auto (non-sensitive) -> proceed.
+   *
+   * Capture (RESEARCH Pattern 1):
+   *   * filter params.type to XHR/Fetch (drop Document/Image/Stylesheet/Font/
+   *     Media -- D-04)
+   *   * same-origin only: new URL(request.url).origin === session.origin (drop
+   *     cross-origin -- the origin-pin precondition, D-04)
+   *   * redact AT the handler (D-05) -- the redacted ObservedCall is the only
+   *     artifact that leaves the event frame
+   *   * responseReceived attaches { status, mimeType } off the event -- the
+   *     response BODY is NEVER fetched (D-08; no CDP response-body command)
+   *   * a non-Network method is a no-op (Input sendCommand traffic is unaffected
+   *     -- DISC-02)
+   *
+   * Ownership-safe release (RESEARCH Pitfall 1): endSession removes the listeners
+   * and sends Network.disable (release the domain, KEEP the attachment), and
+   * detaches the tab ONLY if capture was the attaching owner (weAttached) AND no
+   * Input op holds the tab (keyboardEmulator.isAttachedTo). A capture session
+   * NEVER breaks the KeyboardEmulator Input emulation and never leaks an
+   * attachment.
+   *
+   * Module shell: the dual-export IIFE mirror of consent-policy-store.js /
+   * service-denylist.js. The service worker reads global.FsbNetworkCapture after
+   * importScripts; Node tests require() the module.exports. typeof-guarded
+   * SW-global accessors degrade gracefully under the Node test harness (chrome /
+   * the consent + denylist + redactor modules are mocked / loaded AFTER this
+   * module). Kept dynamic-code-FREE (no run-string-as-code / function-from-string
+   * / dynamic module loader constructs, even in comments).
+   *
+   * NO EMOJIS, ASCII-only source.
+   */
+
+  // ---- Defaults (Claude's discretion per CONTEXT A1) -----------------------
+  // Short time bound + small count cap: a discovery session is a brief, explicit
+  // observation, not a long-lived tap (D-01; the banner must not linger,
+  // RESEARCH Pitfall 2).
+  var DEFAULT_MAX_MS = 30000;
+  var DEFAULT_MAX_COUNT = 25;
+
+  // ---- Consent rejection reason codes (RESEARCH Pattern 3) -----------------
+  // Bare RECIPE_CONSENT_* strings the RED suite asserts (isConsentReason: a
+  // string with the RECIPE_CONSENT_ prefix). The interpreter's createRecipeError
+  // is NOT a dependency here -- the gate runs standalone above the attach.
+  var REASON_DENIED = 'RECIPE_CONSENT_DENIED';
+  var REASON_REQUIRED = 'RECIPE_CONSENT_REQUIRED';
+  var REASON_SENSITIVE = 'RECIPE_CONSENT_SENSITIVE_UNCONFIRMED';
+
+  // ---- The single active session (module-level; one at a time) -------------
+  var _session = null;
+  var _sessionSeq = 0;
+  var _lastEndedCalls = [];
+
+  // ---- typeof-guarded SW-global accessors ----------------------------------
+  // In the service worker the dependency was set on globalThis by importScripts,
+  // so the global read wins. Under the Node test harness a suite may load only
+  // this module (e.g. the dispatch suite seeds chrome.storage but does not
+  // pre-load the consent module as a global); there, fall back to require()-ing
+  // the sibling module (which also sets the global), so the accessor degrades
+  // gracefully either way. The require fallback is guarded by typeof require and
+  // wrapped so a missing sibling never throws on the boot path.
+  function _requireSibling(rel) {
+    if (typeof require !== 'function') { return null; }
+    try { return require(rel); } catch (_e) { return null; }
+  }
+  function _consentStore() {
+    if (typeof globalThis !== 'undefined' && globalThis.FsbConsentPolicyStore) {
+      return globalThis.FsbConsentPolicyStore;
+    }
+    return _requireSibling('./consent-policy-store.js');
+  }
+  function _denylist() {
+    if (typeof globalThis !== 'undefined' && globalThis.FsbServiceDenylist) {
+      return globalThis.FsbServiceDenylist;
+    }
+    return _requireSibling('./service-denylist.js');
+  }
+  function _redactor() {
+    if (typeof globalThis !== 'undefined' && globalThis.FsbNetworkCaptureRedactor) {
+      return globalThis.FsbNetworkCaptureRedactor;
+    }
+    return _requireSibling('./network-capture-redactor.js');
+  }
+  function _chromeDebugger() {
+    var c = (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
+    return (c && c.debugger) ? c.debugger : null;
+  }
+  // The Input-op owner (KeyboardEmulator). Present in the SW; absent under Node.
+  // Used ONLY on the release side to avoid detaching out from under an Input op.
+  function _keyboardEmulator() {
+    return (typeof globalThis !== 'undefined' && globalThis.keyboardEmulator)
+      ? globalThis.keyboardEmulator : null;
+  }
+
+  // ---- _filterResourceType(type) -> bool (D-04) ----------------------------
+  // XHR / Fetch only; every subresource type (Document / Image / Stylesheet /
+  // Font / Media / Script / WebSocket / ...) is dropped.
+  function _filterResourceType(type) {
+    return type === 'XHR' || type === 'Fetch';
+  }
+
+  // ---- attach helpers (promise + callback forms) ---------------------------
+  // chrome.debugger.attach / sendCommand support both a callback and a
+  // promise-returning form. The capture path calls them WITHOUT a callback and
+  // awaits the returned promise (the form the test stub + MV3 both provide).
+  function _attach(dbg, tabId) {
+    return Promise.resolve().then(function() {
+      return dbg.attach({ tabId: tabId }, '1.3');
+    });
+  }
+  function _detach(dbg, tabId) {
+    return Promise.resolve().then(function() {
+      return dbg.detach({ tabId: tabId });
+    }).catch(function() { /* best-effort; a stale/foreign attach detach may fail */ });
+  }
+  function _send(dbg, tabId, method, params) {
+    return Promise.resolve().then(function() {
+      return dbg.sendCommand({ tabId: tabId }, method, params || {});
+    });
+  }
+
+  // ---- collision-safe attach ------------------------------------------------
+  // Attempt the attach once. Chrome permits only one debugger owner per tab; if
+  // DevTools or an Input-domain automation owner is already attached, discovery
+  // fails closed rather than force-detaching that owner and leaking our own attach.
+  function _collisionSafeAttach(dbg, tabId) {
+    return _attach(dbg, tabId).then(function() {
+      return { attached: true, weAttached: true };
+    }, function(attachErr) {
+      throw attachErr;
+    });
+  }
+
+  // ---- _clearTimer ----------------------------------------------------------
+  function _clearTimer() {
+    if (_session && _session.timer) {
+      try { clearTimeout(_session.timer); } catch (_e) { /* best-effort */ }
+      _session.timer = null;
+    }
+  }
+
+  // ---- _onCdpEvent(source, method, params) (RESEARCH Pattern 1) ------------
+  // Method-dispatched. Ignores events that are not ours (no session, or a
+  // different tabId). A non-Network method is a no-op (Input traffic unaffected,
+  // DISC-02).
+  function _onCdpEvent(source, method, params) {
+    if (!_session) { return; }
+    if (!source || source.tabId !== _session.tabId) { return; }   // not our session
+
+    if (method === 'Network.requestWillBeSent') {
+      var p = params || {};
+      // D-04: XHR/Fetch only -- drop Document/Image/Stylesheet/Font/Media/etc.
+      if (!_filterResourceType(p.type)) { return; }
+      var request = (p.request && typeof p.request === 'object') ? p.request : {};
+      // D-04: same-origin only -- parse the origin in try/catch and drop a
+      // cross-origin (or unparseable) request (the origin-pin precondition).
+      var reqOrigin = null;
+      try { reqOrigin = new URL(request.url).origin; } catch (_e) { return; }
+      if (reqOrigin !== _session.origin) { return; }
+      // REDACT AT CAPTURE (D-05): the redacted ObservedCall is the only artifact
+      // that leaves the event frame. Keyed by requestId so responseReceived can
+      // attach the response shape later.
+      var red = _redactor();
+      if (!red) { return; }   // no redactor -> capture nothing rather than leak raw
+      var observed = red.redactRequest(request);
+      observed.requestId = p.requestId;
+      _session.calls.set(p.requestId, observed);
+      // Count bound (D-01): a small cap ends the session promptly.
+      _session.remaining -= 1;
+      if (_session.remaining <= 0) { endSession('count-bound'); }
+      return;
+    }
+
+    if (method === 'Network.responseReceived') {
+      var rp = params || {};
+      var c = _session.calls.get(rp.requestId);
+      if (c) {
+        // status + mimeType off the event ONLY -- the response BODY is NEVER
+        // fetched (D-08; no CDP response-body command path exists here).
+        var red2 = _redactor();
+        c.responseShape = red2 ? red2.redactResponse(rp.response) : null;
+      }
+      return;
+    }
+
+    // Any other method (Input.*, Page.*, ...) is a no-op: the handler is
+    // method-dispatched, so Input sendCommand traffic is unaffected (DISC-02).
+  }
+
+  // ---- _runGate(origin, opts) -> { ok, reason? } ---------------------------
+  // The Phase-30 consent gate reused verbatim, BEFORE any attach (Pattern 3).
+  // Returns ok:true to proceed, or ok:false + a RECIPE_CONSENT_* reason.
+  async function _runGate(origin, opts) {
+    // (0) LO-02: explicit null/empty/non-http origin rejection -- fail CLOSED on
+    // un-resolvable input BEFORE any consent read or attach. This guard is now
+    // LOAD-BEARING: the shipped global default is 'auto', so without this a null
+    // origin would pass getConsentForOrigin(envelope, null) (-> 'auto') and
+    // classify(null).sensitive === false, and the gate would attach with
+    // origin===null. A capture origin MUST be a concrete http(s) origin.
+    if (typeof origin !== 'string' || !/^https?:\/\//.test(origin)) {
+      return { ok: false, reason: REASON_REQUIRED };
+    }
+    var dl = _denylist();
+    if (dl && typeof dl.load === 'function') {
+      try { await dl.load(); } catch (_e) { return { ok: false, reason: REASON_REQUIRED }; }
+    }
+    // (1) Denylist first -- a denied origin is BLOCKED even under Auto (D-03).
+    if (dl && typeof dl.isDenied === 'function') {
+      var d = dl.isDenied(origin);
+      if (d && d.denied) { return { ok: false, reason: REASON_DENIED }; }
+    }
+    var store = _consentStore();
+    // (2) Consent: a per-origin Off (or a reverted global default) is rejected
+    // (DISC-04). The shipped global default is now 'auto' (opt-out), so an unseen
+    // origin passes here. If the consent store is absent, fail CLOSED (treat as
+    // OFF) -- never attach without a consent read. Note: the discovery path KEEPS
+    // its sensitive-confirm at (3) below, unlike the fully-open invoke gate.
+    if (!store || typeof store.readPolicies !== 'function' || typeof store.getConsentForOrigin !== 'function') {
+      return { ok: false, reason: REASON_REQUIRED };
+    }
+    var envelope = await Promise.resolve(store.readPolicies());
+    var consent = store.getConsentForOrigin(envelope, origin);
+    if (!consent || consent.mode === 'off') {
+      return { ok: false, reason: REASON_REQUIRED };
+    }
+    // (3) Sensitive origins need the extra-confirm flag (D-03).
+    if (dl && typeof dl.classify === 'function') {
+      var klass = dl.classify(origin);
+      if (klass && klass.sensitive && !(opts && opts.confirmedSensitive)) {
+        return { ok: false, reason: REASON_SENSITIVE };
+      }
+    }
+    return { ok: true };
+  }
+
+  // ---- startSession(origin, opts) -> Promise<{ ok, reason?, sessionId? }> ---
+  async function startSession(origin, opts) {
+    opts = opts || {};
+    _lastEndedCalls = [];
+
+    // If a prior session is somehow still live, release it first (one at a
+    // time). Best-effort; never throws.
+    if (_session) {
+      try { endSession('superseded'); } catch (_e) { /* best-effort */ }
+    }
+
+    // THE GATE (Pattern 3) -- BEFORE attach. A rejection here means NO attach /
+    // Network.enable ever runs (the consent suite asserts zero Network.enable on
+    // the OFF / denied paths).
+    var verdict = await _runGate(origin, opts);
+    if (!verdict || verdict.ok !== true) {
+      return { ok: false, reason: (verdict && verdict.reason) ? verdict.reason : REASON_REQUIRED };
+    }
+
+    var tabId = opts.tabId;
+    var maxMs = (typeof opts.maxMs === 'number' && opts.maxMs > 0) ? opts.maxMs : DEFAULT_MAX_MS;
+    var maxCount = (typeof opts.maxCount === 'number' && opts.maxCount > 0) ? opts.maxCount : DEFAULT_MAX_COUNT;
+
+    var dbg = _chromeDebugger();
+    if (!dbg || typeof dbg.attach !== 'function' || typeof dbg.sendCommand !== 'function') {
+      // No debugger surface available -- cannot capture. This is NOT a consent
+      // rejection; surface a distinct reason so a caller can tell them apart.
+      return { ok: false, reason: 'RECIPE_CAPTURE_UNAVAILABLE' };
+    }
+
+    // Collision-safe attach (MIRRORED from bg.js:13920-13935), REUSING the
+    // existing Input-domain attachment -- NO manifest change (D-02).
+    var attachResult;
+    try {
+      attachResult = await _collisionSafeAttach(dbg, tabId);
+    } catch (attachErr) {
+      return { ok: false, reason: 'RECIPE_CAPTURE_ATTACH_FAILED' };
+    }
+
+    // Add the Network domain to that SAME attachment (D-02).
+    try {
+      await _send(dbg, tabId, 'Network.enable', {});
+    } catch (enableErr) {
+      // Could not enable Network -- release ownership-safely and bail.
+      if (attachResult && attachResult.weAttached) {
+        var ke = _keyboardEmulator();
+        if (!(ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(tabId))) {
+          await _detach(dbg, tabId);
+        }
+      }
+      return { ok: false, reason: 'RECIPE_CAPTURE_ENABLE_FAILED' };
+    }
+
+    _sessionSeq += 1;
+    var sessionId = 'cap-' + _sessionSeq + '-' + Date.now();
+    _session = {
+      sessionId: sessionId,
+      origin: origin,
+      tabId: tabId,
+      remaining: maxCount,
+      maxCount: maxCount,
+      weAttached: !!(attachResult && attachResult.weAttached),
+      calls: new Map(),
+      detachListener: null,
+      timer: null
+    };
+
+    // NOTE (ME-01): the method-dispatched onEvent listener is registered EXACTLY
+    // ONCE at service-worker boot (background.js) and is gated by `if (!_session)
+    // return`, so it is a no-op outside an active session. We deliberately do NOT
+    // add it per-session here: re-adding the SAME function reference and then
+    // removeListener-ing it in endSession would tear down the boot registration too
+    // (identical reference), and in a non-deduping harness it would double-fire
+    // _onCdpEvent (double-decrementing remaining, ending at half the count bound).
+    // The boot registration is the single owner; endSession leaves it intact.
+
+    // Register onDetach so a Chrome-initiated detach (canceled_by_user when the
+    // user dismisses the banner, target_closed on tab close) tears the session
+    // down cleanly (Pitfall 1).
+    if (dbg.onDetach && typeof dbg.onDetach.addListener === 'function') {
+      var onDetach = function(source) {
+        if (_session && source && source.tabId === _session.tabId) {
+          endSession('detached');
+        }
+      };
+      _session.detachListener = onDetach;
+      dbg.onDetach.addListener(onDetach);
+    }
+
+    // Time bound (D-01): a setTimeout ends the session so the banner does not
+    // linger. unref() so a stray timer never holds a Node test process open.
+    var t = setTimeout(function() { endSession('time-bound'); }, maxMs);
+    if (t && typeof t.unref === 'function') { t.unref(); }
+    _session.timer = t;
+
+    return { ok: true, sessionId: sessionId };
+  }
+
+  // ---- _getObservedCalls() -> ObservedCall[] (test hook) -------------------
+  // Returns the redacted ObservedCalls tracked on the live session (the values
+  // of _session.calls). Empty array when no session.
+  function _getObservedCalls() {
+    if (!_session || !_session.calls) { return []; }
+    var out = [];
+    _session.calls.forEach(function(v) { out.push(v); });
+    return out;
+  }
+
+  function _getLastEndedCalls() {
+    return _lastEndedCalls.slice();
+  }
+
+  // ---- endSession(reason) -> ObservedCall[] (Pitfall 1) --------------------
+  // Removes the per-session onDetach listener, releases the Network domain
+  // (Network.disable -- KEEP the attachment), and detaches the tab ONLY if WE
+  // attached AND no Input op holds the tab. Returns the collected ObservedCalls
+  // (those with a method + path) for Plan 06's glue, then clears the session.
+  //
+  // ME-01: the onEvent (_onCdpEvent) listener is owned by the boot-time
+  // registration (background.js) and is NOT removed here -- removing it would tear
+  // down the permanent boot registration (same function reference) so the NEXT
+  // session would observe nothing. _onCdpEvent no-ops once _session is cleared
+  // below, so leaving it registered is inert between sessions.
+  function endSession(reason) {
+    void reason;
+    if (!_session) { return []; }
+
+    var session = _session;
+    var dbg = _chromeDebugger();
+
+    _clearTimer();
+
+    // Remove the per-session onDetach listener only (the onEvent listener is the
+    // boot-owned permanent registration -- see the ME-01 note above).
+    if (dbg && dbg.onDetach && typeof dbg.onDetach.removeListener === 'function' && session.detachListener) {
+      try { dbg.onDetach.removeListener(session.detachListener); } catch (_e) { /* best-effort */ }
+    }
+
+    // Collect the ObservedCalls (method + path present) BEFORE clearing.
+    var collected = [];
+    session.calls.forEach(function(c) {
+      if (c && typeof c.method === 'string' && typeof c.path === 'string') {
+        collected.push(c);
+      }
+    });
+    _lastEndedCalls = collected.slice();
+
+    // Clear the live session reference NOW so a re-entrant onDetach (fired by the
+    // detach below) sees no session and is a no-op.
+    _session = null;
+
+    // Release the Network domain (KEEP the attachment) -- best-effort, fire and
+    // forget (we do not await in this synchronous teardown).
+    if (dbg && typeof dbg.sendCommand === 'function' && session.tabId != null) {
+      try { _send(dbg, session.tabId, 'Network.disable', {}); } catch (_e) { /* best-effort */ }
+    }
+
+    // Detach the tab ONLY if capture was the attaching owner AND no Input op
+    // holds the tab (do NOT detach out from under a concurrent KeyboardEmulator
+    // Input op -- Pitfall 1). Mirror the bg.js:13915 isAttachedTo coordination.
+    if (session.weAttached && dbg && typeof dbg.detach === 'function' && session.tabId != null) {
+      var ke = _keyboardEmulator();
+      var inputHolds = !!(ke && typeof ke.isAttachedTo === 'function' && ke.isAttachedTo(session.tabId));
+      if (!inputHolds) {
+        try { _detach(dbg, session.tabId); } catch (_e) { /* best-effort */ }
+      }
+    }
+
+    return collected;
+  }
+
+  // ---- discovery-seeds loader (Phase 42 DSEED-01; mirror service-denylist.js) -
+  //
+  // CRITICAL per SC1: this loader reads METADATA only. It adds NO host permission,
+  // NO manifest change, and is NOT a fetch right to the seeded origins. It does NOT
+  // call startSession differently, does NOT touch the consent gate (_runGate), and
+  // does NOT change the capture core. The seeds are consulted later (the synthesizer
+  // recognition bias + the resolve() seed->T2 branch), NEVER to initiate a network
+  // call. A hint biases recognition; it never executes.
+  //
+  // Posture mirrors service-denylist.js EXACTLY: a module-level cache + a lazy
+  // initializer that (a) in SW/browser fetches chrome.runtime.getURL('config/
+  // discovery-seeds.json'); (b) under Node require()s ../config/discovery-seeds.json;
+  // (c) on ANY failure degrades to EMPTY seeds ({}) and emits a single best-effort
+  // warn -- NEVER throws on the boot path.
+  var _seeds = null;            // null = not yet loaded; {} or populated = loaded
+  var _seedsLoadWarned = false;
+
+  function _captureChrome() {
+    return (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
+  }
+
+  function _warnSeedsMissing(detail) {
+    if (_seedsLoadWarned) { return; }
+    _seedsLoadWarned = true;
+    var msg = 'discovery-seeds.json could not be loaded -- seeds are EMPTY (recognition bias off); capture/consent unaffected';
+    try {
+      if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
+        globalThis.rateLimitedWarn('BG', 'discovery-seeds-missing', msg, { detail: String(detail || 'unknown') });
+        return;
+      }
+    } catch (_e) { /* fall through */ }
+    try { console.warn('[FSB BG] ' + msg); } catch (_e2) { /* console may be absent */ }
+  }
+
+  function _applySeeds(data) {
+    _seeds = (data && typeof data === 'object') ? data : {};
+  }
+
+  // Synchronous best-effort lazy load for the Node/require path (the SW path resolves
+  // via the async fetch in loadSeeds(); getSeedsSync degrades to {} until then).
+  function _tryRequireSeeds() {
+    try {
+      if (typeof require === 'function') {
+        // Resolve relative to this module: ../config/discovery-seeds.json.
+        return require('../config/discovery-seeds.json');
+      }
+    } catch (_e) {
+      _warnSeedsMissing((_e && _e.message) ? _e.message : 'require threw');
+    }
+    return null;
+  }
+
+  // loadSeeds() -> Promise<void>. The SW boot path; mirrors service-denylist load().
+  var _seedsLoadPromise = null;
+  function loadSeeds() {
+    if (_seeds !== null) { return Promise.resolve(); }
+    if (_seedsLoadPromise) { return _seedsLoadPromise; }
+    _seedsLoadPromise = (async function () {
+      var fetchErr = null;
+      var chrome = _captureChrome();
+      if (chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function' && typeof fetch === 'function') {
+        try {
+          var url = chrome.runtime.getURL('config/discovery-seeds.json');
+          var resp = await fetch(url);
+          if (resp && resp.ok) { _applySeeds(await resp.json()); return; }
+          fetchErr = 'fetch status ' + (resp ? resp.status : 'no-response');
+        } catch (_e) {
+          fetchErr = (_e && _e.message) ? _e.message : 'fetch threw';
+        }
+      }
+      var viaRequire = _tryRequireSeeds();
+      if (viaRequire) { _applySeeds(viaRequire); return; }
+      _warnSeedsMissing(fetchErr);
+      _applySeeds({});   // degrade to empty -- never throw on boot
+    })().catch(function (e) {
+      _warnSeedsMissing((e && e.message) ? e.message : String(e));
+      _applySeeds({});
+    });
+    return _seedsLoadPromise;
+  }
+
+  // getSeedsSync() -> the loaded seeds object (or {} if not yet loaded). On the Node
+  // path it lazily require()s once so the catalog/synthesizer suites see the real
+  // seeds without an explicit loadSeeds() await; on the SW path it returns whatever
+  // loadSeeds() has populated (or {} until then). NEVER throws.
+  function getSeedsSync() {
+    if (_seeds === null) {
+      var viaRequire = _tryRequireSeeds();
+      _applySeeds(viaRequire || {});
+    }
+    return _seeds || {};
+  }
+
+  // getSeedForOrigin(origin) -> { hints, provenance } | null. A bare-origin lookup
+  // into the loaded seeds; the _meta key is never a match. Metadata read only.
+  function getSeedForOrigin(origin) {
+    if (typeof origin !== 'string' || origin.length === 0) { return null; }
+    var seeds = getSeedsSync();
+    if (!seeds || typeof seeds !== 'object') { return null; }
+    if (!Object.prototype.hasOwnProperty.call(seeds, origin)) { return null; }
+    if (origin === '_meta') { return null; }
+    var entry = seeds[origin];
+    return (entry && typeof entry === 'object') ? entry : null;
+  }
+
+  // ---- Export shape (dual-export IIFE; mirror consent-policy-store.js) ------
+  var exportsObj = {
+    startSession: startSession,
+    endSession: endSession,
+    _onCdpEvent: _onCdpEvent,
+    _filterResourceType: _filterResourceType,
+    _getObservedCalls: _getObservedCalls,
+    _getLastEndedCalls: _getLastEndedCalls,
+    // Phase 42 (DSEED-01) ADDITIVE seed accessors -- metadata only, no fetch right,
+    // no manifest change. The existing surface above is UNCHANGED (byte-stable).
+    loadSeeds: loadSeeds,
+    getSeedsSync: getSeedsSync,
+    getSeedForOrigin: getSeedForOrigin
+  };
+
+  global.FsbNetworkCapture = exportsObj;   // SW importScripts consumer reads this global
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = exportsObj;            // Node tests require() this
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);

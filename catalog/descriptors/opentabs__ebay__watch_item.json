@@ -1,0 +1,38 @@
+{
+  "slug": "ebay.watch_item",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "watch an item in ebay",
+    "watch item in ebay",
+    "add an item to your ebay watchlist in ebay"
+  ],
+  "description": "Add an item to the authenticated user's eBay watchlist. Requires the item ID. The tool fetches the item page to extract the required CSRF token, then calls the watch API.",
+  "actionVerb": "watch",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "eBay item ID to watch"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/watch-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "watch"
+    }
+  }
+}

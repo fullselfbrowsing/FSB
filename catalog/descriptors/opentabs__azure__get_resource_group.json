@@ -1,0 +1,45 @@
+{
+  "slug": "azure.get_resource_group",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "get a resource group in azure",
+    "look up a resource group in azure",
+    "fetch a single resource group in azure",
+    "view one specific resource group in azure",
+    "get resource group in azure",
+    "get resource group details in azure"
+  ],
+  "description": "Get detailed information about a specific resource group.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/get-resource-group.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "aws.stop_instance",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "stop an instance in aws",
+    "stop instance in aws",
+    "stop a running ec2 instance in aws"
+  ],
+  "description": "Stop a running EC2 instance. The instance must be in the \"running\" state. Returns the previous and current state of the instance.",
+  "actionVerb": "stop",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instance_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "EC2 instance ID to stop (e.g., i-1234567890abcdef0)"
+      }
+    },
+    "required": [
+      "instance_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/stop-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "stop"
+    }
+  }
+}

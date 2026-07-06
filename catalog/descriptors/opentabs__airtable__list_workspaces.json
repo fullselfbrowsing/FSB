@@ -1,0 +1,31 @@
+{
+  "slug": "airtable.list_workspaces",
+  "service": "airtable.com",
+  "intentSynonyms": [
+    "list workspaces in airtable",
+    "show me my workspaces in airtable",
+    "view my workspaces in airtable",
+    "see all my workspaces in airtable",
+    "list all workspaces and their bases in airtable"
+  ],
+  "description": "List all workspaces and bases the current user has access to. Returns workspace metadata with nested base (application) information.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airtable/src/tools/list-workspaces.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

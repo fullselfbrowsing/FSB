@@ -1,0 +1,31 @@
+{
+  "slug": "uber.get_enabled_products",
+  "service": "uber.com",
+  "intentSynonyms": [
+    "get enabled products in uber",
+    "look up enabled products in uber",
+    "fetch a single enabled products in uber",
+    "view one specific enabled products in uber",
+    "get uber products available in the region in uber"
+  ],
+  "description": "Get the Uber products enabled in the user's region (e.g., Ride, Connect/Courier, Rent). Useful for understanding what services are available.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/uber/src/tools/get-enabled-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "discord.read_thread",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "read a thread in discord",
+    "read thread in discord",
+    "read messages from a thread in discord"
+  ],
+  "description": "Read messages from a thread. Threads are channels, so this works the same as read_messages but is semantically specific to threads.",
+  "actionVerb": "read",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thread_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Thread (channel) ID to read messages from"
+      },
+      "limit": {
+        "description": "Number of messages to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "before": {
+        "description": "Get messages before this message ID (for pagination)",
+        "type": "string"
+      },
+      "after": {
+        "description": "Get messages after this message ID",
+        "type": "string"
+      }
+    },
+    "required": [
+      "thread_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/read-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "read"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.list_chats",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "list chats in whatsapp",
+    "show me my chats in whatsapp",
+    "view my chats in whatsapp",
+    "see all my chats in whatsapp",
+    "list all whatsapp chats in whatsapp"
+  ],
+  "description": "List all WhatsApp chats sorted by most recent activity. Returns chat name, unread count, archive/pin/mute status, and whether it is a group.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of chats to return (default 50, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/list-chats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "slug": "robinhood.get_historicals",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get historicals in robinhood",
+    "look up historicals in robinhood",
+    "fetch a single historicals in robinhood",
+    "view one specific historicals in robinhood",
+    "get historical price data for stocks in robinhood"
+  ],
+  "description": "Get historical OHLCV price data for one or more stocks. Supports multiple intervals (5min to weekly) and spans (day to all-time). Use bounds to include extended hours data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbols": {
+        "type": "string",
+        "description": "Comma-separated ticker symbols (e.g., \"AAPL,TSLA\")"
+      },
+      "interval": {
+        "type": "string",
+        "enum": [
+          "5minute",
+          "10minute",
+          "hour",
+          "day",
+          "week"
+        ],
+        "description": "Candle interval (e.g., 5minute, hour, day)"
+      },
+      "span": {
+        "type": "string",
+        "enum": [
+          "day",
+          "week",
+          "month",
+          "3month",
+          "year",
+          "5year",
+          "all"
+        ],
+        "description": "Time span to retrieve (e.g., month, year, all)"
+      },
+      "bounds": {
+        "default": "regular",
+        "description": "Trading session bounds: regular (default), extended, or trading",
+        "type": "string",
+        "enum": [
+          "regular",
+          "extended",
+          "trading"
+        ]
+      }
+    },
+    "required": [
+      "symbols",
+      "interval",
+      "span",
+      "bounds"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-historicals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

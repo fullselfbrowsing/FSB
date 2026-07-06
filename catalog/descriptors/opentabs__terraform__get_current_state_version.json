@@ -1,0 +1,39 @@
+{
+  "slug": "terraform.get_current_state_version",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get a current state version in terraform",
+    "look up a current state version in terraform",
+    "fetch a single current state version in terraform",
+    "view one specific current state version in terraform",
+    "get current state version in terraform"
+  ],
+  "description": "Get the current (latest) state version for a workspace.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-current-state-version.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

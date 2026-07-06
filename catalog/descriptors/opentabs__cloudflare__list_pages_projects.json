@@ -1,0 +1,30 @@
+{
+  "slug": "cloudflare.list_pages_projects",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list pages projects in cloudflare",
+    "show me my pages projects in cloudflare",
+    "view my pages projects in cloudflare",
+    "see all my pages projects in cloudflare"
+  ],
+  "description": "List all Cloudflare Pages projects in the account. Returns project names, subdomains, production branches, and linked Git repositories.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-pages-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

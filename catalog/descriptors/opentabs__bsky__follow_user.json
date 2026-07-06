@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.follow_user",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "follow an user in bsky",
+    "follow user in bsky",
+    "follow an user in bluesky",
+    "follow a user in bsky"
+  ],
+  "description": "Follow a user. Requires the target user's DID. Returns the follow record URI (needed for unfollowing).",
+  "actionVerb": "follow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "did": {
+        "type": "string",
+        "description": "DID of the user to follow"
+      }
+    },
+    "required": [
+      "did"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/follow-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "follow"
+    }
+  }
+}

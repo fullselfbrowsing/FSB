@@ -28,17 +28,6 @@
             <i class="fas fa-circle status-dot"></i>
           </div>
         </div>
-        <button class="header-btn" id="testApiBtn" title="Test API Connection">
-          <i class="fas fa-plug"></i>
-          Test API
-        </button>
-        <button class="header-btn" id="exportBtn" title="Export Settings">
-          <i class="fas fa-download"></i>
-          Export
-        </button>
-        <button class="header-btn theme-toggle" id="themeToggle" title="Toggle Theme">
-          <i class="fas fa-moon"></i>
-        </button>
       </div>
     </header>
 
@@ -179,14 +168,23 @@
               
               <!-- Model Selection -->
               <div class="form-group">
-                <label for="modelName">Model</label>
-                <div class="model-select-row">
-                  <select id="modelName" class="form-select">
-                    <!-- Options will be populated dynamically based on provider -->
+                <label for="modelSearch">Model</label>
+                <div class="model-combobox" id="modelCombobox">
+                  <div class="model-combobox__control">
+                    <div class="model-combobox__field">
+                      <input type="text" id="modelSearch" class="form-input model-combobox__input" placeholder="Search models" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="modelListbox" aria-autocomplete="list" aria-haspopup="listbox" aria-label="Search and select model">
+                      <button type="button" id="modelComboboxToggle" class="model-combobox__chevron" tabindex="-1" aria-label="Toggle model list">
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                    <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
+                      <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                  </div>
+                  <ul class="model-combobox__listbox" id="modelListbox" role="listbox" aria-label="Models" tabindex="-1" hidden></ul>
+                  <select id="modelName" class="model-combobox__native" tabindex="-1" aria-hidden="true">
+                    <!-- Hidden source of truth; options populated dynamically based on provider -->
                   </select>
-                  <button id="refreshModelsBtn" type="button" class="btn-secondary btn-icon" title="Refresh model list">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                  </button>
                 </div>
                 <div id="modelDiscoveryStatus" class="discovery-status" hidden></div>
                 <div class="form-help" id="modelDescription">Select the AI model to use</div>
@@ -306,6 +304,39 @@
                 </div>
               </div>
 
+              <!-- CAPTCHA Solver -->
+              <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 12px;">CAPTCHA Solver</h3>
+                <p class="captcha-reassurance"><i class="fas fa-circle-check" aria-hidden="true"></i>Users haven't reported a single instance of FSB being detected as a bot and interrupting their workflow. That said, not every day is sunshine. This is here for when one isn't.</p>
+                <div class="toggle-grid single">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="captchaSolverEnabled">
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Enable CAPTCHA Solving</span>
+                      <span class="toggle-desc">Use 2Captcha service to solve reCAPTCHA v2, hCaptcha, and Cloudflare Turnstile challenges</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div id="captchaSolverConfig" style="display: none; margin-top: var(--space-lg);">
+                  <div class="form-group">
+                    <label for="captchaApiKey">2Captcha API Key</label>
+                    <div class="input-with-button">
+                      <input type="password" id="captchaApiKey" placeholder="Enter your 2Captcha API key" class="form-input">
+                      <button type="button" class="input-btn" id="toggleCaptchaApiKey" title="Toggle visibility">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                    </div>
+                    <div class="form-help">
+                      Sign up at <a href="https://2captcha.com?from=fsb" target="_blank">2captcha.com</a>, add balance, then copy your API key from the dashboard. Solves reCAPTCHA v2, hCaptcha, and Turnstile.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- API Status Card -->
               <div class="api-status-card" id="apiStatusCard" style="display: none;">
                 <div class="status-display">
@@ -340,6 +371,25 @@
           <!-- Settings Grid -->
           <div class="advanced-settings-grid">
 
+            <div class="adv-sub"><i class="fas fa-palette"></i><span>Appearance</span><span class="adv-sub-rule"></span></div>
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon"><i class="fas fa-palette"></i></div>
+                <div class="settings-card-title">
+                  <h3>Theme</h3>
+                  <p>Appearance of the control panel</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="site-graph-detail-toggle theme-mode-toggle" id="themeModeToggle" role="radiogroup" aria-label="Theme">
+                  <button type="button" class="detail-btn active" data-theme-mode="system" role="radio" aria-checked="true">System</button>
+                  <button type="button" class="detail-btn" data-theme-mode="dark" role="radio" aria-checked="false">Dark</button>
+                  <button type="button" class="detail-btn" data-theme-mode="light" role="radio" aria-checked="false">Light</button>
+                </div>
+                <div class="setting-hint">System follows your operating system appearance. Default: System.</div>
+              </div>
+            </div>
+            <div class="adv-sub"><i class="fas fa-gauge-high"></i><span>Execution &amp; Limits</span><span class="adv-sub-rule"></span></div>
             <!-- Automation Limits Card -->
             <div class="settings-card">
               <div class="settings-card-header">
@@ -355,10 +405,13 @@
                 <div class="setting-item">
                   <div class="setting-label">
                     <span>Max Iterations</span>
-                    <span class="setting-value-display" id="maxIterationsDisplay">500</span>
+                    <div class="fsb-stepper" data-min="50" data-max="500" data-step="10">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease max iterations"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="maxIterationsSlider" value="100">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase max iterations"><i class="fas fa-plus"></i></button>
+                    </div>
                   </div>
-                  <input type="range" id="maxIterationsSlider" min="5" max="500" value="500" class="modern-slider">
-                  <input type="hidden" id="maxIterations" value="20">
+                  <input type="hidden" id="maxIterations" value="100">
                   <div class="setting-hint">Prevents runaway automation loops</div>
                 </div>
               </div>
@@ -379,9 +432,12 @@
                 <div class="setting-item">
                   <div class="setting-label">
                     <span>Element Limit</span>
-                    <span class="setting-value-display" id="maxDOMElementsDisplay">2000</span>
+                    <div class="fsb-stepper" data-min="500" data-max="5000" data-step="500">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element limit"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="maxDOMElementsSlider" value="2000">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element limit"><i class="fas fa-plus"></i></button>
+                    </div>
                   </div>
-                  <input type="range" id="maxDOMElementsSlider" min="500" max="5000" value="2000" step="500" class="modern-slider">
                   <input type="hidden" id="maxDOMElements" value="2000">
                   <div class="setting-hint">Balance between coverage and speed</div>
                 </div>
@@ -397,16 +453,18 @@
                     <option value="500">500 (Heavy - complex SPAs)</option>
                     <option value="custom">Custom...</option>
                   </select>
-                  <input type="number" id="elementCacheSizeCustom" class="form-input"
-                         min="10" max="1000" style="display: none; margin-top: 8px;"
-                         placeholder="Enter value (10-1000)">
+                  <div class="fsb-stepper" id="elementCacheSizeCustomWrap" data-min="10" data-max="1000" data-step="10" style="display: none; margin-top: 8px;">
+                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease element cache size"><i class="fas fa-minus"></i></button>
+                    <input type="text" inputmode="numeric" class="fsb-stepper__input" id="elementCacheSizeCustom" value="200">
+                    <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase element cache size"><i class="fas fa-plus"></i></button>
+                  </div>
                   <input type="hidden" id="elementCacheSize" value="200">
                   <div class="setting-hint">Cached element lookups for faster repeated queries. Higher = faster on complex pages, more memory.</div>
                 </div>
               </div>
             </div>
 
-            <!-- Phase 241 D-05 / POOL-05: Agent Concurrency cap (range 1-64, default 8) -->
+            <!-- Phase 241 D-05 / POOL-05: Agent Concurrency cap (range 1-64, RAM-recommended default) -->
             <div class="settings-card">
               <div class="settings-card-header">
                 <div class="settings-card-icon">
@@ -422,14 +480,17 @@
                   <div class="setting-label">
                     <span>Concurrency Cap</span>
                     <span class="setting-value-display" id="fsbAgentCapDisplay">8</span>
+                    <div class="fsb-stepper" data-min="1" data-max="64" data-step="1">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease agent concurrency cap"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbAgentCap" value="8">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase agent concurrency cap"><i class="fas fa-plus"></i></button>
+                    </div>
                   </div>
-                  <input type="number" id="fsbAgentCap" class="form-input"
-                         min="1" max="64" step="1" value="8">
                   <button type="button" class="form-secondary-btn" id="fsbAgentCapReset" style="margin-top: 8px;">
-                    Reset to default (8)
+                    <i class="fas fa-rotate-left"></i> <span class="form-secondary-btn__label">Reset to recommended (8)</span>
                   </button>
                   <div class="setting-hint">
-                    Default 8. Range 1 to 64. Lower = predictable resource use; higher = more parallel agents. Lowering this value while active agents are running does not evict them; new claims past the new cap are rejected (grandfather behavior).
+                    Automatically recommended for your system. Range 1 to 64. Lower = predictable resource use; higher = more parallel agents. Lowering this value while active agents are running does not evict them; new claims past the new cap are rejected (grandfather behavior).
                   </div>
                   <!-- Phase 243 Plan 04 / UI-03: inline validation message for out-of-range input (D-06). -->
                   <div class="setting-hint" id="fsbAgentCapValidation"
@@ -446,6 +507,45 @@
               </div>
             </div>
 
+            <!-- Trigger Concurrency cap (range 1-64, default 8) -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-bolt"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>Trigger Concurrency</h3>
+                  <p>Maximum simultaneous trigger watches</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <div class="setting-label">
+                    <span>Concurrency Cap</span>
+                    <div class="fsb-stepper" data-min="1" data-max="64" data-step="1">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease trigger concurrency cap"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbTriggerCap" value="8">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase trigger concurrency cap"><i class="fas fa-plus"></i></button>
+                    </div>
+                  </div>
+                  <button type="button" class="form-secondary-btn" id="fsbTriggerCapReset" style="margin-top: 8px;">
+                    <i class="fas fa-rotate-left"></i> Reset to default (8)
+                  </button>
+                  <div class="setting-hint">
+                    Default 8. Range 1 to 64. Lower = predictable resource use; higher = more parallel watches. Lowering this value while triggers are active does not stop existing watches; new triggers past the new cap are rejected.
+                  </div>
+                  <div class="setting-hint" id="fsbTriggerCapValidation"
+                       style="color: #ff6b6b; display: none; margin-top: 4px;">
+                    Must be between 1 and 64
+                  </div>
+                  <div class="setting-hint" id="fsbTriggerCapCurrentActive" style="margin-top: 4px;">
+                    0 of 8 active
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="adv-sub"><i class="fas fa-wand-magic-sparkles"></i><span>Automation Behavior</span><span class="adv-sub-rule"></span></div>
             <!-- Phase 245 D-07: Action Change Reports global toggle (default ON) -->
             <div class="settings-card">
               <div class="settings-card-header">
@@ -560,48 +660,7 @@
               </div>
             </div>
 
-            <!-- CAPTCHA Solver Card -->
-            <div class="settings-card full-width">
-              <div class="settings-card-header">
-                <div class="settings-card-icon captcha">
-                  <i class="fas fa-puzzle-piece"></i>
-                </div>
-                <div class="settings-card-title">
-                  <h3>CAPTCHA Solver</h3>
-                  <p>Automatically solve CAPTCHAs during automation using 2Captcha</p>
-                </div>
-              </div>
-              <div class="settings-card-content">
-                <div class="toggle-grid single">
-                  <label class="modern-toggle">
-                    <input type="checkbox" id="captchaSolverEnabled">
-                    <span class="toggle-track">
-                      <span class="toggle-thumb"></span>
-                    </span>
-                    <div class="toggle-content">
-                      <span class="toggle-label">Enable CAPTCHA Solving</span>
-                      <span class="toggle-desc">Use 2Captcha service to solve reCAPTCHA v2, hCaptcha, and Cloudflare Turnstile challenges</span>
-                    </div>
-                  </label>
-                </div>
-
-                <div id="captchaSolverConfig" style="display: none; margin-top: var(--space-lg);">
-                  <div class="form-group">
-                    <label for="captchaApiKey">2Captcha API Key</label>
-                    <div class="input-with-button">
-                      <input type="password" id="captchaApiKey" placeholder="Enter your 2Captcha API key" class="form-input">
-                      <button type="button" class="input-btn" id="toggleCaptchaApiKey" title="Toggle visibility">
-                        <i class="fas fa-eye"></i>
-                      </button>
-                    </div>
-                    <div class="form-help">
-                      Sign up at <a href="https://2captcha.com?from=fsb" target="_blank">2captcha.com</a>, add balance, then copy your API key from the dashboard. Solves reCAPTCHA v2, hCaptcha, and Turnstile.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            <div class="adv-sub"><i class="fas fa-user-shield"></i><span>Privacy &amp; Developer</span><span class="adv-sub-rule"></span></div>
             <!-- Developer Card -->
             <div class="settings-card full-width">
               <div class="settings-card-header">
@@ -693,17 +752,23 @@
               <input type="hidden" id="serverUrl">
               <div class="form-group">
                 <label for="serverHashKey">Hash Key</label>
-                <div class="input-with-button">
-                  <input type="text" id="serverHashKey" class="form-input" placeholder="Your server hash key" readonly>
-                  <button class="control-btn small" id="btnGenerateHashKey">Generate</button>
-                  <button class="control-btn small" id="btnCopyHashKey">Copy</button>
+                <div class="sync-key-row">
+                  <input type="text" id="serverHashKey" class="form-input sync-key-input" placeholder="Your server hash key" readonly>
+                  <button class="control-btn" id="btnGenerateHashKey"><i class="fas fa-rotate"></i> Generate</button>
+                  <button class="control-btn sync-copy-btn" id="btnCopyHashKey" title="Copy hash key" aria-label="Copy hash key"><i class="fas fa-copy"></i></button>
                 </div>
+                <div class="form-help">Generate a key, then pair the dashboard to link this browser to the FSB server.</div>
               </div>
-              <div class="form-group">
+              <div class="sync-action-row">
                 <button class="control-btn accent" id="btnPairDashboard">
                   <i class="fas fa-qrcode"></i>
                   Pair Dashboard
                 </button>
+                <button class="control-btn" id="btnTestConnection">
+                  <i class="fas fa-plug"></i>
+                  Test Connection
+                </button>
+                <span class="connection-status" id="syncConnectionStatus"></span>
               </div>
               <div id="pairingQROverlay" class="pairing-qr-overlay" style="display: none;">
                 <div class="pairing-qr-popup">
@@ -718,38 +783,18 @@
                   <div id="pairingQRMessage" class="pairing-qr-message"></div>
                 </div>
               </div>
-              <div class="form-group">
-                <button class="control-btn" id="btnTestConnection">
-                  <i class="fas fa-plug"></i>
-                  Test Connection
-                </button>
-                <span class="connection-status" id="connectionStatus"></span>
-              </div>
             </div>
           </div>
 
-          <!-- DEPRECATION CARD (relocated from background-agents section per Sync consolidation) -->
-          <div class="settings-card full-width fsb-deprecation-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon">
-                <i class="fas fa-flag-checkered"></i>
-              </div>
-              <div class="settings-card-title">
-                <h3 class="fsb-deprecation-headline">Background agents have left the building.</h3>
-                <p class="fsb-deprecation-body">FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it: <strong>OpenClaw</strong> for an open-source agent loop, and <strong>Claude Routines</strong> for managed long-running automations. Pick whichever fits the way you work.</p>
-              </div>
+          <!-- Background agents: inline informational note (was a card) -->
+          <div class="sync-deprecation">
+            <div class="sync-deprecation-head"><i class="fas fa-flag-checkered"></i> Background agents have left the building</div>
+            <p class="sync-deprecation-body">FSB stays focused on precise single-attempt browser execution. Scheduled and recurring task work is better served by tools built for it: <strong>OpenClaw</strong> for an open-source agent loop, and <strong>Claude Routines</strong> for managed long-running automations. Pick whichever fits the way you work.</p>
+            <div class="sync-deprecation-links">
+              <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer">Try OpenClaw <i class="fas fa-arrow-up-right-from-square"></i></a>
+              <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer">Try Claude Routines <i class="fas fa-arrow-up-right-from-square"></i></a>
             </div>
-            <div class="settings-card-content">
-              <div class="fsb-deprecation-cta-row">
-                <a class="control-btn accent" href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer">
-                  Try OpenClaw
-                </a>
-                <a class="control-btn accent" href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer">
-                  Try Claude Routines
-                </a>
-              </div>
-              <small class="muted fsb-deprecation-footer">Retired in v0.9.45rc1 (April 2026)</small>
-            </div>
+            <small class="sync-deprecation-foot">Retired in v0.9.45rc1 · April 2026</small>
           </div>
 
           <!-- SUNSET NOTICE (one-time names list per AGENTS-03 / D-07..D-12) -->
@@ -955,13 +1000,20 @@
             </div>
           </div>
 
-          <!-- FSB Intelligence -- Consolidated 3D Mind Map -->
+          <!-- Consolidated Memory -- 3D Mind Map, linked out to the community Sitemaps page -->
           <div class="site-guides-section" id="siteGuidesSection">
-            <div class="site-guides-header" style="text-align: center;">
-              <h3 style="justify-content: center;">
+            <div class="site-guides-header" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <h3>
                 <i class="fas fa-brain"></i>
-                FSB Intelligence
+                Consolidated Memory
               </h3>
+              <a class="sitemap-link" href="https://full-selfbrowsing.com/sitemaps" target="_blank" rel="noopener noreferrer">
+                <span class="sitemap-link-main">
+                  <span class="sitemap-link-title">Site Maps</span>
+                  <span class="sitemap-link-sub">Community</span>
+                </span>
+                <i class="fas fa-arrow-up-right-from-square"></i>
+              </a>
             </div>
 
             <div class="knowledge-graph-toolbar">
@@ -980,15 +1032,23 @@
             </div>
 
             <div class="knowledge-graph-legend" id="knowledgeGraphLegend">
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> E-Commerce</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> Social</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Finance</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Travel</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Email</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> Coding</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> Career</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> Gaming</span>
-              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> Productivity</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> E-Commerce &amp; Shopping</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> Social Media</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Finance &amp; Trading</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Travel &amp; Booking</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Email Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #06b6d4;"></span> Coding Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ec4899;"></span> Career &amp; Job Search</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #f97316;"></span> Gaming Platforms</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #14b8a6;"></span> Productivity Tools</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #a855f7;"></span> Design &amp; Whiteboard</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #0891b2;"></span> Games</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #d946ef;"></span> Media</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #4285f4;"></span> Music</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #34a853;"></span> News</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #ea4335;"></span> Reference</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #fbbc04;"></span> Sports</span>
+              <span class="knowledge-legend-item"><span class="knowledge-legend-dot" style="background: #8b5cf6;"></span> Utilities</span>
             </div>
           </div>
 
@@ -1094,6 +1154,226 @@
             </div>
           </div>
 
+        </section>
+
+        <!-- Phase 30 (GOV-07/GOV-08, D-13/D-14/D-15): Consent & Audit (shown under Advanced Settings) -->
+        <section class="content-section" id="consent-audit">
+          <!-- Screen-reader landmark for the section (the visible header lives
+               in the .adv-sub row below to match the sub-group visual pattern).
+               Kept explicit so consent-audit-settings-ui.test.js and assistive-
+               tech both see a semantic H2. -->
+          <h2 class="visually-hidden">Consent &amp; Audit</h2>
+          <div class="advanced-settings-grid">
+            <div class="adv-sub-group">
+              <div class="adv-sub"><i class="fas fa-clipboard-check"></i><span>Consent &amp; Audit</span><span class="adv-sub-rule"></span></div>
+              <p class="adv-sub-desc">The default below applies to every site you have not configured; the per-origin list lets you opt individual sites out.</p>
+            </div>
+
+          <!-- Default for New Sites Card (global consent default; opt-out posture) -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-shield-halved"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Default for New Sites</h3>
+                <p>How FSB treats a site you have not configured. Auto lets FSB call any non-blocked site's authenticated API (reads and writes). Off requires you to enable each site first. Ask queues a request for your approval.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="site-graph-detail-toggle consent-default-toggle" role="radiogroup" aria-label="Default consent mode for new sites" id="consentDefaultModeToggle">
+                <button type="button" class="detail-btn" data-default-mode="off" role="radio" aria-checked="false">Off</button>
+                <button type="button" class="detail-btn" data-default-mode="ask" role="radio" aria-checked="false">Ask</button>
+                <button type="button" class="detail-btn" data-default-mode="auto" role="radio" aria-checked="true">Auto</button>
+              </div>
+              <div class="setting-hint">Financial and government services are always blocked regardless of this setting. Shipped as Auto; set to Off to restore strict opt-in.</div>
+            </div>
+          </div>
+
+          <!-- Per-Origin Consent Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-user-shield"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Per-Origin Consent</h3>
+                <p>Every site follows the default above unless you override it here. Set a site to Off to stop FSB acting on it.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-list-container" id="consentOriginListContainer">
+                <div class="session-list" id="consentOriginList">
+                  <div class="session-empty-state" id="consentOriginEmptyState">
+                    <i class="fas fa-globe"></i>
+                    <p>No sites yet. Every site FSB acts on appears here so you can set it to Off (opt out). New sites follow the default above.</p>
+                  </div>
+                </div>
+              </div>
+              <!--
+                Per-origin row template (cloned by options.js render() for each seen
+                origin). It carries the canonical structure: an Off/Ask/Auto segmented
+                control (role="radiogroup") + the legacy mutating metadata toggle.
+                The Sensitive (amber) / Blocked (red) badges are toggled by render()
+                reading FsbServiceDenylist.classify(origin). Sensitive is
+                informational for invokes; Blocked remains non-enableable. Hidden
+                until cloned.
+              -->
+              <template id="consentOriginRowTemplate">
+                <div class="setting-item consent-origin-row" data-origin="">
+                  <div class="setting-label">
+                    <span class="consent-origin-name"></span>
+                    <span class="feature-badge consent-sensitive-badge" style="display:none; background: var(--warning-color);">
+                      <i class="fas fa-triangle-exclamation"></i> Sensitive
+                    </span>
+                    <span class="feature-badge consent-blocked-badge" style="display:none; background: var(--error-color);">
+                      <i class="fas fa-ban"></i> Blocked
+                    </span>
+                  </div>
+                  <div class="site-graph-detail-toggle consent-mode-toggle" role="radiogroup" aria-label="Consent mode for origin">
+                    <button type="button" class="detail-btn" data-mode="off" role="radio" aria-checked="true">Off</button>
+                    <button type="button" class="detail-btn" data-mode="ask" role="radio" aria-checked="false">Ask</button>
+                    <button type="button" class="detail-btn" data-mode="auto" role="radio" aria-checked="false">Auto</button>
+                  </div>
+                  <label class="modern-toggle consent-mutating-toggle" style="display:none;">
+                    <input type="checkbox" class="consent-mutating-input" disabled>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Allow mutating (write) calls</span>
+                      <span class="toggle-desc">Compatibility metadata for POST/PUT/PATCH/DELETE. Under Auto, FSB can perform reads and writes on non-blocked origins.</span>
+                    </div>
+                  </label>
+                  <div class="setting-hint consent-origin-hint" style="display:none;"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Pending Requests Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-bell"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Pending Requests</h3>
+                <p>Requests waiting on your decision. Granting one lets the caller retry; FSB never acts without your approval.</p>
+              </div>
+              <span class="sync-status-pill" id="pendingRequestCount" data-state="remote-active" style="display: none;">0 pending</span>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-list-container" id="pendingRequestListContainer">
+                <div class="session-list" id="pendingRequestList">
+                  <div class="session-empty-state" id="pendingRequestEmptyState">
+                    <i class="fas fa-inbox"></i>
+                    <p>No pending requests. When a tool needs consent it appears here. You can also grant access ahead of time from the list above.</p>
+                  </div>
+                </div>
+              </div>
+              <!--
+                Pending request row template (cloned by options.js render() per queued
+                Ask). It exposes only the read-only origin/slug/method/sideEffectClass
+                (no secrets, T-30-16) plus Grant + Deny. Grant writes consent for that
+                exact origin/scope only; Deny removes without granting. Hidden until cloned.
+              -->
+              <template id="pendingRequestRowTemplate">
+                <div class="setting-item pending-request-row" data-origin="" data-scope="">
+                  <div class="setting-label">
+                    <span class="pending-request-origin"></span>
+                    <span class="pending-request-meta"></span>
+                    <span class="feature-badge pending-write-badge" style="display:none; background: var(--warning-color);">write</span>
+                  </div>
+                  <div class="session-controls">
+                    <button type="button" class="control-btn pending-grant-btn">
+                      <i class="fas fa-check"></i>
+                      Grant
+                    </button>
+                    <button type="button" class="control-btn danger pending-deny-btn">
+                      <i class="fas fa-xmark"></i>
+                      Deny
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Audit Log Card -->
+          <div class="settings-card full-width">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-clipboard-check"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Audit Log</h3>
+                <p>A redacted, append-only record of capability calls. No arguments, tokens, cookies, or response bodies are ever stored.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <div class="session-controls">
+                <button class="control-btn primary" id="auditExportBtn">
+                  <i class="fas fa-download"></i>
+                  Export Log
+                </button>
+                <button class="control-btn danger" id="auditClearBtn">
+                  <i class="fas fa-trash"></i>
+                  Clear Log
+                </button>
+              </div>
+              <div class="logs-content">
+                <table class="logs-display" id="auditLogTable" aria-label="Audit log">
+                  <thead>
+                    <tr class="log-entry">
+                      <th scope="col">Time</th>
+                      <th scope="col">Origin</th>
+                      <th scope="col">Capability</th>
+                      <th scope="col">Method</th>
+                      <th scope="col">Side Effect</th>
+                      <th scope="col">Consent</th>
+                      <th scope="col">Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditLogBody">
+                    <tr class="log-entry" id="auditLogEmptyRow">
+                      <td colspan="7">
+                        <div class="session-empty-state">
+                          <i class="fas fa-clipboard-list"></i>
+                          <p>No audit entries yet. Capability calls are recorded here once you allow an origin. Entries are redacted and stored locally only.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legal & Service Policy Card -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon">
+                <i class="fas fa-scale-balanced"></i>
+              </div>
+              <div class="settings-card-title">
+                <h3>Legal &amp; Service Policy</h3>
+                <p>FSB's automation posture, audit retention, and the consent model are documented in LEGAL.md. Some origins are blocked from automation by the service denylist.</p>
+              </div>
+            </div>
+            <div class="settings-card-content">
+              <a class="setting-hint" href="https://full-selfbrowsing.com/legal"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">Read the legal posture &rarr;</a>
+              <a class="setting-hint" href="../config/service-denylist.json"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">View blocked services &rarr;</a>
+              <a class="setting-hint" href="https://full-selfbrowsing.com/privacy.html"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:block; margin-top:8px;">Privacy policy &rarr;</a>
+            </div>
+          </div>
+          </div>
         </section>
 
 
@@ -1418,11 +1698,38 @@
 
             <div class="help-card">
               <div class="help-icon">
+                <i class="fas fa-route"></i>
+              </div>
+              <h3>Guided Setup</h3>
+              <p>Re-run the onboarding walkthrough to change your provider or MCP setup</p>
+              <a href="onboarding.html" target="_blank" class="help-link">Restart Setup</a>
+            </div>
+
+            <div class="help-card">
+              <div class="help-icon">
                 <i class="fas fa-book"></i>
               </div>
               <h3>Documentation</h3>
               <p>Complete documentation and setup guides for FSB</p>
               <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link">View Repository</a>
+            </div>
+
+            <div class="help-card">
+              <div class="help-icon">
+                <i class="fas fa-life-ring"></i>
+              </div>
+              <h3>Support & FAQ</h3>
+              <p>Browse FAQs and fix common connection issues</p>
+              <a href="https://full-selfbrowsing.com/support" target="_blank" rel="noopener" class="help-link">Open Support</a>
+            </div>
+
+            <div class="help-card">
+              <div class="help-icon">
+                <i class="fas fa-plug"></i>
+              </div>
+              <h3>MCP Setup</h3>
+              <p>Connect MCP clients like Claude Code and Cursor, then verify with the doctor command</p>
+              <a href="https://full-selfbrowsing.com/agents" target="_blank" rel="noopener" class="help-link">View MCP Guide</a>
             </div>
 
             <div class="help-card">
@@ -1451,6 +1758,36 @@
               <p>View the source code and contribute to FSB development</p>
               <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" class="help-link">View GitHub</a>
             </div>
+
+            <div class="help-card">
+              <div class="help-icon">
+                <i class="fas fa-clock-rotate-left"></i>
+              </div>
+              <h3>Release Notes</h3>
+              <p>See what's new and changed in each FSB release</p>
+              <a href="https://github.com/LakshmanTurlapati/FSB/releases" target="_blank" rel="noopener" class="help-link">View Releases</a>
+            </div>
+
+            <div class="help-card">
+              <div class="help-icon">
+                <i class="fas fa-gavel"></i>
+              </div>
+              <h3>License</h3>
+              <p>FSB is open source under the BSL 1.1 license</p>
+              <a href="https://github.com/LakshmanTurlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener" class="help-link">View License</a>
+            </div>
+
+            <div class="help-card">
+              <div class="help-icon">
+                <i class="fas fa-users"></i>
+              </div>
+              <h3>Community</h3>
+              <p>Join other FSB users and follow along for updates</p>
+              <div class="help-links-row">
+                <a href="https://discord.gg/fullselfbrowsing" target="_blank" rel="noopener" class="help-link"><i class="fa-brands fa-discord"></i> Discord</a>
+                <a href="https://x.com/fullselfbrowsing" target="_blank" rel="noopener" class="help-link" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1458,7 +1795,9 @@
         <section id="branding">
           <div class="branding-section">
             <div class="branding-content">
-              <img id="footer-logo-img" src="../assets/fsb_logo_dark_footer.png" alt="FSB - Fast Smart Browser" class="footer-logo">
+              <div class="fsb-foot-brand">
+                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.90</span>
+              </div>
             </div>
           </div>
         </section>
@@ -1569,8 +1908,19 @@
   <script src="site-guides-viewer.js"></script>
   <script src="lib/qrcode-generator.min.js"></script>
   <script src="pin-input.js"></script>
+  <script src="../utils/agent-cap-recommendation.js"></script>
   <!-- Phase 243 Plan 04 / UI-03: pure helpers for the cap counter + validation. Must load BEFORE options.js. -->
   <script src="cap-counter-helpers.js"></script>
+  <!--
+    Phase 30 (GOV-07/GOV-08): the consent + audit + denylist stores the Consent &
+    Audit section reads/writes. Must load BEFORE options.js so its cacheElements +
+    render path can consume globalThis.FsbConsentPolicyStore / FsbAuditLog /
+    FsbServiceDenylist. The UI is the ONLY surface that mutates consent from user
+    intent; the gate (background.js) remains the authoritative enforcement.
+  -->
+  <script src="../utils/consent-policy-store.js"></script>
+  <script src="../utils/audit-log.js"></script>
+  <script src="../utils/service-denylist.js"></script>
   <script src="options.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.

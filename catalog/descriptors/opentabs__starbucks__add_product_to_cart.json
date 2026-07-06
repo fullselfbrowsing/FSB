@@ -1,0 +1,59 @@
+{
+  "slug": "starbucks.add_product_to_cart",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "add a product to cart in starbucks",
+    "add product to cart in starbucks",
+    "add a product to the cart in starbucks"
+  ],
+  "description": "Quick-add a product to the cart by its product code. Get product codes from get_store_menu. Optionally specify a quantity (defaults to 1). The user must have selected a store on the Starbucks website first.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_number": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Product number from the menu (e.g., 34833)"
+      },
+      "form": {
+        "type": "string",
+        "description": "Product form (e.g., \"iced\", \"hot\", \"single\")"
+      },
+      "size": {
+        "description": "Size code (e.g., \"Tall\", \"Grande\", \"Venti\"). Defaults to the product's default size.",
+        "type": "string"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "store_number": {
+        "type": "string",
+        "description": "Store number for product availability (e.g., \"53646-283069\")"
+      }
+    },
+    "required": [
+      "product_number",
+      "form",
+      "store_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/add-product-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "add"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "medium.clap_post",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "clap a post in medium",
+    "clap post in medium",
+    "clap (like) a medium post in medium"
+  ],
+  "description": "Clap (like) a Medium post. Each user can clap up to 50 times per post. Returns the updated clap count.",
+  "actionVerb": "clap",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "post_id": {
+        "type": "string",
+        "description": "Medium post ID to clap"
+      },
+      "count": {
+        "description": "Number of claps to add (default 1, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/clap-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "clap"
+    }
+  }
+}

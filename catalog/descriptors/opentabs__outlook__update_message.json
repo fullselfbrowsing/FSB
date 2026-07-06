@@ -1,0 +1,69 @@
+{
+  "slug": "outlook.update_message",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "update a message in outlook",
+    "edit a message in outlook",
+    "change the details of message in outlook",
+    "modify a message in outlook",
+    "update message in outlook",
+    "update email properties in outlook"
+  ],
+  "description": "Update message properties like read status, importance, categories, or flag status.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID to update"
+      },
+      "is_read": {
+        "description": "Mark as read or unread",
+        "type": "boolean"
+      },
+      "importance": {
+        "description": "Set importance level",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high"
+        ]
+      },
+      "categories": {
+        "description": "Set categories/labels",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "flag_status": {
+        "description": "Set flag status",
+        "type": "string",
+        "enum": [
+          "notFlagged",
+          "flagged",
+          "complete"
+        ]
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/update-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

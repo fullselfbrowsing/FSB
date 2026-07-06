@@ -1,0 +1,39 @@
+{
+  "slug": "twilio.delete_message",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "delete a message in twilio",
+    "remove a message in twilio",
+    "trash a message in twilio",
+    "permanently delete a message in twilio",
+    "delete message in twilio"
+  ],
+  "description": "Delete a message by its SID. This action is permanent and cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sid": {
+        "type": "string",
+        "description": "Message SID to delete (e.g., SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)"
+      }
+    },
+    "required": [
+      "sid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/delete-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

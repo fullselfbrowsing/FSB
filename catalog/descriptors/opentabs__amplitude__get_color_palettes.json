@@ -1,0 +1,31 @@
+{
+  "slug": "amplitude.get_color_palettes",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "get color palettes in amplitude",
+    "look up color palettes in amplitude",
+    "fetch a single color palettes in amplitude",
+    "view one specific color palettes in amplitude",
+    "get chart color palettes in amplitude"
+  ],
+  "description": "Get all color palettes available in the organization for chart visualization. Includes built-in Amplitude palettes and custom user-created palettes.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/get-color-palettes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "minimax.list_homepage_experts",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list homepage experts in minimax",
+    "show me my homepage experts in minimax",
+    "view my homepage experts in minimax",
+    "see all my homepage experts in minimax"
+  ],
+  "description": "List featured AI experts/agents shown on the homepage. Returns paginated results.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_num": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-homepage-experts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

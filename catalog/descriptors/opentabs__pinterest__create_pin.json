@@ -1,0 +1,61 @@
+{
+  "slug": "pinterest.create_pin",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "create a pin in pinterest",
+    "add a pin in pinterest",
+    "make a new pin in pinterest",
+    "open a new pin in pinterest",
+    "create pin in pinterest",
+    "create a new pin on a board in pinterest"
+  ],
+  "description": "Create a new pin from an image URL and save it to a board. Requires the board ID, an image URL, and optionally a title, description, and external link.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "board_id": {
+        "type": "string",
+        "description": "Board ID to save the pin to"
+      },
+      "image_url": {
+        "type": "string",
+        "description": "URL of the image to pin"
+      },
+      "title": {
+        "description": "Pin title",
+        "type": "string"
+      },
+      "description": {
+        "description": "Pin description",
+        "type": "string"
+      },
+      "link": {
+        "description": "External link URL",
+        "type": "string"
+      },
+      "section_id": {
+        "description": "Board section ID to save the pin to",
+        "type": "string"
+      }
+    },
+    "required": [
+      "board_id",
+      "image_url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/create-pin.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourcepost",
+      "httpMethod": "SCRAPED",
+      "opNameVerb": "create"
+    }
+  }
+}

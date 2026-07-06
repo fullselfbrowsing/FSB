@@ -1,0 +1,38 @@
+{
+  "slug": "telegram.resolve_username",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "resolve an username in telegram",
+    "resolve username in telegram",
+    "look up a user or channel by @username in telegram"
+  ],
+  "description": "Resolve a Telegram @username to a user or chat/channel. Returns the peer type and ID along with full profile data. The username should be provided without the @ prefix.",
+  "actionVerb": "resolve",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username to resolve (without the @ prefix)"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/resolve-username.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "resolve"
+    }
+  }
+}

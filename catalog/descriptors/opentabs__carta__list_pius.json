@@ -1,0 +1,42 @@
+{
+  "slug": "carta.list_pius",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list a pius in carta",
+    "show me my pius in carta",
+    "view my pius in carta",
+    "see all my pius in carta",
+    "list pius in carta",
+    "list profits interest units in carta"
+  ],
+  "description": "List all profits interest units (PIUs) for a company in the portfolio.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-pius.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

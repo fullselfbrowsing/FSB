@@ -1,0 +1,44 @@
+{
+  "slug": "teams.invite_to_channel",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "invite a to channel in teams",
+    "invite to channel in teams",
+    "add a user to a group chat in teams"
+  ],
+  "description": "Add a user to a Teams group chat by their MRI identifier (e.g., \"8:live:username\").",
+  "actionVerb": "invite",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      },
+      "user": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User MRI to add (e.g., \"8:live:username\")"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "user"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/invite-to-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "invite"
+    }
+  }
+}

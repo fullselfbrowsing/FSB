@@ -1,0 +1,64 @@
+{
+  "slug": "datadog.list_notebooks",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list notebooks in datadog",
+    "show me my notebooks in datadog",
+    "view my notebooks in datadog",
+    "see all my notebooks in datadog",
+    "list datadog notebooks in datadog"
+  ],
+  "description": "List Datadog notebooks with optional text search. Notebooks are collaborative documents with time-synced data widgets.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Text search for notebook names",
+        "type": "string"
+      },
+      "count": {
+        "description": "Results per page (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "start": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "sort_field": {
+        "description": "Sort by field",
+        "type": "string",
+        "enum": [
+          "modified",
+          "name"
+        ]
+      },
+      "sort_dir": {
+        "description": "Sort direction",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-notebooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

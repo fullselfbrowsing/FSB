@@ -1,0 +1,57 @@
+{
+  "slug": "meticulous.get_test_run_diffs",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get test run diffs in meticulous",
+    "look up test run diffs in meticulous",
+    "fetch a single test run diffs in meticulous",
+    "view one specific test run diffs in meticulous",
+    "get replay diffs for a test run in meticulous"
+  ],
+  "description": "Get replay diffs for a test run. Each diff compares a head replay against a base replay. Set only_with_screenshot_diffs=true to skip diffs that have no visual differences (many diffs are structural-only with empty screenshot_diffs). Use compare_replays with the base_replay.id to see full comparison details including screenshots.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "only_with_screenshot_diffs": {
+        "default": false,
+        "description": "Only return diffs that have actual visual screenshot differences",
+        "type": "boolean"
+      },
+      "limit": {
+        "default": 100,
+        "description": "Max results to return",
+        "type": "number"
+      },
+      "offset": {
+        "default": 0,
+        "description": "Offset for pagination",
+        "type": "number"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "only_with_screenshot_diffs",
+      "limit",
+      "offset"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-diffs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

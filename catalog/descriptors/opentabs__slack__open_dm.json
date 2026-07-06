@@ -1,0 +1,38 @@
+{
+  "slug": "slack.open_dm",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "open a dm in slack",
+    "open dm in slack",
+    "open a direct message conversation in slack"
+  ],
+  "description": "Open a direct message conversation with one or more users. Returns an existing DM channel if one already exists, or creates a new one. For multi-person DMs (group DMs), pass multiple comma-separated user IDs.",
+  "actionVerb": "open",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "users": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comma-separated user IDs to open a DM with (e.g., U01234567 for 1:1, or U01234567,U07654321 for group DM)"
+      }
+    },
+    "required": [
+      "users"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/open-dm.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "open"
+    }
+  }
+}

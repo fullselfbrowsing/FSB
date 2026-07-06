@@ -1,0 +1,47 @@
+{
+  "slug": "gcal.move_event",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "move an event in gcal",
+    "move event in gcal",
+    "move an event in google calendar",
+    "move an event to another calendar in gcal"
+  ],
+  "description": "Move an event to another calendar. This changes the event organizer. Only default events can be moved — birthday, focusTime, fromGmail, outOfOffice, and workingLocation events cannot be moved.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Source calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "event_id": {
+        "type": "string",
+        "description": "Event ID to move"
+      },
+      "destination": {
+        "type": "string",
+        "description": "Destination calendar ID to move the event to"
+      }
+    },
+    "required": [
+      "event_id",
+      "destination"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/move-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "move"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "twilio.list_applications",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list applications in twilio",
+    "show me my applications in twilio",
+    "view my applications in twilio",
+    "see all my applications in twilio"
+  ],
+  "description": "List TwiML applications. Optionally search by friendly name.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of applications to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "friendly_name": {
+        "description": "Search applications by friendly name",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-applications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "retool.move_resource_to_folder",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "move a resource to folder in retool",
+    "move resource to folder in retool",
+    "move a resource to a folder in retool"
+  ],
+  "description": "Move a resource (data source) to a different resource folder. Use list_resources to find resource IDs.",
+  "actionVerb": "move",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_id": {
+        "type": "number",
+        "description": "Resource ID to move"
+      },
+      "resource_folder_id": {
+        "type": "number",
+        "description": "Destination resource folder ID"
+      }
+    },
+    "required": [
+      "resource_id",
+      "resource_folder_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/move-resource-to-folder.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "move"
+    }
+  }
+}

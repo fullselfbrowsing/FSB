@@ -1,0 +1,36 @@
+{
+  "slug": "ynab.list_accounts",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "list accounts in ynab",
+    "show me my accounts in ynab",
+    "view my accounts in ynab",
+    "see all my accounts in ynab",
+    "list all budget accounts in ynab"
+  ],
+  "description": "List all accounts in the active YNAB plan. Returns account name, type, balances, and on-budget status. Includes checking, savings, credit cards, and tracking accounts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "include_closed": {
+        "description": "Include closed accounts (default false)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/list-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "zendesk.get_organization",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "get an organization in zendesk",
+    "look up an organization in zendesk",
+    "fetch a single organization in zendesk",
+    "view one specific organization in zendesk",
+    "get organization in zendesk",
+    "get an organization by id in zendesk"
+  ],
+  "description": "Get detailed information about a specific Zendesk organization by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Organization ID to retrieve"
+      }
+    },
+    "required": [
+      "organization_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/get-organization.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

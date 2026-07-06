@@ -1,0 +1,36 @@
+{
+  "slug": "sentry.list_projects",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list projects in sentry",
+    "show me my projects in sentry",
+    "view my projects in sentry",
+    "see all my projects in sentry",
+    "list all projects in the organization in sentry"
+  ],
+  "description": "List all projects for the current Sentry organization. Returns project name, slug, platform, and access status. Use the project slug for filtering issues or retrieving events.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

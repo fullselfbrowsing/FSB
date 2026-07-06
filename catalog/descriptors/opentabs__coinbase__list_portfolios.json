@@ -1,0 +1,31 @@
+{
+  "slug": "coinbase.list_portfolios",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "list portfolios in coinbase",
+    "show me my portfolios in coinbase",
+    "view my portfolios in coinbase",
+    "see all my portfolios in coinbase",
+    "list all portfolios in coinbase"
+  ],
+  "description": "List all portfolios in the Coinbase account. Most users have a single \"Primary\" portfolio of type DEFAULT.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/list-portfolios.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

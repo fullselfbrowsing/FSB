@@ -1,0 +1,39 @@
+{
+  "slug": "stripe.delete_customer",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "delete a customer in stripe",
+    "remove a customer in stripe",
+    "trash a customer in stripe",
+    "permanently delete a customer in stripe",
+    "delete customer in stripe"
+  ],
+  "description": "Permanently delete a customer and all their subscriptions and payment sources. This cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "description": "Customer ID to delete (e.g., cus_xxx)"
+      }
+    },
+    "required": [
+      "customer_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/delete-customer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

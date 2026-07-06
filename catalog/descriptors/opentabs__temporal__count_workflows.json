@@ -1,0 +1,38 @@
+{
+  "slug": "temporal.count_workflows",
+  "service": "cloud.temporal.io",
+  "intentSynonyms": [
+    "count workflows in temporal",
+    "count workflows matching a query in temporal",
+    "count workflow executions matching an optional visibility query in temporal"
+  ],
+  "description": "Count workflow executions matching an optional visibility query. Useful for getting a quick overview of workflow states without fetching full execution data.",
+  "actionVerb": "count",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "namespace": {
+        "description": "Temporal namespace (e.g., \"prod-us-west-2.abc123\"). Defaults to the namespace in the current browser tab.",
+        "type": "string"
+      },
+      "query": {
+        "description": "Temporal visibility query filter (e.g., ExecutionStatus=\"Failed\" AND CloseTime > \"2024-01-01\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/temporal-cloud/src/tools/count-workflows.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "count"
+    }
+  }
+}

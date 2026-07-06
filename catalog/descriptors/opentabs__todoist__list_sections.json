@@ -1,0 +1,35 @@
+{
+  "slug": "todoist.list_sections",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list sections in todoist",
+    "show me my sections in todoist",
+    "view my sections in todoist",
+    "see all my sections in todoist"
+  ],
+  "description": "List sections in a Todoist project. If no project ID is provided, returns sections across all projects.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Filter sections by project ID",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-sections.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

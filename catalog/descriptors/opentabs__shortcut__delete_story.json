@@ -1,0 +1,41 @@
+{
+  "slug": "shortcut.delete_story",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "delete a story in shortcut",
+    "remove a story in shortcut",
+    "trash a story in shortcut",
+    "permanently delete a story in shortcut",
+    "delete story in shortcut"
+  ],
+  "description": "Permanently delete a story by its numeric ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "story_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Story numeric ID to delete"
+      }
+    },
+    "required": [
+      "story_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/delete-story.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

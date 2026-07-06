@@ -1,0 +1,45 @@
+{
+  "slug": "dominos.find_stores_by_address",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "find a stores by address in dominos",
+    "find stores by address in dominos",
+    "find stores near a specific address in dominos"
+  ],
+  "description": "Find nearby Domino's stores using a Google Place ID. Get a place_id by calling search_address first. Optionally filter by service method (DELIVERY or CARRYOUT).",
+  "actionVerb": "find",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "place_id": {
+        "type": "string",
+        "description": "Google Place ID from search_address results"
+      },
+      "service_method": {
+        "description": "Filter by service method",
+        "type": "string",
+        "enum": [
+          "DELIVERY",
+          "CARRYOUT"
+        ]
+      }
+    },
+    "required": [
+      "place_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/find-stores-by-address.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "find"
+    }
+  }
+}

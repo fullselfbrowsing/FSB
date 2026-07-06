@@ -1,0 +1,31 @@
+{
+  "slug": "pandaexpress.get_billing_accounts",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get billing accounts in pandaexpress",
+    "look up billing accounts in pandaexpress",
+    "fetch a single billing accounts in pandaexpress",
+    "view one specific billing accounts in pandaexpress",
+    "view your saved payment methods in pandaexpress"
+  ],
+  "description": "Get the authenticated user's saved payment methods. Returns card type, last 4 digits, and default status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-billing-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

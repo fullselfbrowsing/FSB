@@ -1,0 +1,37 @@
+{
+  "slug": "chatgpt.unarchive_conversation",
+  "service": "chatgpt.com",
+  "intentSynonyms": [
+    "unarchive a conversation in chatgpt",
+    "unarchive conversation in chatgpt",
+    "unarchive a previously archived chatgpt conversation, restoring it to the main conversation list in chatgpt"
+  ],
+  "description": "Unarchive a previously archived ChatGPT conversation, restoring it to the main conversation list.",
+  "actionVerb": "unarchive",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "description": "Conversation ID (UUID)"
+      }
+    },
+    "required": [
+      "conversation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chatgpt/src/tools/unarchive-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "unarchive"
+    }
+  }
+}

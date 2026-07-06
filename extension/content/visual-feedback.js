@@ -250,6 +250,7 @@
       this._lastTextWriteAt = 0;         // performance.now() of last visible text write
       this._lastVisiblePercent = 0;      // monotonic clamp floor
       this._lastActionCount = null;      // last written actionCount (batching gate)
+      this._logBuffer = [];              // rolling scrollback of previously-flushed detail strings, capped at 3
     }
 
     /**
@@ -306,6 +307,13 @@
       if (summaryEl) summaryEl.textContent = p.subtitle;
       if (stepTextEl) stepTextEl.textContent = p.detail;
       if (stepNumberEl) stepNumberEl.textContent = p.stepNumberLabel;
+      // Scrollback log: push the outgoing detail text (about to be replaced)
+      // into the rolling buffer, deduped against consecutive repeats, capped
+      // at 3 entries (current + 2 "previous" lines rendered in update()).
+      if (p.detail && this._logBuffer[this._logBuffer.length - 1] !== p.detail) {
+        this._logBuffer.push(p.detail);
+        if (this._logBuffer.length > 3) this._logBuffer.shift();
+      }
       this._lastTextWriteAt = performance.now();
       this._pendingDisplay = null;
     }
@@ -419,6 +427,14 @@
         pointer-events: none;
       }
 
+      .fsb-overlay.capability {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.38);
+      }
+
+      .fsb-overlay.guarded {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 165, 36, 0.45);
+      }
+
       .fsb-header {
         display: flex;
         align-items: center;
@@ -456,6 +472,32 @@
         white-space: nowrap;
       }
 
+      .fsb-stop {
+        margin-left: 8px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        cursor: pointer;
+        flex-shrink: 0;
+        pointer-events: auto;
+        transition: background 0.15s ease;
+      }
+
+      .fsb-stop:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .fsb-stop.hidden {
+        display: none;
+      }
+
       .fsb-task {
         color: rgba(255, 255, 255, 0.7);
         font-size: 12px;
@@ -475,6 +517,80 @@
         display: none;
       }
 
+      .fsb-chip {
+        display: none;
+        align-items: center;
+        gap: 7px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 7px;
+        padding: 7px 9px;
+        margin-bottom: 9px;
+        font-size: 11px;
+      }
+
+      .fsb-chip.show {
+        display: flex;
+      }
+
+      .fsb-chip-lock {
+        opacity: 0.55;
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+
+      .fsb-chip-txt {
+        flex: 1;
+        color: rgba(255, 255, 255, 0.82);
+        font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+        font-size: 10.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .fsb-chip-rdy {
+        flex-shrink: 0;
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+
+      .fsb-chip-rdy.ready {
+        background: rgba(52, 211, 153, 0.18);
+        color: #34D399;
+      }
+
+      .fsb-chip-rdy.guarded {
+        background: rgba(245, 165, 36, 0.2);
+        color: #f5b942;
+      }
+
+      .fsb-note {
+        display: none;
+        align-items: flex-start;
+        gap: 6px;
+        background: rgba(245, 165, 36, 0.1);
+        border: 1px solid rgba(245, 165, 36, 0.25);
+        border-radius: 7px;
+        padding: 7px 9px;
+        margin-bottom: 9px;
+        font-size: 11px;
+        color: #f5cf8f;
+        line-height: 1.4;
+      }
+
+      .fsb-note.show {
+        display: flex;
+      }
+
+      .fsb-note-icon {
+        margin-top: 1px;
+        flex-shrink: 0;
+      }
+
       .fsb-step {
         display: flex;
         align-items: flex-start;
@@ -492,12 +608,47 @@
         flex-shrink: 0;
       }
 
+      .fsb-step-number.calling {
+        background: rgba(139, 92, 246, 0.22);
+        color: #b79dfb;
+      }
+
+      .fsb-step-number.guarded {
+        background: rgba(245, 165, 36, 0.22);
+        color: #f5b942;
+      }
+
       .fsb-step-text {
         color: rgba(255, 255, 255, 0.9);
         font-size: 12px;
         flex: 1;
         line-height: 1.45;
         overflow-wrap: anywhere;
+      }
+
+      .fsb-log {
+        max-height: 14px;
+        overflow: hidden;
+        transition: max-height 0.22s ease;
+        margin-bottom: 2px;
+        cursor: default;
+      }
+
+      .fsb-log:hover {
+        max-height: 52px;
+      }
+
+      .fsb-log-line {
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.34);
+        line-height: 1.35;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .fsb-log-line:empty {
+        display: none;
       }
 
       .fsb-meta {
@@ -549,6 +700,11 @@
         transform: scaleX(1) !important;
       }
 
+      .fsb-progress-fill.guarded {
+        background: #f5a524;
+        animation: none;
+      }
+
       @keyframes fsbProgressSweep {
         0% { transform: translateX(-120%); }
         100% { transform: translateX(320%); }
@@ -572,12 +728,23 @@
         .fsb-summary,
         .fsb-step-text,
         .fsb-step-number,
-        .fsb-eta {
+        .fsb-eta,
+        .fsb-chip-txt,
+        .fsb-chip-rdy,
+        .fsb-note,
+        .fsb-log-line {
           transition: none !important;
           animation: none !important;
         }
         /* .fsb-progress-fill.complete background change is a single state,
            not an animation -- preserved as the only celebratory cue. */
+        /* Hover-driven max-height reveal is itself a motion-gated disclosure --
+           show the (max 2-line) scrollback permanently instead under reduced motion. */
+        .fsb-log,
+        .fsb-log:hover {
+          transition: none !important;
+          max-height: 52px;
+        }
       }
     `;
 
@@ -591,12 +758,26 @@
         <img class="fsb-logo" src="" alt="FSB">
         <span class="fsb-title">FSB Automating</span>
         <span class="fsb-client-badge"></span>
+        <button type="button" class="fsb-stop hidden" aria-label="Stop">&#9632;</button>
       </div>
       <div class="fsb-task">-</div>
       <div class="fsb-summary"></div>
+      <div class="fsb-chip">
+        <span class="fsb-chip-lock">&#128274;</span>
+        <span class="fsb-chip-txt"></span>
+        <span class="fsb-chip-rdy"></span>
+      </div>
+      <div class="fsb-note">
+        <span class="fsb-note-icon">&#9888;</span>
+        <span class="fsb-note-text"></span>
+      </div>
       <div class="fsb-step">
         <span class="fsb-step-number">Planning</span>
         <span class="fsb-step-text">Initializing...</span>
+      </div>
+      <div class="fsb-log">
+        <div class="fsb-log-line"></div>
+        <div class="fsb-log-line"></div>
       </div>
       <div class="fsb-meta">
         <span class="fsb-phase"></span>
@@ -610,6 +791,22 @@
       // Set logo image src using chrome.runtime.getURL for web_accessible_resources
       const logoImg = this.container.querySelector('.fsb-logo');
       logoImg.src = chrome.runtime.getURL('assets/icon48.png');
+
+      // Stop button: attached once here (not in update()) to avoid re-attaching
+      // listeners on every session-status tick. Reuses the extension's existing
+      // stopAutomation mechanism verbatim -- see the "Stop control" section of
+      // the implementation plan for why this doesn't attempt per-invoke cancellation.
+      const stopBtn = this.container.querySelector('.fsb-stop');
+      if (stopBtn) {
+        stopBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          try {
+            chrome.runtime.sendMessage({ action: 'stopAutomation', sessionId: FSB.sessionId || undefined });
+          } catch (err) {
+            logger.error('Stop button sendMessage failed', { error: err.message });
+          }
+        });
+      }
 
       this.shadow.appendChild(this.container);
 
@@ -712,6 +909,65 @@
         clientBadgeEl.style.display = combined ? 'inline-flex' : 'none';
       }
 
+      // Capability-call visual treatment: violet "calling" mode + amber
+      // "guarded" fail-closed state for invoke_capability calls, distinct
+      // from ordinary DOM-action phases. All reads are defensive against
+      // `capability`/`guarded`/`stoppable` being absent (the common case for
+      // every non-capability session), so this block is fully inert there.
+      var isGuarded = !!overlayState.guarded;
+      var isCalling = overlayState.phase === 'calling';
+      var capability = overlayState.capability || null;
+      this.container.classList.toggle('guarded', isGuarded);
+      this.container.classList.toggle('capability', !isGuarded && isCalling);
+
+      var chipEl = this.container.querySelector('.fsb-chip');
+      if (chipEl) {
+        chipEl.classList.toggle('show', !!(capability && capability.chipText));
+        if (capability) {
+          var chipTxtEl = this.container.querySelector('.fsb-chip-txt');
+          var chipRdyEl = this.container.querySelector('.fsb-chip-rdy');
+          if (chipTxtEl) chipTxtEl.textContent = capability.chipText || '';
+          if (chipRdyEl) {
+            chipRdyEl.textContent = capability.readinessLabel || '';
+            chipRdyEl.classList.remove('ready', 'guarded');
+            if (capability.readinessClass) chipRdyEl.classList.add(capability.readinessClass);
+          }
+        }
+      }
+
+      var noteEl = this.container.querySelector('.fsb-note');
+      if (noteEl) {
+        noteEl.classList.toggle('show', isGuarded && !!(capability && capability.noteText));
+        if (capability) {
+          var noteTextEl = this.container.querySelector('.fsb-note-text');
+          if (noteTextEl) noteTextEl.textContent = capability.noteText || '';
+        }
+      }
+
+      // Step-number pill color: an immediate (non-debounced) class write, kept
+      // separate from the debounced pill TEXT write below -- coupling the
+      // color to the debounce would let the ring color and pill color visibly
+      // desync during the hold window.
+      var stepNumberEl = this.container.querySelector('.fsb-step-number');
+      if (stepNumberEl) {
+        stepNumberEl.classList.toggle('calling', !isGuarded && isCalling);
+        stepNumberEl.classList.toggle('guarded', isGuarded);
+      }
+
+      var stopBtnEl = this.container.querySelector('.fsb-stop');
+      if (stopBtnEl) {
+        stopBtnEl.classList.toggle('hidden', !overlayState.stoppable);
+      }
+
+      // Scrollback log: render the 2 steps before the current one from the
+      // rolling buffer populated in _flushPendingText().
+      var logLines = this.container.querySelectorAll('.fsb-log-line');
+      if (logLines && logLines.length) {
+        var prevLines = this._logBuffer.slice(0, -1).slice(-2).reverse();
+        if (logLines[0]) logLines[0].textContent = prevLines[0] || '';
+        if (logLines[1]) logLines[1].textContent = prevLines[1] || '';
+      }
+
       // Phase 229-02 (OVERLAY-05): suppress generic 'thinking-class' phase
       // labels in detail when session elapsed < 1s. Avoids the 'Thinking...'
       // / 'Planning...' flash on fast turns. Only suppresses when detail is
@@ -751,7 +1007,19 @@
 
       var bar = this.container.querySelector('.fsb-progress-bar');
       var fill = this.container.querySelector('.fsb-progress-fill');
-      if (progress.mode === 'determinate' && progress.percent !== null) {
+      fill.classList.toggle('guarded', isGuarded);
+      // Trigger watchers don't have progress -- they sit and observe. The
+      // indeterminate sweep implies forward motion, which misreads as
+      // "something is happening". Hide the bar entirely; the breathing
+      // edge-glow + static caption carry the "armed and waiting" signal.
+      var isTriggerWatch = overlayState.phase === 'trigger-watch'
+        || overlayState.mode === 'trigger-watch';
+      if (isTriggerWatch) {
+        fill.style.transform = '';
+        fill.style.transformOrigin = '';
+        bar.classList.add('hidden');
+        bar.classList.remove('indeterminate');
+      } else if (progress.mode === 'determinate' && progress.percent !== null) {
         bar.classList.remove('indeterminate');
         bar.classList.remove('hidden');
         fill.style.width = '100%';
@@ -860,6 +1128,7 @@
       this._lastTextWriteAt = 0;
       this._lastVisiblePercent = 0;
       this._lastActionCount = null;
+      this._logBuffer = [];
       this._startTime = null;
       this._frozen = false;
       if (this.host) {
@@ -894,7 +1163,7 @@
     constructor() {
       this.host = null;
       this.shadow = null;
-      this.state = null; // 'thinking' or 'acting'
+      this.state = null; // 'thinking' | 'acting' | 'watching'
       this._rafId = null;
       this._startTime = null;
       this._bars = null; // cached DOM references: { top, right, bottom, left }
@@ -939,13 +1208,16 @@
       }
       const root = this.shadow.querySelector('.viewport-glow-root');
       if (root) {
-        root.classList.remove('state-thinking', 'state-acting');
+        root.classList.remove('state-thinking', 'state-acting', 'state-watching', 'state-calling');
         root.classList.add(`state-${state}`);
       }
     }
 
     _getDuration() {
-      return this.state === 'acting' ? 4000 : 6000;
+      if (this.state === 'acting') return 4000;
+      if (this.state === 'watching') return 5000;
+      if (this.state === 'calling') return 4000;
+      return 6000;
     }
 
     /**
@@ -1113,6 +1385,22 @@
         --ambient-inner: rgba(255, 140, 0, 0.51);
         --ambient-outer: rgba(255, 102, 0, 0.26);
       }
+      .viewport-glow-root.state-watching {
+        --glow-color-1: #ff8c00;
+        --glow-color-2: #ffa500;
+        --glow-opacity: 0.85;
+        --glow-brightness: 1.4;
+        --ambient-inner: rgba(255, 140, 0, 0.27);
+        --ambient-outer: rgba(255, 166, 0, 0.13);
+      }
+      .viewport-glow-root.state-calling {
+        --glow-color-1: #8b5cf6;
+        --glow-color-2: #a78bfa;
+        --glow-opacity: 1;
+        --glow-brightness: 1.5;
+        --ambient-inner: rgba(139, 92, 246, 0.3);
+        --ambient-outer: rgba(167, 139, 250, 0.15);
+      }
 
       /* Ambient inset glow */
       .viewport-ambient {
@@ -1191,6 +1479,176 @@
   const viewportGlow = new ViewportGlow();
 
   /**
+   * TriggerBadge - Compact pill in the top-right viewport that tallies armed
+   * trigger watchers and their fire counts. Mirrors the visual language of the
+   * other overlays (Shadow DOM + Popover top-layer + orange palette) and stays
+   * deliberately quiet: no animation while idle, soft fade when counts shift.
+   *
+   * API:
+   *   show({watching, fired}) — show or update; pass {watching:0, fired:0} to fade out
+   *   hide()                  — fade and remove
+   *   destroy()               — synchronous teardown
+   */
+  class TriggerBadge {
+    constructor() {
+      this.host = null;
+      this.shadow = null;
+      this.root = null;
+      this.watchingEl = null;
+      this.firedEl = null;
+      this.lastWatching = 0;
+      this.lastFired = 0;
+      this._inTopLayer = false;
+    }
+
+    _create() {
+      this.host = markOverlayElement(document.createElement('div'), 'trigger-badge-host');
+      this.host.id = 'fsb-trigger-badge-host';
+      this.host.style.cssText = 'all:initial!important;position:fixed!important;bottom:0!important;right:0!important;z-index:2147483647!important;pointer-events:none!important;margin:0!important;padding:0!important;border:none!important;background:none!important;';
+
+      this.shadow = this.host.attachShadow({ mode: 'closed' });
+
+      const style = document.createElement('style');
+      style.textContent = `
+        :host { all: initial !important; }
+        .badge-root {
+          position: fixed;
+          bottom: 14px;
+          right: 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          font: 500 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          color: #fff5e6;
+          background: rgba(20, 16, 12, 0.88);
+          border: 1px solid rgba(255, 140, 0, 0.55);
+          border-radius: 999px;
+          box-shadow: 0 4px 16px rgba(255, 140, 0, 0.18), 0 0 0 1px rgba(255, 140, 0, 0.10);
+          opacity: 0;
+          transform: translateY(4px);
+          transition: opacity 220ms ease-out, transform 220ms ease-out;
+          pointer-events: none;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+        }
+        .badge-root.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .badge-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: rgba(255, 166, 0, 0.95);
+          box-shadow: 0 0 8px rgba(255, 140, 0, 0.75);
+          animation: fsb-trigger-badge-dot 2.4s ease-in-out infinite;
+        }
+        @keyframes fsb-trigger-badge-dot {
+          0%, 100% { opacity: 0.55; transform: scale(1); }
+          50%      { opacity: 1;    transform: scale(1.15); }
+        }
+        .badge-text {
+          white-space: nowrap;
+        }
+        .badge-sep {
+          opacity: 0.45;
+          margin: 0 2px;
+        }
+        .badge-fired {
+          color: rgba(255, 220, 180, 0.75);
+        }
+        .badge-fired.zero { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+          .badge-root { transition: opacity 80ms linear; transform: none; }
+          .badge-root.visible { transform: none; }
+          .badge-dot { animation: none; opacity: 0.85; }
+        }
+      `;
+      this.shadow.appendChild(style);
+
+      this.root = document.createElement('div');
+      this.root.className = 'badge-root';
+      this.root.innerHTML = `
+        <span class="badge-dot"></span>
+        <span class="badge-text"><span class="badge-watching">0 watching</span><span class="badge-sep badge-fired-sep"> · </span><span class="badge-fired zero">0 fired</span></span>
+      `;
+      this.shadow.appendChild(this.root);
+
+      this.watchingEl = this.root.querySelector('.badge-watching');
+      this.firedEl = this.root.querySelector('.badge-fired');
+      this.firedSepEl = this.root.querySelector('.badge-fired-sep');
+
+      this._inTopLayer = promoteToTopLayer(this.host);
+      if (!this._inTopLayer) {
+        document.documentElement.appendChild(this.host);
+      }
+    }
+
+    show(counts) {
+      const watching = Math.max(0, Number((counts && counts.watching) || 0));
+      const fired = Math.max(0, Number((counts && counts.fired) || 0));
+      this.lastWatching = watching;
+      this.lastFired = fired;
+
+      if (watching === 0 && fired === 0) {
+        this.hide();
+        return;
+      }
+
+      if (!this.host) {
+        this._create();
+        requestAnimationFrame(() => {
+          if (this.root) this.root.classList.add('visible');
+        });
+      } else {
+        this.root.classList.add('visible');
+      }
+
+      if (this.watchingEl) {
+        this.watchingEl.textContent = watching + (watching === 1 ? ' watching' : ' watching');
+      }
+      if (this.firedEl) {
+        this.firedEl.textContent = fired + ' fired';
+        this.firedEl.classList.toggle('zero', fired === 0);
+      }
+      if (this.firedSepEl) {
+        this.firedSepEl.style.display = fired > 0 ? '' : 'none';
+      }
+    }
+
+    hide() {
+      if (!this.root) {
+        this.destroy();
+        return;
+      }
+      this.root.classList.remove('visible');
+      setTimeout(() => {
+        if (this.lastWatching === 0 && this.lastFired === 0) {
+          this.destroy();
+        }
+      }, 250);
+    }
+
+    destroy() {
+      if (this.host) {
+        try { demoteFromTopLayer(this.host); } catch (_e) { /* best-effort */ }
+        try { this.host.remove(); } catch (_e) { /* best-effort */ }
+      }
+      this.host = null;
+      this.shadow = null;
+      this.root = null;
+      this.watchingEl = null;
+      this.firedEl = null;
+      this.firedSepEl = null;
+      this._inTopLayer = false;
+    }
+  }
+
+  // Singleton instance for trigger badge
+  const triggerBadge = new TriggerBadge();
+
+  /**
    * ActionGlowOverlay - Animated target-aware highlight that persists during action execution
    *
    * Uses Shadow DOM for style isolation. Inline links and text-first targets
@@ -1208,6 +1666,7 @@
       this.currentGeometry = null;
       this.currentMode = null;
       this._isVisible = false;
+      this._pulseMode = false;
       // Phase 229-01 (OVERLAY-02): rect memoization fields.
       this._rectDirty = true;
       this._onWindowChange = null;
@@ -1547,6 +2006,20 @@
         40%  { transform: scale(1.03); }
         100% { transform: scale(1); }
       }
+      @keyframes fsb-trigger-pulse {
+        0%, 100% {
+          opacity: 0.55;
+          transform: scale(1);
+          border-color: rgba(255, 140, 0, 0.55);
+          background: rgba(255, 140, 0, 0.03);
+        }
+        50% {
+          opacity: 0.92;
+          transform: scale(1.025);
+          border-color: rgba(255, 166, 0, 0.85);
+          background: rgba(255, 140, 0, 0.08);
+        }
+      }
       @keyframes fsbTextGlow {
         0%, 100% {
           background: linear-gradient(90deg, rgba(255, 140, 0, 0.30), rgba(255, 166, 0, 0.16));
@@ -1584,6 +2057,14 @@
         opacity: 1;
         animation: fsbActionGlow 1.5s ease-in-out infinite, fsbGlowAppear 0.3s ease-out;
       }
+      .box-overlay.trigger-pulse,
+      .box-overlay.trigger-pulse.active {
+        opacity: 1;
+        border-color: rgba(255, 140, 0, 0.65);
+        background: rgba(255, 140, 0, 0.05);
+        animation: fsb-trigger-pulse 2.4s ease-in-out infinite;
+        will-change: opacity, transform, border-color, background;
+      }
       .text-highlight {
         border-radius: 6px;
         transform: scale(0.985);
@@ -1606,6 +2087,14 @@
         .box-overlay.active,
         .text-highlight.active {
           animation: none;
+        }
+        .box-overlay.trigger-pulse,
+        .box-overlay.trigger-pulse.active {
+          animation: none;
+          opacity: 1;
+          transform: none;
+          border-color: rgba(255, 140, 0, 0.75);
+          background: rgba(255, 140, 0, 0.08);
         }
       }
     `;
@@ -1646,6 +2135,29 @@
       }
     }
 
+    showPulse(element) {
+      this.show(element);
+      this._pulseMode = true;
+      if (this.boxOverlay) {
+        this.boxOverlay.classList.add('trigger-pulse');
+      }
+    }
+
+    clearPulse() {
+      // Only tear down the shared overlay when it is actually showing a trigger
+      // pulse. A concurrent action re-targets this singleton via show() (which
+      // resets _pulseMode via its destroy-first path), so destroying here
+      // unconditionally would wipe an in-progress action highlight.
+      var wasPulse = this._pulseMode;
+      this._pulseMode = false;
+      if (this.boxOverlay) {
+        this.boxOverlay.classList.remove('trigger-pulse');
+      }
+      if (wasPulse) {
+        this.destroy();
+      }
+    }
+
     _updatePosition() {
       if (!this.targetElement || !this.overlayRoot) return;
 
@@ -1682,6 +2194,9 @@
           this.boxOverlay.classList.add('active');
         } else {
           this.boxOverlay.classList.remove('active');
+        }
+        if (this._pulseMode) {
+          this.boxOverlay.classList.add('trigger-pulse');
         }
       }
 
@@ -1788,6 +2303,7 @@
         this.currentGeometry = null;
         this.currentMode = null;
         this._isVisible = false;
+        this._pulseMode = false;
         this._inTopLayer = false;
       }, 250);
     }
@@ -1813,6 +2329,7 @@
       this.currentGeometry = null;
       this.currentMode = null;
       this._isVisible = false;
+      this._pulseMode = false;
       this._inTopLayer = false;
     }
   }
@@ -2265,6 +2782,13 @@
     } catch (e) { /* ignore cleanup errors on unload */ }
   });
 
+  window.addEventListener('pagehide', (e) => {
+    if (e.persisted) return;
+    try {
+      actionGlowOverlay.destroy();
+    } catch (_err) { /* ignore cleanup errors on pagehide */ }
+  });
+
   // ============================================================================
   // Attach all exports to FSB namespace
   // ============================================================================
@@ -2274,6 +2798,7 @@
   FSB.ProgressOverlay = ProgressOverlay;
   FSB.ViewportGlow = ViewportGlow;
   FSB.ActionGlowOverlay = ActionGlowOverlay;
+  FSB.TriggerBadge = TriggerBadge;
   FSB.ElementInspector = ElementInspector;
   FSB.CrawlProgressOverlay = CrawlProgressOverlay;
 
@@ -2282,6 +2807,7 @@
   FSB.progressOverlay = progressOverlay;
   FSB.viewportGlow = viewportGlow;
   FSB.actionGlowOverlay = actionGlowOverlay;
+  FSB.triggerBadge = triggerBadge;
   FSB.elementInspector = elementInspector;
   FSB.crawlProgressOverlay = crawlProgressOverlay;
 

@@ -1,0 +1,57 @@
+{
+  "slug": "stripe.list_invoices",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list invoices in stripe",
+    "show me my invoices in stripe",
+    "view my invoices in stripe",
+    "see all my invoices in stripe",
+    "list invoices with pagination in stripe"
+  ],
+  "description": "List invoices in your Stripe account. Returns invoices sorted by creation date (newest first).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Invoice ID cursor for pagination",
+        "type": "string"
+      },
+      "customer": {
+        "description": "Filter by customer ID",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by invoice status",
+        "type": "string",
+        "enum": [
+          "draft",
+          "open",
+          "paid",
+          "uncollectible",
+          "void"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-invoices.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

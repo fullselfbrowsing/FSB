@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.get_account",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "get an account in netlify",
+    "look up an account in netlify",
+    "fetch a single account in netlify",
+    "view one specific account in netlify",
+    "get account in netlify",
+    "get account details by id in netlify"
+  ],
+  "description": "Get detailed information about a specific Netlify account (team) by its ID. Returns name, slug, plan capabilities, billing info, and owner IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "string",
+        "description": "The account ID to retrieve"
+      }
+    },
+    "required": [
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/get-account.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

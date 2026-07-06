@@ -1,0 +1,39 @@
+{
+  "slug": "calendly.clone_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "clone an event type in calendly",
+    "clone event type in calendly",
+    "create a copy of an existing event type with all its settings in calendly"
+  ],
+  "description": "Create a copy of an existing event type with all its settings. The clone is created with \" (clone)\" appended to the name and a generated slug. Returns the new event type ID and edit path.",
+  "actionVerb": "clone",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID to clone"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/clone-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "clone"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "telegram.add_contact",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "add a contact in telegram",
+    "add contact in telegram",
+    "add a user to contacts in telegram"
+  ],
+  "description": "Add a user to your Telegram contacts by their user ID. You must provide a first name; last name and phone are optional.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "number",
+        "description": "User ID to add as a contact"
+      },
+      "first_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "First name for the contact"
+      },
+      "last_name": {
+        "description": "Last name for the contact",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Phone number for the contact",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id",
+      "first_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/add-contact.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

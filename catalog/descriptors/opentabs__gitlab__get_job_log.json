@@ -1,0 +1,48 @@
+{
+  "slug": "gitlab.get_job_log",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "get a job log in gitlab",
+    "look up a job log in gitlab",
+    "fetch a single job log in gitlab",
+    "view one specific job log in gitlab",
+    "get job log in gitlab",
+    "get the log output of a job in gitlab"
+  ],
+  "description": "Get the log (trace) output of a CI/CD job. Returns the raw log text.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "job_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Job ID"
+      }
+    },
+    "required": [
+      "project",
+      "job_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/get-job-log.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

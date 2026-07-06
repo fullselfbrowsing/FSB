@@ -1,0 +1,49 @@
+{
+  "slug": "newrelic.list_nrql_conditions",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "list nrql conditions in newrelic",
+    "show me my nrql conditions in newrelic",
+    "view my nrql conditions in newrelic",
+    "see all my nrql conditions in newrelic",
+    "list nrql alert conditions in newrelic"
+  ],
+  "description": "List NRQL-based alert conditions for an account. Optionally filter by policy ID. NRQL conditions trigger alerts when a NRQL query result crosses a threshold.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID"
+      },
+      "policy_id": {
+        "description": "Filter by alert policy ID",
+        "type": "string"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "account_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/list-nrql-conditions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+<main class="sitemaps-main">
+  <canvas #globeCanvas class="globe-canvas" aria-hidden="true"></canvas>
+
+  <div class="sitemaps-empty">
+    <span class="sitemaps-eyebrow" i18n="@@sitemaps.eyebrow">
+      <i class="fa-solid fa-users" aria-hidden="true"></i>
+      Community
+    </span>
+    <h1 i18n="@@sitemaps.title">Site Maps</h1>
+    <p i18n="@@sitemaps.copy">
+      The vision is simple. Anyone in the community can upload their well tested site maps.
+      These are schemas that get included in <span [attr.translate]="'no'">FSB</span> when they
+      prove promising. Community contribution is still under development, so please check
+      back again later.
+    </p>
+    <div class="sitemaps-actions">
+      <a routerLink="/about" class="btn btn-secondary btn-sm" i18n="@@sitemaps.cta.memory">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        Back to memory
+      </a>
+      <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-primary btn-sm" i18n="@@sitemaps.cta.github">
+        Contribute on <span [attr.translate]="'no'">GitHub</span>
+      </a>
+    </div>
+  </div>
+</main>

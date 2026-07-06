@@ -1,0 +1,44 @@
+{
+  "slug": "powerpoint.create_presentation",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "create a presentation in powerpoint",
+    "add a presentation in powerpoint",
+    "make a new presentation in powerpoint",
+    "open a new presentation in powerpoint",
+    "create presentation in powerpoint",
+    "create a new blank presentation in powerpoint"
+  ],
+  "description": "Create a new empty PowerPoint presentation (.pptx) in OneDrive. Specify a name and optional parent folder. Returns the created file details.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "File name without extension — .pptx is appended automatically"
+      },
+      "folder_id": {
+        "description": "Parent folder item ID — defaults to root",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/create-presentation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "create"
+    }
+  }
+}

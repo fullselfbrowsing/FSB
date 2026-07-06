@@ -1,0 +1,48 @@
+{
+  "slug": "jira.list_boards",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list boards in jira",
+    "show me my boards in jira",
+    "view my boards in jira",
+    "see all my boards in jira",
+    "list agile boards in jira"
+  ],
+  "description": "List Jira boards (Scrum and Kanban). Returns board name, type, and associated project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "description": "Filter boards by project key",
+        "type": "string"
+      },
+      "type": {
+        "description": "Filter by board type: scrum, kanban, simple",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Maximum number of boards to return (default 50)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first result to return for pagination",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/list-boards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "x.add_list_member",
+  "service": "x.com",
+  "intentSynonyms": [
+    "add a list member in x",
+    "add list member in x",
+    "add a user to a list in x"
+  ],
+  "description": "Add a user to a list.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID"
+      },
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to add"
+      }
+    },
+    "required": [
+      "list_id",
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/add-list-member.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

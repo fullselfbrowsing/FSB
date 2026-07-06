@@ -1,0 +1,39 @@
+{
+  "slug": "pinterest.delete_pin",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "delete a pin in pinterest",
+    "remove a pin in pinterest",
+    "trash a pin in pinterest",
+    "permanently delete a pin in pinterest",
+    "delete pin in pinterest"
+  ],
+  "description": "Delete a pin by its ID. Only works for pins you own. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pin_id": {
+        "type": "string",
+        "description": "Pin ID to delete"
+      }
+    },
+    "required": [
+      "pin_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/delete-pin.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

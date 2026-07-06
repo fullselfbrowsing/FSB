@@ -1,0 +1,31 @@
+{
+  "slug": "calendly.get_user_permissions",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get user permissions in calendly",
+    "look up user permissions in calendly",
+    "fetch a single user permissions in calendly",
+    "view one specific user permissions in calendly",
+    "get current user permissions and capabilities in calendly"
+  ],
+  "description": "Get the permission policy for the current user, showing what actions they can perform in the organization (create event types, manage teams, configure workflows, etc.).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-user-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

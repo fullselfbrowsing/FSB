@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FSB -- Lattice host (offscreen)</title>
+</head>
+<body>
+  <!--
+    FSB v0.10.0-attempt-2 Phase 5 Plan 05-04: hybrid offscreen Lattice host.
+
+    First in-extension Lattice consumption surface (Option B carryforward
+    from Phase 1 ends here). Background.js stays classic + the 153
+    importScripts chain stays untouched (D-17). Lattice loads HERE in
+    this offscreen iframe via the bundled ESM output.
+
+    Loader strategy:
+      - Source: lattice-host.js (this directory; ESM source the bundler reads).
+      - Bundle: extension/dist/offscreen/lattice-host.js (esbuild ESM output
+        with the 'lattice' bare specifier rewritten to inline Lattice modules).
+      - Production: a future phase flips manifest to load from dist/; in
+        Plan 05-04 the source HTML + source JS land in extension/ and the
+        bundled JS lands in extension/dist/. The smoke in Plan 05-05 reads
+        the bundle to verify the bare-specifier rewrite happened.
+
+    The SW <-> offscreen message bus (D-16) is invoked via chrome.runtime
+    .sendMessage from the SW side. The handler in lattice-host.js listens
+    on chrome.runtime.onMessage for {type: 'lattice-step-transition'} and
+    posts back {type: 'lattice-receipt-minted'} with the signed envelope.
+
+    Background.js (the SW) does NOT post step-transition envelopes in
+    Plan 05-04 -- production paths gated by the feature flag (Plan 05-05)
+    default-off. The handler is registered, the bare specifier resolves,
+    the surface is reachable; no production runtime calls it yet.
+  -->
+  <script type="module" src="../dist/offscreen/lattice-host.js"></script>
+</body>
+</html>

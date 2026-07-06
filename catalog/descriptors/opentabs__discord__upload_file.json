@@ -1,0 +1,58 @@
+{
+  "slug": "discord.upload_file",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "upload a file in discord",
+    "upload file in discord",
+    "upload a file to a channel in discord"
+  ],
+  "description": "Upload a file to a Discord channel. Supports text files and base64-encoded binary files.",
+  "actionVerb": "upload",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to share the file to"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File content as a UTF-8 string (text files) or base64-encoded string (binary files)"
+      },
+      "filename": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name of the file including extension (e.g., report.txt, image.png)"
+      },
+      "is_base64": {
+        "description": "Set to true when content is base64-encoded (e.g., binary files like images or PDFs). Defaults to false (UTF-8 text).",
+        "type": "boolean"
+      },
+      "initial_comment": {
+        "description": "Message text to include with the file upload",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel",
+      "content",
+      "filename"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/upload-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "upload"
+    }
+  }
+}

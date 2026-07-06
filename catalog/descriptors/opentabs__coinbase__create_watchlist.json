@@ -1,0 +1,40 @@
+{
+  "slug": "coinbase.create_watchlist",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "create a watchlist in coinbase",
+    "add a watchlist in coinbase",
+    "make a new watchlist in coinbase",
+    "open a new watchlist in coinbase",
+    "create watchlist in coinbase",
+    "create a new watchlist in coinbase"
+  ],
+  "description": "Create a new empty watchlist with a given name. Use add_watchlist_item to add assets to it afterwards.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new watchlist"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/create-watchlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

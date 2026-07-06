@@ -1,0 +1,31 @@
+{
+  "slug": "carta.list_accounts",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list accounts in carta",
+    "show me my accounts in carta",
+    "view my accounts in carta",
+    "see all my accounts in carta",
+    "list user accounts in carta"
+  ],
+  "description": "List all Carta accounts the user has access to, including portfolio and organization accounts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-accounts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

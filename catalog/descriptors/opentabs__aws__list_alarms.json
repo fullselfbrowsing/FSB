@@ -1,0 +1,47 @@
+{
+  "slug": "aws.list_alarms",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list alarms in aws",
+    "show me my alarms in aws",
+    "view my alarms in aws",
+    "see all my alarms in aws",
+    "list cloudwatch alarms in the current region in aws"
+  ],
+  "description": "List CloudWatch metric alarms in the current region. Returns alarm name, state, metric name, and namespace. Supports filtering by state (OK, ALARM, INSUFFICIENT_DATA).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "state_value": {
+        "description": "Filter by alarm state (OK, ALARM, or INSUFFICIENT_DATA)",
+        "type": "string",
+        "enum": [
+          "OK",
+          "ALARM",
+          "INSUFFICIENT_DATA"
+        ]
+      },
+      "max_records": {
+        "description": "Maximum alarms to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-alarms.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

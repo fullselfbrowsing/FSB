@@ -1,0 +1,68 @@
+{
+  "name": "@opentabs-dev/opentabs-plugin-hack2hire",
+  "description": "OpenTabs plugin for Hack2Hire",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.114",
+  "type": "module",
+  "main": "dist/adapter.iife.js",
+  "keywords": [
+    "opentabs-plugin",
+    "opentabs",
+    "mcp",
+    "modelcontextprotocol",
+    "chrome-extension",
+    "ai-agent",
+    "browser-automation"
+  ],
+  "opentabs": {
+    "displayName": "Hack2Hire",
+    "description": "OpenTabs plugin for Hack2Hire",
+    "urlPatterns": [
+      "*://*.hack2hire.com/*"
+    ],
+    "homepage": "https://www.hack2hire.com",
+    "iconSvg": "<svg viewBox=\"0 -12 181 181\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"> <path d=\"M38.5 114L10.2426 85.7426C7.8995 83.3995 7.89949 79.6005 10.2426 77.2574L38.5 49\" stroke=\"black\" stroke-width=\"16\" stroke-linecap=\"round\"/> <path d=\"M143 114L171.257 85.7426C173.601 83.3995 173.601 79.6005 171.257 77.2574L143 49\" stroke=\"black\" stroke-width=\"16\" stroke-linecap=\"round\"/> <path d=\"M67.0137 70.8078L98.1864 27.6079C101.45 23.085 108.548 26.4929 107.06 31.868L96.5 70C111.575 70 120.123 87.4227 110.73 99.2146L81.398 136.04C77.9794 140.332 71.1436 136.781 72.6896 131.517L84 93H78.3666C66.9485 93 60.3323 80.067 67.0137 70.8078Z\" fill=\"black\"/> </svg>",
+    "iconDarkSvg": "<svg viewBox=\"0 -12 181 181\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"> <path d=\"M38.5 114L10.2426 85.7426C7.8995 83.3995 7.89949 79.6005 10.2426 77.2574L38.5 49\" stroke=\"#ffffff\" stroke-width=\"16\" stroke-linecap=\"round\"/> <path d=\"M143 114L171.257 85.7426C173.601 83.3995 173.601 79.6005 171.257 77.2574L143 49\" stroke=\"#ffffff\" stroke-width=\"16\" stroke-linecap=\"round\"/> <path d=\"M67.0137 70.8078L98.1864 27.6079C101.45 23.085 108.548 26.4929 107.06 31.868L96.5 70C111.575 70 120.123 87.4227 110.73 99.2146L81.398 136.04C77.9794 140.332 71.1436 136.781 72.6896 131.517L84 93H78.3666C66.9485 93 60.3323 80.067 67.0137 70.8078Z\" fill=\"#ffffff\"/> </svg>"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && opentabs-plugin build",
+    "dev": "tsc --watch --preserveWatchOutput & opentabs-plugin build --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --fix src/",
+    "format:check": "biome format src/",
+    "format": "biome format --write src/",
+    "check": "npm run build && npm run type-check && npm run lint && npm run format:check"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@opentabs-dev/plugin-sdk": "^0.0.113"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@opentabs-dev/plugin-tools": "^0.0.113",
+    "jiti": "^2.6.1",
+    "typescript": "^6.0.3",
+    "zod": "^4.3.6"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opentabs-dev/opentabs.git",
+    "directory": "plugins/hack2hire"
+  }
+}

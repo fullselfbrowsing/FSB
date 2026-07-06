@@ -1,0 +1,32 @@
+{
+  "slug": "cloudflare.get_user",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "get an user in cloudflare",
+    "look up an user in cloudflare",
+    "fetch a single user in cloudflare",
+    "view one specific user in cloudflare",
+    "get user in cloudflare",
+    "get current user profile in cloudflare"
+  ],
+  "description": "Get the currently authenticated Cloudflare user profile, including email, name, and account details.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

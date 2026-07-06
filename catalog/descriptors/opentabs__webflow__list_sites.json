@@ -1,0 +1,45 @@
+{
+  "slug": "webflow.list_sites",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "list sites in webflow",
+    "show me my sites in webflow",
+    "view my sites in webflow",
+    "see all my sites in webflow",
+    "list sites in a workspace in webflow"
+  ],
+  "description": "List all sites in a Webflow workspace. Returns site names, slugs, publish status, and timestamps. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/list-sites.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

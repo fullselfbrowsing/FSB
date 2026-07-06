@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Analyze New E2E Career Search Session Log"
 created: 2026-02-24T02:00:00Z
-updated: 2026-02-24T02:00:00Z
+updated: 2026-06-15
 session_file: logs/sessions/fsb-session-2026-02-24-1771897409695.json
 ---
 
@@ -326,3 +326,10 @@ files_involved:
 - ai/ai-integration.js: Multi-turn conversation management, compaction, prompt building
 - site-guides/index.js: Missing Amazon careers site guide
 - content.js: "key" tool validation
+
+## Closeout
+
+Closed as historical. The failures from this diagnostic were split into later
+multi-site, Sheets, and CLI workflow workstreams, including archived v9.4 and
+v10.0 phases for career search orchestration, Sheets data entry, Sheets CLI
+navigation, and formula-bar verification.

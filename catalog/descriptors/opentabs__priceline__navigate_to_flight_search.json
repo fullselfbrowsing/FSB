@@ -1,0 +1,75 @@
+{
+  "slug": "priceline.navigate_to_flight_search",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "navigate a to flight search in priceline",
+    "navigate to flight search in priceline",
+    "open priceline flight search for a route in priceline"
+  ],
+  "description": "Open Priceline's flight search results page for a given route and dates in the user's browser. This navigates the current tab so the user can review flights, apply filters, and book in their authenticated session. Use this after get_flight_price_calendar or find_cheapest_flight_date has identified a good route/date — it hands control back to the user for the full search and booking flow. Requires airport/city codes (use search_airports to find them).",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "origin": {
+        "type": "string",
+        "description": "Origin airport or city code (e.g., JFK, NYC)"
+      },
+      "destination": {
+        "type": "string",
+        "description": "Destination airport or city code (e.g., LAX, LON)"
+      },
+      "depart_date": {
+        "type": "string",
+        "description": "Departure date in YYYY-MM-DD format"
+      },
+      "return_date": {
+        "description": "Return date in YYYY-MM-DD format (round-trip only; omit for one-way)",
+        "type": "string"
+      },
+      "trip_type": {
+        "description": "Trip type (default OW for one-way, RT when return_date is set)",
+        "type": "string",
+        "enum": [
+          "OW",
+          "RT"
+        ]
+      },
+      "cabin_class": {
+        "description": "Cabin class (default ECONOMY)",
+        "type": "string",
+        "enum": [
+          "ECONOMY",
+          "PREMIUM",
+          "BUSINESS",
+          "FIRST"
+        ]
+      },
+      "passengers": {
+        "description": "Number of passengers (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8
+      }
+    },
+    "required": [
+      "origin",
+      "destination",
+      "depart_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/navigate-to-flight-search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

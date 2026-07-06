@@ -1,0 +1,32 @@
+{
+  "slug": "posthog.get_current_user",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get a current user in posthog",
+    "look up a current user in posthog",
+    "fetch a single current user in posthog",
+    "view one specific current user in posthog",
+    "get current user in posthog",
+    "get your posthog profile in posthog"
+  ],
+  "description": "Get the profile of the currently authenticated PostHog user including email, name, and organization details.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

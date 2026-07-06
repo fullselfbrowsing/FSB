@@ -1,0 +1,60 @@
+{
+  "slug": "instacart.update_cart_items",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "update cart items in instacart",
+    "edit cart items in instacart",
+    "change the details of cart items in instacart",
+    "modify cart items in instacart",
+    "add, update, or remove cart items in instacart"
+  ],
+  "description": "Add, update, or remove items in a shopping cart. Each update specifies an item ID and a quantity. Set quantity to 0 to remove an item. Set quantity > 0 to add or update. The item ID format is \"items_{shopId}-{productId}\" (e.g. \"items_121560-7079\"). Returns the updated cart.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "updates": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "description": "Item ID (format: items_{shopId}-{productId})"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "New quantity (0 to remove)"
+            }
+          },
+          "required": [
+            "item_id",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Item updates to apply"
+      }
+    },
+    "required": [
+      "updates"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/update-cart-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

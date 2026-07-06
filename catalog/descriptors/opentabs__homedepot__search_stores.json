@@ -1,0 +1,41 @@
+{
+  "slug": "homedepot.search_stores",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "search stores in homedepot",
+    "find stores near a zip code in homedepot",
+    "find home depot stores near a zip code in homedepot"
+  ],
+  "description": "Find Home Depot stores near a ZIP code. Returns store name, address, phone number, and operating hours.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zip_code": {
+        "type": "string",
+        "description": "ZIP code to search near (e.g., \"90210\")"
+      },
+      "radius": {
+        "description": "Search radius in miles (default 25)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "zip_code"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/search-stores.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

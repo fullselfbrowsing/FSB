@@ -1,39 +1,174 @@
-import { Component, OnInit, Renderer2, inject, DOCUMENT, LOCALE_ID } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  Renderer2,
+  ViewChild,
+  inject,
+  DOCUMENT,
+  LOCALE_ID,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Title, Meta } from '@angular/platform-browser';
 
+import { PixelLoaderComponent } from '../../components/pixel-loader/pixel-loader.component';
 import { APP_VERSION } from '../../core/seo/version';
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { ThemeService } from '../../core/theme.service';
+
+interface InstallClient {
+  readonly id: string;
+  readonly name: string;
+  readonly logo: string;
+  readonly flag: string;
+  readonly cmd?: string;
+}
+
+interface FanClient extends InstallClient {
+  readonly dx: number;
+  readonly rot: number;
+  readonly flagLabel: string;
+}
+
+interface CapabilityApp {
+  readonly name: string;
+  readonly icon: string;
+  readonly cls?: string;
+}
 
 const ROUTE_PATH = '';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
 const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
 const SITE_NAME = 'FSB - Full Self-Browsing';
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
+const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
+const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
+const ROTATE_MS = 1800;
+const SIMPLE_ICON_COLOR = '94a3b8';
+function capabilityIcon(name: string): string {
+  const label = name.slice(0, 1).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="none"/><text x="12" y="16" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#94a3b8">${label}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function simpleIcon(slug: string): string {
+  return `https://cdn.simpleicons.org/${slug}/${SIMPLE_ICON_COLOR}`;
+}
+
+function capability(name: string, slug?: string): CapabilityApp {
+  return { name, icon: slug ? simpleIcon(slug) : capabilityIcon(name), cls: '' };
+}
 
 @Component({
   selector: 'app-home-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, PixelLoaderComponent],
   templateUrl: './home-page.component.html',
   styleUrl: './home-page.component.scss',
 })
-export class HomePageComponent implements OnInit {
+export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('scrollCue') private scrollCue?: ElementRef<HTMLElement>;
+
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly renderer = inject(Renderer2);
   private readonly doc = inject(DOCUMENT);
   private readonly localeId = inject(LOCALE_ID);
+  private readonly themeService = inject(ThemeService);
+
+  private rollTimer?: ReturnType<typeof setInterval>;
+  private hoverTimer?: ReturnType<typeof setTimeout>;
+  private fanCloseTimer?: ReturnType<typeof setTimeout>;
+  private copiedTimer?: ReturnType<typeof setTimeout>;
+  private rafId?: number;
+  private removeScrollListener?: () => void;
 
   readonly storeUrl = 'https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk?utm_source=item-share-cp';
-  // Prerender-safe default: Chrome is the install target, so a chrome icon is the right SSR fallback.
+  readonly githubRepo = GITHUB_REPO;
+  readonly rollClients: readonly InstallClient[] = [
+    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code' },
+    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop' },
+    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor' },
+    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode' },
+    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf' },
+    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex' },
+    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode' },
+  ];
+  readonly allClients: readonly InstallClient[] = [
+    { id: 'claude-code', name: 'Claude Code', logo: 'claude.svg', flag: '--claude-code', cmd: `${BASE_INSTALL_COMMAND} --claude-code` },
+    { id: 'claude-desktop', name: 'Claude Desktop', logo: 'claude.svg', flag: '--claude-desktop', cmd: `${BASE_INSTALL_COMMAND} --claude-desktop` },
+    { id: 'cursor', name: 'Cursor', logo: 'cursor.svg', flag: '--cursor', cmd: `${BASE_INSTALL_COMMAND} --cursor` },
+    { id: 'vscode', name: 'VS Code', logo: 'vscode.svg', flag: '--vscode', cmd: `${BASE_INSTALL_COMMAND} --vscode` },
+    { id: 'windsurf', name: 'Windsurf', logo: 'windsurf.svg', flag: '--windsurf', cmd: `${BASE_INSTALL_COMMAND} --windsurf` },
+    { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: `${BASE_INSTALL_COMMAND} --codex` },
+    { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: `${BASE_INSTALL_COMMAND} --opencode` },
+    { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
+    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
+  ];
+  readonly capRow1: readonly CapabilityApp[] = [
+    capability('GitHub', 'github'),
+    capability('Slack'),
+    capability('Notion', 'notion'),
+    capability('Linear', 'linear'),
+    capability('Jira', 'jira'),
+    capability('Confluence', 'confluence'),
+    capability('ClickUp', 'clickup'),
+    capability('Asana', 'asana'),
+    capability('Airtable', 'airtable'),
+    capability('GitLab', 'gitlab'),
+    capability('Bitbucket', 'bitbucket'),
+    capability('Vercel', 'vercel'),
+    capability('Netlify', 'netlify'),
+  ];
+  readonly capRow2: readonly CapabilityApp[] = [
+    capability('Cloudflare', 'cloudflare'),
+    capability('CircleCI', 'circleci'),
+    capability('Datadog', 'datadog'),
+    capability('Sentry', 'sentry'),
+    capability('PostHog', 'posthog'),
+    { name: 'ChatGPT', icon: '/assets/providers/openai.svg', cls: 'cap-logo-inv' },
+    capability('Claude', 'claude'),
+    capability('Bluesky', 'bluesky'),
+    capability('Mastodon', 'mastodon'),
+    capability('Threads', 'threads'),
+    capability('Discord', 'discord'),
+    capability('Reddit', 'reddit'),
+  ];
+
   browserIconClass = 'fa-chrome';
+  iconIndex = 0;
+  token = '--claude-code';
+  morphing = false;
+  paused = false;
+  fanOpen = false;
+  copied: string | null = null;
+
+  get currentClient(): InstallClient {
+    return this.rollClients[this.iconIndex];
+  }
+
+  get copyIconClass(): string {
+    return this.copied === 'current' ? 'fa-solid fa-check' : 'fa-regular fa-copy';
+  }
+
+  get loaderTheme(): 'dark' | 'light' {
+    return this.themeService.isDark() ? 'dark' : 'light';
+  }
+
+  get fanItemsUp(): FanClient[] {
+    const half = Math.ceil(this.allClients.length / 2);
+    return this.buildFanItems(this.allClients.slice(0, half), -1);
+  }
+
+  get fanItemsDown(): FanClient[] {
+    const half = Math.ceil(this.allClients.length / 2);
+    return this.buildFanItems(this.allClients.slice(half), 1);
+  }
 
   ngOnInit(): void {
-    // Locale-aware canonical: en bare HOST, non-en HOST/{subpath}. No trailing slash on home.
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
-    // Brand-only title; preserved verbatim via $localize so per-locale builds emit identical text
-    // (translators see the @@id but the source contains only brand tokens listed in DO-NOT-TRANSLATE.md).
     const t = $localize`:@@home.meta.title:FSB - Full Self-Browsing`;
     const d = $localize`:@@home.meta.description:Open-source Chrome extension for AI-powered browser automation through natural language, with an MCP server for Claude Code, Codex, Cursor, and other agents.`;
     this.applyMeta(t, d, url);
@@ -41,6 +176,69 @@ export class HomePageComponent implements OnInit {
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
       this.browserIconClass = detectBrowserIconClass(navigator);
     }
+  }
+
+  ngAfterViewInit(): void {
+    if (typeof window === 'undefined') return;
+    this.rollTimer = setInterval(() => this.advance(), ROTATE_MS);
+    this.removeScrollListener = this.renderer.listen('window', 'scroll', () => this.updateScrollCue());
+    this.updateScrollCue();
+  }
+
+  ngOnDestroy(): void {
+    if (this.rollTimer) clearInterval(this.rollTimer);
+    if (this.hoverTimer) clearTimeout(this.hoverTimer);
+    if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
+    if (this.copiedTimer) clearTimeout(this.copiedTimer);
+    if (this.rafId !== undefined && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(this.rafId);
+    }
+    this.removeScrollListener?.();
+  }
+
+  logoMask(logo: string): string {
+    return `url("/assets/providers/${logo}")`;
+  }
+
+  onBarEnter(): void {
+    this.paused = true;
+  }
+
+  onBarLeave(): void {
+    this.paused = false;
+  }
+
+  onCopyEnter(): void {
+    if (this.hoverTimer) clearTimeout(this.hoverTimer);
+    if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
+    this.hoverTimer = setTimeout(() => {
+      this.fanOpen = true;
+    }, 500);
+  }
+
+  onCopyLeave(): void {
+    if (this.hoverTimer) clearTimeout(this.hoverTimer);
+    if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
+    this.fanCloseTimer = setTimeout(() => {
+      this.fanOpen = false;
+    }, 260);
+  }
+
+  copyCurrent(): void {
+    const client = this.currentClient;
+    this.copyText(`${BASE_INSTALL_COMMAND} ${client.flag}`, 'current');
+  }
+
+  copyClient(client: InstallClient): void {
+    this.copyText(client.cmd ?? `${BASE_INSTALL_COMMAND} ${client.flag}`.trim(), client.id);
+  }
+
+  trackInstallClient(_index: number, client: InstallClient): string {
+    return client.id;
+  }
+
+  trackCapability(_index: number, app: CapabilityApp): string {
+    return app.name;
   }
 
   private applyMeta(t: string, d: string, url: string): void {
@@ -63,13 +261,6 @@ export class HomePageComponent implements OnInit {
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
   }
 
-  /**
-   * Inject SoftwareApplication JSON-LD on the home route only (LD-02, D-13..D-17).
-   * publisher.@id cross-references the Organization block in src/index.html (LD-01).
-   * Escape rule per PITFALLS.md P4 + T-LD-01: JSON.stringify(...).replace(/</g, '\\u003c')
-   * defeats </script> injection by escaping every '<' literal as the JSON Unicode escape \u003c.
-   * Idempotent: data-ld attribute prevents double-injection on route revisits.
-   */
   private injectSoftwareApplicationJsonLd(): void {
     if (this.doc.head.querySelector('script[data-ld="software-application"]')) {
       return;
@@ -84,19 +275,18 @@ export class HomePageComponent implements OnInit {
       applicationSubCategory: 'AI browser automation and MCP tools',
       operatingSystem: 'Chrome',
       softwareVersion: APP_VERSION,
-      downloadUrl: 'https://github.com/fullselfbrowsing/FSB',
-      sameAs: ['https://github.com/fullselfbrowsing/FSB', YOUTUBE_CHANNEL],
+      downloadUrl: GITHUB_REPO,
+      sameAs: [GITHUB_REPO, YOUTUBE_CHANNEL],
       featureList: [
         'MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw',
         'Real browser automation through a local Chrome extension',
-        'Autonomous app testing loop with observation and verification',
+        'Direct API execution for supported logged-in apps',
         'DOM-based page understanding, browser actions, visual feedback, and local memory',
       ],
       keywords: 'MCP browser automation, AI browser agent, Claude Code browser testing, Codex browser testing, self-browsing automation',
       publisher: { '@id': 'https://full-selfbrowsing.com/#org' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     };
-    // T-LD-01 mitigation: escape '<' as '\u003c' to defeat </script> injection (PITFALLS.md P4).
     const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     const script = this.renderer.createElement('script') as HTMLScriptElement;
     this.renderer.setAttribute(script, 'type', 'application/ld+json');
@@ -105,11 +295,96 @@ export class HomePageComponent implements OnInit {
     this.renderer.appendChild(script, text);
     this.renderer.appendChild(this.doc.head, script);
   }
+
+  private advance(): void {
+    if (this.paused || this.fanOpen || this.morphing) return;
+    const next = (this.iconIndex + 1) % this.rollClients.length;
+    this.scramble(next);
+  }
+
+  private scramble(targetIndex: number): void {
+    if (typeof window === 'undefined') return;
+    const target = this.rollClients[targetIndex].flag;
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789-_/';
+    const duration = 560;
+    const lockTimes = Array.from({ length: target.length }, (_, i) => ((i + 1) / target.length) * (duration * 0.82));
+    const start = performance.now();
+    this.morphing = true;
+    if (this.rafId !== undefined) window.cancelAnimationFrame(this.rafId);
+
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      if (elapsed >= duration) {
+        this.rafId = undefined;
+        this.token = target;
+        this.iconIndex = targetIndex;
+        this.morphing = false;
+        return;
+      }
+      this.token = Array.from({ length: target.length }, (_, i) =>
+        elapsed >= lockTimes[i] ? target[i] : alphabet[Math.floor(Math.random() * alphabet.length)]
+      ).join('');
+      this.rafId = window.requestAnimationFrame(tick);
+    };
+
+    this.rafId = window.requestAnimationFrame(tick);
+  }
+
+  private copyText(text: string, key: string): void {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text).catch(() => this.copyTextFallback(text));
+    } else {
+      this.copyTextFallback(text);
+    }
+    this.markCopied(key);
+  }
+
+  private copyTextFallback(text: string): void {
+    const textarea = this.renderer.createElement('textarea') as HTMLTextAreaElement;
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    this.renderer.appendChild(this.doc.body, textarea);
+    textarea.select();
+    try {
+      this.doc.execCommand('copy');
+    } catch {
+      // Copy feedback is still shown; failure is non-fatal for the page.
+    }
+    this.renderer.removeChild(this.doc.body, textarea);
+  }
+
+  private markCopied(key: string): void {
+    if (this.copiedTimer) clearTimeout(this.copiedTimer);
+    this.copied = key;
+    this.copiedTimer = setTimeout(() => {
+      this.copied = null;
+    }, 1600);
+  }
+
+  private updateScrollCue(): void {
+    if (typeof window === 'undefined') return;
+    const el = this.scrollCue?.nativeElement;
+    if (!el) return;
+    const fade = Math.min(1, window.scrollY / 320);
+    el.style.opacity = String(1 - fade);
+    el.style.pointerEvents = fade > 0.9 ? 'none' : 'auto';
+  }
+
+  private buildFanItems(clients: readonly InstallClient[], direction: number): FanClient[] {
+    return clients.map((client, index) => {
+      const t = clients.length > 1 ? index / (clients.length - 1) : 0;
+      return {
+        ...client,
+        flagLabel: client.flag || 'manual',
+        dx: -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60),
+        rot: Number((direction * t * 6).toFixed(1)),
+      };
+    });
+  }
 }
 
-// Returns a FontAwesome 6.6 brand icon class matching the current browser.
-// Order matters: Edge/Opera UA strings contain "Chrome", and Chrome's UA contains "Safari".
-// Brave is treated as Chrome — FA Free has no fa-brave brand icon, and the Web Store install path is identical.
 function detectBrowserIconClass(nav: Navigator): string {
   const ua = nav.userAgent;
   if (/Edg\//.test(ua)) return 'fa-edge';

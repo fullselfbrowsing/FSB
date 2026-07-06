@@ -1,0 +1,52 @@
+{
+  "slug": "opentable.search_restaurants",
+  "service": "www.opentable.com",
+  "intentSynonyms": [
+    "search restaurants in opentable",
+    "search restaurants on opentable in opentable",
+    "search opentable for restaurants with availability in a location for a date, time, and party size in opentable"
+  ],
+  "description": "Search OpenTable for restaurants with availability in a location for a date, time, and party size. Returns matching restaurants with open time slots.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "minLength": 1,
+        "description": "City, neighborhood, or restaurant name to search"
+      },
+      "date": {
+        "description": "Reservation date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "time": {
+        "description": "Desired time (HH:MM, 24h)",
+        "type": "string"
+      },
+      "party_size": {
+        "description": "Number of diners",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "location"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/opentable/src/tools/search-restaurants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

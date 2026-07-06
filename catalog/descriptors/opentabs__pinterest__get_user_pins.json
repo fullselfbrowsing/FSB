@@ -1,0 +1,49 @@
+{
+  "slug": "pinterest.get_user_pins",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get user pins in pinterest",
+    "look up user pins in pinterest",
+    "fetch a single user pins in pinterest",
+    "view one specific user pins in pinterest",
+    "get pins created by a user in pinterest"
+  ],
+  "description": "Get pins created by a specific user. Supports pagination via bookmark cursor.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Pinterest username"
+      },
+      "page_size": {
+        "description": "Number of pins per page (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-user-pins.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "slug": "stripe.create_customer",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "create a customer in stripe",
+    "add a customer in stripe",
+    "make a new customer in stripe",
+    "open a new customer in stripe",
+    "create customer in stripe",
+    "create a new customer in stripe"
+  ],
+  "description": "Create a new customer in your Stripe account.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "email": {
+        "description": "Customer email address",
+        "type": "string"
+      },
+      "name": {
+        "description": "Customer full name",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Customer phone number",
+        "type": "string"
+      },
+      "description": {
+        "description": "Description of the customer",
+        "type": "string"
+      },
+      "metadata": {
+        "description": "Arbitrary key-value metadata",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/create-customer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

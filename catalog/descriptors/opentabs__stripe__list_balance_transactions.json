@@ -1,0 +1,45 @@
+{
+  "slug": "stripe.list_balance_transactions",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "list balance transactions in stripe",
+    "show me my balance transactions in stripe",
+    "view my balance transactions in stripe",
+    "see all my balance transactions in stripe"
+  ],
+  "description": "List balance transactions (charges, refunds, payouts, etc.) showing how funds flow through your account.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "starting_after": {
+        "description": "Balance transaction ID cursor for pagination",
+        "type": "string"
+      },
+      "type": {
+        "description": "Filter by transaction type (e.g., charge, refund, payout, transfer)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/list-balance-transactions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

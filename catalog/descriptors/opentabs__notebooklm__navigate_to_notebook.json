@@ -1,0 +1,37 @@
+{
+  "slug": "notebooklm.navigate_to_notebook",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "navigate a to notebook in notebooklm",
+    "navigate to notebook in notebooklm",
+    "open a notebook in notebooklm"
+  ],
+  "description": "Navigate the browser to a specific notebook page in NotebookLM.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/navigate-to-notebook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

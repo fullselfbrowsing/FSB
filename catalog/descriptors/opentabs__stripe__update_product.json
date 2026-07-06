@@ -1,0 +1,61 @@
+{
+  "slug": "stripe.update_product",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "update a product in stripe",
+    "edit a product in stripe",
+    "change the details of product in stripe",
+    "modify a product in stripe",
+    "update product in stripe"
+  ],
+  "description": "Update an existing product. Only specified fields are changed; omitted fields remain unchanged.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string",
+        "description": "Product ID to update (e.g., prod_xxx)"
+      },
+      "name": {
+        "description": "New product name",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description",
+        "type": "string"
+      },
+      "active": {
+        "description": "Whether the product is available for purchase",
+        "type": "boolean"
+      },
+      "metadata": {
+        "description": "New metadata (replaces existing)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/update-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

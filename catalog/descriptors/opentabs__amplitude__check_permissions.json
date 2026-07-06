@@ -1,0 +1,49 @@
+{
+  "slug": "amplitude.check_permissions",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "check permissions in amplitude",
+    "check user rbac permissions in amplitude",
+    "check whether the current user has specific rbac permissions in amplitude"
+  ],
+  "description": "Check whether the current user has specific RBAC permissions. Common actions include: INVITE_NEW_USERS, VIEW_PROJECT_LIST, UPDATE_COHORT, CREATE_FEATURE_EXPERIMENT, AI_VIEW_GLOBAL_AGENT, AI_CREATE_GLOBAL_AGENT, UPDATE_BILLING_METHOD, READ_ACCESS_EXPERIMENT.",
+  "actionVerb": "check",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "actions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Permission action names to check (e.g., [\"INVITE_NEW_USERS\", \"VIEW_PROJECT_LIST\"])"
+      },
+      "app_ids": {
+        "description": "App/project IDs to scope the permission check to (optional)",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "required": [
+      "actions"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/check-permissions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "check"
+    }
+  }
+}

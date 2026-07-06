@@ -1,0 +1,32 @@
+{
+  "slug": "calendly.get_current_user",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "get a current user in calendly",
+    "look up a current user in calendly",
+    "fetch a single current user in calendly",
+    "view one specific current user in calendly",
+    "get current user in calendly",
+    "get the authenticated user profile in calendly"
+  ],
+  "description": "Get the profile of the currently authenticated Calendly user including name, email, booking URL, timezone, and event count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

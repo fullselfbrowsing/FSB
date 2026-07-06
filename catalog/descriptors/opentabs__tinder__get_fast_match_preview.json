@@ -1,0 +1,32 @@
+{
+  "slug": "tinder.get_fast_match_preview",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "get a fast match preview in tinder",
+    "look up a fast match preview in tinder",
+    "fetch a single fast match preview in tinder",
+    "view one specific fast match preview in tinder",
+    "get fast match preview in tinder",
+    "preview people who liked you in tinder"
+  ],
+  "description": "Get a preview of the people who liked you. Returns blurred preview images. Full profiles require Tinder Gold or Platinum subscription.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/get-fast-match-preview.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

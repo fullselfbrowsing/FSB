@@ -1,0 +1,51 @@
+{
+  "slug": "terraform.list_variable_sets",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list variable sets in terraform",
+    "show me my variable sets in terraform",
+    "view my variable sets in terraform",
+    "see all my variable sets in terraform",
+    "list variable sets in an organization in terraform"
+  ],
+  "description": "List variable sets in an organization. Variable sets allow sharing variables across workspaces.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "organization"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-variable-sets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

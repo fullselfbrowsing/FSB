@@ -1,0 +1,69 @@
+{
+  "slug": "dockerhub.search_catalog",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "search a catalog in dockerhub",
+    "search catalog in dockerhub",
+    "search a catalog in docker hub",
+    "search docker hub catalog (images, models, extensions) in dockerhub"
+  ],
+  "description": "Search the Docker Hub catalog for images, extensions, and models. Returns rich metadata including categories, source type (official, verified publisher, community), and content types. This is the newer, more comprehensive search API.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query"
+      },
+      "from": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "size": {
+        "description": "Number of results to return (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "type": {
+        "description": "Filter by content type",
+        "type": "string",
+        "enum": [
+          "image",
+          "model",
+          "extension"
+        ]
+      },
+      "source": {
+        "description": "Filter by source type",
+        "type": "string",
+        "enum": [
+          "official",
+          "verified_publisher",
+          "community"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/search-catalog.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

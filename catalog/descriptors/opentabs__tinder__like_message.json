@@ -1,0 +1,37 @@
+{
+  "slug": "tinder.like_message",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "like a message in tinder",
+    "like message in tinder",
+    "like a message in a match conversation in tinder"
+  ],
+  "description": "Like a message in a match conversation. This sends a \"liked\" reaction to the message.",
+  "actionVerb": "like",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "Message ID to like"
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/like-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "like"
+    }
+  }
+}

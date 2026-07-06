@@ -1,0 +1,40 @@
+{
+  "slug": "stripe.get_invoice",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "get an invoice in stripe",
+    "look up an invoice in stripe",
+    "fetch a single invoice in stripe",
+    "view one specific invoice in stripe",
+    "get invoice in stripe",
+    "get an invoice by id in stripe"
+  ],
+  "description": "Get detailed information about a specific invoice by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "invoice_id": {
+        "type": "string",
+        "description": "Invoice ID (e.g., in_xxx)"
+      }
+    },
+    "required": [
+      "invoice_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/get-invoice.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

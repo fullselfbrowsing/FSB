@@ -1,0 +1,32 @@
+{
+  "slug": "youtube.get_watch_history",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a watch history in youtube",
+    "look up a watch history in youtube",
+    "fetch a single watch history in youtube",
+    "view one specific watch history in youtube",
+    "get watch history in youtube",
+    "get recent watch history in youtube"
+  ],
+  "description": "Get the user's watch history. Returns recently watched videos with titles and metadata.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-watch-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "spotify.transfer_playback",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "transfer a playback in spotify",
+    "transfer playback in spotify",
+    "transfer playback to a different device in spotify"
+  ],
+  "description": "Transfer playback to a different device. Use get_available_devices to discover device IDs. Optionally start playback on the target device.",
+  "actionVerb": "transfer",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "type": "string",
+        "description": "ID of the device to transfer playback to"
+      },
+      "play": {
+        "description": "Whether to start playing on the target device. If omitted, keeps current play state.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "device_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/transfer-playback.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "transfer"
+    }
+  }
+}

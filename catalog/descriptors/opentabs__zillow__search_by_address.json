@@ -1,0 +1,38 @@
+{
+  "slug": "zillow.search_by_address",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "search a by address in zillow",
+    "search by address in zillow",
+    "look up a property by street address in zillow"
+  ],
+  "description": "Look up a specific property by its street address. First resolves the address to coordinates via autocomplete, then searches for matching properties nearby. Returns the closest matching listing with full details including Zestimate, tax assessment, and rental estimate.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Street address to look up (e.g., \"123 Main St, San Francisco, CA\")"
+      }
+    },
+    "required": [
+      "address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/search-by-address.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

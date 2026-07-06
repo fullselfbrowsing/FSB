@@ -1,0 +1,32 @@
+{
+  "slug": "instacart.get_location_context",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "get a location context in instacart",
+    "look up a location context in instacart",
+    "fetch a single location context in instacart",
+    "view one specific location context in instacart",
+    "get location context in instacart",
+    "get current delivery location info in instacart"
+  ],
+  "description": "Get the current delivery location context including zone ID, postal code, and coordinates. This context is needed for search and store queries. The data comes from the active session — no API call is made.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/get-location-context.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

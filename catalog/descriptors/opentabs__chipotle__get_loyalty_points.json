@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_loyalty_points",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get loyalty points in chipotle",
+    "look up loyalty points in chipotle",
+    "fetch a single loyalty points in chipotle",
+    "view one specific loyalty points in chipotle",
+    "get loyalty points balance and reward threshold in chipotle"
+  ],
+  "description": "Get the current Chipotle Rewards loyalty points balance and the threshold needed to earn a reward.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-loyalty-points.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "slug": "gmaps.get_map_url",
+  "service": "www.google.com",
+  "intentSynonyms": [
+    "get a map url in gmaps",
+    "look up a map url in gmaps",
+    "fetch a single map url in gmaps",
+    "view one specific map url in gmaps",
+    "get map url in gmaps",
+    "build a maps url without navigating in gmaps"
+  ],
+  "description": "Build a Google Maps URL without navigating. Useful for generating links to include in messages, emails, or documents. Supports location, search, place, and directions URLs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "location",
+          "search",
+          "place",
+          "directions"
+        ],
+        "description": "Type of Maps URL to generate"
+      },
+      "query": {
+        "description": "Search query or place name (required for search, place, and directions types)",
+        "type": "string"
+      },
+      "lat": {
+        "description": "Latitude (for location type)",
+        "type": "number"
+      },
+      "lng": {
+        "description": "Longitude (for location type)",
+        "type": "number"
+      },
+      "zoom": {
+        "description": "Zoom level for location type (default 15)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 21
+      },
+      "origin": {
+        "description": "Origin for directions (required for directions type)",
+        "type": "string"
+      },
+      "destination": {
+        "description": "Destination for directions (required for directions type)",
+        "type": "string"
+      },
+      "travel_mode": {
+        "description": "Travel mode for directions (default \"driving\")",
+        "type": "string",
+        "enum": [
+          "driving",
+          "transit",
+          "walking",
+          "bicycling"
+        ]
+      }
+    },
+    "required": [
+      "type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-maps/src/tools/get-map-url.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

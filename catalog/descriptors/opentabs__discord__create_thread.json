@@ -1,0 +1,57 @@
+{
+  "slug": "discord.create_thread",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "create a thread in discord",
+    "add a thread in discord",
+    "make a new thread in discord",
+    "publish a thread in discord",
+    "share a thread in discord",
+    "write a thread in discord"
+  ],
+  "description": "Create a new thread from a message, or a standalone thread in a channel. Threads are temporary sub-channels for focused conversation.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to create the thread in"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Thread name (max 100 chars)"
+      },
+      "message_id": {
+        "description": "Message ID to start a thread from (omit for a standalone thread)",
+        "type": "string"
+      },
+      "auto_archive_duration": {
+        "description": "Minutes of inactivity before auto-archiving: 60, 1440, 4320, or 10080",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "channel",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/create-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

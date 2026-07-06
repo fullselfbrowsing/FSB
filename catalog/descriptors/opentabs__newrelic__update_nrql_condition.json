@@ -1,0 +1,92 @@
+{
+  "slug": "newrelic.update_nrql_condition",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "update a nrql condition in newrelic",
+    "edit a nrql condition in newrelic",
+    "change the details of nrql condition in newrelic",
+    "modify a nrql condition in newrelic",
+    "update nrql condition in newrelic",
+    "update a nrql alert condition in newrelic"
+  ],
+  "description": "Update an existing NRQL alert condition. All fields are required — this replaces the entire condition definition.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Account ID"
+      },
+      "condition_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Condition ID to update"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Condition name"
+      },
+      "nrql_query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "NRQL query"
+      },
+      "critical_threshold": {
+        "type": "number",
+        "description": "Critical threshold value"
+      },
+      "threshold_operator": {
+        "description": "Threshold operator (default ABOVE)",
+        "type": "string",
+        "enum": [
+          "ABOVE",
+          "BELOW",
+          "EQUALS"
+        ]
+      },
+      "threshold_duration": {
+        "description": "Duration in seconds (default 300)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "threshold_occurrences": {
+        "description": "Occurrences (default ALL)",
+        "type": "string",
+        "enum": [
+          "ALL",
+          "AT_LEAST_ONCE"
+        ]
+      },
+      "enabled": {
+        "description": "Whether the condition is enabled (default true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "account_id",
+      "condition_id",
+      "name",
+      "nrql_query",
+      "critical_threshold"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/update-nrql-condition.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

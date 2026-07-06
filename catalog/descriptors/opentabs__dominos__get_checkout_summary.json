@@ -1,0 +1,32 @@
+{
+  "slug": "dominos.get_checkout_summary",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get a checkout summary in dominos",
+    "look up a checkout summary in dominos",
+    "fetch a single checkout summary in dominos",
+    "view one specific checkout summary in dominos",
+    "get checkout summary in dominos",
+    "review your order before checkout in dominos"
+  ],
+  "description": "Get the full checkout summary including cart total, payment options, and all products. Use this before placing an order to review the total.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-checkout-summary.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "minimax.get_current_user",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get a current user in minimax",
+    "look up a current user in minimax",
+    "fetch a single current user in minimax",
+    "view one specific current user in minimax",
+    "get current user in minimax",
+    "get the authenticated user profile in minimax"
+  ],
+  "description": "Get the authenticated MiniMax Agent user profile including user ID, display name, email, avatar, and login status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

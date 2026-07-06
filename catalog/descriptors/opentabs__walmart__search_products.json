@@ -1,0 +1,55 @@
+{
+  "slug": "walmart.search_products",
+  "service": "walmart.com",
+  "intentSynonyms": [
+    "search products in walmart",
+    "search for products on walmart in walmart",
+    "search for products on walmart by keyword in walmart"
+  ],
+  "description": "Search for products on Walmart by keyword. Returns up to 40 products per page with prices, ratings, and availability. Supports pagination and sorting.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search keywords"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "sort": {
+        "description": "Sort order (default \"best_match\")",
+        "type": "string",
+        "enum": [
+          "best_match",
+          "price_low",
+          "price_high",
+          "best_seller",
+          "new",
+          "rating_high"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/walmart/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "jira.get_transitions",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "get transitions in jira",
+    "look up transitions in jira",
+    "fetch a single transitions in jira",
+    "view one specific transitions in jira",
+    "get available status transitions in jira"
+  ],
+  "description": "Get available status transitions for a Jira issue. Use this to find transition IDs before calling transition_issue.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_key": {
+        "type": "string",
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
+      }
+    },
+    "required": [
+      "issue_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/get-transitions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "x.get_bookmarks",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get bookmarks in x",
+    "look up bookmarks in x",
+    "fetch a single bookmarks in x",
+    "view one specific bookmarks in x",
+    "get bookmarked tweets in x"
+  ],
+  "description": "Get the authenticated user's bookmarked tweets.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of tweets (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-bookmarks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

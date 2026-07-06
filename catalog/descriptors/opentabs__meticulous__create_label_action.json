@@ -1,0 +1,53 @@
+{
+  "slug": "meticulous.create_label_action",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "create a label action in meticulous",
+    "add a label action in meticulous",
+    "make a new label action in meticulous",
+    "open a new label action in meticulous",
+    "create label action in meticulous",
+    "label a screenshot diff in meticulous"
+  ],
+  "description": "Label a specific screenshot diff as approved or rejected. Use this to approve or reject individual visual differences within a test run.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "replay_diff_id": {
+        "description": "Replay diff ID",
+        "type": "string"
+      },
+      "screenshot_file_name": {
+        "description": "Screenshot filename",
+        "type": "string"
+      },
+      "label": {
+        "type": "string",
+        "description": "Label to apply (e.g., approved, rejected)"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "label"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/create-label-action.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

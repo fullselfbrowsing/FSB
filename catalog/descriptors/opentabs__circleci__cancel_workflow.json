@@ -1,0 +1,37 @@
+{
+  "slug": "circleci.cancel_workflow",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "cancel a workflow in circleci",
+    "cancel workflow in circleci",
+    "cancel a running workflow in circleci"
+  ],
+  "description": "Cancel a running workflow. The workflow and its running jobs will be stopped.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow UUID"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/cancel-workflow.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "cancel"
+    }
+  }
+}

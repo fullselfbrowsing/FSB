@@ -1,8 +1,8 @@
 ---
-status: verifying
+status: resolved
 trigger: "The extension types plain text into Google Docs via CDP insertText, but markdown formatting appears literally. Need to find a way to write properly formatted documents."
 created: 2026-02-17T00:00:00Z
-updated: 2026-02-17T02:00:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -83,3 +83,10 @@ files_changed:
   - content.js: Added hasMarkdownFormatting(), markdownToHTML(), applyInlineFormatting(), clipboardPasteHTML(), stripMarkdown() functions. Modified canvas editor type path to use formatted paste when markdown detected on Google Docs.
   - manifest.json: Added "clipboardWrite" permission.
   - ai/ai-integration.js: Updated WRITING TO GOOGLE DOCS prompt to instruct AI to use markdown formatting and send content in a single type call.
+
+## Closeout
+
+Closed as historical. The current runtime retains the Google Docs formatted
+paste path in `extension/content/actions.js`, and `extension/ai/ai-integration.js`
+still instructs markdown-formatted Google Docs writes that the extension
+converts to rich HTML before pasting.

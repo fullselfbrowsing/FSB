@@ -1,0 +1,50 @@
+{
+  "slug": "reddit.list_popular_subreddits",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "list popular subreddits in reddit",
+    "show me my popular subreddits in reddit",
+    "view my popular subreddits in reddit",
+    "see all my popular subreddits in reddit"
+  ],
+  "description": "List popular, new, or default subreddits. Use category \"popular\" for most popular, \"new\" for newest, or \"default\" for default subreddits.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "description": "Subreddit category to list (default \"popular\")",
+        "type": "string",
+        "enum": [
+          "popular",
+          "new",
+          "default"
+        ]
+      },
+      "limit": {
+        "description": "Number of results (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "after": {
+        "description": "Pagination cursor for the next page",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/list-popular-subreddits.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

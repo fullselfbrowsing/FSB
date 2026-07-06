@@ -1,0 +1,53 @@
+{
+  "slug": "stackoverflow.list_related_questions",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "list related questions in stackoverflow",
+    "show me my related questions in stackoverflow",
+    "view my related questions in stackoverflow",
+    "see all my related questions in stackoverflow",
+    "get related questions in stackoverflow"
+  ],
+  "description": "Get questions related to a specific Stack Overflow question. Returns questions that the system considers similar based on content and tags.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "question_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Question ID to find related questions for"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "question_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/list-related-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -67,6 +67,29 @@
     }
   }
 
+  function fsbClassifyTriggerReadBlockedPage() {
+    const href = (window.location && window.location.href) ? String(window.location.href) : '';
+    const title = (document && document.title) ? String(document.title) : '';
+    const haystack = (href + ' ' + title).toLowerCase();
+
+    if (/\/(login|signin|auth|challenge)(\/|[?#:]|$)/i.test(href) || /(captcha|challenge|verify)/i.test(haystack)) {
+      return { blocked_reason: haystack.includes('captcha') ? 'captcha' : (haystack.includes('challenge') || haystack.includes('verify') ? 'challenge' : 'login') };
+    }
+
+    try {
+      if (document.querySelector('input[type="password"]')) {
+        return { blocked_reason: 'login' };
+      }
+      if (document.querySelector('.g-recaptcha, [data-sitekey], iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare.com"], .cf-turnstile')) {
+        return { blocked_reason: 'captcha' };
+      }
+    } catch (_err) {
+      return null;
+    }
+
+    return null;
+  }
+
   // Handle messages from parent frame for coordinated DOM extraction
   window.addEventListener('message', (event) => {
     // Only process FSB-specific messages
@@ -1137,9 +1160,11 @@
             FSB.lastActionStatusText = null;
           } else {
             if (overlayState.highlight?.animated) {
-              const glowState = (overlayState.phase === 'acting' || overlayState.phase === 'writing' || overlayState.phase === 'switching_tab')
-                ? 'acting'
-                : 'thinking';
+              const glowState = overlayState.phase === 'calling'
+                ? 'calling'
+                : (overlayState.phase === 'acting' || overlayState.phase === 'writing' || overlayState.phase === 'switching_tab')
+                  ? 'acting'
+                  : 'thinking';
               FSB.viewportGlow.show(glowState);
             } else {
               FSB.viewportGlow.destroy();
@@ -1236,6 +1261,204 @@
             } else {
               sendResponse({ success: false, error: 'Element not found' });
             }
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerObserveStart':
+        (async () => {
+          try {
+            if (!FSB.triggerObserve || typeof FSB.triggerObserve.start !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            const result = FSB.triggerObserve.start(
+              request.trigger_id,
+              request.selector,
+              request.extract,
+              request.attrName || request.attribute
+            );
+            sendResponse(result || { ok: false, reason: 'no_result' });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerObserveStop':
+        (async () => {
+          try {
+            if (!FSB.triggerObserve || typeof FSB.triggerObserve.stop !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            FSB.triggerObserve.stop(request.trigger_id);
+            sendResponse({ success: true });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerRead':
+        (async () => {
+          try {
+            const reader = FSB.triggerObserve && FSB.triggerObserve['read' + 'Value'];
+            if (!FSB.triggerObserve || typeof reader !== 'function') {
+              sendResponse({ success: false, error: 'triggerObserve unavailable' });
+              return;
+            }
+            const blockedPage = fsbClassifyTriggerReadBlockedPage();
+            if (blockedPage) {
+              sendResponse({
+                success: false,
+                ok: false,
+                code: 'TRIGGER_PAGE_BLOCKED',
+                reason: 'blocked',
+                blocked_reason: blockedPage.blocked_reason,
+                url: window.location.href
+              });
+              return;
+            }
+            const selector = request.selector;
+            const leaf = selector ? FSB.querySelectorWithShadow(selector) : null;
+            if (!leaf) {
+              sendResponse({
+                success: false,
+                ok: false,
+                code: 'ELEMENT_NOT_FOUND',
+                reason: 'element_not_found',
+                selector
+              });
+              return;
+            }
+            const value = FSB.triggerObserve.readValue(leaf, request.extract, request.attrName || request.attribute);
+            sendResponse({ success: true, ok: true, value });
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerPulseStart':
+        (async () => {
+          try {
+            if (!FSB.actionGlowOverlay || typeof FSB.actionGlowOverlay.showPulse !== 'function') {
+              sendResponse({ success: false, error: 'actionGlowOverlay pulse unavailable' });
+              return;
+            }
+            const overlayState = FSB.overlayState || null;
+            const activeActionGlow = overlayState
+              && overlayState.lifecycle === 'running'
+              && overlayState.mode !== 'trigger-watch'
+              && (overlayState.phase === 'acting'
+                || overlayState.phase === 'writing'
+                || overlayState.phase === 'switching_tab');
+            if (activeActionGlow) {
+              sendResponse({ success: false, error: 'Action glow active' });
+              return;
+            }
+            const el = FSB.querySelectorWithShadow(request.selector);
+            if (el) {
+              FSB.actionGlowOverlay.showPulse(el);
+
+              // Drive the broader trigger-watch chrome: viewport-edge glow,
+              // labeled progress caption, and badge tally. Each guarded so a
+              // concurrent action tool's overlay state is not stomped.
+              try {
+                if (FSB.viewportGlow && typeof FSB.viewportGlow.show === 'function') {
+                  if (FSB.viewportGlow.state !== 'acting') {
+                    FSB.viewportGlow.show('watching');
+                  }
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.progressOverlay && typeof FSB.progressOverlay.update === 'function') {
+                  FSB.progressOverlay.update({
+                    lifecycle: 'running',
+                    phase: 'trigger-watch',
+                    mode: 'trigger-watch',
+                    display: {
+                      title: 'FSB Trigger',
+                      subtitle: '',
+                      detail: request.caption || 'Watching DOM for change'
+                    },
+                    progress: { mode: 'indeterminate', percent: null, label: 'Watching', eta: null }
+                  });
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.triggerBadge && typeof FSB.triggerBadge.show === 'function') {
+                  const counts = (request.counts && typeof request.counts === 'object')
+                    ? request.counts
+                    : { watching: 1, fired: 0 };
+                  FSB.triggerBadge.show(counts);
+                }
+              } catch (_e) { /* best-effort */ }
+
+              sendResponse({ success: true });
+            } else {
+              sendResponse({ success: false, error: 'Element not found' });
+            }
+          } catch (error) {
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        return true;
+
+      case 'triggerPulseStop':
+        (async () => {
+          try {
+            if (!FSB.actionGlowOverlay || typeof FSB.actionGlowOverlay.clearPulse !== 'function') {
+              sendResponse({ success: false, error: 'actionGlowOverlay pulse unavailable' });
+              return;
+            }
+            FSB.actionGlowOverlay.clearPulse();
+
+            const counts = (request.counts && typeof request.counts === 'object')
+              ? request.counts
+              : { watching: 0, fired: 0 };
+            const stillWatching = Number(counts.watching) > 0;
+
+            // Badge always reflects the latest counts; hides itself when both
+            // tallies are zero (handled inside TriggerBadge.show).
+            try {
+              if (FSB.triggerBadge && typeof FSB.triggerBadge.show === 'function') {
+                FSB.triggerBadge.show(counts);
+              }
+            } catch (_e) { /* best-effort */ }
+
+            if (!stillWatching) {
+              // Last watcher gone -> tear down trigger-only chrome but leave
+              // any ongoing action overlay alone.
+              try {
+                if (FSB.viewportGlow && FSB.viewportGlow.state === 'watching'
+                    && typeof FSB.viewportGlow.destroy === 'function') {
+                  FSB.viewportGlow.destroy();
+                }
+              } catch (_e) { /* best-effort */ }
+
+              try {
+                if (FSB.progressOverlay && typeof FSB.progressOverlay.update === 'function') {
+                  const cur = FSB.overlayState || null;
+                  if (!cur || cur.mode === 'trigger-watch' || cur.phase === 'trigger-watch') {
+                    FSB.progressOverlay.update({
+                      lifecycle: 'cleared',
+                      phase: 'cleared',
+                      mode: 'trigger-watch',
+                      display: { title: '', subtitle: '', detail: '' },
+                      progress: null
+                    });
+                  }
+                }
+              } catch (_e) { /* best-effort */ }
+            }
+
+            sendResponse({ success: true });
           } catch (error) {
             sendResponse({ success: false, error: error.message });
           }

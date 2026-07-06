@@ -1,0 +1,51 @@
+{
+  "slug": "onlyfans.get_user_posts",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "get user posts in onlyfans",
+    "look up user posts in onlyfans",
+    "fetch a single user posts in onlyfans",
+    "view one specific user posts in onlyfans",
+    "get posts from a user in onlyfans"
+  ],
+  "description": "Get posts from a specific user by their numeric ID. Returns posts in reverse chronological order with pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "User ID to get posts from"
+      },
+      "limit": {
+        "description": "Number of posts to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination marker from a previous response (tail_marker)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/get-user-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

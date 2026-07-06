@@ -1,0 +1,68 @@
+{
+  "slug": "priceline.find_cheapest_flight_date",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "find a cheapest flight date in priceline",
+    "find cheapest flight date in priceline",
+    "find the cheapest flight date in a window in priceline"
+  ],
+  "description": "Find the single cheapest date to fly a route within a given date window. Returns the bottom N fares ordered from lowest to highest price, so the caller can pick the best date that fits their schedule. Works for one-way routes; for round-trip price optimization use get_flight_price_calendar with two trips.",
+  "actionVerb": "find",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "origin": {
+        "type": "string",
+        "description": "Origin airport or city code (e.g., JFK, NYC)"
+      },
+      "destination": {
+        "type": "string",
+        "description": "Destination airport or city code (e.g., LAX, LON)"
+      },
+      "depart_date_from": {
+        "type": "string",
+        "description": "Start of departure window in YYYY-MM-DD format"
+      },
+      "depart_date_to": {
+        "type": "string",
+        "description": "End of departure window in YYYY-MM-DD format"
+      },
+      "top_n": {
+        "description": "Number of cheapest dates to return (default 5, max 30)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 30
+      },
+      "cabin_class": {
+        "description": "Cabin class filter (default ECO)",
+        "type": "string",
+        "enum": [
+          "ECO",
+          "PREMIUM",
+          "BUS",
+          "FIRST"
+        ]
+      }
+    },
+    "required": [
+      "origin",
+      "destination",
+      "depart_date_from",
+      "depart_date_to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/find-cheapest-flight-date.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "find"
+    }
+  }
+}

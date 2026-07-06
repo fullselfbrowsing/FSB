@@ -1,0 +1,40 @@
+{
+  "slug": "terraform.get_run",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "get a run in terraform",
+    "look up a run in terraform",
+    "fetch a single run in terraform",
+    "view one specific run in terraform",
+    "get run in terraform",
+    "get run details in terraform"
+  ],
+  "description": "Get detailed information about a specific run including status, plan details, and available actions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "run_id": {
+        "type": "string",
+        "description": "Run ID (e.g., \"run-...\")"
+      }
+    },
+    "required": [
+      "run_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/get-run.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

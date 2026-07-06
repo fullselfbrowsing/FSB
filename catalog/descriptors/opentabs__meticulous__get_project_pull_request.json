@@ -1,0 +1,50 @@
+{
+  "slug": "meticulous.get_project_pull_request",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get a project pull request in meticulous",
+    "look up a project pull request in meticulous",
+    "fetch a single project pull request in meticulous",
+    "view one specific project pull request in meticulous",
+    "get project pull request in meticulous",
+    "get pr test status in meticulous"
+  ],
+  "description": "Get the Meticulous test status for a specific pull request by its hosting provider ID (e.g., GitHub PR number).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization_name": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "project_name": {
+        "type": "string",
+        "description": "Project name"
+      },
+      "pull_request_id": {
+        "type": "string",
+        "description": "Hosting provider PR identifier (e.g., GitHub PR number as string)"
+      }
+    },
+    "required": [
+      "organization_name",
+      "project_name",
+      "pull_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-project-pull-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

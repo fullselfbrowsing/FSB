@@ -1,0 +1,39 @@
+{
+  "slug": "instagram.get_user_stories",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "get user stories in instagram",
+    "look up user stories in instagram",
+    "fetch a single user stories in instagram",
+    "view one specific user stories in instagram",
+    "get a user's active stories in instagram"
+  ],
+  "description": "Get active stories from a specific user. Stories expire after 24 hours. Requires the user numeric ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User numeric ID (pk)"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/get-user-stories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

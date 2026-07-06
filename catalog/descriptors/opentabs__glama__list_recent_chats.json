@@ -1,0 +1,31 @@
+{
+  "slug": "glama.list_recent_chats",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list recent chats in glama",
+    "show me my recent chats in glama",
+    "view my recent chats in glama",
+    "see all my recent chats in glama",
+    "list recent chat sessions in glama"
+  ],
+  "description": "List recent chat sessions from the sidebar, including their UIDs and titles.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-recent-chats.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

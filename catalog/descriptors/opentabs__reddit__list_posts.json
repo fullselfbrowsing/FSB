@@ -1,0 +1,73 @@
+{
+  "slug": "reddit.list_posts",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "list posts in reddit",
+    "show me my posts in reddit",
+    "view my posts in reddit",
+    "see all my posts in reddit",
+    "list posts from a subreddit in reddit"
+  ],
+  "description": "List posts from a subreddit or the front page. Supports sorting by hot, new, top, rising, and controversial. Use the \"after\" cursor for pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "description": "Subreddit name without r/ prefix. Omit to get the front page / home feed.",
+        "type": "string"
+      },
+      "sort": {
+        "description": "Sort order (default \"hot\")",
+        "type": "string",
+        "enum": [
+          "hot",
+          "new",
+          "top",
+          "rising",
+          "controversial"
+        ]
+      },
+      "t": {
+        "description": "Time period for \"top\" and \"controversial\" sort (default \"day\")",
+        "type": "string",
+        "enum": [
+          "hour",
+          "day",
+          "week",
+          "month",
+          "year",
+          "all"
+        ]
+      },
+      "limit": {
+        "description": "Number of posts to return (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "after": {
+        "description": "Pagination cursor — fullname of the last item (e.g., \"t3_abc123\")",
+        "type": "string"
+      },
+      "include_body": {
+        "description": "Whether to include post body text (selftext) and external URL. Defaults to false — titles and metadata only. Set true when you need to read post contents (doubles-to-triples the response size).",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/list-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

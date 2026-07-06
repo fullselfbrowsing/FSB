@@ -1,0 +1,57 @@
+{
+  "slug": "pandaexpress.add_product_to_basket",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "add a product to basket in pandaexpress",
+    "add product to basket in pandaexpress",
+    "add a menu item to your order in pandaexpress"
+  ],
+  "description": "Add a menu product to an existing basket. Most products require modifier selections — call get_product_modifiers first to get available options, then pass the selected option IDs. For simple products (bottled drinks), only the size option is needed.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID)"
+      },
+      "product_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Product ID from get_restaurant_menu"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "options": {
+        "description": "Array of modifier option IDs from get_product_modifiers. For combos, include one option from each mandatory group (e.g., side choice, entree choice, drink choice).",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "required": [
+      "basket_id",
+      "product_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/add-product-to-basket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

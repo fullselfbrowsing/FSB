@@ -1,98 +1,119 @@
-<section class="stats-page container">
-  <header class="stats-header">
-    <div class="stats-header-text">
-      <h1>Stats <span class="muted">for nerds</span></h1>
-      <p class="stats-sub">Live signals from <code>fullselfbrowsing/FSB</code>.</p>
-    </div>
-    <span class="stats-live-badge" role="status" aria-label="Live data">Live</span>
-  </header>
+<div class="stats-shell">
+  <div class="stats-glow-bg" aria-hidden="true"></div>
+  <a routerLink="/" class="stats-back-btn" i18n-aria-label="@@stats.back.aria" aria-label="Go back">
+    <i class="ph ph-arrow-left"></i>
+  </a>
 
-  <nav class="view-switcher" role="tablist" aria-label="Stats view">
-    @for (opt of views; track trackByView($index, opt)) {
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="selectedView === opt.id"
-        [attr.data-view]="opt.id"
-        [class.active]="selectedView === opt.id"
-        (click)="setView(opt.id)">
-        {{ opt.label }}
-      </button>
-    }
-  </nav>
+  <main class="stats-main">
+    <section class="stats-page">
+      <header class="stats-header">
+        <div class="stats-header-text">
+          <h1><span i18n="@@stats.header.title">Stats</span> <span class="muted" i18n="@@stats.header.muted">for nerds</span></h1>
+          <p class="stats-sub" i18n="@@stats.header.subtitle">Live signals from <code [attr.translate]="'no'">fullselfbrowsing/FSB</code>.</p>
+        </div>
+        <span class="stats-live-badge" role="status" i18n-aria-label="@@stats.live.aria" aria-label="Live data" i18n="@@stats.live.label">Live</span>
+      </header>
 
-  <div class="stats-headline-row">
-    <div class="stats-tab-metrics" role="status" aria-live="polite" aria-label="Current tab metrics">
-      @for (m of tabMetrics; track m.label) {
-        <span class="headline-cell">
-          <strong>{{ m.value }}</strong>
-          <span>{{ m.label }}</span>
-        </span>
-        @if (!$last) {
+      <div class="stats-headline-row">
+        <div class="stats-tab-metrics" role="status" aria-live="polite" i18n-aria-label="@@stats.tabMetrics.aria" aria-label="Current tab metrics">
+          @for (metric of tabMetrics; track trackByMetric($index, metric)) {
+            <span class="headline-cell"><strong>{{ metric.value }}</strong> <span>{{ metric.label }}</span></span>
+          }
+        </div>
+        <div class="stats-headline" role="status" aria-live="polite"
+             aria-label="Live FSB metrics"
+             i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
+          <span class="headline-cell">
+            <strong>{{ formattedFsbActive }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
+          </span>
           <span class="headline-dot" aria-hidden="true">·</span>
+          <span class="headline-cell">
+            <strong>{{ formattedFsbTotal }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">total users</span>
+          </span>
+          <span class="headline-dot" aria-hidden="true">·</span>
+          <span class="headline-cell">
+            <strong>{{ formattedFsbTokens }}</strong>
+            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (last 24h)</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="chart-card" [class.chart-card-bare]="selectedView === 'fsb-active-now'" [attr.data-state]="viewState">
+        @if (viewState === 'loading') {
+          <div class="skeleton" aria-busy="true" aria-live="polite">
+            <span class="sr-only" i18n="@@stats.loading.sr">Loading stats...</span>
+          </div>
         }
-      }
-    </div>
-    @if (fsbHeadline) {
-      <div class="stats-headline" role="status" aria-live="polite"
-           aria-label="Live FSB metrics"
-           i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
-        <span class="headline-cell">
-          <strong>{{ fsbHeadline.active_users_now }}</strong>
-          <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
-        </span>
-        <span class="headline-dot" aria-hidden="true">·</span>
-        <span class="headline-cell">
-          <strong>{{ fsbHeadline.total_users }}</strong>
-          <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">total users</span>
-        </span>
-        <span class="headline-dot" aria-hidden="true">·</span>
-        <span class="headline-cell">
-          <strong>{{ fsbHeadline.tokens_24h }}</strong>
-          <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (last 24h)</span>
-        </span>
+        @if (viewState === 'ready') {
+          <div class="chart-mount" [class.chart-mount-hidden]="selectedView === 'fsb-active-now'">
+            <canvas #chartCanvas></canvas>
+          </div>
+          <div class="globe-panel" [class.active]="selectedView === 'fsb-active-now'">
+            <div class="globe-mount"><canvas #globeCanvas class="stats-globe-canvas" aria-hidden="true"></canvas></div>
+            <p class="globe-annotation">
+              <i class="ph ph-info" aria-hidden="true"></i>
+              @if (hasPlottableRegions) {
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Each lit node is live activity, clustered by region.</span>
+              } @else {
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_EMPTY">Not enough anonymous activity yet to break down by region — check back soon.</span>
+              }
+            </p>
+          </div>
+        }
+        @if (viewState === 'rate-limited') {
+          <div class="rate-card" role="status">
+            <h3 i18n="@@stats.rate.title">GitHub rate-limited</h3>
+            <p i18n="@@stats.rate.body">
+              Retrying at
+              <strong>{{ rateLimitedUntil | date:'HH:mm' }}</strong>.
+              The unauthenticated API allows 60 requests / hour / IP - we'll be back shortly.
+            </p>
+          </div>
+        }
+        @if (viewState === 'error') {
+          <div class="error-card" role="alert">
+            <h3 i18n="@@stats.error.title">Could not load stats</h3>
+            <p><span>{{ errorMessage || fallbackErrorMessage }}</span> <span i18n="@@stats.error.retry">The page retries automatically every 5 minutes.</span></p>
+          </div>
+        }
       </div>
-    }
-  </div>
 
-  <div class="chart-card" [attr.data-state]="viewState">
-    @if (viewState === 'loading') {
-      <div class="skeleton" aria-busy="true" aria-live="polite">
-        <span class="sr-only">Loading stats…</span>
+      <div class="stats-tab-dock">
+        <div class="stats-tab-wrap" role="tablist" i18n-aria-label="@@stats.view.aria" aria-label="Stats view"
+             (mouseenter)="onTabsEnter()" (mouseleave)="onTabsLeave()">
+          <div class="stats-tab-fan stats-tab-fan-left" [class.open]="fanOpen">
+            <div class="stats-tab-fan-track">
+              @for (opt of fanItemsLeft; track trackByView($index, opt)) {
+                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
+                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
+              }
+            </div>
+          </div>
+          <button type="button" role="tab" aria-selected="true" [attr.aria-expanded]="fanOpen"
+                  class="stats-tab-active" [class.stats-tab-pulse]="tabPulse" (click)="onTabsToggle()">
+            {{ activeViewLabel }}
+          </button>
+          <div class="stats-tab-fan stats-tab-fan-right" [class.open]="fanOpen">
+            <div class="stats-tab-fan-track">
+              @for (opt of fanItemsRight; track trackByView($index, opt)) {
+                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
+                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
+              }
+            </div>
+          </div>
+        </div>
       </div>
-    }
-    <!-- Quick task 260517-fsf -- the chart-mount (and its canvas) MUST stay
-         mounted in the DOM independent of viewState so that @ViewChild('chartCanvas')
-         always resolves. Previously this was wrapped in `@if (viewState === 'ready')`,
-         which caused a first-load race: onDatasetUpdate / onFsbHeadlineUpdate
-         flipped viewState to 'ready' and synchronously called redrawChart() before
-         change-detection materialized the @if branch, so canvasRef was undefined
-         and the chart never drew. We now use [hidden] (the same workaround that
-         was already in place for the fsb-avg-agents-per-user big-number tile) so
-         the canvas is queryable from the moment the component mounts, and only
-         visually hidden while we are still in loading / rate-limited / error
-         states. The .chart-mount also stays out of the document flow when hidden
-         so the skeleton / rate-card / error-card branches above are still the
-         only visible content during their respective states. -->
-    <div class="chart-mount" [hidden]="viewState !== 'ready'">
-      <canvas #chartCanvas></canvas>
-    </div>
-    @if (viewState === 'rate-limited') {
-      <div class="rate-card" role="status">
-        <h3>GitHub rate-limited</h3>
-        <p>
-          Retrying at
-          <strong>{{ rateLimitedUntil | date:'HH:mm' }}</strong>.
-          The unauthenticated API allows 60 requests / hour / IP &mdash; we'll be back shortly.
-        </p>
-      </div>
-    }
-    @if (viewState === 'error') {
-      <div class="error-card" role="alert">
-        <h3>Could not load stats</h3>
-        <p>{{ errorMessage || 'Network or parse error.' }} The page retries automatically every 5 minutes.</p>
-      </div>
-    }
-  </div>
+    </section>
+  </main>
 
-</section>
+  <footer class="footer stats-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p i18n="@@stats.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <p i18n="@@stats.footer.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
+      </div>
+    </div>
+  </footer>
+</div>

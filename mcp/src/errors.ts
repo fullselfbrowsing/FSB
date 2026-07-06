@@ -65,6 +65,10 @@ const CODE_ONLY_ERROR_KEYS = new Set([
   'BADGE_NOT_ALLOWED',
   // v0.9.62 removal of explicit visual-session tools (Phase 258 Plan 01)
   'TOOL_REMOVED',
+  // v0.9.99 Native Capability Catalog (Phase 27 FETCH-04): mid-mutation SW-eviction
+  // ambiguity. Surfaced verbatim so the MCP host can distinguish "ambiguous -- ask
+  // the user" from a generic action_rejected. INV-01-safe (no MCP tool schema touched).
+  'RECOVERY_AMBIGUOUS',
 ]);
 
 type LayerLabel = typeof LAYER_LABELS[keyof typeof LAYER_LABELS];
@@ -105,6 +109,32 @@ function resolveErrorKey(
     ? fsbResult.errorCode
     : (typeof fsbResult?.code === 'string' ? fsbResult.code : '');
   if (FSB_ERROR_MESSAGES[explicitCode] || CODE_ONLY_ERROR_KEYS.has(explicitCode)) {
+    return explicitCode;
+  }
+
+  // Surface trigger-tool errorCodes verbatim. The arm-side failure shapes in
+  // extension/background.js (TRIGGER_READ_FAILED, TRIGGER_ARM_FAILED,
+  // TRIGGER_PAGE_BLOCKED, TRIGGER_WATCH_INVALID, TRIGGER_ACCESS_DENIED,
+  // TRIGGER_SELECTOR_INVALID, TRIGGER_CONDITION_INVALID,
+  // TRIGGER_MANAGER_UNAVAILABLE, TRIGGER_TAB_WATCH_CONFLICT,
+  // TRIGGER_STORE_UNAVAILABLE, TRIGGER_NOT_FOUND, TRIGGER_CAP_REACHED,
+  // INVALID_TRIGGER_ID, INVALID_TAB_ID, LIFECYCLE_UNAVAILABLE,
+  // REFRESH_POLL_INTERVAL_TOO_LOW) set errorCode without error, so the
+  // substring fallthrough below cannot match and they would otherwise collapse
+  // to 'action_rejected'. Returning them verbatim lets buildLayeredDetail's
+  // default arm surface the specific code to the caller.
+  // v0.9.99 Native Capability Catalog (Phase 26 Plan 02): the RECIPE_* family
+  // (RECIPE_SCHEMA_INVALID / RECIPE_UNKNOWN_FIELD / RECIPE_OPCODE_INVALID) is
+  // returned by the SW-side recipe schema/interpreter with `code`, `errorCode`,
+  // AND `error` all set to the same RECIPE_* string (createRecipeError sets
+  // error:code). resolveErrorKey matches on errorCode/code (not the message), so
+  // the substring fallthrough below never sees these and the codes would
+  // otherwise collapse to 'action_rejected'. Surfacing them verbatim lets
+  // buildLayeredDetail's default arm report the specific code; because the raw
+  // `error` equals the resolved key, appendRawError's `errorMsg === errorKey`
+  // guard suppresses the duplicate "Raw error:" line. INV-01: no MCP tool schema
+  // is touched -- this is only the error passthrough regex.
+  if (explicitCode && /^(TRIGGER_.+|RECIPE_.+|INVALID_TRIGGER_ID|INVALID_TAB_ID|LIFECYCLE_UNAVAILABLE|REFRESH_POLL_INTERVAL_TOO_LOW)$/.test(explicitCode)) {
     return explicitCode;
   }
 
@@ -356,7 +386,11 @@ function buildLayeredDetail(
     default:
       return {
         detected: LAYER_LABELS.pageNavigation,
-        why: errorMsg || 'The current page state did not allow the requested tool call to complete.',
+        why: errorMsg
+          ? errorMsg
+          : (errorKey && errorKey !== 'action_rejected'
+            ? `Tool returned error code: ${errorKey}.`
+            : 'The current page state did not allow the requested tool call to complete.'),
         nextAction: 'Refresh page state with read_page or get_dom_snapshot, then retry.',
       };
   }

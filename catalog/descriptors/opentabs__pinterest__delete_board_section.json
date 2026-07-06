@@ -1,0 +1,39 @@
+{
+  "slug": "pinterest.delete_board_section",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "delete a board section in pinterest",
+    "remove a board section in pinterest",
+    "trash a board section in pinterest",
+    "permanently delete a board section in pinterest",
+    "delete board section in pinterest"
+  ],
+  "description": "Delete a section from a board. Pins in the section are moved back to the board. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "description": "Section ID to delete"
+      }
+    },
+    "required": [
+      "section_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/delete-board-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

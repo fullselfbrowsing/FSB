@@ -1,0 +1,51 @@
+{
+  "slug": "spotify.get_recently_played",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get a recently played in spotify",
+    "look up a recently played in spotify",
+    "fetch a single recently played in spotify",
+    "view one specific recently played in spotify",
+    "get recently played in spotify",
+    "get recently played tracks in spotify"
+  ],
+  "description": "Get tracks the user has recently played. Returns up to 50 items with track details and the timestamp of each play. Use before/after cursors for pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of items to return (1-50, default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "before": {
+        "description": "Unix timestamp in milliseconds — return items played before this time",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "after": {
+        "description": "Unix timestamp in milliseconds — return items played after this time",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-recently-played.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

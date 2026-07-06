@@ -1,0 +1,40 @@
+{
+  "slug": "pinterest.get_pin",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "get a pin in pinterest",
+    "look up a pin in pinterest",
+    "fetch a single pin in pinterest",
+    "view one specific pin in pinterest",
+    "get pin in pinterest",
+    "get pin details by id in pinterest"
+  ],
+  "description": "Get detailed information about a specific pin by its ID. Returns title, description, image, link, repin count, comment count, and creator info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pin_id": {
+        "type": "string",
+        "description": "Pin ID"
+      }
+    },
+    "required": [
+      "pin_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/get-pin.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

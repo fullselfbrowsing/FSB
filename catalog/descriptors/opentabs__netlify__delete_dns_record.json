@@ -1,0 +1,44 @@
+{
+  "slug": "netlify.delete_dns_record",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "delete a dns record in netlify",
+    "remove a dns record in netlify",
+    "trash a dns record in netlify",
+    "permanently delete a dns record in netlify",
+    "delete dns record in netlify"
+  ],
+  "description": "Delete a DNS record from a Netlify DNS zone. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "The DNS zone ID the record belongs to"
+      },
+      "record_id": {
+        "type": "string",
+        "description": "The DNS record ID to delete"
+      }
+    },
+    "required": [
+      "zone_id",
+      "record_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/delete-dns-record.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

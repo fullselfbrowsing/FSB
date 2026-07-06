@@ -1,0 +1,47 @@
+{
+  "slug": "datadog.list_teams",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list teams in datadog",
+    "show me my teams in datadog",
+    "view my teams in datadog",
+    "see all my teams in datadog"
+  ],
+  "description": "List teams in the Datadog organization.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Results per page",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page_number": {
+        "description": "Page number",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "filter": {
+        "description": "Filter by team name",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-teams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

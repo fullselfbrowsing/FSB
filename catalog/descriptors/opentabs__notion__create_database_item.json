@@ -1,0 +1,57 @@
+{
+  "slug": "notion.create_database_item",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "create a database item in notion",
+    "add a database item in notion",
+    "make a new database item in notion",
+    "open a new database item in notion",
+    "create database item in notion",
+    "add a row to a database in notion"
+  ],
+  "description": "Add a new row/item to a Notion database. Use get_database first to understand the property schema.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "database_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Database (collection) ID to add a row to"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Title for the new row"
+      },
+      "properties": {
+        "description": "Property values as key-value pairs. Keys are property names (from get_database). Values are strings.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "database_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/create-database-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

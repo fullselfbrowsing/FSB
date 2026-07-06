@@ -1,0 +1,69 @@
+import { ToolError, clearAuthCache, defineTool } from '@opentabs-dev/plugin-sdk';
+import { z } from 'zod';
+import { getGraphToken } from '../microsoft-word-api.js';
+import { type RawDriveItem, driveItemSchema, mapDriveItem } from './schemas.js';
+
+const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
+
+export const uploadFile = defineTool({
+  name: 'upload_file',
+  displayName: 'Upload File',
+  description:
+    'Upload a text file to OneDrive. Creates a new file or overwrites existing. Specify the full path relative to drive root (e.g., "Documents/report.txt").',
+  summary: 'Upload a text file to OneDrive',
+  icon: 'upload',
+  group: 'Files',
+  input: z.object({
+    path: z.string().min(1).describe('File path relative to drive root (e.g., "Documents/report.txt")'),
+    content: z.string().describe('File content as text'),
+    content_type: z.string().optional().describe('MIME type (default "text/plain")'),
+  }),
+  output: z.object({
+    item: driveItemSchema.describe('The uploaded file'),
+  }),
+  handle: async params => {
+    const token = getGraphToken();
+    const encodedPath = encodeURIComponent(params.path).replace(/%2F/g, '/');
+    const url = `${GRAPH_API_BASE}/me/drive/root:/${encodedPath}:/content`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'PUT',
+        credentials: 'omit',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': params.content_type ?? 'text/plain',
+        },
+        body: params.content,
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'TimeoutError') {
+        throw ToolError.timeout('Microsoft Graph API request timed out.');
+      }
+      throw ToolError.internal(`Network error: ${err instanceof Error ? err.message : 'unknown'}`);
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      clearAuthCache('microsoft-word');
+      throw ToolError.auth('Authentication expired — please refresh the page.');
+    }
+
+    if (!response.ok) {
+      let errorMsg = `Microsoft Graph API error (${response.status})`;
+      try {
+        const errBody = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (errBody.error?.message) errorMsg = errBody.error.message;
+      } catch {
+        // ignore parse errors
+      }
+      throw ToolError.internal(errorMsg);
+    }
+
+    const data = (await response.json()) as RawDriveItem;
+    return { item: mapDriveItem(data) };
+  },
+});

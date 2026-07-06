@@ -1,0 +1,47 @@
+{
+  "slug": "onenote.create_section",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "create a section in onenote",
+    "add a section in onenote",
+    "make a new section in onenote",
+    "open a new section in onenote",
+    "create section in onenote",
+    "create a new section in a notebook in onenote"
+  ],
+  "description": "Create a new section in a OneNote notebook. Sections contain pages and are the primary organizational unit within a notebook.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Notebook ID to create the section in"
+      },
+      "display_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name for the new section"
+      }
+    },
+    "required": [
+      "notebook_id",
+      "display_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/create-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

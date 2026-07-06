@@ -1,0 +1,56 @@
+{
+  "slug": "x.update_list",
+  "service": "x.com",
+  "intentSynonyms": [
+    "update a list in x",
+    "edit a list in x",
+    "change the details of list in x",
+    "modify a list in x",
+    "update list in x",
+    "update list details in x"
+  ],
+  "description": "Update a list's name, description, or privacy setting.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "List ID"
+      },
+      "name": {
+        "description": "New name",
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 25
+      },
+      "description": {
+        "description": "New description",
+        "type": "string",
+        "maxLength": 100
+      },
+      "is_private": {
+        "description": "New privacy setting",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "list_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/update-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

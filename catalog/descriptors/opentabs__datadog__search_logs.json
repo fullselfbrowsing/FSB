@@ -1,0 +1,59 @@
+{
+  "slug": "datadog.search_logs",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search logs in datadog",
+    "search logs with datadog query syntax in datadog",
+    "search datadog logs using query syntax in datadog"
+  ],
+  "description": "Search Datadog logs using query syntax. Supports filtering by service, host, status, tags, and free text. Uses the Datadog log query language (e.g., \"service:my-app status:error\", \"@http.status_code:500\").",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Log search query (e.g., \"service:my-app status:error\", \"@http.url:/api/v1/*\")"
+      },
+      "from": {
+        "description": "Start time — relative (e.g., \"now-1h\", \"now-15m\") or epoch ms. Default: now-15m",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time — relative (e.g., \"now\") or epoch ms. Default: now",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum log entries (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "sort": {
+        "description": "Sort order by timestamp (default desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-logs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

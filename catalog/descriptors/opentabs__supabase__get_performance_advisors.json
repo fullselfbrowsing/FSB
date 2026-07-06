@@ -1,0 +1,40 @@
+{
+  "slug": "supabase.get_performance_advisors",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get performance advisors in supabase",
+    "look up performance advisors in supabase",
+    "fetch a single performance advisors in supabase",
+    "view one specific performance advisors in supabase",
+    "get performance advisor recommendations in supabase"
+  ],
+  "description": "Get performance advisor recommendations for a Supabase project. Identifies potential performance issues like missing indexes, unused indexes, and slow queries.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-performance-advisors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "circleci.rerun_workflow",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "rerun a workflow in circleci",
+    "rerun workflow in circleci",
+    "rerun workflow in the circleci app",
+    "use circleci to rerun a workflow"
+  ],
+  "description": "Rerun a workflow. Optionally rerun only failed jobs or run from a specific job.",
+  "actionVerb": "rerun",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow UUID"
+      },
+      "from_failed": {
+        "description": "Rerun only from failed jobs",
+        "type": "boolean"
+      },
+      "jobs": {
+        "description": "Specific job UUIDs to rerun",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "sparse_tree": {
+        "description": "Rerun only the specified jobs and their dependencies",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/rerun-workflow.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "rerun"
+    }
+  }
+}

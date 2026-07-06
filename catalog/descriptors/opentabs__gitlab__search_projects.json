@@ -1,0 +1,70 @@
+{
+  "slug": "gitlab.search_projects",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "search projects in gitlab",
+    "search for projects in gitlab",
+    "search for projects by name across gitlab in gitlab"
+  ],
+  "description": "Search for projects by name across GitLab.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "search": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query"
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "id",
+          "name",
+          "path",
+          "created_at",
+          "updated_at",
+          "last_activity_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "search"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/search-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

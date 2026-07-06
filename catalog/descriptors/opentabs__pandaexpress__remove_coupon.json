@@ -1,0 +1,37 @@
+{
+  "slug": "pandaexpress.remove_coupon",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "remove a coupon in pandaexpress",
+    "remove coupon in pandaexpress",
+    "remove a coupon from your order in pandaexpress"
+  ],
+  "description": "Remove a previously applied coupon from the basket.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "basket_id": {
+        "type": "string",
+        "description": "Basket ID (UUID)"
+      }
+    },
+    "required": [
+      "basket_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/remove-coupon.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "remove"
+    }
+  }
+}

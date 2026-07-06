@@ -1,0 +1,50 @@
+{
+  "slug": "calendly.list_scheduled_events",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "list scheduled events in calendly",
+    "show me my scheduled events in calendly",
+    "view my scheduled events in calendly",
+    "see all my scheduled events in calendly",
+    "list your scheduled meetings in calendly"
+  ],
+  "description": "List scheduled events (meetings) with optional status filter. Defaults to showing all events. Supports pagination with 20 events per page.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter by status: \"active\" (current), \"upcoming\", \"past\", \"canceled\", \"completed\", or \"pending\"",
+        "type": "string",
+        "enum": [
+          "active",
+          "upcoming",
+          "past",
+          "canceled",
+          "completed",
+          "pending"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/list-scheduled-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

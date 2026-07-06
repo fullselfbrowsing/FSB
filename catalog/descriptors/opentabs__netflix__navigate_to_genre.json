@@ -1,0 +1,39 @@
+{
+  "slug": "netflix.navigate_to_genre",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "navigate a to genre in netflix",
+    "navigate to genre in netflix",
+    "open a genre page in the browser in netflix"
+  ],
+  "description": "Navigate the browser to a Netflix genre browse page. Common genre IDs: 83 (TV Shows), 34399 (Movies), 1365 (Action), 5763 (Drama), 6548 (Comedy), 8933 (Thriller), 7424 (Anime), 2243108 (Korean TV), 26065 (Sci-Fi), 8711 (Horror), 10118 (Comic & Superhero), 13335 (Reality TV), 11559 (Stand-Up Comedy), 6839 (Documentaries).",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "genre_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix genre ID (e.g., 1365 for Action, 6548 for Comedy)"
+      }
+    },
+    "required": [
+      "genre_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/navigate-to-genre.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

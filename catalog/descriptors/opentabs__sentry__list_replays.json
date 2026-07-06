@@ -1,0 +1,52 @@
+{
+  "slug": "sentry.list_replays",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list replays in sentry",
+    "show me my replays in sentry",
+    "view my replays in sentry",
+    "see all my replays in sentry",
+    "list session replays in the organization in sentry"
+  ],
+  "description": "List session replays for the current Sentry organization. Replays capture user browser sessions including DOM interactions, console logs, and network requests.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "description": "Filter by project IDs. Omit to list replays across all projects",
+        "type": "array",
+        "items": {
+          "type": "number",
+          "description": "Project ID"
+        }
+      },
+      "query": {
+        "description": "Search query to filter replays (e.g., by URL or error)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of replays to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-replays.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

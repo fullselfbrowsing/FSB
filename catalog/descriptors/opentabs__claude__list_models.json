@@ -1,0 +1,31 @@
+{
+  "slug": "claude.list_models",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "list models in claude",
+    "show me my models in claude",
+    "view my models in claude",
+    "see all my models in claude",
+    "list available claude models in claude"
+  ],
+  "description": "List all available Claude AI models for the current organization including model IDs, display names, and descriptions.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/list-models.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

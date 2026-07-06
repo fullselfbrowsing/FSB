@@ -1,0 +1,31 @@
+{
+  "slug": "supabase.list_organizations",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "list organizations in supabase",
+    "show me my organizations in supabase",
+    "view my organizations in supabase",
+    "see all my organizations in supabase",
+    "list all organizations in supabase"
+  ],
+  "description": "List all organizations the authenticated user belongs to.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/list-organizations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "slack.add_reaction",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "add a reaction in slack",
+    "add reaction in slack",
+    "add an emoji reaction to a message in slack"
+  ],
+  "description": "Add an emoji reaction to a Slack message",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the message to react to — serves as the unique message ID (e.g., 1234567890.123456)"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Emoji name without colons (e.g., thumbsup, heart, rocket)"
+      }
+    },
+    "required": [
+      "channel",
+      "ts",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/add-reaction.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

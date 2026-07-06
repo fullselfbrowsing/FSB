@@ -1,0 +1,39 @@
+{
+  "slug": "todoist.delete_comment",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "delete a comment in todoist",
+    "remove a comment in todoist",
+    "trash a comment in todoist",
+    "permanently delete a comment in todoist",
+    "delete comment in todoist"
+  ],
+  "description": "Permanently delete a comment. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "comment_id": {
+        "type": "string",
+        "description": "The ID of the comment to delete"
+      }
+    },
+    "required": [
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/delete-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

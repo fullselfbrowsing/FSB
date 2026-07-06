@@ -1,6 +1,7 @@
 ---
-status: diagnosed
+status: resolved
 discovered: 2026-04-03
+updated: 2026-06-15
 session_id: session_1775188402694
 milestone: v0.9.24
 ---
@@ -45,3 +46,9 @@ The glow animation and debugger overlay disappeared mid-run. This specific sessi
 ## Gap Work Created
 
 - Phase 162.3: Overlay Lifecycle Reliability
+
+## Resolution
+
+Resolved by archived milestone v0.9.24. `.planning/milestones/v0.9.24-ROADMAP.md`
+records Phase 162.3 as shipped for overlay replay, heartbeat refresh,
+degraded waiting state, and dashboard resync.

@@ -1,0 +1,48 @@
+{
+  "slug": "linear.list_initiatives",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list initiatives in linear",
+    "show me my initiatives in linear",
+    "view my initiatives in linear",
+    "see all my initiatives in linear"
+  ],
+  "description": "List initiatives in the Linear workspace, optionally filtered by status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Filter by initiative status",
+        "type": "string",
+        "enum": [
+          "Planned",
+          "Active",
+          "Completed"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-initiatives.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

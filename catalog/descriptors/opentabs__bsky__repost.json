@@ -1,0 +1,42 @@
+{
+  "slug": "bsky.repost",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "repost in bsky",
+    "repost in bluesky",
+    "repost a post in bsky"
+  ],
+  "description": "Repost a post. Requires the post's AT URI and CID. Returns the URI of the repost record (needed for unreposting).",
+  "actionVerb": "repost",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "AT URI of the post to repost"
+      },
+      "cid": {
+        "type": "string",
+        "description": "CID of the post to repost"
+      }
+    },
+    "required": [
+      "uri",
+      "cid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/repost.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "repost"
+    }
+  }
+}

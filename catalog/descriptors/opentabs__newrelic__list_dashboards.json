@@ -1,0 +1,35 @@
+{
+  "slug": "newrelic.list_dashboards",
+  "service": "one.newrelic.com",
+  "intentSynonyms": [
+    "list dashboards in newrelic",
+    "show me my dashboards in newrelic",
+    "view my dashboards in newrelic",
+    "see all my dashboards in newrelic"
+  ],
+  "description": "List dashboards accessible to the current user. Returns dashboard names, GUIDs, permissions, and page details.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/newrelic/src/tools/list-dashboards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

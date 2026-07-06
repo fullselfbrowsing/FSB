@@ -1,0 +1,43 @@
+{
+  "slug": "bestbuy.search_products",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "search products in bestbuy",
+    "search for products on best buy in bestbuy",
+    "search the best buy product catalog by keyword in bestbuy"
+  ],
+  "description": "Search the Best Buy product catalog by keyword. Returns product name, price, brand, rating, and availability. Results are from the user's local store for pricing and availability.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "keyword": {
+        "type": "string",
+        "description": "Search keyword (e.g., \"airpods\", \"4K TV\", \"laptop\")"
+      },
+      "count": {
+        "description": "Number of results (default 10, max 24)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 24
+      }
+    },
+    "required": [
+      "keyword"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

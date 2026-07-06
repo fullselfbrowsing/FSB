@@ -1,0 +1,39 @@
+{
+  "slug": "tripadvisor.list_attractions",
+  "service": "tripadvisor.com",
+  "intentSynonyms": [
+    "list attractions in tripadvisor",
+    "show me my attractions in tripadvisor",
+    "view my attractions in tripadvisor",
+    "see all my attractions in tripadvisor",
+    "list things to do in an area in tripadvisor"
+  ],
+  "description": "List attractions and things to do in a city or area on TripAdvisor. Returns a page of attraction listings. Uses the geo-based attraction listing page URL.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Attraction listing page URL path (e.g., \"/Attractions-g60713-Activities-San_Francisco_California.html\")"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tripadvisor/src/tools/list-attractions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

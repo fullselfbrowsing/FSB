@@ -1,0 +1,31 @@
+{
+  "slug": "npm.list_tokens",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "list tokens in npm",
+    "show me my tokens in npm",
+    "view my tokens in npm",
+    "see all my tokens in npm",
+    "list your npm access tokens in npm"
+  ],
+  "description": "List the authenticated user's access tokens. Shows token prefixes and read-only status. Requires authentication.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/list-tokens.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

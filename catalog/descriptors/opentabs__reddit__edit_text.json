@@ -1,0 +1,44 @@
+{
+  "slug": "reddit.edit_text",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "edit a text in reddit",
+    "edit text in reddit",
+    "edit a post or comment in reddit"
+  ],
+  "description": "Edit the body text of a self-post or comment. Only the author can edit their own content. Link posts cannot be edited.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Fullname of the post or comment to edit (e.g., \"t3_abc123\" for a post, \"t1_xyz\" for a comment)"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New body text (supports Reddit markdown)"
+      }
+    },
+    "required": [
+      "thing_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/edit-text.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditpost",
+      "httpMethod": null,
+      "opNameVerb": "edit"
+    }
+  }
+}

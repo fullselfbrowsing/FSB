@@ -1,0 +1,32 @@
+{
+  "slug": "hack2hire.get_current_user",
+  "service": "hack2hire.com",
+  "intentSynonyms": [
+    "get a current user in hack2hire",
+    "look up a current user in hack2hire",
+    "fetch a single current user in hack2hire",
+    "view one specific current user in hack2hire",
+    "get current user in hack2hire",
+    "get the authenticated user profile in hack2hire"
+  ],
+  "description": "Get the authenticated Hack2Hire user profile, including the user ID, email, public alias, avatar URL, account type, premium expiration date, account credit balance, account creation date, and last login timestamp.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hack2hire/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

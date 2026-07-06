@@ -1,0 +1,45 @@
+{
+  "slug": "netlify.create_site",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a site in netlify",
+    "add a site in netlify",
+    "make a new site in netlify",
+    "open a new site in netlify",
+    "create site in netlify",
+    "create a new site in netlify"
+  ],
+  "description": "Create a new Netlify site in the specified account. Provide a site name (used as the subdomain). Returns the created site details.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_slug": {
+        "type": "string",
+        "description": "The account slug to create the site in"
+      },
+      "name": {
+        "type": "string",
+        "description": "Site name (becomes the subdomain, e.g. \"my-app\" → my-app.netlify.app)"
+      }
+    },
+    "required": [
+      "account_slug",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-site.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

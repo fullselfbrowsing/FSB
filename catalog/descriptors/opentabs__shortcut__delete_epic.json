@@ -1,0 +1,41 @@
+{
+  "slug": "shortcut.delete_epic",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "delete an epic in shortcut",
+    "remove an epic in shortcut",
+    "trash an epic in shortcut",
+    "permanently delete an epic in shortcut",
+    "delete epic in shortcut"
+  ],
+  "description": "Permanently delete an epic by its numeric ID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "epic_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Epic numeric ID to delete"
+      }
+    },
+    "required": [
+      "epic_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/delete-epic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

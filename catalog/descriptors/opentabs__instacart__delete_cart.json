@@ -1,0 +1,40 @@
+{
+  "slug": "instacart.delete_cart",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "delete a cart in instacart",
+    "remove a cart in instacart",
+    "trash a cart in instacart",
+    "permanently delete a cart in instacart",
+    "delete cart in instacart",
+    "delete a shopping cart in instacart"
+  ],
+  "description": "Delete a shopping cart and all its items. This action cannot be undone. Use list_active_carts to find cart IDs.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "cart_id": {
+        "type": "string",
+        "description": "Cart ID to delete"
+      }
+    },
+    "required": [
+      "cart_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/delete-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

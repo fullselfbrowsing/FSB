@@ -16,6 +16,7 @@ const createAuthRouter = require('./src/routes/auth');
 const createAgentsRouter = require('./src/routes/agents');
 const createPairRouter = require('./src/routes/pair');
 const { setupWSHandler } = require('./src/ws/handler');
+const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
 const { LOCALES, SOURCE_LOCALE, LOCALE_SUBPATHS } = require('./src/utils/locale-constants');
 
@@ -196,18 +197,33 @@ if (staticPath) {
 }
 
 // Phase 216 SRV-01 / SRV-02 / D-09 / D-10 + locale-aware extension (2026-05-21):
-// Prefer per-route prerendered HTML for marketing routes; whitelist /dashboard and
-// /stats for the SPA shell; fall through to a 404 otherwise. This replaces the
-// previous all-routes -> root-index SPA fallback, which would have shadowed
-// crawler files and served the wrong <title>/<meta> for /about /privacy /support
-// after Phase 215 prerender landed.
+// Prefer per-route prerendered HTML for marketing routes; whitelist exact-match
+// client-shell routes (/dashboard, /stats, /legal) for the SPA shell; fall through
+// to a 404 otherwise. This replaces the previous all-routes -> root-index SPA
+// fallback, which would have shadowed crawler files and served the wrong
+// <title>/<meta> for /about /privacy /support after Phase 215 prerender landed.
 //
 // Locale extension: requests like /es/agents must serve public/es/agents/index.html.
 // express.static({ redirect: false }) intentionally suppresses the trailing-slash
 // 301, so without this branch /es/agents 404s while /es/agents/ works. Splitting
 // req.path into (localeSubPath, routeWithinLocale) lets one whitelist handle every
 // locale uniformly.
-const marketingRoutes = new Set(['/', '/about', '/agents', '/privacy', '/support']);
+const marketingRoutes = new Set([
+  '/',
+  '/about',
+  '/agents',
+  '/privacy',
+  '/support',
+  '/lattice',
+  '/phantom-stream',
+  '/prometheus',
+  '/sitemaps'
+]);
+const clientShellRoutes = new Set([
+  '/dashboard',
+  '/stats',
+  '/legal'
+]);
 const NON_SOURCE_LOCALE_SUBPATHS = LOCALES
   .filter(function(loc) { return loc !== SOURCE_LOCALE; })
   .map(function(loc) { return LOCALE_SUBPATHS[loc]; })
@@ -228,14 +244,13 @@ function splitLocaleFromPath(reqPath) {
   }
   return { localeSubPath: '', routeWithinLocale: reqPath };
 }
-
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return next();
   }
   const { localeSubPath, routeWithinLocale } = splitLocaleFromPath(req.path);
   const isMarketing = marketingRoutes.has(routeWithinLocale);
-  const isSpaShell = routeWithinLocale === '/dashboard' || routeWithinLocale === '/stats';
+  const isSpaShell = clientShellRoutes.has(routeWithinLocale);
   if (!staticPath) {
     if (isMarketing || isSpaShell) {
       res.status(503).type('text/plain').send('Showcase build not found. Run `npm --prefix showcase/angular run build` first.');
@@ -256,10 +271,10 @@ app.use((req, res, next) => {
     return next();
   }
   if (isSpaShell) {
-    // D-10 exact-match whitelist: /dashboard and /stats are SPA-shell routes
-    // (RenderMode.Client per app.routes.server.ts). /dashboard/* and /stats/*
-    // are NOT covered and fall through to 404. Per-locale SPA shells are at
-    // public/<locale>/index.html, falling back to root index.html for EN.
+    // D-10 exact-match whitelist: /dashboard, /stats, and /legal are SPA-shell
+    // routes (RenderMode.Client per app.routes.server.ts). Nested paths like
+    // /dashboard/* are NOT covered and fall through to 404. Per-locale SPA shells
+    // are at public/<locale>/index.html, falling back to root index.html for EN.
     const shellCandidate = path.join(staticPath, localeSubPath, 'index.html');
     if (fs.existsSync(shellCandidate)) {
       res.sendFile(shellCandidate);
@@ -279,7 +294,10 @@ app.use((err, req, res, _next) => {
 
 // Create HTTP server and WebSocket server
 const server = http.createServer(app);
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  maxPayload: RELAY_PER_MESSAGE_LIMIT_BYTES + 1024
+});
 
 // Set up WS message handling
 setupWSHandler(wss);

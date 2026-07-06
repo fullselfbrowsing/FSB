@@ -1,0 +1,42 @@
+{
+  "slug": "outlook.download_attachment",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "download an attachment in outlook",
+    "download attachment in outlook",
+    "save attachment to downloads folder in outlook"
+  ],
+  "description": "Download an email attachment to the local filesystem (browser Downloads folder). Works with any file type — Excel, PDF, images, Word documents, etc. Returns the filename so you can locate it in the Downloads folder.",
+  "actionVerb": "download",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID"
+      },
+      "attachment_id": {
+        "type": "string",
+        "description": "The attachment ID (from list_attachments)"
+      }
+    },
+    "required": [
+      "message_id",
+      "attachment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/download-attachment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "download"
+    }
+  }
+}

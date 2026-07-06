@@ -1,0 +1,61 @@
+{
+  "slug": "posthog.create_insight",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "create an insight in posthog",
+    "add an insight in posthog",
+    "make a new insight in posthog",
+    "open a new insight in posthog",
+    "create insight in posthog",
+    "create a new saved insight in posthog"
+  ],
+  "description": "Create a new saved insight in the current PostHog project. Provide a HogQL query string and the insight will be created as a HogQL visualization. Optionally specify a name, description, and dashboard to add it to.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Insight name",
+        "type": "string"
+      },
+      "description": {
+        "description": "Insight description",
+        "type": "string"
+      },
+      "query": {
+        "type": "string",
+        "description": "HogQL query string for the insight"
+      },
+      "dashboard_id": {
+        "description": "Dashboard ID to add the insight to",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "tags": {
+        "description": "Tags to attach",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/create-insight.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "aws.list_instances",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list instances in aws",
+    "show me my instances in aws",
+    "view my instances in aws",
+    "see all my instances in aws",
+    "list ec2 instances in the current region in aws"
+  ],
+  "description": "List EC2 instances in the current region. Returns instance ID, type, state, IPs, VPC, and tags. Supports filtering by instance IDs. Defaults to max 50 results.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instance_ids": {
+        "description": "Filter by specific instance IDs (e.g., [\"i-1234567890abcdef0\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "max_results": {
+        "description": "Maximum number of instances to return (default 50)",
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 1000
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-instances.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

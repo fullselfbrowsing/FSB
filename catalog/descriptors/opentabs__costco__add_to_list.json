@@ -1,0 +1,52 @@
+{
+  "slug": "costco.add_to_list",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "add a to list in costco",
+    "add to list in costco",
+    "add a product to a shopping list in costco"
+  ],
+  "description": "Add a product to a Costco shopping list by item number.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "list_id": {
+        "type": "string",
+        "description": "Shopping list ID (from get_lists)"
+      },
+      "item_number": {
+        "type": "string",
+        "description": "Costco item number to add"
+      },
+      "quantity": {
+        "description": "Quantity to add (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "comment": {
+        "description": "Optional comment for the item",
+        "type": "string"
+      }
+    },
+    "required": [
+      "list_id",
+      "item_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/add-to-list.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

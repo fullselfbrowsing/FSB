@@ -10,6 +10,10 @@ export type MCPMessageType =
   | 'mcp:stop-automation'     // Cancel running task
   | 'mcp:get-status'          // Query task status
   | 'mcp:get-task-snapshot'   // Phase 239 plan 03: D-05 SW-wake snapshot lookup (server-side sw_evicted catch)
+  | 'mcp:trigger'             // Arm a background-owned DOM trigger
+  | 'mcp:stop-trigger'        // Cancel a background-owned DOM trigger
+  | 'mcp:get-trigger-status'  // Query one persisted trigger status
+  | 'mcp:list-triggers'       // List persisted trigger snapshots
   | 'mcp:start-visual-session' // MCP-owned visible lifecycle start
   | 'mcp:end-visual-session'   // MCP-owned visible lifecycle end
   | 'mcp:execute-action'      // Manual: execute a single browser action
@@ -37,6 +41,8 @@ export type MCPMessageType =
   | 'mcp:fill-credential'    // Vault: autofill login form (password stays in extension)
   | 'mcp:list-payments'      // Vault: list payment methods (last4+brand only)
   | 'mcp:use-payment-method' // Vault: fill checkout with confirmation gate
+  | 'mcp:capabilities-search' // Phase 28: read-only capability search (queue-bypass, search_capabilities)
+  | 'mcp:capabilities-invoke' // Phase 28: queued capability invoke (serialized, invoke_capability)
   | 'agent:register'         // Phase 238: lazy-mint per-process agent_id
   | 'agent:release'          // Phase 238: handler only; server caller in Phase 241
   | 'agent:status';          // Phase 238: caller-self introspection

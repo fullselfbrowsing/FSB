@@ -1,0 +1,39 @@
+{
+  "slug": "circleci.delete_context",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "delete a context in circleci",
+    "remove a context in circleci",
+    "trash a context in circleci",
+    "permanently delete a context in circleci",
+    "delete context in circleci"
+  ],
+  "description": "Delete a context and all its environment variables. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "context_id": {
+        "type": "string",
+        "description": "Context UUID"
+      }
+    },
+    "required": [
+      "context_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/delete-context.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "jira.transition_issue",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "transition an issue in jira",
+    "transition a ticket in jira",
+    "transition issue in jira",
+    "change an issue's status in jira"
+  ],
+  "description": "Transition a Jira issue to a new status. Use get_transitions to find available transition IDs for an issue.",
+  "actionVerb": "transition",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_key": {
+        "type": "string",
+        "description": "Issue key (e.g. \"KAN-1\") or issue ID"
+      },
+      "transition_id": {
+        "type": "string",
+        "description": "Transition ID to execute (use get_transitions to find available IDs)"
+      }
+    },
+    "required": [
+      "issue_key",
+      "transition_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/transition-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "transition"
+    }
+  }
+}

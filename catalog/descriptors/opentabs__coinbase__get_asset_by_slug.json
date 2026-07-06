@@ -1,0 +1,44 @@
+{
+  "slug": "coinbase.get_asset_by_slug",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "get an asset by slug in coinbase",
+    "look up an asset by slug in coinbase",
+    "fetch a single asset by slug in coinbase",
+    "view one specific asset by slug in coinbase",
+    "get asset by slug in coinbase",
+    "get asset details by url slug in coinbase"
+  ],
+  "description": "Get detailed information about a cryptocurrency asset by its URL slug (e.g. \"bitcoin\", \"ethereum\", \"solana\"). Returns market data and current price.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string",
+        "description": "Asset URL slug (e.g. \"bitcoin\", \"ethereum\", \"solana\", \"dogecoin\")"
+      },
+      "quote_currency": {
+        "description": "Quote currency for price (default \"USD\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/get-asset-by-slug.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

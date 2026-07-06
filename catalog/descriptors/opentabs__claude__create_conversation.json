@@ -1,0 +1,43 @@
+{
+  "slug": "claude.create_conversation",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "create a conversation in claude",
+    "add a conversation in claude",
+    "make a new conversation in claude",
+    "create conversation in claude",
+    "create a conversation with an initial message in claude"
+  ],
+  "description": "Create a new conversation and send an initial message. Creates the conversation, then sends a completion request to get the assistant response.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "Initial message to send in the new conversation"
+      },
+      "model": {
+        "description": "Model to use (default claude-sonnet-4-6)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "message"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/create-conversation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

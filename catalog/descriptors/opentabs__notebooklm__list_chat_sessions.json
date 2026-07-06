@@ -1,0 +1,44 @@
+{
+  "slug": "notebooklm.list_chat_sessions",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "list chat sessions in notebooklm",
+    "show me my chat sessions in notebooklm",
+    "view my chat sessions in notebooklm",
+    "see all my chat sessions in notebooklm"
+  ],
+  "description": "List chat sessions in a notebook. Each notebook has one or more chat sessions that contain conversation history.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      },
+      "limit": {
+        "description": "Max results (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/list-chat-sessions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

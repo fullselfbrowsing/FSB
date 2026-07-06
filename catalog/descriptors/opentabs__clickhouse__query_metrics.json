@@ -1,0 +1,58 @@
+{
+  "slug": "clickhouse.query_metrics",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "query metrics in clickhouse",
+    "get service health metrics in clickhouse",
+    "query health and performance metrics for a clickhouse cloud service in clickhouse"
+  ],
+  "description": "Query health and performance metrics for a ClickHouse Cloud service. Available metric types: ALLOCATED_MEMORY (bytes), CPU_USAGE (percentage), MEMORY_USAGE (bytes), QUERIES_PER_SECOND. Time periods: LAST_HOUR, LAST_DAY, LAST_WEEK, LAST_MONTH.",
+  "actionVerb": "query",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "string",
+        "description": "Service UUID"
+      },
+      "metric_type": {
+        "type": "string",
+        "enum": [
+          "ALLOCATED_MEMORY",
+          "CPU_USAGE",
+          "MEMORY_USAGE",
+          "QUERIES_PER_SECOND"
+        ],
+        "description": "Metric type to query"
+      },
+      "time_period": {
+        "description": "Time period (default LAST_HOUR)",
+        "type": "string",
+        "enum": [
+          "LAST_HOUR",
+          "LAST_DAY",
+          "LAST_WEEK",
+          "LAST_MONTH"
+        ]
+      }
+    },
+    "required": [
+      "service_id",
+      "metric_type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/query-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "query"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "slug": "stackoverflow.list_linked_questions",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "list linked questions in stackoverflow",
+    "show me my linked questions in stackoverflow",
+    "view my linked questions in stackoverflow",
+    "see all my linked questions in stackoverflow",
+    "get questions linking to a question in stackoverflow"
+  ],
+  "description": "Get questions that link to a specific Stack Overflow question. These are questions whose answers or body reference the given question.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "question_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Question ID to find linked questions for"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "question_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/list-linked-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

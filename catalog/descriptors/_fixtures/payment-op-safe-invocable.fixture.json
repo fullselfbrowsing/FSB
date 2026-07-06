@@ -1,0 +1,14 @@
+{
+  "slug": "shopcorp.place_order",
+  "service": "shopcorp.example",
+  "description": "Place a paid order (Phase 39 payment-op-guard fixture: a payment op declared on a SAFE origin AND promoted to an API-invocable backing handler -- BOTH failure conditions in one fixture; checkPaymentOpsNotSafeInvocable MUST reject it).",
+  "actionVerb": "place",
+  "sideEffectClass": "write",
+  "backing": "handler",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "_fixture": "Phase 39 (BRDTH-02, the headline): a payment-bearing op (slug shopcorp.place_order -> payment verb 'place' via verbPrefix AND op-name 'place_order' in PAYMENT_OP_NAMES) declared on a SAFE origin (shopcorp.example, NOT in service-denylist.json sensitiveOrigins/deniedOrigins) AND promoted to backing 'handler' (API-invocable). checkPaymentOpsNotSafeInvocable() in verify-catalog-crosscheck.mjs MUST flag this descriptor -- a payment op must NEVER be safe-and-API-invocable (writable under Auto = money moved without consent). _fixtures/ is excluded by readJsonDir non-recursion so it never ships and never reaches the CLI corpus sweep."
+}

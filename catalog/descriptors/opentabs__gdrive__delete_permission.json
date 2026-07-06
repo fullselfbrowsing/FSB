@@ -1,0 +1,45 @@
+{
+  "slug": "gdrive.delete_permission",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "delete a permission in gdrive",
+    "remove a permission in gdrive",
+    "trash a permission in gdrive",
+    "permanently delete a permission in gdrive",
+    "delete permission in gdrive",
+    "delete a permission in google drive"
+  ],
+  "description": "Remove a sharing permission from a file or folder. Use list_permissions to find permission IDs.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      },
+      "permission_id": {
+        "type": "string",
+        "description": "Permission ID to remove (from list_permissions)"
+      }
+    },
+    "required": [
+      "file_id",
+      "permission_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/delete-permission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "gcal.search_events",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "search events in gcal",
+    "search events in google calendar",
+    "search events across all calendars in gcal"
+  ],
+  "description": "Search for events across all writable calendars by text query. Searches event summary, description, location, and attendee names. Returns matching events from all calendars the user has write access to.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query to match against event text"
+      },
+      "time_min": {
+        "description": "Lower bound (inclusive) as ISO 8601 timestamp",
+        "type": "string"
+      },
+      "time_max": {
+        "description": "Upper bound (exclusive) as ISO 8601 timestamp",
+        "type": "string"
+      },
+      "max_results_per_calendar": {
+        "description": "Maximum results per calendar (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/search-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "instacart.search_products",
+  "service": "instacart.com",
+  "intentSynonyms": [
+    "search products in instacart",
+    "search groceries in instacart",
+    "search grocery items in instacart",
+    "search for grocery products in instacart"
+  ],
+  "description": "Search for products across all available retailers near the delivery address. Returns suggested items with thumbnails. Use get_location_context first if you need the zone ID. The search uses the user's current delivery location automatically.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (e.g. \"milk\", \"organic eggs\", \"chicken breast\")"
+      },
+      "limit": {
+        "description": "Max results (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instacart/src/tools/search-products.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

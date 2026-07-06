@@ -1,0 +1,44 @@
+{
+  "slug": "slack.pin_message",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "pin a message in slack",
+    "pin message in slack",
+    "pin a message to a channel in slack"
+  ],
+  "description": "Pin a message to a Slack channel",
+  "actionVerb": "pin",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located (e.g., C01234567)"
+      },
+      "ts": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Timestamp of the message to pin — serves as the unique message ID (e.g., 1234567890.123456)"
+      }
+    },
+    "required": [
+      "channel",
+      "ts"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/pin-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "pin"
+    }
+  }
+}

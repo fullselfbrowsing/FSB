@@ -1,0 +1,36 @@
+{
+  "slug": "robinhood.list_orders",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "list orders in robinhood",
+    "show me my orders in robinhood",
+    "view my orders in robinhood",
+    "see all my orders in robinhood",
+    "list recent stock orders in robinhood"
+  ],
+  "description": "List recent stock orders. Returns order history including filled, cancelled, and pending orders. Does not place or modify orders.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "updated_at_gte": {
+        "description": "Only return orders updated after this ISO date (e.g., 2025-01-01)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "slug": "chipotle.find_restaurants",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "find restaurants in chipotle",
+    "find nearby chipotle locations by coordinates in chipotle",
+    "search for nearby chipotle restaurants by geographic coordinates in chipotle"
+  ],
+  "description": "Search for nearby Chipotle restaurants by geographic coordinates. Returns restaurants sorted by distance with address, phone, online ordering availability, and Chipotlane status.",
+  "actionVerb": "find",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "latitude": {
+        "type": "number",
+        "description": "Latitude coordinate of the search center"
+      },
+      "longitude": {
+        "type": "number",
+        "description": "Longitude coordinate of the search center"
+      },
+      "radius": {
+        "description": "Search radius in meters (default 8045, ~5 miles)",
+        "type": "number"
+      },
+      "page_size": {
+        "description": "Number of results per page (default 10)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "page_index": {
+        "description": "Page index for pagination (default 0)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "latitude",
+      "longitude"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/find-restaurants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "find"
+    }
+  }
+}

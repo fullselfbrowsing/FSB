@@ -1,0 +1,44 @@
+{
+  "slug": "figma.post_comment",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "post a comment in figma",
+    "post comment in figma",
+    "add a comment to a file in figma"
+  ],
+  "description": "Add a comment to a Figma file. Comments are visible to all collaborators.",
+  "actionVerb": "post",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "File key to comment on"
+      },
+      "message": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment text to post"
+      }
+    },
+    "required": [
+      "file_key",
+      "message"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/post-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "post"
+    }
+  }
+}

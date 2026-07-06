@@ -1,0 +1,31 @@
+{
+  "slug": "robinhood.list_positions",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "list positions in robinhood",
+    "show me my positions in robinhood",
+    "view my positions in robinhood",
+    "see all my positions in robinhood",
+    "list current stock positions in robinhood"
+  ],
+  "description": "List all nonzero stock positions in the Robinhood portfolio including instrument ID, ticker symbol, quantity, average buy price, and shares available for sale.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/list-positions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "doordash.list_payment_methods",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "list payment methods in doordash",
+    "show me my payment methods in doordash",
+    "view my payment methods in doordash",
+    "see all my payment methods in doordash",
+    "list your saved payment methods in doordash"
+  ],
+  "description": "List all saved payment methods on the DoorDash account. Returns card type, last 4 digits, expiration date, and whether the card is the default.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/list-payment-methods.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

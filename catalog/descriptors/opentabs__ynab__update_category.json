@@ -1,0 +1,235 @@
+{
+  "slug": "ynab.update_category",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "update a category in ynab",
+    "edit a category in ynab",
+    "change the details of category in ynab",
+    "modify a category in ynab",
+    "update category in ynab"
+  ],
+  "description": "Rename a category, change its group, set/clear its goal, or hide/unhide it. Only specified fields change; omitted fields remain unchanged. Goal types: \"set_aside\" / \"refill\" (recurring NEED with optional cadence), \"target_balance\" (have $X), \"target_by_date\" (have $X by date), \"debt\" (recurring debt payment), or \"none\" to clear an existing goal.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "category_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Category ID to update"
+      },
+      "name": {
+        "description": "New name",
+        "type": "string",
+        "minLength": 1
+      },
+      "group_id": {
+        "description": "New parent category group ID (to move the category)",
+        "type": "string",
+        "minLength": 1
+      },
+      "goal": {
+        "description": "New goal definition. Pass { type: \"none\" } to clear the goal.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "set_aside"
+              },
+              "target": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Goal amount in currency units (e.g. 50 for $50)"
+              },
+              "cadence": {
+                "description": "How often the goal recurs. Defaults to monthly.",
+                "type": "string",
+                "enum": [
+                  "weekly",
+                  "monthly",
+                  "yearly"
+                ]
+              },
+              "every": {
+                "description": "Multiplier on cadence (e.g. cadence=monthly + every=5 means every 5 months). Defaults to 1.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "day": {
+                "description": "Day-of-week (0=Sunday, 6=Saturday) for weekly cadence, or day-of-month (1-31) for monthly cadence.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              },
+              "start_date": {
+                "description": "First occurrence date (YYYY-MM-DD). Required for yearly cadence; optional for others.",
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "type",
+              "target"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "refill"
+              },
+              "target": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Goal amount in currency units (e.g. 50 for $50)"
+              },
+              "cadence": {
+                "description": "How often the goal recurs. Defaults to monthly.",
+                "type": "string",
+                "enum": [
+                  "weekly",
+                  "monthly",
+                  "yearly"
+                ]
+              },
+              "every": {
+                "description": "Multiplier on cadence (e.g. cadence=monthly + every=5 means every 5 months). Defaults to 1.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "day": {
+                "description": "Day-of-week (0=Sunday, 6=Saturday) for weekly cadence, or day-of-month (1-31) for monthly cadence.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31
+              },
+              "start_date": {
+                "description": "First occurrence date (YYYY-MM-DD). Required for yearly cadence; optional for others.",
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "type",
+              "target"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "target_balance"
+              },
+              "target": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Balance to maintain in currency units"
+              }
+            },
+            "required": [
+              "type",
+              "target"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "target_by_date"
+              },
+              "target": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Target balance to have by the given date in currency units"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Target date YYYY-MM-DD"
+              }
+            },
+            "required": [
+              "type",
+              "target",
+              "date"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "debt"
+              },
+              "target": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Monthly payment amount in currency units"
+              },
+              "day": {
+                "description": "Day of month the payment is due (1-31). Defaults to 1.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              }
+            },
+            "required": [
+              "type",
+              "target"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "none"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "hidden": {
+        "description": "Hide or unhide the category",
+        "type": "boolean"
+      },
+      "note": {
+        "description": "New note (pass empty string to clear)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "category_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/update-category.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

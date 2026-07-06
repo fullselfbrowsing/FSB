@@ -1,0 +1,41 @@
+{
+  "slug": "ebay.get_item",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "get an item in ebay",
+    "look up an item in ebay",
+    "fetch a single item in ebay",
+    "view one specific item in ebay",
+    "get item in ebay",
+    "get details for an ebay item listing in ebay"
+  ],
+  "description": "Get detailed information about a specific eBay item by its item ID. Returns title, price, condition, images, seller info, shipping details, and return policy. Uses JSON-LD structured data embedded in the item page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "eBay item ID (numeric string, e.g., \"236495878573\")"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/get-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

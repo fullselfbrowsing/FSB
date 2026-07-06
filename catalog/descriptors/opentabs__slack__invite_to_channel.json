@@ -1,0 +1,44 @@
+{
+  "slug": "slack.invite_to_channel",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "invite a to channel in slack",
+    "invite to channel in slack",
+    "invite a user to a channel in slack"
+  ],
+  "description": "Invite a user to a Slack channel",
+  "actionVerb": "invite",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to invite the user to (e.g., C01234567)"
+      },
+      "user": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID to invite (e.g., U01234567)"
+      }
+    },
+    "required": [
+      "channel",
+      "user"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/invite-to-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "invite"
+    }
+  }
+}

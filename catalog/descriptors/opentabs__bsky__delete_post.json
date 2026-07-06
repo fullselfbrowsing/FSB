@@ -1,0 +1,40 @@
+{
+  "slug": "bsky.delete_post",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "delete a post in bsky",
+    "remove a post in bsky",
+    "trash a post in bsky",
+    "permanently delete a post in bsky",
+    "delete post in bsky",
+    "delete a post in bluesky"
+  ],
+  "description": "Delete a post by its AT URI. Only the post author can delete their own posts. The rkey is extracted from the URI.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "AT URI of the post to delete"
+      }
+    },
+    "required": [
+      "uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/delete-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

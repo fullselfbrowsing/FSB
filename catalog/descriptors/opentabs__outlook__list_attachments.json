@@ -1,0 +1,39 @@
+{
+  "slug": "outlook.list_attachments",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "list attachments in outlook",
+    "show me my attachments in outlook",
+    "view my attachments in outlook",
+    "see all my attachments in outlook",
+    "list email attachments in outlook"
+  ],
+  "description": "List attachments on an email message. Returns file names, types, and sizes.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "message_id": {
+        "type": "string",
+        "description": "The message ID"
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/list-attachments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

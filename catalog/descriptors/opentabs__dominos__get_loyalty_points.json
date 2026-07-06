@@ -1,0 +1,31 @@
+{
+  "slug": "dominos.get_loyalty_points",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get loyalty points in dominos",
+    "look up loyalty points in dominos",
+    "fetch a single loyalty points in dominos",
+    "view one specific loyalty points in dominos",
+    "check your loyalty point balance in dominos"
+  ],
+  "description": "Get the customer's Domino's Rewards loyalty point balance. Points can be redeemed for free menu items.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-loyalty-points.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

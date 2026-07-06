@@ -1,0 +1,45 @@
+{
+  "slug": "ynab.get_month",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "get a month in ynab",
+    "look up a month in ynab",
+    "fetch a single month in ynab",
+    "view one specific month in ynab",
+    "get month in ynab",
+    "get budget details for a month in ynab"
+  ],
+  "description": "Get budget summary and category details for a specific month. Returns the month overview (income, budgeted, activity, Ready to Assign) plus per-category breakdowns. Month format is YYYY-MM-DD using the first of the month (e.g. 2026-03-01).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "month": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Month in YYYY-MM-DD format (first of month, e.g. 2026-03-01)"
+      },
+      "include_hidden": {
+        "description": "Include hidden categories (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "month"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/get-month.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

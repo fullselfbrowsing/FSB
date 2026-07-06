@@ -1,0 +1,31 @@
+{
+  "slug": "leetcode.list_favorites",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "list favorites in leetcode",
+    "show me my favorites in leetcode",
+    "view my favorites in leetcode",
+    "see all my favorites in leetcode",
+    "list your favorite problem lists in leetcode"
+  ],
+  "description": "List your LeetCode favorite/problem lists. Each list has a name, visibility, and a list of problem slugs saved in it.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/list-favorites.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

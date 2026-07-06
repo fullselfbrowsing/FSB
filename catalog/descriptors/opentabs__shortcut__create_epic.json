@@ -1,0 +1,70 @@
+{
+  "slug": "shortcut.create_epic",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "create an epic in shortcut",
+    "add an epic in shortcut",
+    "make a new epic in shortcut",
+    "open a new epic in shortcut",
+    "create epic in shortcut",
+    "create a new epic in shortcut"
+  ],
+  "description": "Create a new epic. Requires a name. Optionally set description, state, deadline, owners, and labels.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Epic name"
+      },
+      "description": {
+        "description": "Epic description in Markdown",
+        "type": "string"
+      },
+      "epic_state_id": {
+        "description": "Epic state ID (from workspace epic workflow)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "deadline": {
+        "description": "Deadline in ISO 8601 format",
+        "type": "string"
+      },
+      "owner_ids": {
+        "description": "Member UUIDs to set as owners",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "label_ids": {
+        "description": "Label IDs to attach",
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/create-epic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

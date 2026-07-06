@@ -1,0 +1,50 @@
+{
+  "slug": "bsky.get_followers",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get followers in bsky",
+    "look up followers in bsky",
+    "fetch a single followers in bsky",
+    "view one specific followers in bsky",
+    "get a user's followers in bsky"
+  ],
+  "description": "Get a user's followers list. Supports cursor-based pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "actor": {
+        "type": "string",
+        "description": "DID or handle of the user whose followers to retrieve"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of followers to return (1-100, default 50)",
+        "default": 50,
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "actor"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-followers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

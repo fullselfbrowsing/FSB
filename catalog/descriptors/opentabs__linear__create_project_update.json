@@ -1,0 +1,55 @@
+{
+  "slug": "linear.create_project_update",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create a project update in linear",
+    "add a project update in linear",
+    "make a new project update in linear",
+    "open a new project update in linear",
+    "create project update in linear",
+    "post a project status update in linear"
+  ],
+  "description": "Post a status update (health report) on a Linear project.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID to post the update on"
+      },
+      "body": {
+        "type": "string",
+        "description": "Status update body in markdown"
+      },
+      "health": {
+        "type": "string",
+        "enum": [
+          "onTrack",
+          "atRisk",
+          "offTrack"
+        ],
+        "description": "Project health status"
+      }
+    },
+    "required": [
+      "project_id",
+      "body",
+      "health"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-project-update.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "target.list_orders",
+  "service": "target.com",
+  "intentSynonyms": [
+    "list orders in target",
+    "show me my orders in target",
+    "view my orders in target",
+    "see all my orders in target",
+    "list order history in target"
+  ],
+  "description": "List the user's Target order history with order number, date, total, and line items. Supports pagination. Returns both online and in-store orders.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "per_page": {
+        "description": "Orders per page (default 10, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/list-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

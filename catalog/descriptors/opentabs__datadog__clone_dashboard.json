@@ -1,0 +1,45 @@
+{
+  "slug": "datadog.clone_dashboard",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "clone a dashboard in datadog",
+    "clone dashboard in datadog",
+    "clone a dashboard with optional overrides in datadog"
+  ],
+  "description": "Clone an existing dashboard to create a copy. Optionally override the title or description. The original dashboard is not modified.",
+  "actionVerb": "clone",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "dashboard_id": {
+        "type": "string",
+        "description": "ID of the dashboard to clone (e.g., \"abc-def-ghi\")"
+      },
+      "title": {
+        "description": "Title for the cloned dashboard. Defaults to \"Clone of <original title>\".",
+        "type": "string"
+      },
+      "description": {
+        "description": "Override the description on the clone",
+        "type": "string"
+      }
+    },
+    "required": [
+      "dashboard_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/clone-dashboard.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "clone"
+    }
+  }
+}

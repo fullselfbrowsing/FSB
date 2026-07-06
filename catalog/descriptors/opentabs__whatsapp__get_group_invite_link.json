@@ -1,0 +1,40 @@
+{
+  "slug": "whatsapp.get_group_invite_link",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "get a group invite link in whatsapp",
+    "look up a group invite link in whatsapp",
+    "fetch a single group invite link in whatsapp",
+    "view one specific group invite link in whatsapp",
+    "get group invite link in whatsapp"
+  ],
+  "description": "Get the invite link for a WhatsApp group. Only group admins can retrieve the invite link.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Group chat ID (must be a group chat)"
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/get-group-invite-link.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

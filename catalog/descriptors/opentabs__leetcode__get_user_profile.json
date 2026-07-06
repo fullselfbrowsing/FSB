@@ -1,0 +1,40 @@
+{
+  "slug": "leetcode.get_user_profile",
+  "service": "leetcode.com",
+  "intentSynonyms": [
+    "get an user profile in leetcode",
+    "look up an user profile in leetcode",
+    "fetch a single user profile in leetcode",
+    "view one specific user profile in leetcode",
+    "get user profile in leetcode",
+    "get a user profile by username in leetcode"
+  ],
+  "description": "Get a LeetCode user public profile by username. Returns real name, bio, ranking, company, school, and skill tags.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "LeetCode username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/leetcode/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

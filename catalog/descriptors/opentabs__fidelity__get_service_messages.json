@@ -1,0 +1,31 @@
+{
+  "slug": "fidelity.get_service_messages",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get service messages in fidelity",
+    "look up service messages in fidelity",
+    "fetch a single service messages in fidelity",
+    "view one specific service messages in fidelity",
+    "check message center alerts in fidelity"
+  ],
+  "description": "Get account service messages and alerts from the Fidelity message center. Shows total, urgent, and new message counts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-service-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

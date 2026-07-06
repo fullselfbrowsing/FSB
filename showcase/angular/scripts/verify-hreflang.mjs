@@ -19,7 +19,7 @@ import { join, relative } from 'node:path';
 const HOST = 'https://full-selfbrowsing.com';
 const LOCALES = ['en', 'es', 'de', 'ja', 'zh-CN', 'zh-TW'];
 const SOURCE_LOCALE = 'en';
-const ROUTE_PATHS = ['', '/about', '/agents', '/privacy', '/support']; // '' = home
+const SERVER_ROUTES_PATH = join(process.cwd(), 'src', 'app', 'app.routes.server.ts');
 
 // Default to the @angular/build:application outputPath in showcase/angular/angular.json.
 const DIST_ROOT = process.env.DIST_ROOT
@@ -42,6 +42,26 @@ function buildLocaleUrl(locale, routePath) {
     return sub ? `${HOST}/${sub}` : HOST;
   }
   return sub ? `${HOST}/${sub}${routePath}` : `${HOST}${routePath}`;
+}
+
+function loadPrerenderRoutePaths() {
+  if (!existsSync(SERVER_ROUTES_PATH)) {
+    return ['', '/about', '/agents', '/privacy', '/support'];
+  }
+
+  const source = readFileSync(SERVER_ROUTES_PATH, 'utf8');
+  const routes = [];
+  const routeRe = /\{\s*path:\s*'([^']*)'[\s\S]*?renderMode:\s*RenderMode\.Prerender[\s\S]*?\}/g;
+  let match;
+  while ((match = routeRe.exec(source)) !== null) {
+    const raw = match[1];
+    if (!raw || raw === '/') {
+      routes.push('');
+    } else if (!raw.includes('*') && !raw.includes(':')) {
+      routes.push('/' + raw.replace(/^\/+/, ''));
+    }
+  }
+  return [...new Set(routes)].sort((a, b) => a.localeCompare(b));
 }
 
 // Given a path like dist/.../browser/es/about/index.html, infer ('es', '/about').
@@ -192,10 +212,10 @@ function main() {
     process.exit(2);
   }
 
-  // Expect exactly 30: 6 locales * 5 routes.
-  const expectedCount = LOCALES.length * ROUTE_PATHS.length;
+  const routePaths = loadPrerenderRoutePaths();
+  const expectedCount = LOCALES.length * routePaths.length;
   if (files.length !== expectedCount) {
-    record(false, `total index.html count`, `expected ${expectedCount} (${LOCALES.length} locales x ${ROUTE_PATHS.length} routes), got ${files.length}`);
+    record(false, `total index.html count`, `expected ${expectedCount} (${LOCALES.length} locales x ${routePaths.length} prerender routes), got ${files.length}`);
   } else {
     record(true, `total index.html count = ${expectedCount}`);
   }

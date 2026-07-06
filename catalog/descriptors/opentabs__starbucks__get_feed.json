@@ -1,0 +1,45 @@
+{
+  "slug": "starbucks.get_feed",
+  "service": "starbucks.com",
+  "intentSynonyms": [
+    "get a feed in starbucks",
+    "look up a feed in starbucks",
+    "fetch a single feed in starbucks",
+    "view one specific feed in starbucks",
+    "get feed in starbucks",
+    "get personalized promotions and offers feed in starbucks"
+  ],
+  "description": "Get the personalized \"For You\" feed of promotions, offers, and content from Starbucks. Includes seasonal highlights, new products, and personalized recommendations.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of feed items to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/starbucks/src/tools/get-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "wikipedia.get_page_views",
+  "service": "wikipedia.org",
+  "intentSynonyms": [
+    "get page views in wikipedia",
+    "look up page views in wikipedia",
+    "fetch a single page views in wikipedia",
+    "view one specific page views in wikipedia",
+    "get daily page view statistics in wikipedia"
+  ],
+  "description": "Get the daily page view counts for a Wikipedia article over a date range. Uses the Wikimedia REST API. Dates must be in YYYYMMDD format. Maximum range is 365 days.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Article title (e.g., \"JavaScript\")"
+      },
+      "start": {
+        "type": "string",
+        "description": "Start date in YYYYMMDD format (e.g., \"20260101\")"
+      },
+      "end": {
+        "type": "string",
+        "description": "End date in YYYYMMDD format (e.g., \"20260131\")"
+      }
+    },
+    "required": [
+      "title",
+      "start",
+      "end"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/wikipedia/src/tools/get-page-views.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

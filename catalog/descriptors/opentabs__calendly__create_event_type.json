@@ -1,0 +1,59 @@
+{
+  "slug": "calendly.create_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "create an event type in calendly",
+    "add an event type in calendly",
+    "make a new event type in calendly",
+    "open a new event type in calendly",
+    "create event type in calendly",
+    "create a new scheduling event type in calendly"
+  ],
+  "description": "Create a new event type (scheduling template). Requires a name and a URL-safe slug. Returns the new event type ID and edit path.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Event type display name (e.g. \"Discovery Call\")"
+      },
+      "slug": {
+        "type": "string",
+        "description": "URL-safe slug using lowercase a-z, 0-9, hyphens, or underscores (e.g. \"discovery-call\")"
+      },
+      "duration": {
+        "description": "Duration in minutes (default 30)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "description": {
+        "description": "Description shown to invitees",
+        "type": "string"
+      },
+      "color": {
+        "description": "Display color hex code (e.g. \"#0069ff\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/create-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

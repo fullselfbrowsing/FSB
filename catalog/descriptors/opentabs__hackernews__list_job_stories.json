@@ -1,0 +1,38 @@
+{
+  "slug": "hackernews.list_job_stories",
+  "service": "news.ycombinator.com",
+  "intentSynonyms": [
+    "list job stories in hackernews",
+    "show me my job stories in hackernews",
+    "view my job stories in hackernews",
+    "see all my job stories in hackernews",
+    "get job postings in hackernews"
+  ],
+  "description": "Get the latest job postings on Hacker News. Returns 30 jobs per page. Use page for pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hackernews/src/tools/list-job-stories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

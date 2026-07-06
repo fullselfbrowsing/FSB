@@ -1,0 +1,60 @@
+{
+  "slug": "tumblr.edit_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "edit a post in tumblr",
+    "edit post in tumblr",
+    "edit an existing tumblr post in tumblr"
+  ],
+  "description": "Edit an existing Tumblr post. Only provided fields are updated.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or URL"
+      },
+      "post_id": {
+        "type": "string",
+        "description": "Post ID to edit"
+      },
+      "content": {
+        "description": "New text content for the post",
+        "type": "string"
+      },
+      "tags": {
+        "description": "Comma-separated tags (replaces existing tags)",
+        "type": "string"
+      },
+      "state": {
+        "description": "New post state",
+        "type": "string",
+        "enum": [
+          "published",
+          "draft",
+          "queue",
+          "private"
+        ]
+      }
+    },
+    "required": [
+      "blog_name",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/edit-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "edit"
+    }
+  }
+}

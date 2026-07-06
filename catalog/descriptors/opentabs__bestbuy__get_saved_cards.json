@@ -1,0 +1,31 @@
+{
+  "slug": "bestbuy.get_saved_cards",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get saved cards in bestbuy",
+    "look up saved cards in bestbuy",
+    "fetch a single saved cards in bestbuy",
+    "view one specific saved cards in bestbuy",
+    "list saved payment cards in bestbuy"
+  ],
+  "description": "List all saved payment cards on the Best Buy account. Returns card type, last 4 digits, expiration date, cardholder name, billing address, and whether it is the default payment method.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-saved-cards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

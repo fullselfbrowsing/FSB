@@ -1,0 +1,39 @@
+{
+  "slug": "retool.list_workflow_triggers",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list workflow triggers in retool",
+    "show me my workflow triggers in retool",
+    "view my workflow triggers in retool",
+    "see all my workflow triggers in retool",
+    "list triggers for a workflow in retool"
+  ],
+  "description": "List all triggers configured for a Retool workflow. Returns both deployed (active) and latest saved (pending) triggers, including webhooks and schedules.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-workflow-triggers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

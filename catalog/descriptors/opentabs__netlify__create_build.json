@@ -1,0 +1,40 @@
+{
+  "slug": "netlify.create_build",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a build in netlify",
+    "add a build in netlify",
+    "make a new build in netlify",
+    "open a new build in netlify",
+    "create build in netlify",
+    "trigger a new site build in netlify"
+  ],
+  "description": "Trigger a new build for a Netlify site. This starts a fresh build and deploy using the current site configuration and linked repository.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to trigger a build for"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-build.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "source": "opentabs",
+  "repo": "github.com/opentabs-dev/opentabs",
+  "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+  "license": "MIT",
+  "pinnedAt": "2026-06-21T21:54:20Z",
+  "augment": {
+    "policy": "AUGMENT, not replace (Phase 39.5-01): vendor real OpenTabs src and preserve the hand-authored-only apps",
+    "realSlicesVendored": 115,
+    "overlapRegenerated": 39,
+    "netNew": 76,
+    "handAuthoredOnlyPreserved": 13,
+    "skipped": {
+      "grafana": "real upstream grafana has empty urlPatterns (self-hosted); the hand-authored grafana.com slice is PRESERVED instead, so grafana stays covered -- real grafana NOT vendored over it",
+      "sqlpad": "real upstream sqlpad has empty urlPatterns (self-hosted) and has no hand-authored slice -> simply not vendored",
+      "ciFixtures": ["e2e-test", "prescript-test"]
+    },
+    "vendoredPluginDirs": 129,
+    "note": "Real-app provenance (source: 'opentabs') is filled into catalog/descriptors/_fixtures/_provenance.json by the frozen importer (fillProvenance) at Plan 39.5-04 run time. This vendor-side file records ONLY the augment policy + the 13 hand-authored-only no-upstream markers below, so they are never mistaken for real-source. Real-app descriptor lists are intentionally NOT pre-populated here."
+  },
+  "apps": [
+    {
+      "app": "amazon",
+      "service": "www.amazon.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/amazon/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "etsy",
+      "service": "www.etsy.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/etsy/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "eventbrite",
+      "service": "www.eventbrite.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/eventbrite/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "grubhub",
+      "service": "www.grubhub.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/grubhub/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "kayak",
+      "service": "www.kayak.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/kayak/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "lyft",
+      "service": "lyft.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/lyft/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "mastodon",
+      "service": "mastodon.social",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/mastodon/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "opentable",
+      "service": "www.opentable.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/opentable/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "shopify",
+      "service": "shopify.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/shopify/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "stubhub",
+      "service": "www.stubhub.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/stubhub/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "threads",
+      "service": "www.threads.net",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/threads/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "ticketmaster",
+      "service": "www.ticketmaster.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/ticketmaster/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    },
+    {
+      "app": "ubereats",
+      "service": "www.ubereats.com",
+      "source": "hand-authored",
+      "upstream": "none",
+      "upstreamSha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+      "license": "MIT",
+      "sourcePath": "plugins/ubereats/",
+      "note": "hand-authored, no upstream@SHA (preserved by Phase 39.5-01 augment)"
+    }
+  ]
+}

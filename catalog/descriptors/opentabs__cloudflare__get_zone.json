@@ -1,0 +1,40 @@
+{
+  "slug": "cloudflare.get_zone",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "get a zone in cloudflare",
+    "look up a zone in cloudflare",
+    "fetch a single zone in cloudflare",
+    "view one specific zone in cloudflare",
+    "get zone in cloudflare",
+    "get zone details in cloudflare"
+  ],
+  "description": "Get detailed information about a specific zone (domain) by its zone ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/get-zone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

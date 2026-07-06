@@ -1,0 +1,46 @@
+{
+  "slug": "ubereats.list_restaurants",
+  "service": "www.ubereats.com",
+  "intentSynonyms": [
+    "list restaurants in ubereats",
+    "show me my restaurants in ubereats",
+    "view my restaurants in ubereats",
+    "see all my restaurants in ubereats",
+    "show me restaurants on ubereats in ubereats"
+  ],
+  "description": "List or search Uber Eats restaurants available for delivery to an address. Optionally filter by a search term (cuisine or restaurant name).",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "description": "Delivery address to find restaurants for",
+        "type": "string"
+      },
+      "query": {
+        "description": "Search term (cuisine, dish, or restaurant name)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of restaurants to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ubereats/src/tools/list-restaurants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

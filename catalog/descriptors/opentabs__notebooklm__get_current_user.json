@@ -1,0 +1,32 @@
+{
+  "slug": "notebooklm.get_current_user",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "get a current user in notebooklm",
+    "look up a current user in notebooklm",
+    "fetch a single current user in notebooklm",
+    "view one specific current user in notebooklm",
+    "get current user in notebooklm",
+    "get current user info in notebooklm"
+  ],
+  "description": "Get the currently logged-in user's account information (email and user ID).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

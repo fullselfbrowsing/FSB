@@ -1,0 +1,58 @@
+{
+  "slug": "circleci.get_workflow_job_metrics",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get workflow job metrics in circleci",
+    "look up workflow job metrics in circleci",
+    "fetch a single workflow job metrics in circleci",
+    "view one specific workflow job metrics in circleci",
+    "get job metrics for a workflow in circleci"
+  ],
+  "description": "Get job-level metrics for a specific workflow including success rates and durations per job.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "workflow_name": {
+        "type": "string",
+        "description": "Workflow name"
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      },
+      "reporting_window": {
+        "description": "Time window (default \"last-90-days\")",
+        "type": "string",
+        "enum": [
+          "last-7-days",
+          "last-30-days",
+          "last-60-days",
+          "last-90-days"
+        ]
+      }
+    },
+    "required": [
+      "project_slug",
+      "workflow_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-workflow-job-metrics.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

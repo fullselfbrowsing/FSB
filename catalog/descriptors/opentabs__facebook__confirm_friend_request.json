@@ -1,0 +1,37 @@
+{
+  "slug": "facebook.confirm_friend_request",
+  "service": "facebook.com",
+  "intentSynonyms": [
+    "confirm a friend request in facebook",
+    "confirm friend request in facebook",
+    "accept a friend request in facebook"
+  ],
+  "description": "Accept an incoming Facebook friend request. Requires the sender's user ID.",
+  "actionVerb": "confirm",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "Facebook user ID of the person who sent the friend request"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/facebook/src/tools/confirm-friend-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "confirm"
+    }
+  }
+}

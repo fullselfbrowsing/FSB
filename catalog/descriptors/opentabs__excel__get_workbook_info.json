@@ -1,0 +1,32 @@
+{
+  "slug": "excel.get_workbook_info",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "get a workbook info in excel",
+    "look up a workbook info in excel",
+    "fetch a single workbook info in excel",
+    "view one specific workbook info in excel",
+    "get workbook info in excel",
+    "get current workbook metadata in excel"
+  ],
+  "description": "Get information about the currently open Excel workbook including drive ID, item ID, and file name. Returns context needed by other tools. The workbook must be open in the browser.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/get-workbook-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

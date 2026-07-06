@@ -1,0 +1,32 @@
+{
+  "slug": "minimax.get_membership_info",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get a membership info in minimax",
+    "look up a membership info in minimax",
+    "fetch a single membership info in minimax",
+    "view one specific membership info in minimax",
+    "get membership info in minimax",
+    "get membership plan and credit details in minimax"
+  ],
+  "description": "Get the current MiniMax Agent membership details including plan type, plan name, remaining credits, pending credits, renewal status, expiration date, and Pro Builder status.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-membership-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

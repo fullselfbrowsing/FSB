@@ -1,0 +1,78 @@
+{
+  "slug": "asana.create_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "create a task in asana",
+    "add a task in asana",
+    "make a new task in asana",
+    "open a new task in asana",
+    "create a to-do in asana",
+    "create a to-do item in asana"
+  ],
+  "description": "Create a new task in a workspace. Optionally assign to a project, user, or parent task.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task name"
+      },
+      "workspace": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace GID to create the task in"
+      },
+      "projects": {
+        "description": "Project GIDs to add the task to",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "assignee": {
+        "description": "Assignee user GID",
+        "type": "string"
+      },
+      "due_on": {
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "due_at": {
+        "description": "Due datetime in ISO 8601 format",
+        "type": "string"
+      },
+      "start_on": {
+        "description": "Start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "notes": {
+        "description": "Plain-text task description",
+        "type": "string"
+      },
+      "parent": {
+        "description": "Parent task GID to create as a subtask",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "workspace"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/create-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

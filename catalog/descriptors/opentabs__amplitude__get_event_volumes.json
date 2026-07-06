@@ -1,0 +1,44 @@
+{
+  "slug": "amplitude.get_event_volumes",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "get event volumes in amplitude",
+    "look up event volumes in amplitude",
+    "fetch a single event volumes in amplitude",
+    "view one specific event volumes in amplitude",
+    "get monthly event volume metrics in amplitude"
+  ],
+  "description": "Get monthly event ingestion volumes for the organization within a date range. Shows total, ingested, and billed event counts per month.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "interval_start": {
+        "type": "string",
+        "description": "Start date in YYYY-MM-DD format (e.g., \"2026-01-01\")"
+      },
+      "interval_end": {
+        "type": "string",
+        "description": "End date in YYYY-MM-DD format (e.g., \"2026-03-31\")"
+      }
+    },
+    "required": [
+      "interval_start",
+      "interval_end"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/get-event-volumes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

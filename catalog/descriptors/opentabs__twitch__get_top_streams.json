@@ -1,0 +1,38 @@
+{
+  "slug": "twitch.get_top_streams",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get top streams in twitch",
+    "look up top streams in twitch",
+    "fetch a single top streams in twitch",
+    "view one specific top streams in twitch",
+    "get top live streams by viewer count in twitch"
+  ],
+  "description": "Get the top live streams on Twitch sorted by viewer count. Returns stream title, viewer count, broadcaster info, and the game being played.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "first": {
+        "description": "Number of streams to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-top-streams.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

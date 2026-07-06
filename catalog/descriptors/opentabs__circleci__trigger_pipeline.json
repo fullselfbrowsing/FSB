@@ -1,0 +1,53 @@
+{
+  "slug": "circleci.trigger_pipeline",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "trigger a pipeline in circleci",
+    "trigger pipeline in circleci",
+    "trigger a new pipeline in circleci"
+  ],
+  "description": "Trigger a new pipeline on a project. Specify a branch or tag to build.",
+  "actionVerb": "trigger",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "branch": {
+        "description": "VCS branch to build",
+        "type": "string"
+      },
+      "tag": {
+        "description": "VCS tag to build",
+        "type": "string"
+      },
+      "parameters": {
+        "description": "Pipeline parameters as key-value pairs",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "project_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/trigger-pipeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "trigger"
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "pandaexpress.find_restaurants",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "find restaurants in pandaexpress",
+    "find nearby panda express locations in pandaexpress",
+    "search for nearby panda express restaurants by geographic coordinates in pandaexpress"
+  ],
+  "description": "Search for nearby Panda Express restaurants by geographic coordinates. Returns restaurants sorted by distance with availability, delivery, and pickup status.",
+  "actionVerb": "find",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "latitude": {
+        "type": "number",
+        "description": "Latitude coordinate of the search center"
+      },
+      "longitude": {
+        "type": "number",
+        "description": "Longitude coordinate of the search center"
+      },
+      "radius": {
+        "description": "Search radius in miles (default 10)",
+        "type": "number"
+      },
+      "limit": {
+        "description": "Maximum number of results (default 10)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "latitude",
+      "longitude"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/find-restaurants.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "find"
+    }
+  }
+}

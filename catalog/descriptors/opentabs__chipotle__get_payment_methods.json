@@ -1,0 +1,31 @@
+{
+  "slug": "chipotle.get_payment_methods",
+  "service": "chipotle.com",
+  "intentSynonyms": [
+    "get payment methods in chipotle",
+    "look up payment methods in chipotle",
+    "fetch a single payment methods in chipotle",
+    "view one specific payment methods in chipotle",
+    "list saved payment cards and gift cards in chipotle"
+  ],
+  "description": "List all saved payment methods on the Chipotle account including credit cards, debit cards, and gift cards with card type, last four digits, and expiration.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/chipotle/src/tools/get-payment-methods.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

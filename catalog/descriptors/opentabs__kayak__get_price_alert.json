@@ -1,0 +1,41 @@
+{
+  "slug": "kayak.get_price_alert",
+  "service": "www.kayak.com",
+  "intentSynonyms": [
+    "get a price alert in kayak",
+    "look up a price alert in kayak",
+    "fetch a single price alert in kayak",
+    "view one specific price alert in kayak",
+    "get price alert in kayak",
+    "look up a kayak price alert in kayak"
+  ],
+  "description": "Get the details and latest tracked price of a single saved KAYAK price alert by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "alert_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The price alert ID to fetch"
+      }
+    },
+    "required": [
+      "alert_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/kayak/src/tools/get-price-alert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

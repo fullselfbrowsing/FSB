@@ -1,8 +1,8 @@
 ---
-status: verifying
+status: resolved
 trigger: "AI cannot write/type into Google Docs editor body. Two partial fixes applied, need verification of full pipeline."
 created: 2026-02-17T00:00:00Z
-updated: 2026-02-17T00:02:00Z
+updated: 2026-06-15
 ---
 
 ## Current Focus
@@ -82,3 +82,10 @@ verification: Syntax validation passed. Pipeline trace verified end-to-end. No r
 
 files_changed:
   - content.js (5 changes across type action, calculateElementScore, inferElementPurpose)
+
+## Closeout
+
+Closed as historical. The current Google Docs guide and runtime still carry
+the canvas-editor path: Google Docs is documented as canvas-rendered, and the
+type path uses dedicated Google Docs handling instead of ordinary DOM input
+selectors.

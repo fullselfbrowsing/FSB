@@ -1,0 +1,40 @@
+{
+  "slug": "minimax.get_chat_detail",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "get a chat detail in minimax",
+    "look up a chat detail in minimax",
+    "fetch a single chat detail in minimax",
+    "view one specific chat detail in minimax",
+    "get chat detail in minimax",
+    "get chat details and messages in minimax"
+  ],
+  "description": "Get detailed information about a specific chat conversation including its messages.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "number",
+        "description": "Chat ID to retrieve"
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/get-chat-detail.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "get"
+    }
+  }
+}

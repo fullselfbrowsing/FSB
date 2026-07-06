@@ -1,0 +1,61 @@
+{
+  "slug": "gitlab.merge_merge_request",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "merge a merge request in gitlab",
+    "merge merge request in gitlab",
+    "accept and merge a merge request in gitlab"
+  ],
+  "description": "Accept and merge a merge request. Optionally squash commits or delete the source branch.",
+  "actionVerb": "merge",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "merge_request_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Merge request IID (project-scoped ID)"
+      },
+      "merge_commit_message": {
+        "description": "Custom merge commit message",
+        "type": "string"
+      },
+      "squash_commit_message": {
+        "description": "Custom squash commit message",
+        "type": "string"
+      },
+      "squash": {
+        "description": "Squash commits when merging",
+        "type": "boolean"
+      },
+      "should_remove_source_branch": {
+        "description": "Delete source branch after merge",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project",
+      "merge_request_iid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/merge-merge-request.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "merge"
+    }
+  }
+}

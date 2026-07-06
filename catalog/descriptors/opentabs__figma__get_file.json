@@ -1,0 +1,41 @@
+{
+  "slug": "figma.get_file",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "get a file in figma",
+    "look up a file in figma",
+    "fetch a single file in figma",
+    "view one specific file in figma",
+    "get file in figma",
+    "get metadata for a file in figma"
+  ],
+  "description": "Get detailed metadata for a specific Figma file by its file key",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Unique file key (e.g., \"XjkWXw6sWdGlio3PM5lP36\")"
+      }
+    },
+    "required": [
+      "file_key"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/get-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

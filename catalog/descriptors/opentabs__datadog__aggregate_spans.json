@@ -1,0 +1,126 @@
+{
+  "slug": "datadog.aggregate_spans",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "aggregate spans in datadog",
+    "aggregate apm span data with grouping in datadog",
+    "aggregate datadog apm spans to compute counts, sums, averages, min, max, and cardinality, with optional grouping by fields or time intervals in datadog"
+  ],
+  "description": "Aggregate Datadog APM spans to compute counts, sums, averages, min, max, and cardinality, with optional grouping by fields or time intervals. Use this for aggregated analysis such as request counts over time, average duration by service, or error counts grouped by endpoint.",
+  "actionVerb": "aggregate",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query to filter spans (e.g., \"service:web-store\", \"@http.status_code:500\")"
+      },
+      "compute": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "aggregation": {
+              "type": "string",
+              "enum": [
+                "count",
+                "avg",
+                "sum",
+                "min",
+                "max",
+                "cardinality"
+              ],
+              "description": "Aggregation function"
+            },
+            "field": {
+              "description": "Field to aggregate on (use \"*\" or omit for count)",
+              "type": "string"
+            },
+            "type": {
+              "description": "Compute type (default: total)",
+              "type": "string",
+              "enum": [
+                "total",
+                "timeseries"
+              ]
+            }
+          },
+          "required": [
+            "aggregation"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Aggregation computations to perform"
+      },
+      "group_by": {
+        "description": "Grouping configuration",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "facet": {
+              "type": "string",
+              "description": "Field name to group by (e.g., \"service\", \"resource_name\")"
+            },
+            "limit": {
+              "description": "Max number of groups",
+              "type": "number"
+            },
+            "sort": {
+              "type": "object",
+              "properties": {
+                "aggregation": {
+                  "type": "string",
+                  "description": "Aggregation to sort by"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Sort order"
+                }
+              },
+              "required": [
+                "aggregation",
+                "order"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "facet"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "from": {
+        "description": "Start time (default now-1h)",
+        "type": "string"
+      },
+      "to": {
+        "description": "End time (default now)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "query",
+      "compute"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/aggregate-spans.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "aggregate"
+    }
+  }
+}

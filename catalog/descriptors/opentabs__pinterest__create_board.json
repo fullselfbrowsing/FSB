@@ -1,0 +1,52 @@
+{
+  "slug": "pinterest.create_board",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "create a board in pinterest",
+    "add a board in pinterest",
+    "make a new board in pinterest",
+    "open a new board in pinterest",
+    "create board in pinterest",
+    "create a new board in pinterest"
+  ],
+  "description": "Create a new Pinterest board. Specify a name, optional description, and privacy setting.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Board name"
+      },
+      "description": {
+        "description": "Board description",
+        "type": "string"
+      },
+      "privacy": {
+        "description": "Privacy setting (default \"public\")",
+        "type": "string",
+        "enum": [
+          "public",
+          "secret"
+        ]
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/create-board.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourcepost",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

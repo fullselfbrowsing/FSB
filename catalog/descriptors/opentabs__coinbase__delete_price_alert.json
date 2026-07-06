@@ -1,0 +1,39 @@
+{
+  "slug": "coinbase.delete_price_alert",
+  "service": "coinbase.com",
+  "intentSynonyms": [
+    "delete a price alert in coinbase",
+    "remove a price alert in coinbase",
+    "trash a price alert in coinbase",
+    "permanently delete a price alert in coinbase",
+    "delete price alert in coinbase"
+  ],
+  "description": "Delete an existing price alert by its UUID. Use list_price_alerts to find alert UUIDs.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "alert_uuid": {
+        "type": "string",
+        "description": "UUID of the price alert to delete"
+      }
+    },
+    "required": [
+      "alert_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/coinbase/src/tools/delete-price-alert.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

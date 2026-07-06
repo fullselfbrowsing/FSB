@@ -1,0 +1,32 @@
+{
+  "slug": "youtube.get_home_feed",
+  "service": "youtube.com",
+  "intentSynonyms": [
+    "get a home feed in youtube",
+    "look up a home feed in youtube",
+    "fetch a single home feed in youtube",
+    "view one specific home feed in youtube",
+    "get home feed in youtube",
+    "get personalized home feed in youtube"
+  ],
+  "description": "Get the personalized YouTube home feed. Returns recommended videos based on viewing history and subscriptions.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube/src/tools/get-home-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

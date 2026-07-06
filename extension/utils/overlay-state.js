@@ -96,6 +96,13 @@
         return 'writing';
       case 'tab_switch':
         return 'switching_tab';
+      case 'watching':
+      case 'trigger-watch':
+        // Trigger watcher arm phase. Distinct from action phases so the overlay
+        // can render a static caption + breathing edge-glow instead of the
+        // sweep used during active mutations. See visual-feedback.js
+        // progressOverlay.update() for the rendering branch.
+        return 'trigger-watch';
       case 'complete':
       case 'error':
       case 'analyzing':
@@ -103,6 +110,7 @@
       case 'recovering':
       case 'writing':
       case 'switching_tab':
+      case 'calling':
         return phase;
       case 'ended':
       case 'cleared':
@@ -136,6 +144,8 @@
       recovering: 'Recovering',
       writing: 'Writing',
       switching_tab: 'Switching Tabs',
+      calling: 'Calling API',
+      'trigger-watch': 'Watching a trigger',
       complete: 'Complete',
       error: 'Error',
       cleared: 'Hidden'
@@ -147,7 +157,8 @@
   // in the overlay pill (e.g. "Acting…"). Terminal / degraded phases do not.
   var ELLIPSIS_PHASES = {
     analyzing: true, planning: true, acting: true,
-    recovering: true, writing: true, switching_tab: true
+    recovering: true, writing: true, switching_tab: true,
+    calling: true
   };
   function humanizePhaseWithSuffix(phase) {
     var label = humanizeOverlayPhase(phase);
@@ -173,6 +184,9 @@
         return 'Updating page';
       case 'switching_tab':
         return 'Switching to another tab';
+      case 'trigger-watch':
+      case 'watching':
+        return 'Watching DOM for change';
       default:
         return 'Working';
     }
@@ -211,6 +225,39 @@
       subtitle: sanitizeOverlayText(rawSubtitle, 60),
       detail: sanitizeActionText(firstSentence(sanitizeOverlayText(rawDetail, 120))) || getDefaultDetail(normalizedPhase, result)
     };
+  }
+
+  // Capability-call overlay treatment: chip/readiness/guarded-note display data
+  // for invoke_capability calls, distinct from ordinary DOM-action phases.
+  // readinessLabel/readinessClass are accepted from the caller (the front
+  // door knows the resolved catalog tier, e.g. T2/T3 previews as "Guarded"
+  // even before any typed error fires) and only default from `guarded` when
+  // the caller doesn't supply them.
+  function buildCapabilityDisplay(statusData) {
+    var raw = statusData && statusData.capability;
+    if (!raw || typeof raw !== 'object') return null;
+    var guarded = !!raw.guarded;
+    return {
+      chipText: sanitizeOverlayText(raw.chipText || '', 48),
+      readinessLabel: raw.readinessLabel || (guarded ? 'Guarded' : 'T1 ready'),
+      readinessClass: raw.readinessClass || (guarded ? 'guarded' : 'ready'),
+      noteText: guarded ? sanitizeOverlayText(raw.noteText || '', 120) || null : null
+    };
+  }
+
+  var CAPABILITY_GUARDED_NOTE_TEXT = {
+    RECIPE_CONSENT_MUTATING_REQUIRED: 'Blocked — nothing was created. Needs your approval to run write actions.',
+    RECIPE_CONSENT_REQUIRED: 'Blocked — this site needs your approval before FSB can act here.',
+    RECIPE_CONSENT_BLOCKED: 'Blocked — this site is on the do-not-automate list.',
+    RECIPE_LEARN_PENDING: 'Not learned yet on this site — FSB will fall back to on-page actions.',
+    RECIPE_DOM_FALLBACK_PENDING: 'The direct API path looks unavailable — falling back to on-page actions.'
+  };
+
+  // RECIPE_NOT_FOUND is deliberately excluded (returns null, no guarded
+  // treatment): an unknown slug is a model-reasoning problem, not a "FSB
+  // could act but won't without your OK" state the amber banner communicates.
+  function mapCapabilityErrorToNote(code) {
+    return CAPABILITY_GUARDED_NOTE_TEXT[code] || null;
   }
 
   // D-02: ETA removed from overlay in Phase 168. Elapsed time replaces it in Phase 169.
@@ -370,17 +417,22 @@
     var sessionToken = statusData && statusData.sessionToken ? String(statusData.sessionToken) : null;
     var version = Number.isFinite(statusData && statusData.version) ? Number(statusData.version) : null;
     var clientLabel = statusData && statusData.clientLabel ? String(statusData.clientLabel) : null;
+    var mode = statusData && statusData.mode ? String(statusData.mode) : null;
     // Phase 243 plan 03 (UI-01): thread short agent id alongside clientLabel.
     // Sourced via formatAgentIdForDisplay (agent-registry.js:184) -- never sliced
     // locally. agentIdShort is a SEPARATE field (not concatenated upstream) so
     // the dashboard mirror (D-04) keeps composition flexibility.
     var agentIdShort = _agentIdShort(statusData, session);
+    var guarded = !!(statusData && statusData.guarded);
+    var capability = buildCapabilityDisplay(statusData || {});
+    var stoppable = !!(statusData && statusData.stoppable);
 
     return {
       ...(sessionToken ? { sessionToken: sessionToken } : {}),
       ...(version !== null ? { version: version } : {}),
       ...(clientLabel ? { clientLabel: clientLabel } : {}),
       ...(agentIdShort ? { agentIdShort: agentIdShort } : {}),
+      ...(mode ? { mode: mode } : {}),
       lifecycle: lifecycle,
       result: result,
       phase: lifecycle === 'cleared' ? 'cleared' : normalizedPhase,
@@ -389,7 +441,10 @@
       actionCount: null,
       highlight: {
         animated: !!(!statusData || statusData.animatedHighlights !== false) && lifecycle === 'running'
-      }
+      },
+      guarded: guarded,
+      ...(capability ? { capability: capability } : {}),
+      stoppable: stoppable
     };
   }
 
@@ -438,7 +493,9 @@
     humanizeOverlayPhase: humanizeOverlayPhase,
     isThinkingPhase: isThinkingPhase,
     buildOverlayState: buildOverlayState,
-    shouldApplyOverlayState: shouldApplyOverlayState
+    shouldApplyOverlayState: shouldApplyOverlayState,
+    buildCapabilityDisplay: buildCapabilityDisplay,
+    mapCapabilityErrorToNote: mapCapabilityErrorToNote
   };
 
   global.FSBOverlayStateUtils = exportsObj;

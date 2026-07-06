@@ -1,0 +1,40 @@
+{
+  "slug": "excel.list_charts",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "list charts in excel",
+    "show me my charts in excel",
+    "view my charts in excel",
+    "see all my charts in excel",
+    "list charts in excel online",
+    "list all charts in a worksheet in excel"
+  ],
+  "description": "List all charts in a worksheet. Returns chart names, IDs, dimensions, and positions.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      }
+    },
+    "required": [
+      "worksheet"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/list-charts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

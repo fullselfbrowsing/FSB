@@ -1,0 +1,55 @@
+{
+  "slug": "twitch.get_game_clips",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get game clips in twitch",
+    "look up game clips in twitch",
+    "fetch a single game clips in twitch",
+    "view one specific game clips in twitch",
+    "get top clips for a game or category in twitch"
+  ],
+  "description": "Get top clips for a specific game/category on Twitch. Provide the game name and optionally filter by time period.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Game name (e.g., \"Fortnite\", \"Just Chatting\")"
+      },
+      "period": {
+        "description": "Time period filter (default LAST_WEEK)",
+        "type": "string",
+        "enum": [
+          "LAST_DAY",
+          "LAST_WEEK",
+          "LAST_MONTH",
+          "ALL_TIME"
+        ]
+      },
+      "first": {
+        "description": "Number of clips to return (default 10, max 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-game-clips.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

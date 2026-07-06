@@ -1,0 +1,40 @@
+{
+  "slug": "gcloud.get_bucket",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "get a bucket in gcloud",
+    "look up a bucket in gcloud",
+    "fetch a single bucket in gcloud",
+    "view one specific bucket in gcloud",
+    "get bucket in gcloud",
+    "get a cloud storage bucket in gcloud"
+  ],
+  "description": "Get detailed information about a specific Cloud Storage bucket.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "bucket_name": {
+        "type": "string",
+        "description": "Bucket name"
+      }
+    },
+    "required": [
+      "bucket_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/get-bucket.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "todoist.update_project",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "update a project in todoist",
+    "edit a project in todoist",
+    "change the details of project in todoist",
+    "modify a project in todoist",
+    "update project in todoist"
+  ],
+  "description": "Update an existing Todoist project. Only the fields provided will be changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "The ID of the project to update"
+      },
+      "name": {
+        "description": "New name for the project",
+        "type": "string"
+      },
+      "color": {
+        "description": "New color name (e.g. \"berry_red\", \"blue\", \"green\")",
+        "type": "string"
+      },
+      "is_favorite": {
+        "description": "Whether to mark the project as a favorite",
+        "type": "boolean"
+      },
+      "view_style": {
+        "description": "New view style: \"list\" or \"board\"",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/update-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

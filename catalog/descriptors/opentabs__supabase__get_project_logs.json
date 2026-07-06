@@ -1,0 +1,45 @@
+{
+  "slug": "supabase.get_project_logs",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get project logs in supabase",
+    "look up project logs in supabase",
+    "fetch a single project logs in supabase",
+    "view one specific project logs in supabase",
+    "fetch project logs by source in supabase"
+  ],
+  "description": "Fetch recent logs from a Supabase project. Supports filtering by log source (e.g., \"postgres\", \"auth\", \"storage\", \"realtime\", \"edge-functions\", \"postgrest\").",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      },
+      "source": {
+        "type": "string",
+        "description": "Log source to query: \"postgres\", \"auth\", \"storage\", \"realtime\", \"edge-functions\", or \"postgrest\""
+      }
+    },
+    "required": [
+      "ref",
+      "source"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-project-logs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

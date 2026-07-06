@@ -1,0 +1,40 @@
+{
+  "slug": "clickhouse.get_private_endpoint_config",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "get a private endpoint config in clickhouse",
+    "look up a private endpoint config in clickhouse",
+    "fetch a single private endpoint config in clickhouse",
+    "view one specific private endpoint config in clickhouse",
+    "get private endpoint config in clickhouse",
+    "get private endpoint configuration in clickhouse"
+  ],
+  "description": "Get the private endpoint configuration for a ClickHouse Cloud service. Returns the cloud provider endpoint service ID and private DNS hostname needed to set up private connectivity.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "string",
+        "description": "Service UUID"
+      }
+    },
+    "required": [
+      "service_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/get-private-endpoint-config.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "expedia.navigate_to_hotel",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "navigate a to hotel in expedia",
+    "navigate to hotel in expedia",
+    "open a hotel detail page in the browser in expedia"
+  ],
+  "description": "Navigate the browser to an Expedia hotel detail page. The user can view full hotel information, photos, reviews, room options, and proceed to booking.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "hotel_name": {
+        "type": "string",
+        "description": "Hotel name to search for on Expedia"
+      },
+      "region_id": {
+        "description": "Gaia region ID for the destination (from search_locations)",
+        "type": "string"
+      },
+      "check_in_date": {
+        "description": "Check-in date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "check_out_date": {
+        "description": "Check-out date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 14
+      }
+    },
+    "required": [
+      "hotel_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/navigate-to-hotel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

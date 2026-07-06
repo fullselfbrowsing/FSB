@@ -1,0 +1,55 @@
+{
+  "slug": "linear.create_issue_relation",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create an issue relation in linear",
+    "add an issue relation in linear",
+    "make a new issue relation in linear",
+    "open a new issue relation in linear",
+    "create issue relation in linear"
+  ],
+  "description": "Create a relation between two Linear issues (blocks, is blocked by, relates to, or duplicate of).",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "UUID of the source issue"
+      },
+      "related_issue_id": {
+        "type": "string",
+        "description": "UUID of the target issue to relate to"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "blocks",
+          "blockedBy",
+          "related",
+          "duplicate"
+        ],
+        "description": "Relation type: blocks, blockedBy, related, or duplicate"
+      }
+    },
+    "required": [
+      "issue_id",
+      "related_issue_id",
+      "type"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-issue-relation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

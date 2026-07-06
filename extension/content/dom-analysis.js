@@ -46,18 +46,18 @@
     return `${type}|${stableId}|${testId}|${role}|${name}|${parentTag}:${parentRole}|${formId}|${text}`;
   }
 
-  // Check if element is in viewport
+  // Check if element is in viewport.
+  // element.position.{x,y} come from getBoundingClientRect() and are
+  // viewport-relative; compare against the viewport box, not scroll offsets.
   function isInViewport(element) {
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    const scrollY = window.scrollY;
-    const scrollX = window.scrollX;
-
+    const pos = element.position;
+    if (!pos) return false;
+    if (typeof pos.inViewport === 'boolean') return pos.inViewport;
     return (
-      element.position.y >= scrollY &&
-      element.position.y <= scrollY + viewportHeight &&
-      element.position.x >= scrollX &&
-      element.position.x <= scrollX + viewportWidth
+      pos.y >= 0 &&
+      pos.y <= window.innerHeight &&
+      pos.x >= 0 &&
+      pos.x <= window.innerWidth
     );
   }
 

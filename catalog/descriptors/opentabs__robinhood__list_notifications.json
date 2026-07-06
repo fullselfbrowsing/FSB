@@ -1,0 +1,31 @@
+{
+  "slug": "robinhood.list_notifications",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "list notifications in robinhood",
+    "show me my notifications in robinhood",
+    "view my notifications in robinhood",
+    "see all my notifications in robinhood",
+    "list recent notifications in robinhood"
+  ],
+  "description": "List recent account notifications including alerts, updates, and system messages.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/list-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

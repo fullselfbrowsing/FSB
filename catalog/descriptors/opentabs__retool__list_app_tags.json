@@ -1,0 +1,39 @@
+{
+  "slug": "retool.list_app_tags",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list app tags in retool",
+    "show me my app tags in retool",
+    "view my app tags in retool",
+    "see all my app tags in retool",
+    "list version tags for an app in retool"
+  ],
+  "description": "List published version tags (releases) for a Retool application. Tags are named snapshots deployed to end users.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-app-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

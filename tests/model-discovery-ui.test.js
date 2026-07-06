@@ -77,6 +77,18 @@ assert(
   /id="modelDiscoveryStatus"/.test(HTML),
   '[Task 1] control_panel.html has #modelDiscoveryStatus indicator element'
 );
+assert(
+  /id="modelSearch"/.test(HTML),
+  '[Task 1] control_panel.html has #modelSearch input'
+);
+assert(
+  /id="modelListbox"/.test(HTML),
+  '[Task 1] control_panel.html has #modelListbox combobox popup'
+);
+assert(
+  /id="modelName"/.test(HTML),
+  '[Task 1] control_panel.html retains #modelName select (value source of truth)'
+);
 
 console.log('\n--- Plan 228-02 / Task 1: CSS chip styles ---');
 
@@ -85,6 +97,9 @@ assert(/\.discovery-status\.info\b/.test(CSS), '[Task 1] options.css defines .di
 assert(/\.discovery-status\.warning\b/.test(CSS), '[Task 1] options.css defines .discovery-status.warning');
 assert(/\.discovery-status\.error\b/.test(CSS), '[Task 1] options.css defines .discovery-status.error');
 assert(/\.discovery-status\.loading\b/.test(CSS), '[Task 1] options.css defines .discovery-status.loading');
+assert(/\.model-combobox\b/.test(CSS), '[Task 1] options.css defines .model-combobox');
+assert(/\.model-combobox__listbox\b/.test(CSS), '[Task 1] options.css defines .model-combobox__listbox');
+assert(/\.model-combobox__hl\b/.test(CSS), '[Task 1] options.css defines .model-combobox__hl (search-term highlight)');
 
 console.log('\n--- Plan 228-02 / Task 2: options.js wiring call sites ---');
 
@@ -163,6 +178,7 @@ const reg = makeRegistry();
 
 // Model select + chip + refresh button + 5 provider key inputs
 const modelSelect      = reg.make('modelName', 'select');
+const modelSearch      = reg.make('modelSearch', 'input');
 const statusChip       = reg.make('modelDiscoveryStatus', 'div');
 const refreshBtn       = reg.make('refreshModelsBtn', 'button');
 const providerSelect   = reg.make('modelProvider', 'select');
@@ -244,6 +260,8 @@ assert(typeof ui === 'object' && ui !== null, '[Task 2] FSBDiscoveryUI exposed o
 assert(typeof ui.runDiscovery === 'function', '[Task 2] FSBDiscoveryUI.runDiscovery is a function');
 assert(typeof ui.setDiscoveryStatus === 'function', '[Task 2] FSBDiscoveryUI.setDiscoveryStatus is a function');
 assert(typeof ui.renderModelDropdown === 'function', '[Task 2] FSBDiscoveryUI.renderModelDropdown is a function');
+assert(typeof ui.applyModelSearch === 'function', '[Task 2] FSBDiscoveryUI.applyModelSearch is a function');
+assert(typeof ui.filterModelsForSearch === 'function', '[Task 2] FSBDiscoveryUI.filterModelsForSearch is a function');
 assert(typeof ui.IN_SCOPE_PROVIDERS === 'object', '[Task 2] FSBDiscoveryUI.IN_SCOPE_PROVIDERS exposed');
 
 // Helpers --------------------------------------------------------------------
@@ -259,6 +277,7 @@ function reset() {
   statusChip.className = '';
   statusChip.textContent = '';
   refreshBtn.disabled = false;
+  modelSearch.value = '';
 }
 
 function setProviderKey(provider, value) {
@@ -463,6 +482,45 @@ async function test_debounce() {
   assert(clearCalls[0] === 'xai', '[T2/debounce] cache cleared for provider before discovery');
 }
 await test_debounce();
+
+// 13. Smart model search ----------------------------------------------------
+async function test_smart_model_search() {
+  reset();
+  const models = [
+    { id: 'openai/gpt-4o', displayName: 'OpenAI: GPT-4o', description: 'Flagship model', provider: 'openrouter' },
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', displayName: 'Llama 3.3 70B Instruct Free', description: 'OpenRouter free tier', provider: 'openrouter' },
+    { id: 'google/gemini-2.0-flash-exp:free', displayName: 'Gemini 2.0 Flash Experimental Free', description: 'Free model', provider: 'openrouter' },
+    { id: 'anthropic/claude-sonnet-4', displayName: 'Anthropic: Claude Sonnet 4', description: 'Paid model', provider: 'openrouter' }
+  ];
+
+  ui.renderModelDropdown(models);
+  assert(modelSelect.children.length === 4, '[T2/search] empty search renders all models');
+
+  ui.applyModelSearch('free');
+  let ids = modelSelect.children.map(c => c.value);
+  assert(ids.length === 2, '[T2/search] free query filters to 2 matching models');
+  assert(ids.includes('meta-llama/llama-3.3-70b-instruct:free'), '[T2/search] free matches OpenRouter id suffix');
+  assert(ids.includes('google/gemini-2.0-flash-exp:free'), '[T2/search] free matches model display/description too');
+  assert(!ids.includes('openai/gpt-4o'), '[T2/search] free excludes non-free GPT model');
+
+  ui.applyModelSearch('GPT');
+  ids = modelSelect.children.map(c => c.value);
+  assert(ids.length === 1 && ids[0] === 'openai/gpt-4o', '[T2/search] GPT query matches case-insensitively');
+
+  ui.applyModelSearch('openai GPT');
+  ids = modelSelect.children.map(c => c.value);
+  assert(ids.length === 1 && ids[0] === 'openai/gpt-4o', '[T2/search] multi-token query requires both tokens');
+
+  ui.applyModelSearch('not-a-real-model');
+  assert(modelSelect.children.length === 1, '[T2/search] no-match query renders one placeholder option');
+  assert(modelSelect.children[0].disabled === true, '[T2/search] no-match placeholder is disabled');
+  assert(/no models match/i.test(modelSelect.children[0].textContent), '[T2/search] no-match placeholder text is explicit');
+
+  ui.applyModelSearch('');
+  ids = modelSelect.children.map(c => c.value);
+  assert(ids.length === 4, '[T2/search] clearing query restores full list');
+}
+await test_smart_model_search();
 
 } // end runSequentialTests
 

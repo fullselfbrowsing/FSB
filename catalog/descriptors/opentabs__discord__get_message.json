@@ -1,0 +1,47 @@
+{
+  "slug": "discord.get_message",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "get a message in discord",
+    "look up a message in discord",
+    "fetch a single message in discord",
+    "view one specific message in discord",
+    "get message in discord",
+    "get a message by id in discord"
+  ],
+  "description": "Get a specific message by its ID from a Discord channel.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID where the message is located"
+      },
+      "message_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ID of the message to retrieve"
+      }
+    },
+    "required": [
+      "channel",
+      "message_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/get-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

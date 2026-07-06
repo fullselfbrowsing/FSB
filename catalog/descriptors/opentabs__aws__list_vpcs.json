@@ -1,0 +1,31 @@
+{
+  "slug": "aws.list_vpcs",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list vpcs in aws",
+    "show me my vpcs in aws",
+    "view my vpcs in aws",
+    "see all my vpcs in aws",
+    "list vpcs in the current region in aws"
+  ],
+  "description": "List VPCs in the current region. Returns VPC ID, CIDR block, state, and whether it is the default VPC.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-vpcs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

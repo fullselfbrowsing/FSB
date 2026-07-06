@@ -1,0 +1,36 @@
+{
+  "slug": "notion.list_pages",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "list pages in notion",
+    "show me my pages in notion",
+    "view my pages in notion",
+    "see all my pages in notion",
+    "list pages in the workspace in notion"
+  ],
+  "description": "List all pages in the Notion workspace, sorted by last edited time. Use this to get an overview of workspace content.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of pages to return (default 20, max 100)",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/list-pages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

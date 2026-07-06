@@ -1,0 +1,42 @@
+{
+  "slug": "calendly.delete_event_type",
+  "service": "calendly.com",
+  "intentSynonyms": [
+    "delete an event type in calendly",
+    "remove an event type in calendly",
+    "trash an event type in calendly",
+    "permanently delete an event type in calendly",
+    "delete event type in calendly",
+    "delete an event type permanently in calendly"
+  ],
+  "description": "Permanently delete an event type by its numeric ID. This action cannot be undone. Active events scheduled through this event type are not affected.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event_type_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Event type numeric ID to delete"
+      }
+    },
+    "required": [
+      "event_type_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/calendly/src/tools/delete-event-type.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

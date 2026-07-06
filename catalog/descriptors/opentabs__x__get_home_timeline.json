@@ -1,0 +1,43 @@
+{
+  "slug": "x.get_home_timeline",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a home timeline in x",
+    "look up a home timeline in x",
+    "fetch a single home timeline in x",
+    "view one specific home timeline in x",
+    "get home timeline in x",
+    "get home timeline tweets in x"
+  ],
+  "description": "Get tweets from the authenticated user's home timeline (For You feed). Returns the most recent tweets. Use cursor for pagination.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of tweets to return (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-home-timeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

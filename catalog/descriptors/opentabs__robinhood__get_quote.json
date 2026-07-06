@@ -1,0 +1,40 @@
+{
+  "slug": "robinhood.get_quote",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get a quote in robinhood",
+    "look up a quote in robinhood",
+    "fetch a single quote in robinhood",
+    "view one specific quote in robinhood",
+    "get quote in robinhood",
+    "get real-time stock quotes in robinhood"
+  ],
+  "description": "Get real-time stock quotes for one or more ticker symbols. Returns bid/ask prices, last trade price, previous close, and trading halt status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbols": {
+        "type": "string",
+        "description": "Comma-separated ticker symbols (e.g., \"AAPL,TSLA,MSFT\")"
+      }
+    },
+    "required": [
+      "symbols"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-quote.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

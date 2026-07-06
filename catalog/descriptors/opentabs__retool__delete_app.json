@@ -1,0 +1,40 @@
+{
+  "slug": "retool.delete_app",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "delete an app in retool",
+    "remove an app in retool",
+    "trash an app in retool",
+    "permanently delete an app in retool",
+    "delete app in retool",
+    "delete a retool app in retool"
+  ],
+  "description": "Delete (trash) a Retool app by UUID. The app is moved to the trash folder and can be recovered from there.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_uuid": {
+        "type": "string",
+        "description": "App UUID to delete"
+      }
+    },
+    "required": [
+      "page_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/delete-app.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

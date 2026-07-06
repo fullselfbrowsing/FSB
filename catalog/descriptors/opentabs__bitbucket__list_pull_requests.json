@@ -1,0 +1,66 @@
+{
+  "slug": "bitbucket.list_pull_requests",
+  "service": "bitbucket.org",
+  "intentSynonyms": [
+    "list pull requests in bitbucket",
+    "show me my pull requests in bitbucket",
+    "view my pull requests in bitbucket",
+    "see all my pull requests in bitbucket",
+    "list pull requests for a repository in bitbucket"
+  ],
+  "description": "List pull requests for a Bitbucket repository. By default returns open pull requests. Supports pagination and state filtering.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "description": "Workspace slug or UUID"
+      },
+      "repo_slug": {
+        "type": "string",
+        "description": "Repository slug"
+      },
+      "state": {
+        "description": "Pull request state filter (default OPEN)",
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "MERGED",
+          "DECLINED",
+          "SUPERSEDED"
+        ]
+      },
+      "page": {
+        "description": "Page number for pagination (default 1)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "pagelen": {
+        "description": "Number of results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workspace",
+      "repo_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bitbucket/src/tools/list-pull-requests.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "circleci.create_env_var",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "create an env var in circleci",
+    "add an env var in circleci",
+    "make a new env var in circleci",
+    "open a new env var in circleci",
+    "create env var in circleci",
+    "create a project env var in circleci"
+  ],
+  "description": "Create a project environment variable. The value is stored securely and masked in responses.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "name": {
+        "type": "string",
+        "description": "Variable name"
+      },
+      "value": {
+        "type": "string",
+        "description": "Variable value"
+      }
+    },
+    "required": [
+      "project_slug",
+      "name",
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/create-env-var.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

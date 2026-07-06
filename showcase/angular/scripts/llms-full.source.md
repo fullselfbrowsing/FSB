@@ -2,7 +2,7 @@
 
 ## 1. Project Description
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs entirely in your browser with your own API keys -- no backend, no telemetry, no data collection. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, local providers), 50+ browser actions, 142+ site-specific guides. BSL 1.1 licensed.
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 66-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.90 (Chrome extension) with fsb-mcp-server 0.10.0 (npm MCP package). BSL 1.1 licensed.
 
 FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, Windsurf, OpenClaw, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
@@ -10,7 +10,7 @@ FSB exists because the gap between "I want the browser to do X" and "I can write
 
 A useful MCP framing: FSB is not only a "bot that browses." It is the browser surface agents can use when they need to act, observe, verify, and iterate across real web interfaces. Companion systems such as OpenClaw can provide autonomy, scheduling, identity, and personality while FSB performs the browser actions.
 
-The About page now uses real demo videos instead of synthetic CSS recreations. The demos show FSB e-commerce autopilot powered by Grok 4.1, flight booking powered by Codex MCP, OpenClaw monitoring Doge price, and an Aha moment powered by Claude Opus 4.7.
+The About page now uses real demo videos instead of synthetic CSS recreations. The demos show FSB e-commerce autopilot powered by Grok 4.1, flight booking powered by Codex MCP, OpenClaw monitoring Doge price, and an Aha moment powered by Claude Opus 4.7. The About page also embeds an interactive knowledge-graph viewer of FSB's site intelligence and guide coverage.
 
 Demo video URLs:
 - FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
@@ -19,7 +19,7 @@ Demo video URLs:
 - An Aha Moment by Claude Opus 4.7: https://www.youtube.com/watch?v=mD9oGB2JqVM
 - YouTube channel: https://www.youtube.com/@parzival5707
 
-The audience is developers, power users, researchers, and agent builders who want browser automation without giving a third party their cookies, their API keys, or their attention. FSB is local-first by construction: the extension is the runtime, the user's browser is the execution surface, and the user's API keys live encrypted in Chrome's local storage and never leave the machine. There is no FSB cloud, no FSB account, no FSB telemetry. Each task is a private transaction between the user, the local extension, and the model provider the user chose.
+The audience is developers, power users, researchers, and agent builders who want browser automation without giving a third party their cookies, their API keys, or their attention. FSB is local-first by construction: the extension is the runtime, the user's browser is the execution surface, and the user's API keys live encrypted in Chrome's local storage and never leave the machine. There is no FSB account, no page-content collection, and no browser-history collection; the only first-party data sent home is opt-out anonymous usage telemetry for aggregate public stats. Each task is a private transaction between the user, the local extension, and the model provider the user chose.
 
 The bring-your-own-key model is deliberate. The user picks the model -- frontier reasoning model for hard tasks, fast cheap model for repetitive work, local model for fully air-gapped operation -- and pays the model provider directly for token usage. FSB takes no cut, sees no payments, and brokers no API quotas. The trade-off is setup friction (you need at least one provider key) in exchange for full control over cost, privacy, and model selection.
 
@@ -31,21 +31,48 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 - Personality-embedded engagement: OpenClaw can act as the reasoning, tone, opinions, traits, and debate-style layer while FSB supplies the browser control surface.
 - Networking automation: an agent can research people at aspirational companies, open relevant profiles, and assist with connection outreach that the user reviews and controls.
 - Operator loop: every workflow can act on the page, observe what changed, verify the outcome, report errors, and recover when the web app shifts.
+- Reactive monitoring: arm a trigger watcher on one page element and get notified on value changes, thresholds, deltas, or regex matches instead of polling manually.
 
-### Action categories
-- Navigation: navigate, searchGoogle, refresh, goBack, goForward
-- Element interaction: click, rightClick, doubleClick, hover, focus, blur
-- Text and input: type, clearInput, selectText, pressEnter, keyPress
-- Form controls: selectOption, toggleCheckbox
-- Information gathering: getText, getAttribute, setAttribute
-- Advanced: waitForElement, moveMouse, scroll, waitForDOMStable, detectLoadingState
+### MCP tool surface (66 tools)
+- Navigation and tabs: navigate, search, refresh, go_back, go_forward, back, open_tab, close_tab, switch_tab, list_tabs
+- Clicking and pointer: click, double_click, right_click, hover, click_at, double_click_at, click_and_hold, drag, drag_drop, drag_variable_speed
+- Text and keyboard: type_text, insert_text, clear_input, press_key, press_enter, select_text_range, focus
+- Forms and files: select_option, check_box, set_attribute, upload_file (real local files on `<input type="file">`), drop_file (synthetic drag/drop)
+- Scrolling: scroll, scroll_at, scroll_to_element, scroll_to_top, scroll_to_bottom
+- Spreadsheets: read_sheet, fill_sheet
+- Read-only inspection: read_page, get_text, get_attribute, get_dom_snapshot, get_page_snapshot, get_site_guide
+- Scripting: execute_js for safe DOM reads and simple DOM-triggered actions
+- Autopilot: run_task, stop_task, get_task_status
+- Trigger watchers: trigger, stop_trigger, get_trigger_status, list_triggers
+- Capabilities: search_capabilities, invoke_capability
+- Visual sessions: start_visual_session, end_visual_session
+- Observability: list_sessions, get_session_detail, get_logs, search_memory, get_memory_stats
+- Vault: list_credentials, fill_credential, list_payment_methods, use_payment_method (supervised autofill; raw secrets never cross the MCP bridge)
+
+Read-only tools bypass the mutation queue where safe; mutation tools are serialized so two clients never click, type, upload, invoke, or navigate at the same time.
+
+### Trigger watchers (reactive DOM monitoring)
+`trigger` arms a watch on one page element; `stop_trigger`, `get_trigger_status`, and `list_triggers` manage it. Two watch modes: `live-observe` (in-page observer, no reload) and `refresh-poll` (background reload + coalesce). Conditions include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR with hysteresis. Callers either block with 30s heartbeats (120s default timeout) or pass `detached:true` and poll by trigger_id. Watches are local and session-bound -- Chrome and the FSB extension must stay open, results report back to the MCP caller, and there is no server-side monitoring or push delivery. Concurrency is capped by `fsbTriggerCap` (default 8, range 1-64).
+
+### Native capability catalog (first-party API execution)
+Beyond DOM automation, `search_capabilities` searches a 128-app catalog and `invoke_capability` executes verified first-party API capabilities against the user's logged-in sessions. Verified T1/T1b capabilities run through a router that checks the origin, verifies the recipe signature, checks the denylist, serializes the action, and writes an audit record that never includes secrets. Search results carry readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits. Sensitive origins are flagged in the interface and audit trail; denylisted origins stay blocked.
+
+### Real file uploads
+`upload_file(selector, file_path, tab_id?)` sets an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
+
+### PhantomStream live preview
+The remote dashboard's DOM live preview is powered by PhantomStream (published on npm as `@full-self-browsing/phantom-stream`): one style-inlined snapshot, then MutationObserver diffs instead of pixels. As of PhantomStream 0.2.1, progressive `<video>` and `<audio>` elements can mirror alongside DOM snapshots through a media side channel. Input fields are masked in captured frames; adaptive HLS/DASH discovery is deferred because it would require a new `webRequest` permission.
 
 ### Supported AI providers
-- xAI: grok-4-1-fast (recommended), grok-4-1, grok-4, grok-code-fast-1, grok-3, grok-3-mini, grok-2-vision
-- OpenAI: GPT-4o, ChatGPT-4o Latest, GPT-4o Mini, GPT-4 Turbo
-- Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5, Claude Opus 4.1
-- Google: Gemini 2.5 Flash, Gemini 2.5 Pro, Gemini 2.0 Flash (free experimental)
-- Custom: any OpenAI-compatible endpoint
+- xAI: grok-4-1-fast (default, recommended), grok-4-1-fast-non-reasoning, grok-4, grok-code-fast-1, grok-3, grok-3-mini
+- OpenAI: GPT-4o (default), ChatGPT-4o Latest, GPT-4o Mini, GPT-4 Turbo
+- Anthropic: Claude Sonnet 4.6 (default), Claude Opus 4.6, Claude Opus 4.5, Claude Sonnet 4.5, Claude Haiku 4.5, and older Claude models
+- Google: Gemini 2.5 Flash (default), Gemini 2.5 Flash-Lite, Gemini 2.5 Pro, Gemini 2.0 Flash (free experimental)
+- OpenRouter: one key routes many models (GPT-4o, Claude, Gemini, Grok, Llama 4, DeepSeek R1 presets) with live discovery
+- LM Studio: local models with no API key; FSB reads the live list from the local server's /v1/models
+- Custom: any OpenAI-compatible chat-completions endpoint
+
+Live model discovery queries provider model endpoints where available and falls back to the bundled lists above when a provider is offline or a key is missing.
 
 ### Install posture
 - Chrome 88+ (Manifest V3); also runs on Chromium-based browsers (Edge, Brave)
@@ -54,12 +81,29 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 
 ## 3. Install Instructions
 
+Fastest path: install FSB from the Chrome Web Store at `https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk`.
+
+From source:
+
 1. Clone the repository: `git clone https://github.com/fullselfbrowsing/FSB.git`
 2. Open `chrome://extensions/` in Chrome.
 3. Enable Developer Mode (top-right toggle).
-4. Click "Load unpacked" and select the cloned FSB directory.
+4. Click "Load unpacked" and select the `extension/` directory inside the cloned repo.
 5. Click the FSB icon in the toolbar; open Settings; paste an API key for at least one supported provider.
 6. Pin the extension and use the popup or side panel to issue natural-language tasks.
+
+### MCP install for AI agents (one command per client)
+No FSB API key is needed on this path -- the MCP client's model does the reasoning:
+
+- Claude Code: `npx -y fsb-mcp-server install --claude-code`
+- Claude Desktop: `npx -y fsb-mcp-server install --claude-desktop`
+- Cursor: `npx -y fsb-mcp-server install --cursor`
+- VS Code: `npx -y fsb-mcp-server install --vscode`
+- Windsurf: `npx -y fsb-mcp-server install --windsurf`
+- Codex: `npx -y fsb-mcp-server install --codex`
+- All detected hosts: `npx -y fsb-mcp-server install --all`
+
+Append `--dry-run` to preview without writing, sanity-check with `npx -y fsb-mcp-server doctor`, and restart the client so the new MCP server appears. The extension pairs with the local bridge on `ws://localhost:7225`; optional Streamable HTTP mode exposes `http://127.0.0.1:7226/mcp`.
 
 No build step is required for end users -- the extension ships as plain JavaScript per Manifest V3 conventions. Developers contributing to FSB do not need npm to install or run the extension itself; npm is only used by the showcase site under `showcase/angular/`.
 
@@ -100,6 +144,13 @@ These all run as manual-mode tool calls. Autopilot (`run_task`) only fires when 
 ### Site guides and memory
 FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday, Airtable, Trello, Greenhouse, Lever, and more) that prepend domain-specific strategy hints to the planning prompt when the user is on a known site. The extension also accumulates per-site memory across sessions: successful action sequences become procedural memory, page-structure observations become semantic memory, and consolidated reports become episodic memory. Memory and guides together let FSB get faster and more reliable on sites it has seen before without ever sending data outside the user's machine.
 
+### Ecosystem pages
+- Lattice (`https://full-selfbrowsing.com/lattice`): capability runtime SDK for multimodal AI applications -- typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.
+- PhantomStream (`https://full-selfbrowsing.com/phantom-stream`): DOM-native live browser mirroring library -- one style-inlined snapshot, then MutationObserver diffs instead of pixels; powers FSB's remote dashboard live preview.
+- Prometheus (`https://full-selfbrowsing.com/prometheus`): the autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
+- Site Maps (`https://full-selfbrowsing.com/sitemaps`): community hub (under development) for contributing well-tested site schemas that can become built-in browser knowledge.
+- Legal (`https://full-selfbrowsing.com/legal`): FSB's automation posture, consent model, audit-log retention policy, and service-denylist rationale.
+
 ## 5. Comparison
 
 These are factual capability summaries, not endorsements. FSB has overlap and differentiation with each project; the right tool depends on what you need.
@@ -120,6 +171,12 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - Agents: https://full-selfbrowsing.com/agents
 - Support: https://full-selfbrowsing.com/support
 - Privacy: https://full-selfbrowsing.com/privacy
+- Lattice: https://full-selfbrowsing.com/lattice
+- PhantomStream: https://full-selfbrowsing.com/phantom-stream
+- Prometheus: https://full-selfbrowsing.com/prometheus
+- Site Maps: https://full-selfbrowsing.com/sitemaps
+- Legal: https://full-selfbrowsing.com/legal
+- Chrome Web Store: https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk
 - GitHub: https://github.com/fullselfbrowsing/FSB
 - YouTube channel: https://www.youtube.com/@parzival5707
 - Demo: FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU

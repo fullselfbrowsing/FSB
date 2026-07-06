@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_initiative",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get an initiative in linear",
+    "look up an initiative in linear",
+    "fetch a single initiative in linear",
+    "view one specific initiative in linear",
+    "get initiative in linear",
+    "get details of a single initiative in linear"
+  ],
+  "description": "Get detailed information about a single Linear initiative by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "initiative_id": {
+        "type": "string",
+        "description": "Initiative UUID"
+      }
+    },
+    "required": [
+      "initiative_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-initiative.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

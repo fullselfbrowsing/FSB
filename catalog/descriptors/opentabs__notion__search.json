@@ -1,0 +1,42 @@
+{
+  "slug": "notion.search",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "search in notion",
+    "search pages and blocks in notion",
+    "search for pages and blocks in the notion workspace by text query in notion"
+  ],
+  "description": "Search for pages and blocks in the Notion workspace by text query",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query text"
+      },
+      "limit": {
+        "description": "Maximum number of results to return (default 10, max 100)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/search.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

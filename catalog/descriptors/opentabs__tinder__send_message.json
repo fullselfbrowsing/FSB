@@ -1,0 +1,44 @@
+{
+  "slug": "tinder.send_message",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "send a message in tinder",
+    "post a message in tinder",
+    "write a new message in tinder",
+    "send message in tinder",
+    "send a message to a match in tinder"
+  ],
+  "description": "Send a message to a match. The match_id is the ID from list_matches.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "match_id": {
+        "type": "string",
+        "description": "Match ID to message"
+      },
+      "message": {
+        "type": "string",
+        "description": "Message text to send"
+      }
+    },
+    "required": [
+      "match_id",
+      "message"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

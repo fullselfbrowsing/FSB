@@ -1,0 +1,47 @@
+{
+  "slug": "homedepot.add_to_cart",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "add a to cart in homedepot",
+    "add to cart in homedepot",
+    "add a product to cart in homedepot"
+  ],
+  "description": "Add a product to the Home Depot shopping cart by item ID. Falls back to the page-level cart API if the REST endpoint is unavailable.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Product item ID to add"
+      },
+      "quantity": {
+        "description": "Quantity to add (defaults to 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "store_id": {
+        "description": "Store ID for fulfillment",
+        "type": "string"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/add-to-cart.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

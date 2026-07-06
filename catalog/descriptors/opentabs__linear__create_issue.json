@@ -1,0 +1,88 @@
+{
+  "slug": "linear.create_issue",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "create an issue in linear",
+    "add an issue in linear",
+    "make a new issue in linear",
+    "open a new issue in linear",
+    "file a bug in linear",
+    "log a bug in linear"
+  ],
+  "description": "Create a new issue in Linear. Requires a team ID and title at minimum.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "description": "Team UUID to create the issue in (use list_teams to find team IDs)"
+      },
+      "title": {
+        "type": "string",
+        "description": "Issue title"
+      },
+      "description": {
+        "description": "Issue description in markdown",
+        "type": "string"
+      },
+      "priority": {
+        "description": "Priority level (0=none, 1=urgent, 2=high, 3=medium, 4=low)",
+        "type": "number"
+      },
+      "assignee_id": {
+        "description": "UUID of the user to assign (use list_users to find user IDs)",
+        "type": "string"
+      },
+      "state_id": {
+        "description": "Workflow state UUID (use list_workflow_states to find state IDs)",
+        "type": "string"
+      },
+      "label_ids": {
+        "description": "Array of label UUIDs to apply (use list_labels to find label IDs)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "project_id": {
+        "description": "Project UUID to add the issue to (use list_projects to find IDs)",
+        "type": "string"
+      },
+      "cycle_id": {
+        "description": "Cycle UUID to add the issue to (use list_cycles to find IDs)",
+        "type": "string"
+      },
+      "due_date": {
+        "description": "Due date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "estimate": {
+        "description": "Estimate points",
+        "type": "number"
+      },
+      "parent_id": {
+        "description": "Parent issue UUID for creating a sub-issue",
+        "type": "string"
+      }
+    },
+    "required": [
+      "team_id",
+      "title"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/create-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "minimax.rename_chat",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "rename a chat in minimax",
+    "rename chat in minimax",
+    "rename a chat conversation in minimax"
+  ],
+  "description": "Rename a chat conversation.",
+  "actionVerb": "rename",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "number",
+        "description": "Chat ID to rename"
+      },
+      "name": {
+        "type": "string",
+        "description": "New name for the chat"
+      }
+    },
+    "required": [
+      "chat_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/rename-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "rename"
+    }
+  }
+}

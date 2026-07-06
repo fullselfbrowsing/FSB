@@ -1,0 +1,40 @@
+{
+  "slug": "datadog.get_downtime",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a downtime in datadog",
+    "look up a downtime in datadog",
+    "fetch a single downtime in datadog",
+    "view one specific downtime in datadog",
+    "get downtime in datadog",
+    "get a downtime by id in datadog"
+  ],
+  "description": "Get detailed information about a specific scheduled downtime by ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "downtime_id": {
+        "type": "string",
+        "description": "Downtime ID"
+      }
+    },
+    "required": [
+      "downtime_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-downtime.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

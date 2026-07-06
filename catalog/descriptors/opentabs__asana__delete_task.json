@@ -1,0 +1,41 @@
+{
+  "slug": "asana.delete_task",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "delete a task in asana",
+    "remove a task in asana",
+    "trash a task in asana",
+    "permanently delete a task in asana",
+    "delete a to-do in asana",
+    "delete a to-do item in asana"
+  ],
+  "description": "Permanently delete a task by its GID. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to delete"
+      }
+    },
+    "required": [
+      "task_gid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/delete-task.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

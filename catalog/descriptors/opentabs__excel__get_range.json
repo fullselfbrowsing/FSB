@@ -1,0 +1,45 @@
+{
+  "slug": "excel.get_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "get a range in excel",
+    "look up a range in excel",
+    "fetch a single range in excel",
+    "view one specific range in excel",
+    "get range in excel",
+    "read cell values from a range in excel"
+  ],
+  "description": "Get cell values, formulas, and formatting for a specific range in a worksheet. The range address uses A1 notation (e.g., \"A1:C10\"). Returns values, formulas, text, and number formats.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address in A1 notation (e.g., \"A1:C10\", \"B2\", \"A:D\")"
+      }
+    },
+    "required": [
+      "worksheet",
+      "address"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/get-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

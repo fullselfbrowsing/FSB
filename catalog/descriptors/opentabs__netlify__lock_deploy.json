@@ -1,0 +1,37 @@
+{
+  "slug": "netlify.lock_deploy",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "lock a deploy in netlify",
+    "lock deploy in netlify",
+    "lock a deploy to prevent auto-publish in netlify"
+  ],
+  "description": "Lock a deploy to prevent auto-publishing of new deploys. The locked deploy stays published until it is unlocked. Useful for pinning a known-good deploy in production.",
+  "actionVerb": "lock",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "deploy_id": {
+        "type": "string",
+        "description": "The deploy ID to lock"
+      }
+    },
+    "required": [
+      "deploy_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/lock-deploy.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "lock"
+    }
+  }
+}

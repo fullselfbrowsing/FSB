@@ -1,0 +1,50 @@
+{
+  "slug": "confluence.list_labels",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list labels in confluence",
+    "show me my labels in confluence",
+    "view my labels in confluence",
+    "see all my labels in confluence",
+    "list labels on a page in confluence"
+  ],
+  "description": "List labels attached to a Confluence page",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page ID to list labels for"
+      },
+      "limit": {
+        "description": "Maximum number of labels to return (default 25, max 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-labels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

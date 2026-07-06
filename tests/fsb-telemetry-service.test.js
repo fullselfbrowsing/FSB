@@ -171,7 +171,8 @@ check('types: exports DatasetState type',
 const REQUIRED_HEADLINE_FIELDS = [
   'active_users_now', 'active_agents_now', 'active_agents_bucket',
   'total_users', 'total_agents_lifetime', 'tokens_total_lifetime',
-  'tokens_24h', 'popular_mcp_clients', 'popular_agents', 'avg_agents_per_user',
+  'tokens_24h', 'popular_mcp_clients', 'popular_agents', 'popular_regions',
+  'avg_agents_per_user',
 ];
 for (const f of REQUIRED_HEADLINE_FIELDS) {
   check(`types: FSBTelemetryHeadline includes ${f}`,

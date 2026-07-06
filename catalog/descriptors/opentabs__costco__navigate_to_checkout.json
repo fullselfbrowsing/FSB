@@ -1,0 +1,29 @@
+{
+  "slug": "costco.navigate_to_checkout",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "navigate a to checkout in costco",
+    "navigate to checkout in costco",
+    "open the checkout page in costco"
+  ],
+  "description": "Navigate the browser to the Costco checkout page where the user can review the order and complete payment. The user must complete the payment manually.",
+  "actionVerb": "navigate",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/navigate-to-checkout.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "navigate"
+    }
+  }
+}

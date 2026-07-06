@@ -1,0 +1,42 @@
+{
+  "slug": "bsky.like_post",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "like a post in bsky",
+    "like post in bsky",
+    "like a post in bluesky"
+  ],
+  "description": "Like a post. Requires the post's AT URI and CID. Returns the URI of the like record (needed for unliking).",
+  "actionVerb": "like",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "uri": {
+        "type": "string",
+        "description": "AT URI of the post to like"
+      },
+      "cid": {
+        "type": "string",
+        "description": "CID of the post to like"
+      }
+    },
+    "required": [
+      "uri",
+      "cid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/like-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "like"
+    }
+  }
+}

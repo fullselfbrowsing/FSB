@@ -1,0 +1,31 @@
+{
+  "slug": "jira.list_priorities",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list priorities in jira",
+    "show me my priorities in jira",
+    "view my priorities in jira",
+    "see all my priorities in jira",
+    "list available priorities in jira"
+  ],
+  "description": "List available priority levels for the Jira instance. Use this to find valid priority names for create_issue and update_issue.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/list-priorities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

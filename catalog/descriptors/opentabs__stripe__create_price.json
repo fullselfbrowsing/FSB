@@ -1,0 +1,78 @@
+{
+  "slug": "stripe.create_price",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "create a price in stripe",
+    "add a price in stripe",
+    "make a new price in stripe",
+    "open a new price in stripe",
+    "create price in stripe",
+    "create a new price in stripe"
+  ],
+  "description": "Create a new price for a product. Prices define how much and how often to charge for a product.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "product": {
+        "type": "string",
+        "description": "Product ID to attach this price to"
+      },
+      "unit_amount": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Price in smallest currency unit (e.g., 1000 = $10.00)"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Three-letter ISO currency code (e.g., usd)"
+      },
+      "recurring_interval": {
+        "description": "Billing interval for recurring prices (omit for one-time)",
+        "type": "string",
+        "enum": [
+          "day",
+          "week",
+          "month",
+          "year"
+        ]
+      },
+      "recurring_interval_count": {
+        "description": "Number of intervals between billings (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "metadata": {
+        "description": "Arbitrary key-value metadata",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "product",
+      "unit_amount",
+      "currency"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/create-price.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

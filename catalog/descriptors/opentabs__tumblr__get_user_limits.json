@@ -1,0 +1,31 @@
+{
+  "slug": "tumblr.get_user_limits",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get user limits in tumblr",
+    "look up user limits in tumblr",
+    "fetch a single user limits in tumblr",
+    "view one specific user limits in tumblr",
+    "get your tumblr rate limits in tumblr"
+  ],
+  "description": "Get the current rate limits for the authenticated user including daily posting, photo, video, audio, and follow limits.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-user-limits.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

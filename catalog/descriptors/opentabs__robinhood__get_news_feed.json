@@ -1,0 +1,37 @@
+{
+  "slug": "robinhood.get_news_feed",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get a news feed in robinhood",
+    "look up a news feed in robinhood",
+    "fetch a single news feed in robinhood",
+    "view one specific news feed in robinhood",
+    "get news feed in robinhood",
+    "get news and market feed in robinhood"
+  ],
+  "description": "Get the news and market feed. Optionally filter by instrument ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instrument_id": {
+        "description": "Instrument UUID to filter news for a specific stock",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-news-feed.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "notion.update_block",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "update a block in notion",
+    "edit a block in notion",
+    "change the details of block in notion",
+    "modify a block in notion",
+    "update block in notion",
+    "update a block's text content in notion"
+  ],
+  "description": "Update the text content of a block in a Notion page. Replaces the block text with the new content.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "block_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block ID (UUID) to update"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New text content for the block"
+      }
+    },
+    "required": [
+      "block_id",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/update-block.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

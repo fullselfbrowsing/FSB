@@ -1,0 +1,31 @@
+{
+  "slug": "fidelity.get_customer_orders",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get customer orders in fidelity",
+    "look up customer orders in fidelity",
+    "fetch a single customer orders in fidelity",
+    "view one specific customer orders in fidelity",
+    "view buy/sell order flow sentiment in fidelity"
+  ],
+  "description": "Get aggregated customer order flow data showing the percentage of buy vs sell orders for securities. Useful for gauging market sentiment.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-customer-orders.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

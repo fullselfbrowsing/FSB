@@ -1,0 +1,57 @@
+{
+  "slug": "msword.create_sharing_link",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "create a sharing link in msword",
+    "add a sharing link in msword",
+    "make a new sharing link in msword",
+    "open a new sharing link in msword",
+    "create sharing link in msword",
+    "create a sharing link in microsoft word"
+  ],
+  "description": "Create a sharing link for a file or folder. Returns a URL that can be shared with others.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "File or folder ID"
+      },
+      "type": {
+        "description": "Link type (default \"view\")",
+        "type": "string",
+        "enum": [
+          "view",
+          "edit",
+          "embed"
+        ]
+      },
+      "scope": {
+        "description": "Link scope (default \"anonymous\")",
+        "type": "string",
+        "enum": [
+          "anonymous",
+          "organization"
+        ]
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/create-sharing-link.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

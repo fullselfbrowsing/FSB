@@ -1,0 +1,50 @@
+{
+  "slug": "x.get_likers",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get likers in x",
+    "look up likers in x",
+    "fetch a single likers in x",
+    "view one specific likers in x",
+    "list users who liked a tweet in x"
+  ],
+  "description": "Get the users who liked a tweet, by tweet ID. Returns a paginated list of users. Useful for engagement-fanout discovery — finding accounts that engaged with a given post.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID to get likers for"
+      },
+      "count": {
+        "description": "Number of users (default 20, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-likers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

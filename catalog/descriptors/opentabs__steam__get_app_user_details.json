@@ -1,0 +1,41 @@
+{
+  "slug": "steam.get_app_user_details",
+  "service": "store.steampowered.com",
+  "intentSynonyms": [
+    "get app user details in steam",
+    "look up app user details in steam",
+    "fetch a single app user details in steam",
+    "view one specific app user details in steam",
+    "check ownership, wishlist status, and friends who own an app in steam"
+  ],
+  "description": "Get the current user's relationship with a specific app: whether they own it, whether it's on their wishlist, and which friends also own it with their playtime.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "appid": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Steam app ID to check"
+      }
+    },
+    "required": [
+      "appid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/steam/src/tools/get-app-user-details.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "storeget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

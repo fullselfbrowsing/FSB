@@ -1,0 +1,39 @@
+{
+  "slug": "minimax.delete_chat",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "delete a chat in minimax",
+    "remove a chat in minimax",
+    "trash a chat in minimax",
+    "permanently delete a chat in minimax",
+    "delete chat in minimax"
+  ],
+  "description": "Permanently delete a chat conversation. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "number",
+        "description": "Chat ID to delete"
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/delete-chat.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

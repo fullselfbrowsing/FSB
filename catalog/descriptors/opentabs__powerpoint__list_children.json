@@ -1,0 +1,43 @@
+{
+  "slug": "powerpoint.list_children",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "list a children in powerpoint",
+    "show me my children in powerpoint",
+    "view my children in powerpoint",
+    "see all my children in powerpoint",
+    "list children in powerpoint",
+    "list files and folders in a directory in powerpoint"
+  ],
+  "description": "List files and folders in a OneDrive folder. Defaults to the root folder. Returns file name, size, type, and modification info.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "folder_id": {
+        "description": "Folder item ID — defaults to root",
+        "type": "string"
+      },
+      "top": {
+        "description": "Max items to return (default 20, max 200)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/list-children.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

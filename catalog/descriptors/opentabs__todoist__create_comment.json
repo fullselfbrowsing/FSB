@@ -1,0 +1,48 @@
+{
+  "slug": "todoist.create_comment",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "create a comment in todoist",
+    "add a comment in todoist",
+    "make a new comment in todoist",
+    "open a new comment in todoist",
+    "create comment in todoist",
+    "add a comment to a task or project in todoist"
+  ],
+  "description": "Add a comment to a task or project. Provide either task_id or project_id.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "Comment content in markdown"
+      },
+      "task_id": {
+        "description": "Task ID to add the comment to",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Project ID to add the comment to",
+        "type": "string"
+      }
+    },
+    "required": [
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/create-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

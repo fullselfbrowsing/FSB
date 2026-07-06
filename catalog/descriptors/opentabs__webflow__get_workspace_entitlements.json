@@ -1,0 +1,39 @@
+{
+  "slug": "webflow.get_workspace_entitlements",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get workspace entitlements in webflow",
+    "look up workspace entitlements in webflow",
+    "fetch a single workspace entitlements in webflow",
+    "view one specific workspace entitlements in webflow",
+    "get workspace feature entitlements in webflow"
+  ],
+  "description": "Get the feature entitlements for a Webflow workspace. Shows which features are available on the current plan with usage limits and current consumption (e.g., max sites, max pages, logic flows).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_slug": {
+        "type": "string",
+        "description": "Workspace URL slug"
+      }
+    },
+    "required": [
+      "workspace_slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-workspace-entitlements.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

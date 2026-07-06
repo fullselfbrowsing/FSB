@@ -1,0 +1,83 @@
+{
+  "slug": "gitlab.update_issue",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "update an issue in gitlab",
+    "edit an issue in gitlab",
+    "change the details of issue in gitlab",
+    "modify an issue in gitlab",
+    "update a ticket in gitlab",
+    "update issue in gitlab"
+  ],
+  "description": "Update an existing issue. Only specified fields are changed.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project path (e.g., \"group/project\") or numeric project ID"
+      },
+      "issue_iid": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Issue IID (project-scoped ID)"
+      },
+      "title": {
+        "description": "New title",
+        "type": "string"
+      },
+      "description": {
+        "description": "New description in Markdown",
+        "type": "string"
+      },
+      "state_event": {
+        "description": "Transition the issue state",
+        "type": "string",
+        "enum": [
+          "close",
+          "reopen"
+        ]
+      },
+      "labels": {
+        "description": "Comma-separated list of label names (replaces existing)",
+        "type": "string"
+      },
+      "assignee_ids": {
+        "description": "User IDs to assign (replaces existing)",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "milestone_id": {
+        "description": "Milestone ID",
+        "type": "number"
+      },
+      "confidential": {
+        "description": "Whether the issue is confidential",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "project",
+      "issue_iid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/update-issue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "update"
+    }
+  }
+}

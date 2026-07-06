@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.unfollow_user",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "unfollow an user in bsky",
+    "unfollow user in bsky",
+    "unfollow an user in bluesky",
+    "unfollow a user in bsky"
+  ],
+  "description": "Unfollow a user. Requires the AT URI of the follow record (returned by follow_user or found in the viewer relationship).",
+  "actionVerb": "unfollow",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "follow_uri": {
+        "type": "string",
+        "description": "AT URI of the follow record to delete"
+      }
+    },
+    "required": [
+      "follow_uri"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/unfollow-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unfollow"
+    }
+  }
+}

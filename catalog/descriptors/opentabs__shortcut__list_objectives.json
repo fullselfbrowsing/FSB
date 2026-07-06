@@ -1,0 +1,31 @@
+{
+  "slug": "shortcut.list_objectives",
+  "service": "app.shortcut.com",
+  "intentSynonyms": [
+    "list objectives in shortcut",
+    "show me my objectives in shortcut",
+    "view my objectives in shortcut",
+    "see all my objectives in shortcut",
+    "list all objectives in shortcut"
+  ],
+  "description": "List all objectives in the workspace. Objectives are high-level goals that epics work toward.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/shortcut/src/tools/list-objectives.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

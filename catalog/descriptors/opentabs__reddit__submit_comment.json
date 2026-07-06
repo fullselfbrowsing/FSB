@@ -1,0 +1,44 @@
+{
+  "slug": "reddit.submit_comment",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "submit a comment in reddit",
+    "submit comment in reddit",
+    "post a comment or reply in reddit"
+  ],
+  "description": "Post a comment on a Reddit post or reply to an existing comment",
+  "actionVerb": "submit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thing_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Fullname of the thing to comment on — \"t3_xxx\" for a post or \"t1_xxx\" for a comment reply"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment body text (supports Reddit markdown)"
+      }
+    },
+    "required": [
+      "thing_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/submit-comment.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditpost",
+      "httpMethod": null,
+      "opNameVerb": "submit"
+    }
+  }
+}

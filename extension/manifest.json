@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "FSB v0.9.72",
-  "version": "0.9.72",
+  "name": "FSB v0.9.90",
+  "version": "0.9.90",
   "description": "FSB - Universal AI-powered browser automation assistant with multi-model support",
   "homepage_url": "https://full-selfbrowsing.com",
   "permissions": [
@@ -16,7 +16,8 @@
     "webNavigation",
     "alarms",
     "clipboardWrite",
-    "offscreen"
+    "offscreen",
+    "system.memory"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -42,7 +43,7 @@
   "options_page": "ui/control_panel.html",
   "web_accessible_resources": [
     {
-      "resources": ["assets/icon48.png", "site-maps/*.json", "test-data/**/*", "utils/redactForLog.js", "utils/diagnostics-ring-buffer.js"],
+      "resources": ["assets/icon48.png", "site-maps/*.json", "test-data/**/*", "utils/redactForLog.js", "utils/diagnostics-ring-buffer.js", "offscreen/lattice-host.html"],
       "matches": ["<all_urls>"]
     }
   ],

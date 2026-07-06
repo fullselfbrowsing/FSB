@@ -1,0 +1,43 @@
+{
+  "slug": "spotify.seek_to_position",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "seek a to position in spotify",
+    "seek to position in spotify",
+    "seek to a position in the current track in spotify"
+  ],
+  "description": "Seek to a specific position in the currently playing track.",
+  "actionVerb": "seek",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "position_ms": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Position in milliseconds to seek to"
+      },
+      "device_id": {
+        "description": "Device ID to seek on",
+        "type": "string"
+      }
+    },
+    "required": [
+      "position_ms"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/seek-to-position.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PUT",
+      "opNameVerb": "seek"
+    }
+  }
+}

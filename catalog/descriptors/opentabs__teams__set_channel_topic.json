@@ -1,0 +1,44 @@
+{
+  "slug": "teams.set_channel_topic",
+  "service": "teams.live.com",
+  "intentSynonyms": [
+    "set a channel topic in teams",
+    "set channel topic in teams",
+    "set a chat topic in teams"
+  ],
+  "description": "Set or update the topic (title) of a Teams chat conversation.",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Conversation/thread ID"
+      },
+      "topic": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New topic text for the chat"
+      }
+    },
+    "required": [
+      "conversation_id",
+      "topic"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/teams/src/tools/set-channel-topic.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PUT",
+      "opNameVerb": "set"
+    }
+  }
+}

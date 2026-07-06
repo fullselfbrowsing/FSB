@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_project",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a project in linear",
+    "look up a project in linear",
+    "fetch a single project in linear",
+    "view one specific project in linear",
+    "get project in linear",
+    "get details of a project in linear"
+  ],
+  "description": "Get detailed information about a single Linear project by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

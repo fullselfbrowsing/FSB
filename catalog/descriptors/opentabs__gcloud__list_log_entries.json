@@ -1,0 +1,55 @@
+{
+  "slug": "gcloud.list_log_entries",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "list log entries in gcloud",
+    "show me my log entries in gcloud",
+    "view my log entries in gcloud",
+    "see all my log entries in gcloud",
+    "list log entries in google cloud",
+    "list cloud logging entries in gcloud"
+  ],
+  "description": "List log entries from Cloud Logging. Supports advanced log filters (e.g., 'severity>=ERROR', 'resource.type=\"gce_instance\"').",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      },
+      "filter": {
+        "description": "Cloud Logging filter expression (e.g., 'severity>=ERROR')",
+        "type": "string"
+      },
+      "page_size": {
+        "description": "Max results per page (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "page_token": {
+        "description": "Page token from a previous response",
+        "type": "string"
+      },
+      "order_by": {
+        "description": "Sort order: \"timestamp desc\" (default) or \"timestamp asc\"",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/list-log-entries.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

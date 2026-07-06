@@ -1,0 +1,59 @@
+{
+  "slug": "twilio.create_application",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "create an application in twilio",
+    "add an application in twilio",
+    "make a new application in twilio",
+    "open a new application in twilio",
+    "create application in twilio"
+  ],
+  "description": "Create a new TwiML application for handling voice and SMS webhooks.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "friendly_name": {
+        "type": "string",
+        "description": "Friendly name for the application"
+      },
+      "voice_url": {
+        "description": "URL for incoming voice requests",
+        "type": "string"
+      },
+      "voice_method": {
+        "description": "HTTP method for voice URL (GET or POST)",
+        "type": "string"
+      },
+      "sms_url": {
+        "description": "URL for incoming SMS requests",
+        "type": "string"
+      },
+      "sms_method": {
+        "description": "HTTP method for SMS URL (GET or POST)",
+        "type": "string"
+      },
+      "status_callback": {
+        "description": "URL for status callback webhooks",
+        "type": "string"
+      }
+    },
+    "required": [
+      "friendly_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/create-application.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

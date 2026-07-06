@@ -1,0 +1,31 @@
+{
+  "slug": "airbnb.get_inbox_filters",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get inbox filters in airbnb",
+    "look up inbox filters in airbnb",
+    "fetch a single inbox filters in airbnb",
+    "view one specific inbox filters in airbnb",
+    "get inbox filter categories with unread counts in airbnb"
+  ],
+  "description": "Get the available inbox filter categories and their unread message counts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-inbox-filters.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

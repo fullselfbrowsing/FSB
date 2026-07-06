@@ -1,0 +1,39 @@
+{
+  "slug": "webflow.get_site_domains",
+  "service": "webflow.com",
+  "intentSynonyms": [
+    "get site domains in webflow",
+    "look up site domains in webflow",
+    "fetch a single site domains in webflow",
+    "view one specific site domains in webflow",
+    "get site domains and subdomain in webflow"
+  ],
+  "description": "Get all domains and the default subdomain for a Webflow site. Returns custom domains with SSL status and the webflow.io staging subdomain.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_short_name": {
+        "type": "string",
+        "description": "Site short name / URL slug"
+      }
+    },
+    "required": [
+      "site_short_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/webflow/src/tools/get-site-domains.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "id": "circleci.list_collaborations",
+  "origin": "https://app.circleci.com",
+  "endpoint": "/api/v2/me/collaborations",
+  "method": "GET",
+  "authStrategy": "same-origin-cookie",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "extract": "@",
+  "expectedShape": "@"
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "circleci.approve_job",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "approve a job in circleci",
+    "approve job in circleci",
+    "approve a pending job in circleci"
+  ],
+  "description": "Approve a pending approval job in a workflow. Requires the workflow ID and approval request ID.",
+  "actionVerb": "approve",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow UUID"
+      },
+      "approval_request_id": {
+        "type": "string",
+        "description": "Approval request UUID (same as the approval job ID)"
+      }
+    },
+    "required": [
+      "workflow_id",
+      "approval_request_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/approve-job.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "approve"
+    }
+  }
+}

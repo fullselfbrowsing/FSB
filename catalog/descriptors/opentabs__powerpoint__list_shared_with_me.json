@@ -1,0 +1,39 @@
+{
+  "slug": "powerpoint.list_shared_with_me",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "list a shared with me in powerpoint",
+    "show me my shared with me in powerpoint",
+    "view my shared with me in powerpoint",
+    "see all my shared with me in powerpoint",
+    "list shared with me in powerpoint",
+    "list files shared with you in powerpoint"
+  ],
+  "description": "List files that other people have shared with you. Returns file metadata including who shared it.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "top": {
+        "description": "Max items to return (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/list-shared-with-me.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

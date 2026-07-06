@@ -1,0 +1,45 @@
+{
+  "slug": "dockerhub.list_organizations",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "list organizations in dockerhub",
+    "show me my organizations in dockerhub",
+    "view my organizations in dockerhub",
+    "see all my organizations in dockerhub",
+    "list organizations in docker hub",
+    "list your docker hub organizations in dockerhub"
+  ],
+  "description": "List Docker Hub organizations the current user belongs to. Returns organization names, locations, and join dates.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page_size": {
+        "description": "Results per page (default 25, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/list-organizations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

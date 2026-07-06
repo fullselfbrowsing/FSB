@@ -1,0 +1,75 @@
+{
+  "slug": "gdrive.create_permission",
+  "service": "drive.google.com",
+  "intentSynonyms": [
+    "create a permission in gdrive",
+    "add a permission in gdrive",
+    "make a new permission in gdrive",
+    "open a new permission in gdrive",
+    "create permission in gdrive",
+    "create a permission in google drive"
+  ],
+  "description": "Share a file or folder with a user, group, domain, or make it public. For user/group sharing, provide an email address. For domain sharing, provide a domain name. Use type \"anyone\" to make the file accessible via link.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file_id": {
+        "type": "string",
+        "description": "File or folder ID to share"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "user",
+          "group",
+          "domain",
+          "anyone"
+        ],
+        "description": "Permission type: \"user\", \"group\", \"domain\", or \"anyone\" (public link)"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "reader",
+          "commenter",
+          "writer",
+          "fileOrganizer",
+          "organizer"
+        ],
+        "description": "Permission role: \"reader\", \"commenter\", \"writer\", \"fileOrganizer\", or \"organizer\""
+      },
+      "email": {
+        "description": "Email address of the user or group (required for user/group types)",
+        "type": "string"
+      },
+      "domain": {
+        "description": "Domain name (required for domain type)",
+        "type": "string"
+      },
+      "send_notification": {
+        "description": "Send email notification to the grantee (default true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "file_id",
+      "type",
+      "role"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-drive/src/tools/create-permission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

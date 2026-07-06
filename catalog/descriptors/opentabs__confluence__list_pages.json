@@ -1,0 +1,50 @@
+{
+  "slug": "confluence.list_pages",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list pages in confluence",
+    "show me my pages in confluence",
+    "view my pages in confluence",
+    "see all my pages in confluence",
+    "list pages in a space in confluence"
+  ],
+  "description": "List Confluence pages. Optionally filter by space ID and sort by modified date. Returns paginated results.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "space_id": {
+        "description": "Filter pages by space ID — omit to list pages across all spaces",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of pages to return (default 25, max 250)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 250
+      },
+      "sort": {
+        "description": "Sort order (e.g., \"-modified-date\" for most recent first, \"title\" for alphabetical)",
+        "type": "string"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/confluence/src/tools/list-pages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

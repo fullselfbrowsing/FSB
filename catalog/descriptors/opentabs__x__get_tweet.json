@@ -1,0 +1,41 @@
+{
+  "slug": "x.get_tweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a tweet in x",
+    "look up a tweet in x",
+    "fetch a single tweet in x",
+    "view one specific tweet in x",
+    "get tweet in x",
+    "get tweet details by id in x"
+  ],
+  "description": "Get detailed information about a specific tweet by its ID. Returns the tweet with full engagement metrics, author details, and reply thread context.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Tweet ID"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-tweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

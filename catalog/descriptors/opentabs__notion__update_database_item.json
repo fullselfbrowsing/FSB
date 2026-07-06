@@ -1,0 +1,55 @@
+{
+  "slug": "notion.update_database_item",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "update a database item in notion",
+    "edit a database item in notion",
+    "change the details of database item in notion",
+    "modify a database item in notion",
+    "update database item in notion",
+    "update a database row by setting property values in notion"
+  ],
+  "description": "Update a row/item in a Notion database. Use get_database first to understand the property schema.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page/row ID (UUID) of the database item to update"
+      },
+      "title": {
+        "description": "New title for the row",
+        "type": "string"
+      },
+      "properties": {
+        "description": "Property values as key-value pairs. Keys are property names (from get_database). Values are strings.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "page_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/update-database-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "update"
+    }
+  }
+}

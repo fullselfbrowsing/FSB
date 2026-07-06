@@ -1,0 +1,47 @@
+{
+  "slug": "onlyfans.send_chat_message",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "send a chat message in onlyfans",
+    "post a chat message in onlyfans",
+    "write a new chat message in onlyfans",
+    "send chat message in onlyfans",
+    "send a message in a chat in onlyfans"
+  ],
+  "description": "Send a text message in a chat conversation. The chat must already exist.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Chat ID (from list_chats)"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message text to send"
+      }
+    },
+    "required": [
+      "chat_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/send-chat-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "send"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "showcase-angular",
-  "version": "0.9.72",
+  "version": "0.9.90",
   "private": true,
   "scripts": {
     "ng": "ng",
@@ -9,8 +9,9 @@
     "build": "ng build",
     "test": "ng test",
     "smoke:crawler": "node scripts/smoke-crawler.mjs",
+    "smoke:crawler:local": "node scripts/smoke-crawler-local.mjs",
     "serve:ssr:showcase-angular": "node ../dist/showcase-angular/server/server.mjs",
-    "lint:i18n": "eslint \"src/**/*.html\" --ignore-pattern \"src/app/pages/dashboard/**\" --ignore-pattern \"src/app/pages/stats/**\" --ignore-pattern \"src/app/pages/privacy/privacy-history-archive.component.html\"",
+    "lint:i18n": "eslint \"src/**/*.html\" --ignore-pattern \"src/app/pages/dashboard/**\" --ignore-pattern \"src/app/pages/stats/**\"",
     "verify:hreflang": "node scripts/verify-hreflang.mjs"
   },
   "dependencies": {

@@ -1,0 +1,45 @@
+{
+  "slug": "jira.search_issues",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "search issues in jira",
+    "search a ticket in jira",
+    "search issues using jql in jira"
+  ],
+  "description": "Search for Jira issues using JQL (Jira Query Language). Supports filtering by project, status, assignee, labels, and more.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "jql": {
+        "type": "string",
+        "description": "JQL query string (e.g. \"project = KAN AND status = 'In Progress'\")"
+      },
+      "max_results": {
+        "description": "Maximum number of results to return (default 20, max 100)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first result to return for pagination",
+        "type": "number"
+      }
+    },
+    "required": [
+      "jql"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/search-issues.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

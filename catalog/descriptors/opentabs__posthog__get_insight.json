@@ -1,0 +1,42 @@
+{
+  "slug": "posthog.get_insight",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "get an insight in posthog",
+    "look up an insight in posthog",
+    "fetch a single insight in posthog",
+    "view one specific insight in posthog",
+    "get insight in posthog",
+    "get insight details in posthog"
+  ],
+  "description": "Get detailed information about a specific insight including its query configuration and dashboard associations.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "insight_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Insight ID"
+      }
+    },
+    "required": [
+      "insight_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/get-insight.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

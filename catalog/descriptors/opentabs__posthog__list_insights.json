@@ -1,0 +1,52 @@
+{
+  "slug": "posthog.list_insights",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "list insights in posthog",
+    "show me my insights in posthog",
+    "view my insights in posthog",
+    "see all my insights in posthog",
+    "list insights in the project in posthog"
+  ],
+  "description": "List insights (trends, funnels, retention, paths, etc.) in the current PostHog project. Insights are the core analytics visualizations.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Results per page (default 100, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Pagination offset (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "short_id": {
+        "description": "Filter by short ID",
+        "type": "string"
+      },
+      "saved": {
+        "description": "Filter by saved status",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/list-insights.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

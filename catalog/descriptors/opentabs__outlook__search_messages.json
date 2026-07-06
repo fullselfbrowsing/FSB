@@ -1,0 +1,43 @@
+{
+  "slug": "outlook.search_messages",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "search messages in outlook",
+    "search emails by keyword in outlook",
+    "search emails using a keyword query (kql) in outlook"
+  ],
+  "description": "Search emails using a keyword query (KQL). Searches subject, body, and sender. Examples: \"budget report\", \"from:jane@example.com\", \"subject:quarterly review\", \"hasAttachments:true\".",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (KQL syntax)"
+      },
+      "limit": {
+        "description": "Max results (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/search-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "slug": "tumblr.get_post_notes",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get post notes in tumblr",
+    "look up post notes in tumblr",
+    "fetch a single post notes in tumblr",
+    "view one specific post notes in tumblr",
+    "get notes on a post in tumblr"
+  ],
+  "description": "Get notes (likes, reblogs, replies) on a Tumblr post. Filter by mode to see specific note types.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or URL that owns the post"
+      },
+      "post_id": {
+        "type": "string",
+        "description": "Post ID to get notes for"
+      },
+      "mode": {
+        "description": "Note filter mode",
+        "type": "string",
+        "enum": [
+          "all",
+          "likes",
+          "conversation",
+          "reblog_with_tags",
+          "reblogs_with_tags"
+        ]
+      }
+    },
+    "required": [
+      "blog_name",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-post-notes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

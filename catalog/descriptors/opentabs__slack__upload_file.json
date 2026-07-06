@@ -1,0 +1,67 @@
+{
+  "slug": "slack.upload_file",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "upload a file in slack",
+    "upload file in slack",
+    "upload a file to a channel in slack"
+  ],
+  "description": "Upload a file to a Slack channel",
+  "actionVerb": "upload",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to share the file to (e.g., C01234567)"
+      },
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20000000,
+        "description": "File content as a UTF-8 string (text files) or base64-encoded string (binary files). Max 20MB."
+      },
+      "is_base64": {
+        "description": "Set to true when content is base64-encoded (e.g., binary files like images or PDFs). Defaults to false (UTF-8 text).",
+        "type": "boolean"
+      },
+      "filename": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Name of the file including extension (e.g., report.txt, image.png)"
+      },
+      "title": {
+        "description": "Title for the file displayed in Slack",
+        "type": "string"
+      },
+      "initial_comment": {
+        "description": "Message text to include with the file upload",
+        "type": "string"
+      },
+      "filetype": {
+        "description": "Slack file type identifier (e.g., txt, png, pdf) — auto-detected if omitted",
+        "type": "string"
+      }
+    },
+    "required": [
+      "channel",
+      "content",
+      "filename"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/upload-file.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "upload"
+    }
+  }
+}

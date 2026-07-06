@@ -1,0 +1,66 @@
+{
+  "slug": "slack.search_messages",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "search messages in slack",
+    "search messages across channels in slack",
+    "search for messages across slack channels with optional pagination and sorting in slack"
+  ],
+  "description": "Search for messages across Slack channels with optional pagination and sorting",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Search query string — supports Slack search modifiers (e.g., \"from:@user in:#channel\")"
+      },
+      "count": {
+        "description": "Number of results to return per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "page": {
+        "description": "Page number of results to return (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "sort": {
+        "description": "Sort field — relevance or recency (default \"score\")",
+        "type": "string",
+        "enum": [
+          "score",
+          "timestamp"
+        ]
+      },
+      "sort_dir": {
+        "description": "Sort direction (default \"desc\")",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/search-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

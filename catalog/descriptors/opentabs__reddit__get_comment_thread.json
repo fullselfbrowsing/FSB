@@ -1,0 +1,65 @@
+{
+  "slug": "reddit.get_comment_thread",
+  "service": "www.reddit.com",
+  "intentSynonyms": [
+    "get a comment thread in reddit",
+    "look up a comment thread in reddit",
+    "fetch a single comment thread in reddit",
+    "view one specific comment thread in reddit",
+    "get comment thread in reddit",
+    "get a comment and its replies in reddit"
+  ],
+  "description": "Get a specific comment and its nested replies. Focuses the comment tree on a particular comment, returning its full reply chain regardless of nesting depth. Use this to read deeply nested conversations that get_post may truncate.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subreddit": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Subreddit name without r/ prefix"
+      },
+      "post_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Post ID without t3_ prefix (e.g., \"1ki00n1\")"
+      },
+      "comment_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Comment ID without t1_ prefix (e.g., \"o9z5cx1\") — the comment to focus on"
+      },
+      "depth": {
+        "description": "Max reply nesting depth below the target comment (default 8)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "limit": {
+        "description": "Max number of child comments to return (default 100)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "subreddit",
+      "post_id",
+      "comment_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/reddit/src/tools/get-comment-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "redditget",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "twitch.get_current_user",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get a current user in twitch",
+    "look up a current user in twitch",
+    "fetch a single current user in twitch",
+    "view one specific current user in twitch",
+    "get current user in twitch",
+    "get the authenticated twitch user profile in twitch"
+  ],
+  "description": "Get the authenticated Twitch user profile including email, display name, follower count, partner/affiliate status, and account creation date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

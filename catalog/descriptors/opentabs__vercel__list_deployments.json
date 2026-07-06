@@ -1,0 +1,64 @@
+{
+  "slug": "vercel.list_deployments",
+  "service": "vercel.com",
+  "intentSynonyms": [
+    "list deployments in vercel",
+    "show me my deployments in vercel",
+    "view my deployments in vercel",
+    "see all my deployments in vercel",
+    "list vercel deployments in vercel"
+  ],
+  "description": "List deployments for the current team/account, optionally filtered by project. Returns deployment URLs, states, Git metadata, and timestamps.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project": {
+        "description": "Filter by project name or ID",
+        "type": "string"
+      },
+      "target": {
+        "description": "Filter by deployment target",
+        "type": "string",
+        "enum": [
+          "production",
+          "preview"
+        ]
+      },
+      "state": {
+        "description": "Filter by deployment state",
+        "type": "string",
+        "enum": [
+          "BUILDING",
+          "ERROR",
+          "INITIALIZING",
+          "QUEUED",
+          "READY",
+          "CANCELED"
+        ]
+      },
+      "limit": {
+        "description": "Maximum number of deployments to return (default 20, max 100)",
+        "type": "number"
+      },
+      "from": {
+        "description": "Pagination cursor — timestamp in ms to fetch deployments before",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/vercel/src/tools/list-deployments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

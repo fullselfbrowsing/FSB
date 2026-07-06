@@ -1,0 +1,47 @@
+{
+  "slug": "tumblr.search_tagged",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "search a tagged in tumblr",
+    "search tagged in tumblr",
+    "search posts by tag in tumblr"
+  ],
+  "description": "Search for Tumblr posts with a specific tag. Returns posts in reverse chronological order.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tag": {
+        "type": "string",
+        "description": "Tag to search for (without # prefix)"
+      },
+      "limit": {
+        "description": "Number of posts to return (default 20, max 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "before": {
+        "description": "Unix timestamp for pagination — return posts before this time",
+        "type": "number"
+      }
+    },
+    "required": [
+      "tag"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/search-tagged.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

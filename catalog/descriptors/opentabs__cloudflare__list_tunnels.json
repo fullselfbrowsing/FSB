@@ -1,0 +1,36 @@
+{
+  "slug": "cloudflare.list_tunnels",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list tunnels in cloudflare",
+    "show me my tunnels in cloudflare",
+    "view my tunnels in cloudflare",
+    "see all my tunnels in cloudflare",
+    "list cloudflare tunnels in cloudflare"
+  ],
+  "description": "List Cloudflare Tunnels in the account. Tunnels create secure outbound-only connections from your infrastructure to Cloudflare, without opening inbound ports.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "is_deleted": {
+        "description": "Filter by deletion status (default false — only active tunnels)",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-tunnels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

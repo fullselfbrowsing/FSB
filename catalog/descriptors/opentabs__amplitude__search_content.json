@@ -1,0 +1,79 @@
+{
+  "slug": "amplitude.search_content",
+  "service": "app.amplitude.com",
+  "intentSynonyms": [
+    "search a content in amplitude",
+    "search content in amplitude",
+    "search charts, dashboards, cohorts, and more in amplitude"
+  ],
+  "description": "Search across all Amplitude content including charts, dashboards, cohorts, notebooks, and nudges. Filter by content type, owner, space, and more. Results are sorted by relevance by default.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text (empty string for recent items)"
+      },
+      "limit": {
+        "description": "Max results to return (default 30)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "content_types": {
+        "description": "Filter by content types: CHART, DASHBOARD, COHORT, NOTEBOOK, NUDGE, SPACE (default: all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "owners": {
+        "description": "Filter by owner login IDs",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "is_archived": {
+        "description": "Include archived content (default false)",
+        "type": "boolean"
+      },
+      "sort_order": {
+        "description": "Sort order (default RELEVANCE)",
+        "type": "string",
+        "enum": [
+          "RELEVANCE",
+          "LAST_MODIFIED",
+          "LAST_VIEWED",
+          "VIEW_COUNT"
+        ]
+      },
+      "sort_direction": {
+        "description": "Sort direction (default DESC)",
+        "type": "string",
+        "enum": [
+          "ASC",
+          "DESC"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/amplitude/src/tools/search-content.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

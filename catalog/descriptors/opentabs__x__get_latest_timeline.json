@@ -1,0 +1,43 @@
+{
+  "slug": "x.get_latest_timeline",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get a latest timeline in x",
+    "look up a latest timeline in x",
+    "fetch a single latest timeline in x",
+    "view one specific latest timeline in x",
+    "get latest timeline in x",
+    "get latest tweets from followed accounts in x"
+  ],
+  "description": "Get tweets from the \"Following\" tab — chronological timeline of accounts the user follows.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "count": {
+        "description": "Number of tweets to return (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-latest-timeline.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

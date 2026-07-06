@@ -1,0 +1,43 @@
+{
+  "slug": "ytmusic.add_to_playlist",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "add a to playlist in ytmusic",
+    "add to playlist in ytmusic",
+    "add a to playlist in youtube music",
+    "add a song to a playlist in ytmusic"
+  ],
+  "description": "Add a song to a playlist on YouTube Music",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "ID of the playlist to add the song to"
+      },
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID of the song to add"
+      }
+    },
+    "required": [
+      "playlist_id",
+      "video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/add-to-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "add"
+    }
+  }
+}

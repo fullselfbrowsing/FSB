@@ -1,0 +1,93 @@
+{
+  "slug": "zillow.search_foreclosures",
+  "service": "zillow.com",
+  "intentSynonyms": [
+    "search foreclosures in zillow",
+    "find foreclosure properties in zillow",
+    "search for foreclosure and pre-foreclosure properties on zillow in zillow"
+  ],
+  "description": "Search for foreclosure and pre-foreclosure properties on Zillow. Requires either a region_id (from search_locations) or map_bounds.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "region_id": {
+        "description": "Zillow region ID (from search_locations). Required if map_bounds is not provided.",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "region_type": {
+        "description": "Region type: \"city\", \"county\", \"zipcode\", \"neighborhood\" (default \"city\")",
+        "type": "string"
+      },
+      "map_bounds": {
+        "description": "Map bounding box. Required if region_id is not provided.",
+        "type": "object",
+        "properties": {
+          "west": {
+            "type": "number",
+            "description": "Western longitude"
+          },
+          "east": {
+            "type": "number",
+            "description": "Eastern longitude"
+          },
+          "south": {
+            "type": "number",
+            "description": "Southern latitude"
+          },
+          "north": {
+            "type": "number",
+            "description": "Northern latitude"
+          }
+        },
+        "required": [
+          "west",
+          "east",
+          "south",
+          "north"
+        ],
+        "additionalProperties": false
+      },
+      "min_price": {
+        "description": "Minimum price in dollars",
+        "type": "number"
+      },
+      "max_price": {
+        "description": "Maximum price in dollars",
+        "type": "number"
+      },
+      "sort": {
+        "description": "Sort order (default \"globalrelevanceex\")",
+        "type": "string",
+        "enum": [
+          "globalrelevanceex",
+          "days",
+          "pricea",
+          "priced"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zillow/src/tools/search-foreclosures.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

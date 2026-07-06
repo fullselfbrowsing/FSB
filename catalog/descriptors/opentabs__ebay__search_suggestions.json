@@ -1,0 +1,38 @@
+{
+  "slug": "ebay.search_suggestions",
+  "service": "ebay.com",
+  "intentSynonyms": [
+    "search suggestions in ebay",
+    "get autocomplete suggestions for search in ebay",
+    "get autocomplete suggestions for a search query in ebay"
+  ],
+  "description": "Get autocomplete suggestions for a search query. Returns the URL to the autocomplete JavaScript module and active search factors. Use this to understand what search features are available for the current user context.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Partial search text to get suggestions for"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ebay/src/tools/search-suggestions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

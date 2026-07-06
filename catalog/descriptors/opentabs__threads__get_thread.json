@@ -1,0 +1,41 @@
+{
+  "slug": "threads.get_thread",
+  "service": "www.threads.net",
+  "intentSynonyms": [
+    "get a thread in threads",
+    "look up a thread in threads",
+    "fetch a single thread in threads",
+    "view one specific thread in threads",
+    "open a thread in threads",
+    "get thread in threads"
+  ],
+  "description": "Get a single Threads post and its replies by thread ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thread_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Thread ID to retrieve"
+      }
+    },
+    "required": [
+      "thread_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/threads/src/tools/get-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

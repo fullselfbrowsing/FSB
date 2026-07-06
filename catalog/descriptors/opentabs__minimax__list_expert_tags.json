@@ -1,0 +1,30 @@
+{
+  "slug": "minimax.list_expert_tags",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list expert tags in minimax",
+    "show me my expert tags in minimax",
+    "view my expert tags in minimax",
+    "see all my expert tags in minimax"
+  ],
+  "description": "List all available tags for categorizing AI experts/agents.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-expert-tags.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

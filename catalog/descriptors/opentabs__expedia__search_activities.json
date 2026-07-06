@@ -1,0 +1,49 @@
+{
+  "slug": "expedia.search_activities",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search activities in expedia",
+    "navigate to activities search results in expedia",
+    "navigate to the expedia activities/things to do search results page for a destination in expedia"
+  ],
+  "description": "Navigate to the Expedia activities/things to do search results page for a destination. Returns the search URL.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "destination": {
+        "type": "string",
+        "description": "Destination name (e.g. \"New York\", \"Paris\")"
+      },
+      "region_id": {
+        "description": "Gaia region ID from search_locations for more precise results",
+        "type": "string"
+      },
+      "start_date": {
+        "description": "Start date in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "end_date": {
+        "description": "End date in YYYY-MM-DD format",
+        "type": "string"
+      }
+    },
+    "required": [
+      "destination"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-activities.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

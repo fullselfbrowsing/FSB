@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="css/dashboard.css?v=20260329">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-  (function(){if(localStorage.getItem('fsb-showcase-theme')==='light'){document.documentElement.setAttribute('data-theme','light')}})();
+  (function(){if(window.matchMedia&&!window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.setAttribute('data-theme','light')}})();
   </script>
 </head>
 <body>
@@ -33,7 +33,7 @@
         <a href="support.html">Support</a>
       </div>
       <div class="nav-actions">
-        <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-sm btn-github">
+        <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" class="btn btn-sm btn-github">
           <i class="fa-brands fa-github"></i> GitHub
         </a>
       </div>
@@ -52,7 +52,7 @@
     <a href="dashboard.html" class="active">Dashboard</a>
     <a href="privacy.html">Privacy</a>
     <a href="support.html">Support</a>
-    <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener">
+    <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener">
       <i class="fa-brands fa-github"></i> GitHub
     </a>
   </div>
@@ -249,43 +249,50 @@
             </button>
           </form>
         </div>
-        <div id="dash-preview-stage" class="dash-preview-stage">
-          <div class="dash-preview-loading" id="dash-preview-loading">
-            <div class="dash-spinner"></div>
-            <span>Connecting to browser...</span>
+        <div class="dash-preview-loading" id="dash-preview-loading">
+          <div class="dash-spinner"></div>
+          <span>Connecting to browser...</span>
+        </div>
+        <div id="dash-preview-restricted" class="dash-preview-restricted" style="display: none;">
+          <div class="dash-preview-restricted-card">
+            <div class="dash-preview-restricted-icon"><i class="fa-solid fa-window-maximize"></i></div>
+            <div class="dash-preview-restricted-title" id="dash-preview-restricted-title">New Tab</div>
+            <div class="dash-preview-restricted-url" id="dash-preview-restricted-url"></div>
+            <div class="dash-preview-restricted-hint">This page can't be streamed. Use the URL bar above to open a website.</div>
           </div>
-          <div id="dash-preview-restricted" class="dash-preview-restricted" style="display: none;">
-            <div class="dash-preview-restricted-card">
-              <div class="dash-preview-restricted-icon"><i class="fa-solid fa-window-maximize"></i></div>
-              <div class="dash-preview-restricted-title" id="dash-preview-restricted-title">New Tab</div>
-              <div class="dash-preview-restricted-url" id="dash-preview-restricted-url"></div>
-              <div class="dash-preview-restricted-hint">This page can't be streamed. Use the URL bar above to open a website.</div>
+        </div>
+        <div id="dash-preview-viewer" class="dash-preview-viewer" aria-label="Live page preview"></div>
+        <div id="dash-preview-glow" class="dash-preview-glow" style="display: none;"></div>
+        <div id="dash-remote-overlay" class="dash-remote-overlay" style="display: none;"></div>
+        <div id="dash-preview-progress" class="dash-preview-progress" style="display: none;">
+          <div class="dash-preview-progress-top">
+            <span id="dash-preview-progress-badge" class="dash-preview-client-badge" style="display: none;"></span>
+            <span id="dash-preview-progress-status" class="dash-preview-progress-status"></span>
+          </div>
+          <div id="dash-preview-progress-detail" class="dash-preview-progress-detail" style="display: none;"></div>
+        </div>
+        <div id="dash-preview-dialog" class="dash-preview-dialog" style="display: none;">
+          <div class="dash-preview-dialog-card">
+            <div class="dash-preview-dialog-icon">
+              <i class="fa-solid fa-message"></i>
             </div>
+            <div class="dash-preview-dialog-type" id="dash-preview-dialog-type">Alert</div>
+            <div class="dash-preview-dialog-message" id="dash-preview-dialog-message"></div>
           </div>
-          <iframe id="dash-preview-iframe" class="dash-preview-iframe" sandbox="allow-same-origin" title="Live page preview"></iframe>
-          <div id="dash-preview-glow" class="dash-preview-glow" style="display: none;"></div>
-          <div id="dash-remote-overlay" class="dash-remote-overlay" style="display: none;"></div>
-          <div id="dash-preview-progress" class="dash-preview-progress" style="display: none;"></div>
-          <div id="dash-preview-dialog" class="dash-preview-dialog" style="display: none;">
-            <div class="dash-preview-dialog-card">
-              <div class="dash-preview-dialog-icon">
-                <i class="fa-solid fa-message"></i>
-              </div>
-              <div class="dash-preview-dialog-type" id="dash-preview-dialog-type">Alert</div>
-              <div class="dash-preview-dialog-message" id="dash-preview-dialog-message"></div>
-            </div>
-          </div>
-          <div id="dash-preview-disconnected" class="dash-preview-disconnected" style="display: none;">
-            <span>Stream disconnected</span>
-          </div>
-          <div id="dash-preview-frozen-overlay" class="dash-preview-frozen-overlay" style="display: none;">
+        </div>
+        <div id="dash-preview-disconnected" class="dash-preview-disconnected" style="display: none;">
+          <span>Stream disconnected</span>
+        </div>
+        <div id="dash-preview-frozen-overlay" class="dash-preview-frozen-overlay" style="display: none;">
+          <div class="dash-preview-frozen-stack">
+            <span id="dash-preview-frozen-badge" class="dash-preview-client-badge dash-preview-client-badge-frozen" style="display: none;"></span>
             <span class="dash-preview-frozen-label">Disconnected</span>
           </div>
-          <div id="dash-preview-error" class="dash-preview-error" style="display: none;">
-            <i class="fa-solid fa-exclamation-triangle"></i>
-            <p>Could not load page preview</p>
-            <span>The extension may have navigated to a restricted page</span>
-          </div>
+        </div>
+        <div id="dash-preview-error" class="dash-preview-error" style="display: none;">
+          <i class="fa-solid fa-exclamation-triangle"></i>
+          <p>Could not load page preview</p>
+          <span>The extension may have navigated to a restricted page</span>
         </div>
         <div id="dash-preview-fs-exit" class="dash-preview-fs-exit" style="display: none;">
           <button class="dash-preview-fs-exit-btn" title="Exit fullscreen">
@@ -298,11 +305,11 @@
       <div class="dash-stats-bar">
         <div class="dash-stat-card">
           <div class="dash-stat-value" id="stat-enabled">0</div>
-          <div class="dash-stat-label">Active</div>
+          <div class="dash-stat-label">Total Tokens</div>
         </div>
         <div class="dash-stat-card">
           <div class="dash-stat-value" id="stat-runs-today">0</div>
-          <div class="dash-stat-label">Runs Today</div>
+          <div class="dash-stat-label">Requests</div>
         </div>
         <div class="dash-stat-card">
           <div class="dash-stat-value" id="stat-success-rate">0%</div>
@@ -313,8 +320,8 @@
           <div class="dash-stat-label">Total Cost</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="stat-cost-saved">$0.00</div>
-          <div class="dash-stat-label">Cost Saved</div>
+          <div class="dash-stat-value" id="stat-cost-saved">Offline</div>
+          <div class="dash-stat-label">Remote</div>
         </div>
       </div>
 
@@ -348,9 +355,9 @@
           </div>
           <div class="footer-column">
             <h4>Project</h4>
-            <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener">GitHub</a>
-            <a href="https://github.com/fullselfbrowsing/FSB/issues" target="_blank" rel="noopener">Issues</a>
-            <a href="https://github.com/fullselfbrowsing/FSB/blob/main/LICENSE" target="_blank" rel="noopener">BSL 1.1 License</a>
+            <a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://github.com/lakshmanturlapati/FSB/issues" target="_blank" rel="noopener">Issues</a>
+            <a href="https://github.com/lakshmanturlapati/FSB/blob/main/LICENSE" target="_blank" rel="noopener">BSL 1.1 License</a>
           </div>
         </div>
       </div>
@@ -361,13 +368,10 @@
     </div>
   </footer>
 
-  <button class="theme-toggle-btn" aria-label="Toggle theme">
-    <i class="ph ph-sun"></i>
-  </button>
-
   <script src="js/lz-string.min.js?v=20260331d"></script>
   <script src="js/main.js?v=20260331d"></script>
   <script src="js/dashboard-runtime-state.js?v=20260331d"></script>
+  <script src="js/phantom-stream-viewer.js?v=20260617a"></script>
   <script src="js/dashboard.js?v=20260331d"></script>
 </body>
 </html>

@@ -1,0 +1,40 @@
+{
+  "slug": "linear.list_projects",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list projects in linear",
+    "show me my projects in linear",
+    "view my projects in linear",
+    "see all my projects in linear",
+    "list all projects in linear"
+  ],
+  "description": "List all projects in the Linear workspace. Supports pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Maximum number of projects to return (default 25, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

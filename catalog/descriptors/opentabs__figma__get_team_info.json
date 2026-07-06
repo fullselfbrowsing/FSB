@@ -1,0 +1,41 @@
+{
+  "slug": "figma.get_team_info",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "get a team info in figma",
+    "look up a team info in figma",
+    "fetch a single team info in figma",
+    "view one specific team info in figma",
+    "get team info in figma",
+    "get details about a team in figma"
+  ],
+  "description": "Get detailed information about a specific Figma team",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Team ID to get information for"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/get-team-info.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

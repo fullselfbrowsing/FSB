@@ -1,0 +1,60 @@
+{
+  "slug": "netlify.update_site",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "update a site in netlify",
+    "edit a site in netlify",
+    "change the details of site in netlify",
+    "modify a site in netlify",
+    "update site in netlify",
+    "update site settings in netlify"
+  ],
+  "description": "Update an existing Netlify site. Supports changing the site name, custom domain, repo branch, build command, and SSL settings. Only provided fields are updated.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to update"
+      },
+      "name": {
+        "description": "New site name (subdomain)",
+        "type": "string"
+      },
+      "custom_domain": {
+        "description": "Custom domain name to assign",
+        "type": "string"
+      },
+      "force_ssl": {
+        "description": "Whether to enforce HTTPS",
+        "type": "boolean"
+      },
+      "repo_branch": {
+        "description": "Production branch name",
+        "type": "string"
+      },
+      "build_cmd": {
+        "description": "Build command",
+        "type": "string"
+      }
+    },
+    "required": [
+      "site_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/update-site.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "PATCH",
+      "opNameVerb": "update"
+    }
+  }
+}

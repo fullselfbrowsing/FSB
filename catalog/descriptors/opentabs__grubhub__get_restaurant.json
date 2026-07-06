@@ -1,0 +1,41 @@
+{
+  "slug": "grubhub.get_restaurant",
+  "service": "www.grubhub.com",
+  "intentSynonyms": [
+    "get a restaurant in grubhub",
+    "look up a restaurant in grubhub",
+    "fetch a single restaurant in grubhub",
+    "view one specific restaurant in grubhub",
+    "get restaurant in grubhub",
+    "look up a grubhub restaurant menu in grubhub"
+  ],
+  "description": "Get the details and menu of a single Grubhub restaurant by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "restaurant_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The restaurant ID to fetch"
+      }
+    },
+    "required": [
+      "restaurant_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/grubhub/src/tools/get-restaurant.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

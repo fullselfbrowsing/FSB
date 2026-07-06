@@ -1,0 +1,42 @@
+{
+  "slug": "carta.get_qsbs_eligibility",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get a qsbs eligibility in carta",
+    "look up a qsbs eligibility in carta",
+    "fetch a single qsbs eligibility in carta",
+    "view one specific qsbs eligibility in carta",
+    "get qsbs eligibility in carta",
+    "get qsbs eligible shares in carta"
+  ],
+  "description": "Get Qualified Small Business Stock (QSBS) eligible sold shares for a company. QSBS shares may qualify for federal tax exclusion under Section 1202.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-qsbs-eligibility.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

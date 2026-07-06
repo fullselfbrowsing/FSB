@@ -1,0 +1,45 @@
+{
+  "slug": "slack.set_channel_purpose",
+  "service": "slack.com",
+  "intentSynonyms": [
+    "set a channel purpose in slack",
+    "set channel purpose in slack",
+    "set the purpose of a channel in slack"
+  ],
+  "description": "Set the purpose of a Slack channel",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "channel": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel ID to set the purpose for (e.g., C01234567)"
+      },
+      "purpose": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 250,
+        "description": "New purpose text for the channel (max 250 chars)"
+      }
+    },
+    "required": [
+      "channel",
+      "purpose"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/slack/src/tools/set-channel-purpose.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "set"
+    }
+  }
+}

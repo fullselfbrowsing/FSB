@@ -1,0 +1,47 @@
+{
+  "slug": "circleci.get_job",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get a job in circleci",
+    "look up a job in circleci",
+    "fetch a single job in circleci",
+    "view one specific job in circleci",
+    "get job in circleci",
+    "get job details in circleci"
+  ],
+  "description": "Get detailed information about a job by project slug and job number. Returns status, timing, duration, parallelism, and web URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_slug": {
+        "type": "string",
+        "description": "Project slug e.g. \"gh/org/repo\""
+      },
+      "job_number": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Job number within the project"
+      }
+    },
+    "required": [
+      "project_slug",
+      "job_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-job.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "slug": "sentry.list_issue_events",
+  "service": "sentry.io",
+  "intentSynonyms": [
+    "list issue events in sentry",
+    "show me my issue events in sentry",
+    "view my issue events in sentry",
+    "see all my issue events in sentry",
+    "list events for a specific issue in sentry"
+  ],
+  "description": "List the events (occurrences) for a specific Sentry issue. Each event represents a single occurrence of the issue with its own stack trace, tags, and context.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "The issue ID to list events for"
+      },
+      "limit": {
+        "description": "Maximum number of events to return (default 25, max 100)",
+        "type": "number"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "issue_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/sentry/src/tools/list-issue-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "supabase.get_security_advisors",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "get security advisors in supabase",
+    "look up security advisors in supabase",
+    "fetch a single security advisors in supabase",
+    "view one specific security advisors in supabase",
+    "get security advisor recommendations in supabase"
+  ],
+  "description": "Get security advisor recommendations for a Supabase project. Identifies potential security issues like exposed credentials, weak RLS policies, and auth misconfigurations.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/get-security-advisors.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

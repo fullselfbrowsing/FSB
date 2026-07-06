@@ -1,0 +1,40 @@
+{
+  "slug": "dockerhub.get_user_profile",
+  "service": "hub.docker.com",
+  "intentSynonyms": [
+    "get an user profile in dockerhub",
+    "look up an user profile in dockerhub",
+    "fetch a single user profile in dockerhub",
+    "view one specific user profile in dockerhub",
+    "get user profile in dockerhub",
+    "get a docker hub user profile by username in dockerhub"
+  ],
+  "description": "Get a Docker Hub user profile by username. Returns username, full name, location, company, account type, and join date.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Docker Hub username"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/docker-hub/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

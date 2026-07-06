@@ -1,0 +1,47 @@
+{
+  "slug": "netflix.list_genre_titles",
+  "service": "netflix.com",
+  "intentSynonyms": [
+    "list genre titles in netflix",
+    "show me my genre titles in netflix",
+    "view my genre titles in netflix",
+    "see all my genre titles in netflix",
+    "browse titles in a genre category in netflix"
+  ],
+  "description": "Browse Netflix titles by genre ID. Common genre IDs: 83 (TV Shows), 34399 (Movies), 1365 (Action), 5763 (Drama), 6548 (Comedy), 8933 (Thriller), 7424 (Anime), 2243108 (Korean TV), 26065 (Sci-Fi), 8711 (Horror), 10118 (Comic & Superhero), 13335 (Reality TV), 11559 (Stand-Up Comedy), 6839 (Documentaries). Navigate to netflix.com/browse/genre/<id> to discover more genre IDs.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "genre_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Netflix genre ID (e.g., 1365 for Action, 6548 for Comedy)"
+      },
+      "limit": {
+        "description": "Max results to return (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      }
+    },
+    "required": [
+      "genre_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netflix/src/tools/list-genre-titles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

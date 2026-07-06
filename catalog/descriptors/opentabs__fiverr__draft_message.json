@@ -1,0 +1,44 @@
+{
+  "slug": "fiverr.draft_message",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "draft a message in fiverr",
+    "draft message in fiverr",
+    "compose a message preview without sending in fiverr"
+  ],
+  "description": "Prepare a Fiverr message to a recipient without sending it. Validates the recipient and body and returns a structured preview (sender, recipient, body, character count). Use this to compose and confirm a message before calling `send_message`. Makes no network request and sends nothing.",
+  "actionVerb": "draft",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "recipient_username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username of the person the message would be sent to"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message text to compose"
+      }
+    },
+    "required": [
+      "recipient_username",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/draft-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "draft"
+    }
+  }
+}

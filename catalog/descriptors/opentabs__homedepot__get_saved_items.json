@@ -1,0 +1,31 @@
+{
+  "slug": "homedepot.get_saved_items",
+  "service": "homedepot.com",
+  "intentSynonyms": [
+    "get saved items in homedepot",
+    "look up saved items in homedepot",
+    "fetch a single saved items in homedepot",
+    "view one specific saved items in homedepot",
+    "get save for later items in homedepot"
+  ],
+  "description": "Get all items saved for later in the Home Depot cart. Returns product details, pricing, and quantities.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/homedepot/src/tools/get-saved-items.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

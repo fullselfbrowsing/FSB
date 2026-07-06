@@ -1,0 +1,48 @@
+{
+  "slug": "ytmusic.remove_from_playlist",
+  "service": "music.youtube.com",
+  "intentSynonyms": [
+    "remove a from playlist in ytmusic",
+    "remove from playlist in ytmusic",
+    "remove a from playlist in youtube music",
+    "remove a song from a playlist in ytmusic"
+  ],
+  "description": "Remove a song from a playlist on YouTube Music",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "playlist_id": {
+        "type": "string",
+        "description": "ID of the playlist to remove the song from"
+      },
+      "video_id": {
+        "type": "string",
+        "description": "YouTube video ID of the song to remove"
+      },
+      "set_video_id": {
+        "type": "string",
+        "description": "Set video ID from playlist track data, identifies the specific playlist entry"
+      }
+    },
+    "required": [
+      "playlist_id",
+      "video_id",
+      "set_video_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/youtube-music/src/tools/remove-from-playlist.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

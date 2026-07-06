@@ -1,0 +1,40 @@
+{
+  "slug": "claude.get_project",
+  "service": "claude.ai",
+  "intentSynonyms": [
+    "get a project in claude",
+    "look up a project in claude",
+    "fetch a single project in claude",
+    "view one specific project in claude",
+    "get project in claude",
+    "get a project by uuid in claude"
+  ],
+  "description": "Get detailed information about a specific project by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_uuid": {
+        "type": "string",
+        "description": "Project UUID to retrieve"
+      }
+    },
+    "required": [
+      "project_uuid"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/claude/src/tools/get-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "slug": "bsky.search_posts",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "search posts in bsky",
+    "search posts in bluesky",
+    "search posts by keyword in bsky"
+  ],
+  "description": "Search for posts matching a query. Supports filtering by author, mentions, language, URL, domain, and tags. Results can be sorted by latest or top.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Search query string"
+      },
+      "sort": {
+        "description": "Sort order (default: latest)",
+        "type": "string",
+        "enum": [
+          "top",
+          "latest"
+        ]
+      },
+      "author": {
+        "description": "Filter by author DID or handle",
+        "type": "string"
+      },
+      "lang": {
+        "description": "Filter by 2-letter language code",
+        "type": "string"
+      },
+      "domain": {
+        "description": "Filter by domain in post links",
+        "type": "string"
+      },
+      "url": {
+        "description": "Filter by URL in post links",
+        "type": "string"
+      },
+      "tag": {
+        "description": "Filter by hashtag (without the # symbol)",
+        "type": "string"
+      },
+      "since": {
+        "description": "Filter posts after this ISO 8601 date",
+        "type": "string"
+      },
+      "until": {
+        "description": "Filter posts before this ISO 8601 date",
+        "type": "string"
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of results to return (1-100, default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "q"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/search-posts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

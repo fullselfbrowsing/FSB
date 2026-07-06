@@ -1,0 +1,43 @@
+{
+  "slug": "datadog.search_notebooks",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "search notebooks in datadog",
+    "search notebooks by name in datadog",
+    "search datadog notebooks by name in datadog"
+  ],
+  "description": "Search Datadog notebooks by name. Returns matching notebooks sorted by modification time.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text to match against notebook names"
+      },
+      "count": {
+        "description": "Maximum results (default 25)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/search-notebooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

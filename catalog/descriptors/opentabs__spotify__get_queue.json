@@ -1,0 +1,32 @@
+{
+  "slug": "spotify.get_queue",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get a queue in spotify",
+    "look up a queue in spotify",
+    "fetch a single queue in spotify",
+    "view one specific queue in spotify",
+    "get queue in spotify",
+    "get the current playback queue in spotify"
+  ],
+  "description": "Get the current playback queue including the currently playing track and upcoming tracks. Returns the user's queue as managed by Spotify.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-queue.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

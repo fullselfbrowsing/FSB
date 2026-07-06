@@ -1,0 +1,40 @@
+{
+  "slug": "linear.delete_project_update",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "delete a project update in linear",
+    "remove a project update in linear",
+    "trash a project update in linear",
+    "permanently delete a project update in linear",
+    "delete project update in linear",
+    "delete a project status update in linear"
+  ],
+  "description": "Delete a status update from a Linear project.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "update_id": {
+        "type": "string",
+        "description": "Project update UUID to delete"
+      }
+    },
+    "required": [
+      "update_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/delete-project-update.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

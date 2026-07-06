@@ -1,0 +1,38 @@
+{
+  "slug": "x.unretweet",
+  "service": "x.com",
+  "intentSynonyms": [
+    "unretweet in x",
+    "undo a retweet in x",
+    "remove a retweet in x"
+  ],
+  "description": "Remove a retweet.",
+  "actionVerb": "unretweet",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tweet_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Original tweet ID to unretweet"
+      }
+    },
+    "required": [
+      "tweet_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/unretweet.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlmutation",
+      "httpMethod": null,
+      "opNameVerb": "unretweet"
+    }
+  }
+}

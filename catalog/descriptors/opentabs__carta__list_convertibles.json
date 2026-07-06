@@ -1,0 +1,41 @@
+{
+  "slug": "carta.list_convertibles",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "list convertibles in carta",
+    "show me my convertibles in carta",
+    "view my convertibles in carta",
+    "see all my convertibles in carta",
+    "list convertible instruments in carta"
+  ],
+  "description": "List all convertible instruments (convertible notes, SAFEs) for a company in the portfolio.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "corporation_id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Corporation ID from list_companies"
+      }
+    },
+    "required": [
+      "corporation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/list-convertibles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

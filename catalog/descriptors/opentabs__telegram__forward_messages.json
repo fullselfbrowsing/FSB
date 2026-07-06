@@ -1,0 +1,53 @@
+{
+  "slug": "telegram.forward_messages",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "forward messages in telegram",
+    "forward messages to another chat in telegram",
+    "forward one or more messages from one conversation to another in telegram"
+  ],
+  "description": "Forward one or more messages from one conversation to another. The forwarded messages show the original sender attribution.",
+  "actionVerb": "forward",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "from_peer_id": {
+        "type": "number",
+        "description": "Peer ID of the source conversation"
+      },
+      "to_peer_id": {
+        "type": "number",
+        "description": "Peer ID of the destination conversation"
+      },
+      "message_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "description": "Array of message IDs to forward"
+      }
+    },
+    "required": [
+      "from_peer_id",
+      "to_peer_id",
+      "message_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/forward-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "forward"
+    }
+  }
+}

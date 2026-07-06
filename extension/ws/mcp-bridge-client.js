@@ -16,6 +16,9 @@ const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
 const MCP_PING_INTERVAL_MS = 25000;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
+const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
+const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
+const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
 // Phase 241 D-07 / D-08 -- mirror of agent-registry.js RECONNECT_GRACE_MS.
 // On bridge _ws.onclose the bridge asks the registry to stage release for
 // every agent stamped with the current connection_id; that staged release
@@ -406,6 +409,14 @@ class MCPBridgeClient {
       case 'mcp:read-page':
         return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
 
+      case 'mcp:stop-trigger':
+      case 'mcp:get-trigger-status':
+      case 'mcp:list-triggers':
+        return dispatchMcpMessageRoute({ type, payload, client: this, mcpMsgId: id });
+
+      case 'mcp:trigger':
+        return this._handleTrigger(payload, id);
+
       case 'mcp:start-visual-session':
         return this._handleStartVisualSession(payload);
 
@@ -455,6 +466,21 @@ class MCPBridgeClient {
 
       case 'mcp:search-memory':
         return this._handleSearchMemory(payload);
+
+      // Capability surface (Phase 28) -- thin pass-throughs into the dispatcher;
+      // origin/tab resolution lives in the dispatcher handlers, not here.
+      case 'mcp:capabilities-search':
+        return this._handleCapabilitiesSearch(payload);
+
+      case 'mcp:capabilities-invoke':
+        return this._handleCapabilitiesInvoke(payload);
+
+      // Phase 31 DISC-01: the user-initiated discovery trigger. Thin pass-through --
+      // the authoritative origin/tabId resolution + the consent-gated capture session
+      // run in the dispatcher handler, NOT here. Internal control surface (out of
+      // TOOL_REGISTRY, INV-01).
+      case 'mcp:capabilities-discover':
+        return this._handleCapabilitiesDiscover(payload);
 
       case 'mcp:create-agent':
         return this._handleAgentAction('createAgent', payload);
@@ -951,21 +977,26 @@ class MCPBridgeClient {
   }
 
   /**
-   * Dispatch a request through background.js's onMessage handler.
-   * Since we're in the same service worker scope, we simulate the
-   * chrome.runtime.onMessage pattern by calling the handler directly.
+   * Dispatch a request to background.js's onMessage handler.
+   *
+   * This file is evaluated inside the background service worker, and
+   * chrome.runtime.sendMessage() never delivers to onMessage listeners in
+   * the sender's own context (the same constraint Phase 225-01 documents
+   * for lifecycle broadcasts). background.js exposes
+   * globalThis.fsbDispatchInternalMessage, which invokes its listener
+   * directly and resolves with the handler's sendResponse envelope. The
+   * sendMessage fallback stays for contexts where the global is absent
+   * (standalone harnesses); it degrades to the port-closed error envelope
+   * rather than throwing.
    */
   _dispatchToBackground(request) {
+    if (typeof globalThis !== 'undefined' && typeof globalThis.fsbDispatchInternalMessage === 'function') {
+      return Promise.resolve()
+        .then(() => globalThis.fsbDispatchInternalMessage(request))
+        .then((response) => response || {})
+        .catch((error) => ({ success: false, error: (error && error.message) ? error.message : String(error) }));
+    }
     return new Promise((resolve) => {
-      // Trigger the onMessage listener in background.js
-      // The listener uses sendResponse callback pattern
-      const fakeMessageEvent = new CustomEvent('fsb-mcp-internal', {
-        detail: { request, resolve }
-      });
-
-      // Direct dispatch: call the handler via the existing message listener
-      // background.js's chrome.runtime.onMessage handler is not directly callable,
-      // so we use chrome.runtime.sendMessage which loops back within the service worker
       chrome.runtime.sendMessage(request, (response) => {
         if (chrome.runtime.lastError) {
           resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -973,6 +1004,258 @@ class MCPBridgeClient {
         }
         resolve(response || {});
       });
+    });
+  }
+
+  _triggerFinitePositiveMs(value) {
+    return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
+  }
+
+  _triggerSafetyCeilingMs(payload = {}) {
+    const requested = this._triggerFinitePositiveMs(payload.safety_ceiling_ms);
+    return Math.min(requested || TRIGGER_BLOCKING_SAFETY_CEILING_MS, TRIGGER_BLOCKING_SAFETY_CEILING_MS);
+  }
+
+  _triggerTimeoutMs(payload = {}) {
+    return this._triggerFinitePositiveMs(payload.timeout_ms) || TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS;
+  }
+
+  _triggerTargetTabId(payload = {}, snapshot = null) {
+    const fromSnapshot = snapshot && Number(snapshot.target_tab_id);
+    if (Number.isFinite(fromSnapshot)) return fromSnapshot;
+    const fromTarget = Number(payload && payload.target_tab_id);
+    if (Number.isFinite(fromTarget)) return fromTarget;
+    const fromTab = Number(payload && payload.tab_id);
+    return Number.isFinite(fromTab) ? fromTab : null;
+  }
+
+  _triggerCurrentValue(snapshot = null) {
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    if (snapshot.reported_value !== undefined && snapshot.reported_value !== null) return snapshot.reported_value;
+    if (snapshot.last_value !== undefined && snapshot.last_value !== null) return snapshot.last_value;
+    return snapshot.baseline !== undefined ? snapshot.baseline : null;
+  }
+
+  _triggerHeartbeatPayload(triggerId, payload = {}, snapshot = null, startedAt = Date.now()) {
+    const now = Date.now();
+    return {
+      trigger_id: triggerId,
+      alive: true,
+      elapsed_ms: Math.max(0, now - startedAt),
+      status: (snapshot && snapshot.status) || 'unknown',
+      current_value: this._triggerCurrentValue(snapshot),
+      last_evaluated_at: snapshot && snapshot.last_evaluated_at,
+      last_reported_at: snapshot && snapshot.last_reported_at,
+      target_tab_id: this._triggerTargetTabId(payload, snapshot)
+    };
+  }
+
+  async _readTriggerSnapshot(triggerId) {
+    try {
+      const store = (typeof globalThis !== 'undefined') ? globalThis.FsbTriggerStore : null;
+      if (store && typeof store.readSnapshot === 'function') {
+        return await store.readSnapshot(triggerId);
+      }
+    } catch (_e) { /* best-effort */ }
+    return null;
+  }
+
+  _triggerTimeoutContext(payload = {}, snapshot = null) {
+    const tabId = this._triggerTargetTabId(payload, snapshot);
+    return {
+      source: 'mcp',
+      agentId: payload.agentId || payload.agent_id,
+      ownershipToken: payload.ownershipToken || payload.ownership_token,
+      tabId,
+      target_tab_id: tabId
+    };
+  }
+
+  async _markTriggerTimedOut(triggerId, payload = {}, startedAt = Date.now()) {
+    const helper = (typeof globalThis !== 'undefined') ? globalThis.fsbTriggerMarkTimedOutForMcp : null;
+    if (typeof helper === 'function') {
+      try {
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        const result = await helper(triggerId, this._triggerTimeoutContext(payload, snapshot));
+        if (result && result.success !== false) {
+          return {
+            ...result,
+            success: true,
+            outcome: result.outcome || 'timed_out',
+            trigger_id: result.trigger_id || triggerId
+          };
+        }
+        return {
+          success: true,
+          outcome: 'timed_out',
+          trigger_id: triggerId,
+          status: { status: 'timed_out', trigger_id: triggerId },
+          cleanup: { ok: false, result }
+        };
+      } catch (err) {
+        return {
+          success: true,
+          outcome: 'timed_out',
+          trigger_id: triggerId,
+          status: { status: 'timed_out', trigger_id: triggerId },
+          cleanup: { ok: false, error: err && err.message ? err.message : String(err) }
+        };
+      }
+    }
+    const snapshot = await this._readTriggerSnapshot(triggerId);
+    return {
+      success: true,
+      outcome: 'timed_out',
+      trigger_id: triggerId,
+      status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt),
+      cleanup: { skipped: true }
+    };
+  }
+
+  async _handleTrigger(payload = {}, mcpMsgId) {
+    const armResponse = await dispatchMcpMessageRoute({
+      type: 'mcp:trigger',
+      payload,
+      client: this,
+      mcpMsgId
+    });
+
+    if (!armResponse || armResponse.success === false) {
+      return armResponse || { success: false, error: 'Failed to arm trigger' };
+    }
+
+    const triggerId = (typeof payload.trigger_id === 'string' && payload.trigger_id)
+      ? payload.trigger_id
+      : (typeof armResponse.trigger_id === 'string' ? armResponse.trigger_id : null);
+
+    if (payload.detached === true) {
+      return {
+        ...armResponse,
+        outcome: armResponse.outcome || 'detached',
+        detached: true,
+        trigger_id: triggerId || armResponse.trigger_id
+      };
+    }
+
+    if (!triggerId) {
+      return armResponse;
+    }
+
+    const startedAt = Date.now();
+    const timeoutMs = this._triggerTimeoutMs(payload);
+    const safetyMs = this._triggerSafetyCeilingMs(payload);
+    const shouldUseTimeout = timeoutMs <= safetyMs;
+    const initialSnapshot = await this._readTriggerSnapshot(triggerId);
+    const initialFireCount = Number(initialSnapshot && initialSnapshot.fire_count);
+    const fireCountAtArm = Number.isFinite(initialFireCount) ? initialFireCount : 0;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let heartbeatTimer = null;
+      let timeoutTimer = null;
+      let safetyTimer = null;
+
+      const cleanup = () => {
+        if (heartbeatTimer !== null) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+        if (timeoutTimer !== null) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = null;
+        }
+        if (safetyTimer !== null) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+      };
+
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const settleFromSnapshot = (snapshot) => {
+        if (!snapshot || typeof snapshot !== 'object') return false;
+        if (snapshot.status === 'fired') {
+          settle({
+            success: true,
+            outcome: 'fired',
+            trigger_id: triggerId,
+            event: snapshot.last_event || snapshot.last_fire_event || null,
+            status: snapshot
+          });
+          return true;
+        }
+        const fireCount = Number(snapshot.fire_count || 0);
+        const rearmedEvent = snapshot.last_event || snapshot.last_fire_event || null;
+        if (snapshot.status === 'armed' && Number.isFinite(fireCount) && fireCount > fireCountAtArm && rearmedEvent) {
+          settle({
+            success: true,
+            outcome: 'fired',
+            trigger_id: triggerId,
+            event: rearmedEvent,
+            still_armed: true,
+            status: snapshot
+          });
+          return true;
+        }
+        if (snapshot.status === 'timed_out') {
+          settle({
+            success: true,
+            outcome: 'timed_out',
+            trigger_id: triggerId,
+            status: snapshot
+          });
+          return true;
+        }
+        return false;
+      };
+
+      const checkSnapshot = async () => {
+        if (settled) return null;
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        if (settled) return snapshot;
+        settleFromSnapshot(snapshot);
+        return snapshot;
+      };
+
+      const fireHeartbeat = async () => {
+        if (settled) return;
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        if (settled) return;
+        const progressPayload = this._triggerHeartbeatPayload(triggerId, payload, snapshot, startedAt);
+        try { this._sendProgress(mcpMsgId, progressPayload); } catch (_e) { /* best-effort */ }
+        if (settled) return;
+        settleFromSnapshot(snapshot);
+      };
+
+      heartbeatTimer = setInterval(fireHeartbeat, TRIGGER_HEARTBEAT_INTERVAL_MS);
+
+      if (shouldUseTimeout) {
+        timeoutTimer = setTimeout(async () => {
+          const snapshot = await this._readTriggerSnapshot(triggerId);
+          if (settleFromSnapshot(snapshot)) return;
+          const result = await this._markTriggerTimedOut(triggerId, payload, startedAt);
+          settle(result);
+        }, timeoutMs);
+      }
+
+      safetyTimer = setTimeout(async () => {
+        const snapshot = await this._readTriggerSnapshot(triggerId);
+        settle({
+          success: true,
+          outcome: 'detached',
+          detached: true,
+          reason: 'safety_ceiling',
+          trigger_id: triggerId,
+          status: snapshot || this._triggerHeartbeatPayload(triggerId, payload, null, startedAt)
+        });
+      }, safetyMs);
+
+      checkSnapshot().catch(() => { /* best-effort initial terminal check */ });
     });
   }
 
@@ -1400,12 +1683,53 @@ class MCPBridgeClient {
     return response || {};
   }
 
-  async _handleAgentAction(action, payload) {
-    const response = await this._dispatchToBackground({
-      action,
-      ...payload,
+  // Phase 28 SURF-01: read-only capability search. Thin pass-through -- the
+  // un-spoofable owned-tab origin is resolved in the dispatcher handler (D-11).
+  async _handleCapabilitiesSearch(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-search',
+      payload,
+      client: this
     });
     return response || {};
+  }
+
+  // Phase 28 SURF-02: routerless capability invoke. Thin pass-through -- the
+  // slug -> interpretRecipe -> executeBoundSpec path runs in the dispatcher handler.
+  async _handleCapabilitiesInvoke(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-invoke',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  // Phase 31 DISC-01: user-initiated discovery trigger. Thin pass-through -- the
+  // SW-side origin/tabId resolution + the consent-gated promote-after-replay session
+  // run in the dispatcher handler (the single authoritative resolution point). No
+  // origin/tab resolution in the bridge.
+  async _handleCapabilitiesDiscover(payload) {
+    const response = await dispatchMcpMessageRoute({
+      type: 'mcp:capabilities-discover',
+      payload,
+      client: this
+    });
+    return response || {};
+  }
+
+  async _handleAgentAction(action, payload) {
+    // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
+    // background.js's agent switch cases are commented out and
+    // mcp/src/tools/agents.ts registers no agent tools, so only a
+    // version-skewed MCP server can still send mcp:*-agent messages.
+    // Short-circuit with an explicit envelope instead of dispatching into
+    // the background switch's default branch.
+    return {
+      success: false,
+      errorCode: 'agent_management_deprecated',
+      error: 'Background agent management (' + action + ') was deprecated in v0.9.45rc1 and superseded by OpenClaw / Claude Routines.',
+    };
   }
 
   // --------------------------------------------------------------------------

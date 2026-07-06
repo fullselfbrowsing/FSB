@@ -1,0 +1,42 @@
+{
+  "slug": "hackernews.get_item",
+  "service": "news.ycombinator.com",
+  "intentSynonyms": [
+    "get an item in hackernews",
+    "look up an item in hackernews",
+    "fetch a single item in hackernews",
+    "view one specific item in hackernews",
+    "get item in hackernews",
+    "get a story, comment, or job by id in hackernews"
+  ],
+  "description": "Get a Hacker News item by its ID. Items include stories, comments, and jobs. Returns the full item with title, URL, text, score, author, and comment count.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Item ID"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/hackernews/src/tools/get-item.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

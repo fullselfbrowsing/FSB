@@ -1,0 +1,46 @@
+{
+  "slug": "fiverr.send_message",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "send a message in fiverr",
+    "post a message in fiverr",
+    "write a new message in fiverr",
+    "send message in fiverr",
+    "send a message to a fiverr user in fiverr"
+  ],
+  "description": "Send a message to another Fiverr user’s inbox. Provide the recipient username and the message text. This is a write action — it delivers a real message immediately. Compose with `draft_message` first to review the content before sending. Note: if a Fiverr AI assistant currently manages the conversation, the first manual message takes over the thread from the assistant.",
+  "actionVerb": "send",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "recipient_username": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username of the recipient"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Message text to send"
+      }
+    },
+    "required": [
+      "recipient_username",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/send-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "send"
+    }
+  }
+}

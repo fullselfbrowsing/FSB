@@ -1,0 +1,32 @@
+{
+  "slug": "netlify.create_deploy_key",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a deploy key in netlify",
+    "add a deploy key in netlify",
+    "make a new deploy key in netlify",
+    "open a new deploy key in netlify",
+    "create deploy key in netlify",
+    "create a new deploy key in netlify"
+  ],
+  "description": "Generate a new deploy key (SSH key pair). Returns the public key which can be added to your Git provider for deploy authentication.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-deploy-key.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

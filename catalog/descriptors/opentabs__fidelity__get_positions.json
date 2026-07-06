@@ -1,0 +1,39 @@
+{
+  "slug": "fidelity.get_positions",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get positions in fidelity",
+    "look up positions in fidelity",
+    "fetch a single positions in fidelity",
+    "view one specific positions in fidelity",
+    "view holdings for your accounts in fidelity"
+  ],
+  "description": "Get holdings/positions for all accounts or specific accounts. Returns symbol, quantity, market value, gain/loss, and holding percentage for each position. Call list_accounts first to discover account numbers.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "account_numbers": {
+        "description": "Account numbers to get positions for. If omitted, returns positions for all accounts.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-positions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

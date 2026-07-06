@@ -1,0 +1,57 @@
+{
+  "slug": "meticulous.get_test_run_test_cases",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "get test run test cases in meticulous",
+    "look up test run test cases in meticulous",
+    "fetch a single test run test cases in meticulous",
+    "view one specific test run test cases in meticulous",
+    "get test case results in meticulous"
+  ],
+  "description": "Get test case results for a test run. Each test case has a head replay with status and accuracy info. A replay with is_accurate=false means the replay diverged from the original session (non-deterministic behavior, flaky). Note: test cases do not have a base replay — they represent individual session replays, not diff comparisons. For visual diffs, use get_test_run_diffs instead.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "include_passes": {
+        "default": false,
+        "description": "Include passing test cases (defaults to failures only)",
+        "type": "boolean"
+      },
+      "limit": {
+        "default": 100,
+        "description": "Max results to return",
+        "type": "number"
+      },
+      "offset": {
+        "default": 0,
+        "description": "Offset for pagination",
+        "type": "number"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "include_passes",
+      "limit",
+      "offset"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/get-test-run-test-cases.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

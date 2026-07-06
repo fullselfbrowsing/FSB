@@ -1,0 +1,31 @@
+{
+  "slug": "craigslist.get_saved_search_counts",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "get saved search counts in craigslist",
+    "look up saved search counts in craigslist",
+    "fetch a single saved search counts in craigslist",
+    "view one specific saved search counts in craigslist",
+    "get counts for saved searches in craigslist"
+  ],
+  "description": "Get the number of new results for each saved search. Returns saved search IDs with their current result counts.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/get-saved-search-counts.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

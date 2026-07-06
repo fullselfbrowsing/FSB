@@ -1,0 +1,42 @@
+{
+  "slug": "aws.list_log_groups",
+  "service": "console.aws.amazon.com",
+  "intentSynonyms": [
+    "list log groups in aws",
+    "show me my log groups in aws",
+    "view my log groups in aws",
+    "see all my log groups in aws",
+    "list cloudwatch logs log groups in aws"
+  ],
+  "description": "List CloudWatch Logs log groups in the current region. Optionally filter by name prefix. Returns log group name, ARN, retention, and stored bytes.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "prefix": {
+        "description": "Filter by log group name prefix (e.g., /aws/lambda/)",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum log groups to return (default 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/aws-console/src/tools/list-log-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

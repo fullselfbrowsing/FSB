@@ -1,0 +1,39 @@
+{
+  "slug": "linear.list_project_labels",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list project labels in linear",
+    "show me my project labels in linear",
+    "view my project labels in linear",
+    "see all my project labels in linear",
+    "list labels on a project in linear"
+  ],
+  "description": "List labels applied to a specific Linear project.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "description": "Project UUID to list labels for"
+      }
+    },
+    "required": [
+      "project_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-project-labels.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

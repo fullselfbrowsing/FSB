@@ -1,0 +1,39 @@
+{
+  "slug": "robinhood.get_earnings",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get earnings in robinhood",
+    "look up earnings in robinhood",
+    "fetch a single earnings in robinhood",
+    "view one specific earnings in robinhood",
+    "get earnings history and estimates in robinhood"
+  ],
+  "description": "Get earnings history and estimates for a stock. Returns EPS estimates vs actuals, report dates, and report timing (before/after market).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "symbol": {
+        "type": "string",
+        "description": "Ticker symbol"
+      }
+    },
+    "required": [
+      "symbol"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-earnings.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "minimax.list_mcp_servers",
+  "service": "agent.minimax.io",
+  "intentSynonyms": [
+    "list mcp servers in minimax",
+    "show me my mcp servers in minimax",
+    "view my mcp servers in minimax",
+    "see all my mcp servers in minimax",
+    "list added mcp servers in minimax"
+  ],
+  "description": "List all MCP servers added to the MiniMax Agent workspace. Returns server names, URLs, connection status, and descriptions.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/minimax-agent/src/tools/list-mcp-servers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apipost",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

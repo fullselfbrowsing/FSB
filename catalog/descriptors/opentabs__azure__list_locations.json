@@ -1,0 +1,31 @@
+{
+  "slug": "azure.list_locations",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list locations in azure",
+    "show me my locations in azure",
+    "view my locations in azure",
+    "see all my locations in azure",
+    "list all azure regions in azure"
+  ],
+  "description": "List all available Azure regions/locations. Returns region name, display name, geography, and category (Recommended or Other). Does not require a subscription.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

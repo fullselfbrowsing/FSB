@@ -1,0 +1,47 @@
+{
+  "slug": "excel.delete_table_row",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a table row in excel",
+    "remove a table row in excel",
+    "trash a table row in excel",
+    "permanently delete a table row in excel",
+    "delete table row in excel",
+    "delete a table row in excel online"
+  ],
+  "description": "Delete a specific row from a table by its zero-based index. The row is permanently removed and subsequent rows shift up.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "table": {
+        "type": "string",
+        "description": "Table name or ID"
+      },
+      "index": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Zero-based row index to delete"
+      }
+    },
+    "required": [
+      "table",
+      "index"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/delete-table-row.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

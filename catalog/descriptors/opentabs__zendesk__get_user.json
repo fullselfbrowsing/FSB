@@ -1,0 +1,42 @@
+{
+  "slug": "zendesk.get_user",
+  "service": "zendesk.com",
+  "intentSynonyms": [
+    "get an user in zendesk",
+    "look up an user in zendesk",
+    "fetch a single user in zendesk",
+    "view one specific user in zendesk",
+    "get user in zendesk",
+    "get a user by id in zendesk"
+  ],
+  "description": "Get detailed information about a specific Zendesk user by their ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "User ID to retrieve"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/zendesk/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

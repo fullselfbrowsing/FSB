@@ -1,0 +1,56 @@
+{
+  "slug": "terraform.create_variable_set",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "create a variable set in terraform",
+    "add a variable set in terraform",
+    "make a new variable set in terraform",
+    "open a new variable set in terraform",
+    "create variable set in terraform"
+  ],
+  "description": "Create a new variable set in an organization. Set global to true to apply to all workspaces.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "organization": {
+        "type": "string",
+        "description": "Organization name"
+      },
+      "name": {
+        "type": "string",
+        "description": "Variable set name"
+      },
+      "description": {
+        "description": "Variable set description",
+        "type": "string"
+      },
+      "global": {
+        "description": "Whether to apply to all workspaces (default false)",
+        "type": "boolean"
+      },
+      "priority": {
+        "description": "Whether this set takes priority over workspace variables (default false)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "organization",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/create-variable-set.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

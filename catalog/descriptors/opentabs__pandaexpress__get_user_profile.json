@@ -1,0 +1,32 @@
+{
+  "slug": "pandaexpress.get_user_profile",
+  "service": "pandaexpress.com",
+  "intentSynonyms": [
+    "get an user profile in pandaexpress",
+    "look up an user profile in pandaexpress",
+    "fetch a single user profile in pandaexpress",
+    "view one specific user profile in pandaexpress",
+    "get user profile in pandaexpress",
+    "view your panda express account info in pandaexpress"
+  ],
+  "description": "Get the currently logged-in user's profile information including name, email, phone, and loyalty membership status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/panda-express/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

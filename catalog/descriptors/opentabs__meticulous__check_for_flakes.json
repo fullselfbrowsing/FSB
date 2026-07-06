@@ -1,0 +1,43 @@
+{
+  "slug": "meticulous.check_for_flakes",
+  "service": "app.meticulous.ai",
+  "intentSynonyms": [
+    "check for flakes in meticulous",
+    "check for flaky tests in meticulous",
+    "trigger a flake detection check for a test run in meticulous"
+  ],
+  "description": "Trigger a flake detection check for a test run. Re-runs failing tests multiple times to determine if failures are flaky (non-deterministic).",
+  "actionVerb": "check",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "test_run_id": {
+        "type": "string",
+        "description": "Test run ID"
+      },
+      "rerun_count": {
+        "default": 3,
+        "description": "Number of times to re-run tests for flake detection",
+        "type": "number"
+      }
+    },
+    "required": [
+      "test_run_id",
+      "rerun_count"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/meticulous/src/tools/check-for-flakes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "check"
+    }
+  }
+}

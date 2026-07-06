@@ -1,0 +1,55 @@
+{
+  "slug": "expedia.search_car_rentals",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search car rentals in expedia",
+    "navigate to car rental search results in expedia",
+    "navigate to the expedia car rental search results page for the given location and dates in expedia"
+  ],
+  "description": "Navigate to the Expedia car rental search results page for the given location and dates. Returns the search URL.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pickup_location": {
+        "type": "string",
+        "description": "Pickup location airport code or city (e.g. \"LAX\", \"Los Angeles, CA\")"
+      },
+      "pickup_date": {
+        "type": "string",
+        "description": "Pickup date in YYYY-MM-DD format"
+      },
+      "dropoff_date": {
+        "type": "string",
+        "description": "Drop-off date in YYYY-MM-DD format"
+      },
+      "pickup_time": {
+        "description": "Pickup time in HH:MM format, 24-hour (default \"10:00\")",
+        "type": "string"
+      },
+      "dropoff_time": {
+        "description": "Drop-off time in HH:MM format, 24-hour (default \"10:00\")",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pickup_location",
+      "pickup_date",
+      "dropoff_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-car-rentals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

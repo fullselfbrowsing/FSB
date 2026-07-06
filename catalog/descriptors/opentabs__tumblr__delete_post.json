@@ -1,0 +1,44 @@
+{
+  "slug": "tumblr.delete_post",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "delete a post in tumblr",
+    "remove a post in tumblr",
+    "trash a post in tumblr",
+    "permanently delete a post in tumblr",
+    "delete post in tumblr"
+  ],
+  "description": "Permanently delete a post from a Tumblr blog. This action cannot be undone.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "blog_name": {
+        "type": "string",
+        "description": "Blog name or URL"
+      },
+      "post_id": {
+        "type": "string",
+        "description": "Post ID to delete"
+      }
+    },
+    "required": [
+      "blog_name",
+      "post_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/delete-post.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

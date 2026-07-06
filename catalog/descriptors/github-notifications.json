@@ -1,0 +1,15 @@
+{
+  "slug": "github.notifications",
+  "service": "github.com",
+  "intentSynonyms": [
+    "show my github notifications",
+    "check github alerts",
+    "list unread github notifications",
+    "what is new on github",
+    "read my github inbox"
+  ],
+  "description": "List your unread GitHub notifications",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "backing": "recipe"
+}

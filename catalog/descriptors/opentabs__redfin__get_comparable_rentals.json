@@ -1,0 +1,55 @@
+{
+  "slug": "redfin.get_comparable_rentals",
+  "service": "redfin.com",
+  "intentSynonyms": [
+    "get comparable rentals in redfin",
+    "look up comparable rentals in redfin",
+    "fetch a single comparable rentals in redfin",
+    "view one specific comparable rentals in redfin",
+    "find comparable rental listings nearby in redfin"
+  ],
+  "description": "Find comparable rental listings near a property. Requires the property coordinates and an estimated rent value. Use get_property_details to get the latitude and longitude first.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Redfin property ID"
+      },
+      "latitude": {
+        "type": "number",
+        "description": "Property latitude"
+      },
+      "longitude": {
+        "type": "number",
+        "description": "Property longitude"
+      },
+      "rent_estimate": {
+        "description": "Estimated monthly rent in dollars (default 3000)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "property_id",
+      "latitude",
+      "longitude"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/redfin/src/tools/get-comparable-rentals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

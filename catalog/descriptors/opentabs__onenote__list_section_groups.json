@@ -1,0 +1,42 @@
+{
+  "slug": "onenote.list_section_groups",
+  "service": "onenote.cloud.microsoft",
+  "intentSynonyms": [
+    "list section groups in onenote",
+    "show me my section groups in onenote",
+    "view my section groups in onenote",
+    "see all my section groups in onenote",
+    "list section groups in a notebook or across all notebooks in onenote"
+  ],
+  "description": "List OneNote section groups. When a notebook_id is provided, returns section groups in that notebook. Otherwise returns all section groups across all notebooks. Section groups are folders that organize sections within a notebook.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "description": "Notebook ID to list section groups for. Omit to list all section groups.",
+        "type": "string"
+      },
+      "top": {
+        "description": "Maximum number of section groups to return (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onenote/src/tools/list-section-groups.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

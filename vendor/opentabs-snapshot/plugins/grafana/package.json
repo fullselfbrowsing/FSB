@@ -1,0 +1,16 @@
+{
+  "_role": "opentabs-metadata-snapshot",
+  "_note": "Metadata-only slice of the OpenTabs grafana plugin, vendored hermetically at SHA 4b17021637d2cac12b8d84d21c40e765aa7b85e9 (see vendor/opentabs-snapshot/PIN.md). Wall 1: NO dist/, NO handle() runtime is executed -- the importer (scripts/import-opentabs-catalog.mjs) reads ONLY .name/.description/.input/.group/.summary metadata. The opentabs.urlPatterns below is the AUTHORITATIVE upstream value (*://grafana.com/* -> service grafana.com). grafana.com derives the host stem 'grafana' correctly; the dir-name STEM_OVERRIDES {grafana:'grafana'} pins the slug to opentabs__grafana__* for stability (the apex pattern, like reddit/calendly). grafana.com is left UNCLASSIFIED (SAFE) in extension/config/service-denylist.json -- it is a read-only observability app (dashboard listing + a single dashboard + a metric query are reads; reads run under Auto with no mutating re-gate). The 39-01-widened finance/payment heuristic uses deliberately SPECIFIC tokens (checkout/cart/place-order/charge), so 'grafana'/'dashboards'/'metrics' do NOT false-trip it. It is added to verify-catalog-crosscheck.mjs READ_ONLY_SAFE_SERVICES (the 38 MED-02 guard) SPECIFICALLY because its vendored ops are read-only, so a FUTURE re-vendor adding a write op for grafana would FAIL the build. defineTool/OpenTabsPlugin and the api transport helper are resolved from local stubs (sdk-stub.ts, grafana-api.ts) so the importer's import() never drags the real SDK's DOM/fetch surface into node. backing:'dom' (the frozen conservative default) -> DOM-only routing. ALL ops are read (api {method:'GET'}); NO write op, NO payment verb -> the READ_ONLY_SAFE guard PASSES and the payment-op guard never keys on grafana.",
+  "name": "@opentabs-dev/opentabs-plugin-grafana",
+  "version": "0.0.42",
+  "type": "module",
+  "opentabs": {
+    "displayName": "Grafana",
+    "description": "OpenTabs plugin for Grafana",
+    "urlPatterns": [
+      "*://grafana.com/*"
+    ],
+    "homepage": "https://grafana.com"
+  },
+  "license": "MIT"
+}

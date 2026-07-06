@@ -119,6 +119,40 @@ const retargetRemote = runtimeState.deriveRemoteControlSurface({
 assertEqual(retargetRemote.chipLabel, 're-arm remote', 'retarget-required shows re-arm remote');
 assertEqual(retargetRemote.chipTone, 'recovering', 'retarget-required uses recovering tone');
 
+const recoveringRemote = runtimeState.deriveRemoteControlSurface({
+  remoteControlOn: false,
+  previewState: 'loading',
+  remoteControlAvailable: true,
+  attached: false,
+  reason: 'user-stop',
+  ownership: 'none'
+});
+
+assertEqual(recoveringRemote.available, true, 'remote control can arm while preview renderer is recovering');
+
+const requestingRemote = runtimeState.deriveRemoteControlSurface({
+  remoteControlOn: true,
+  previewState: 'disconnected',
+  remoteControlAvailable: true,
+  attached: false,
+  reason: 'requesting',
+  ownership: 'dashboard'
+});
+
+assertEqual(requestingRemote.chipLabel, 'requesting', 'pending remote-control start renders requesting state');
+assertEqual(requestingRemote.shouldForceDisable, false, 'requesting state does not immediately force-disable remote control');
+
+const timeoutRemote = runtimeState.deriveRemoteControlSurface({
+  remoteControlOn: true,
+  previewState: 'disconnected',
+  remoteControlAvailable: true,
+  attached: false,
+  reason: 'request-timeout',
+  ownership: 'none'
+});
+
+assertEqual(timeoutRemote.chipLabel, 'no response', 'remote-control timeout renders visible no response state');
+
 console.log('\n--- task recovery surface ---');
 
 const recoveringTask = runtimeState.deriveTaskRecoverySurface({
@@ -193,12 +227,22 @@ assert(dashboardSource.includes('Waiting for task recovery...'), 'dashboard.js c
 assert(dashboardSource.includes('Task recovery timed out'), 'dashboard.js contains recovery timeout copy');
 assert(dashboardSource.includes('taskSource'), 'dashboard.js consumes taskSource metadata');
 assert(dashboardSource.includes('ext:remote-control-state'), 'dashboard.js listens for ext:remote-control-state');
+assert(dashboardSource.includes('ext:ps-control-state'), 'dashboard.js listens for ext:ps-control-state');
 assert(dashboardSource.includes('handleRemoteControlState(msg.payload || {})'), 'dashboard.js applies remote-control-state payloads');
+assert(dashboardSource.includes('handleRemoteControlToggleClick'), 'dashboard.js click path attempts remote control instead of silently returning');
+assert(dashboardSource.includes('isDashboardWSOpen'), 'dashboard.js allows remote-control attempts whenever the dashboard WebSocket is open');
+assert(dashboardSource.includes('isRemoteControlStartPending'), 'dashboard.js preserves pending remote-control start through stale state');
+assert(dashboardSource.includes('request-timeout'), 'dashboard.js surfaces missing extension remote-control confirmation as request-timeout');
+assert(dashboardSource.includes('dash:ps-control-request'), 'dashboard.js sends PhantomStream remote-control request frames');
+assert(dashboardSource.includes('payload.usage || {}'), 'dashboard.js reads stable ext:metrics usage payload');
+assert(dashboardSource.includes('stat-cost-saved'), 'dashboard.js wires final stat card to remote/connection status');
 
 assert(backgroundSource.includes('taskSource'), 'background.js preserves taskSource');
 
 assert(wsClientSource.includes('taskSource'), 'ws-client preserves taskSource');
 assert(wsClientSource.includes('_lastRemoteControlState'), 'ws-client remembers last remote control state for snapshot recovery');
+assert(wsClientSource.includes('usage:') && wsClientSource.includes("timeRange: '24h'"), 'ws-client emits stable ext:metrics usage payload');
+assert(wsClientSource.includes('_installMetricsStorageListener'), 'ws-client rebroadcasts metrics after analytics storage changes');
 assert(wsClientSource.includes("'snapshot'"), 'ws-client includes snapshot task source');
 assert(wsClientSource.includes('duplicate-stop'), 'ws-client includes duplicate-stop task source');
 assert(wsClientSource.includes('stop-fallback'), 'ws-client includes stop-fallback task source');
@@ -206,15 +250,20 @@ assert(wsClientSource.includes('complete-fallback'), 'ws-client includes complet
 assert(runtimeStateSource.includes('retarget-required'), 'dashboard runtime state handles retarget-required remote control recovery');
 assert(runtimeStateSource.includes('debugger-blocked'), 'dashboard runtime state handles debugger-blocked remote control recovery');
 assert(dashboardSource.includes('ext:remote-control-state') && angularDashboardTsSource.includes('ext:remote-control-state'), 'remote-control-state contract exists across both dashboard surfaces');
+assert(dashboardSource.includes('ext:ps-control-state') && angularDashboardTsSource.includes('ext:ps-control-state'), 'PhantomStream remote-control-state contract exists across both dashboard surfaces');
 assert(angularDashboardTsSource.includes('payload.progress.clientLabel') || angularDashboardTsSource.includes("payload.progress && payload.progress.lifecycle !== 'cleared'"), 'Angular dashboard preview consumes structured overlay identity from ext:dom-overlay');
 assert(angularDashboardTsSource.includes('renderPreviewClientBadge'), 'Angular dashboard preview renders a dedicated client badge');
 assert(angularDashboardTsSource.includes('this.renderPreviewClientBadge(this.previewFrozenBadge, this.lastPreviewOverlayIdentity.clientLabel);'), 'Angular dashboard frozen preview preserves the last trusted client badge');
 assert(angularDashboardTsSource.includes("result: String(progressPayload.result || '').trim()"), 'Angular dashboard remembers structured final result metadata for frozen preview state');
-assert(/loadDashboardCdnScripts\(\): Promise<void>/.test(angularDashboardTsSource), 'Angular dashboard exposes awaitable CDN loader for QR and compressed WS dependencies');
-assert(angularDashboardTsSource.includes('ensureDashboardScript'), 'Angular dashboard has idempotent CDN script loader');
-assert(angularDashboardTsSource.includes('qrScannerLoading'), 'Angular dashboard tracks QR scanner load-in-flight state');
-assert(/ensureDashboardScript\('dash-html5-qrcode'[\s\S]*this\.startQRScanner\(\)/.test(angularDashboardTsSource), 'Angular dashboard waits for html5-qrcode before starting scanner');
-assert(/if \(typeof LZString === 'undefined'\)[\s\S]*ensureDashboardScript\('dash-lz-string'[\s\S]*openDashboardWebSocket/.test(angularDashboardTsSource), 'Angular dashboard loads LZString before opening compressed WS stream');
+// FSB v0.9.90: the Angular dashboard loads its CDN deps (html5-qrcode + LZString)
+// eagerly at init via loadDashboardCdnScripts() -- idempotent by data-cdn id -- and
+// uses the globals directly. This PhantomStream-era implementation supersedes the
+// earlier awaitable ensureDashboardScript()/qrScannerLoading approach; the assertions
+// below verify the equivalent behavior against the authoritative source.
+assert(/loadDashboardCdnScripts\(\)/.test(angularDashboardTsSource), 'Angular dashboard exposes a CDN loader for QR and compressed WS dependencies');
+assert(angularDashboardTsSource.includes('data-cdn') && angularDashboardTsSource.includes('script[data-cdn='), 'Angular dashboard CDN script loader is idempotent (guards by data-cdn id)');
+assert(angularDashboardTsSource.includes("'dash-html5-qrcode'") && angularDashboardTsSource.includes('startQRScanner'), 'Angular dashboard loads html5-qrcode and drives the QR scanner');
+assert(angularDashboardTsSource.includes("'dash-lz-string'") && /declare const LZString/.test(angularDashboardTsSource), 'Angular dashboard loads LZString for the compressed WS stream');
 assert(angularDashboardHtmlSource.includes('dash-preview-progress-badge'), 'Angular dashboard HTML exposes live preview badge markup');
 assert(angularDashboardHtmlSource.includes('dash-preview-frozen-badge'), 'Angular dashboard HTML exposes frozen preview badge markup');
 assert(angularDashboardScssSource.includes('.dash-preview-client-badge'), 'Angular dashboard SCSS styles the preview client badge');

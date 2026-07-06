@@ -88,6 +88,26 @@
     return (typeof globalThis !== 'undefined' && globalThis.chrome) ? globalThis.chrome : null;
   }
 
+  function _getCapRecommendationModule() {
+    if (global && global.FsbAgentCapRecommendation) return global.FsbAgentCapRecommendation;
+    if (typeof globalThis !== 'undefined' && globalThis.FsbAgentCapRecommendation) {
+      return globalThis.FsbAgentCapRecommendation;
+    }
+    return null;
+  }
+
+  async function _resolveRecommendedCap() {
+    var recommendation = _getCapRecommendationModule();
+    if (recommendation && typeof recommendation.getRecommendedAgentCap === 'function') {
+      try {
+        return _clampCap(await recommendation.getRecommendedAgentCap());
+      } catch (_e) {
+        return FSB_AGENT_CAP_DEFAULT;
+      }
+    }
+    return FSB_AGENT_CAP_DEFAULT;
+  }
+
   async function readPersistedAgentRegistry() {
     var c = _getChrome();
     if (!c || !c.storage || !c.storage.session || typeof c.storage.session.get !== 'function') {
@@ -760,6 +780,16 @@
         self._tabsByAgent.delete(agentId);
         self._agents.delete(agentId);
         releasedAny = true;
+        try {
+          if (typeof globalThis !== 'undefined'
+              && globalThis.FsbTriggerLifecycle
+              && typeof globalThis.FsbTriggerLifecycle.handleTriggerOwnerReleased === 'function') {
+            var cleanup = globalThis.FsbTriggerLifecycle.handleTriggerOwnerReleased(agentId);
+            if (cleanup && typeof cleanup.catch === 'function') {
+              cleanup.catch(function() { /* best-effort */ });
+            }
+          }
+        } catch (_cleanupError) { /* best-effort */ }
         // D-09: one LOG-04 event per released agent in the connection.
         try {
           if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
@@ -843,18 +873,38 @@
    * Phase 241 D-05: Best-effort hydrate of the cached cap from
    * chrome.storage.local. Called from hydrate() before serving requests so
    * the SW wakes with the operator-configured cap (not the static default).
-   * Errors are swallowed; the default 8 stands when storage is unavailable.
+   * If fsbAgentCap is missing, seeds the cap from the RAM-based recommendation
+   * helper and persists it. Errors are swallowed; the fallback 8 stands when
+   * storage or memory detection is unavailable.
    */
   AgentRegistry.prototype._loadCapFromStorage = async function() {
     var c = _getChrome();
-    if (!c || !c.storage || !c.storage.local || typeof c.storage.local.get !== 'function') return;
+    if (!c || !c.storage || !c.storage.local || typeof c.storage.local.get !== 'function') {
+      this._cachedCap = await _resolveRecommendedCap();
+      return;
+    }
     try {
       var stored = await c.storage.local.get([FSB_AGENT_CAP_STORAGE_KEY]);
+      var hasStoredCap = !!(stored && Object.prototype.hasOwnProperty.call(stored, FSB_AGENT_CAP_STORAGE_KEY));
       var raw = stored && stored[FSB_AGENT_CAP_STORAGE_KEY];
       if (typeof raw === 'number' && Number.isFinite(raw)) {
         this._cachedCap = _clampCap(raw);
+        return;
       }
-    } catch (_e) { /* keep default */ }
+      if (hasStoredCap) {
+        return;
+      }
+      this._cachedCap = await _resolveRecommendedCap();
+      if (typeof c.storage.local.set === 'function') {
+        var payload = {};
+        payload[FSB_AGENT_CAP_STORAGE_KEY] = this._cachedCap;
+        await c.storage.local.set(payload);
+      }
+    } catch (_e) {
+      try {
+        this._cachedCap = await _resolveRecommendedCap();
+      } catch (_inner) { /* keep fallback default */ }
+    }
   };
 
   /**
@@ -1409,6 +1459,7 @@
     // _internal: test-only hooks. NOT to be consumed by production callers.
     _internal: {
       emitAgentReapedEvent: emitAgentReapedEvent,
+      resolveRecommendedCap: _resolveRecommendedCap,
       readPersistedAgentRegistry: readPersistedAgentRegistry,
       writePersistedAgentRegistry: writePersistedAgentRegistry
     }

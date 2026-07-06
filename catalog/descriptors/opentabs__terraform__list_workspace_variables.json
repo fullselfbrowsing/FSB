@@ -1,0 +1,39 @@
+{
+  "slug": "terraform.list_workspace_variables",
+  "service": "app.terraform.io",
+  "intentSynonyms": [
+    "list workspace variables in terraform",
+    "show me my workspace variables in terraform",
+    "view my workspace variables in terraform",
+    "see all my workspace variables in terraform",
+    "list variables for a workspace in terraform"
+  ],
+  "description": "List all variables for a workspace including Terraform and environment variables.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace ID (e.g., \"ws-...\")"
+      }
+    },
+    "required": [
+      "workspace_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/terraform-cloud/src/tools/list-workspace-variables.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

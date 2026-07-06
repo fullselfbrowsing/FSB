@@ -1,0 +1,42 @@
+{
+  "slug": "linear.remove_issue_label",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "remove an issue label in linear",
+    "remove issue label in linear",
+    "remove a label from an issue in linear"
+  ],
+  "description": "Remove a label from an issue without affecting other labels. Unlike update_issue which replaces all labels, this removes only the specified one.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "issue_id": {
+        "type": "string",
+        "description": "Issue UUID to remove the label from"
+      },
+      "label_id": {
+        "type": "string",
+        "description": "Label UUID to remove (use list_labels to find label IDs)"
+      }
+    },
+    "required": [
+      "issue_id",
+      "label_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/remove-issue-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "remove"
+    }
+  }
+}

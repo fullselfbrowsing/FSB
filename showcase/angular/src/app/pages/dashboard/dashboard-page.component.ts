@@ -17,6 +17,14 @@ interface MetricsPayload {
   connection?: { connected?: boolean; pairedClient?: string; connectedAt?: number };
   sessions?: { activeSessions?: number; completedTasks?: number; errorCount?: number };
   cost?: { totalCost?: number; totalTokens?: number };
+  usage?: {
+    timeRange?: string;
+    totalTokens?: number;
+    totalCost?: number;
+    totalRequests?: number;
+    successfulRequests?: number;
+    successRate?: number;
+  };
   activeTab?: { tabId?: number; url?: string };
 }
 
@@ -86,68 +94,22 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   ngOnInit(): void {
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
-    void this.loadDashboardCdnScripts();
+    this.loadDashboardCdnScripts();
   }
 
-  private loadDashboardCdnScripts(): Promise<void> {
-    return Promise.all([
-      this.ensureDashboardScript('dash-html5-qrcode', this.HTML5_QRCODE_SRC, 'Html5Qrcode'),
-      this.ensureDashboardScript('dash-lz-string', this.LZ_STRING_SRC, 'LZString'),
-    ]).then(() => undefined);
-  }
-
-  private ensureDashboardScript(id: string, src: string, globalName: string): Promise<void> {
-    const w = window as any;
-    if (w[globalName]) return Promise.resolve();
-
-    const existingPromise = this.dashboardScriptPromises.get(id);
-    if (existingPromise) return existingPromise;
-
-    const selector = `script[data-cdn="${id}"]`;
-    let script = this.doc.body.querySelector(selector) as HTMLScriptElement | null;
-    if (!script) script = this.doc.head.querySelector(selector) as HTMLScriptElement | null;
-
-    const promise = new Promise<void>((resolve, reject) => {
-      function cleanup() {
-        script?.removeEventListener('load', finish);
-        script?.removeEventListener('error', fail);
-      }
-      function finish() {
-        cleanup();
-        if (w[globalName]) {
-          script?.setAttribute('data-loaded', 'true');
-          resolve();
-        } else {
-          reject(new Error(globalName + ' did not initialize'));
-        }
-      }
-      function fail() {
-        cleanup();
-        reject(new Error('Failed to load ' + globalName));
-      }
-
-      if (script?.getAttribute('data-loaded') === 'true') {
-        finish();
-        return;
-      }
-
-      if (!script) {
-        script = this.renderer.createElement('script') as HTMLScriptElement;
-        this.renderer.setAttribute(script, 'src', src);
-        this.renderer.setAttribute(script, 'data-cdn', id);
-        this.renderer.setAttribute(script, 'async', 'true');
-        script.addEventListener('load', finish);
-        script.addEventListener('error', fail);
-        this.renderer.appendChild(this.doc.body, script);
-        return;
-      }
-
-      script.addEventListener('load', finish);
-      script.addEventListener('error', fail);
-    });
-
-    this.dashboardScriptPromises.set(id, promise);
-    return promise;
+  private loadDashboardCdnScripts(): void {
+    const libs: ReadonlyArray<readonly [string, string]> = [
+      ['dash-html5-qrcode', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'],
+      ['dash-lz-string',    'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js'],
+    ];
+    for (const [id, src] of libs) {
+      if (this.doc.head.querySelector(`script[data-cdn="${id}"]`)) continue;
+      const s = this.renderer.createElement('script') as HTMLScriptElement;
+      this.renderer.setAttribute(s, 'src', src);
+      this.renderer.setAttribute(s, 'data-cdn', id);
+      this.renderer.setAttribute(s, 'defer', '');
+      this.renderer.appendChild(this.doc.body, s);
+    }
   }
 
   // ---- Constants ----
@@ -161,9 +123,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly TASK_RECOVERY_WAIT_TEXT = 'Waiting for task recovery...';
   private readonly TASK_RECOVERY_TIMEOUT_TEXT = 'Task recovery timed out';
   private readonly DASHBOARD_TRANSPORT_DIAGNOSTIC_LIMIT = 100;
-  private readonly HTML5_QRCODE_SRC = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-  private readonly LZ_STRING_SRC = 'https://unpkg.com/lz-string@1.5.0/libs/lz-string.min.js';
-  private readonly dashboardScriptPromises = new Map<string, Promise<void>>();
 
   // ---- Persistent state ----
   private hashKey = '';
@@ -172,7 +131,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   // ---- Runtime state ----
   private qrScanner: any = null;
-  private qrScannerLoading = false;
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
   // private agents: any[] = [];
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
@@ -220,8 +178,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private previewState: PreviewState = 'hidden';
   private previewLayoutMode: PreviewLayoutMode = 'inline';
   private previewScale = 1;
-  private previewOffsetX = 0;
-  private previewOffsetY = 0;
+  private previewViewer: any = null;
+  private previewViewerHealth: any = null;
   private previewHideTimer: any = null;
   private previewSnapshotData: any = null;
   private lastPreviewScroll = { x: 0, y: 0 };
@@ -272,6 +230,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     reason: 'user-stop',
     ownership: 'none',
   };
+  private remoteControlRequestedAt = 0;
+  private remoteControlRequestTimer: any = null;
+  private readonly REMOTE_CONTROL_START_GRACE_MS = 5000;
 
   // ---- DOM references (populated in ngAfterViewInit) ----
   private loginSection!: HTMLElement | null;
@@ -324,8 +285,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   // DOM preview refs
   private previewContainer!: HTMLElement | null;
-  private previewStage!: HTMLElement | null;
-  private previewIframe!: HTMLIFrameElement | null;
+  private previewViewerHost!: HTMLElement | null;
   private previewLoading!: HTMLElement | null;
   private previewGlow!: HTMLElement | null;
   private previewProgress!: HTMLElement | null;
@@ -456,6 +416,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.taskElapsedTimer) clearInterval(this.taskElapsedTimer);
     if (this.taskTimeoutTimer) clearTimeout(this.taskTimeoutTimer);
     if (this.taskRecoveryTimer) clearTimeout(this.taskRecoveryTimer);
+    this.clearRemoteControlRequestTimer();
     if (this.previewHideTimer) clearTimeout(this.previewHideTimer);
     if (this.pendingStreamRecovery) clearTimeout(this.pendingStreamRecovery);
 
@@ -469,6 +430,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
+    }
+
+    if (this.previewViewer && typeof this.previewViewer.destroy === 'function') {
+      this.previewViewer.destroy();
+      this.previewViewer = null;
     }
   }
 
@@ -527,8 +493,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.taskStopBtn = this.el('dash-task-stop');
 
     this.previewContainer = this.el('dash-preview');
-    this.previewStage = this.el('dash-preview-stage');
-    this.previewIframe = this.el('dash-preview-iframe') as HTMLIFrameElement | null;
+    this.previewViewerHost = this.el('dash-preview-viewer');
     this.previewLoading = this.el('dash-preview-loading');
     this.previewGlow = this.el('dash-preview-glow');
     this.previewProgress = this.el('dash-preview-progress');
@@ -669,8 +634,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     // Remote control toggle
     this.listen(this.previewRcBtn, 'click', () => {
-      if (this.previewState !== 'streaming') return;
-      this.setRemoteControl(!this.remoteControlOn);
+      this.handleRemoteControlToggleClick();
     });
 
     // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
@@ -859,13 +823,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     // Fullscreen change
     this.listen(document, 'fullscreenchange', () => {
-      if (document.fullscreenElement === this.previewContainer) {
-        if (this.previewLayoutMode !== 'fullscreen') {
-          this.setPreviewLayout('fullscreen');
-        } else if (this.previewState === 'streaming') {
-          this.updatePreviewScale();
-        }
-      } else if (!document.fullscreenElement && this.previewLayoutMode === 'fullscreen') {
+      if (!document.fullscreenElement && this.previewLayoutMode === 'fullscreen') {
         this.setPreviewLayout('inline');
       }
     });
@@ -1037,6 +995,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private resetPreviewGenerationState(): void {
     this.staleMutationCount = 0;
     this.mutationApplyFailures = 0;
+    this.previewViewerHealth = null;
     // Phase 276 STREAM-04: reset tooltip counters on every generation cycle
     // so a fresh snapshot starts counting from 0. lastFrameTime is left as-is
     // (refreshed on the next message) so the tooltip's "X seconds ago" reading
@@ -1045,9 +1004,96 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.previewResyncPending = false;
   }
 
+  private handlePreviewViewerHealth(health: any): void {
+    this.previewViewerHealth = health || null;
+    if (this.previewViewerHealth) {
+      if (typeof this.previewViewerHealth.staleMisses === 'number') {
+        this.staleMutationCount = this.previewViewerHealth.staleMisses;
+      }
+      if (typeof this.previewViewerHealth.applyFailures === 'number') {
+        this.mutationApplyFailures = this.previewViewerHealth.applyFailures;
+      }
+      if (typeof this.previewViewerHealth.lastFrameAt === 'number' && this.previewViewerHealth.lastFrameAt > 0) {
+        this.lastFrameTime = this.previewViewerHealth.lastFrameAt;
+      }
+      if (typeof this.previewViewerHealth.lastSnapshotAt === 'number' && this.previewViewerHealth.lastSnapshotAt > 0) {
+        this.lastSnapshotTime = this.previewViewerHealth.lastSnapshotAt;
+      }
+    }
+    this.updatePreviewTooltip();
+  }
+
+  private handlePreviewViewerState(event: any): void {
+    const state = event?.state || '';
+    this.recordTransportEvent('phantomstream-viewer-state', {
+      state,
+      reason: event?.reason || '',
+    });
+    if (state === 'live' && this.previewState === 'loading' && this.previewSnapshotData) {
+      this.setPreviewState('streaming');
+    }
+  }
+
+  private ensurePreviewViewer(): any {
+    if (this.previewViewer) return this.previewViewer;
+    if (!this.previewViewerHost) {
+      this.recordTransportError('phantomstream-viewer-missing', 'Preview viewer host missing', {
+        type: 'dashboard-preview',
+      });
+      return null;
+    }
+    const bridge = (window as any).FSBPhantomStreamViewer;
+    if (!bridge || typeof bridge.createDashboardViewer !== 'function') {
+      this.recordTransportError('phantomstream-viewer-missing', 'PhantomStream viewer bundle missing', {
+        type: 'dashboard-preview',
+      });
+      return null;
+    }
+    this.previewViewer = bridge.createDashboardViewer({
+      container: this.previewViewerHost,
+      logger: console,
+      onResync: (payload: any) => {
+        payload = payload || {};
+        this.requestPreviewResync(payload.reason || 'phantomstream-viewer-resync', payload);
+      },
+      onSubtreeRequest: (payload: any) => {
+        this.recordTransportEvent('phantomstream-subtree-request-deferred', {
+          requestId: payload?.requestId || '',
+          nid: payload?.nid || '',
+        });
+      },
+      onUnsupportedControl: (type: string) => {
+        this.recordTransportEvent('phantomstream-control-ignored', {
+          type: type || '',
+        });
+      },
+      onState: (event: any) => this.handlePreviewViewerState(event),
+      onHealth: (health: any) => this.handlePreviewViewerHealth(health),
+      // Phase 33 (MEDIA): live <video>/<audio> mirroring by reference (parity
+      // with the static dashboard). 'reference' is the package default and the
+      // point of the feature; switch to 'poster'/'off' for a more conservative
+      // posture. Degrade callbacks are logger-trapped by the package.
+      mediaMode: 'reference',
+      onMediaBlocked: (nid: string) => {
+        this.recordTransportEvent('phantomstream-media-blocked', { nid: nid || '' });
+      },
+      onMediaUnavailable: (nid: string, reason: string) => {
+        this.recordTransportEvent('phantomstream-media-unavailable', { nid: nid || '', reason: reason || '' });
+      },
+    });
+    return this.previewViewer;
+  }
+
+  private dispatchPreviewViewer(type: string, payload: any): boolean {
+    const viewer = this.ensurePreviewViewer();
+    if (!viewer || typeof viewer.dispatch !== 'function') return false;
+    viewer.dispatch(type, payload || {});
+    return true;
+  }
+
   /**
    * Phase 276 STREAM-04: seconds since the last DOM frame (snapshot OR mutation)
-   * was applied to the preview iframe. Surfaced in the dash-preview-tooltip.
+   * was applied to the preview viewer. Surfaced in the dash-preview-tooltip.
    * Returns 0 when no frame has been observed yet. Capped at -- not the
    * "0s ago" reading, which would be misleading if no frame ever arrived.
    */
@@ -1155,14 +1201,90 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     element.style.display = '';
   }
 
+  private normalizeRemoteControlReason(reason: any, fallback: string): string {
+    if (typeof reason !== 'string' || !reason) return fallback;
+    switch (reason) {
+      case 'ready':
+      case 'retarget-required':
+      case 'dispatch-failed':
+      case 'debugger-blocked':
+      case 'stream-not-ready':
+      case 'user-stop':
+      case 'no-tab':
+        return reason;
+      case 'active':
+      case 'approved':
+      case 'authorization-approved':
+      case 'control-approved':
+        return 'ready';
+      case 'locked':
+      case 'requesting':
+        return 'requesting';
+      case 'stopped':
+        return 'user-stop';
+      case 'denied':
+      case 'authorization-denied':
+      case 'control-denied':
+        return 'debugger-blocked';
+      default:
+        return fallback;
+    }
+  }
+
+  private normalizePhantomRemoteControlState(payload: any): RemoteControlState | null {
+    if (!payload || typeof payload.state !== 'string') return null;
+    const tabId = typeof payload.tabId === 'number' ? payload.tabId : null;
+    const ownership = typeof payload.ownership === 'string' && payload.ownership ? payload.ownership : null;
+
+    switch (payload.state) {
+      case 'active':
+        return {
+          enabled: true,
+          attached: true,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'ready'),
+          ownership: ownership || 'dashboard',
+        };
+      case 'requesting':
+      case 'locked':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'requesting'),
+          ownership: ownership || 'none',
+        };
+      case 'denied':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'debugger-blocked'),
+          ownership: ownership || 'none',
+        };
+      case 'stopped':
+        return {
+          enabled: false,
+          attached: false,
+          tabId,
+          reason: this.normalizeRemoteControlReason(payload.reason, 'user-stop'),
+          ownership: ownership || 'none',
+        };
+      default:
+        return null;
+    }
+  }
+
   private normalizeRemoteControlState(payload: any): RemoteControlState {
     payload = payload || {};
+    const phantomState = this.normalizePhantomRemoteControlState(payload);
+    if (phantomState) return phantomState;
     return {
       enabled: !!payload.enabled,
       attached: !!payload.attached,
       tabId: typeof payload.tabId === 'number' ? payload.tabId : null,
-      reason: payload.reason || 'user-stop',
-      ownership: payload.ownership || 'none',
+      reason: typeof payload.reason === 'string' && payload.reason ? payload.reason : 'user-stop',
+      ownership: typeof payload.ownership === 'string' && payload.ownership ? payload.ownership : 'none',
     };
   }
 
@@ -1189,21 +1311,24 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private deriveRemoteRuntimeSurface(payload: RemoteControlState): RemoteControlSurface {
+    const remoteControlAvailable = this.canClickRemoteControlToggle();
     const helpers = this.getDashboardRuntimeStateHelpers();
     if (helpers.deriveRemoteControlSurface) {
       return helpers.deriveRemoteControlSurface({
         remoteControlOn: this.remoteControlOn,
         previewState: this.previewState,
+        remoteControlAvailable,
         attached: payload.attached,
         reason: payload.reason,
         ownership: payload.ownership,
+        requestPending: this.isRemoteControlStartPending(),
       });
     }
     return {
       chipLabel: '',
       chipTone: 'paused',
       detailText: '',
-      available: this.previewState === 'streaming',
+      available: remoteControlAvailable,
       shouldForceDisable: payload.attached !== true || payload.reason !== 'ready',
     };
   }
@@ -1360,18 +1485,24 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private renderRemoteControlState(payload: any, options?: { skipToggleSync?: boolean }): RemoteControlSurface {
     options = options || {};
-    this.lastRemoteControlState = this.normalizeRemoteControlState(payload || this.lastRemoteControlState);
+    const nextState = this.normalizeRemoteControlState(payload || this.lastRemoteControlState);
+    const suppressStaleOff = this.isRemoteControlStartPending() && this.isBenignRemoteControlOff(nextState);
+    if (!suppressStaleOff) {
+      this.lastRemoteControlState = nextState;
+    }
     const surface = this.deriveRemoteRuntimeSurface(this.lastRemoteControlState);
     this.renderStateChip(this.previewRcState, 'dash-preview-rc-state', surface.chipLabel, surface.chipTone);
     if (this.previewRcBtn) {
-      (this.previewRcBtn as HTMLButtonElement).disabled = this.previewState !== 'streaming' || surface.available !== true;
+      (this.previewRcBtn as HTMLButtonElement).disabled = !this.canClickRemoteControlToggle();
     }
     if (options.skipToggleSync) return surface;
     if (this.lastRemoteControlState.enabled && this.lastRemoteControlState.attached && this.lastRemoteControlState.reason === 'ready') {
+      this.completeRemoteControlRequest();
       if (!this.remoteControlOn) {
         this.setRemoteControl(true, { silent: true, source: 'remote-state' });
       }
-    } else if (surface.shouldForceDisable && this.remoteControlOn) {
+    } else if (surface.shouldForceDisable && this.remoteControlOn && !suppressStaleOff) {
+      this.completeRemoteControlRequest();
       this.setRemoteControl(false, { silent: true, source: 'remote-state' });
     }
     return surface;
@@ -1387,24 +1518,38 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     const sessions = payload.sessions || {};
     const cost = payload.cost || {};
+    const usage = payload.usage || {};
 
-    const activeSessions = typeof sessions.activeSessions === 'number' ? sessions.activeSessions : 0;
+    const totalTokens = typeof usage.totalTokens === 'number'
+      ? usage.totalTokens
+      : (typeof cost.totalTokens === 'number' ? cost.totalTokens : 0);
+    const totalCost = typeof usage.totalCost === 'number'
+      ? usage.totalCost
+      : (typeof cost.totalCost === 'number' ? cost.totalCost : 0);
+    const totalRequests = typeof usage.totalRequests === 'number'
+      ? usage.totalRequests
+      : ((typeof sessions.completedTasks === 'number' ? sessions.completedTasks : 0) +
+        (typeof sessions.errorCount === 'number' ? Math.max(0, sessions.errorCount) : 0));
     const completedTasks = typeof sessions.completedTasks === 'number' ? sessions.completedTasks : 0;
     const errorCount = typeof sessions.errorCount === 'number' ? Math.max(0, sessions.errorCount) : 0;
-    const totalCost = typeof cost.totalCost === 'number' ? cost.totalCost : 0;
-
-    const totalAttempts = completedTasks + errorCount;
-    const successRate = totalAttempts > 0 ? Math.round((completedTasks / totalAttempts) * 100) : 0;
+    const totalAttempts = totalRequests > 0 ? totalRequests : completedTasks + errorCount;
+    const successRate = typeof usage.successRate === 'number'
+      ? usage.successRate
+      : (totalAttempts > 0 ? (completedTasks / totalAttempts) * 100 : 0);
 
     const enabledEl = document.getElementById('stat-enabled');
     const runsEl = document.getElementById('stat-runs-today');
     const rateEl = document.getElementById('stat-success-rate');
     const costEl = document.getElementById('stat-total-cost');
+    const remoteEl = document.getElementById('stat-cost-saved');
 
-    if (enabledEl) enabledEl.textContent = String(activeSessions);
-    if (runsEl) runsEl.textContent = String(completedTasks);
-    if (rateEl) rateEl.textContent = successRate + '%';
+    if (enabledEl) enabledEl.textContent = this.formatStatNumber(totalTokens);
+    if (runsEl) runsEl.textContent = this.formatStatNumber(totalRequests);
+    if (rateEl) rateEl.textContent = Math.round(successRate) + '%';
     if (costEl) costEl.textContent = '$' + totalCost.toFixed(2);
+    if (remoteEl) remoteEl.textContent = this.remoteControlOn
+      ? 'Remote on'
+      : (payload.connection?.connected ? 'Connected' : 'Offline');
   }
 
   private clearMetrics(): void {
@@ -1412,14 +1557,21 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     const runsEl = document.getElementById('stat-runs-today');
     const rateEl = document.getElementById('stat-success-rate');
     const costEl = document.getElementById('stat-total-cost');
+    const remoteEl = document.getElementById('stat-cost-saved');
 
     if (enabledEl) enabledEl.textContent = '0';
     if (runsEl) runsEl.textContent = '0';
     if (rateEl) rateEl.textContent = '0%';
     if (costEl) costEl.textContent = '$0.00';
+    if (remoteEl) remoteEl.textContent = 'Offline';
   }
 
   // ==================== REMOTE CONTROL HELPERS ====================
+
+  private formatStatNumber(value: number): string {
+    const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+    return Math.round(safe).toLocaleString();
+  }
 
   private getRemoteViewportSize(): { width: number; height: number } {
     return {
@@ -1429,10 +1581,16 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private clampRemotePreviewPoint(localX: number, localY: number): { x: number; y: number } {
+    if (this.previewViewer && typeof this.previewViewer.mapPointToViewport === 'function') {
+      const mapped = this.previewViewer.mapPointToViewport({ x: localX, y: localY });
+      if (mapped && mapped.inside && typeof mapped.x === 'number' && typeof mapped.y === 'number') {
+        return { x: mapped.x, y: mapped.y };
+      }
+    }
     const viewport = this.getRemoteViewportSize();
     const scale = this.previewScale > 0 ? this.previewScale : 1;
-    const x = Math.round((localX - this.previewOffsetX) / scale);
-    const y = Math.round((localY - this.previewOffsetY) / scale);
+    const x = Math.round(localX / scale);
+    const y = Math.round(localY / scale);
     return {
       x: Math.max(0, Math.min(viewport.width - 1, x)),
       y: Math.max(0, Math.min(viewport.height - 1, y)),
@@ -2028,26 +2186,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private startQRScanner(): void {
     if (this.qrScanner) return;
     if (typeof Html5Qrcode === 'undefined') {
-      if (this.qrScannerLoading) return;
-      this.qrScannerLoading = true;
-      if (this.scanError) {
-        this.scanError.textContent = 'Loading QR scanner...';
-        this.scanError.style.display = 'block';
-      }
-      this.ensureDashboardScript('dash-html5-qrcode', this.HTML5_QRCODE_SRC, 'Html5Qrcode')
-        .then(() => {
-          this.qrScannerLoading = false;
-          if (this.destroyed) return;
-          if (this.loginSection && this.loginSection.style.display !== 'none' && this.tabScan?.classList.contains('active')) {
-            if (this.scanError) this.scanError.style.display = 'none';
-            this.startQRScanner();
-          }
-        })
-        .catch(() => {
-          this.qrScannerLoading = false;
-          this.showScanError('QR scanner not available');
-          this.switchTab('paste');
-        });
+      this.showScanError('QR scanner not available');
+      this.switchTab('paste');
       return;
     }
 
@@ -2863,7 +3003,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     // Reset all sub-views
     if (this.previewContainer) this.previewContainer.style.display = 'none';
     if (this.previewLoading) this.previewLoading.style.display = 'none';
-    if (this.previewIframe) (this.previewIframe as HTMLElement).style.display = 'none';
+    if (this.previewViewerHost) this.previewViewerHost.style.display = 'none';
     if (this.previewGlow) this.previewGlow.style.display = 'none';
     if (this.previewProgress) this.previewProgress.style.display = 'none';
     if (this.previewDialog) this.previewDialog.style.display = 'none';
@@ -2888,8 +3028,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
           this.previewLoading.style.display = 'flex';
           this.setPreviewLoadingText(previewSurface.detailText);
         }
-        if (this.previewIframe && previewSurface.showIframe) {
-          (this.previewIframe as HTMLElement).style.display = '';
+        if (this.previewViewerHost && previewSurface.showIframe) {
+          this.previewViewerHost.style.display = '';
         }
         if (this.previewDisconnected && previewSurface.showDisconnected) {
           this.previewDisconnected.style.display = 'flex';
@@ -2907,62 +3047,90 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         break;
       }
     }
-    if (newState !== 'streaming' && newState !== 'frozen-disconnect' && newState !== 'frozen-complete' && this.remoteControlOn) {
+    const keepRemoteUntilAuthoritativeState = newState !== 'paused' &&
+      (this.isRemoteControlStartPending() || this.isDashboardWSOpen());
+    if (newState !== 'streaming' && newState !== 'frozen-disconnect' && newState !== 'frozen-complete' && this.remoteControlOn && !keepRemoteUntilAuthoritativeState) {
       this.setRemoteControl(false, { silent: newState !== 'paused', source: 'preview-state' });
     }
     this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
   }
 
-  private escapePreviewAttribute(value: any): string {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  private isRemoteControlToggleAvailable(): boolean {
+    if (this.isDashboardWSOpen()) return true;
+    if (this.isRemoteControlStartPending()) return true;
+    if (this.previewState === 'streaming') return true;
+    if (this.previewState !== 'loading') return false;
+    if (!this.streamToggleOn || this.previewNotReadyReason) return false;
+    return this.pageReady === true ||
+      this.lastRecoveredStreamState === 'ready' ||
+      this.lastRecoveredStreamState === 'recovering';
   }
 
-  private buildShellAttributeString(attrs: any, styleText?: any): string {
-    const parts: string[] = [];
-    if (attrs && typeof attrs === 'object') {
-      Object.keys(attrs).forEach((rawName) => {
-        const name = String(rawName || '').toLowerCase();
-        if (!/^[a-z][a-z0-9_:.~-]*$/.test(name)) return;
-        if (name === 'style' || name.startsWith('on')) return;
-        const value = attrs[rawName];
-        if (value === undefined || value === null) return;
-        parts.push(name + '="' + this.escapePreviewAttribute(value) + '"');
-      });
+  private isDashboardWSOpen(): boolean {
+    return !!(this.ws && this.ws.readyState === WebSocket.OPEN);
+  }
+
+  private canClickRemoteControlToggle(): boolean {
+    return this.remoteControlOn || this.isRemoteControlStartPending() || this.isDashboardWSOpen();
+  }
+
+  private isRemoteControlStartPending(): boolean {
+    return this.remoteControlRequestedAt > 0 &&
+      Date.now() - this.remoteControlRequestedAt < this.REMOTE_CONTROL_START_GRACE_MS;
+  }
+
+  private isBenignRemoteControlOff(state: RemoteControlState): boolean {
+    if (!state || state.enabled || state.attached) return false;
+    return state.reason === 'user-stop' || state.reason === 'stream-not-ready';
+  }
+
+  private clearRemoteControlRequestTimer(): void {
+    if (this.remoteControlRequestTimer) {
+      clearTimeout(this.remoteControlRequestTimer);
+      this.remoteControlRequestTimer = null;
     }
-    const style = String(styleText || '').trim();
-    if (style) parts.push('style="' + this.escapePreviewAttribute(style) + '"');
-    return parts.length ? ' ' + parts.join(' ') : '';
   }
 
-  private isMobilePreviewStage(): boolean {
-    return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+  private completeRemoteControlRequest(): void {
+    this.remoteControlRequestedAt = 0;
+    this.clearRemoteControlRequestTimer();
   }
 
-  private isScreenPreviewLayout(): boolean {
-    return this.previewLayoutMode === 'maximized' || this.previewLayoutMode === 'fullscreen';
+  private armRemoteControlRequestTimeout(): void {
+    this.clearRemoteControlRequestTimer();
+    this.remoteControlRequestTimer = setTimeout(() => {
+      this.remoteControlRequestTimer = null;
+      if (!this.remoteControlRequestedAt || !this.remoteControlOn) return;
+      this.remoteControlRequestedAt = 0;
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'request-timeout',
+        ownership: 'none',
+      };
+      this.setRemoteControl(false, { silent: true, source: 'request-timeout' });
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+    }, this.REMOTE_CONTROL_START_GRACE_MS);
   }
 
-  private getScreenPreviewStageSize(): { width: number; height: number } {
-    const rect = this.previewContainer?.getBoundingClientRect();
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
-    return {
-      width: Math.max(1, Math.round(rect?.width || viewportWidth)),
-      height: Math.max(1, Math.round(rect?.height || viewportHeight)),
-    };
-  }
-
-  private resetPreviewContainerFrame(): void {
-    if (!this.previewContainer) return;
-    this.previewContainer.style.left = '';
-    this.previewContainer.style.top = '';
-    this.previewContainer.style.bottom = '';
-    this.previewContainer.style.right = '';
-    this.previewContainer.style.height = '';
+  private handleRemoteControlToggleClick(): void {
+    if (this.remoteControlOn) {
+      this.setRemoteControl(false);
+      return;
+    }
+    if (!this.isDashboardWSOpen()) {
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'dashboard-disconnected',
+        ownership: 'none',
+      };
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      return;
+    }
+    this.setRemoteControl(true);
   }
 
   private handleDOMSnapshot(payload: any): void {
@@ -3006,31 +3174,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.updatePreviewTooltip();
 
     try {
-      const stylesheetLinks = (payload.stylesheets || []).map((url: string) =>
-        '<link rel="stylesheet" href="' + url.replace(/"/g, '&quot;') + '">').join('\n');
-      const inlineStyleTags = (payload.inlineStyles || []).map((css: string) =>
-        '<style>' + css + '</style>').join('\n');
-      const htmlAttrs = this.buildShellAttributeString(payload.htmlAttrs, payload.htmlStyle);
-      const bodyAttrs = this.buildShellAttributeString(payload.bodyAttrs, payload.bodyStyle);
-      const fullHTML = '<!DOCTYPE html><html' + htmlAttrs + '><head><meta charset="UTF-8">' +
-        '<meta name="viewport" content="width=' + (payload.viewportWidth || 1920) + '">' +
-        stylesheetLinks + inlineStyleTags +
-        '<style>body { margin: 0; overflow: hidden; } *::selection { background: transparent; } ::-webkit-scrollbar { display: none; }</style>' +
-        '</head><body' + bodyAttrs + '>' + payload.html + '</body></html>';
-
-      if (this.previewIframe) {
-        if (this.previewContainer) this.previewContainer.style.display = '';
-        this.previewIframe.srcdoc = fullHTML;
-        this.previewIframe.onload = () => {
-          this.updatePreviewScale();
-          try { this.previewIframe!.contentWindow?.scrollTo(payload.scrollX || 0, payload.scrollY || 0); } catch (e) {}
-          this.setPreviewState('streaming');
-        };
-        this.previewIframe.onerror = () => {
-          this.recordTransportError('dom-snapshot-render-failed', 'Iframe failed to load dashboard snapshot', { type: 'ext:dom-snapshot' });
-          this.setPreviewState('error');
-        };
+      if (!this.dispatchPreviewViewer('ext:dom-snapshot', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
       }
+      this.updatePreviewScale();
+      this.setPreviewState('streaming');
     } catch (e: any) {
       this.recordTransportError('dom-snapshot-render-failed', e.message, { type: 'ext:dom-snapshot' });
       this.setPreviewState('error');
@@ -3038,46 +3186,60 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   private updatePreviewScale(): void {
-    if (!this.previewIframe || !this.previewContainer || !this.previewStage || !this.previewSnapshotData) return;
-    const pageWidth = Math.max(1, this.previewSnapshotData.viewportWidth || this.previewSnapshotData.pageWidth || 1920);
-    const pageHeight = Math.max(1, this.previewSnapshotData.viewportHeight || 1080);
-    let stageWidth = Math.max(1, this.previewStage.clientWidth || this.previewContainer.clientWidth || 1);
-    let stageHeight = Math.max(1, this.previewStage.clientHeight || Math.round(stageWidth * 10 / 16));
+    if (!this.previewViewerHost || !this.previewContainer || !this.previewSnapshotData) return;
+    const containerWidth = this.previewContainer.clientWidth;
+    const pageWidth = this.previewSnapshotData.viewportWidth || this.previewSnapshotData.pageWidth || 1920;
+    const pageHeight = this.previewSnapshotData.viewportHeight || 1080;
 
+    let computedHeight = (pageHeight / pageWidth) * containerWidth;
+    if (this.previewLayoutMode === 'inline') {
+      computedHeight = Math.max(200, Math.min(computedHeight, window.innerHeight * 0.9));
+    }
+    if (this.previewLayoutMode === 'maximized' || this.previewLayoutMode === 'fullscreen') {
+      computedHeight = this.previewContainer.clientHeight;
+    }
     if (this.previewLayoutMode === 'inline' || this.previewLayoutMode === 'pip') {
-      const fixedStageRatio = this.previewLayoutMode === 'pip' || !this.isMobilePreviewStage();
-      const computedHeight = fixedStageRatio
-        ? Math.round(stageWidth * 10 / 16)
-        : Math.max(200, Math.min(Math.round((pageHeight / pageWidth) * stageWidth), window.innerHeight * 0.9));
-      this.previewStage.style.width = '';
-      this.previewStage.style.height = computedHeight + 'px';
-      stageHeight = computedHeight;
-    } else if (this.isScreenPreviewLayout()) {
-      const screenStage = this.getScreenPreviewStageSize();
-      this.previewStage.style.width = screenStage.width + 'px';
-      this.previewStage.style.height = screenStage.height + 'px';
-      stageWidth = screenStage.width;
-      stageHeight = screenStage.height;
-    } else {
-      this.previewStage.style.width = '';
-      this.previewStage.style.height = '';
-      stageHeight = Math.max(1, this.previewStage.clientHeight || stageHeight);
+      this.previewContainer.style.height = computedHeight + 'px';
     }
 
-    this.previewScale = Math.min(stageWidth / pageWidth, stageHeight / pageHeight);
-    if (!Number.isFinite(this.previewScale) || this.previewScale <= 0) this.previewScale = 1;
-    this.previewOffsetX = Math.max(0, (stageWidth - (pageWidth * this.previewScale)) / 2);
-    this.previewOffsetY = Math.max(0, (stageHeight - (pageHeight * this.previewScale)) / 2);
-    this.previewIframe.style.width = pageWidth + 'px';
-    this.previewIframe.style.height = pageHeight + 'px';
-    this.previewIframe.style.left = this.previewOffsetX + 'px';
-    this.previewIframe.style.top = this.previewOffsetY + 'px';
-    this.previewIframe.style.transform = 'scale(' + this.previewScale + ')';
+    this.previewScale = containerWidth / pageWidth;
+    if (this.previewViewer && typeof this.previewViewer.getViewportMapping === 'function') {
+      try {
+        const mapping = this.previewViewer.getViewportMapping();
+        if (mapping && mapping.scale && typeof mapping.scale.s === 'number' && mapping.scale.s > 0) {
+          this.previewScale = mapping.scale.s;
+        }
+      } catch (e) {}
+    }
   }
 
   private setRemoteControl(on: boolean, options?: { silent?: boolean; source?: string }): void {
     options = options || {};
+    if (on && options.silent !== true && !this.isDashboardWSOpen()) {
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'dashboard-disconnected',
+        ownership: 'none',
+      };
+      this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      return;
+    }
     this.remoteControlOn = on;
+    if (on && options.silent !== true) {
+      this.remoteControlRequestedAt = Date.now();
+      this.lastRemoteControlState = {
+        enabled: false,
+        attached: false,
+        tabId: this.activePreviewTabId,
+        reason: 'requesting',
+        ownership: 'dashboard',
+      };
+      this.armRemoteControlRequestTimeout();
+    } else if (!on) {
+      this.completeRemoteControlRequest();
+    }
     this.setRemoteControlCaptureActive(false);
     if (this.remoteOverlay) {
       this.remoteOverlay.tabIndex = on ? 0 : -1;
@@ -3105,9 +3267,15 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       }
       this.previewRcBtn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i>';
     }
-    if (options.silent !== true && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
+    const activeWs = this.ws;
+    if (options.silent !== true && activeWs && activeWs.readyState === WebSocket.OPEN) {
+      activeWs.send(JSON.stringify({
         type: on ? 'dash:remote-control-start' : 'dash:remote-control-stop',
+        payload: {},
+        ts: Date.now(),
+      }));
+      activeWs.send(JSON.stringify({
+        type: on ? 'dash:ps-control-request' : 'dash:ps-control-stop',
         payload: {},
         ts: Date.now(),
       }));
@@ -3124,7 +3292,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     switch (mode) {
       case 'maximized':
-        this.resetPreviewContainerFrame();
         if (this.previewContainer) this.previewContainer.classList.add('dash-preview-maximized');
         document.body.classList.add('dash-layout-maximized');
         if (this.previewMaximizeBtn) { this.previewMaximizeBtn.innerHTML = '<i class="fa-solid fa-compress"></i>'; this.previewMaximizeBtn.title = 'Minimize'; }
@@ -3134,7 +3301,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-arrow-down-left-and-up-right-to-center"></i>'; this.previewPipBtn.title = 'Exit picture-in-picture'; }
         break;
       case 'fullscreen':
-        this.resetPreviewContainerFrame();
         if (this.previewFsExit) this.previewFsExit.style.display = 'block';
         if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>'; this.previewFullscreenBtn.title = 'Exit fullscreen'; }
         break;
@@ -3144,7 +3310,13 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-window-restore"></i>'; this.previewPipBtn.title = 'Picture-in-picture'; }
         if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i>'; this.previewFullscreenBtn.title = 'Fullscreen'; }
         if (this.previewFsExit) this.previewFsExit.style.display = 'none';
-        this.resetPreviewContainerFrame();
+        if (this.previewContainer) {
+          this.previewContainer.style.left = '';
+          this.previewContainer.style.top = '';
+          this.previewContainer.style.bottom = '';
+          this.previewContainer.style.right = '';
+          this.previewContainer.style.height = '';
+        }
         break;
     }
     setTimeout(() => this.updatePreviewScale(), 50);
@@ -3162,9 +3334,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (document.fullscreenElement === this.previewContainer) {
       document.exitFullscreen();
     } else if (this.previewContainer) {
-      this.previewContainer.requestFullscreen()
-        .then(() => this.setPreviewLayout('fullscreen'))
-        .catch(() => {});
+      this.previewContainer.requestFullscreen().catch(() => {});
+      this.setPreviewLayout('fullscreen');
     }
   }
 
@@ -3312,74 +3483,33 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private handleDOMMutations(payload: any): void {
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-mutations')) return;
-    if (this.previewState !== 'streaming' || !this.previewIframe) return;
+    if (this.previewState !== 'streaming') return;
 
-    // Phase 276 STREAM-04: refresh the "last frame" timestamp on every
-    // mutation envelope. mutationsAppliedTotal is incremented per accepted
-    // mutation operation inside the forEach branch below.
     this.lastFrameTime = Date.now();
 
     try {
       const mutations = payload.mutations || [];
-      const doc = this.previewIframe.contentDocument;
-      if (!doc || !doc.body) return;
-
-      mutations.forEach((m: any) => {
-        try {
-          switch (m.op) {
-            case 'add': {
-              const parent = doc.querySelector('[data-fsb-nid="' + m.parentNid + '"]');
-              if (!parent) {
-                this.staleMutationCount += 1;
-                if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-parent');
-                break;
-              }
-              const temp = doc.createElement('div');
-              temp.innerHTML = m.html;
-              const newNode = temp.firstElementChild;
-              if (!newNode) break;
-              if (m.beforeNid) {
-                const before = doc.querySelector('[data-fsb-nid="' + m.beforeNid + '"]');
-                parent.insertBefore(newNode, before);
-              } else {
-                parent.appendChild(newNode);
-              }
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'rm': {
-              const el = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!el) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              if (el.parentNode) el.parentNode.removeChild(el);
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'attr': {
-              const target = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!target) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              if (m.val === null) target.removeAttribute(m.attr);
-              else target.setAttribute(m.attr, m.val);
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-            case 'text': {
-              const textTarget = doc.querySelector('[data-fsb-nid="' + m.nid + '"]');
-              if (!textTarget) { this.staleMutationCount += 1; if (this.staleMutationCount >= 3) this.requestPreviewResync('stale-mutation-target'); break; }
-              textTarget.textContent = m.text;
-              this.mutationsAppliedTotal += 1;
-              break;
-            }
-          }
-        } catch (e: any) {
-          this.mutationApplyFailures += 1;
-          if (this.mutationApplyFailures >= 2) this.requestPreviewResync('dom-mutation-apply-failed');
-        }
+      this.recordTransportEvent('dom-mutations-dispatched', {
+        type: 'ext:dom-mutations',
+        mutationCount: mutations.length,
+        streamSessionId: payload.streamSessionId || this.activePreviewStreamSessionId,
+        snapshotId: payload.snapshotId || this.activePreviewSnapshotId,
       });
-
-      try { this.previewIframe.contentWindow?.scrollTo(this.lastPreviewScroll.x, this.lastPreviewScroll.y); } catch (e) {}
+      if (!this.dispatchPreviewViewer('ext:dom-mutations', payload)) {
+        throw new Error('phantomstream-viewer-unavailable');
+      }
+      this.mutationsAppliedTotal += mutations.length;
+      this.updatePreviewTooltip();
     } catch (e: any) {
       this.mutationApplyFailures += 1;
-      this.requestPreviewResync('dom-mutation-batch-failed');
+      this.recordTransportError('dom-mutation-apply-failed', e.message, {
+        type: 'ext:dom-mutations',
+        mutationCount: payload?.mutations ? payload.mutations.length : 0,
+        mutationApplyFailures: this.mutationApplyFailures,
+      });
+      this.requestPreviewResync('dom-mutation-batch-failed', {
+        mutationCount: payload?.mutations ? payload.mutations.length : 0,
+      });
     }
   }
 
@@ -3387,8 +3517,24 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-scroll')) return;
     this.lastPreviewScroll.x = payload.scrollX || 0;
     this.lastPreviewScroll.y = payload.scrollY || 0;
-    if (this.previewState !== 'streaming' || !this.previewIframe) return;
-    try { this.previewIframe.contentWindow?.scrollTo({ left: this.lastPreviewScroll.x, top: this.lastPreviewScroll.y, behavior: 'smooth' }); } catch (e) {}
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-scroll', payload);
+  }
+
+  private handleDOMMedia(payload: any): void {
+    // Phase 33 (MEDIA): forward live media playback state to the viewer's
+    // reconciler. Stream-only (like scroll); the viewer self-heals drift.
+    if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-media')) return;
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-media', payload);
+  }
+
+  private handleDOMMediaHint(payload: any): void {
+    // Phase 33 (MEDIA): adaptive-manifest discovery hint (dormant until the
+    // opt-in chrome.webRequest discovery path is enabled).
+    if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-media-hint')) return;
+    if (this.previewState !== 'streaming') return;
+    this.dispatchPreviewViewer('ext:dom-media-hint', payload);
   }
 
   private handleDOMOverlay(payload: any): void {
@@ -3397,10 +3543,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       || this.previewState === 'frozen-disconnect'
       || this.previewState === 'frozen-complete';
     if (!canRenderOverlay) return;
+    this.dispatchPreviewViewer('ext:dom-overlay', payload);
     if (payload.glow?.state === 'active' && this.previewGlow) {
       this.previewGlow.style.display = '';
-      this.previewGlow.style.top = (this.previewOffsetY + payload.glow.y * this.previewScale) + 'px';
-      this.previewGlow.style.left = (this.previewOffsetX + payload.glow.x * this.previewScale) + 'px';
+      this.previewGlow.style.top = (payload.glow.y * this.previewScale) + 'px';
+      this.previewGlow.style.left = (payload.glow.x * this.previewScale) + 'px';
       this.previewGlow.style.width = (payload.glow.w * this.previewScale) + 'px';
       this.previewGlow.style.height = (payload.glow.h * this.previewScale) + 'px';
     } else if (this.previewGlow) {
@@ -3444,6 +3591,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private handleDOMDialog(payload: any): void {
     if (!this.shouldAcceptPreviewMessage(payload, 'ext:dom-dialog')) return;
+    this.dispatchPreviewViewer('ext:dom-dialog', payload);
     const dialog = payload.dialog || payload;
     if (!dialog) return;
 
@@ -3491,22 +3639,6 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   // ==================== WEBSOCKET ====================
 
   private connectWS(): void {
-    if (typeof LZString === 'undefined') {
-      this.setWsState('reconnecting');
-      this.ensureDashboardScript('dash-lz-string', this.LZ_STRING_SRC, 'LZString')
-        .then(() => {
-          if (!this.destroyed && this.hashKey) this.connectWS();
-        })
-        .catch(() => {
-          this.recordTransportError('cdn-load-failed', 'Could not load LZString before WebSocket connect');
-          if (!this.destroyed && this.hashKey) this.openDashboardWebSocket();
-        });
-      return;
-    }
-    this.openDashboardWebSocket();
-  }
-
-  private openDashboardWebSocket(): void {
     this.disconnectWS();
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = proto + '//' + location.host + '/ws?key=' +
@@ -3551,6 +3683,17 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     this.ws.onclose = (e) => {
       this.clearMetrics();
+      if (this.remoteControlOn || this.remoteControlRequestedAt) {
+        this.setRemoteControl(false, { silent: true, source: 'ws-close' });
+        this.lastRemoteControlState = {
+          enabled: false,
+          attached: false,
+          tabId: this.activePreviewTabId,
+          reason: 'dashboard-disconnected',
+          ownership: 'none',
+        };
+        this.renderRemoteControlState(this.lastRemoteControlState, { skipToggleSync: true });
+      }
       this.recordTransportEvent('ws-close', { closeCode: e.code, closeReason: e.reason || '' });
       this.extensionOnline = false;
       this.pageReady = false;
@@ -3569,6 +3712,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   private disconnectWS(): void {
     this.clearPendingStreamRecovery();
+    this.clearRemoteControlRequestTimer();
     if (this.wsReconnectTimer) { clearTimeout(this.wsReconnectTimer); this.wsReconnectTimer = null; }
     if (this.wsPingTimer) { clearInterval(this.wsPingTimer); this.wsPingTimer = null; }
     if (this.ws) {
@@ -3672,7 +3816,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         this.pageReady = snapshot.streamStatus === 'ready';
         this.previewLoadStartedAt = Date.now();
         this.setPreviewLoadingText(snapshot.streamStatus === 'recovering' ? 'Recovering browser preview...' : 'Waiting for live page preview...');
-        this.setPreviewState('loading');
+        if (this.previewState !== 'streaming') this.setPreviewState('loading');
         if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('snapshot:' + (snapshot.snapshotSource || 'unknown'));
       }
       this.updatePreviewTooltip();
@@ -3718,8 +3862,16 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (msg.type === 'ext:dom-scroll') { this.handleDOMScroll(msg.payload); return; }
     if (msg.type === 'ext:dom-overlay') { this.handleDOMOverlay(msg.payload); return; }
     if (msg.type === 'ext:dom-dialog') { this.handleDOMDialog(msg.payload); return; }
+    if (msg.type === 'ext:dom-media') { this.handleDOMMedia(msg.payload); return; }
+    if (msg.type === 'ext:dom-media-hint') { this.handleDOMMediaHint(msg.payload); return; }
     if (msg.type === 'ext:stream-state') { this.handleRecoveredStreamState(msg.payload || {}); return; }
-    if (msg.type === 'ext:remote-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }
+    if (msg.type === 'ext:request-snapshot') {
+      if (this.previewState !== 'frozen-complete') {
+        this.requestPreviewResync(msg.payload?.reason || 'request-snapshot', msg.payload || {});
+      }
+      return;
+    }
+    if (msg.type === 'ext:remote-control-state' || msg.type === 'ext:ps-control-state') { this.renderRemoteControlState(msg.payload || {}); return; }
     if (msg.type === 'ext:metrics') { this.renderMetrics(msg.payload || {}); return; }
 
     if (msg.type === 'ext:page-ready') {

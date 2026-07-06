@@ -1,0 +1,37 @@
+{
+  "slug": "twilio.list_verify_services",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list verify services in twilio",
+    "show me my verify services in twilio",
+    "view my verify services in twilio",
+    "see all my verify services in twilio"
+  ],
+  "description": "List verification services configured on the account.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of services to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-verify-services.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

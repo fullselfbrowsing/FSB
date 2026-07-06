@@ -1,0 +1,47 @@
+{
+  "slug": "linear.list_cycles",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "list cycles in linear",
+    "show me my cycles in linear",
+    "view my cycles in linear",
+    "see all my cycles in linear",
+    "list cycles for a team in linear"
+  ],
+  "description": "List cycles (sprints) for a team. Use this to find cycle IDs for creating or filtering issues.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "team_id": {
+        "type": "string",
+        "description": "Team UUID to list cycles for (use list_teams to find IDs)"
+      },
+      "limit": {
+        "description": "Maximum number of cycles to return (default 10, max 50)",
+        "type": "number"
+      },
+      "after": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/list-cycles.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

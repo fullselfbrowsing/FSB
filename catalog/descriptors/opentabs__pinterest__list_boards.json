@@ -1,0 +1,49 @@
+{
+  "slug": "pinterest.list_boards",
+  "service": "pinterest.com",
+  "intentSynonyms": [
+    "list boards in pinterest",
+    "show me my boards in pinterest",
+    "view my boards in pinterest",
+    "see all my boards in pinterest",
+    "list boards for a user in pinterest"
+  ],
+  "description": "List boards for a Pinterest user by username. Returns board names, pin counts, privacy settings, and cover images. Supports pagination via bookmark cursor.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Pinterest username to list boards for (e.g., \"pinterest\")"
+      },
+      "page_size": {
+        "description": "Number of boards per page (default 25, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "bookmark": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/pinterest/src/tools/list-boards.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "resourceget",
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

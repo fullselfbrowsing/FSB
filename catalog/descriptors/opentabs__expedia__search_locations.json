@@ -1,0 +1,53 @@
+{
+  "slug": "expedia.search_locations",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search locations in expedia",
+    "search for destinations by name in expedia",
+    "search for cities, airports, neighborhoods, and hotels by name in expedia"
+  ],
+  "description": "Search for cities, airports, neighborhoods, and hotels by name. Returns region IDs (gaiaId) needed for hotel and activity searches. Use \"HOTELS\" lob for hotel searches, \"FLIGHTS\" for flights.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Location name to search for (e.g. \"San Francisco\", \"JFK\")"
+      },
+      "lob": {
+        "description": "Line of business filter (default \"HOTELS\")",
+        "type": "string",
+        "enum": [
+          "HOTELS",
+          "FLIGHTS",
+          "PACKAGES",
+          "ACTIVITIES"
+        ]
+      },
+      "max_results": {
+        "description": "Maximum results to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-locations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

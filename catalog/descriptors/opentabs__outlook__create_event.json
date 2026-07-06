@@ -1,0 +1,142 @@
+{
+  "slug": "outlook.create_event",
+  "service": "outlook.cloud.microsoft",
+  "intentSynonyms": [
+    "create an event in outlook",
+    "add an event in outlook",
+    "make a new event in outlook",
+    "open a new event in outlook",
+    "create event in outlook",
+    "create a calendar event in outlook"
+  ],
+  "description": "Create a calendar event or meeting. Add attendees to send invitations. Set is_online_meeting to attach a Teams meeting link. Times are interpreted as UTC unless a time_zone is supplied.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "description": "Event subject/title"
+      },
+      "start": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$",
+        "description": "Start as ISO 8601 without an offset (e.g. \"2026-06-02T13:00:00\"); the zone is set by time_zone."
+      },
+      "end": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|))$",
+        "description": "End as ISO 8601 without an offset (e.g. \"2026-06-02T14:00:00\"); the zone is set by time_zone."
+      },
+      "time_zone": {
+        "description": "Time zone for start/end (e.g. \"Eastern Standard Time\"). Defaults to UTC.",
+        "type": "string"
+      },
+      "body": {
+        "description": "Event body/description",
+        "type": "string"
+      },
+      "body_type": {
+        "description": "Body content type (default: text)",
+        "type": "string",
+        "enum": [
+          "text",
+          "html"
+        ]
+      },
+      "location": {
+        "description": "Location display name",
+        "type": "string"
+      },
+      "attendees": {
+        "description": "Attendees to invite",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "Attendee email address"
+            },
+            "name": {
+              "description": "Attendee display name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Attendance type (default: required)",
+              "type": "string",
+              "enum": [
+                "required",
+                "optional",
+                "resource"
+              ]
+            }
+          },
+          "required": [
+            "address"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "is_all_day": {
+        "description": "All-day event. When true, start/end must be at midnight.",
+        "type": "boolean"
+      },
+      "is_online_meeting": {
+        "description": "Attach an online (Teams) meeting",
+        "type": "boolean"
+      },
+      "importance": {
+        "description": "Importance level",
+        "type": "string",
+        "enum": [
+          "low",
+          "normal",
+          "high"
+        ]
+      },
+      "show_as": {
+        "description": "Free/busy status to show (default: busy)",
+        "type": "string",
+        "enum": [
+          "free",
+          "tentative",
+          "busy",
+          "oof",
+          "workingElsewhere"
+        ]
+      },
+      "reminder_minutes_before_start": {
+        "description": "Reminder lead time in minutes",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "calendar_id": {
+        "description": "Calendar to create the event in. Defaults to the primary calendar.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subject",
+      "start",
+      "end"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/outlook/src/tools/create-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "asana.add_followers",
+  "service": "app.asana.com",
+  "intentSynonyms": [
+    "add followers in asana",
+    "add followers to a task in asana",
+    "add follower in the asana app",
+    "use asana to add a follower"
+  ],
+  "description": "Add followers to a task. Followers receive notifications about task activity.",
+  "actionVerb": "add",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_gid": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Task GID to add followers to"
+      },
+      "followers": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Array of user GIDs to add as followers"
+      }
+    },
+    "required": [
+      "task_gid",
+      "followers"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/asana/src/tools/add-followers.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "add"
+    }
+  }
+}

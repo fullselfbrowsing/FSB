@@ -1,0 +1,40 @@
+{
+  "slug": "retool.get_resource",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "get a resource in retool",
+    "look up a resource in retool",
+    "fetch a single resource in retool",
+    "view one specific resource in retool",
+    "get resource in retool",
+    "get resource details by id in retool"
+  ],
+  "description": "Get full details of a single resource (data source) by ID. Returns connection configuration, environment settings, and metadata. Use list_resources to find resource IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "resource_id": {
+        "type": "number",
+        "description": "Resource ID (from list_resources)"
+      }
+    },
+    "required": [
+      "resource_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/get-resource.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

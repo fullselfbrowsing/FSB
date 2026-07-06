@@ -1,0 +1,54 @@
+{
+  "slug": "excel.delete_range",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a range in excel",
+    "remove a range in excel",
+    "trash a range in excel",
+    "permanently delete a range in excel",
+    "delete range in excel",
+    "delete a range in excel online"
+  ],
+  "description": "Delete cells at a range address, shifting remaining cells up or to the left. Use shift=\"Up\" to pull cells up or shift=\"Left\" to pull cells left.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "worksheet": {
+        "type": "string",
+        "description": "Worksheet name (e.g., \"Sheet1\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Range address of cells to delete (e.g., \"A2:A5\")"
+      },
+      "shift": {
+        "type": "string",
+        "enum": [
+          "Up",
+          "Left"
+        ],
+        "description": "Direction to shift remaining cells: \"Up\" or \"Left\""
+      }
+    },
+    "required": [
+      "worksheet",
+      "address",
+      "shift"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/delete-range.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "delete"
+    }
+  }
+}

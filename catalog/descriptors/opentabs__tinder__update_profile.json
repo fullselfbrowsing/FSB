@@ -1,0 +1,63 @@
+{
+  "slug": "tinder.update_profile",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "update a profile in tinder",
+    "edit a profile in tinder",
+    "change the details of profile in tinder",
+    "modify a profile in tinder",
+    "update profile in tinder",
+    "update your tinder profile in tinder"
+  ],
+  "description": "Update profile preferences including bio, age range, distance filter, gender filter, and discoverability. Only provided fields are updated.",
+  "actionVerb": "update",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "bio": {
+        "type": "string",
+        "description": "Profile bio text"
+      },
+      "age_filter_min": {
+        "type": "number",
+        "minimum": 18,
+        "maximum": 100,
+        "description": "Minimum age preference (18-100)"
+      },
+      "age_filter_max": {
+        "type": "number",
+        "minimum": 18,
+        "maximum": 100,
+        "description": "Maximum age preference (18-100)"
+      },
+      "distance_filter": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100,
+        "description": "Maximum distance in miles (1-100)"
+      },
+      "gender_filter": {
+        "type": "number",
+        "description": "Gender preference filter (-1=everyone, 0=male, 1=female)"
+      },
+      "discoverable": {
+        "type": "boolean",
+        "description": "Whether profile is visible to others"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/update-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "update"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "bestbuy.get_product",
+  "service": "bestbuy.com",
+  "intentSynonyms": [
+    "get a product in bestbuy",
+    "look up a product in bestbuy",
+    "fetch a single product in bestbuy",
+    "view one specific product in bestbuy",
+    "get product in bestbuy",
+    "get product details by sku id in bestbuy"
+  ],
+  "description": "Get detailed information about a Best Buy product by its SKU ID. Returns description, pricing, availability, fulfillment options, and reviews. Use search_products to find SKU IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sku_id": {
+        "type": "string",
+        "description": "Best Buy SKU ID (e.g., \"6612975\")"
+      }
+    },
+    "required": [
+      "sku_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bestbuy/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

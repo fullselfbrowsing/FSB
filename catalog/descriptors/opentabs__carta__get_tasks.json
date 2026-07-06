@@ -1,0 +1,31 @@
+{
+  "slug": "carta.get_tasks",
+  "service": "app.carta.com",
+  "intentSynonyms": [
+    "get tasks in carta",
+    "look up tasks in carta",
+    "fetch a single tasks in carta",
+    "view one specific tasks in carta",
+    "get pending action items in carta"
+  ],
+  "description": "Get pending tasks that require action, such as signing documents, accepting grants, or completing forms.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/carta/src/tools/get-tasks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

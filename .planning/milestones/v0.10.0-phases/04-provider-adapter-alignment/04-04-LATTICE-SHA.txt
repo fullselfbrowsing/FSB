@@ -1,0 +1,3 @@
+f1c943bd9398daeda2ccf92a3d0c2bc004a0379f docs(fsb-integration): close Phase 4 audit rows (providers)
+f9c7ef4186667c00835aec11ea798bb5a589c29b test(providers): add INV-03 parity smoke covering 7 logical providers
+e5659a8034a6b8a6b3c0e36c43e2894e2a1231b4 feat(api): re-export 5 new provider factories from public surface

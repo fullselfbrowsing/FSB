@@ -1,0 +1,42 @@
+{
+  "slug": "priceline.get_hotel_descriptions",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get hotel descriptions in priceline",
+    "look up hotel descriptions in priceline",
+    "fetch a single hotel descriptions in priceline",
+    "view one specific hotel descriptions in priceline",
+    "get short descriptions for hotels in priceline"
+  ],
+  "description": "Get AI-generated short descriptions for a batch of hotels by their IDs. Useful for enriching hotel search results with descriptive text. Accepts up to 30 hotel IDs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "hotel_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of Priceline hotel IDs (max 30)"
+      }
+    },
+    "required": [
+      "hotel_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-hotel-descriptions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

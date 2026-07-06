@@ -5,10 +5,7 @@
     <h1 i18n="@@home.hero.title">Full <span class="highlight">Self</span>-Browsing</h1>
     <p class="hero-subtitle" i18n="@@home.hero.subtitle">AI-powered browser automation through natural language. Tell it what to do, and watch it browse for you.</p>
     <div class="hero-actions">
-      <a routerLink="/dashboard" class="btn btn-primary" i18n="@@home.hero.cta.dashboard">
-        <i class="fa-solid fa-gauge-high"></i> Open Dashboard
-      </a>
-      <a [href]="storeUrl" target="_blank" rel="noopener" class="btn btn-outline" i18n="@@home.hero.cta.getStarted">
+      <a [href]="storeUrl" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@home.hero.cta.getStarted">
         <i [class]="'fa-brands ' + browserIconClass"></i> Get Started
       </a>
       <a routerLink="/about" class="btn btn-outline" i18n="@@home.hero.cta.seeAction">
@@ -16,6 +13,10 @@
       </a>
     </div>
   </div>
+  <a href="#features" class="scroll-cue" #scrollCue aria-label="Scroll to features" i18n-aria-label="@@home.hero.scrollCue.aria">
+    <span class="cue-text" i18n="@@home.hero.scrollCue.text">Scroll</span>
+    <span class="cue-line"></span>
+  </a>
 </section>
 
 <!-- Features -->
@@ -27,44 +28,49 @@
     </div>
     <div class="features-grid">
       <div class="feature-card reveal delay-1">
-        <div class="feature-icon"><i class="fa-solid fa-brain"></i></div>
-        <h3 i18n="@@home.features.card.multiModelAi.title">Multi-Model AI</h3>
-        <p i18n="@@home.features.card.multiModelAi.desc">6 built-in providers, 20+ cloud models, plus local model discovery. Choose from <span [attr.translate]="'no'">xAI Grok</span>, <span [attr.translate]="'no'">OpenAI GPT</span>, <span [attr.translate]="'no'">Anthropic Claude</span>, <span [attr.translate]="'no'">Google Gemini</span>, <span [attr.translate]="'no'">OpenRouter</span>, or <span [attr.translate]="'no'">LM Studio</span>.</p>
-      </div>
-      <div class="feature-card reveal delay-2">
-        <div class="feature-icon"><i class="fa-solid fa-comments"></i></div>
-        <h3 i18n="@@home.features.card.naturalLanguage.title">Natural Language</h3>
-        <p i18n="@@home.features.card.naturalLanguage.desc">No scripting required. Describe your task in plain English and <span [attr.translate]="'no'">FSB</span> figures out the clicks, types, and navigations.</p>
+        <div class="feature-icon"><i class="fa-solid fa-bolt"></i></div>
+        <h3 i18n="@@home.features.card.directApi.title">Direct API Execution</h3>
+        <p i18n="@@home.features.card.directApi.desc">Beyond clicking. <span [attr.translate]="'no'">FSB</span> can call an app's own authenticated API through your logged-in session. Faster and more reliable than DOM automation, with DOM as the automatic fallback. Inspired by <a href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener" [attr.translate]="'no'">OpenTabs</a>.</p>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feature-icon"><i class="fa-solid fa-hand-pointer"></i></div>
-        <h3 i18n="@@home.features.card.actions.title">50+ Browser Actions</h3>
-        <p i18n="@@home.features.card.actions.desc">Click, type, scroll, drag-and-drop, canvas drawing, <span [attr.translate]="'no'">CDP</span> mouse control, multi-tab management, and more.</p>
+        <h3 i18n="@@home.features.card.actions.title">60 Browser Actions</h3>
+        <p i18n="@@home.features.card.actions.desc">Click, type, scroll, drag-and-drop, canvas drawing, <span [attr.translate]="'no'">CDP</span> mouse control, multi-tab management, and more. 53 DOM actions plus 7 through the <span [attr.translate]="'no'">Chrome DevTools Protocol</span>.</p>
+      </div>
+      <div class="feature-card reveal delay-4">
+        <div class="feature-icon"><i class="fa-solid fa-bell"></i></div>
+        <h3 i18n="@@home.features.card.reactiveTriggers.title">Reactive Triggers</h3>
+        <p i18n="@@home.features.card.reactiveTriggers.desc">Watch any element and get notified the instant a value changes, crosses a threshold, or matches a pattern.</p>
       </div>
       <div class="feature-card reveal delay-4">
         <div class="feature-icon"><i class="fa-solid fa-sitemap"></i></div>
         <h3 i18n="@@home.features.card.domAnalysis.title">Smart DOM Analysis</h3>
         <p i18n="@@home.features.card.domAnalysis.desc">Incremental DOM diffing, multi-strategy selectors, and element identification for reliable automation.</p>
       </div>
+      <div class="feature-card reveal delay-6">
+        <div class="feature-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <h3 i18n="@@home.features.card.autopilot.title">Autopilot</h3>
+        <p i18n="@@home.features.card.autopilot.desc">Rebuilt on the <a routerLink="/lattice" [attr.translate]="'no'">Lattice</a> SDK, long runs survive <span [attr.translate]="'no'">Chrome</span>'s <span [attr.translate]="'no'">MV3</span> shutdowns and finish. Up to 64 concurrent tabs, plus real file uploads from disk.</p>
+      </div>
       <div class="feature-card reveal delay-5">
         <div class="feature-icon"><i class="fa-solid fa-eye"></i></div>
         <h3 i18n="@@home.features.card.visualFeedback.title">Visual Feedback</h3>
-        <p i18n="@@home.features.card.visualFeedback.desc">Viewport glow borders, element highlighting with orange pulse, and a floating progress overlay show exactly what <span [attr.translate]="'no'">FSB</span> is doing.</p>
+        <p i18n="@@home.features.card.visualFeedback.desc">Glow borders, pulsing element highlights, and a floating progress overlay show exactly what <span [attr.translate]="'no'">FSB</span> is doing.</p>
       </div>
       <div class="feature-card reveal delay-6">
         <div class="feature-icon"><i class="fa-solid fa-compass"></i></div>
         <h3 i18n="@@home.features.card.siteIntel.title">Site Intelligence</h3>
-        <p i18n="@@home.features.card.siteIntel.desc">142+ built-in site guides spanning e-commerce, finance, social media, travel, career, coding, and productivity platforms.</p>
+        <p i18n="@@home.features.card.siteIntel.desc">130+ built-in site guides across 17 categories, from commerce to coding.</p>
       </div>
       <div class="feature-card reveal delay-2">
         <div class="feature-icon"><i class="fa-solid fa-plug"></i></div>
         <h3 i18n="@@home.features.card.mcpIntegration.title"><span [attr.translate]="'no'">MCP</span> Integration</h3>
-        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. Automate browsers directly from your IDE.</p>
+        <p i18n="@@home.features.card.mcpIntegration.desc">Use <span [attr.translate]="'no'">FSB</span> as an <span [attr.translate]="'no'">MCP</span> server from <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">OpenClaw</span>, or any <span [attr.translate]="'no'">MCP</span> client. 66 tools, with browser automation straight from your IDE.</p>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feature-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
         <h3 i18n="@@home.features.card.remoteDashboard.title">Remote Dashboard</h3>
-        <p i18n="@@home.features.card.remoteDashboard.desc">Monitor and control <span [attr.translate]="'no'">FSB</span> from any device. QR-code pairing, live DOM preview, and real-time task execution.</p>
+        <p i18n="@@home.features.card.remoteDashboard.desc">Monitor and control <span [attr.translate]="'no'">FSB</span> from any device. QR-code pairing, a live DOM preview powered by <a routerLink="/phantom-stream" [attr.translate]="'no'">PhantomStream</a>, now with media mirroring, and real-time task execution.</p>
       </div>
       <div class="feature-card reveal delay-4">
         <div class="feature-icon"><i class="fa-solid fa-database"></i></div>
@@ -72,7 +78,6 @@
         <p i18n="@@home.features.card.memoryLearning.desc"><span [attr.translate]="'no'">FSB</span> remembers navigation patterns across sites. Semantic, episodic, and procedural memory for smarter automation over time.</p>
       </div>
     </div>
-
   </div>
 </section>
 
@@ -101,7 +106,7 @@
       </div>
       <div class="competitor-card">
         <div class="competitor-logo">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071.005l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071-.006l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.661zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071.005l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071-.006l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.661zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></svg>
         </div>
         <h4 i18n="@@home.comparison.competitor.operator" [attr.translate]="'no'">Operator</h4>
         <span class="competitor-tag" i18n="@@home.comparison.competitor.tag.vision"><i class="fa-solid fa-eye"></i> Vision</span>
@@ -117,8 +122,15 @@
 
     <div class="fsb-highlight-card reveal">
       <div class="fsb-highlight-header">
-        <img src="/assets/icon48.png" alt="FSB" width="36" height="36" loading="lazy" decoding="async" i18n-alt="@@home.comparison.fsb.logo.alt">
-        <h3 i18n="@@home.comparison.fsb.name" [attr.translate]="'no'">FSB</h3>
+        <h3 class="fsb-mark fsb-highlight-wordmark" i18n-aria-label="@@home.comparison.fsb.name" aria-label="FSB" [attr.translate]="'no'">
+          <span class="fsb-row" aria-hidden="true">
+            <span class="fsb-f"></span>
+            <span class="fsb-s"></span>
+            <svg class="fsb-b" viewBox="-3 -3 78 103" aria-hidden="true">
+              <path d="M0 0 L40 0 C58 0 70 10 70 26 C70 38 62 46 50 49 C64 51 72 60 72 74 C72 90 60 100 40 100 L0 100 Z"></path>
+            </svg>
+          </span>
+        </h3>
         <span class="fsb-tag" i18n="@@home.comparison.fsb.tag"><i class="fa-solid fa-code"></i> DOM-Based</span>
       </div>
       <p class="fsb-highlight-desc" i18n="@@home.comparison.fsb.desc">Better than all of them. Pure structural intelligence. Zero vision. Zero guessing.</p>
@@ -139,11 +151,111 @@
     </div>
 
     <div class="mcp-callout reveal">
-      <div class="mcp-callout-icon"><i class="fa-solid fa-plug"></i></div>
-      <div class="mcp-callout-content">
-        <h3 i18n="@@home.comparison.worksWith.title">Works WITH All of Them</h3>
-        <p i18n="@@home.comparison.worksWith.desc"><span [attr.translate]="'no'">FSB</span> does not just compete. It complements. Through its <span [attr.translate]="'no'">MCP</span> server, <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Windsurf</span>, and any <span [attr.translate]="'no'">MCP</span>-compatible agent can use <span [attr.translate]="'no'">FSB</span> as their browser automation layer. The intelligence of any AI combined with the precision of <span [attr.translate]="'no'">FSB</span>'s DOM engine.</p>
+      <div class="mcp-callout-top">
+        <div class="mcp-callout-icon" aria-hidden="true">
+          <app-pixel-loader [accent]="'#FF6B35'" [theme]="loaderTheme" [size]="18" [dotShape]="'square'"></app-pixel-loader>
+        </div>
+        <div class="mcp-callout-content">
+          <h3 i18n="@@home.comparison.worksWith.title">Works WITH All of Them</h3>
+          <p i18n="@@home.comparison.worksWith.desc"><span [attr.translate]="'no'">FSB</span> does not just compete. It complements. Through its <span [attr.translate]="'no'">MCP</span> server, <span [attr.translate]="'no'">Claude Code</span>, <span [attr.translate]="'no'">Codex</span>, <span [attr.translate]="'no'">Cursor</span>, <span [attr.translate]="'no'">Windsurf</span>, and any <span [attr.translate]="'no'">MCP</span>-compatible agent can use <span [attr.translate]="'no'">FSB</span> as their browser automation layer. The intelligence of any AI combined with the precision of <span [attr.translate]="'no'">FSB</span>'s DOM engine.</p>
+        </div>
       </div>
+
+      <div class="install-widget" (mouseenter)="onBarEnter()" (mouseleave)="onBarLeave()">
+        <div class="install-label" i18n="@@home.install.label">One command. Pick your agent.</div>
+        <div class="install-bar">
+          <span class="install-mark" [class.is-morphing]="morphing" [style.--install-logo]="logoMask(currentClient.logo)" aria-hidden="true">
+            <span class="install-glyph"></span>
+          </span>
+          <button class="install-cmd" type="button" (click)="copyCurrent()" title="Copy command" i18n-title="@@home.install.copyCurrent.title">
+            <span class="install-base" i18n="@@home.install.baseCommand" [attr.translate]="'no'">npx -y fsb-mcp-server install</span>
+            <span class="install-flag" [class.is-morphing]="morphing" [attr.translate]="'no'">{{ token }}</span>
+          </button>
+          <div class="install-copy-wrap" (mouseenter)="onCopyEnter()" (mouseleave)="onCopyLeave()">
+            <button class="install-copy" [class.copied]="copied === 'current'" type="button" (click)="copyCurrent()" aria-label="Copy install command" i18n-aria-label="@@home.install.copyCurrent.aria">
+              <i [class]="copyIconClass"></i>
+            </button>
+            <div class="install-fan install-fan-up" [class.open]="fanOpen" role="menu" aria-label="Copy command for a specific client" i18n-aria-label="@@home.install.copySpecific.aria">
+              @for (client of fanItemsUp; track trackInstallClient($index, client)) {
+                <button class="install-fan-item" [class.copied]="copied === client.id" type="button" role="menuitem" [style.--dx]="client.dx + 'px'" [style.--rot]="client.rot + 'deg'" (click)="copyClient(client)">
+                  <span class="install-fan-icon" [style.--install-logo]="logoMask(client.logo)" aria-hidden="true">
+                    <span class="install-glyph"></span>
+                  </span>
+                  <span class="install-fan-name" [attr.translate]="'no'">{{ client.name }}</span>
+                  <span class="install-fan-flag" [attr.translate]="'no'">{{ client.flagLabel }}</span>
+                  <i class="install-fan-copyicon" [class.fa-solid]="copied === client.id" [class.fa-check]="copied === client.id" [class.fa-regular]="copied !== client.id" [class.fa-copy]="copied !== client.id"></i>
+                </button>
+              }
+            </div>
+            <div class="install-fan install-fan-down" [class.open]="fanOpen" role="menu" aria-label="Copy command for a specific client" i18n-aria-label="@@home.install.copySpecific.aria">
+              @for (client of fanItemsDown; track trackInstallClient($index, client)) {
+                <button class="install-fan-item" [class.copied]="copied === client.id" type="button" role="menuitem" [style.--dx]="client.dx + 'px'" [style.--rot]="client.rot + 'deg'" (click)="copyClient(client)">
+                  <span class="install-fan-icon" [style.--install-logo]="logoMask(client.logo)" aria-hidden="true">
+                    <span class="install-glyph"></span>
+                  </span>
+                  <span class="install-fan-name" [attr.translate]="'no'">{{ client.name }}</span>
+                  <span class="install-fan-flag" [attr.translate]="'no'">{{ client.flagLabel }}</span>
+                  <i class="install-fan-copyicon" [class.fa-solid]="copied === client.id" [class.fa-check]="copied === client.id" [class.fa-regular]="copied !== client.id" [class.fa-copy]="copied !== client.id"></i>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Native Capability Catalog -->
+<section class="capabilities section" id="capabilities">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="cap-eyebrow" i18n="@@home.capabilities.eyebrow"><i class="fa-solid fa-bolt"></i> Native API handlers</span>
+      <h2 i18n="@@home.capabilities.title">It clicks when it must. <span class="highlight">It calls APIs when it can.</span></h2>
+      <p i18n="@@home.capabilities.subtitle"><span [attr.translate]="'no'">FSB</span> no longer has to drive a UI for everything. For supported apps it talks straight to the app's own authenticated API through your logged-in session, far faster and more reliable than DOM automation, and falls back to clicking automatically when no API exists.</p>
+    </div>
+
+    <div class="cap-marquee reveal" aria-label="Apps FSB supports" i18n-aria-label="@@home.capabilities.marquee.aria">
+      <div class="cap-marquee-row">
+        <div class="cap-track">
+          @for (app of capRow1; track trackCapability($index, app)) {
+            <span class="cap-logo">
+              <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async">
+              <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
+            </span>
+          }
+          @for (app of capRow1; track trackCapability($index, app)) {
+            <span class="cap-logo" aria-hidden="true">
+              <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async">
+              <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
+            </span>
+          }
+        </div>
+      </div>
+      <div class="cap-marquee-row cap-marquee-row--rev">
+        <div class="cap-track">
+          @for (app of capRow2; track trackCapability($index, app)) {
+            <span class="cap-logo">
+              <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" [alt]="app.name" width="22" height="22" loading="lazy" decoding="async">
+              <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
+            </span>
+          }
+          @for (app of capRow2; track trackCapability($index, app)) {
+            <span class="cap-logo" aria-hidden="true">
+              <img class="cap-logo-img" [class]="app.cls" [src]="app.icon" alt="" width="22" height="22" loading="lazy" decoding="async">
+              <span class="cap-logo-name" [attr.translate]="'no'">{{ app.name }}</span>
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="cap-credit-wrap">
+      <a class="cap-credit" href="https://github.com/opentabs-dev/opentabs" target="_blank" rel="noopener">
+        <span i18n="@@home.capabilities.credit.prefix">Inspired by</span>
+        <img class="cap-credit-logo" src="/assets/opentabs.svg" alt="" width="18" height="18" decoding="async">
+        <span class="cap-credit-name" i18n="@@home.capabilities.credit.opentabs" [attr.translate]="'no'">OpenTabs</span>
+      </a>
     </div>
   </div>
 </section>
@@ -163,7 +275,7 @@
       </div>
 
       <div class="step-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="5" y1="12" x2="19" y2="12"/>
           <polyline points="12 5 19 12 12 19"/>
         </svg>
@@ -176,7 +288,7 @@
       </div>
 
       <div class="step-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="5" y1="12" x2="19" y2="12"/>
           <polyline points="12 5 19 12 12 19"/>
         </svg>
@@ -205,11 +317,11 @@
           <img src="/assets/providers/xai.png" alt="xAI" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.xai.logo.alt">
         </div>
         <h3 i18n="@@home.providers.xai.name" [attr.translate]="'no'">xAI Grok</h3>
-        <p class="provider-models" i18n="@@home.providers.xai.models" [attr.translate]="'no'">Grok 4.1, Grok 4.1 Fast, Grok Code Fast</p>
+        <p class="provider-models" i18n="@@home.providers.xai.models" [attr.translate]="'no'">Grok 4.1 Fast, Grok 4, Grok Code Fast 1</p>
       </div>
       <div class="provider-card reveal delay-2">
         <div class="provider-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071.005l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071-.006l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.661zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></svg>
+          <img src="/assets/providers/openai.svg" alt="" width="40" height="40" loading="lazy" decoding="async">
         </div>
         <h3 i18n="@@home.providers.openai.name" [attr.translate]="'no'">OpenAI</h3>
         <p class="provider-models" i18n="@@home.providers.openai.models" [attr.translate]="'no'">GPT-4o, GPT-4o Mini, GPT-4 Turbo</p>
@@ -219,7 +331,7 @@
           <img src="/assets/providers/anthropic.webp" alt="Anthropic" width="40" height="40" loading="lazy" decoding="async" i18n-alt="@@home.providers.anthropic.logo.alt">
         </div>
         <h3 i18n="@@home.providers.anthropic.name" [attr.translate]="'no'">Anthropic</h3>
-        <p class="provider-models" i18n="@@home.providers.anthropic.models" [attr.translate]="'no'">Claude Sonnet 4.5, Haiku 4.5, Opus 4.1</p>
+        <p class="provider-models" i18n="@@home.providers.anthropic.models" [attr.translate]="'no'">Claude Opus 4.6, Sonnet 4.6, Haiku 4.5</p>
       </div>
       <div class="provider-card reveal delay-4">
         <div class="provider-icon">
@@ -252,7 +364,7 @@
   <div class="container reveal">
     <h2 i18n="@@home.cta.openSource.title">Open Source. <span [attr.translate]="'no'">BSL 1.1</span> Licensed. Built for Everyone.</h2>
     <p i18n="@@home.cta.openSource.desc"><span [attr.translate]="'no'">FSB</span> is free and open source. Inspect the code, contribute features, or fork it for your own use.</p>
-    <a href="https://github.com/fullselfbrowsing/FSB" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@home.cta.openSource.github">
+    <a [href]="githubRepo" target="_blank" rel="noopener" class="btn btn-primary" i18n="@@home.cta.openSource.github">
       <i class="fa-brands fa-github"></i> View on <span [attr.translate]="'no'">GitHub</span>
     </a>
   </div>

@@ -1,0 +1,85 @@
+{
+  "slug": "gitlab.list_projects",
+  "service": "gitlab.com",
+  "intentSynonyms": [
+    "list projects in gitlab",
+    "show me my projects in gitlab",
+    "view my projects in gitlab",
+    "see all my projects in gitlab",
+    "list accessible projects in gitlab"
+  ],
+  "description": "List projects accessible to the authenticated user. Can filter by membership, visibility, search query, and more.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "membership": {
+        "description": "Limit to projects the user is a member of (default: false)",
+        "type": "boolean"
+      },
+      "owned": {
+        "description": "Limit to projects owned by the user (default: false)",
+        "type": "boolean"
+      },
+      "search": {
+        "description": "Search by project name",
+        "type": "string"
+      },
+      "visibility": {
+        "description": "Filter by visibility level",
+        "type": "string",
+        "enum": [
+          "public",
+          "internal",
+          "private"
+        ]
+      },
+      "order_by": {
+        "description": "Sort field (default: created_at)",
+        "type": "string",
+        "enum": [
+          "id",
+          "name",
+          "path",
+          "created_at",
+          "updated_at",
+          "last_activity_at"
+        ]
+      },
+      "sort": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "per_page": {
+        "description": "Results per page (default 20, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/gitlab/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

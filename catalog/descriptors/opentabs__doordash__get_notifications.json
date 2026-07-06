@@ -1,0 +1,31 @@
+{
+  "slug": "doordash.get_notifications",
+  "service": "doordash.com",
+  "intentSynonyms": [
+    "get notifications in doordash",
+    "look up notifications in doordash",
+    "fetch a single notifications in doordash",
+    "view one specific notifications in doordash",
+    "check for new notifications in doordash"
+  ],
+  "description": "Check whether the user has new or unread notifications on DoorDash.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/doordash/src/tools/get-notifications.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

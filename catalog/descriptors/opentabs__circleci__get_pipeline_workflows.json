@@ -1,0 +1,43 @@
+{
+  "slug": "circleci.get_pipeline_workflows",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get pipeline workflows in circleci",
+    "look up pipeline workflows in circleci",
+    "fetch a single pipeline workflows in circleci",
+    "view one specific pipeline workflows in circleci",
+    "list workflows for a pipeline in circleci"
+  ],
+  "description": "List all workflows for a pipeline. Returns workflow names, statuses, and timing.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "pipeline_id": {
+        "type": "string",
+        "description": "Pipeline UUID"
+      },
+      "page_token": {
+        "description": "Pagination token from a previous response",
+        "type": "string"
+      }
+    },
+    "required": [
+      "pipeline_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-pipeline-workflows.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

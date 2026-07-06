@@ -1,0 +1,39 @@
+{
+  "slug": "todoist.delete_section",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "delete a section in todoist",
+    "remove a section in todoist",
+    "trash a section in todoist",
+    "permanently delete a section in todoist",
+    "delete section in todoist"
+  ],
+  "description": "Permanently delete a section by its ID. Tasks in the section are moved to the parent project.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "section_id": {
+        "type": "string",
+        "description": "Section ID to delete"
+      }
+    },
+    "required": [
+      "section_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/delete-section.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

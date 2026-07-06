@@ -1,0 +1,40 @@
+{
+  "slug": "lucid.get_document",
+  "service": "lucid.app",
+  "intentSynonyms": [
+    "get a document in lucid",
+    "look up a document in lucid",
+    "fetch a single document in lucid",
+    "view one specific document in lucid",
+    "get document in lucid",
+    "get document details in lucid"
+  ],
+  "description": "Get detailed information about a specific Lucid document by its UUID, including title, product type, timestamps, size, and edit URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "document_id": {
+        "type": "string",
+        "description": "Document UUID"
+      }
+    },
+    "required": [
+      "document_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/lucid/src/tools/get-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

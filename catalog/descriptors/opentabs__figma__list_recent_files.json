@@ -1,0 +1,31 @@
+{
+  "slug": "figma.list_recent_files",
+  "service": "figma.com",
+  "intentSynonyms": [
+    "list recent files in figma",
+    "show me my recent files in figma",
+    "view my recent files in figma",
+    "see all my recent files in figma",
+    "list recently accessed files in figma"
+  ],
+  "description": "List recently accessed Figma files and prototypes",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/figma/src/tools/list-recent-files.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "stackoverflow.search_users",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "search users in stackoverflow",
+    "search users by display name in stackoverflow",
+    "search stack overflow users by display name in stackoverflow"
+  ],
+  "description": "Search Stack Overflow users by display name. Returns matching user profiles sorted by reputation, creation date, or name.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "inname": {
+        "type": "string",
+        "description": "Search string to match against display names"
+      },
+      "sort": {
+        "description": "Sort order (default: reputation)",
+        "type": "string",
+        "enum": [
+          "reputation",
+          "creation",
+          "name",
+          "modified"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "inname"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/search-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

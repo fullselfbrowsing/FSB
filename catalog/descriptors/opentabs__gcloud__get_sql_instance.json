@@ -1,0 +1,44 @@
+{
+  "slug": "gcloud.get_sql_instance",
+  "service": "console.cloud.google.com",
+  "intentSynonyms": [
+    "get a sql instance in gcloud",
+    "look up a sql instance in gcloud",
+    "fetch a single sql instance in gcloud",
+    "view one specific sql instance in gcloud",
+    "get sql instance in gcloud",
+    "get a cloud sql instance in gcloud"
+  ],
+  "description": "Get detailed information about a specific Cloud SQL database instance.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "instance_name": {
+        "type": "string",
+        "description": "Cloud SQL instance name"
+      },
+      "project_id": {
+        "description": "Project ID (defaults to currently active project)",
+        "type": "string"
+      }
+    },
+    "required": [
+      "instance_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-cloud/src/tools/get-sql-instance.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

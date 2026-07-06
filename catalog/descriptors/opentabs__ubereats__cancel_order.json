@@ -1,0 +1,42 @@
+{
+  "slug": "ubereats.cancel_order",
+  "service": "www.ubereats.com",
+  "intentSynonyms": [
+    "cancel an order in ubereats",
+    "cancel order in ubereats",
+    "cancel my ubereats order in ubereats"
+  ],
+  "description": "Cancel an in-progress Uber Eats order by its ID. This may be irreversible once the restaurant has accepted it.",
+  "actionVerb": "cancel",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The order ID to cancel"
+      },
+      "reason": {
+        "description": "Optional cancellation reason",
+        "type": "string"
+      }
+    },
+    "required": [
+      "order_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ubereats/src/tools/cancel-order.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "DELETE",
+      "opNameVerb": "cancel"
+    }
+  }
+}

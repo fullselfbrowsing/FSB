@@ -1,0 +1,32 @@
+{
+  "slug": "ynab.get_plan",
+  "service": "app.ynab.com",
+  "intentSynonyms": [
+    "get a plan in ynab",
+    "look up a plan in ynab",
+    "fetch a single plan in ynab",
+    "view one specific plan in ynab",
+    "get plan in ynab",
+    "get the active plan details in ynab"
+  ],
+  "description": "Get details about the currently active YNAB plan (budget), including name, currency, and date format. The plan ID is extracted from the current URL.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/ynab/src/tools/get-plan.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "slug": "circleci.get_workflow",
+  "service": "app.circleci.com",
+  "intentSynonyms": [
+    "get a workflow in circleci",
+    "look up a workflow in circleci",
+    "fetch a single workflow in circleci",
+    "view one specific workflow in circleci",
+    "get workflow in circleci",
+    "get a workflow by id in circleci"
+  ],
+  "description": "Get a single workflow by its UUID. Returns status, timing, and pipeline info.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow UUID"
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/circleci/src/tools/get-workflow.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

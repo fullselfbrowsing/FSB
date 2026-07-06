@@ -1,0 +1,44 @@
+{
+  "slug": "jira.list_projects",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "list projects in jira",
+    "show me my projects in jira",
+    "view my projects in jira",
+    "see all my projects in jira",
+    "list accessible projects in jira"
+  ],
+  "description": "List Jira projects accessible to the current user with optional search.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Search query to filter projects by name",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Maximum number of projects to return (default 20, max 50)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first project to return for pagination",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/list-projects.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

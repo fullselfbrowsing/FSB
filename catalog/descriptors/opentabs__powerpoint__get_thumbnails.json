@@ -1,0 +1,39 @@
+{
+  "slug": "powerpoint.get_thumbnails",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "get thumbnails in powerpoint",
+    "look up thumbnails in powerpoint",
+    "fetch a single thumbnails in powerpoint",
+    "view one specific thumbnails in powerpoint",
+    "get thumbnail previews of a file in powerpoint"
+  ],
+  "description": "Get thumbnail preview images for a file. Returns URLs for small, medium, and large thumbnails. Useful for previewing presentations without opening them.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file"
+      }
+    },
+    "required": [
+      "item_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/get-thumbnails.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

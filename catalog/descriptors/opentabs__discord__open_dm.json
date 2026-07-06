@@ -1,0 +1,41 @@
+{
+  "slug": "discord.open_dm",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "open a dm in discord",
+    "open dm in discord",
+    "open a direct message conversation in discord"
+  ],
+  "description": "Open or get an existing direct message channel with a user. For group DMs, pass multiple user IDs.",
+  "actionVerb": "open",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "recipient_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of user IDs to open a DM with (1 for DM, 2+ for group DM)"
+      }
+    },
+    "required": [
+      "recipient_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/open-dm.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "open"
+    }
+  }
+}

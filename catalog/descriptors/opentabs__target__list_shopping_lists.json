@@ -1,0 +1,31 @@
+{
+  "slug": "target.list_shopping_lists",
+  "service": "target.com",
+  "intentSynonyms": [
+    "list shopping lists in target",
+    "show me my shopping lists in target",
+    "view my shopping lists in target",
+    "see all my shopping lists in target",
+    "list all shopping lists in target"
+  ],
+  "description": "List all of the user's Target shopping lists including the default shopping list and any custom lists. Returns list name, type, item count, and last modified date.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/list-shopping-lists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

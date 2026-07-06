@@ -1,0 +1,49 @@
+{
+  "slug": "netlify.create_build_hook",
+  "service": "app.netlify.com",
+  "intentSynonyms": [
+    "create a build hook in netlify",
+    "add a build hook in netlify",
+    "make a new build hook in netlify",
+    "open a new build hook in netlify",
+    "create build hook in netlify"
+  ],
+  "description": "Create a new build hook for a Netlify site. Build hooks generate a URL that triggers a new build for the specified branch when POSTed to.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "site_id": {
+        "type": "string",
+        "description": "The site ID to create the build hook for"
+      },
+      "title": {
+        "type": "string",
+        "description": "Display title for the build hook"
+      },
+      "branch": {
+        "type": "string",
+        "description": "Git branch to build when the hook is triggered"
+      }
+    },
+    "required": [
+      "site_id",
+      "title",
+      "branch"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/netlify/src/tools/create-build-hook.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

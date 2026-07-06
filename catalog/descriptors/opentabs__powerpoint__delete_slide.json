@@ -1,0 +1,47 @@
+{
+  "slug": "powerpoint.delete_slide",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a slide in powerpoint",
+    "remove a slide in powerpoint",
+    "trash a slide in powerpoint",
+    "permanently delete a slide in powerpoint",
+    "delete slide in powerpoint",
+    "remove a slide from a presentation in powerpoint"
+  ],
+  "description": "Delete a slide from a PowerPoint presentation by number (1-indexed). Downloads the PPTX, removes the slide and updates all references, then re-uploads.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the PowerPoint file"
+      },
+      "slide_number": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "description": "Slide number to delete (1-indexed)"
+      }
+    },
+    "required": [
+      "item_id",
+      "slide_number"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/delete-slide.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

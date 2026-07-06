@@ -1,0 +1,49 @@
+{
+  "slug": "gdocs.create_document",
+  "service": "docs.google.com",
+  "intentSynonyms": [
+    "create a document in gdocs",
+    "add a document in gdocs",
+    "make a new document in gdocs",
+    "open a new document in gdocs",
+    "create document in gdocs",
+    "create a document in google docs"
+  ],
+  "description": "Create a new blank Google Doc in Drive. Open the new document in Google Docs and call update_document when you want to add or replace its content.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Document title"
+      },
+      "folder_id": {
+        "description": "Optional Drive folder ID where the new document should be created",
+        "type": "string"
+      },
+      "description": {
+        "description": "Optional Drive file description",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-docs/src/tools/create-document.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

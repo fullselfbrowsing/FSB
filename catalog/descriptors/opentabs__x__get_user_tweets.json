@@ -1,0 +1,50 @@
+{
+  "slug": "x.get_user_tweets",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get user tweets in x",
+    "look up user tweets in x",
+    "fetch a single user tweets in x",
+    "view one specific user tweets in x",
+    "get tweets by a user in x"
+  ],
+  "description": "Get tweets posted by a specific user. Requires the user's numeric ID (use get_user_profile to find it from a screen name).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "User ID (numeric)"
+      },
+      "count": {
+        "description": "Number of tweets (default 20, max 40)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 40
+      },
+      "cursor": {
+        "description": "Pagination cursor",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-user-tweets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

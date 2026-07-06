@@ -1,0 +1,32 @@
+{
+  "slug": "tinder.get_fast_match_count",
+  "service": "tinder.com",
+  "intentSynonyms": [
+    "get a fast match count in tinder",
+    "look up a fast match count in tinder",
+    "fetch a single fast match count in tinder",
+    "view one specific fast match count in tinder",
+    "get fast match count in tinder",
+    "get count of people who liked you in tinder"
+  ],
+  "description": "Get the count of people who have already liked you. These are profiles available in the \"Likes You\" section (Tinder Gold/Platinum feature).",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tinder/src/tools/get-fast-match-count.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

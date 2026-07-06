@@ -1,0 +1,40 @@
+{
+  "slug": "notebooklm.get_notebook_guide",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "get a notebook guide in notebooklm",
+    "look up a notebook guide in notebooklm",
+    "fetch a single notebook guide in notebooklm",
+    "view one specific notebook guide in notebooklm",
+    "get notebook guide in notebooklm",
+    "get ai summary of sources in notebooklm"
+  ],
+  "description": "Generate an AI summary of all sources in a notebook, along with suggested questions for deeper exploration. This is the primary way to get NotebookLM to analyze and synthesize your sources.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "notebook_id": {
+        "type": "string",
+        "description": "Notebook UUID"
+      }
+    },
+    "required": [
+      "notebook_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/get-notebook-guide.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

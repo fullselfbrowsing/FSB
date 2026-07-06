@@ -1,0 +1,31 @@
+{
+  "slug": "fiverr.list_conversations",
+  "service": "fiverr.com",
+  "intentSynonyms": [
+    "list conversations in fiverr",
+    "show me my conversations in fiverr",
+    "view my conversations in fiverr",
+    "see all my conversations in fiverr",
+    "list fiverr inbox conversations in fiverr"
+  ],
+  "description": "List the logged-in user’s Fiverr inbox conversations, most recent first. Each entry includes the other participant’s username, unread count, a preview of the latest message, and the timestamp. Pass a username from a result to `get_conversation` to read the full thread.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fiverr/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

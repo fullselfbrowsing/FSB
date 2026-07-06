@@ -1,0 +1,32 @@
+{
+  "slug": "spotify.get_playback_state",
+  "service": "open.spotify.com",
+  "intentSynonyms": [
+    "get a playback state in spotify",
+    "look up a playback state in spotify",
+    "fetch a single playback state in spotify",
+    "view one specific playback state in spotify",
+    "get playback state in spotify",
+    "get current playback state in spotify"
+  ],
+  "description": "Get the current playback state including device, shuffle, repeat mode, progress, and the currently playing track.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/spotify/src/tools/get-playback-state.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

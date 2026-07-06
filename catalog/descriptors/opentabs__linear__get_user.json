@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_user",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get an user in linear",
+    "look up an user in linear",
+    "fetch a single user in linear",
+    "view one specific user in linear",
+    "get user in linear",
+    "get details of a single user in linear"
+  ],
+  "description": "Get detailed information about a single Linear user by their UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User UUID"
+      }
+    },
+    "required": [
+      "user_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "slug": "stackoverflow.list_questions",
+  "service": "stackoverflow.com",
+  "intentSynonyms": [
+    "list questions in stackoverflow",
+    "show me my questions in stackoverflow",
+    "view my questions in stackoverflow",
+    "see all my questions in stackoverflow",
+    "list questions by activity, votes, or trending in stackoverflow"
+  ],
+  "description": "List Stack Overflow questions sorted by activity, creation date, votes, or trending periods (hot, week, month). Returns questions with body content. Use this to browse recent or popular questions.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "sort": {
+        "description": "Sort order (default: activity)",
+        "type": "string",
+        "enum": [
+          "activity",
+          "creation",
+          "votes",
+          "hot",
+          "week",
+          "month"
+        ]
+      },
+      "order": {
+        "description": "Sort direction (default: desc)",
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ]
+      },
+      "tagged": {
+        "description": "Semicolon-delimited tags to filter by (e.g., \"javascript;react\"). AND logic.",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number (default 1)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      },
+      "pagesize": {
+        "description": "Results per page (default 30, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stackoverflow/src/tools/list-questions.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

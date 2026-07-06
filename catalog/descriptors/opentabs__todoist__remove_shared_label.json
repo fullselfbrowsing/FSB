@@ -1,0 +1,37 @@
+{
+  "slug": "todoist.remove_shared_label",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "remove a shared label in todoist",
+    "remove shared label in todoist",
+    "remove a shared label from all tasks across collaborative projects in todoist"
+  ],
+  "description": "Remove a shared label from all tasks across collaborative projects.",
+  "actionVerb": "remove",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the shared label to remove"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/remove-shared-label.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apivoid",
+      "httpMethod": "POST",
+      "opNameVerb": "remove"
+    }
+  }
+}

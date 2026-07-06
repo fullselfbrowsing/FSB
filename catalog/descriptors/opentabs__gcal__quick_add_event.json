@@ -1,0 +1,51 @@
+{
+  "slug": "gcal.quick_add_event",
+  "service": "calendar.google.com",
+  "intentSynonyms": [
+    "quick an add event in gcal",
+    "quick add event in gcal",
+    "quick an add event in google calendar",
+    "create an event from natural language text in gcal"
+  ],
+  "description": "Create an event using natural language text. Google Calendar parses the text to extract event details like title, date, time, and location. Examples: \"Meeting with Bob tomorrow at 3pm\", \"Dinner at Olive Garden on Friday 7pm-9pm\".",
+  "actionVerb": "quick",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "calendar_id": {
+        "description": "Calendar ID (default \"primary\")",
+        "type": "string"
+      },
+      "text": {
+        "type": "string",
+        "description": "Natural language text describing the event (e.g., \"Lunch with Sarah tomorrow at noon\")"
+      },
+      "send_updates": {
+        "description": "Who to send notifications to (default \"none\")",
+        "type": "string",
+        "enum": [
+          "all",
+          "externalOnly",
+          "none"
+        ]
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/google-calendar/src/tools/quick-add-event.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "quick"
+    }
+  }
+}

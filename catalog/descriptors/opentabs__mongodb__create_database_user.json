@@ -1,0 +1,89 @@
+{
+  "slug": "mongodb.create_database_user",
+  "service": "cloud.mongodb.com",
+  "intentSynonyms": [
+    "create a database user in mongodb",
+    "add a database user in mongodb",
+    "make a new database user in mongodb",
+    "open a new database user in mongodb",
+    "create database user in mongodb"
+  ],
+  "description": "Create a new database user in the current MongoDB Atlas project with specified roles and optional cluster scopes.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "Username for the new database user"
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for the new database user"
+      },
+      "roles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "role_name": {
+              "type": "string",
+              "description": "Role name (e.g., readWriteAnyDatabase, atlasAdmin, readWrite)"
+            },
+            "database_name": {
+              "type": "string",
+              "description": "Database the role applies to (e.g., admin, mydb)"
+            }
+          },
+          "required": [
+            "role_name",
+            "database_name"
+          ],
+          "additionalProperties": false
+        },
+        "description": "Roles to assign to the user"
+      },
+      "scopes": {
+        "description": "Optional cluster scopes to restrict access",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Scope name (cluster name)"
+            },
+            "type": {
+              "type": "string",
+              "description": "Scope type (CLUSTER)"
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "username",
+      "password",
+      "roles"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/mongodb-atlas/src/tools/create-database-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

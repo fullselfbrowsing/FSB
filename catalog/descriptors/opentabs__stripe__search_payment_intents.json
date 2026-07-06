@@ -1,0 +1,43 @@
+{
+  "slug": "stripe.search_payment_intents",
+  "service": "dashboard.stripe.com",
+  "intentSynonyms": [
+    "search payment intents in stripe",
+    "search payment intents by query in stripe",
+    "search payment intents using stripe search syntax in stripe"
+  ],
+  "description": "Search payment intents using Stripe search syntax. Example queries: \"status:'succeeded'\", \"customer:'cus_xxx'\", \"amount>1000\".",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query using Stripe search syntax"
+      },
+      "limit": {
+        "description": "Number of results (default 10, max 100)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/stripe/src/tools/search-payment-intents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

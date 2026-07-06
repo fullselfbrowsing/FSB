@@ -1,0 +1,39 @@
+{
+  "slug": "cloudflare.list_worker_routes",
+  "service": "dash.cloudflare.com",
+  "intentSynonyms": [
+    "list worker routes in cloudflare",
+    "show me my worker routes in cloudflare",
+    "view my worker routes in cloudflare",
+    "see all my worker routes in cloudflare",
+    "list workers routes for a zone in cloudflare"
+  ],
+  "description": "List Workers routes for a zone. Worker routes map URL patterns to Worker scripts that handle matching requests.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "zone_id": {
+        "type": "string",
+        "description": "Zone ID (32-char hex string)"
+      }
+    },
+    "required": [
+      "zone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/cloudflare/src/tools/list-worker-routes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

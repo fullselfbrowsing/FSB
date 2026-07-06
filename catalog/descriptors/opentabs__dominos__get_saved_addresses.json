@@ -1,0 +1,31 @@
+{
+  "slug": "dominos.get_saved_addresses",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get saved addresses in dominos",
+    "look up saved addresses in dominos",
+    "fetch a single saved addresses in dominos",
+    "view one specific saved addresses in dominos",
+    "list your saved delivery addresses in dominos"
+  ],
+  "description": "List all saved delivery addresses on the customer account. Returns address type, street, city, state, ZIP, and nickname.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-saved-addresses.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

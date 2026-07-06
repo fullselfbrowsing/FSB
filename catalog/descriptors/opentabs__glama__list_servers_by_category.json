@@ -1,0 +1,40 @@
+{
+  "slug": "glama.list_servers_by_category",
+  "service": "glama.ai",
+  "intentSynonyms": [
+    "list a servers by category in glama",
+    "show me my servers by category in glama",
+    "view my servers by category in glama",
+    "see all my servers by category in glama",
+    "list servers by category in glama",
+    "list mcp servers in a specific category in glama"
+  ],
+  "description": "List MCP servers in a specific category. Provide the category slug (e.g. \"browser-automation\") to get all servers in that category.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string",
+        "description": "Category slug (e.g. \"browser-automation\")"
+      }
+    },
+    "required": [
+      "slug"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/glama/src/tools/list-servers-by-category.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "slug": "craigslist.set_default_payment_card",
+  "service": "craigslist.org",
+  "intentSynonyms": [
+    "set a default payment card in craigslist",
+    "set default payment card in craigslist",
+    "set a card as the default payment method in craigslist"
+  ],
+  "description": "Set a payment card as the default payment method for the Craigslist account. Requires the card ID from list_payment_cards.",
+  "actionVerb": "set",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "card_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Payment card ID to set as default (from list_payment_cards)"
+      }
+    },
+    "required": [
+      "card_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/craigslist/src/tools/set-default-payment-card.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "PATCH",
+      "opNameVerb": "set"
+    }
+  }
+}

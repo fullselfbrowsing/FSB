@@ -1,0 +1,32 @@
+{
+  "slug": "excel.list_worksheets",
+  "service": "excel.cloud.microsoft",
+  "intentSynonyms": [
+    "list worksheets in excel",
+    "show me my worksheets in excel",
+    "view my worksheets in excel",
+    "see all my worksheets in excel",
+    "list worksheets in excel online",
+    "list all worksheets in the workbook in excel"
+  ],
+  "description": "List all worksheets in the currently open Excel workbook. Returns worksheet names, IDs, positions, and visibility status.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/excel-online/src/tools/list-worksheets.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

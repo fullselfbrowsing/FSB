@@ -51,7 +51,11 @@ const requiredPublicRoutes = [
   'get_memory_stats',
   'read_page',
   'get_dom_snapshot',
-  'get_page_snapshot'
+  'get_page_snapshot',
+  'trigger',
+  'stop_trigger',
+  'get_trigger_status',
+  'list_triggers'
 ];
 
 const requiredMessageRoutes = [
@@ -70,7 +74,11 @@ const requiredMessageRoutes = [
   'mcp:get-logs',
   'mcp:search-memory',
   'mcp:get-memory',
-  'mcp:go-back'
+  'mcp:go-back',
+  'mcp:trigger',
+  'mcp:stop-trigger',
+  'mcp:get-trigger-status',
+  'mcp:list-triggers'
 ];
 
 // Phase 199 left fill_credential / fill_payment_method out of the route-contract
@@ -152,13 +160,27 @@ const groupDefinitions = {
       'mcp:get-dom',
       'mcp:get-page-snapshot'
     ]
+  },
+  trigger: {
+    tools: [
+      'trigger',
+      'stop_trigger',
+      'get_trigger_status',
+      'list_triggers'
+    ],
+    messages: [
+      'mcp:trigger',
+      'mcp:stop-trigger',
+      'mcp:get-trigger-status',
+      'mcp:list-triggers'
+    ]
   }
 };
 
 function selectedGroups() {
   const groupArg = process.argv.find(arg => arg.startsWith('--group='));
   if (!groupArg) {
-    return ['browser', 'visual', 'autopilot', 'observability', 'read'];
+    return ['browser', 'visual', 'autopilot', 'observability', 'read', 'trigger'];
   }
 
   const group = groupArg.slice('--group='.length);
@@ -211,6 +233,10 @@ function runRegistryChecks() {
     .map(tool => tool.name);
 
   for (const required of groupDefinitions.browser.tools) {
+    assert(backgroundToolNames.includes(required), `background TOOL_REGISTRY includes ${required}`);
+  }
+
+  for (const required of groupDefinitions.trigger.tools) {
     assert(backgroundToolNames.includes(required), `background TOOL_REGISTRY includes ${required}`);
   }
 
@@ -386,6 +412,67 @@ async function runObservabilityRedactionCase(dispatcher, groups) {
   }
 }
 
+async function runTriggerOwnershipGateCase(dispatcher, groups) {
+  if (!dispatcher || !groups.includes('trigger')) return;
+
+  console.log('\n--- trigger message ownership gate ---');
+
+  const previousRegistry = global.fsbAgentRegistryInstance;
+  const previousDispatch = global.fsbTriggerDispatchToolRequest;
+  let dispatchCalls = 0;
+
+  global.fsbAgentRegistryInstance = {
+    hasAgent(agentId) {
+      return agentId === 'agent_a' || agentId === 'agent_b';
+    },
+    isOwnedBy() {
+      return false;
+    },
+    getOwner(tabId) {
+      return tabId === 77 ? 'agent_a' : null;
+    },
+    getTabMetadata() {
+      return { incognito: false, windowId: 1 };
+    },
+    getAgentWindowId() {
+      return 1;
+    }
+  };
+  global.fsbTriggerDispatchToolRequest = async () => {
+    dispatchCalls++;
+    return { success: true };
+  };
+
+  try {
+    const response = await dispatcher.dispatchMcpMessageRoute({
+      type: 'mcp:trigger',
+      payload: {
+        selector: '#price',
+        condition: { kind: 'changed' },
+        target_tab_id: 77,
+        agentId: 'agent_b',
+        ownershipToken: 'tok_b'
+      }
+    });
+
+    assert(response?.success === false, 'mcp:trigger rejects cross-agent target');
+    assert(response?.errorCode === 'TAB_NOT_OWNED', 'mcp:trigger cross-agent rejection uses TAB_NOT_OWNED');
+    assert(response?.requestedTabId === 77, 'mcp:trigger ownership gate reads target_tab_id');
+    assert(dispatchCalls === 0, 'mcp:trigger ownership gate rejects before background trigger dispatch');
+  } finally {
+    if (previousRegistry === undefined) {
+      delete global.fsbAgentRegistryInstance;
+    } else {
+      global.fsbAgentRegistryInstance = previousRegistry;
+    }
+    if (previousDispatch === undefined) {
+      delete global.fsbTriggerDispatchToolRequest;
+    } else {
+      global.fsbTriggerDispatchToolRequest = previousDispatch;
+    }
+  }
+}
+
 async function run() {
   const groups = selectedGroups();
   console.log(`\n--- MCP route contract group: ${groups.join(', ')} ---`);
@@ -394,6 +481,7 @@ async function run() {
   const dispatcher = loadDispatcher();
   runDispatcherChecks(dispatcher, groups);
   await runObservabilityRedactionCase(dispatcher, groups);
+  await runTriggerOwnershipGateCase(dispatcher, groups);
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

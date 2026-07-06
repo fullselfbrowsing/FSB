@@ -1,0 +1,71 @@
+{
+  "slug": "robinhood.get_portfolio_historicals",
+  "service": "robinhood.com",
+  "intentSynonyms": [
+    "get portfolio historicals in robinhood",
+    "look up portfolio historicals in robinhood",
+    "fetch a single portfolio historicals in robinhood",
+    "view one specific portfolio historicals in robinhood",
+    "get historical portfolio performance in robinhood"
+  ],
+  "description": "Get historical portfolio performance data points over a configurable time span and interval. Returns a series of value snapshots useful for charting portfolio growth.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "span": {
+        "default": "month",
+        "description": "Time span for historical data",
+        "type": "string",
+        "enum": [
+          "day",
+          "week",
+          "month",
+          "3month",
+          "year",
+          "all"
+        ]
+      },
+      "interval": {
+        "default": "day",
+        "description": "Data point interval granularity",
+        "type": "string",
+        "enum": [
+          "5minute",
+          "10minute",
+          "day",
+          "week"
+        ]
+      },
+      "bounds": {
+        "default": "regular",
+        "description": "Trading session bounds to include",
+        "type": "string",
+        "enum": [
+          "regular",
+          "extended",
+          "trading"
+        ]
+      }
+    },
+    "required": [
+      "span",
+      "interval",
+      "bounds"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/robinhood/src/tools/get-portfolio-historicals.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

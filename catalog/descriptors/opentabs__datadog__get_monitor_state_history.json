@@ -1,0 +1,52 @@
+{
+  "slug": "datadog.get_monitor_state_history",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a monitor state history in datadog",
+    "look up a monitor state history in datadog",
+    "fetch a single monitor state history in datadog",
+    "view one specific monitor state history in datadog",
+    "get monitor state history in datadog",
+    "get monitor evaluation preview over time in datadog"
+  ],
+  "description": "Preview the evaluation results of a monitor over a time range. Shows the timeseries data that the monitor evaluates against.",
+  "actionVerb": "get",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Monitor ID"
+      },
+      "from": {
+        "type": "number",
+        "description": "Start time (epoch milliseconds)"
+      },
+      "to": {
+        "type": "number",
+        "description": "End time (epoch milliseconds)"
+      }
+    },
+    "required": [
+      "monitor_id",
+      "from",
+      "to"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-monitor-state-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiuipost",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "twilio.list_messages",
+  "service": "console.twilio.com",
+  "intentSynonyms": [
+    "list messages in twilio",
+    "show me my messages in twilio",
+    "view my messages in twilio",
+    "see all my messages in twilio"
+  ],
+  "description": "List SMS/MMS messages. Supports filtering by recipient, sender, and date sent.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "page_size": {
+        "description": "Number of messages to return per page (default 20, max 1000)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "to": {
+        "description": "Filter by recipient phone number (E.164 format)",
+        "type": "string"
+      },
+      "from": {
+        "description": "Filter by sender phone number (E.164 format)",
+        "type": "string"
+      },
+      "date_sent": {
+        "description": "Filter by date sent (YYYY-MM-DD)",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twilio/src/tools/list-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

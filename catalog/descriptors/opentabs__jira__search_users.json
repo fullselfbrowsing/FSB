@@ -1,0 +1,42 @@
+{
+  "slug": "jira.search_users",
+  "service": "atlassian.net",
+  "intentSynonyms": [
+    "search users in jira",
+    "search for users by name or email in jira",
+    "search for jira users by name or email in jira"
+  ],
+  "description": "Search for Jira users by name or email. Useful for finding account IDs to use with assign_issue or create_issue.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Search string to match against user display names and emails. Leave empty to list all users.",
+        "type": "string"
+      },
+      "max_results": {
+        "description": "Maximum number of users to return (default 20, max 50)",
+        "type": "number"
+      },
+      "start_at": {
+        "description": "Index of the first user to return for pagination",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/jira/src/tools/search-users.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "search"
+    }
+  }
+}

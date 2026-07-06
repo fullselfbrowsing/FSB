@@ -1,0 +1,31 @@
+{
+  "slug": "onlyfans.list_stories",
+  "service": "onlyfans.com",
+  "intentSynonyms": [
+    "list stories in onlyfans",
+    "show me my stories in onlyfans",
+    "view my stories in onlyfans",
+    "see all my stories in onlyfans",
+    "list active stories from creators in onlyfans"
+  ],
+  "description": "Get the stories map showing which creators have active stories. Returns a list of creators with story counts.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/onlyfans/src/tools/list-stories.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

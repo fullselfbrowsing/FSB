@@ -1,0 +1,40 @@
+{
+  "slug": "todoist.list_comments",
+  "service": "app.todoist.com",
+  "intentSynonyms": [
+    "list comments in todoist",
+    "show me my comments in todoist",
+    "view my comments in todoist",
+    "see all my comments in todoist",
+    "list comments on a task or project in todoist"
+  ],
+  "description": "List comments on a task or project. Provide either task_id or project_id.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "description": "Task ID to list comments for",
+        "type": "string"
+      },
+      "project_id": {
+        "description": "Project ID to list comments for",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/todoist/src/tools/list-comments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

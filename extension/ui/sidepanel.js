@@ -1,4 +1,4 @@
-// Side Panel Script for FSB v0.9.50 - Persistent UI
+// Side Panel Script for FSB v0.9.90 - Persistent UI
 
 // Phase 243 plan 03 (UI-02): the sidepanel's surface id (matches the
 // legacy:sidepanel agent synthesized by ensureLegacySidepanelAgent below).
@@ -14,7 +14,109 @@ let stopRequested = false;
 let livenessInterval = null;
 let livenessFailCount = 0;
 let isHistoryViewActive = false;
-let showSidepanelProgressEnabled = false;
+let showSidepanelProgressEnabled = true;
+
+// QT-93i-02 (per-tab isRunning) -- replace module-scope global `isRunning`
+// + `currentSessionId` with a per-tab Map<tabId, { isRunning, sessionId }>.
+//
+// Background: today the module-scope flag is GLOBAL across tabs. Dispatching
+// a task in tab A then swapping to tab B leaves sendBtn DISABLED on B even
+// though B has no in-flight work. After this change, the send button reflects
+// THE ACTIVE TAB'S running state; per-tab state for all other working tabs
+// is preserved so swapping back to tab A restores its "Working" UI.
+//
+// Design:
+//  - `_tabRunningMap`: keyed by tabId (number). Value: { isRunning: bool,
+//    sessionId: string|null }. Entries created lazily on first
+//    setRunningState/setIdleState/setErrorState call.
+//  - `_activeTabIdSnapshot`: cached active tab id; updated by the
+//    chrome.tabs.onActivated handler at line ~786 (Issue B Edit 4 below).
+//    Boot-time value resolved by the existing chrome.tabs.query inside
+//    DOMContentLoaded.
+//  - `getCurrentTabRunningState()`: returns the active tab's entry, or
+//    a default {isRunning:false, sessionId:null} if no entry exists yet.
+//  - The module-scope `isRunning` + `currentSessionId` are MIRRORS of the
+//    active tab's entry, kept in sync by the setters. Existing read sites
+//    (updateSendButtonState, keydown handler, stopAutomation, etc.)
+//    continue to work without modification.
+var _tabRunningMap = new Map();
+var _activeTabIdSnapshot = null;
+
+function _getTabRunningEntry(tabId) {
+  if (typeof tabId !== 'number') return { isRunning: false, sessionId: null, startedAt: null };
+  var entry = _tabRunningMap.get(tabId);
+  if (!entry) {
+    entry = { isRunning: false, sessionId: null, startedAt: null };
+    _tabRunningMap.set(tabId, entry);
+  }
+  return entry;
+}
+
+function getCurrentTabRunningState() {
+  if (typeof _activeTabIdSnapshot !== 'number') {
+    return { isRunning: false, sessionId: null, startedAt: null };
+  }
+  return _getTabRunningEntry(_activeTabIdSnapshot);
+}
+
+// Internal helper: sync the module-scope `isRunning` + `currentSessionId`
+// to whatever the active tab's per-tab entry says. Called by the
+// chrome.tabs.onActivated re-sync block (Edit 4) and after every
+// setter that mutates the active tab's entry (Edits 2 + 3).
+function _syncModuleScopeFromActiveTab() {
+  var snap = getCurrentTabRunningState();
+  isRunning = !!snap.isRunning;
+  currentSessionId = snap.sessionId || null;
+}
+
+// QT-93i-regression (Strategy B) -- resolve a tabId by scanning _tabRunningMap
+// for an entry whose .sessionId matches. Returns the matching tabId, or
+// _activeTabIdSnapshot when no entry is found (defensive fallback so callers
+// always get a valid number). Used by session-driven setter call sites
+// (stopAutomation reply, liveness orphan, renderAutomationCompletionPayload,
+// automationError) to route setIdleState / setErrorState to the OWNING tab
+// instead of the currently-active tab. See .planning/debug/qt93i-regression.md.
+function _resolveTabIdForSession(sessionId) {
+  if (typeof sessionId === 'string' && sessionId.length > 0) {
+    var iter = _tabRunningMap.entries();
+    var next = iter.next();
+    while (!next.done) {
+      var tabId = next.value[0];
+      var entry = next.value[1];
+      if (entry && entry.sessionId === sessionId) return tabId;
+      next = iter.next();
+    }
+  }
+  return _activeTabIdSnapshot;
+}
+
+// Phase 12 FINT-23 write-through state.
+// _messageLogDebouncer: per-convId 200ms debouncer (Plan 12-00 sidecar factory).
+//                      Initialized at boot inside DOMContentLoaded.
+// _messageLogPendingBuffer: in-memory buffer Map<convId, Array<msg>>.
+//                           Accumulates messages between debounced flushes
+//                           so a burst of N messages results in 1 storage
+//                           write at 200ms after the last call.
+var _messageLogDebouncer = null;
+var _messageLogPendingBuffer = new Map();
+
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- declare module-scope
+// thread state that pre-existing renderAutomationCompletionPayload /
+// recoverLatestThreadTerminalOutcome scaffolding referenced without ever
+// declaring. Without these, any call into that scaffolding throws a
+// ReferenceError on first assignment. Defaults are null/no-op so the
+// existing scaffolding behaves identically to its prior dead-code state
+// until the new hydrate-on-boot path activates it.
+let historySessionId = null;
+let activeConversationId = null;
+let lastRenderedTerminalSessionId = null;
+
+// No-op stub for the pre-existing scaffolding's persist call. Thread
+// state today is reconstructable from the per-tab conversation envelope
+// + fsbSessionLogs index, so no separate persist surface is needed.
+// Wiring a real persistence backend is out of Phase 11 scope; the stub
+// keeps renderAutomationCompletionPayload callable without ReferenceError.
+function persistSidepanelThreadState() { /* no-op stub -- thread state is derived */ }
 
 // Quick task 260524-7n9 -- chip-owned lock: true while the active tab is owned
 // by a non-self agent and the read-only "owned by <ClientName>" chip is showing.
@@ -50,19 +152,334 @@ async function ensureLegacySidepanelAgent() {
   return _legacySidepanelAgent;
 }
 
-// Initialize or restore conversation ID for session continuity
-async function initConversationId() {
-  try {
-    const stored = await chrome.storage.session.get(['fsbSidepanelConversationId']);
-    if (stored.fsbSidepanelConversationId) {
-      conversationId = stored.fsbSidepanelConversationId;
-    } else {
-      conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      await chrome.storage.session.set({ fsbSidepanelConversationId: conversationId });
+// Phase 11 FINT-21 -- per-tab conversation state envelope.
+//
+// Module-scope cache + hydration gate. Event handlers MUST
+// `await _envelopeReadyPromise` before touching the envelope so an
+// onActivated firing during DOMContentLoaded async boot waits for
+// migration to complete (RESEARCH Section 5 race-free pattern).
+let tabConvEnvelope = null;
+let _envelopeReadyResolve = null;
+const _envelopeReadyPromise = new Promise(function (resolve) {
+  _envelopeReadyResolve = resolve;
+});
+
+function _mintConversationId() {
+  return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+}
+
+// Phase 11 FINT-21 WR-01 fix -- serialize envelope writes so concurrent
+// drop/ensure paths cannot race on the read-mutate-write cycle.
+// dropTabConversation (on chrome.tabs.onRemoved) and
+// ensureTabConversationForActiveTab (on user send / startNewChat) both
+// mutate tabConvEnvelope in place then write the entire envelope back
+// to storage. Without serialization a last-writer-wins race can drop
+// a just-minted conversationId or resurrect a just-dropped entry.
+// Pattern mirrors withRegistryLock in extension/utils/agent-registry.js
+// (the .then(fn, fn) shape keeps the chain alive across rejections;
+// .catch on the assignment prevents UnhandledRejection leakage).
+var _envelopeWriteChain = Promise.resolve();
+function _serializeEnvelopeWrite(fn) {
+  var next = _envelopeWriteChain.then(fn, fn);
+  _envelopeWriteChain = next.catch(function () { /* swallow so chain continues */ });
+  return next;
+}
+
+async function _persistEnvelope() {
+  // Wrap the storage write in the in-flight promise chain so concurrent
+  // callers linearize at the storage boundary. Existing call sites keep
+  // working unchanged (still fire-and-forget compatible via await).
+  return _serializeEnvelopeWrite(async function () {
+    try {
+      var payload = {};
+      payload[FSBSidepanelTabConvStore.STORAGE_KEY] = tabConvEnvelope;
+      await chrome.storage.session.set(payload);
+    } catch (_e) {
+      // Best-effort: storage failures do NOT block UI flow.
     }
-  } catch (e) {
-    // Fallback: generate without persistence
-    conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  });
+}
+
+// Phase 11 FINT-21 -- one-shot boot migration + envelope hydration.
+// Idempotent: subsequent boots find legacy key absent + envelope present
+// and short-circuit through the sidecar's migration helper.
+async function initTabConversationStore() {
+  try {
+    if (typeof FSBSidepanelTabConvStore === 'undefined'
+        || typeof FSBSidepanelTabConvStore.migrateLegacyConversationKey !== 'function') {
+      tabConvEnvelope = { v: 1, byTab: {}, lru: [] };
+      conversationId = _mintConversationId();
+      if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
+      return;
+    }
+    var activeTabId = null;
+    try {
+      var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs && tabs[0] && typeof tabs[0].id === 'number') activeTabId = tabs[0].id;
+    } catch (_e) { /* swallow */ }
+
+    // QT-93i-02 -- cache active tab id at boot so the per-tab map and
+    // setRunningState/setIdleState/setErrorState can resolve "active tab"
+    // BEFORE chrome.tabs.onActivated fires for the first time.
+    if (activeTabId !== null) {
+      _activeTabIdSnapshot = activeTabId;
+    }
+
+    tabConvEnvelope = await FSBSidepanelTabConvStore.migrateLegacyConversationKey(
+      function (keys) { return chrome.storage.session.get(keys); },
+      function (payload) { return chrome.storage.session.set(payload); },
+      function (key) { return chrome.storage.session.remove(key); },
+      activeTabId
+    );
+
+    if (activeTabId !== null) {
+      var existing = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, activeTabId);
+      if (existing) {
+        conversationId = existing;
+      } else {
+        // D-17 lazy mint: no entry on this tab yet; conversationId remains
+        // null until first user message in this tab.
+        conversationId = null;
+      }
+    } else {
+      conversationId = null;
+    }
+  } catch (_e) {
+    // Fallback: ensure module continues to boot even if migration fails.
+    tabConvEnvelope = { v: 1, byTab: {}, lru: [] };
+    conversationId = _mintConversationId();
+  } finally {
+    if (typeof _envelopeReadyResolve === 'function') _envelopeReadyResolve();
+  }
+}
+
+// Phase 11 FINT-21 -- swap chat surface to the new tab's conversation
+// when chrome.tabs.onActivated fires. Peek-only: does NOT mint (D-17).
+// If no entry exists, conversationId is set to null and chatMessages is
+// cleared; first send triggers ensureTabConversationForActiveTab().
+//
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- when the target tab
+// has a bound conversationId, hydrate the chat surface from that
+// conversation's persisted session log (same path as boot). Without
+// hydrate, swap leaves chatMessages empty even though the underlying
+// conversation already has a transcript, which is the same UX problem
+// as the boot-reopen-empty bug. With hydrate, swapping back to a tab
+// the user has chatted in restores that tab's transcript.
+//
+// This is consistent with the spirit of RESOLVED Open Question #1 in
+// 11-RESEARCH.md (no auto-render of NEW state on swap) -- swap still
+// does no work for unminted tabs; only tabs with an EXISTING bound
+// conversation render their transcript, and they render the SAME
+// transcript that a fresh sidepanel reopen on that tab would.
+async function swapToTabConversation(tabId) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined') return;
+    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
+    var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
+    if (nextConvId === conversationId) return; // same conversation; no-op
+    conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
+    if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
+      chatMessages.innerHTML = '';
+    }
+    // If the target tab has a bound conversation, hydrate its transcript.
+    // hydrateChatFromConversationId clears chatMessages internally before
+    // rendering, so the manual clear above is harmless (covers the
+    // null-convId / unminted-tab case where hydrate early-returns 0).
+    if (nextConvId) {
+      try { await hydrateChatFromConversationId(nextConvId); } catch (_e) { /* swallow */ }
+    }
+  } catch (_e) { /* swallow: swap is best-effort */ }
+}
+
+// Phase 11 FINT-21 -- drop tab's entry on chrome.tabs.onRemoved (D-14).
+// No-op if entry never existed. Persists envelope after drop.
+async function dropTabConversation(tabId) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined') return;
+    if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
+    FSBSidepanelTabConvStore.dropTabConversation(tabConvEnvelope, tabId);
+    await _persistEnvelope();
+  } catch (_e) { /* swallow */ }
+}
+
+// Phase 11 FINT-21 -- lazy mint OR touch the active tab's
+// conversationId. Persists envelope. Returns the conversationId string.
+// When `overwrite` is true, drops the existing entry first (used by
+// startNewChat to force a fresh conversation in the current tab).
+async function ensureTabConversationForActiveTab(overwrite) {
+  try {
+    await _envelopeReadyPromise;
+    if (typeof FSBSidepanelTabConvStore === 'undefined'
+        || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) {
+      var fallback = _mintConversationId();
+      conversationId = fallback;
+      return fallback;
+    }
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tab = tabs && tabs[0];
+    if (!tab || typeof tab.id !== 'number') {
+      // Phase 11 FINT-21 WR-02 fix -- surface the no-active-tab edge
+      // case in force/overwrite mode so the existing stale entry
+      // (e.g., from the previous active tab) becomes visible to
+      // telemetry / DevTools. Behavior unchanged: still falls through
+      // to noTabFallback mint (no auto-recovery); only adds a console
+      // breadcrumb so the rare race (side panel open in inactive
+      // window context, brief no-focused-tab window after window
+      // close) is no longer silent. The pre-existing entry remains
+      // untouched; on next activation swapToTabConversation will
+      // restore that conversationId per D-17 lazy-mint semantics.
+      if (overwrite === true) {
+        console.warn('[sidepanel] ensureTabConversationForActiveTab(force=true) skipped -- no active tab in current window');
+      }
+      // No active tab; fall back to direct mint (preserves Phase 243 fail-open).
+      var noTabFallback = _mintConversationId();
+      conversationId = noTabFallback;
+      return noTabFallback;
+    }
+    if (overwrite === true) {
+      FSBSidepanelTabConvStore.dropTabConversation(tabConvEnvelope, tab.id);
+    }
+    var newConvId = FSBSidepanelTabConvStore.ensureTabConversation(
+      tabConvEnvelope, tab.id, _mintConversationId
+    );
+    conversationId = newConvId;
+    await _persistEnvelope();
+    return newConvId;
+  } catch (_e) {
+    var errFallback = _mintConversationId();
+    conversationId = errFallback;
+    return errFallback;
+  }
+}
+
+// Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
+// surface from persisted session logs for a given conversationId.
+//
+// Background: fsbSessionLogs (chrome.storage.local) stores one row per
+// session keyed by sessionId, with metadata { conversationId, commands[],
+// completionMessage, result, error, outcome, startTime, status }. Follow-
+// up commands in the same conversation reuse the same session row (via
+// the conversationSessions continuity map in background.js), so commands[]
+// represents the user's chronological prompts in that conversation. A new
+// conversation produces a new session row that shares the conversationId.
+//
+// Restore strategy:
+//   1. Read fsbSessionIndex (lightweight metadata array) + fsbSessionLogs
+//      (full session detail map).
+//   2. Filter index entries where conversationId matches the target.
+//   3. Sort ascending by startTime (oldest first -- chronological replay).
+//   4. For each matching session: replay session.commands[] as 'user'
+//      messages, then session.completionMessage (or session.result) as a
+//      single 'ai' completion message. Skip empty completions.
+//
+// Idempotent + race-tolerant: callers may invoke multiple times; each
+// call clears chatMessages first then re-renders the full transcript.
+// Best-effort: storage failures degrade to no-op (caller proceeds with
+// empty chat surface + welcome message as before).
+//
+// @param {string} convId - conversationId to hydrate; null returns early.
+// @returns {Promise<number>} count of session rows rendered (0 if none).
+async function hydrateChatFromConversationId(convId) {
+  if (!convId || typeof convId !== 'string') return 0;
+  if (!chatMessages) return 0;
+
+  // ============================================================
+  // Tier 1 (Phase 12 FINT-23): new fsbConversationMessages store.
+  // ============================================================
+  try {
+    if (typeof FSBSidepanelMessageLog !== 'undefined'
+        && typeof FSBSidepanelMessageLog.getMessages === 'function'
+        && typeof FSBSidepanelMessageLog.STORAGE_KEY === 'string') {
+      const bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+      const envelope = bag[FSBSidepanelMessageLog.STORAGE_KEY];
+      const messages = FSBSidepanelMessageLog.getMessages(envelope, convId);
+      if (Array.isArray(messages) && messages.length > 0) {
+        chatMessages.innerHTML = '';
+        const sorted = messages.slice().sort(function (a, b) {
+          return (a.timestamp || 0) - (b.timestamp || 0);
+        });
+        for (var i = 0; i < sorted.length; i++) {
+          var m = sorted[i];
+          renderPersistedMessage(m.content, m.role, m.kind);
+        }
+        activeConversationId = convId;
+        return sorted.length;
+      }
+    }
+  } catch (_e) {
+    // fall through to Tier 2
+  }
+
+  // ============================================================
+  // Tier 2 (b8b761e8 body preserved; addMessage replaced with
+  // renderPersistedMessage per Pitfall 3 defense): fsbSessionLogs fallback.
+  // ============================================================
+  try {
+    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+    const sessionStorage = stored.fsbSessionLogs || {};
+    const sessionIndex = stored.fsbSessionIndex || [];
+    if (!Array.isArray(sessionIndex) || sessionIndex.length === 0) return 0;
+
+    var matching = [];
+    for (var i = 0; i < sessionIndex.length; i++) {
+      var entry = sessionIndex[i];
+      if (entry && entry.conversationId === convId) {
+        var detail = (entry.id && sessionStorage[entry.id]) ? sessionStorage[entry.id] : entry;
+        matching.push(detail);
+      }
+    }
+    if (matching.length === 0) return 0;
+
+    matching.sort(function (a, b) {
+      var aTime = a?.startTime || 0;
+      var bTime = b?.startTime || 0;
+      return aTime - bTime;
+    });
+
+    // Clear chat surface before replay so repeated calls do not duplicate.
+    chatMessages.innerHTML = '';
+
+    for (var s = 0; s < matching.length; s++) {
+      var session = matching[s] || {};
+      var commands = Array.isArray(session.commands) ? session.commands : [];
+      if (commands.length === 0 && session.lastTask) commands = [session.lastTask];
+
+      for (var c = 0; c < commands.length; c++) {
+        var cmd = commands[c];
+        if (typeof cmd === 'string' && cmd.trim().length > 0) {
+          renderPersistedMessage(cmd, 'user', 'text');
+        }
+      }
+
+      var completion = session.completionMessage || session.result || '';
+      if (typeof completion === 'string' && completion.trim().length > 0) {
+        var outcomeStr = typeof session.outcome === 'string' ? session.outcome.toLowerCase() : '';
+        var isError = outcomeStr === 'failure' || (session.error && !completion);
+        if (isError) {
+          renderPersistedMessage(completion, 'assistant', 'error');
+        } else {
+          renderPersistedMessage(completion, 'assistant', 'text');
+        }
+      } else if (session.error && typeof session.error === 'string' && session.error.trim().length > 0) {
+        renderPersistedMessage(session.error, 'assistant', 'error');
+      }
+    }
+
+    var latest = matching[matching.length - 1];
+    if (latest && latest.id) {
+      lastRenderedTerminalSessionId = latest.id;
+      historySessionId = latest.historySessionId || latest.id;
+    }
+    activeConversationId = convId;
+
+    return matching.length;
+  } catch (_e) {
+    // ============================================================
+    // Tier 3: empty render (caller fires welcome message).
+    // ============================================================
+    return 0;
   }
 }
 
@@ -77,11 +494,192 @@ const historyBtn = document.getElementById('historyBtn');
 const micBtn = document.getElementById('micBtn');
 const statusDot = document.querySelector('.status-dot');
 const statusText = document.querySelector('.status-text');
+const automationRunner = document.getElementById('automationRunner');
+const automationTimer = document.getElementById('automationTimer');
+const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 
-// Apply theme based on settings
+let automationTimerInterval = null;
+let automationTimerStartedAt = null;
+let automationPixelCycleTimeout = null;
+let automationPixelTimeouts = [];
+let automationPixelRevealIndex = 0;
+
+const AUTOMATION_PIXEL_REVEAL_DIRECTIONS = ['bottom-up', 'left-right', 'top-bottom', 'right-left'];
+const AUTOMATION_PIXEL_CYCLE_MS = 2700;
+const AUTOMATION_PIXEL_LETTER_SLOT_MS = 900;
+const AUTOMATION_PIXEL_VISIBLE_OFFSET_MS = 320;
+const AUTOMATION_PIXEL_STEP_MS = 34;
+
+function formatAutomationElapsed(startedAt) {
+  if (typeof startedAt !== 'number') return '0.000s';
+  var elapsedMs = Math.max(0, Date.now() - startedAt);
+  var hours = Math.floor(elapsedMs / 3600000);
+  var minutes = Math.floor((elapsedMs % 3600000) / 60000);
+  var seconds = Math.floor((elapsedMs % 60000) / 1000);
+  var milliseconds = Math.floor(elapsedMs % 1000);
+  var secondText = String(seconds).padStart(hours > 0 || minutes > 0 ? 2 : 1, '0');
+  var millisecondText = String(milliseconds).padStart(3, '0');
+
+  if (hours > 0) {
+    return hours + ':' + String(minutes).padStart(2, '0') + ':' + secondText + '.' + millisecondText;
+  }
+  if (minutes > 0) {
+    return minutes + ':' + secondText + '.' + millisecondText;
+  }
+  return secondText + '.' + millisecondText + 's';
+}
+
+function updateAutomationTimer() {
+  if (!automationTimer) return;
+  automationTimer.textContent = formatAutomationElapsed(automationTimerStartedAt);
+}
+
+function getAutomationPixelLetters() {
+  if (!automationRunner) return [];
+  return Array.from(automationRunner.querySelectorAll('.pixel-letter'));
+}
+
+function clearAutomationPixelClasses() {
+  getAutomationPixelLetters().forEach(function (letter) {
+    Array.from(letter.querySelectorAll('span.pixel-lit')).forEach(function (pixel) {
+      pixel.classList.remove('pixel-lit');
+    });
+  });
+}
+
+function clearAutomationPixelTimeouts() {
+  automationPixelTimeouts.forEach(function (timeoutId) {
+    clearTimeout(timeoutId);
+  });
+  automationPixelTimeouts = [];
+  if (automationPixelCycleTimeout) {
+    clearTimeout(automationPixelCycleTimeout);
+    automationPixelCycleTimeout = null;
+  }
+}
+
+function queueAutomationPixelTimeout(fn, delay) {
+  var timeoutId = setTimeout(function () {
+    automationPixelTimeouts = automationPixelTimeouts.filter(function (id) {
+      return id !== timeoutId;
+    });
+    fn();
+  }, delay);
+  automationPixelTimeouts.push(timeoutId);
+  return timeoutId;
+}
+
+function getAutomationPixelOrder(letter, direction) {
+  return Array.from(letter.children)
+    .map(function (pixel, index) {
+      return {
+        pixel: pixel,
+        row: Math.floor(index / 3),
+        col: index % 3
+      };
+    })
+    .filter(function (entry) {
+      return entry.pixel && entry.pixel.tagName === 'SPAN';
+    })
+    .sort(function (a, b) {
+      if (direction === 'bottom-up') return (b.row - a.row) || (a.col - b.col);
+      if (direction === 'left-right') return (a.col - b.col) || (a.row - b.row);
+      if (direction === 'right-left') return (b.col - a.col) || (a.row - b.row);
+      return (a.row - b.row) || (a.col - b.col);
+    })
+    .map(function (entry) {
+      return entry.pixel;
+    });
+}
+
+function revealAutomationLetterPixels(letter, direction) {
+  clearAutomationPixelClasses();
+  getAutomationPixelOrder(letter, direction).forEach(function (pixel, index) {
+    queueAutomationPixelTimeout(function () {
+      pixel.classList.add('pixel-lit');
+    }, index * AUTOMATION_PIXEL_STEP_MS);
+  });
+}
+
+function startAutomationPixelReveal() {
+  clearAutomationPixelTimeouts();
+  clearAutomationPixelClasses();
+  automationPixelRevealIndex = 0;
+
+  var letters = getAutomationPixelLetters();
+  if (!letters.length) return;
+
+  function runCycle() {
+    letters.forEach(function (letter, letterIndex) {
+      var directionIndex = (automationPixelRevealIndex + letterIndex) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
+      var direction = AUTOMATION_PIXEL_REVEAL_DIRECTIONS[directionIndex];
+      queueAutomationPixelTimeout(function () {
+        revealAutomationLetterPixels(letter, direction);
+      }, AUTOMATION_PIXEL_VISIBLE_OFFSET_MS + (letterIndex * AUTOMATION_PIXEL_LETTER_SLOT_MS));
+    });
+
+    automationPixelRevealIndex = (automationPixelRevealIndex + letters.length) % AUTOMATION_PIXEL_REVEAL_DIRECTIONS.length;
+    automationPixelCycleTimeout = setTimeout(runCycle, AUTOMATION_PIXEL_CYCLE_MS);
+  }
+
+  runCycle();
+}
+
+function stopAutomationPixelReveal() {
+  clearAutomationPixelTimeouts();
+  clearAutomationPixelClasses();
+  automationPixelRevealIndex = 0;
+}
+
+function setAutomationRunnerText(text) {
+  if (!automationRunnerLabel) return;
+  automationRunnerLabel.textContent = text || 'Automation running';
+}
+
+function showAutomationRunner(startedAt, text) {
+  automationTimerStartedAt = (typeof startedAt === 'number') ? startedAt : Date.now();
+  setAutomationRunnerText(text);
+  if (automationRunner) {
+    automationRunner.classList.remove('hidden');
+    automationRunner.setAttribute('aria-hidden', 'false');
+  }
+  updateAutomationTimer();
+  if (automationTimerInterval) clearInterval(automationTimerInterval);
+  automationTimerInterval = setInterval(updateAutomationTimer, 100);
+  startAutomationPixelReveal();
+}
+
+function hideAutomationRunner() {
+  if (automationTimerInterval) {
+    clearInterval(automationTimerInterval);
+    automationTimerInterval = null;
+  }
+  automationTimerStartedAt = null;
+  if (automationRunner) {
+    automationRunner.classList.add('hidden');
+    automationRunner.setAttribute('aria-hidden', 'true');
+  }
+  if (automationTimer) automationTimer.textContent = '0.000s';
+  stopAutomationPixelReveal();
+  setAutomationRunnerText('Ready');
+}
+
+// Apply theme based on settings. Preference is 'system' | 'dark' | 'light'
+// (set by the options page's Advanced Settings); 'system' resolves live from
+// the OS via matchMedia instead of hardening into 'light'/'dark' on first run.
+function resolveEffectiveTheme(preference) {
+  if (preference === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  return preference;
+}
+
 function applyTheme() {
-  const savedTheme = localStorage.getItem('fsb-theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  let preference = localStorage.getItem('fsb-theme');
+  if (!['system', 'dark', 'light'].includes(preference)) {
+    preference = 'system';
+  }
+  document.documentElement.setAttribute('data-theme', resolveEffectiveTheme(preference));
 }
 
 // Listen for theme changes from options page
@@ -90,6 +688,11 @@ window.addEventListener('storage', (e) => {
     applyTheme();
   }
 });
+
+// Live-follow OS theme changes while the preference is 'system'
+if (typeof window !== 'undefined' && window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+}
 
 // Initialize analytics for sidepanel context
 let sidepanelAnalytics = null;
@@ -198,7 +801,19 @@ function handleReconComplete(data) {
     const retryBtn = document.createElement('button');
     retryBtn.className = 'retry-btn';
     retryBtn.textContent = 'Retry with Site Map';
-    retryBtn.addEventListener('click', () => {
+    retryBtn.addEventListener('click', async () => {
+      // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
+      // check. applyInputLockout dims chatInput/sendBtn/stopBtn/micBtn when
+      // the active tab is foreign-owned, but retry buttons are created
+      // AFTER the snapshot so they cannot be dimmed via the lockout class.
+      // The handleSendMessage entry already fail-closes on foreign-owned
+      // (defense-in-depth), but without this guard the click silently
+      // drops the user's intent. Early-return + console.warn surfaces the
+      // edge case while honoring D-11 (chip is the visible explanation).
+      if (await _isActiveTabForeignOwned()) {
+        console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
+        return;
+      }
       retryDiv.remove();
       chatInput.textContent = pendingReconTask;
       pendingReconTask = null;
@@ -221,9 +836,11 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 // Keep sidepanel progress setting in sync when changed from options
+// (Phase 12 FINT-22 (Plan 12-03): default fallback flipped true to match
+// boot read semantics per RESEARCH Section 6.4.)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.showSidepanelProgress != null) {
-    showSidepanelProgressEnabled = changes.showSidepanelProgress.newValue ?? false;
+    showSidepanelProgressEnabled = changes.showSidepanelProgress.newValue ?? true;
   }
   // Phase 243 plan 03 (UI-02) follow-up: refresh chip when registry mutates
   // for the active tab (ownership claimed/released/transferred). The
@@ -238,7 +855,119 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'session' && changes && (changes.fsbAgentRegistry || changes.fsbAgentClientLabels)) {
     refreshOwnerChip();
   }
+  // debug-sidepanel-agent-name fix: also refresh the chip when any
+  // mcpVisualSession:<tabId> key mutates. The MCP visual-session lifecycle
+  // entry is written by recordVisualSessionTick (extension/utils/
+  // mcp-visual-session-lifecycle.js) AFTER ownership has been claimed in
+  // fsbAgentRegistry, i.e. AFTER the first storage-change branch above has
+  // already fired and resolved Tier 2 (friendly client label) as null. By
+  // the time entry.client lands in storage, no listener observes the write
+  // and the chip stays stuck on the Tier 3 formatAgentIdForDisplay
+  // short-prefix (e.g., 'agent_95ef8b'). Re-firing refreshOwnerChip on the
+  // visual-session key family causes the chip to re-resolve through Tier 2
+  // and pick up the friendly label (e.g., 'Claude', 'OpenClaw'). Best-effort
+  // key scan (Object.keys + indexOf) -- bounded by at most one entry per
+  // owned tab so this is O(1) on typical input.
+  if (area === 'session' && changes && typeof changes === 'object') {
+    var keys = Object.keys(changes);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].indexOf('mcpVisualSession:') === 0) {
+        refreshOwnerChip();
+        break;
+      }
+    }
+  }
 });
+
+// Phase 11 FINT-20 -- foreign-owned input lockout helpers.
+//
+// applyInputLockout(foreignOwned) toggles the disabled state on the 4 input
+// controls (chatInput contenteditable div + sendBtn + stopBtn + micBtn).
+// CONTEXT D-10 lists 5 controls, but the existing sidepanel UI uses
+// sendBtn for both 'send message' and 'run task' (RESEARCH Section 1.B);
+// the 4-control set covers all user-input affordances.
+//
+// D-11: visual treatment is dimmed/disabled CSS + aria-disabled='true'; NO
+// separate banner -- the existing owner chip is the explanation cue and
+// the aria-describedby span at sidepanel.html line ~27 supplies
+// screen-reader semantics.
+//
+// D-13: stopBtn is included in the lockout because stopBtn is
+// FSB-Autopilot-local; surfacing it as enabled while a foreign agent owns
+// the tab creates a false affordance.
+function applyInputLockout(foreignOwned) {
+  var ariaDescribedById = 'fsb-lockout-aria-description';
+  var controls = [
+    { id: 'chatInput', kind: 'contenteditable' },
+    { id: 'sendBtn', kind: 'button' },
+    { id: 'stopBtn', kind: 'button' },
+    { id: 'micBtn', kind: 'button' }
+  ];
+  for (var i = 0; i < controls.length; i++) {
+    var spec = controls[i];
+    var el = document.getElementById(spec.id);
+    if (!el) continue;
+    if (foreignOwned) {
+      if (spec.kind === 'button') {
+        el.disabled = true;
+      } else {
+        el.setAttribute('contenteditable', 'false');
+      }
+      el.setAttribute('aria-disabled', 'true');
+      el.setAttribute('aria-describedby', ariaDescribedById);
+      el.classList.add('fsb-foreign-owned-disabled');
+    } else {
+      if (spec.kind === 'button') {
+        // Phase 11 FIX (debug-phase-11-tab-swap-stale): restore disabled=false
+        // on stopBtn + micBtn. sendBtn is exempt -- it is governed by
+        // isRunning via updateSendButtonState (called below). Pre-fix the
+        // unlock path ONLY cleared aria-disabled, leaving el.disabled=true
+        // forever after a single lockout cycle, which produced the UAT-11
+        // symptom "input controls stay disabled after switching to a free
+        // tab while autopilot runs on the previous tab".
+        if (spec.id !== 'sendBtn') {
+          el.disabled = false;
+        }
+        el.removeAttribute('aria-disabled');
+      } else {
+        el.setAttribute('contenteditable', 'true');
+        el.removeAttribute('aria-disabled');
+        // Clear the "Disabled while tab is owned by ..." tooltip that
+        // refreshOwnerChip's lock path sets after applyInputLockout(true).
+        el.removeAttribute('title');
+      }
+      el.removeAttribute('aria-describedby');
+      el.classList.remove('fsb-foreign-owned-disabled');
+    }
+  }
+  // Restore the correct sendBtn state so isRunning-driven disabled flag is
+  // preserved on the unlock path (the existing helper handles both
+  // hasContent + isRunning gating). Defensive: helper may not be defined
+  // yet in some boot orderings.
+  if (typeof updateSendButtonState === 'function') {
+    try { updateSendButtonState(); } catch (_e) { /* swallow */ }
+  }
+}
+
+// Phase 11 FINT-20 -- defense-in-depth runtime gate for handleSendMessage.
+// Re-reads active tab + agent registry envelope + shouldShowOwnerChip per
+// the same contract refreshOwnerChip uses. Fail-open on any error: storage
+// failures do NOT block user sends (the primary defense is the sendBtn
+// disabled attribute set by applyInputLockout).
+async function _isActiveTabForeignOwned() {
+  try {
+    if (typeof FSBOwnerChip === 'undefined') return false;
+    var tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    var tab = tabs && tabs[0];
+    if (!tab || typeof tab.id !== 'number') return false;
+    var stored = await chrome.storage.session.get('fsbAgentRegistry');
+    var envelope = stored && stored.fsbAgentRegistry;
+    var ownerAgentId = FSBOwnerChip.findOwnerInEnvelope(envelope, tab.id);
+    return FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE);
+  } catch (_e) {
+    return false;
+  }
+}
 
 // Phase 243 plan 03 (UI-02): refresh the read-only "owned by Agent X" chip.
 // Reads the persisted registry envelope from chrome.storage.session (Phase 237
@@ -254,15 +983,13 @@ async function refreshOwnerChip() {
     if (!chipEl) return;
     if (typeof FSBOwnerChip === 'undefined') {
       chipEl.style.display = 'none';
-      // Quick task 260524-7n9: helper-unload race -- if we previously locked
-      // the input, release it so the user is not stranded with a disabled
-      // input forever just because the chip helper went away.
-      if (_chatLockedByOwnerChip) {
-        _chatLockedByOwnerChip = false;
-        chatInput.setAttribute('contenteditable', 'true');
-        chatInput.removeAttribute('title');
-        updateSendButtonState();
-      }
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
+      // honor the unlock contract on every chip-hidden path. applyInputLockout
+      // restores chatInput + stopBtn + micBtn + aria; clearing the
+      // _chatLockedByOwnerChip flag keeps updateSendButtonState in sync so the
+      // user is not stranded with a disabled input after the helper went away.
+      _chatLockedByOwnerChip = false;
+      applyInputLockout(false);
       return;
     }
 
@@ -270,14 +997,12 @@ async function refreshOwnerChip() {
     const tab = tabs && tabs[0];
     if (!tab || typeof tab.id !== 'number') {
       chipEl.style.display = 'none';
-      // Quick task 260524-7n9: no active tab -- release any lock to avoid
-      // stranding the input disabled across an empty tab query.
-      if (_chatLockedByOwnerChip) {
-        _chatLockedByOwnerChip = false;
-        chatInput.setAttribute('contenteditable', 'true');
-        chatInput.removeAttribute('title');
-        updateSendButtonState();
-      }
+      // Phase 11 FIX (debug-phase-11-tab-swap-stale) + Quick task 260524-7n9:
+      // the no-active-tab branch must also unlock so controls re-enable when the
+      // active-tab race resolves. Clear the _chatLockedByOwnerChip flag so
+      // updateSendButtonState stays in sync.
+      _chatLockedByOwnerChip = false;
+      applyInputLockout(false);
       return;
     }
 
@@ -293,46 +1018,59 @@ async function refreshOwnerChip() {
     if (!FSBOwnerChip.shouldShowOwnerChip(ownerAgentId, MY_SURFACE)) {
       chipEl.textContent = '';
       chipEl.style.display = 'none';
-      // Quick task 260524-7n9: chip is hidden -- release the chat-input lock
-      // if we previously set it (ownership released, agent disconnected, or
-      // user switched to an unowned tab).
-      if (_chatLockedByOwnerChip) {
-        _chatLockedByOwnerChip = false;
-        chatInput.setAttribute('contenteditable', 'true');
-        chatInput.removeAttribute('title');
-        updateSendButtonState();
-      }
+      // Phase 11 FINT-20 + Quick task 260524-7n9 -- unlock controls when the chip
+      // is hidden (either no owner or this surface owns the tab). applyInputLockout
+      // restores chatInput + buttons + aria; clearing the _chatLockedByOwnerChip
+      // flag keeps updateSendButtonState in sync.
+      _chatLockedByOwnerChip = false;
+      applyInputLockout(false);
       return;
     }
 
-    const formatter = (typeof FsbAgentRegistry !== 'undefined'
-      && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
-      ? FsbAgentRegistry.formatAgentIdForDisplay
-      : null;
-    // Quick task 260524-7n9: prefer the canonical MCP client name (Claude,
-    // Codex, Cursor, ...) from the dispatcher-written labels map; fall back
-    // to the legacy 'agent_<hex>' formatter when no label has been observed
-    // yet for this owner (very first agent:register before any action tool
-    // dispatch fires). The clientLabelFor existence check is a
-    // forward-compatibility guard in case the helper has not been re-loaded
-    // after a hot extension reload.
-    const clientLabel = (typeof FSBOwnerChip.clientLabelFor === 'function')
-      ? FSBOwnerChip.clientLabelFor(ownerAgentId, labelsMap)
-      : null;
-    const fallbackLabel = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
-    const displayLabel = clientLabel || fallbackLabel;
-    chipEl.textContent = FSBOwnerChip.buildChipText(displayLabel);
+    // Merged client-label resolution (Phase 11 FINT-19 three-tier + Quick task
+    // 260524-7n9 canonical MCP client name). In priority order:
+    // Tier 1: legacy:* literal (e.g., legacy:popup, legacy:autopilot).
+    // Tier 2: canonical MCP client name (Claude, Codex, Cursor, ...) from the
+    //         dispatcher-written fsbAgentClientLabels map, keyed by ownerAgentId.
+    // Tier 3: friendly client name from the visual-session lifecycle entry
+    //         (Phase 10 D-01 allowlist; e.g., OpenClaw, Claude, FSB Autopilot).
+    // Tier 4: formatAgentIdForDisplay short-prefix fallback for raw-FSB-tool
+    //         agents that never tick the visual-session pipeline.
+    let label;
+    if (ownerAgentId.indexOf('legacy:') === 0) {
+      label = ownerAgentId;
+    } else {
+      const clientLabel = (typeof FSBOwnerChip.clientLabelFor === 'function')
+        ? FSBOwnerChip.clientLabelFor(ownerAgentId, labelsMap)
+        : null;
+      if (clientLabel) {
+        label = clientLabel;
+      } else {
+        const friendly = await FSBOwnerChip.lookupClientLabel(
+          tab.id,
+          (key) => chrome.storage.session.get(key)
+        );
+        if (friendly) {
+          label = friendly;
+        } else {
+          const formatter = (typeof FsbAgentRegistry !== 'undefined'
+            && typeof FsbAgentRegistry.formatAgentIdForDisplay === 'function')
+            ? FsbAgentRegistry.formatAgentIdForDisplay
+            : null;
+          label = FSBOwnerChip.ownerLabelFor(ownerAgentId, formatter);
+        }
+      }
+    }
+    chipEl.textContent = FSBOwnerChip.buildChipText(label);
     chipEl.style.display = 'inline-flex';
-    // Quick task 260524-7n9: chip is visible -- lock the chat input + send
-    // button so the user cannot type into / submit on a tab being actively
-    // driven by an external agent. The send button is gated through
-    // updateSendButtonState (the new _chatLockedByOwnerChip flag composes
-    // into its OR chain). The chat input is a contenteditable div, so
-    // setAttribute('contenteditable', 'false') is the correct lock -- the
-    // `.disabled` property does NOT block typing on contenteditable elements.
+    // Phase 11 FINT-20 + Quick task 260524-7n9 -- lock controls when the chip
+    // renders (tab is foreign-owned). applyInputLockout does the rich lock
+    // (chatInput contenteditable + buttons + aria); the _chatLockedByOwnerChip
+    // flag composes into updateSendButtonState's OR chain, and the title surfaces
+    // which client owns the tab.
     _chatLockedByOwnerChip = true;
-    chatInput.setAttribute('contenteditable', 'false');
-    chatInput.title = 'Disabled while tab is owned by ' + displayLabel;
+    applyInputLockout(true);
+    chatInput.title = 'Disabled while tab is owned by ' + label;
     updateSendButtonState();
   } catch (_e) {
     // Chip is best-effort -- never poison sidepanel boot.
@@ -347,31 +1085,168 @@ async function refreshOwnerChip() {
 try {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onActivated
       && typeof chrome.tabs.onActivated.addListener === 'function') {
-    chrome.tabs.onActivated.addListener(() => {
-      refreshOwnerChip();
+    // Phase 11 FINT-21 -- extended: also swap conversation history on tab
+    // switch (D-14 / D-17 lazy mint). The chip refresh + history swap run
+    // sequentially; both are best-effort, so a failure in one does not
+    // poison the other.
+    chrome.tabs.onActivated.addListener(async (activeInfo) => {
+      // QT-uof-5 (B-FIX) -- persist the OUTGOING tab's
+      // (currentStatusMessage, currentActionGroup) BEFORE the swap clobbers
+      // them. Read _activeTabIdSnapshot here (pre-reassignment) so the
+      // entry is keyed by the tab the user is leaving.
+      try { _persistTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
+
+      try { await refreshOwnerChip(); } catch (_e) { /* swallow */ }
+      try { await swapToTabConversation(activeInfo && activeInfo.tabId); } catch (_e) { /* swallow */ }
+
+      // QT-93i-02 -- after the conversation swap, re-sync the running-state
+      // UI to reflect the newly-active tab's per-tab state. Without this,
+      // the sendBtn / statusDot / statusText reflect whatever tab was
+      // previously active. Tab swaps must surface the active tab's
+      // running state immediately so the send button enable/disable is
+      // correct on every keystroke after the swap.
+      try {
+        if (activeInfo && typeof activeInfo.tabId === 'number') {
+          _activeTabIdSnapshot = activeInfo.tabId;
+          var snap = _getTabRunningEntry(activeInfo.tabId);
+          if (snap.isRunning) {
+            setRunningState(activeInfo.tabId, snap.sessionId || null);
+          } else {
+            setIdleState(activeInfo.tabId);
+          }
+        }
+      } catch (_e) { /* swallow: re-sync is best-effort */ }
+
+      // QT-uof-5 (B-FIX) -- restore the INCOMING tab's previously-persisted
+      // (currentStatusMessage, currentActionGroup). When the tab has no
+      // entry (never had a loader), this nulls the module-scope vars so
+      // subsequent code does not inherit the outgoing tab's references.
+      try { _restoreTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
     });
   }
 } catch (_e) {
   // swallow: chip auto-refresh is non-critical
 }
 
+// Phase 11 FINT-21 -- chrome.tabs.onRemoved listener: drop the tab's
+// entry from the per-tab envelope (CONTEXT D-14). NO discard-event
+// listener registered -- discarded tabs preserve their entry intact
+// (D-15) so the tab can re-restore with its conversation.
+try {
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.onRemoved
+      && typeof chrome.tabs.onRemoved.addListener === 'function') {
+    chrome.tabs.onRemoved.addListener(async (tabId) => {
+      // Phase 12 FINT-23 (Plan 12-02) EC-05 defense: resolve the bound
+      // convId BEFORE the Phase 11 drop nulls the byTab entry, then cancel
+      // any pending debouncer write + drop the message-log entry. Order:
+      // cancel -> drop in-memory buffer -> drop envelope -> persist. This
+      // ensures the would-have-fired 200ms timer cannot resurrect the
+      // dropped entry (the would-be-fired write reads the just-emptied
+      // buffer + returns immediately, AND the timer is cleared anyway).
+      var droppedConvId = null;
+      try {
+        if (typeof FSBSidepanelTabConvStore !== 'undefined'
+            && typeof FSBSidepanelTabConvStore.getTabConversation === 'function'
+            && FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) {
+          droppedConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
+        }
+      } catch (_e) { /* swallow */ }
+
+      try { await dropTabConversation(tabId); } catch (_e) { /* swallow */ }
+
+      // Phase 12 FINT-23 (Plan 12-02): drop message-log entry + cancel pending
+      // debouncer write so EC-05 resurrection-after-drop does not occur.
+      if (droppedConvId
+          && typeof FSBSidepanelMessageLog !== 'undefined'
+          && typeof FSBSidepanelMessageLog.dropConversationMessages === 'function') {
+        if (_messageLogDebouncer && typeof _messageLogDebouncer.cancel === 'function') {
+          _messageLogDebouncer.cancel(droppedConvId);
+        }
+        if (_messageLogPendingBuffer && typeof _messageLogPendingBuffer.delete === 'function') {
+          _messageLogPendingBuffer.delete(droppedConvId);
+        }
+        try {
+          var msgBag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+          var msgEnvelope = msgBag[FSBSidepanelMessageLog.STORAGE_KEY];
+          if (FSBSidepanelMessageLog.isValidEnvelope(msgEnvelope)) {
+            FSBSidepanelMessageLog.dropConversationMessages(msgEnvelope, droppedConvId);
+            var msgPayload = {};
+            msgPayload[FSBSidepanelMessageLog.STORAGE_KEY] = msgEnvelope;
+            await chrome.storage.local.set(msgPayload);
+          }
+        } catch (_e) {
+          // Best-effort: failure leaves orphan entry; LRU eviction reaps eventually.
+        }
+      }
+    });
+  }
+} catch (_e) { /* swallow */ }
+
+// Phase 11 FIX (debug-phase-11-tab-swap-stale) -- defense-in-depth backstop
+// for chrome.tabs.onActivated. The MV3 sidepanel page document context can
+// in rare cases miss an onActivated fire when a brand-new tab is created
+// and immediately becomes active as part of the create (Ctrl+T, opener-
+// linked target=_blank). Adding chrome.windows.onFocusChanged ensures the
+// chip + chat surface re-resolve against the user's real active tab
+// whenever window focus changes. Best-effort: any throw inside swallows.
+//
+// Implementation note: onFocusChanged fires with windowId = -1 (WINDOW_ID_NONE)
+// when focus leaves Chrome entirely. We skip the no-op case so we do not
+// query a stale tab during the un-focused window. When focus returns to a
+// real Chrome window, we resolve the active tab in THAT window (not the
+// sidepanel's hosting window blindly) via tabs.query({active:true, windowId}).
+try {
+  if (typeof chrome !== 'undefined' && chrome.windows && chrome.windows.onFocusChanged
+      && typeof chrome.windows.onFocusChanged.addListener === 'function') {
+    chrome.windows.onFocusChanged.addListener(async (windowId) => {
+      try {
+        if (typeof windowId !== 'number' || windowId < 0) return;
+        await refreshOwnerChip();
+        var tabs = await chrome.tabs.query({ active: true, windowId: windowId });
+        if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
+          _activeTabIdSnapshot = tabs[0].id;  // QT-93i-02
+          await swapToTabConversation(tabs[0].id);
+        }
+      } catch (_e) { /* swallow */ }
+    });
+  }
+} catch (_e) { /* swallow */ }
+
 // Initialize side panel
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('FSB v0.9.50 side panel loaded');
+  console.log(`FSB v${chrome.runtime.getManifest().version} side panel loaded`);
 
   // Apply theme first
   applyTheme();
 
-  // Load sidepanel progress setting
+  // Load sidepanel progress setting (Phase 12 FINT-22 (Plan 12-03): default flipped true per RESEARCH Section 6.4).
   try {
     const stored = await chrome.storage.local.get(['showSidepanelProgress']);
-    showSidepanelProgressEnabled = stored.showSidepanelProgress ?? false;
+    showSidepanelProgressEnabled = stored.showSidepanelProgress ?? true;
   } catch (e) {
-    showSidepanelProgressEnabled = false;
+    showSidepanelProgressEnabled = true;
   }
 
-  // Initialize conversation ID for session continuity
-  await initConversationId();
+  // Phase 11 FINT-21 -- per-tab envelope hydration + legacy migration
+  // (replaces previous single-key conversation init flow).
+  await initTabConversationStore();
+
+  // Phase 12 FINT-23 -- init message-log debouncer + beforeunload force flush.
+  if (typeof FSBSidepanelMessageLog !== 'undefined'
+      && typeof FSBSidepanelMessageLog.createDebouncer === 'function') {
+    _messageLogDebouncer = FSBSidepanelMessageLog.createDebouncer({
+      debounceMs: FSBSidepanelMessageLog.DEFAULT_DEBOUNCE_MS
+    });
+    try {
+      window.addEventListener('beforeunload', function () {
+        if (_messageLogDebouncer && typeof _messageLogDebouncer.flushAll === 'function') {
+          _messageLogDebouncer.flushAll().catch(function () {});
+        }
+      });
+    } catch (_e) {
+      // Sidepanel context may lack window in unusual edge cases.
+    }
+  }
 
   // Initialize analytics
   initializeSidepanelAnalytics();
@@ -398,14 +1273,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Check current status
-  chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
+  // QT-wnz Codex-2 -- send activeTabId so background returns only sessions
+  // owned by THIS tab. Pre-wnz the call omitted activeTabId and background
+  // returned sessionIds[0] globally, which is wrong when another tab has
+  // an older active session.
+  chrome.runtime.sendMessage({ action: 'getStatus', activeTabId: _activeTabIdSnapshot }, (response) => {
     if (chrome.runtime.lastError) {
       console.log('Background script not ready yet');
       return;
     }
     if (response && response.activeSessions > 0) {
-      setRunningState();
+      // QT-93i-02 -- wire boot-restore running state to the cached active tab.
+      setRunningState(_activeTabIdSnapshot, response.currentSessionId || null);
       // Recover sessionId from background if UI lost it (e.g., after service worker restart)
       if (!currentSessionId && response.currentSessionId) {
         currentSessionId = response.currentSessionId;
@@ -429,6 +1308,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       const replayBtn = e.target.closest('.history-replay-btn');
       if (replayBtn) {
         e.stopPropagation();
+        // Phase 11 FINT-20 WR-03 fix -- gate history replay on the
+        // foreign-owned check. The history-replay-btn is dynamically
+        // rendered into the history list AFTER applyInputLockout's
+        // snapshot, so it cannot be dimmed via the lockout class.
+        // Without this guard, clicking replay while another agent owns
+        // the active tab would silently fail downstream (startReplay
+        // dispatches a replaySession message that targets the active
+        // tab). Early-return + console.warn surfaces the edge case.
+        if (await _isActiveTabForeignOwned()) {
+          console.warn('[sidepanel] history replay blocked -- active tab is foreign-owned');
+          return;
+        }
         const sessionId = replayBtn.dataset.sessionId;
         if (sessionId) {
           startReplay(sessionId);
@@ -467,8 +1358,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     new FSBSpeechToText(chatInput, micBtn, sendBtn);
   }
 
-  // Add welcome message
-  addMessage('Welcome to FSB. How can I help?', 'system');
+  // Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
+  // surface from the per-tab conversation's persisted session log BEFORE
+  // adding the welcome message. If conversationId is null (D-17 lazy
+  // mint: no entry minted yet on this tab) OR no matching session rows
+  // exist (fresh conversation), the welcome message renders into an
+  // empty chat as before. Otherwise prior user prompts + ai completions
+  // replay in chronological order and the welcome is suppressed -- the
+  // user sees their conversation continuation, not a redundant greeting.
+  var hydratedCount = 0;
+  try {
+    hydratedCount = await hydrateChatFromConversationId(conversationId);
+  } catch (_e) { /* swallow: hydrate is best-effort */ }
+
+  if (hydratedCount === 0) {
+    // No prior conversation to restore -- show the welcome greeting.
+    addMessage('Welcome to FSB. How can I help?', 'system');
+  }
 
   // Focus the input
   chatInput.focus();
@@ -554,6 +1460,19 @@ async function handleSendMessage() {
     return;
   }
 
+  // Phase 11 FINT-20 -- defense-in-depth runtime gate. The sendBtn
+  // disabled attribute (set by applyInputLockout via refreshOwnerChip) is
+  // the primary defense; this gate guards against a stale UI state where
+  // the button was cleared by a sibling refresh racing with tab
+  // activation. Fail-open: storage errors do NOT block sends.
+  if (await _isActiveTabForeignOwned()) return;
+
+  // Phase 11 FINT-21 -- lazy-mint OR touch the active tab's conversationId.
+  // D-17 lazy mint: this is the first persistence point for a tab the
+  // user is chatting in. Failure to mint falls back to direct mint inside
+  // the helper; never blocks the send path.
+  try { conversationId = await ensureTabConversationForActiveTab(false); } catch (_e) { /* swallow */ }
+
   // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
   // Handle /agent slash commands
   // if (message.startsWith('/agent')) {
@@ -598,8 +1517,11 @@ async function handleSendMessage() {
       }
 
       if (response && response.success) {
+        // QT-93i-02 -- thread the originating tab.id so the per-tab map
+        // records THIS tab's running state (not the active tab's, which
+        // is normally the same here but is the wrong assumption to bake in).
         currentSessionId = response.sessionId;
-        setRunningState();
+        setRunningState(tab && tab.id, response.sessionId);
         addStatusMessage(response.continued ? 'Continuing...' : 'Starting automation...');
       } else {
         const errorMsg = response ? response.error : 'Unknown error';
@@ -609,13 +1531,13 @@ async function handleSendMessage() {
         } else {
           addMessage(`I encountered an error: ${errorMsg}`, 'error');
         }
-        setIdleState();
+        setIdleState(_activeTabIdSnapshot);
       }
     });
     
   } catch (error) {
     addMessage(`Something went wrong: ${error.message}`, 'error');
-    setIdleState();
+    setIdleState(_activeTabIdSnapshot);
   }
 }
 
@@ -651,21 +1573,38 @@ function stopAutomation() {
       if (currentStatusMessage) {
         completeStatusMessage('Automation stopped', 'system');
       }
-      setIdleState();
+      setIdleState(_resolveTabIdForSession(currentSessionId));
       currentSessionId = null;
       stopRequested = false;
       console.log('Side panel: Automation stopped successfully');
     } else {
       const errorMsg = response ? response.error : 'Unknown error';
-      addMessage(`Error stopping automation: ${errorMsg}`, 'error');
-      stopRequested = false;
-      console.error('Side panel: Stop automation failed:', errorMsg);
+      if (response && response.alreadyEnded) {
+        // QT-uof-4 (C-FIX) -- the session completed cleanly between UI
+        // state and stop-click. Treat as a friendly outcome: complete
+        // the loader DOM (or render a system message), set idle, and
+        // skip the misleading 'Session not found' error toast. See
+        // .planning/debug/cluster1-routing.md.
+        if (currentStatusMessage) {
+          completeStatusMessage('Already completed', 'system');
+        } else {
+          addMessage('Already completed', 'system');
+        }
+        setIdleState(_resolveTabIdForSession(currentSessionId));
+        currentSessionId = null;
+        stopRequested = false;
+        console.log('Side panel: Stop arrived after natural completion (alreadyEnded)');
+      } else {
+        addMessage(`Error stopping automation: ${errorMsg}`, 'error');
+        stopRequested = false;
+        console.error('Side panel: Stop automation failed:', errorMsg);
+      }
     }
   });
 }
 
 // Start new chat session
-function startNewChat() {
+async function startNewChat() {
   // Switch back to chat view if history is showing
   if (isHistoryViewActive) {
     showChatView();
@@ -683,29 +1622,39 @@ function startNewChat() {
   currentSessionId = null;
   stopRequested = false;
 
-  // Generate new conversationId for new chat
-  conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  chrome.storage.session.set({ fsbSidepanelConversationId: conversationId }).catch(() => {});
+  // Phase 11 FINT-21 -- mint a fresh conversation in the current tab by
+  // overwriting the existing entry.
+  //
+  // Phase 12 WR-01 fix: AWAIT the fresh-mint before addMessage('Welcome...')
+  // so the new conversationId is bound BEFORE the welcome message's
+  // write-through fires via addMessage -> _persistMessage. Without await,
+  // the welcome was either persisted under the OLD convId or dropped when
+  // _persistMessage saw a stale/null conversationId. The await guarantees
+  // the welcome lands in the FRESH conversation's persisted log so the
+  // next reopen hydrate replays it consistently.
+  try {
+    await ensureTabConversationForActiveTab(true);
+  } catch (_e) { /* swallow -- UI clearing still proceeds below */ }
 
   // Clear chat messages
   chatMessages.innerHTML = '';
-  
-  // Reset UI state
-  setIdleState();
-  
+
+  // Reset UI state -- QT-93i-02 explicit current tab for safety.
+  setIdleState(_activeTabIdSnapshot);
+
   // Clear any saved task
   chrome.storage.local.set({ lastTask: '' });
-  
+
   // Clear input field
   chatInput.textContent = '';
   updateSendButtonState();
-  
+
   // Add fresh welcome message
   addMessage('Welcome to FSB. How can I help?', 'system');
-  
+
   // Focus the input
   chatInput.focus();
-  
+
   console.log('New chat session started');
 }
 
@@ -728,7 +1677,7 @@ function checkSessionLiveness() {
         if (livenessFailCount >= 2) {
           console.warn('[FSB sidepanel] Orphan detected after 2 consecutive failures, recovering');
           addMessage('Session ended unexpectedly. Ready for your next task.', 'error');
-          setIdleState();
+          setIdleState(_resolveTabIdForSession(currentSessionId));
         }
       } else {
         livenessFailCount = 0;
@@ -737,61 +1686,117 @@ function checkSessionLiveness() {
   );
 }
 
-// Update UI for running state
-function setRunningState() {
-  isRunning = true;
-  // Quick task 260524-7n9: sendBtn.disabled is re-derived by
-  // updateSendButtonState() below; that call honours _chatLockedByOwnerChip
-  // so this bare assignment is safe (isRunning=true also keeps it disabled).
-  sendBtn.disabled = true;
-  stopBtn.classList.remove('hidden');
-  statusDot.classList.add('running');
-  statusText.textContent = 'Working';
-  updateSendButtonState();
-  livenessFailCount = 0;
-  if (livenessInterval) clearInterval(livenessInterval);
-  livenessInterval = setInterval(checkSessionLiveness, 10000);
-}
+// QT-93i-02 -- per-tab running state. Optional explicit tabId; defaults
+// to the cached active tab. Writes to the per-tab map, then mirrors to
+// module-scope `isRunning` + `currentSessionId` when the target tabId
+// IS the active tab (so the existing readers like updateSendButtonState
+// see the correct snapshot). Other tabs' state is preserved on the map
+// so swapping back to them restores their UI on chrome.tabs.onActivated.
+function setRunningState(tabId, sessionId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+  var resolvedSessionId = (typeof sessionId === 'string' && sessionId.length > 0)
+    ? sessionId
+    : (currentSessionId || null);
 
-// Update UI for idle state
-function setIdleState() {
-  if (livenessInterval) { clearInterval(livenessInterval); livenessInterval = null; }
-  livenessFailCount = 0;
-  isRunning = false;
-  // Quick task 260524-7n9: sendBtn.disabled is re-derived by
-  // updateSendButtonState() below; that call honours _chatLockedByOwnerChip
-  // so this bare assignment is safe.
-  sendBtn.disabled = false;
-  stopBtn.classList.add('hidden');
-  statusDot.classList.remove('running', 'error');
-  statusText.textContent = 'Ready';
-
-  // Clean up any remaining status message with loader
-  if (currentStatusMessage) {
-    const loaderDots = currentStatusMessage.querySelector('.typing-dots');
-    if (loaderDots) {
-      loaderDots.remove();
-    }
-    currentStatusMessage = null;
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    var previousSessionId = entry.sessionId;
+    var shouldResetStartedAt = !entry.isRunning ||
+      previousSessionId !== resolvedSessionId ||
+      typeof entry.startedAt !== 'number';
+    entry.isRunning = true;
+    entry.sessionId = resolvedSessionId;
+    if (shouldResetStartedAt) entry.startedAt = Date.now();
   }
 
-  // Reset action debug group reference
-  currentActionGroup = null;
-
-  updateSendButtonState();
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    var activeEntry = _getTabRunningEntry(targetTabId);
+    isRunning = true;
+    if (resolvedSessionId) currentSessionId = resolvedSessionId;
+    sendBtn.disabled = true;
+    stopBtn.classList.remove('hidden');
+    statusDot.classList.add('running');
+    statusText.textContent = 'Working';
+    if (typeof showAutomationRunner === 'function') showAutomationRunner(activeEntry.startedAt, 'Working');
+    updateSendButtonState();
+    livenessFailCount = 0;
+    if (livenessInterval) clearInterval(livenessInterval);
+    livenessInterval = setInterval(checkSessionLiveness, 10000);
+  }
 }
 
-// Update UI for error state
-function setErrorState() {
-  isRunning = false;
-  // Quick task 260524-7n9: sendBtn.disabled is re-derived by
-  // updateSendButtonState() below; that call honours _chatLockedByOwnerChip
-  // so this bare assignment is safe.
-  sendBtn.disabled = false;
-  stopBtn.classList.add('hidden');
-  statusDot.classList.add('error');
-  statusText.textContent = 'Error';
-  updateSendButtonState();
+// QT-93i-02 -- per-tab idle state. Optional explicit tabId; defaults to
+// the cached active tab. The existing cleanup (livenessInterval, action
+// group reset, status message cleanup) only fires for the active tab so
+// background-tab completions do NOT clobber the active tab's currentStatusMessage.
+function setIdleState(tabId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    entry.isRunning = false;
+    entry.sessionId = null;
+    entry.startedAt = null;
+  }
+
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    if (livenessInterval) { clearInterval(livenessInterval); livenessInterval = null; }
+    livenessFailCount = 0;
+    isRunning = false;
+    currentSessionId = null;
+    sendBtn.disabled = false;
+    stopBtn.classList.add('hidden');
+    statusDot.classList.remove('running', 'error');
+    statusText.textContent = 'Ready';
+    if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
+
+    // Clean up any remaining status message with loader (active-tab only).
+    if (currentStatusMessage) {
+      currentStatusMessage = null;
+    }
+    currentActionGroup = null;
+    // QT-uof-5 (B-FIX) -- active tab is now idle; the per-tab intent mirror
+    // for this tab should match (statusMessage = null, actionGroup = null).
+    // Drop the entry so a future swap-IN does not restore a stale loader.
+    _clearTabStatusIntent(_activeTabIdSnapshot);
+    updateSendButtonState();
+  } else if (typeof targetTabId === 'number') {
+    // QT-uof-5 (B-FIX) -- background tab transitioned to idle. Drop its
+    // per-tab intent so a future swap-IN does not restore a stale loader
+    // reference (the DOM the loader pointed at may have been removed by
+    // the active-tab's chatMessages.innerHTML wipe during the swap-out
+    // earlier; we never want to re-set currentStatusMessage to a detached
+    // node).
+    _clearTabStatusIntent(targetTabId);
+  }
+}
+
+// QT-93i-02 -- per-tab error state. Same pattern as setIdleState; only
+// the active tab's UI is mutated. Background-tab errors update the per-tab
+// entry so swapping back to that tab can show an error indicator if we
+// later wire one (out of scope for this task).
+function setErrorState(tabId) {
+  var targetTabId = (typeof tabId === 'number') ? tabId : _activeTabIdSnapshot;
+
+  if (typeof targetTabId === 'number') {
+    var entry = _getTabRunningEntry(targetTabId);
+    entry.isRunning = false;
+    entry.startedAt = null;
+    // sessionId left as-is so error reporting can still resolve it.
+  }
+
+  var isActiveTab = (typeof targetTabId === 'number' && targetTabId === _activeTabIdSnapshot);
+  if (isActiveTab) {
+    isRunning = false;
+    sendBtn.disabled = false;
+    stopBtn.classList.add('hidden');
+    statusDot.classList.add('error');
+    statusText.textContent = 'Error';
+    if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
+    updateSendButtonState();
+  }
 }
 
 // Global reference to current status message
@@ -799,6 +1804,46 @@ let currentStatusMessage = null;
 
 // Collapsible debug panel for action steps (lives inside the status message)
 let currentActionGroup = null;
+
+// QT-uof-5 (B-FIX) -- per-tab mirror of (currentStatusMessage,
+// currentActionGroup). The module-scope vars above are SINGLE -- when the
+// user switches tabs while one tab has a loader and another has a different
+// loader, the swap clobbers them. Eagerly persisted on tab swap-OUT;
+// lazily restored on tab swap-IN. Treats both fields as a single per-tab
+// intent pair (audit: currentActionGroup has the EXACT same lifecycle as
+// currentStatusMessage -- set inside ensureActionGroup which returns null
+// without currentStatusMessage; cleared at the same sites). See
+// .planning/debug/cluster1-routing.md Cluster 2 leftover items.
+var _tabStatusIntentMap = new Map(); // Map<tabId, {statusMessage, actionGroup}>
+
+function _persistTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') return;
+  _tabStatusIntentMap.set(tabId, {
+    statusMessage: currentStatusMessage,
+    actionGroup: currentActionGroup
+  });
+}
+
+function _restoreTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') {
+    currentStatusMessage = null;
+    currentActionGroup = null;
+    return;
+  }
+  var entry = _tabStatusIntentMap.get(tabId);
+  if (entry) {
+    currentStatusMessage = entry.statusMessage || null;
+    currentActionGroup = entry.actionGroup || null;
+  } else {
+    currentStatusMessage = null;
+    currentActionGroup = null;
+  }
+}
+
+function _clearTabStatusIntent(tabId) {
+  if (typeof tabId !== 'number') return;
+  _tabStatusIntentMap.delete(tabId);
+}
 
 function ensureActionGroup() {
   if (currentActionGroup) return currentActionGroup;
@@ -833,6 +1878,11 @@ function ensureActionGroup() {
 }
 
 function addActionMessage(text) {
+  // Phase 12 FINT-23 (Plan 12-02): persistence ALWAYS fires (CONTEXT D-10);
+  // DOM render below stays gated by showSidepanelProgressEnabled until
+  // Plan 12-03 flips the default to true (FINT-22).
+  _persistMessage('assistant', text, 'tool');
+
   if (!showSidepanelProgressEnabled) return;
 
   const group = ensureActionGroup();
@@ -854,7 +1904,7 @@ function addActionMessage(text) {
   scrollToBottom();
 }
 
-// Add dynamic status message with integrated loader
+// Add dynamic status message anchor for progress/completion updates
 function addStatusMessage(text, type = 'ai') {
   // Remove any existing status message (and its embedded action group)
   if (currentStatusMessage) {
@@ -863,21 +1913,16 @@ function addStatusMessage(text, type = 'ai') {
   }
   
   const messageDiv = document.createElement('div');
-  messageDiv.className = `message status-message status-dots-only new`;
+  messageDiv.className = `message status-message status-anchor`;
   
-  // Create message content with integrated loader
   const messageContent = document.createElement('div');
   messageContent.className = 'message-content';
   
-  // Create loader dots
-  const loaderDots = document.createElement('div');
-  loaderDots.className = 'typing-dots';
-  loaderDots.innerHTML = '<span></span><span></span><span></span>';
-  
   // Create status text
-  const statusText = document.createElement('span');
-  statusText.className = 'status-text';
-  statusText.textContent = text;
+  const statusTextEl = document.createElement('span');
+  statusTextEl.className = 'status-text';
+  statusTextEl.textContent = text;
+  setAutomationRunnerText(text);
   
   // Progress container (hidden until progress data arrives)
   const progressContainer = document.createElement('div');
@@ -893,8 +1938,7 @@ function addStatusMessage(text, type = 'ai') {
   progressContainer.appendChild(progressLabel);
 
   // Assemble the message
-  messageContent.appendChild(loaderDots);
-  messageContent.appendChild(statusText);
+  messageContent.appendChild(statusTextEl);
   if (showSidepanelProgressEnabled) {
     messageContent.appendChild(progressContainer);
   }
@@ -905,17 +1949,13 @@ function addStatusMessage(text, type = 'ai') {
   // Store reference for updates
   currentStatusMessage = messageDiv;
 
-  // Remove the 'new' class after animation
-  setTimeout(() => {
-    messageDiv.classList.remove('new');
-  }, 400);
-
   scrollToBottom();
   return messageDiv;
 }
 
 // Update existing status message with optional progress data
 function updateStatusMessage(text, progressData) {
+  setAutomationRunnerText(text);
   if (currentStatusMessage) {
     const statusText = currentStatusMessage.querySelector('.status-text');
     if (statusText) {
@@ -950,6 +1990,58 @@ function completeStatusMessage(text, type = 'ai') {
       addMessage(text, 'system');
     }
   }
+}
+
+// QT-7bi-02 (completion-routing fix) -- DOM-only render variant of
+// addCompletionMessage. Used by the automationComplete case where
+// _persistMessageToConversation has ALREADY persisted the message
+// against request.conversationId; calling addCompletionMessage would
+// trigger a second _persistMessage write into the same conv via its
+// internal write-through (line ~1575 in the original helper).
+//
+// Visual treatment is identical to addCompletionMessage. The DOM render
+// path is the only thing that must remain symmetric so the bubble looks
+// the same regardless of whether the completion was for the active tab
+// (this helper) or a non-active tab (persist-only; replayed via
+// hydrateChatFromConversationId on next swap).
+function _renderCompletionDomOnly(text, type, isPartial) {
+  if (type === undefined) type = 'ai';
+  if (isPartial === undefined) isPartial = false;
+  var messageDiv = document.createElement('div');
+  messageDiv.className = 'message ai-completion new';
+
+  if (isPartial) {
+    messageDiv.classList.add('partial-result');
+    var label = document.createElement('div');
+    label.className = 'partial-result-label';
+    label.textContent = 'Partial result';
+    messageDiv.appendChild(label);
+  }
+
+  if (type === 'error') {
+    messageDiv.className = 'message error new';
+    messageDiv.textContent = text;
+  } else {
+    var contentDiv = document.createElement('div');
+    if (typeof FSBMarkdown !== 'undefined') {
+      FSBMarkdown.applyToElement(contentDiv, text);
+    } else {
+      contentDiv.textContent = text;
+    }
+    messageDiv.appendChild(contentDiv);
+  }
+
+  chatMessages.appendChild(messageDiv);
+
+  setTimeout(function () {
+    messageDiv.classList.remove('new');
+  }, 400);
+
+  while (chatMessages.children.length > 100) {
+    chatMessages.removeChild(chatMessages.firstChild);
+  }
+
+  scrollToBottom();
 }
 
 // Add a separate completion message bubble with markdown support
@@ -990,6 +2082,10 @@ function addCompletionMessage(text, type = 'ai', isPartial = false) {
   }
 
   scrollToBottom();
+
+  // Phase 12 FINT-23 write-through (Plan 12-02): completion bubbles persist
+  // as assistant text. isPartial flag NOT recorded per CONTEXT D-07 + D-26.
+  _persistMessage('assistant', text, 'text');
 }
 
 // Show Chrome page error as plain text without bubble
@@ -1016,8 +2112,203 @@ function showChromepageError(text) {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+/**
+ * Phase 12 FINT-23 (Plan 12-02) -- write-through hook.
+ *
+ * Called from addMessage + addCompletionMessage + addActionMessage AFTER
+ * the existing DOM render path. Schedules a 200ms-debounced flush per
+ * conversationId via the module-scope _messageLogDebouncer.
+ *
+ * Guards:
+ *  - lazy-mint window: conversationId may be null in early-boot or
+ *    foreign-owned-tab flows (Phase 11 D-17); skip persistence then.
+ *  - empty content: skip.
+ *  - sidecar absent: skip (script-tag load order failure).
+ *  - debouncer absent: skip (boot init failed; storage write unsafe).
+ *
+ * Storage failures swallow silently -- DOM render must never block on
+ * persistence per CONTEXT D-03.
+ */
+function _persistMessage(role, content, kind) {
+  if (typeof FSBSidepanelMessageLog === 'undefined') return;
+  if (!conversationId || typeof conversationId !== 'string') return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!_messageLogDebouncer) return;
+
+  var resolvedRole = (role === 'user') ? 'user' : 'assistant';
+  var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+
+  // Append to in-memory buffer immediately for read consistency.
+  var convId = conversationId;
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer) {
+    buffer = [];
+    _messageLogPendingBuffer.set(convId, buffer);
+  }
+  buffer.push({
+    role: resolvedRole,
+    content: content,
+    timestamp: Date.now(),
+    kind: resolvedKind
+  });
+
+  // Clear-and-replace 200ms debounce per CONTEXT D-03.
+  _messageLogDebouncer.schedule(convId, function () {
+    return _flushMessageLog(convId);
+  });
+}
+
+/**
+ * QT-7bi-02 (completion-routing fix) -- explicit-convId variant of
+ * _persistMessage.
+ *
+ * The original _persistMessage closes over the module-scope `conversationId`
+ * variable, which is mutated by swapToTabConversation on every tab switch.
+ * When automationComplete fires for a session dispatched from tab A while
+ * the sidepanel currently displays tab B's conversation, _persistMessage
+ * would write the completion bubble into tab B's persisted log (the
+ * currently-displayed conv), not tab A's (the originating conv).
+ *
+ * This sibling helper takes an explicit `convId` so completion-routing
+ * call sites can persist into the originating conversation regardless of
+ * which tab is currently displayed. Identical guards + buffer + debouncer
+ * semantics as _persistMessage.
+ *
+ * Guards:
+ *  - convId must be a non-empty string (lazy-mint windows pass null; skip).
+ *  - sidecar absent: skip (script-tag load order failure).
+ *  - debouncer absent: skip (boot init failed; storage write unsafe).
+ *
+ * Storage failures swallow silently -- DOM render must never block on
+ * persistence (mirrors _persistMessage contract).
+ */
+function _persistMessageToConversation(role, content, kind, convId, sessionId, terminal) {
+  if (typeof FSBSidepanelMessageLog === 'undefined') return;
+  if (!convId || typeof convId !== 'string') return;
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!_messageLogDebouncer) return;
+
+  var resolvedRole = (role === 'user') ? 'user' : 'assistant';
+  var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer) {
+    buffer = [];
+    _messageLogPendingBuffer.set(convId, buffer);
+  }
+  var row = {
+    role: resolvedRole,
+    content: content,
+    timestamp: Date.now(),
+    kind: resolvedKind
+  };
+  // QT-wnz Codex-4 -- carry sessionId + terminal through to envelope so
+  // hasTerminalForSession can dedupe redundant terminal writes (post-C3
+  // the background already persisted; sidepanel is now idempotent backup).
+  if (typeof sessionId === 'string' && sessionId.length > 0) row.sessionId = sessionId;
+  if (terminal === true) row.terminal = true;
+  buffer.push(row);
+
+  _messageLogDebouncer.schedule(convId, function () {
+    return _flushMessageLog(convId);
+  });
+}
+
+/**
+ * Plan 12-02 FINT-23 flush helper.
+ *
+ * Reads the envelope from chrome.storage.local, appends the buffered
+ * messages via the sidecar's appendMessage (which enforces LRU cap = 50),
+ * persists. On failure, resurrects the snapshot into the buffer so the
+ * next flush retries.
+ */
+async function _flushMessageLog(convId) {
+  var buffer = _messageLogPendingBuffer.get(convId);
+  if (!buffer || buffer.length === 0) return;
+  var snapshot = buffer.slice();
+  buffer.length = 0;
+  try {
+    var bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+    var envelope = bag[FSBSidepanelMessageLog.STORAGE_KEY];
+    if (!FSBSidepanelMessageLog.isValidEnvelope(envelope)) {
+      envelope = FSBSidepanelMessageLog.emptyEnvelope();
+    }
+    for (var i = 0; i < snapshot.length; i++) {
+      FSBSidepanelMessageLog.appendMessage(envelope, convId, snapshot[i]);
+    }
+    var payload = {};
+    payload[FSBSidepanelMessageLog.STORAGE_KEY] = envelope;
+    await chrome.storage.local.set(payload);
+
+    // Phase 12 WR-02 fix: items appended to _messageLogPendingBuffer DURING
+    // the chrome.storage.local.get + chrome.storage.local.set awaits stay
+    // in the in-memory buffer (they were not part of `snapshot`). The
+    // debouncer timer for this convId has already fired, so without an
+    // explicit re-schedule the residual items would languish until the
+    // NEXT _persistMessage call (which could be minutes). That stretches
+    // the documented 200ms lost-on-crash bound (D-03) beyond contract.
+    // Re-schedule another 200ms flush cycle so residuals land bounded-time
+    // later, per the documented D-03 invariant.
+    var residual = _messageLogPendingBuffer.get(convId);
+    if (residual && residual.length > 0 && _messageLogDebouncer
+        && typeof _messageLogDebouncer.schedule === 'function') {
+      _messageLogDebouncer.schedule(convId, function () {
+        return _flushMessageLog(convId);
+      });
+    }
+  } catch (_e) {
+    // Best-effort: failure resurrects the buffer so next flush retries.
+    var current = _messageLogPendingBuffer.get(convId);
+    if (current && current.length > 0) {
+      _messageLogPendingBuffer.set(convId, snapshot.concat(current));
+    } else {
+      _messageLogPendingBuffer.set(convId, snapshot);
+    }
+    // Phase 12 WR-02 fix: on storage failure, also re-schedule so the
+    // retry fires bounded-time later (same D-03 contract). Without this,
+    // a transient storage write failure could strand the resurrected
+    // buffer until the next _persistMessage call.
+    if (_messageLogDebouncer
+        && typeof _messageLogDebouncer.schedule === 'function') {
+      _messageLogDebouncer.schedule(convId, function () {
+        return _flushMessageLog(convId);
+      });
+    }
+  }
+}
+
+/**
+ * Phase 12 FINT-23 (Plan 12-01) -- DOM-only render path for replay.
+ *
+ * Identical visual treatment to addMessage but bypasses addMessage entirely
+ * so the future Plan 12-02 addMessage write-through hook does NOT loop a
+ * hydrate replay back into chrome.storage.local (Pitfall 3 defense from
+ * 12-RESEARCH Section 10).
+ *
+ * (role, kind) -> CSS type mapping:
+ *   ('user',      'text')     -> .message.user
+ *   ('assistant', 'text')     -> .message.system  (default assistant style)
+ *   ('assistant', 'progress') -> .message.action  (D-12 styling reuses existing action treatment)
+ *   ('assistant', 'tool')     -> .message.action  (D-12 styling)
+ *   ('assistant', 'error')    -> .message.error
+ *
+ * No .new class. No animation setTimeout. Scrollback is not "new".
+ */
+function renderPersistedMessage(content, role, kind) {
+  if (typeof content !== 'string' || content.length === 0) return;
+  if (!chatMessages) return;
+  var cssType = 'system';
+  if (role === 'user') cssType = 'user';
+  else if (kind === 'error') cssType = 'error';
+  else if (kind === 'progress' || kind === 'tool') cssType = 'action';
+  var messageDiv = document.createElement('div');
+  messageDiv.className = 'message ' + cssType;
+  messageDiv.textContent = content;
+  chatMessages.appendChild(messageDiv);
+}
+
 // Add message to chat with modern bubble styling
-function addMessage(text, type = 'system') {
+function addMessage(text, type = 'system', kind) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${type} new`;
 
@@ -1071,6 +2362,20 @@ function addMessage(text, type = 'system') {
   }
 
   scrollToBottom();
+
+  // Phase 12 FINT-23 write-through hook (Plan 12-02). Fires AFTER DOM render
+  // so persistence failures never block UI. Role + kind derive from the
+  // existing `type` parameter for backward compat with 60+ call sites; the
+  // optional 3rd arg `kind` overrides when the caller knows the kind (e.g.
+  // the Plan 12-03 autopilot listener emits kind='tool' for tool_executed).
+  var _role = (type === 'user') ? 'user' : 'assistant';
+  var _kind = kind;
+  if (!_kind) {
+    if (type === 'error') _kind = 'error';
+    else if (type === 'action') _kind = 'tool';
+    else _kind = 'text';
+  }
+  _persistMessage(_role, text, _kind);
 }
 
 // Smooth scroll to bottom
@@ -1224,7 +2529,7 @@ function renderAutomationCompletionPayload(payload) {
 
   if (outcome === 'failure') {
     var errorMessage = payload.error || payload.outcomeDetails?.error || completionMessage || 'Automation error';
-    setErrorState();
+    setErrorState(_resolveTabIdForSession(payload.sessionId));
     if (currentStatusMessage) {
       completeStatusMessage('Error: ' + errorMessage, 'error');
     } else {
@@ -1241,7 +2546,7 @@ function renderAutomationCompletionPayload(payload) {
     addCompletionMessage(completionMessage, 'ai', outcome === 'partial');
   }
 
-  setIdleState();
+  setIdleState(_resolveTabIdForSession(payload.sessionId));
   currentSessionId = null;
   lastRenderedTerminalSessionId = payload.sessionId || historySessionId || null;
 
@@ -1344,66 +2649,206 @@ async function recoverLatestThreadTerminalOutcome(options = {}) {
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
-    case 'automationComplete':
-      if (!isRunning) return; // Already idle, ignore duplicate
-      if (request.sessionId === currentSessionId) {
-        // AI must always provide a meaningful completion message
-        const completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
-        const isPartial = request.partial === true;
-
-        if (currentStatusMessage) {
-          completeStatusMessage(completionMessage, isPartial ? 'partial' : undefined);
-        } else {
-          addCompletionMessage(completionMessage, 'ai', isPartial);
-        }
-
-        setIdleState();
-        // Refresh history list if history view is active
-        if (isHistoryViewActive) {
-          loadHistoryList();
-        }
-
-        // Check if reconnaissance could help (partial/stuck completions on unmapped sites)
-        if (isPartial) {
-          (async () => {
-            try {
-              const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-              const currentUrl = tabs[0]?.url;
-              if (currentUrl && currentUrl.startsWith('http')) {
-                const domain = new URL(currentUrl).hostname;
-                const siteMapCheck = await chrome.runtime.sendMessage({
-                  action: 'checkSiteMap',
-                  domain
-                });
-
-                if (!siteMapCheck || !siteMapCheck.exists) {
-                  const reconDiv = document.createElement('div');
-                  reconDiv.className = 'message system new recon-suggestion';
-                  const textSpan = document.createElement('span');
-                  textSpan.className = 'recon-suggestion-text';
-                  textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
-                  reconDiv.appendChild(textSpan);
-
-                  const reconBtn = document.createElement('button');
-                  reconBtn.className = 'recon-btn';
-                  reconBtn.id = 'reconFromSidepanel';
-                  reconBtn.textContent = 'Run Reconnaissance';
-                  reconBtn.addEventListener('click', () => {
-                    startReconFromSidepanel(currentUrl, request.task || completionMessage);
-                  });
-                  reconDiv.appendChild(reconBtn);
-
-                  chatMessages.appendChild(reconDiv);
-                  scrollToBottom();
-                }
-              }
-            } catch (e) {
-              console.warn('Recon suggestion check failed:', e.message);
-            }
-          })();
+    // QT-uof-1 (D-FIX + E-FIX) -- see .planning/debug/cluster1-routing.md.
+    //
+    // D-FIX (Symptom D, primary): pre-fix outer bail at this case dropped
+    // EVERY completion whose sessionId did not match currentSessionId. That
+    // meant background-tab sessions never got persisted into their own
+    // conv's message log, and their _tabRunningMap entry never flipped to
+    // isRunning:false. The relaxed outer guard below admits ANY session
+    // that lives in _tabRunningMap (active OR background); persistence and
+    // per-tab state updates run UNCONDITIONALLY for those messages. Only
+    // the DOM render stays gated on isOriginatingActive.
+    //
+    // E-FIX (Symptom E, secondary): the pre-fix active-tab path called
+    // _persistMessageToConversation, THEN completeStatusMessage, which calls
+    // addCompletionMessage, which calls _persistMessage AGAIN against the
+    // module-scope conversationId (== originatingConvId when active). That
+    // produced a double-persist into conv_A. The if-branch below now
+    // manually removes the loader DOM and invokes _renderCompletionDomOnly
+    // directly so persistence fires EXACTLY ONCE.
+    case 'automationComplete': {
+      // D-FIX: relaxed outer guard. We accept the message if it targets
+      // (a) our currently-active sessionId, OR (b) any sessionId carried
+      // by a known _tabRunningMap entry (background-tab completion). Drop
+      // only when the sessionId is genuinely unknown to this sidepanel.
+      var sessionKnown = (request.sessionId === currentSessionId);
+      if (!sessionKnown) {
+        var _iter = _tabRunningMap.values();
+        var _n = _iter.next();
+        while (!_n.done) {
+          if (_n.value && _n.value.sessionId === request.sessionId) {
+            sessionKnown = true;
+            break;
+          }
+          _n = _iter.next();
         }
       }
+      if (!sessionKnown) return;
+
+      // AI must always provide a meaningful completion message.
+      var completionMessage = request.result || 'The automation completed but no summary was provided. Please try again if the task wasn\'t completed as expected.';
+      var isPartial = request.partial === true;
+
+      // Resolve the originating conv from the broadcast. When the broadcast
+      // omits it, the module-scope conversationId is correct ONLY when the
+      // completed session IS the visible conversation's session; for any other
+      // session (a replay or another conversation-less path) resolve to null so
+      // the completion is NEVER persisted into whatever conversation happens to
+      // be visible (agent-loop + background.js supply the id per QT-7bi-02 +
+      // QT-uof-2; a null here means the session genuinely has no conversation).
+      var originatingConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
+        ? request.conversationId
+        : (request.sessionId === currentSessionId ? conversationId : null);
+
+      // QT-wnz Codex-4 -- dedupe guard. Background C3 already persisted the
+      // terminal entry BEFORE this broadcast fired. Check fsbConversationMessages
+      // for an existing terminal entry for this sessionId on this convId; if
+      // present, skip BOTH the redundant persist AND the redundant DOM render
+      // (the user already saw it, or will see it via hydrate-on-swap from the
+      // authoritative background write).
+      var _wnzTerminalDedupe = false;
+      try {
+        var _pendingBuf = (typeof _messageLogPendingBuffer !== 'undefined' && _messageLogPendingBuffer)
+          ? _messageLogPendingBuffer.get(originatingConvId)
+          : null;
+        if (Array.isArray(_pendingBuf)) {
+          for (var _bi = 0; _bi < _pendingBuf.length; _bi++) {
+            var _bm = _pendingBuf[_bi];
+            if (_bm && _bm.sessionId === request.sessionId && _bm.terminal === true) {
+              _wnzTerminalDedupe = true;
+              break;
+            }
+          }
+        }
+      } catch (_e) { /* swallow -- best-effort */ }
+
+      if (!_wnzTerminalDedupe && typeof FSBSidepanelMessageLog !== 'undefined' &&
+          typeof FSBSidepanelMessageLog.hasTerminalForSession === 'function' &&
+          typeof FSBSidepanelMessageLog.STORAGE_KEY === 'string') {
+        // Fire-and-forget async storage peek. If storage confirms a prior
+        // terminal write (background C3 path or another sidepanel context),
+        // remove any same-sessionId+terminal entry we just buffered so the
+        // debounced flush does not produce a duplicate. Cannot await here
+        // (handler is sync) -- the buffer-peek above is the primary guard.
+        (async function () {
+          try {
+            var bag = await chrome.storage.local.get(FSBSidepanelMessageLog.STORAGE_KEY);
+            if (FSBSidepanelMessageLog.hasTerminalForSession(bag[FSBSidepanelMessageLog.STORAGE_KEY], originatingConvId, request.sessionId)) {
+              if (typeof _messageLogPendingBuffer !== 'undefined' && _messageLogPendingBuffer) {
+                var _b = _messageLogPendingBuffer.get(originatingConvId);
+                if (Array.isArray(_b)) {
+                  for (var _i = _b.length - 1; _i >= 0; _i--) {
+                    if (_b[_i] && _b[_i].sessionId === request.sessionId && _b[_i].terminal === true) {
+                      _b.splice(_i, 1);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (_storageErr) { /* swallow */ }
+        })();
+      }
+
+      // D-FIX: persistence runs for any session-matched message that RESOLVED
+      // an originating conversation. Absence of this call on the background-tab
+      // path was the primary D root cause -- conv_B's message log stayed empty
+      // so hydrate-on-swap rendered nothing for the missing-second-completion.
+      // A null originatingConvId (conversation-less replay/legacy session) is
+      // NOT persisted anywhere -- the per-tab state update below still runs.
+      // QT-wnz Codex-4 -- also gated on the dedupe-flag + carries the
+      // sessionId + terminal:true markers so future fanouts can dedupe.
+      if (!_wnzTerminalDedupe && originatingConvId) {
+        _persistMessageToConversation('assistant', completionMessage, 'text', originatingConvId, request.sessionId, true);
+      }
+
+      // Resolve the originating tabId. request.tabId is now threaded
+      // through every automationComplete broadcast site per QT-uof-2;
+      // _resolveTabIdForSession is the defense-in-depth fallback that
+      // walks _tabRunningMap for a matching sessionId.
+      var originatingTabId = (typeof request.tabId === 'number')
+        ? request.tabId
+        : _resolveTabIdForSession(request.sessionId);
+
+      // E-FIX: the if-branch (active tab AND currentStatusMessage non-null)
+      // must NOT call completeStatusMessage. completeStatusMessage routes
+      // through addCompletionMessage, which calls _persistMessage against
+      // the module-scope conversationId -- producing a SECOND persist into
+      // the same conv we already wrote above. Manually clear the loader
+      // DOM and invoke _renderCompletionDomOnly directly so the bubble
+      // renders exactly once and persistence fires exactly once.
+      // QT-wnz Codex-4 -- DOM render is now also gated on the dedupe-flag;
+      // if a prior context already rendered, hydrate-on-swap from storage
+      // will surface the message instead.
+      var isOriginatingActive = (originatingConvId === conversationId) &&
+        (originatingConvId !== null || request.sessionId === currentSessionId);
+      if (!_wnzTerminalDedupe && isOriginatingActive) {
+        if (currentStatusMessage) {
+          try { currentStatusMessage.remove(); } catch (_e) {}
+          currentStatusMessage = null;
+          currentActionGroup = null;
+          // QT-uof-5 (B-FIX) -- the loader has been removed from the
+          // active tab; drop the per-tab intent entry so a future
+          // swap-OUT does not persist a stale reference.
+          _clearTabStatusIntent(_activeTabIdSnapshot);
+        }
+        _renderCompletionDomOnly(completionMessage, isPartial ? 'partial' : 'ai', isPartial);
+      }
+
+      // D-FIX: per-tab state update UNCONDITIONALLY. setIdleState only
+      // mutates the active-tab UI when target === _activeTabIdSnapshot;
+      // for background tabs it simply flips the per-tab entry so the
+      // owning tab's sendBtn re-enables on swap-back.
+      setIdleState(originatingTabId);
+
+      // Refresh history list if history view is active.
+      if (isHistoryViewActive) {
+        loadHistoryList();
+      }
+
+      // Recon suggestion (preserved verbatim) -- only fires on the active
+      // tab + partial completion path, so this gate is unchanged from
+      // QT-7bi-02.
+      if (isPartial && isOriginatingActive) {
+        (async () => {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const currentUrl = tabs[0]?.url;
+            if (currentUrl && currentUrl.startsWith('http')) {
+              const domain = new URL(currentUrl).hostname;
+              const siteMapCheck = await chrome.runtime.sendMessage({
+                action: 'checkSiteMap',
+                domain
+              });
+
+              if (!siteMapCheck || !siteMapCheck.exists) {
+                const reconDiv = document.createElement('div');
+                reconDiv.className = 'message system new recon-suggestion';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'recon-suggestion-text';
+                textSpan.textContent = 'This site does not have a map yet. Reconnaissance can help FSB learn the site structure for better performance.';
+                reconDiv.appendChild(textSpan);
+
+                const reconBtn = document.createElement('button');
+                reconBtn.className = 'recon-btn';
+                reconBtn.id = 'reconFromSidepanel';
+                reconBtn.textContent = 'Run Reconnaissance';
+                reconBtn.addEventListener('click', () => {
+                  startReconFromSidepanel(currentUrl, request.task || completionMessage);
+                });
+                reconDiv.appendChild(reconBtn);
+
+                chatMessages.appendChild(reconDiv);
+                scrollToBottom();
+              }
+            }
+          } catch (e) {
+            console.warn('Recon suggestion check failed:', e.message);
+          }
+        })();
+      }
       break;
+    }
 
     case 'statusUpdate':
       if (request.sessionId === currentSessionId) {
@@ -1426,10 +2871,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
       
       
-    case 'automationError':
-      if (!isRunning) return; // Already idle, ignore duplicate
-      if (request.sessionId === currentSessionId) {
-        setErrorState();
+    case 'automationError': {
+      var errorSessionKnown = (request.sessionId === currentSessionId && isRunning);
+      if (!errorSessionKnown) {
+        var _errorIter = _tabRunningMap.values();
+        var _errorNext = _errorIter.next();
+        while (!_errorNext.done) {
+          if (_errorNext.value && _errorNext.value.sessionId === request.sessionId && _errorNext.value.isRunning === true) {
+            errorSessionKnown = true;
+            break;
+          }
+          _errorNext = _errorIter.next();
+        }
+      }
+      if (!errorSessionKnown) return;
+
+      // QT-93i-regression (Strategy B) -- route by originating tab; mirror
+      // the automationComplete routing pattern at line ~2358. Falls back to
+      // _resolveTabIdForSession when request.tabId is missing.
+      var errorTabId = (typeof request.tabId === 'number')
+        ? request.tabId
+        : _resolveTabIdForSession(request.sessionId);
+      setErrorState(errorTabId);
+
+      var isErrorOriginatingActive = (typeof errorTabId === 'number' && errorTabId === _activeTabIdSnapshot);
+      if (isErrorOriginatingActive) {
         completeStatusMessage(`Error: ${request.error}`, 'error');
 
         // Provide specific guidance for stuck scenarios
@@ -1448,7 +2914,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const retryBtn = document.createElement('button');
           retryBtn.className = 'retry-btn';
           retryBtn.textContent = 'Retry';
-          retryBtn.addEventListener('click', () => {
+          retryBtn.addEventListener('click', async () => {
+            // Phase 11 FINT-20 WR-03 fix -- gate the retry on the foreign-owned
+            // check. See WR-03 rationale at the handleReconComplete retry
+            // handler. Without this guard the click silently drops the user's
+            // intent because handleSendMessage's runtime gate fail-closes
+            // without surfacing the cause.
+            if (await _isActiveTabForeignOwned()) {
+              console.warn('[sidepanel] retry blocked -- active tab is foreign-owned');
+              return;
+            }
             retryDiv.remove();
             chatInput.textContent = request.task;
             handleSendMessage();
@@ -1464,6 +2939,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // since stuck sessions send automationComplete with partial flag, not automationError.
       }
       break;
+    }
 
     case 'loginDetected':
       if (request.sessionId === currentSessionId) {
@@ -1480,35 +2956,63 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       showPaymentFillConfirmation(request);
       break;
 
-    case 'sessionStateEvent':
-      if (request.sessionId !== currentSessionId) break;
-      switch (request.eventType) {
+    case 'sessionStateEvent': {
+      // QT-7bi-02 -- defer the currentSessionId gate to the individual
+      // event branches so iteration_complete persistence fires for
+      // background-tab sessions (their iter milestones must land in the
+      // originating conv's log so the user sees the full progress trail
+      // when they return to that tab).
+      var sevent = request.eventType;
+      switch (sevent) {
         case 'iteration_complete':
-          if (currentStatusMessage && isRunning) {
+          // QT-7bi-02 -- persist iteration progress to the ORIGINATING conv
+          // (request.conversationId). Without this, mid-flight progress
+          // milestones from session A persist into the currently-displayed
+          // tab B's log when the user switches tabs. The DOM render
+          // (updateStatusMessage below) stays gated by currentSessionId
+          // match + isRunning, which is fine because the running indicator
+          // is currentSessionId-shaped, not conv-shaped.
+          var iterConvId = (typeof request.conversationId === 'string' && request.conversationId.length > 0)
+            ? request.conversationId
+            : (request.sessionId === currentSessionId ? conversationId : null);
+          _persistMessageToConversation('assistant', 'Step ' + request.iteration + ' complete', 'progress', iterConvId);
+          // DOM render: only for the active session AND only when running.
+          if (request.sessionId === currentSessionId && currentStatusMessage && isRunning) {
             updateStatusMessage('Step ' + request.iteration + ' complete', {
               iteration: request.iteration,
-              maxIterations: 20,
-              progressPercent: Math.min(100, Math.round((request.iteration / 20) * 100))
+              maxIterations: 100,
+              progressPercent: Math.min(100, Math.round((request.iteration / 100) * 100))
             });
           }
           break;
         case 'session_ended':
-          if (!isRunning) break;
-          setIdleState();
+          // QT-93i-02 -- route by originating tab so non-active sessions
+          // can flip their per-tab idle without affecting the active tab.
+          var sessionEndedTabId = (typeof request.tabId === 'number')
+            ? request.tabId
+            : _activeTabIdSnapshot;
+          var sessionEndedEntry = _getTabRunningEntry(sessionEndedTabId);
+          if (!sessionEndedEntry.isRunning) break;
+          if (request.sessionId !== sessionEndedEntry.sessionId
+              && request.sessionId !== currentSessionId) break;
+          setIdleState(sessionEndedTabId);
           if (isHistoryViewActive) {
             loadHistoryList();
           }
           break;
         case 'tool_executed':
+          if (request.sessionId !== currentSessionId) break;
           if (showSidepanelProgressEnabled && isRunning) {
             addActionMessage(request.toolName + (request.success ? '' : ' [failed]'));
           }
           break;
         case 'error_occurred':
+          if (request.sessionId !== currentSessionId) break;
           console.warn('[FSB] emitter error:', request.error);
           break;
       }
       break;
+    }
   }
 });
 
@@ -2001,7 +3505,7 @@ async function startReplay(sessionId) {
 
     if (response && response.success) {
       currentSessionId = response.sessionId;
-      setRunningState();
+      setRunningState(_activeTabIdSnapshot, response.sessionId);
       updateStatusMessage('Replaying...');
     } else {
       completeStatusMessage(response?.error || 'Failed to start replay', 'error');
@@ -2119,7 +3623,7 @@ function escapeHtml(str) {
 }
 
 
-console.log('FSB v0.9.50 side panel script loaded');
+console.log(`FSB v${chrome.runtime.getManifest().version} side panel script loaded`);
 
 // ==========================================
 // /agent Slash Command Handler

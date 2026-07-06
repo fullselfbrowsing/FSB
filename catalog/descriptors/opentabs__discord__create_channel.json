@@ -1,0 +1,65 @@
+{
+  "slug": "discord.create_channel",
+  "service": "discord.com",
+  "intentSynonyms": [
+    "create a channel in discord",
+    "add a channel in discord",
+    "make a new channel in discord",
+    "open a new channel in discord",
+    "create channel in discord",
+    "create a new channel in a server in discord"
+  ],
+  "description": "Create a new channel in a Discord guild (server). Requires Manage Channels permission.",
+  "actionVerb": "create",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "guild_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Guild (server) ID to create the channel in"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Channel name (lowercase, hyphens, max 100 chars)"
+      },
+      "type": {
+        "description": "Channel type: 0=text (default), 2=voice, 4=category, 5=announcement",
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "topic": {
+        "description": "Channel topic (max 1024 chars for text channels)",
+        "type": "string"
+      },
+      "parent_id": {
+        "description": "Parent category ID to nest the channel under",
+        "type": "string"
+      },
+      "nsfw": {
+        "description": "Whether the channel is NSFW",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "guild_id",
+      "name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/discord/src/tools/create-channel.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": "POST",
+      "opNameVerb": "create"
+    }
+  }
+}

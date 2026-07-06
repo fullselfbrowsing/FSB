@@ -1,0 +1,32 @@
+{
+  "slug": "tumblr.get_current_user",
+  "service": "tumblr.com",
+  "intentSynonyms": [
+    "get a current user in tumblr",
+    "look up a current user in tumblr",
+    "fetch a single current user in tumblr",
+    "view one specific current user in tumblr",
+    "get current user in tumblr",
+    "get your tumblr profile in tumblr"
+  ],
+  "description": "Get the authenticated Tumblr user profile including username, following count, likes count, and owned blogs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/tumblr/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

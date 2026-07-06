@@ -1,0 +1,13 @@
+{
+  "slug": "acme-messenger.post_message",
+  "service": "messenger.acme-social.example",
+  "description": "Post a message to the user's social feed (BRDTH-02 social/messaging batch-gate fixture: a social/messaging batch origin the heuristic flags via 'messenger' but that is NOT classified denied/sensitive)",
+  "actionVerb": "post",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "_fixture": "BRDTH-02: this origin trips the social/messaging sensitivity axis (host contains 'messenger') but is absent from extension/config/service-denylist.json -> the merge-time classifyGate batch-coverage gate MUST reject it (build aborts), proving the per-app comms/social screening fails closed on an unclassified social/messaging batch origin (distinct from the Phase-37 finance fixture batch-unclassified-origin.fixture.json). _fixtures/ is excluded by readJsonDir non-recursion so it never ships."
+}

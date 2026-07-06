@@ -1,0 +1,32 @@
+{
+  "slug": "bsky.get_current_user",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "get a current user in bsky",
+    "look up a current user in bsky",
+    "fetch a single current user in bsky",
+    "view one specific current user in bsky",
+    "get current user in bsky",
+    "get the authenticated user's profile in bsky"
+  ],
+  "description": "Get the authenticated user's profile including name, handle, bio, follower counts, and avatar.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/get-current-user.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "dominos.get_customer",
+  "service": "dominos.com",
+  "intentSynonyms": [
+    "get a customer in dominos",
+    "look up a customer in dominos",
+    "fetch a single customer in dominos",
+    "view one specific customer in dominos",
+    "get customer in dominos",
+    "get your domino's account profile in dominos"
+  ],
+  "description": "Get the currently logged-in customer profile including name, email, and phone number.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/dominos/src/tools/get-customer.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

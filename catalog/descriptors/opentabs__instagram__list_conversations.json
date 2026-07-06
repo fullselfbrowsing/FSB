@@ -1,0 +1,42 @@
+{
+  "slug": "instagram.list_conversations",
+  "service": "instagram.com",
+  "intentSynonyms": [
+    "list conversations in instagram",
+    "show me my conversations in instagram",
+    "view my conversations in instagram",
+    "see all my conversations in instagram",
+    "list dm conversations in instagram"
+  ],
+  "description": "List direct message conversations. Returns threads sorted by most recent activity. Supports cursor pagination.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of conversations to return (default 10)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/instagram/src/tools/list-conversations.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

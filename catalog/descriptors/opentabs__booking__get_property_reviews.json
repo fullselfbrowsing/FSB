@@ -1,0 +1,54 @@
+{
+  "slug": "booking.get_property_reviews",
+  "service": "booking.com",
+  "intentSynonyms": [
+    "get property reviews in booking",
+    "look up property reviews in booking",
+    "fetch a single property reviews in booking",
+    "view one specific property reviews in booking",
+    "get property review scores in booking"
+  ],
+  "description": "Get the review summary for a property on Booking.com by searching for it. Returns the overall score, score breakdown by category, and review count. For individual review text, use navigate_to_property to open the property page.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "property_name": {
+        "type": "string",
+        "description": "Property name to search for"
+      },
+      "city": {
+        "type": "string",
+        "description": "City where the property is located"
+      },
+      "checkin": {
+        "type": "string",
+        "description": "Check-in date in YYYY-MM-DD format"
+      },
+      "checkout": {
+        "type": "string",
+        "description": "Check-out date in YYYY-MM-DD format"
+      }
+    },
+    "required": [
+      "property_name",
+      "city",
+      "checkin",
+      "checkout"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/booking/src/tools/get-property-reviews.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

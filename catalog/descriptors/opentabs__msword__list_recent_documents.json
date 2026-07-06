@@ -1,0 +1,38 @@
+{
+  "slug": "msword.list_recent_documents",
+  "service": "word.cloud.microsoft",
+  "intentSynonyms": [
+    "list recent documents in msword",
+    "show me my recent documents in msword",
+    "view my recent documents in msword",
+    "see all my recent documents in msword",
+    "list recent documents in microsoft word"
+  ],
+  "description": "List recently accessed documents from OneDrive.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Max results (default 10, max 50)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/microsoft-word/src/tools/list-recent-documents.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "retool.list_workflow_runs",
+  "service": "retool.com",
+  "intentSynonyms": [
+    "list workflow runs in retool",
+    "show me my workflow runs in retool",
+    "view my workflow runs in retool",
+    "see all my workflow runs in retool",
+    "list workflow execution runs in retool"
+  ],
+  "description": "List recent execution runs for a Retool workflow with pagination. Shows run status, timing, and data sizes.",
+  "actionVerb": "list",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "workflow_id": {
+        "type": "string",
+        "description": "Workflow ID"
+      },
+      "limit": {
+        "description": "Max results per page (default 20)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination (default 0)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "workflow_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/retool/src/tools/list-workflow-runs.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "list"
+    }
+  }
+}

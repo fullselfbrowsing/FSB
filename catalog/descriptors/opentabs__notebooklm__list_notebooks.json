@@ -1,0 +1,31 @@
+{
+  "slug": "notebooklm.list_notebooks",
+  "service": "notebooklm.google.com",
+  "intentSynonyms": [
+    "list notebooks in notebooklm",
+    "show me my notebooks in notebooklm",
+    "view my notebooks in notebooklm",
+    "see all my notebooks in notebooklm",
+    "list recent notebooks in notebooklm"
+  ],
+  "description": "List recently viewed notebooks in the user's NotebookLM account. Returns notebook IDs, titles, source counts, and timestamps.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notebooklm/src/tools/list-notebooks.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

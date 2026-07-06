@@ -1,0 +1,31 @@
+{
+  "slug": "costco.get_lists",
+  "service": "costco.com",
+  "intentSynonyms": [
+    "get lists in costco",
+    "look up lists in costco",
+    "fetch a single lists in costco",
+    "view one specific lists in costco",
+    "get shopping lists in costco"
+  ],
+  "description": "Get all shopping lists (wishlists) for the current Costco member. Each list can contain saved products.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/costco/src/tools/get-lists.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

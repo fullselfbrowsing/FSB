@@ -1,0 +1,40 @@
+{
+  "slug": "npm.get_user_profile",
+  "service": "www.npmjs.com",
+  "intentSynonyms": [
+    "get an user profile in npm",
+    "look up an user profile in npm",
+    "fetch a single user profile in npm",
+    "view one specific user profile in npm",
+    "get user profile in npm",
+    "get an npm user profile in npm"
+  ],
+  "description": "Get a public npm user profile by username. Returns username, avatar, package count, and organizations.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "username": {
+        "type": "string",
+        "description": "npm username (e.g., \"sindresorhus\")"
+      }
+    },
+    "required": [
+      "username"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/npm/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

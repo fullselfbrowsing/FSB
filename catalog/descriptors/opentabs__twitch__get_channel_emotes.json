@@ -1,0 +1,39 @@
+{
+  "slug": "twitch.get_channel_emotes",
+  "service": "twitch.tv",
+  "intentSynonyms": [
+    "get channel emotes in twitch",
+    "look up channel emotes in twitch",
+    "fetch a single channel emotes in twitch",
+    "view one specific channel emotes in twitch",
+    "get subscription emotes for a channel in twitch"
+  ],
+  "description": "Get subscription emotes for a Twitch channel. Returns the emote name (token) and ID for each emote across all subscription tiers.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "login": {
+        "type": "string",
+        "description": "Channel login name (e.g., \"shroud\")"
+      }
+    },
+    "required": [
+      "login"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/twitch/src/tools/get-channel-emotes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

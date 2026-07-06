@@ -1,0 +1,38 @@
+{
+  "slug": "bsky.unmute_actor",
+  "service": "bsky.app",
+  "intentSynonyms": [
+    "unmute an actor in bsky",
+    "unmute actor in bsky",
+    "unmute an actor in bluesky",
+    "unmute a user in bsky"
+  ],
+  "description": "Unmute a user.",
+  "actionVerb": "unmute",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "actor": {
+        "type": "string",
+        "description": "DID or handle of the user to unmute"
+      }
+    },
+    "required": [
+      "actor"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/bluesky/src/tools/unmute-actor.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "unmute"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "priceline.get_merchandising_badges",
+  "service": "priceline.com",
+  "intentSynonyms": [
+    "get merchandising badges in priceline",
+    "look up merchandising badges in priceline",
+    "fetch a single merchandising badges in priceline",
+    "view one specific merchandising badges in priceline",
+    "get top-rated/top-booked badges for hotels in priceline"
+  ],
+  "description": "Get merchandising badges (top-rated, top-booked) for a batch of hotels. Useful for highlighting popular or highly rated hotels in search results.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "hotel_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Array of Priceline hotel IDs"
+      }
+    },
+    "required": [
+      "hotel_ids"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/priceline/src/tools/get-merchandising-badges.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

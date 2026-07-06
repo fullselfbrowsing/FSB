@@ -1,0 +1,58 @@
+{
+  "slug": "expedia.search_packages",
+  "service": "expedia.com",
+  "intentSynonyms": [
+    "search packages in expedia",
+    "navigate to vacation packages search in expedia",
+    "navigate to the expedia vacation packages search page for a flight + hotel bundle in expedia"
+  ],
+  "description": "Navigate to the Expedia vacation packages search page for a flight + hotel bundle. Returns the search URL.",
+  "actionVerb": "search",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "origin": {
+        "type": "string",
+        "description": "Origin city or airport code (e.g. \"SFO\", \"San Francisco, CA\")"
+      },
+      "destination": {
+        "type": "string",
+        "description": "Destination city or airport code (e.g. \"CUN\", \"Cancun, Mexico\")"
+      },
+      "departure_date": {
+        "type": "string",
+        "description": "Departure date in YYYY-MM-DD format"
+      },
+      "return_date": {
+        "type": "string",
+        "description": "Return date in YYYY-MM-DD format"
+      },
+      "adults": {
+        "description": "Number of adults (default 2)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 6
+      }
+    },
+    "required": [
+      "origin",
+      "destination",
+      "departure_date",
+      "return_date"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/expedia/src/tools/search-packages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "search"
+    }
+  }
+}

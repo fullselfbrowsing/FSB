@@ -1,0 +1,39 @@
+{
+  "slug": "linkedin.get_conversation_messages",
+  "service": "linkedin.com",
+  "intentSynonyms": [
+    "get conversation messages in linkedin",
+    "look up conversation messages in linkedin",
+    "fetch a single conversation messages in linkedin",
+    "view one specific conversation messages in linkedin",
+    "read messages in a conversation in linkedin"
+  ],
+  "description": "Get messages from a specific LinkedIn messaging conversation. Requires the conversation URN from list_conversations. Returns messages with sender info and timestamps.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "conversation_urn": {
+        "type": "string",
+        "description": "Conversation URN (e.g., \"urn:li:msg_conversation:(...)\")"
+      }
+    },
+    "required": [
+      "conversation_urn"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linkedin/src/tools/get-conversation-messages.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

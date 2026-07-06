@@ -1,0 +1,41 @@
+{
+  "slug": "datadog.list_monitor_downtimes",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "list monitor downtimes in datadog",
+    "show me my monitor downtimes in datadog",
+    "view my monitor downtimes in datadog",
+    "see all my monitor downtimes in datadog",
+    "get downtimes for a monitor in datadog"
+  ],
+  "description": "Get downtimes associated with a specific monitor.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "monitor_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Monitor ID to get downtimes for"
+      }
+    },
+    "required": [
+      "monitor_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/list-monitor-downtimes.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "list"
+    }
+  }
+}

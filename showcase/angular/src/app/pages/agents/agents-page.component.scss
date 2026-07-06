@@ -51,33 +51,25 @@
   filter: blur(var(--glitch-blur, 0));
 }
 
-/* Keep 700ms in sync with AgentsPageComponent.MORPH_DURATION_MS in agents-page.component.ts */
 @keyframes agents-hero-glitch {
-  0%   { transform: translate(0, 0)      scale(1);    opacity: 1;    --glitch-blur: 0px;   }
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; --glitch-blur: 0; }
   10%  { transform: translate(1px, -1px) scale(1.08); opacity: 0.85; --glitch-blur: 0.5px; }
-  25%  { transform: translate(-1px, 1px) scale(0.94); opacity: 0.6;  --glitch-blur: 1.5px; }
-  40%  { transform: translate(2px, 0)    scale(1.12); opacity: 0.4;  --glitch-blur: 2px;   }
-  55%  { transform: translate(-1px,-1px) scale(0.92); opacity: 0.7;  --glitch-blur: 1.5px; }
-  70%  { transform: translate(0, 1px)    scale(1.06); opacity: 0.85; --glitch-blur: 1px;   }
-  85%  { transform: translate(1px, 0)    scale(1.02); opacity: 0.95; --glitch-blur: 0.5px; }
-  100% { transform: translate(0, 0)      scale(1);    opacity: 1;    --glitch-blur: 0px;   }
+  25%  { transform: translate(-1px, 1px) scale(0.94); opacity: 0.6; --glitch-blur: 1.5px; }
+  40%  { transform: translate(2px, 0) scale(1.12); opacity: 0.4; --glitch-blur: 2px; }
+  55%  { transform: translate(-1px, -1px) scale(0.92); opacity: 0.7; --glitch-blur: 1.5px; }
+  70%  { transform: translate(0, 1px) scale(1.06); opacity: 0.85; --glitch-blur: 1px; }
+  85%  { transform: translate(1px, 0) scale(1.02); opacity: 0.95; --glitch-blur: 0.5px; }
+  100% { transform: translate(0, 0) scale(1); opacity: 1; --glitch-blur: 0; }
 }
 
 .agents-hero-mark.is-morphing {
   animation: agents-hero-glitch 700ms steps(14, end);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .agents-hero-mark.is-morphing {
-    animation: none;
-  }
-}
-
 .agents-hero-morph {
   display: inline-block;
   min-width: 4.5em;
   text-align: left;
-  font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -95,13 +87,14 @@
 }
 
 .skill-feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 24px;
+  column-count: 3;
+  column-gap: 24px;
   margin-top: 40px;
 }
 
 .skill-feature-card {
+  break-inside: avoid;
+  margin-bottom: 24px;
   padding: 28px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -148,15 +141,14 @@
 
 /* --- Power Grid --- */
 .power-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  column-count: 3;
+  column-gap: 24px;
   margin-top: 40px;
 }
 
 .power-card {
-  display: flex;
-  gap: 20px;
+  break-inside: avoid;
+  margin-bottom: 24px;
   padding: 24px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -171,124 +163,46 @@
 }
 
 .power-card-stat {
-  flex: 0 0 auto;
-  min-width: 72px;
+  display: inline-block;
+  margin-bottom: 12px;
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 1.25rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--accent-color, #ff7a18);
-  letter-spacing: -0.02em;
-  padding-top: 4px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 
 .power-card-body h3 {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-size: 1.05rem;
 }
 
 .power-card-body p {
-  color: var(--text-muted);
-  font-size: 0.94rem;
-  line-height: 1.55;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
   margin: 0;
 }
 
 .power-card code {
   font-size: 0.86em;
   padding: 1px 5px;
-  background: var(--bg-body);
+  background: color-mix(in srgb, var(--accent-color, #ff7a18) 10%, transparent);
   border-radius: 3px;
-}
-
-/* --- Install Steps --- */
-.agents-install {
-  background: var(--bg-card);
-}
-
-.install-steps {
-  list-style: none;
-  padding: 0;
-  margin: 40px auto 0;
-  max-width: 820px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  counter-reset: install-step;
-}
-
-.install-step {
-  display: flex;
-  gap: 20px;
-  padding: 28px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-body);
-}
-
-.install-step-num {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--accent-color, #ff7a18);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-
-.install-step-body {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.install-step-body h3 {
-  margin-bottom: 12px;
-  font-size: 1.15rem;
-}
-
-.install-step-body p {
-  color: var(--text-muted);
-  margin: 12px 0;
-  font-size: 0.96rem;
-  line-height: 1.6;
-}
-
-.install-step-body p:first-of-type {
-  margin-top: 0;
-}
-
-.install-step-code {
-  margin: 12px 0;
-  padding: 14px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  overflow-x: auto;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.install-step-code code {
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  white-space: pre;
 }
 
 /* --- Use-case prompt grid --- */
 .prompt-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  column-count: 3;
+  column-gap: 24px;
   margin-top: 40px;
 }
 
 .prompt-card {
   position: relative;
+  break-inside: avoid;
+  margin-bottom: 24px;
   padding: 20px 22px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -348,28 +262,15 @@
 .prompt-card-body {
   position: relative;
   margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-body);
   font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--text-default);
-}
-
-.prompt-caret {
-  display: inline-block;
-  margin-right: 8px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-weight: 700;
-  color: var(--accent-color, #ff7a18);
-  user-select: none;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 .prompt-card-body code {
   font-size: 0.86em;
   padding: 1px 5px;
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--accent-color, #ff7a18) 10%, transparent);
   border-radius: 3px;
 }
 
@@ -430,24 +331,23 @@
 }
 
 /* --- Responsive --- */
+@media (max-width: 1024px) {
+  .skill-feature-grid,
+  .power-grid,
+  .prompt-grid {
+    column-count: 2;
+  }
+}
+
 @media (max-width: 720px) {
-  .install-step {
-    flex-direction: column;
-    gap: 16px;
-    padding: 22px;
-  }
-
-  .power-card {
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .power-card-stat {
     min-width: 0;
   }
 
+  .skill-feature-grid,
+  .power-grid,
   .prompt-grid {
-    grid-template-columns: 1fr;
+    column-count: 1;
   }
 
   .prompt-card {

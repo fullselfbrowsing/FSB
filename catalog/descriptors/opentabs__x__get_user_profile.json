@@ -1,0 +1,41 @@
+{
+  "slug": "x.get_user_profile",
+  "service": "x.com",
+  "intentSynonyms": [
+    "get an user profile in x",
+    "look up an user profile in x",
+    "fetch a single user profile in x",
+    "view one specific user profile in x",
+    "get user profile in x",
+    "get user profile by username in x"
+  ],
+  "description": "Get a user's profile by their screen name (username). Returns profile details including bio, follower counts, and verification status.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Username without @ (e.g., \"elonmusk\")"
+      }
+    },
+    "required": [
+      "screen_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/x/src/tools/get-user-profile.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphqlquery",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

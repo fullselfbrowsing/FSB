@@ -1,0 +1,50 @@
+{
+  "slug": "datadog.get_slo_history",
+  "service": "datadoghq.com",
+  "intentSynonyms": [
+    "get a slo history in datadog",
+    "look up a slo history in datadog",
+    "fetch a single slo history in datadog",
+    "view one specific slo history in datadog",
+    "get slo history in datadog",
+    "get slo history and error budget in datadog"
+  ],
+  "description": "Get historical SLO data for a specific timeframe. Returns SLI values, error budget remaining, and uptime data.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "slo_id": {
+        "type": "string",
+        "description": "SLO ID"
+      },
+      "from_ts": {
+        "type": "number",
+        "description": "Start timestamp (POSIX epoch seconds)"
+      },
+      "to_ts": {
+        "type": "number",
+        "description": "End timestamp (POSIX epoch seconds)"
+      }
+    },
+    "required": [
+      "slo_id",
+      "from_ts",
+      "to_ts"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/datadog/src/tools/get-slo-history.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "apiget",
+      "httpMethod": "GET",
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "powerpoint.delete_permission",
+  "service": "powerpoint.cloud.microsoft",
+  "intentSynonyms": [
+    "delete a permission in powerpoint",
+    "remove a permission in powerpoint",
+    "trash a permission in powerpoint",
+    "permanently delete a permission in powerpoint",
+    "delete permission in powerpoint",
+    "remove a sharing permission in powerpoint"
+  ],
+  "description": "Remove a sharing permission or revoke a sharing link from a file or folder.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "description": "Item ID of the file or folder"
+      },
+      "permission_id": {
+        "type": "string",
+        "description": "Permission ID to remove (from list_permissions)"
+      }
+    },
+    "required": [
+      "item_id",
+      "permission_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/powerpoint/src/tools/delete-permission.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "DELETE",
+      "opNameVerb": "delete"
+    }
+  }
+}

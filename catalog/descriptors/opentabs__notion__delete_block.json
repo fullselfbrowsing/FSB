@@ -1,0 +1,41 @@
+{
+  "slug": "notion.delete_block",
+  "service": "notion.so",
+  "intentSynonyms": [
+    "delete a block in notion",
+    "remove a block in notion",
+    "trash a block in notion",
+    "permanently delete a block in notion",
+    "delete block in notion",
+    "delete a block from a page in notion"
+  ],
+  "description": "Delete a content block from a Notion page. The block and its children are removed.",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "block_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block ID (UUID) to delete"
+      }
+    },
+    "required": [
+      "block_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/notion/src/tools/delete-block.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

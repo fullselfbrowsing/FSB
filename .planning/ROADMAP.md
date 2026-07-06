@@ -1,221 +1,365 @@
-# Roadmap
+# Roadmap: FSB (Full Self-Browsing)
 
-**Active supplement (2026-05-18):** v0.9.70 Showcase Dashboard Reliability (Streaming + Sync + Viewport) is now the active milestone. The historical v0.9.69 roadmap remains below for archive continuity until the next full GSD roadmap regeneration.
+## Milestones
 
-## Active Milestone: v0.9.70 (Phases 277-279)
+- ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
+- ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; refreshed 2026-07-01 after post-closeout T1 ports. Expanded proven T1/guarded coverage from 26 baseline descriptors to 1,267 executable T1-ready descriptors plus 556 guarded fail-closed rows, and closed the remaining catalog tail with explicit terminal-state accounting. Archive: `.planning/milestones/v1.1.0-ROADMAP.md`.
 
-**Goal:** Make the showcase dashboard reliable for live preview and remote control: streaming works, preview sizing is correct, and Sync-tab pairing can dispatch remote commands end-to-end.
+## Milestone Closed
 
-## v0.9.70 Phases
+**v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; current artifact refresh 2026-07-01.
 
-- [x] **Phase 277: Dashboard DOM-Stream Runtime Restoration** -- canonical content-script bundle injects `content/dom-stream.js`; source tabs register `pingDomStream`; user verified dashboard streaming works live after reload/sideload. Completed 2026-05-18.
-- [x] **Phase 278: Dashboard Preview Viewport Fit** -- inline desktop/PiP preview fixed to 16:10; maximized and browser-fullscreen modes fit the actual viewer surface without stretching the streamed DOM. PR #73 merged and deployed 2026-05-18.
-- [ ] **Phase 279: Sync Tab Remote-Control Restoration** -- diagnose the current Sync-tab pairing / remote-command dispatch break; restore website-to-extension remote control on `full-selfbrowsing.com` with regression coverage.
+No active milestone is currently defined. Run `$gsd-new-milestone` to define the next requirements and roadmap. The detailed v1.1.0 phase record is preserved below and archived at `.planning/milestones/v1.1.0-ROADMAP.md`.
 
-## v0.9.70 Progress
+**Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” Phases 44-50 built the inventory, scaffolds, first T1 ports, bridge decisions, write evidence gate, and closeout backlog. Phase 51 extends the milestone to attack the full 2,264-descriptor remaining tail: every non-denied row must either become verified T1/T1b or carry explicit evidence that it is blocked by policy, unsafe cross-origin architecture, missing live UAT, or an accepted product/legal constraint. It must not mark any row T1-ready without handler/recipe proof.
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 277. Dashboard DOM-Stream Runtime Restoration | 1/1 | Complete | 2026-05-18 |
-| 278. Dashboard Preview Viewport Fit | 1/1 | Complete | 2026-05-18 |
-| 279. Sync Tab Remote-Control Restoration | 0/1 | Active | -- |
+**Baseline entering this milestone:**
 
----
+- Total descriptors: **2,314**.
+- T1/T1b today: **26 descriptors** across GitHub, GitLab, Notion, Reddit, and Slack.
+- Actually executable/recipe-backed today: **21 descriptors**.
+- T1 fail-closed guarded writes today: **5 descriptors**.
+- Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
+- App stems with no direct T1 path: **123**.
 
-**Status:** v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- scoped 2026-05-14, roadmap approved, awaiting Phase 269 plan.
+**Current Phase 51 terminal state after 2026-07-01 artifact refresh:**
 
-**Branch posture:** v0.9.69 work continues on `Refinements` (already 6 commits ahead of `origin/main` from quick task 260514-1nv plus version bump). The milestone-close PR merges `Refinements` -> `main`. Deploy targets remain showcase Angular + Express on Fly.io at `https://full-selfbrowsing.com`.
+- Total descriptors: **2,314**.
+- T1-ready executable descriptors: **1,267**.
+- T1 guarded fail-closed rows: **556**.
+- Catalog tail not direct API-ready: **491**.
+- Terminal-state accounting: **5 bridge-needed**, **141 UAT-needed**, **123 blocked**, **222 degraded/discovery-pending**.
+- App stems with at least one direct T1/guarded row: **121**.
 
-**Phase numbering:** Continues from v0.9.63's last phase (268). v0.9.69 phases begin at **269** and end at **276**.
+**Hard invariants:**
 
----
+- Keep the two-tool MCP surface: `search_capabilities` and `invoke_capability`; do not add one tool per app.
+- Preserve MV3 Wall 1: descriptors and recipes are closed-vocabulary data; no OpenTabs runtime/plugin code ships.
+- Preserve Wall 2 unless explicitly extended by a verified Pattern-D design: credentialed execution stays origin-pinned and same-session.
+- Writes and destructive actions stay fail-closed until live request shape, consent behavior, and no-secret logging are proven.
+- Denylisted origins remain blocked; sensitive origins stay flagged/audited and apply the current invoke/discovery consent semantics.
+- Search must distinguish “directly invocable T1” from “discovery-pending DOM/T2.” No UI/API overclaiming.
 
-## Active Milestone: v0.9.69 (Phases 269-276)
+## Phase 44: T1 Readiness Inventory + Status Surface
 
-**Goal:** Stand up a privacy-preserving telemetry pipeline that flows MCP + extension usage metrics from end-user installs into the showcase server, render aggregates on the public `/stats` Easter-egg page, harden the Chrome Web Store privacy disclosures, and restore the broken DOM streaming in the showcase dashboard.
+- [x] Phase 44: T1 Readiness Inventory + Status Surface (completed 2026-06-29)
 
-## Phases
+**Goal:** Create the authoritative T1 readiness matrix for all 2,314 descriptors and make status visible to developers and users so “catalog supported” is never confused with “direct API-ready.”
 
-- [x] **Phase 269: Install Identity + Opt-Out Scaffold** -- per-install UUIDv4 in `chrome.storage.local`; opt-out kill switch in Advanced Settings. ✓ shipped 2026-05-14 (35/35 tests, user-validated)
-- [x] **Phase 270: MCP Pricing Module** -- `MODEL_PRICING` + `MCP_CLIENT_DEFAULT_MODEL` table with source-stamped 2026-05-14 rates. ✓ shipped 2026-05-14 (167/0 tests, 6 review fixes, parity gate green)
-- [x] **Phase 271: MCPMetricsRecorder + Dispatcher Hooks + Unified Cost Surfacing** -- single chokepoint records every MCP dispatch into `fsbUsageData` alongside AI-provider calls. ✓ shipped 2026-05-14 (88/88 tests + 612 regression assertions, 1 BLOCKER fix landed)
-- [x] **Phase 272: TelemetryCollector + Alarm + Queue Persistence** -- 5-min beat, MV3-SW-survivable queue in `chrome.storage.local`, minute-resolution timestamps, opt-out-aware flush. (completed 2026-05-14)
-- [x] **Phase 273: Server Schema + Telemetry Routes + Salt Rotator + Rate Limiter + Housekeeper** -- ingest pipeline; `trust proxy`, `express-rate-limit@^8.3.0`, HMAC-SHA256 daily salt, k-anonymity-ready rollups. **HAS BLOCKERS #1, #2.** (completed 2026-05-14)
-- [x] **Phase 274: Public Aggregates Endpoint + FSBTelemetryService Angular + /stats Toggle Group** -- `/api/public-stats/*` + `FSBTelemetryService` mirror of `GitHubStatsService` + 6 new chart views on `/stats` with i18n AI-fill. (completed 2026-05-14; 4 atomic commits; 6 new tests / 294 sub-assertions; AGG-01..09 + STATS-01..07)
-- [x] **Phase 275: Privacy Policy Page Update + CWS Listing Diff + CI Guard + Integration Smoke** -- `/privacy#telemetry-disclosure` section with 6-locale i18n (25 trans-units × 6 locales), `store-assets/chrome-web-store/listing-copy.md` "Data Collection" section, new `store-assets/chrome-web-store/privacy-practices-evidence.md`, `scripts/verify-store-listing.mjs` CI gate + 2 new tests / 56 sub-assertions, root npm test chain wiring, `homepage_url` added to manifest.json (Rule 2 auto-fix). BLOCKER #3 RESOLVED. (completed 2026-05-14; 4 atomic commits; CONS-03..07)
-- [x] **Phase 276: Dashboard DOM-Streaming Diagnostic + Minimum Patch** -- 276-DIAGNOSTIC.md scaffold (7-hypothesis matrix) + defensive patches for hypotheses #1 (hashKey room-state logs), #2 (replace setTimeout(300) with pingDomStream readiness poll), #4 (parked-intent re-arm via _pendingStreamStart) + STREAM-04 tooltip with 4 new counters + Resync button + STREAM-05 watchdog auto-resnapshot + STREAM-06 WS backpressure drop counter. Status `human_needed` per autonomous-mode boundary; manual repro pass documented in 276-VERIFICATION.md `<human_verification>`. (completed 2026-05-14; 4 atomic per-task commits + 1 metadata commit; 3 new tests / 52 sub-assertions; STREAM-01..06 satisfied; STREAM-07 5-attempt cap honoured as attempt 1 of 5)
+**Depends on:** v1.0.0 archive.
 
-## Phase Details
+**Requirements:** T1R-01, T1R-02, T1R-03.
 
-### Phase 269: Install Identity + Opt-Out Scaffold
-**Goal**: Every FSB install carries a stable, anonymous identity gated by a visible user-controlled kill switch.
-**Depends on**: Nothing (first phase of the milestone)
-**Requirements**: IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05, CONS-01, CONS-02
-**Success Criteria** (what must be TRUE):
-  1. After a fresh install, the user can open the extension Control Panel "Advanced Settings" tab and see a "Send anonymous usage data" toggle that is ON by default.
-  2. The user can flip the toggle OFF, and within 100ms the displayed state reflects the change with no "Apply" button and no nag screen.
-  3. The user can reload the extension, the service worker can be evicted and revived, and the same install UUID is returned by `chrome.storage.local.fsb_install_uuid` -- no new UUID is minted.
-  4. On an incognito or ephemeral profile where `chrome.storage.local` is unavailable, the telemetry collector silently no-ops without spawning errors visible to the user.
-**Plans**: 1 plan
-  - [ ] 269-01-PLAN.md — install-identity.js + background.js boot hooks + control_panel Privacy & Telemetry card + tests/install-identity.test.js
-**UI hint**: yes
+**Success Criteria:**
+1. A generated readiness report classifies every descriptor by app, slug, side-effect class, current tier, backing, origin class, auth pattern, likely same-origin/separate-origin route, and recommended next action.
+2. `search_capabilities`, docs, and any relevant UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states without stale overclaims.
+3. CI fails if a descriptor is marked T1-ready without a registered handler/recipe plus tests.
 
-### Phase 270: MCP Pricing Module
-**Goal**: A developer can attribute a USD cost to any MCP tool call by looking up the calling client and its assumed default model in a single auditable table.
-**Depends on**: Nothing (PARALLEL with Phase 269; disjoint files, no shared writes)
-**Requirements**: PRICE-01, PRICE-02, PRICE-03, PRICE-04, PRICE-05
-**Success Criteria** (what must be TRUE):
-  1. A developer reading `mcp-pricing.js` can identify the per-million-token input + output rate for every Claude 4.x, GPT-5/5.x, Gemini 2.5, Grok 4.x, and DeepSeek V4 model on the May 2026 board, with a source URL + retrieval date comment beside each row.
-  2. A developer can call the resolver with any client label from the v0.9.36 allowlist (`Claude`, `Codex`, `ChatGPT`, `Perplexity`, `Windsurf`, `Cursor`, `Antigravity`, `OpenCode`, `OpenClaw`, `Grok`, `Gemini`, `Hermes`) and receive an assumed default model plus a HIGH/MEDIUM/LOW confidence stamp.
-  3. When the resolver is given an unknown `(client, model)` pair, the returned result has `cost: null` and `source: 'unknown'` -- never `$0` and never a default model row.
-  4. Every resolver result carries the `PRICING_SOURCE_DATE = "2026-05-14"` constant so downstream consumers know when prices were last refreshed.
-**Plans**: 1 plan
-  - [ ] 270-01-PLAN.md — mcp-pricing-data.json + mcp/src/tools/pricing.ts + extension/utils/mcp-pricing.js + tests/mcp-pricing.test.js + tests/mcp-pricing-data-parity.test.js
+**Plans:**
+- [x] 44-01: T1 readiness matrix generator and evidence report.
+- [x] 44-02: Status-surface and documentation honesty pass.
+- [x] 44-03: T1 readiness CI guard and phase closeout.
 
-### Phase 271: MCPMetricsRecorder + Dispatcher Hooks + Unified Cost Surfacing
-**Goal**: Every MCP tool dispatch flows through a single recorder that contributes to the SAME analytics numbers the user already sees in the Control Panel.
-**Depends on**: Phases 269 + 270 (needs UUID for telemetry summary + pricing for cost field)
-**Requirements**: COST-01, COST-02, COST-03, COST-04, COST-05
-**Success Criteria** (what must be TRUE):
-  1. The user can run an MCP-driven task and watch the Control Panel "Total Tokens / Total Cost / Total Requests" hero numbers increment alongside AI-provider activity -- one set of hero numbers, two sources of activity.
-  2. The user can audit any per-call MCP log row in the Control Panel and see only `{client, tool, tokens_in, tokens_out, cost_usd, ts}` -- no URLs, no prompts, no DOM payloads, no clipboard, no form values are visible anywhere.
-  3. A developer reading `fsbUsageData` rows can distinguish MCP entries from AI-provider entries via the `source: 'mcp' | 'ai-provider'` discriminator without changing the rendered hero numbers.
-  4. The user runs the same MCP tool 10 times and sees exactly 10 new rows in the Control Panel -- no double-counting from local persistence and outbound telemetry both writing.
-**Plans**: 1 plan
-- [ ] 271-01-PLAN.md — MCPMetricsRecorder + dispatcher hooks + analytics back-fill + tests
-**UI hint**: yes
+## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 
-### Phase 272: TelemetryCollector + Alarm + Queue Persistence
-**Goal**: The extension transmits a single anonymous beat every 5 minutes, surviving MV3 service-worker eviction and tab close, honoring the opt-out toggle live on every flush.
-**Depends on**: Phase 271 (needs MCPMetricsRecorder to feed enqueue summaries)
-**Requirements**: BEAT-01, BEAT-02, BEAT-03, BEAT-04, BEAT-05, BEAT-06, BEAT-07, BEAT-08, BEAT-09, BEAT-10
-**Success Criteria** (what must be TRUE):
-  1. After a fresh install, the user sees exactly one `install_announce` beat reach the server within the first 30s grace plus 5min alarm cycle.
-  2. The user can close every Chrome tab and the service worker can be evicted, and on next wake-up the queue resumes from `chrome.storage.local.fsb_telemetry_queue_v1` with no events lost (up to the 200-event cap and 24h freshness window).
-  3. The user can flip the opt-out toggle to OFF mid-session, and the next alarm tick clears the queue, makes no POST, and the alarm continues firing harmlessly.
-  4. The user never sees a notification, badge, or higher-than-debug console log from telemetry activity during normal operation.
-  5. The user can replay a server outage scenario (server returns 500) and verify the batch is re-enqueued via `keepalive: true` semantics with capped re-tries -- no infinite retry loop.
-**Plans**: 1 plan
-- [x] 272-01-PLAN.md — TelemetryCollector module + alarm + active-agent counter + tests
+- [x] Phase 45: T1 Porting Scaffold + Handler Contract Hardening (completed 2026-06-29)
 
-### Phase 273: Server Schema + Telemetry Routes + Salt Rotator + Rate Limiter + Housekeeper
-**Goal**: The showcase server accepts anonymous telemetry batches with three release-gating safeguards: trusted-proxy IP handling, CVE-patched rate limiting, and never-persisted plaintext IPs.
-**Depends on**: Phase 272 (needs client-side beat shape locked)
-**Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04, INGEST-05, INGEST-06, INGEST-07, INGEST-08, INGEST-09, INGEST-10, INGEST-11, INGEST-12, INGEST-13
-**Success Criteria** (what must be TRUE):
-  1. A developer can POST a valid 50-event batch to `https://full-selfbrowsing.com/api/telemetry/events` and see exactly 50 rows inserted into `telemetry_events` with hashed IPs and no plaintext IP anywhere on disk.
-  2. A developer can POST 31 batches in one minute from the same IP-hash and see request 31 rejected with `429 Too Many Requests` carrying RFC 9239 RateLimit headers.
-  3. A developer can POST a payload containing a 10th field (e.g. `prompt`) and see the request rejected with `400 unknown_field` -- the 9-field allowlist is enforced server-side.
-  4. A developer can POST `{install_uuid: "<uuid>"}` to `/api/telemetry/forget` and `/api/telemetry/optout` and see a `204` response whether the UUID existed or not (no enumeration leak); subsequently see zero matching rows remain in `telemetry_events` and `telemetry_rollups_daily`.
-  5. A developer can leave the server running for 25 hours and verify that yesterday's salt row has been deleted, today's salt is fresh, and `telemetry_global_aggregates` has been recomputed at least once by the hourly housekeeper.
-**Plans**: 1 plan
-  - [x] 273-01-PLAN.md — Trust proxy + 4 SQLite tables + WAL pragmas + hash/salt utils + express-rate-limit dep install + rate-limit middleware + 3 telemetry routes (/events, /optout, /forget) + housekeeper + 13 tests + CI grep gate (no IP leak)
+**Goal:** Build the reusable test and implementation scaffold for app ports so each new T1 handler has origin-pin, logged-out guard, shape guard, no-secret logging, consent classification, and byte-stable fallback behavior by default.
 
-### Phase 274: Public Aggregates Endpoint + FSBTelemetryService Angular + /stats Toggle Group
-**Goal**: A visitor to `https://full-selfbrowsing.com/stats` can see live anonymous aggregate metrics about FSB usage, k-anonymity-floor-protected, in all six supported locales.
-**Depends on**: Phase 273 (needs ingest pipeline producing aggregates)
-**Requirements**: AGG-01, AGG-02, AGG-03, AGG-04, AGG-05, AGG-06, AGG-07, AGG-08, AGG-09, STATS-01, STATS-02, STATS-03, STATS-04, STATS-05, STATS-06, STATS-07
-**Success Criteria** (what must be TRUE):
-  1. A visitor can navigate to `https://full-selfbrowsing.com/stats` and see a new headline row reading "active right now: N · total users: N · tokens 24h: NM" alongside the existing GitHub views.
-  2. A visitor can toggle between six new chart views (`fsb-active-now`, `fsb-tokens`, `fsb-agents-running`, `fsb-popular-agents`, `fsb-popular-mcp`, `fsb-avg-agents-per-user`) using the existing tab UI, and watch the data refresh every 5 minutes when the tab is visible (paused when hidden).
-  3. A visitor opening `/stats` in es / de / ja / zh-CN / zh-TW sees the new headline and toggle labels in their locale, with the build-time `i18nMissingTranslation: error` invariant respected.
-  4. A visitor querying `/api/public-stats/global` directly receives JSON with no auth, no cookies in response, ETag + `Cache-Control: max-age=60` headers, and the new path does not shadow the existing auth-gated `/api/stats`.
-  5. A visitor cannot find `/stats` via search engines or `sitemap.xml`/`llms.txt`/`hreflang` -- the Easter-egg posture is preserved, footer link remains the only entry point.
-**Plans**: 2 plans
-  - [ ] 274-01-PLAN.md — Wave 1: server `active-tracker` + `public-stats` route (GET /global + /global/series, 30s memo + ETag + Cache-Control) + queries.js read paths + `recordSeen` hook in telemetry.js + server.js mount + Angular `FSBTelemetryService` + `fsb-telemetry.types.ts` + 5 new tests
-  - [ ] 274-02-PLAN.md — Wave 2: stats-page component updates (6 toggle entries + headline row + section heading + scss) + i18n extract → AI-fill 5 non-en XLF locales (es/de/ja/zh-CN/zh-TW) + build smoke test (`i18nMissingTranslation: error` + Easter-egg crawler invariant)
-**UI hint**: yes
+**Depends on:** Phase 44.
 
-### Phase 275: Privacy Policy Page Update + CWS Listing Diff + CI Guard + Integration Smoke
-**Goal**: The Chrome Web Store listing, public privacy policy, and CI all reflect the new telemetry surface so v0.9.69 can be published without policy violation.
-**Depends on**: Phase 274 (needs final endpoint URLs + payload schema locked)
-**Requirements**: CONS-03, CONS-04, CONS-05, CONS-06, CONS-07
-**Success Criteria** (what must be TRUE):
-  1. A visitor opening `https://full-selfbrowsing.com/privacy` can read a new "Anonymous Usage Telemetry" section listing the 5 collected fields, the 6 explicitly-NOT-collected categories (URLs, prompts, DOM, plaintext IPs, names, emails), the retention policy (7d raw / 365d rollups / lifetime global), the kill-switch path, the GDPR Article 17 erasure curl recipe, and a Limited Use affirmation.
-  2. A visitor opening the privacy policy can click a link reading "we publish aggregated metrics here" and land on `/stats`.
-  3. A developer reading `store-assets/chrome-web-store/listing-copy.md` finds a "Data we collect" section mirroring the privacy page, and `store-assets/chrome-web-store/privacy-practices-evidence.md` records which CWS Privacy Practices checkboxes must be ticked at publish time.
-  4. The CI chain runs `scripts/verify-store-listing.mjs` and fails the build if `listing-copy.md` lacks the Data Collection section or if the homepage URL doesn't terminate at `/privacy`.
-  5. A user reading the privacy policy can copy a curl command and a documented Advanced-Settings path to read their UUID; no "forget my data" button exists in v0.9.69 (documented and explicitly deferred to v0.9.70+).
-**Plans**: TBD
-**UI hint**: yes
+**Requirements:** T1R-04, T1R-05, T1R-09.
 
-### Phase 276: Dashboard DOM-Streaming Diagnostic + Minimum Patch
-**Goal**: A user pairing the showcase dashboard with an active extension on a non-restricted tab sees the live preview pane resume streaming within 3 seconds of pressing "wake".
-**Depends on**: Phase 275 (LAST per locked phase order; only ships when everything else is green)
-**Requirements**: STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06, STREAM-07
-**Success Criteria** (what must be TRUE):
-  1. A developer can read `.planning/phases/276-.../DIAGNOSTIC.md` and find three captured logs (showcase server stdout, extension diagnostics ring, dashboard transport-event history) plus the exact reproduction steps.
-  2. A developer can read the same DIAGNOSTIC.md and walk the 7-hypothesis chain in rank order (hashKey room mismatch -> stream-tab not-ready -> no-tab forward -> domStreamReady pending-intent -> ext:status race -> LZ decompression -> stale-mutation loop), with predicted symptom + verification command + fix surface recorded for each.
-  3. A user pairing the dashboard with an active extension on a non-restricted tab presses "wake" and sees the preview pane begin streaming live DOM within 3 seconds; the stream-state pill reads "streaming".
-  4. A user hovering the stream-state pill sees a tooltip showing `last-frame-ago (s)`, mutations applied, apply failures, and stale-mutation count.
-  5. If 5 fix attempts (one per hypothesis confirmation cycle) fail to confirm a root cause, the unresolved tail is explicitly re-scoped to v0.9.70 with a deferred-items entry rather than expanding scope inside this phase.
-**Plans**: TBD
-**UI hint**: yes
+**Success Criteria:**
+1. A handler/recipe port template and generator or checklist exists for same-origin reads, same-origin writes, and separate-origin candidates.
+2. Shared tests can be applied to every new T1 port: origin match, executeBoundSpec-only, no token/log leak, logged-out body rejected, expected shape guard, and router parity.
+3. The fail-closed guarded-write harness is generalized so write/destructive ports cannot accidentally execute before UAT evidence is recorded.
 
-## Risks
+**Plans:**
+- [x] 45-01: Port contract library and scaffold CLI.
+- [x] 45-02: Current-catalog contract verifier.
+- [x] 45-03: Documentation and phase closeout.
 
-Three formal **BLOCKERs** gate the v0.9.69 release tag to the Chrome Web Store. All three must be landed and verified before publish:
+## Phase 46: Same-Origin Read Ports — First High-Value Batch
 
-| ID | Blocker | Phase | What goes wrong if missed |
-|----|---------|-------|---------------------------|
-| **B1** | `app.set('trust proxy', 1)` MUST precede any telemetry route mount in `showcase/server/server.js` (immediately after `const app = express()`) | **273** | Without it, `req.ip` returns the Fly.io proxy IP for every request, ALL telemetry collapses into one synthetic user, IP-hash rate-limiter becomes a single-bucket system, per-IP daily budgets are meaningless. |
-| **B2** | `express-rate-limit@^8.3.0` minimum (CVE-2026-30827) with custom `keyGenerator: req => hashIp(req.ip, db)` | **273** | Below 8.3.0, the default-keyGenerator IPv4-mapped-IPv6 collision collapses all IPv4 traffic into a single rate-limit bucket on dual-stack hosts. Fly.io is dual-stack. Even on 8.3.0, raw IP must never reach the rate-limiter; rate-bucket must align with the same HMAC-SHA256 identifier the storage layer sees. |
-| **B3** | Updated CWS `listing-copy.md` + Privacy Practices evidence + privacy policy `#telemetry-disclosure` anchor must exist before CWS publish | **275** | Today's listing declares zero data collection. Publishing v0.9.69 without (a) ticking "Personally identifiable information" (the UUID is a regulated "identification number" under the CWS User Data FAQ), (b) providing a Privacy Policy URL covering the telemetry payload, retention, opt-out, and Limited Use compliance, and (c) ticking "Limited Use" certification is a direct policy violation -- soft-reject + re-review delay or hard-removal under sensitive-data policy. |
+- [x] Phase 46: Same-Origin Read Ports — First High-Value Batch (completed 2026-06-29)
 
-**Secondary risks (documented, not release-gating):**
+**Goal:** Convert a first batch of high-value read descriptors from T3 to executable T1 where the app’s authenticated web runtime uses same-origin APIs and can be proven without weakening Wall 2.
 
-- **GDPR opt-IN posture risk:** v0.9.69 ships opt-out-by-default globally. Defensible in the US under CCPA but contestable in the EU/UK under ePrivacy Article 5(3). Accepted risk per locked decision D-02; build `consentDecisionAt` precondition into Phase 273 schema so a future opt-in-per-locale feature flag does not require a schema migration.
-- **Streaming-fix scope unknowable pre-repro:** Phase 276 is diagnostic-first. The 5-attempt hard cap (STREAM-07) protects the milestone close date; if the cap is hit, the unresolved tail re-scopes to v0.9.70 with a deferred-items.md entry.
-- **DeepSeek V4-Pro 75% promo expires 2026-05-31:** Pricing table needs refresh sentinel; flagged for v0.9.70+ refresh cycle, not gating.
-- **Grok 4 retires 2026-05-15:** Requests redirect to grok-4.3 pricing post-retirement; pricing table accommodates both.
+**Depends on:** Phase 45.
 
-## Parallelism
+**Requirements:** T1R-06.
 
-Phases 269 and 270 are **disjoint** (UUID storage bootstrap vs pure data table) and may run in parallel. All other phases run sequentially per the locked phase order (D-13).
+**Success Criteria:**
+1. At least 10 additional read descriptors across multiple apps become executable T1/T1b with passing handler tests and live-smoke notes where credentials are available.
+2. Candidate apps are selected from the readiness matrix by same-origin feasibility, user value, and low side-effect risk.
+3. Each new read port preserves existing descriptor metadata and search ranking while flipping backing/status honestly.
+
+**Plans:**
+- [x] 46-01: Candidate selection and Netlify/Bitbucket/CircleCI handler ports.
+- [x] 46-02: Catalog wiring, search readiness, and same-origin classifier gates.
+- [x] 46-03: Verification, UAT notes, and phase closeout.
+
+## Phase 47: Pattern-D + GAPI Bridge Architecture
+
+- [x] Phase 47: Pattern-D + GAPI Bridge Architecture (completed 2026-06-29)
+
+**Goal:** Design and prove the missing architecture for apps whose useful APIs are separate-origin, per-org-subdomain, or page-bridge mediated, without breaking the active-tab credential boundary.
+
+**Depends on:** Phase 45.
+
+**Requirements:** T1R-07, T1R-08.
+
+**Success Criteria:**
+1. A Pattern-D execution design is implemented or explicitly rejected for separate-origin app APIs such as Linear, Datadog/Jira per-org subdomains, Supabase, and cloud consoles.
+2. A Google Workspace GAPI bridge spike determines whether Docs/Drive/Calendar can be handled through `window.gapi.client.request` safely.
+3. Negative-control tests prove unverified cross-origin ports fail closed and cannot bypass origin/consent gates.
+
+**Plans:**
+- [x] 47-01: Pattern-D decision for separate-origin and per-org APIs.
+- [x] 47-02: GAPI bridge decision for Google Workspace APIs.
+- [x] 47-03: CI gate, negative controls, and closeout.
+
+## Phase 48: High-Value Read Ports — Second Batch
+
+- [x] Phase 48: High-Value Read Ports — Second Batch (completed 2026-06-29)
+
+**Goal:** Use the Phase 47 outcome to port another batch of read descriptors, including Pattern-D/GAPI candidates if the architecture is proven.
+
+**Depends on:** Phases 46 and 47.
+
+**Requirements:** T1R-06, T1R-07, T1R-08.
+
+**Success Criteria:**
+1. A second batch of read descriptors becomes executable T1/T1b using either same-origin handlers, declarative recipes, Pattern-D, or GAPI bridge paths.
+2. The coverage report shows a measurable increase in apps with at least one executable read path.
+3. Apps still unsuitable for T1 are documented with the reason: denied, ToS-sensitive, auth unavailable, cross-origin unsafe, or live-UAT missing.
+
+**Plans:**
+- [x] 48-01: Vercel same-origin read head.
+- [x] 48-02: CircleCI same-origin read expansion.
+- [x] 48-03: Gate, search, and readiness-report closeout.
+
+## Phase 49: Guarded Writes Activation Pipeline
+
+- [x] Phase 49: Guarded Writes Activation Pipeline (completed 2026-06-29)
+
+**Goal:** Turn fail-closed write/destructive candidates into executable T1 only after live mutation-body capture, consent gate verification, and redacted audit proof.
+
+**Depends on:** Phases 44-48.
+
+**Requirements:** T1R-10, T1R-11.
+
+**Success Criteria:**
+1. Existing fail-closed writes are either activated with live evidence or remain explicitly fail-closed with current reasons.
+2. A reusable live UAT template records method/path/body shape, CSRF/token location, Chrome/extension version, and redacted outcome without storing secrets.
+3. At least one low-risk write activation is completed end-to-end, or the milestone explicitly records why no write met the safety bar.
+
+**Plans:**
+- [x] 49-01: Write activation evidence ledger.
+- [x] 49-02: Evidence verifier and validation gate.
+- [x] 49-03: Live-UAT template and closeout decision.
+
+## Phase 50: T1 Expansion Gate + Next-Batch Plan
+
+- [x] Phase 50: T1 Expansion Gate + Next-Batch Plan (completed 2026-06-29)
+
+**Goal:** Close the milestone with an honest T1 coverage gate, full regression suite, and a prioritized backlog for the remaining 2,288-descendant tail.
+
+**Depends on:** Phase 49.
+
+**Requirements:** T1R-12.
+
+**Success Criteria:**
+1. Full `npm test` and `npm run validate:extension` pass with the expanded T1 set.
+2. The readiness report is regenerated and checked into the milestone evidence with before/after counts.
+3. The next T1 batch is ranked by value, feasibility, and risk; no “all apps are T1-ready” claim is made unless every relevant descriptor has executable proof.
+
+**Plans:**
+- [x] 50-01: Regenerate readiness evidence and closeout counts.
+- [x] 50-02: Full regression gate.
+- [x] 50-03: Next-batch backlog and milestone closeout.
+
+## Phase 51: Full T1 Tail Migration Across Remaining Catalog
+
+- [x] Phase 51: Full T1 Tail Migration Across Remaining Catalog (completed 2026-06-30)
+
+**Goal:** Convert the Phase 51 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
+
+**Depends on:** Phase 50.
+
+**Requirements:** T1ALL-01, T1ALL-02, T1ALL-03, T1ALL-04, T1ALL-05.
+
+**Success Criteria:**
+1. A generated Phase 51 worklist covers every non-ready catalog-tail row and partitions it by app, side-effect class, route feasibility, origin class, and required proof.
+2. Every non-denied read descriptor is either backed by a verified handler/recipe or assigned to an approved bridge/UAT workstream with a concrete blocking reason.
+3. Every write/destructive descriptor remains fail-closed until live mutation-body evidence, consent/audit proof, and no-secret logging checks pass.
+4. Denied origins remain blocked; sensitive origins can be T1 only under the current audited invoke posture and any app-specific product/legal acceptance.
+5. Final closeout cannot claim “all apps are T1” unless `npm test`, `npm run validate:extension`, the T1 readiness gate, the port-contract gate, and the Phase 51 worklist all agree there are no untriaged non-denied tail rows.
+
+**Plans:**
+- [x] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
+- [x] 51-02: Existing-head and low-risk same-origin read bulk port.
+- [x] 51-03: Retool CSRF same-origin read head.
+- [x] 51-04: Asana same-origin Pattern-D carveout.
+- [x] 51-05: Pattern-D and GAPI bridge implementation waves.
+- [x] 51-06: Sensitive consumer/social and blocked-policy triage.
+- [x] 51-07: Write/destructive live-UAT activation waves.
+- [x] 51-08: Final all-tail regression, UAT ledger, and closeout.
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order with 269 || 270 (parallel) -> 271 -> 272 -> 273 -> 274 -> 275 -> 276.
-
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 269. Install Identity + Opt-Out Scaffold | 1/1 | ✓ Complete | 2026-05-14 |
-| 270. MCP Pricing Module | 1/1 | ✓ Complete | 2026-05-14 |
-| 271. MCPMetricsRecorder + Dispatcher Hooks + Unified Cost Surfacing | 1/1 | ✓ Complete | 2026-05-14 |
-| 272. TelemetryCollector + Alarm + Queue Persistence | 1/1 | Complete   | 2026-05-14 |
-| 273. Server Schema + Telemetry Routes + Salt Rotator + Rate Limiter + Housekeeper | 1/1 | Complete   | 2026-05-14 |
-| 274. Public Aggregates Endpoint + FSBTelemetryService Angular + /stats Toggle Group | 2/2 | Complete   | 2026-05-14 |
-| 275. Privacy Policy Page Update + CWS Listing Diff + CI Guard + Integration Smoke | 1/1 | Complete   | 2026-05-14 |
-| 276. Dashboard DOM-Streaming Diagnostic + Minimum Patch | 1/1 | Complete (human_needed) | 2026-05-14 |
+| 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
+| 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
+| 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
+| 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
+| 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
+| 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
+| 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
+| 51. Full T1 Tail Migration Across Remaining Catalog | 8/8 | Complete | 2026-06-30 |
 
----
+## Completed Milestones
 
-## Latest milestone archive
+<details>
+<summary>v1.1.0 T1 App Execution Expansion — Phases 44-51, SHIPPED 2026-06-30</summary>
 
-[v0.9.63 -- Showcase i18n](milestones/v0.9.63-ROADMAP.md) -- 7 phases (261, 262, 264, 265, 266, 267, 268), 15 plans, 14/14 requirements satisfied, audit `passed`. Branch: `feat/showcase-i18n`. Marketing site (`showcase/angular`) now ships in en/es/de/ja/zh-CN/zh-TW with hreflang + canonical fan-out, AI-filled XLIFFs, hard-fail CI gates, and Accept-Language auto-detection. WARNING-02 (picker-cookie short-circuits bare-`/` redirect on fresh tabs) carried forward as deferred.
+Archive files:
 
-## Previous archives
+- `.planning/milestones/v1.1.0-ROADMAP.md`
+- `.planning/milestones/v1.1.0-REQUIREMENTS.md`
+- `.planning/milestones/v1.1.0-MILESTONE-AUDIT.md`
 
-- [v0.9.62 -- Implicit Visual Session Contract](milestones/v0.9.62-ROADMAP.md) -- 7 phases (254-260), 15 plans, 27/27 v1 requirements satisfied, audit `passed`. Branch: `refinements`. Final `npm publish fsb-mcp-server@0.9.0` remains user-gated.
-- [v0.9.61 -- FSB Skill (OpenClaw)](milestones/v0.9.61-ROADMAP.md) -- 6 phases, 29/29 requirements, shipped 2026-05-08.
-- [v0.9.60 -- Multi-Agent Tab Concurrency (MCP 0.8.0)](milestones/v0.9.60-ROADMAP.md) -- 11 phases, 42/42 requirements, shipped 2026-05-08.
+Outcome: v1.1.0 expanded proven direct execution from the v1.0.0 baseline into verified T1-ready read coverage across Netlify, Bitbucket, CircleCI, Vercel, Retool, Asana, and generated same-origin reads, with post-closeout ports reflected in the refreshed artifacts. Phase 51 closes the remaining catalog tail honestly: 1,267 rows are executable T1-ready, 556 rows are guarded fail-closed, and the remaining 491 descriptors are explicitly surfaced as bridge-needed, UAT-needed, blocked-policy, or degraded/discovery-pending rather than overclaimed.
 
-See `.planning/MILESTONES.md` for the full milestone history.
+</details>
 
----
+<details>
+<summary>v1.0.0 Full App Catalog (OpenTabs Parity) — Phases 35-43, SHIPPED 2026-06-29</summary>
 
-## Backlog (carry-forward candidates for future milestones)
+Archive files:
 
-- **v0.9.70 (telemetry follow-up):** First-run privacy banner (deferred per D-02); "View what we send" live JSON preview; "Reset anonymous ID" button; "Wipe my telemetry data" in-extension UI button; region-gated opt-IN for EU/UK/CA installs; public versioned `/api/public-stats` documentation; per-day spark lines on `/stats`; geo heatmap (k>=100 floor).
-- **v0.9.70 (streaming):** Full dashboard streaming rewrite if STREAM-07 hard cap is hit during Phase 276.
-- **v0.9.64 (UX, carry-forward from v0.9.63):** revisit WARNING-02 -- picker-set `fsb-locale` cookie short-circuits the bare-`/` Accept-Language redirect on returning fresh-tab / shared-link visits.
-- **v0.9.65 (dashboard i18n, carry-forward from v0.9.63):** translate `showcase/angular/src/app/pages/dashboard/**`; remove the `--ignore-pattern` in `package.json:lint:i18n`.
-- **PRICING-REFRESH-CI:** 90-day CI gate that fails if `PRICING_SOURCE_DATE` is stale (deferred from v0.9.69 per user scope; manual refresh policy).
-- **Carry-forward from prior milestones:**
-  - `git push origin Refinements && git push origin v0.9.69` -- branch + tag (will land at milestone close).
-  - `git push origin feat/showcase-i18n && git push origin v0.9.63` -- branch + tag NOT pushed (v0.9.63).
-  - `git push origin refinements && git push origin v0.9.62` -- branch + tag NOT pushed (v0.9.62).
-  - `npm publish fsb-mcp-server@0.9.0` -- in-tree at 0.9.0; final publish user-gated.
-  - `clawhub publish "skills/FSB Skill"` -- carry-forward from v0.9.61.
-  - 4 live-OpenClaw runtime UAT items carried from v0.9.61.
+- `.planning/milestones/v1.0.0-ROADMAP.md`
+- `.planning/milestones/v1.0.0-REQUIREMENTS.md`
+- `.planning/milestones/v1.0.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v1.0.0-phases/`
+
+Outcome: full OpenTabs-derived catalog/search/discovery surface shipped with 2,314 descriptors across 128 app stems / 129 services. The milestone deliberately fed the existing tier model rather than hand-porting every action: 26 descriptors resolve to T1/T1b today, 5 guarded writes remain fail-closed, and 2,288 descriptors remain T3 DOM/discovery-tail. Full milestone audit passed; non-blocking live UAT and T1 expansion debt are carried forward.
+
+</details>
+
+
+
+<details>
+<summary>v0.9.99 Native Capability Catalog (FSB API Execution) — Phases 26-34, CODE-COMPLETE 2026-06-23</summary>
+
+Gave FSB first-class authenticated-API execution as a fast path alongside DOM automation, between Wall 1 (closed-vocabulary recipe DATA bound by a fixed interpreter) and Wall 2 (MAIN-world authenticated fetch). Full `npm test` EXIT 0; live-browser UAT debt (UAT-27/29/30/31/32-01) carried forward. The v1.0.0 milestone extends this substrate verbatim.
+
+| Phase | Name | Plans | Status |
+|-------|------|-------|--------|
+| 26 | Recipe Schema + Bundled Interpreter + MV3 CI Guard | 3/3 | Complete |
+| 27 | Authenticated Fetch Primitive (MAIN-world) + Origin-Pin + Resume-Sidecar | 3/3 | Complete; live FETCH-05 UAT human_needed |
+| 28 | Lean MCP Surface + Capability Search + Eval Harness | 4/4 | Complete |
+| 29 | Catalog + Tiered Router + Bundled Head + Declarative Tail + Autopilot Parity | 5/5 | Complete; live-capture UAT human_needed |
+| 30 | Consent Governance + Recipe Signature Verification + Audit + Legal Posture | 4/4 | Complete; live smoke human_needed |
+| 31 | Network-Capture Discovery + Recipe Synthesis + Learned Recipes | 6/6 | Complete; live UAT human_needed |
+| 32 | Self-Healing Fallback + Recipe-Rot + Re-Learn + Provider/Schema-Lock Tests + UAT | 5/5 | Complete; live self-heal UAT human_needed |
+| 33 | PhantomStream Media Mirroring (0.2.1 Uptake) — milestone extension | 1/1 | Complete; live media UAT human_needed |
+| 34 | Explicit File Upload Tool (upload_file) — milestone extension | 1/1 | Complete; live upload UAT human_needed |
+
+Substrate carried into v1.0.0 (FIXED — do not redesign): tiers T0/T1a/T1b/T2-learned/T3-DOM; the closed-vocab interpreter; the consent gate (opt-out Auto default, denylist = the ONE hard floor); the 2 out-of-`TOOL_REGISTRY` MCP tools; `capability-catalog.js resolve()` / `capability-router.js invoke()` / `capability-search.js buildIndex()`; `scripts/package-extension.mjs readJsonDir` + the generated `recipe-index.generated.js` IIFE; the `github.js` T1a hand-port contract; `service-denylist.js` loader; `network-capture.js` discovery path; `verify-recipe-path-guard.mjs` Wall-1 guard.
+
+</details>
+
+<details>
+<summary>v0.12.0 PhantomStream Package Migration — Phases 21-25, COMPLETED 2026-06-17</summary>
+
+Archive files:
+
+- `.planning/milestones/v0.12.0-ROADMAP.md`
+- `.planning/milestones/v0.12.0-REQUIREMENTS.md`
+- `.planning/milestones/v0.12.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v0.12.0-phases/`
+
+Phase summary:
+
+| Phase | Name | Plans | Status |
+|-------|------|-------|--------|
+| 21 | Package Intake & Contract Mapping | 3/3 | Complete |
+| 22 | Capture Adapter Migration | 4/4 | Complete |
+| 23 | Dashboard Renderer Migration | 4/4 | Complete |
+| 24 | Transport, Relay & Remote Control Integration | 4/4 | Complete |
+| 25 | Parity Removal, Docs & Browser UAT | 4/4 | Complete; human UAT debt recorded |
+
+Known deferred closeout evidence: live Chrome-extension dashboard preview and remote-control UAT remains `human_needed`; see `.planning/milestones/v0.12.0-phases/25-parity-removal-docs-browser-uat/25-HUMAN-UAT.md`.
+
+</details>
+
+<details>
+<summary>v0.11.0 Trigger Tool (Reactive DOM Monitoring) — Phases 14-20, COMPLETED 2026-06-17</summary>
+
+Phase summary:
+
+| Phase | Name | Plans | Status |
+|-------|------|-------|--------|
+| 14 | Trigger Survivability Foundation | 3/3 | Complete |
+| 15 | Fire-Condition Engine & Value Extraction | 3/3 | Complete |
+| 16 | Live-Observe Watch & Analyzing Pulse | 4/4 | Complete |
+| 17 | Refresh-Poll Watch (Tab-Owning Background Reload) | 4/4 | Complete |
+| 18 | Shared Tool Registry & Dispatcher Wiring | 4/4 | Complete |
+| 19 | MCP Tools & Blocking/Detached Reporting | 3/3 | Complete |
+| 20 | Integration, Cap UI, Docs & Edge Cases | 5/5 | Complete; human UAT debt recorded |
+
+Known deferred closeout evidence: live-browser/composed trigger UAT remains `human_needed`; publish/tag/release actions remain user-gated.
+
+</details>
+
+<details>
+<summary>v0.10.0 Autopilot via Lattice SDK (Phases 01-13) — SHIPPED 2026-06-15</summary>
+
+Archive files:
+
+- `.planning/milestones/v0.10.0-ROADMAP.md`
+- `.planning/milestones/v0.10.0-REQUIREMENTS.md`
+- `.planning/milestones/v0.10.0-MILESTONE-AUDIT.md`
+- `.planning/milestones/v0.10.0-phases/`
+
+Phase summary:
+
+| Phase | Name | Plans | Status |
+|-------|------|-------|--------|
+| 01 | Lattice SDK gap survey + integration scaffolding | 2/2 | Complete |
+| 02 | Lattice tripwire + receipt primitives extension | 5/5 | Complete |
+| 03 | Observability + step-markers extension | 3/3 | Complete |
+| 04 | Provider adapter alignment | 5/5 | Complete |
+| 05 | MV3-survivability adapter contract + bundler infra + hybrid offscreen Lattice host | 6/6 | Complete |
+| 06 | FSB engine consumes Lattice provider abstraction | 7/7 | Complete |
+| 07 | Archive FSB custom provider stack | 4/4 | Complete |
+| 08 | FSB agent brain on Lattice runtime | 3/3 | Complete |
+| 09 | FSB SurvivabilityAdapter activated for MV3 SW eviction resumption | 3/3 | Complete |
+| 10 | MCP-philosophy parity for autopilot driver | 3/3 | Complete |
+| 11 | Tab-aware side panel surface | 5/5 | Complete |
+| 12 | Side panel follows automation | 5/5 | Complete |
+| 13 | Public Lattice package integration | 1/1 | Complete |
+
+Known deferred closeout evidence: 11 human-gated Chrome MV3/UAT verification items were acknowledged at close. See `.planning/STATE.md` `## Deferred Items`.
+
+</details>
+
+## Carry-Forward Candidates
+
+- **Consolidated Chrome MV3 UAT debt:** Run and capture archived v0.10/v0.11/v0.12 + v0.9.99 (UAT-27/29/30/31/32-01) browser evidence if release policy requires post-close proof. v1.0.0 does NOT block on it.
+- **v2 deferred capability families (acknowledged, out of v1.0.0):** GAPI-01 (gapi-bridge handler family for Google Workspace via the `window.gapi.client.request` trampoline); CLOUD-01 (cloud-console Pattern-D ports — aws-console/azure/google-cloud/terraform-cloud — pending per-app CORS verification); UATX-01 (per-app live guarded-write UAT closeout across the hand-ported depth tier).
+- **Delegation primitive:** Parked from v0.10.0; re-scope as either a Lattice-owned primitive or an FSB-only consumer of Lattice receipt + tripwire surfaces.
+
+## Backlog
+
+### Phase 999.1: MCP tool gaps — click heuristics
+
+**Status:** Completed historical backlog work retained outside milestone archival.
+
+- `999.1-01`: Route-aware MCP bridge dispatch + `execute_js` background handler.
+- `999.1-02`: Text-based click targeting with TreeWalker visible-text matching.
+
+Artifacts remain in `.planning/phases/999.1-mcp-tool-gaps-click-heuristics/`.

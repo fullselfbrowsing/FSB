@@ -1,0 +1,47 @@
+{
+  "slug": "fidelity.get_portfolio_events",
+  "service": "digital.fidelity.com",
+  "intentSynonyms": [
+    "get portfolio events in fidelity",
+    "look up portfolio events in fidelity",
+    "fetch a single portfolio events in fidelity",
+    "view one specific portfolio events in fidelity",
+    "view portfolio earnings, dividends, and milestones in fidelity"
+  ],
+  "description": "Get upcoming and past portfolio events including earnings reports, ex-dividend dates, and 52-week highs/lows for positions in your portfolio.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "direction": {
+        "description": "Look at future or past events (default: future)",
+        "type": "string",
+        "enum": [
+          "future",
+          "past"
+        ]
+      },
+      "symbols": {
+        "description": "Specific symbols to check. If omitted, uses top portfolio holdings.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/fidelity/src/tools/get-portfolio-events.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

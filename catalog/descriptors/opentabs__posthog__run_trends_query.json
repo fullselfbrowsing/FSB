@@ -1,0 +1,93 @@
+{
+  "slug": "posthog.run_trends_query",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "run a trends query in posthog",
+    "run trends query in posthog",
+    "run a time series trends query in posthog"
+  ],
+  "description": "Run a time series trends query over events. Returns data points per interval (day, week, month, hour). Supports multiple series, math aggregations (total, unique users, average, sum, min, max), and breakdowns by property. Easier to use than raw HogQL for standard time series charts.",
+  "actionVerb": "run",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "event": {
+        "type": "string",
+        "description": "Event name to trend (e.g., \"$pageview\", \"server_started\")"
+      },
+      "math": {
+        "description": "Math aggregation: \"total\" (event count, default), \"dau\" (unique users), or property aggregations like \"avg\", \"sum\", \"min\", \"max\", \"median\", \"p90\", \"p95\", \"p99\"",
+        "type": "string",
+        "enum": [
+          "total",
+          "dau",
+          "weekly_active",
+          "monthly_active",
+          "unique_group",
+          "avg",
+          "sum",
+          "min",
+          "max",
+          "median",
+          "p90",
+          "p95",
+          "p99"
+        ]
+      },
+      "math_property": {
+        "description": "Property to aggregate when using property math (avg, sum, min, max, etc.)",
+        "type": "string"
+      },
+      "date_from": {
+        "description": "Start date — relative (\"-7d\", \"-30d\", \"-1mStart\") or ISO 8601. Default: \"-7d\"",
+        "type": "string"
+      },
+      "date_to": {
+        "description": "End date — relative or ISO 8601. Default: now",
+        "type": "string"
+      },
+      "interval": {
+        "description": "Time interval for data points (default \"day\")",
+        "type": "string",
+        "enum": [
+          "hour",
+          "day",
+          "week",
+          "month"
+        ]
+      },
+      "breakdown": {
+        "description": "Property name to break down by (e.g., \"$browser\", \"os\", \"$referring_domain\")",
+        "type": "string"
+      },
+      "breakdown_type": {
+        "description": "Breakdown property type (default \"event\")",
+        "type": "string",
+        "enum": [
+          "event",
+          "person",
+          "session",
+          "group",
+          "hogql"
+        ]
+      }
+    },
+    "required": [
+      "event"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/run-trends-query.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "run"
+    }
+  }
+}

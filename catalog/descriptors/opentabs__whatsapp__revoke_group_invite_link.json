@@ -1,0 +1,38 @@
+{
+  "slug": "whatsapp.revoke_group_invite_link",
+  "service": "web.whatsapp.com",
+  "intentSynonyms": [
+    "revoke a group invite link in whatsapp",
+    "revoke group invite link in whatsapp",
+    "revoke and regenerate group invite link in whatsapp"
+  ],
+  "description": "Revoke the current invite link for a WhatsApp group, generating a new one. The old link will no longer work. Only group admins can revoke invite links.",
+  "actionVerb": "revoke",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "chat_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Group chat ID (must be a group chat)"
+      }
+    },
+    "required": [
+      "chat_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/whatsapp/src/tools/revoke-group-invite-link.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "revoke"
+    }
+  }
+}

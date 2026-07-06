@@ -20,6 +20,28 @@ interface PendingRequest {
   timeout: ReturnType<typeof setTimeout>;
 }
 
+// The three error messages this file's disconnect paths reject in-flight
+// sendAndWait promises with. All three MUST be treated as an MV3 SW-eviction
+// signal by consumer tools (autopilot, triggers) so the documented
+// `sw_evicted: true` recovery arms instead of surfacing a raw error.
+//   - 'Bridge disconnected'    -> disconnect() at line ~139 (server shutdown)
+//   - 'Extension disconnected' -> hub-mode extension ws close at line ~398
+//                                 (the real MV3 SW-eviction path)
+//   - 'Lost connection to hub' -> relay-mode hub loss at line ~691
+// A previous version of the consumer tools tested only the shutdown string,
+// leaving real eviction unhandled. Any new reject-on-disconnect callsite in
+// this file MUST add its message here or update these tools directly.
+const BRIDGE_DISCONNECT_MESSAGES = new Set<string>([
+  'Bridge disconnected',
+  'Extension disconnected',
+  'Lost connection to hub',
+]);
+
+export function isBridgeDisconnectError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return BRIDGE_DISCONNECT_MESSAGES.has(msg);
+}
+
 export class WebSocketBridge {
   // Identity
   private instanceId: string;

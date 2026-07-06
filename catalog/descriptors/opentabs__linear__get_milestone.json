@@ -1,0 +1,40 @@
+{
+  "slug": "linear.get_milestone",
+  "service": "linear.app",
+  "intentSynonyms": [
+    "get a milestone in linear",
+    "look up a milestone in linear",
+    "fetch a single milestone in linear",
+    "view one specific milestone in linear",
+    "get milestone in linear",
+    "get details of a single milestone in linear"
+  ],
+  "description": "Get detailed information about a single project milestone by its UUID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "milestone_id": {
+        "type": "string",
+        "description": "Milestone UUID"
+      }
+    },
+    "required": [
+      "milestone_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/linear/src/tools/get-milestone.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

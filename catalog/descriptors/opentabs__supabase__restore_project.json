@@ -1,0 +1,38 @@
+{
+  "slug": "supabase.restore_project",
+  "service": "supabase.com",
+  "intentSynonyms": [
+    "restore a project in supabase",
+    "restore project in supabase",
+    "restore a paused project in supabase"
+  ],
+  "description": "Restore a paused Supabase project. This will start the project database and APIs again.",
+  "actionVerb": "restore",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project reference ID to restore"
+      }
+    },
+    "required": [
+      "ref"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/supabase/src/tools/restore-project.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "api",
+      "httpMethod": "POST",
+      "opNameVerb": "restore"
+    }
+  }
+}

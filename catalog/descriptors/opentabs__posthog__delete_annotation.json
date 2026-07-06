@@ -1,0 +1,41 @@
+{
+  "slug": "posthog.delete_annotation",
+  "service": "us.posthog.com",
+  "intentSynonyms": [
+    "delete an annotation in posthog",
+    "remove an annotation in posthog",
+    "trash an annotation in posthog",
+    "permanently delete an annotation in posthog",
+    "delete annotation in posthog"
+  ],
+  "description": "Delete an annotation by marking it as deleted (soft delete).",
+  "actionVerb": "delete",
+  "sideEffectClass": "destructive",
+  "params": {
+    "type": "object",
+    "properties": {
+      "annotation_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "Annotation ID to delete"
+      }
+    },
+    "required": [
+      "annotation_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/posthog/src/tools/delete-annotation.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "delete"
+    }
+  }
+}

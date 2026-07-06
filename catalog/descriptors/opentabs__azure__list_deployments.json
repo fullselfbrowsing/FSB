@@ -1,0 +1,54 @@
+{
+  "slug": "azure.list_deployments",
+  "service": "portal.azure.com",
+  "intentSynonyms": [
+    "list deployments in azure",
+    "show me my deployments in azure",
+    "view my deployments in azure",
+    "see all my deployments in azure",
+    "list deployments in a resource group in azure"
+  ],
+  "description": "List all template deployments in a resource group. Returns deployment name, provisioning state, timestamp, and mode.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "subscription_id": {
+        "type": "string",
+        "description": "Subscription ID (GUID)"
+      },
+      "resource_group_name": {
+        "type": "string",
+        "description": "Resource group name"
+      },
+      "filter": {
+        "description": "OData filter expression (e.g., \"provisioningState eq 'Failed'\")",
+        "type": "string"
+      },
+      "top": {
+        "description": "Maximum number of results to return",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "subscription_id",
+      "resource_group_name"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/azure/src/tools/list-deployments.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

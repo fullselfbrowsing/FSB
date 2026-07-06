@@ -1,0 +1,30 @@
+{
+  "slug": "clickhouse.list_organization_members",
+  "service": "console.clickhouse.cloud",
+  "intentSynonyms": [
+    "list organization members in clickhouse",
+    "show me my organization members in clickhouse",
+    "view my organization members in clickhouse",
+    "see all my organization members in clickhouse"
+  ],
+  "description": "List all members of the current ClickHouse Cloud organization with their roles and email addresses.",
+  "actionVerb": "list",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/clickhouse/src/tools/list-organization-members.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "list"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "telegram.edit_message",
+  "service": "web.telegram.org",
+  "intentSynonyms": [
+    "edit a message in telegram",
+    "edit message in telegram",
+    "edit a sent message in telegram"
+  ],
+  "description": "Edit the text content of a previously sent message. Only messages sent by the current user can be edited.",
+  "actionVerb": "edit",
+  "sideEffectClass": "write",
+  "params": {
+    "type": "object",
+    "properties": {
+      "peer_id": {
+        "type": "number",
+        "description": "Peer ID of the conversation containing the message"
+      },
+      "message_id": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991,
+        "description": "ID of the message to edit"
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New message text"
+      }
+    },
+    "required": [
+      "peer_id",
+      "message_id",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/telegram/src/tools/edit-message.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "edit"
+    }
+  }
+}

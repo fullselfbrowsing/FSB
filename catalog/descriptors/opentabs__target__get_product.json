@@ -1,0 +1,40 @@
+{
+  "slug": "target.get_product",
+  "service": "target.com",
+  "intentSynonyms": [
+    "get a product in target",
+    "look up a product in target",
+    "fetch a single product in target",
+    "view one specific product in target",
+    "get product in target",
+    "get product details by tcin in target"
+  ],
+  "description": "Get detailed information about a Target product by its TCIN (Target item number). Returns title, description, price, brand, rating, reviews, bullet features, and image. Use search_products to find TCINs.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "tcin": {
+        "type": "string",
+        "description": "Target item number (TCIN) — e.g., \"85978618\""
+      }
+    },
+    "required": [
+      "tcin"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/target/src/tools/get-product.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": null,
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

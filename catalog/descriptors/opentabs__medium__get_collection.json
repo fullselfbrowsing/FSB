@@ -1,0 +1,40 @@
+{
+  "slug": "medium.get_collection",
+  "service": "medium.com",
+  "intentSynonyms": [
+    "get a collection in medium",
+    "look up a collection in medium",
+    "fetch a single collection in medium",
+    "view one specific collection in medium",
+    "get collection in medium",
+    "get a publication by id in medium"
+  ],
+  "description": "Get detailed information about a Medium publication/collection by its ID.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "collection_id": {
+        "type": "string",
+        "description": "Medium collection/publication ID"
+      }
+    },
+    "required": [
+      "collection_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/medium/src/tools/get-collection.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "gql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "airbnb.get_message_thread",
+  "service": "airbnb.com",
+  "intentSynonyms": [
+    "get a message thread in airbnb",
+    "look up a message thread in airbnb",
+    "fetch a single message thread in airbnb",
+    "view one specific message thread in airbnb",
+    "get message thread in airbnb",
+    "get messages in a thread by thread id in airbnb"
+  ],
+  "description": "Get the full message history of a thread including all messages and participants. Use the thread_id from list_message_threads.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "thread_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Base64-encoded thread ID (e.g., TWVzc2FnZVRocmVhZDoxNTI5NDg4NDAz)"
+      }
+    },
+    "required": [
+      "thread_id"
+    ],
+    "additionalProperties": false
+  },
+  "backing": "dom",
+  "provenance": {
+    "source": "opentabs",
+    "sha": "4b17021637d2cac12b8d84d21c40e765aa7b85e9",
+    "sourcePath": "plugins/airbnb/src/tools/get-message-thread.ts",
+    "license": "MIT",
+    "signals": {
+      "transportHelper": "graphql",
+      "httpMethod": null,
+      "opNameVerb": "get"
+    }
+  }
+}
