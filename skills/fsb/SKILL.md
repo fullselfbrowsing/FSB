@@ -1,7 +1,7 @@
 ---
 name: fsb
 description: FSB drives the user's Chrome via the FSB extension and an MCP bridge for live web tasks.
-version: 0.9.62
+version: 0.9.90
 user-invocable: true
 requires:
   bins: [node, npx]
