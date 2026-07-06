@@ -59,9 +59,15 @@ const SHOWCASE_CSP = [
   "script-src 'self' 'unsafe-inline' https://unpkg.com",
   "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com",
   "font-src 'self' data: https://cdnjs.cloudflare.com https://unpkg.com",
-  "img-src 'self' data: blob: https://i.ytimg.com",
+  // cdn.simpleicons.org serves the brand/tech logos in the home capability
+  // marquee (home-page.component simpleIcon()); i.ytimg.com is the /about
+  // YouTube thumbnails. Without simpleicons here every catalog logo is blocked.
+  "img-src 'self' data: blob: https://i.ytimg.com https://cdn.simpleicons.org",
   "media-src 'self' blob:",
-  "connect-src 'self'",
+  // raw.githubusercontent.com serves the Natural Earth land GeoJSON the stats
+  // globe fetches once per session (globe-visualization.service); without it the
+  // globe silently falls back to rough continents.
+  "connect-src 'self' https://raw.githubusercontent.com",
   // YouTube embeds on the /about page require frame-src; without this it falls
   // back to default-src 'self' and the demo videos render as a blocked iframe.
   "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
