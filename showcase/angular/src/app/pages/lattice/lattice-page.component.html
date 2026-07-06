@@ -34,6 +34,11 @@
             <img src="assets/lattice/logo-mark-spin-dark.gif" i18n-alt="@@lattice.hero.orb.alt" alt="Lattice capability mesh" width="400" height="400" decoding="async">
           </div>
         </div>
+        <!-- Mobile-only scroll cue: hidden on desktop via component styles; text-free
+             and aria-hidden so it adds no i18n surface (messages.xlf must not change). -->
+        <a href="#install" class="lat-scroll-cue" aria-hidden="true" tabindex="-1">
+          <span class="lat-cue-chevron"></span>
+        </a>
       </div>
     </section>
 
