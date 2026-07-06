@@ -1258,4 +1258,22 @@
   .features {
     scroll-margin-top: var(--nav-height);
   }
+
+  /* The fan is a tap-toggled dropdown on touch; pills keep the blur but get
+     a near-opaque tint so overlapped content cannot be read through them,
+     and the desktop deck offsets/rotations collapse into a neat right-aligned
+     column so nine pills don't scatter across the following section. */
+  .install-fan {
+    gap: 8px;
+    z-index: 60;
+  }
+
+  .install-fan-item {
+    background: color-mix(in srgb, var(--bg-elevated) 93%, transparent);
+    transform: none;
+  }
+
+  .install-fan-item:hover {
+    transform: none;
+  }
 }

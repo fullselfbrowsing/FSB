@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  HostListener,
   OnDestroy,
   OnInit,
   Renderer2,
@@ -145,6 +146,14 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   fanOpen = false;
   copied: string | null = null;
 
+  /* Prerender-safe guard (matchMedia check mirrors the theme bootstrap). On
+     coarse pointers the fan is click-toggled: taps fire synthetic mouseenter,
+     so the 500ms hover-intent timer would reopen it right after a tap-close. */
+  private readonly coarsePointer =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+
   get currentClient(): InstallClient {
     return this.rollClients[this.iconIndex];
   }
@@ -209,6 +218,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCopyEnter(): void {
+    if (this.coarsePointer) return;
     if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
     this.hoverTimer = setTimeout(() => {
@@ -217,11 +227,28 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCopyLeave(): void {
+    if (this.coarsePointer) return;
     if (this.hoverTimer) clearTimeout(this.hoverTimer);
     if (this.fanCloseTimer) clearTimeout(this.fanCloseTimer);
     this.fanCloseTimer = setTimeout(() => {
       this.fanOpen = false;
     }, 260);
+  }
+
+  onCopyClick(): void {
+    if (this.coarsePointer) {
+      this.fanOpen = !this.fanOpen;
+      return;
+    }
+    this.copyCurrent();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event): void {
+    if (!this.coarsePointer || !this.fanOpen) return;
+    const target = event.target as Element | null;
+    if (target && typeof target.closest === 'function' && target.closest('.install-copy-wrap')) return;
+    this.fanOpen = false;
   }
 
   copyCurrent(): void {

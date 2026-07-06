@@ -172,7 +172,7 @@
             <span class="install-flag" [class.is-morphing]="morphing" [attr.translate]="'no'">{{ token }}</span>
           </button>
           <div class="install-copy-wrap" (mouseenter)="onCopyEnter()" (mouseleave)="onCopyLeave()">
-            <button class="install-copy" [class.copied]="copied === 'current'" type="button" (click)="copyCurrent()" aria-label="Copy install command" i18n-aria-label="@@home.install.copyCurrent.aria">
+            <button class="install-copy" [class.copied]="copied === 'current'" type="button" (click)="onCopyClick()" [attr.aria-expanded]="fanOpen" aria-label="Copy install command" i18n-aria-label="@@home.install.copyCurrent.aria">
               <i [class]="copyIconClass"></i>
             </button>
             <div class="install-fan install-fan-up" [class.open]="fanOpen" role="menu" aria-label="Copy command for a specific client" i18n-aria-label="@@home.install.copySpecific.aria">
