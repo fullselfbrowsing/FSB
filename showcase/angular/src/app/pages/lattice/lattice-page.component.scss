@@ -1213,3 +1213,54 @@
     animation: none;
   }
 }
+
+/* Tablet band (769-920px): the base 2-col hero squeezes badly here (the 1-col
+   collapse only fired at <=768px). Compact centered content-first hero;
+   >=921px stays byte-identical. */
+@media (min-width: 769px) and (max-width: 920px) {
+  .lat-hero-inner {
+    gap: 28px;
+    grid-template-columns: 1fr;
+    padding: 48px 24px 72px;
+  }
+
+  .lat-hero-inner > div:first-child {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .lat-orb-wrap {
+    order: -1;
+  }
+
+  .lat-orb {
+    max-width: 220px;
+  }
+
+  .lat-tagline,
+  .lat-lead {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .lat-cta-row {
+    justify-content: center;
+    margin-top: 24px;
+  }
+
+  .lat-chips {
+    justify-content: center;
+  }
+}
+
+/* Docs-style nav comfort across the whole mobile/tablet range. */
+@media (max-width: 920px) {
+  .lat-subnav a {
+    padding: 10px 15px;
+  }
+
+  .lat-cmd code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

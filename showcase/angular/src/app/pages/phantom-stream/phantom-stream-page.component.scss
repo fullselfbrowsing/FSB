@@ -1789,3 +1789,97 @@
     animation: none;
   }
 }
+
+/* Tablet band (769-920px): the 3-col shell is already collapsed here but the
+   hero still rendered as a squeezed desktop. Compact centered content-first
+   hero; >=921px stays byte-identical. */
+@media (min-width: 769px) and (max-width: 920px) {
+  .ps-hero-inner {
+    gap: 28px;
+    padding: 40px 24px 64px;
+  }
+
+  .ps-hero-inner > div:first-child {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .ps-mirror {
+    margin: 0 auto;
+    max-width: 300px;
+    order: -1;
+  }
+
+  .ps-tagline,
+  .ps-lead,
+  .ps-cmdbar {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .ps-chips {
+    justify-content: center;
+  }
+}
+
+/* Docs-style mobile section nav (pattern: Claude docs' sticky secondary bar,
+   implemented like lattice's subnav pills). Resurrects the existing .ps-side
+   sidebar links as a sticky horizontal pill bar — pure CSS on existing DOM,
+   overriding the earlier @920 display:none by source order. Scroll-spy `.on`
+   highlighting keeps working. */
+@media (max-width: 920px) {
+  .ps-side {
+    align-items: center;
+    align-self: stretch;
+    background: var(--bg-nav);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    margin: 0 -24px;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 16px;
+    scrollbar-width: none;
+    top: var(--nav-height);
+    z-index: 850;
+  }
+
+  .ps-side::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ps-side-group {
+    display: contents;
+  }
+
+  .ps-side-label {
+    display: none;
+  }
+
+  .ps-side-link {
+    border-left: none;
+    border-radius: 999px;
+    flex-shrink: 0;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+
+  .ps-side-link.on {
+    background: rgba(59, 130, 246, 0.12);
+  }
+
+  .ps-sec {
+    scroll-margin-top: calc(var(--nav-height) + 64px);
+  }
+
+  .ps-cmdbar code {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
