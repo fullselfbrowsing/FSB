@@ -1883,3 +1883,101 @@
     white-space: normal;
   }
 }
+
+/* Mobile re-render of the hero mirror animation. The packet flight vectors
+   (--tx/--ty) are fixed pixels tuned to the desktop 430px square; the mirror
+   size must therefore stay PINNED per breakpoint and every vector scales by
+   size/430. Rotations are scale-invariant and start positions are container
+   percentages — do not touch either. Timing stays identical so the packet
+   landing keeps coinciding with the mirror's psMirUpd pulse. */
+@media (max-width: 768px) {
+  /* 280px pinned (fits a 320px viewport exactly); factor 280/430 = 0.651 */
+  .ps-mirror {
+    max-width: 280px;
+  }
+
+  .ps-mini {
+    transform: scale(0.72);
+  }
+
+  .ps-pkt {
+    font-size: 5px;
+    letter-spacing: 0.18em;
+  }
+
+  .ps-frame {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .ps-pkt-sec {
+    --tx: 69px;
+    --ty: -139px;
+  }
+
+  .ps-pkt-load.l1 {
+    --tx: 77px;
+    --ty: -98px;
+  }
+
+  .ps-pkt-load.l2 {
+    --tx: 79px;
+    --ty: -115px;
+  }
+
+  .ps-pkt-load.l3 {
+    --tx: 77px;
+    --ty: -129px;
+  }
+
+  .ps-pkt-load.l4 {
+    --tx: 72px;
+    --ty: -137px;
+  }
+
+  .ps-pkt-load.l5 {
+    --tx: 66px;
+    --ty: -135px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 920px) {
+  /* 300px pinned by the tablet-band rule above; factor 300/430 = 0.698 */
+  .ps-mini {
+    transform: scale(0.78);
+  }
+
+  .ps-pkt {
+    font-size: 5px;
+    letter-spacing: 0.18em;
+  }
+
+  .ps-pkt-sec {
+    --tx: 74px;
+    --ty: -149px;
+  }
+
+  .ps-pkt-load.l1 {
+    --tx: 82px;
+    --ty: -105px;
+  }
+
+  .ps-pkt-load.l2 {
+    --tx: 85px;
+    --ty: -123px;
+  }
+
+  .ps-pkt-load.l3 {
+    --tx: 82px;
+    --ty: -138px;
+  }
+
+  .ps-pkt-load.l4 {
+    --tx: 77px;
+    --ty: -147px;
+  }
+
+  .ps-pkt-load.l5 {
+    --tx: 71px;
+    --ty: -145px;
+  }
+}
