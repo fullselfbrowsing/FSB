@@ -6,6 +6,7 @@
 !showcase/angular/
 !showcase/assets/
 !showcase/js/
+!extension/manifest.json
 
 # Re-ignore things inside those dirs we don't need
 showcase/server/node_modules

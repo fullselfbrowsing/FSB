@@ -10,6 +10,7 @@ RUN npm ci
 COPY showcase/angular/ ./
 COPY showcase/assets/ ../assets/
 COPY showcase/js/ ../js/
+COPY extension/manifest.json ../extension/manifest.json
 RUN npm run build -- --configuration production
 
 # ---
