@@ -2,201 +2,169 @@
 
 ## Milestones
 
-- ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
+- 🚧 **v1.2.0 Showcase i18n Completeness** — Phases 52-56, in progress. Closes the translation gap that reopened after v0.9.63 shipped: a full-page audit establishes the true drift/missing scope, resync + stats-page translation + transcreation review close it, a CI drift-detection gate lands on the clean baseline, and the long-deferred WARNING-02 locale-cookie redirect bug is fixed.
 - ✅ **v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; refreshed 2026-07-01 after post-closeout T1 ports. Expanded proven T1/guarded coverage from 26 baseline descriptors to 1,267 executable T1-ready descriptors plus 556 guarded fail-closed rows, and closed the remaining catalog tail with explicit terminal-state accounting. Archive: `.planning/milestones/v1.1.0-ROADMAP.md`.
+- ✅ **v1.0.0 Full App Catalog (OpenTabs Parity)** — Phases 35-43, shipped 2026-06-29. Full OpenTabs-derived catalog/search/discovery surface: 2,314 descriptors across 128 app stems / 129 services; 26 T1/T1b descriptors today; 2,288 descriptors intentionally remain DOM/discovery-tail. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`.
 
-## Milestone Closed
+## Current Milestone: v1.2.0 Showcase i18n Completeness
 
-**v1.1.0 T1 App Execution Expansion** — Phases 44-51, shipped 2026-06-30; current artifact refresh 2026-07-01.
+**Milestone Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
 
-No active milestone is currently defined. Run `$gsd-new-milestone` to define the next requirements and roadmap. The detailed v1.1.0 phase record is preserved below and archived at `.planning/milestones/v1.1.0-ROADMAP.md`.
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- carried over from v0.9.63's `LocaleService` + locale-constants module, not up for debate. This is the second attempt at closing this exact gap: v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n` -- no new runtime dependency, no XLIFF-format migration.
 
-**Milestone Goal:** Move FSB from “128 apps are catalog/search/routing supported” toward “apps are directly executable through `invoke_capability` where technically and safely provable.” Phases 44-50 built the inventory, scaffolds, first T1 ports, bridge decisions, write evidence gate, and closeout backlog. Phase 51 extends the milestone to attack the full 2,264-descriptor remaining tail: every non-denied row must either become verified T1/T1b or carry explicit evidence that it is blocked by policy, unsafe cross-origin architecture, missing live UAT, or an accepted product/legal constraint. It must not mark any row T1-ready without handler/recipe proof.
+**Phase ordering rationale (from research, all 4 researchers converged independently):** audit first (establish true scope) -> resync + stats-page translation + visual QA (close the known + newly-found gap) -> stats-page lint-gate flip + dashboard boundary documentation (gated on verified resync completion) -> new CI drift-detection gate (must land on a clean, drift-free baseline) -> WARNING-02 cookie-redirect fix (fully independent, zero shared surface with the rest, sequenced last for narrative completeness only).
 
-**Baseline entering this milestone:**
+**Research correction carried into scope:** the milestone brief's original "247 trans-units changed" framing (from commit `6d3ad363`) overstates the resync scope. An id-keyed `<source>`-text diff shows only 5 of the 247 touched trans-unit blocks have real source drift (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`); the other 242 are harmless `<context-group><linenumber>` churn. Phase 52's audit is the authority on the true, final drift count -- do not fix a resync scope number ahead of that audit completing.
 
-- Total descriptors: **2,314**.
-- T1/T1b today: **26 descriptors** across GitHub, GitLab, Notion, Reddit, and Slack.
-- Actually executable/recipe-backed today: **21 descriptors**.
-- T1 fail-closed guarded writes today: **5 descriptors**.
-- Remaining T3 DOM/discovery-tail descriptors: **2,288** (**1,614 read**, **508 write**, **166 destructive**).
-- App stems with no direct T1 path: **123**.
+## Phases
 
-**Current Phase 51 terminal state after 2026-07-01 artifact refresh:**
+**Phase Numbering:**
+- Integer phases (52, 53, 54, 55, 56): Planned milestone work, continuing from v1.1.0's Phase 51
+- Decimal phases (52.1, 52.2): Urgent insertions (marked with INSERTED)
 
-- Total descriptors: **2,314**.
-- T1-ready executable descriptors: **1,267**.
-- T1 guarded fail-closed rows: **556**.
-- Catalog tail not direct API-ready: **491**.
-- Terminal-state accounting: **5 bridge-needed**, **141 UAT-needed**, **123 blocked**, **222 degraded/discovery-pending**.
-- App stems with at least one direct T1/guarded row: **121**.
+- [ ] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
+- [ ] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
+- [ ] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
+- [ ] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
+- [ ] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
 
-**Hard invariants:**
+## Phase Details
 
-- Keep the two-tool MCP surface: `search_capabilities` and `invoke_capability`; do not add one tool per app.
-- Preserve MV3 Wall 1: descriptors and recipes are closed-vocabulary data; no OpenTabs runtime/plugin code ships.
-- Preserve Wall 2 unless explicitly extended by a verified Pattern-D design: credentialed execution stays origin-pinned and same-session.
-- Writes and destructive actions stay fail-closed until live request shape, consent behavior, and no-secret logging are proven.
-- Denylisted origins remain blocked; sensitive origins stay flagged/audited and apply the current invoke/discovery consent semantics.
-- Search must distinguish “directly invocable T1” from “discovery-pending DOM/T2.” No UI/API overclaiming.
+### Phase 52: Full-Page Translation Completeness Audit
+**Goal**: Every current showcase route has an authoritative, per-locale, per-trans-unit verdict that distinguishes "coverage" (marked + target exists) from "currency" (target still matches the current English source) -- and the orphaned `translations.stats-274.*.json` artifacts are traced end-to-end into (or explicitly out of) the live XLIFF files the build consumes.
+**Depends on**: Nothing (first phase of this milestone)
+**Requirements**: AUDIT-01, AUDIT-02
+**Success Criteria** (what must be TRUE):
+  1. A generated audit report lists, for every current showcase route (lattice, phantom-stream, prometheus, home, mobile nav, stats, and the original v0.9.63 routes) and every one of the 5 non-English locales, a per-trans-unit verdict of coverage AND currency as two distinct checks -- not a single pass/fail signal.
+  2. The audit's true drift count is authoritative and supersedes the milestone brief's original "247 trans-units" estimate; the 5 confirmed `6d3ad363`-drifted units are validated as a subset of (not a substitute for) the full audit findings.
+  3. The orphaned `translations.stats-274.*.json` artifacts are explicitly resolved: either shown to already be merged into the live `messages.<locale>.xlf` files, or shown to still be outstanding work with no ambiguity left for Phase 53 to inherit.
+**Plans**: TBD
 
-## Phase 44: T1 Readiness Inventory + Status Surface
+### Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review
+**Goal**: Every trans-unit the Phase 52 audit flagged as drifted is resynced across all 5 translated locales, the stats page reaches full translation coverage, hero/CTA copy gets a transcreation-quality pass instead of literal translation, and German/CJK rendering is confirmed clean on the highest-copy-density routes.
+**Depends on**: Phase 52
+**Requirements**: RESYNC-01, RESYNC-02, RESYNC-03, VISUAL-01
+**Success Criteria** (what must be TRUE):
+  1. Every trans-unit flagged as drifted by the Phase 52 audit (the 5 confirmed `6d3ad363` units plus any additional units the audit surfaced) has an updated `<target>` in es, de, ja, zh-CN, and zh-TW that matches the current English `<source>`, with `<x id=.../>` placeholder alignment preserved and `DO-NOT-TRANSLATE.md` brand/term rules re-verified for each resynced string.
+  2. The stats page has a `<target>` for every trans-unit across all 5 non-English locales -- full coverage, not partial.
+  3. The ~10-20 hero headline and primary CTA strings read as natural, locale-appropriate marketing copy rather than literal word-for-word translation, reviewed explicitly through a transcreation lens.
+  4. A targeted manual visual spot-check of German (text-expansion risk) and zh-CN/zh-TW (CJK line-wrap risk) on the highest-copy-density routes shows no broken layout, truncation, or overflow -- performed only after the resynced/transcreated copy above has landed, since it needs final translated text to check against.
+**Plans**: TBD
 
-- [x] Phase 44: T1 Readiness Inventory + Status Surface (completed 2026-06-29)
+### Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation
+**Goal**: The stats page is held to the same CI translation-completeness bar as every other marketing page, and the dashboard's permanent exclusion from that bar is written down as an explicit architectural decision rather than left as unstated deferred debt.
+**Depends on**: Phase 53 (must follow verified stats-page translation completion, not precede it)
+**Requirements**: CI-01, CI-05
+**Success Criteria** (what must be TRUE):
+  1. The `lint:i18n` ignore-pattern for `src/app/pages/stats/**` in `showcase/angular/package.json` is removed, and `npm run lint:i18n` passes clean against the stats page's own templates.
+  2. The dashboard page's `lint:i18n` exclusion is documented in-repo as a permanent, intentional architectural boundary (authenticated app surface, not marketing content) with an explicit rationale, not a bare ignore-pattern with no explanation.
+**Plans**: TBD
 
-**Goal:** Create the authoritative T1 readiness matrix for all 2,314 descriptors and make status visible to developers and users so “catalog supported” is never confused with “direct API-ready.”
+### Phase 55: CI Drift-Detection Gate
+**Goal**: A new, permanent CI gate automatically fails the build the moment `messages.xlf`'s English source content changes without a matching update in one of the 5 translated locale files -- landing only once the tree is verified drift-free, so it passes clean on day one instead of immediately failing on residual debt.
+**Depends on**: Phase 54 (must land on the clean baseline established by Phases 52-54)
+**Requirements**: CI-02, CI-03, CI-04
+**Success Criteria** (what must be TRUE):
+  1. `verify-translation-drift.mjs` exists, follows the zero-dependency style of the existing `verify-locale-sync.mjs`/`verify-hreflang.mjs` scripts, and fails the build when any trans-unit's English `<source>` text changes without a corresponding update in one of the 5 translated locale files -- diffing per trans-unit `id`, never whole-file or line-count.
+  2. The gate is back-tested against this repo's own git history (known-clean pure-churn commits plus commit `6d3ad363` itself) and demonstrably stays silent on clean churn while firing on `6d3ad363`-shaped drift, before being wired hard-fail into CI.
+  3. The gate's target-locale list is read dynamically from the existing locale registry at runtime, not hardcoded as a literal list in the script.
+**Plans**: TBD
 
-**Depends on:** v1.0.0 archive.
+### Phase 56: Locale-Cookie Redirect Fix (WARNING-02)
+**Goal**: A returning visitor whose picker-set `fsb-locale` cookie names a valid, non-default supported locale is correctly redirected to that locale's subpath from the bare-`/` route, instead of the cookie being ignored in favor of the EN prerender.
+**Depends on**: Nothing (fully independent of Phases 52-55; zero shared surface, could be parallelized)
+**Requirements**: ROUTE-01, ROUTE-02
+**Success Criteria** (what must be TRUE):
+  1. A request to `/` carrying an `fsb-locale` cookie set to a non-default supported locale (es, de, ja, zh-CN, or zh-TW) redirects to that locale's subpath rather than serving the EN prerender.
+  2. A request to `/` carrying an `fsb-locale` cookie set to `en` (the default) still falls through correctly to the EN prerender without redirecting to a 404ing `/en/` path.
+**Plans**: TBD
 
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
+
+| Phase | Plans Complete | Status | Completed |
+|-------|-----------------|--------|-----------|
+| 52. Full-Page Translation Completeness Audit | 0/TBD | Not started | - |
+| 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 0/TBD | Not started | - |
+| 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 0/TBD | Not started | - |
+| 55. CI Drift-Detection Gate | 0/TBD | Not started | - |
+| 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
+
+## Completed Milestones
+
+<details>
+<summary>v1.1.0 T1 App Execution Expansion — Phases 44-51, SHIPPED 2026-06-30</summary>
+
+**Hard invariants (v1.1.0):**
+
+- Kept the two-tool MCP surface: `search_capabilities` and `invoke_capability`; no one tool per app.
+- Preserved MV3 Wall 1: descriptors and recipes are closed-vocabulary data; no OpenTabs runtime/plugin code ships.
+- Preserved Wall 2 unless explicitly extended by a verified Pattern-D design: credentialed execution stays origin-pinned and same-session.
+- Writes and destructive actions stayed fail-closed until live request shape, consent behavior, and no-secret logging were proven.
+- Denylisted origins remained blocked; sensitive origins stayed flagged/audited under the existing invoke/discovery consent semantics.
+- Search distinguished "directly invocable T1" from "discovery-pending DOM/T2."
+
+### Phase 44: T1 Readiness Inventory + Status Surface
+**Goal:** Create the authoritative T1 readiness matrix for all 2,314 descriptors and make status visible to developers and users so "catalog supported" is never confused with "direct API-ready."
 **Requirements:** T1R-01, T1R-02, T1R-03.
-
-**Success Criteria:**
-1. A generated readiness report classifies every descriptor by app, slug, side-effect class, current tier, backing, origin class, auth pattern, likely same-origin/separate-origin route, and recommended next action.
-2. `search_capabilities`, docs, and any relevant UI copy distinguish T1-ready, fail-closed, learn-pending, and DOM/discovery-pending states without stale overclaims.
-3. CI fails if a descriptor is marked T1-ready without a registered handler/recipe plus tests.
-
 **Plans:**
 - [x] 44-01: T1 readiness matrix generator and evidence report.
 - [x] 44-02: Status-surface and documentation honesty pass.
 - [x] 44-03: T1 readiness CI guard and phase closeout.
 
-## Phase 45: T1 Porting Scaffold + Handler Contract Hardening
-
-- [x] Phase 45: T1 Porting Scaffold + Handler Contract Hardening (completed 2026-06-29)
-
+### Phase 45: T1 Porting Scaffold + Handler Contract Hardening
 **Goal:** Build the reusable test and implementation scaffold for app ports so each new T1 handler has origin-pin, logged-out guard, shape guard, no-secret logging, consent classification, and byte-stable fallback behavior by default.
-
-**Depends on:** Phase 44.
-
 **Requirements:** T1R-04, T1R-05, T1R-09.
-
-**Success Criteria:**
-1. A handler/recipe port template and generator or checklist exists for same-origin reads, same-origin writes, and separate-origin candidates.
-2. Shared tests can be applied to every new T1 port: origin match, executeBoundSpec-only, no token/log leak, logged-out body rejected, expected shape guard, and router parity.
-3. The fail-closed guarded-write harness is generalized so write/destructive ports cannot accidentally execute before UAT evidence is recorded.
-
 **Plans:**
 - [x] 45-01: Port contract library and scaffold CLI.
 - [x] 45-02: Current-catalog contract verifier.
 - [x] 45-03: Documentation and phase closeout.
 
-## Phase 46: Same-Origin Read Ports — First High-Value Batch
-
-- [x] Phase 46: Same-Origin Read Ports — First High-Value Batch (completed 2026-06-29)
-
-**Goal:** Convert a first batch of high-value read descriptors from T3 to executable T1 where the app’s authenticated web runtime uses same-origin APIs and can be proven without weakening Wall 2.
-
-**Depends on:** Phase 45.
-
+### Phase 46: Same-Origin Read Ports — First High-Value Batch
+**Goal:** Convert a first batch of high-value read descriptors from T3 to executable T1 where the app's authenticated web runtime uses same-origin APIs and can be proven without weakening Wall 2.
 **Requirements:** T1R-06.
-
-**Success Criteria:**
-1. At least 10 additional read descriptors across multiple apps become executable T1/T1b with passing handler tests and live-smoke notes where credentials are available.
-2. Candidate apps are selected from the readiness matrix by same-origin feasibility, user value, and low side-effect risk.
-3. Each new read port preserves existing descriptor metadata and search ranking while flipping backing/status honestly.
-
 **Plans:**
 - [x] 46-01: Candidate selection and Netlify/Bitbucket/CircleCI handler ports.
 - [x] 46-02: Catalog wiring, search readiness, and same-origin classifier gates.
 - [x] 46-03: Verification, UAT notes, and phase closeout.
 
-## Phase 47: Pattern-D + GAPI Bridge Architecture
-
-- [x] Phase 47: Pattern-D + GAPI Bridge Architecture (completed 2026-06-29)
-
+### Phase 47: Pattern-D + GAPI Bridge Architecture
 **Goal:** Design and prove the missing architecture for apps whose useful APIs are separate-origin, per-org-subdomain, or page-bridge mediated, without breaking the active-tab credential boundary.
-
-**Depends on:** Phase 45.
-
 **Requirements:** T1R-07, T1R-08.
-
-**Success Criteria:**
-1. A Pattern-D execution design is implemented or explicitly rejected for separate-origin app APIs such as Linear, Datadog/Jira per-org subdomains, Supabase, and cloud consoles.
-2. A Google Workspace GAPI bridge spike determines whether Docs/Drive/Calendar can be handled through `window.gapi.client.request` safely.
-3. Negative-control tests prove unverified cross-origin ports fail closed and cannot bypass origin/consent gates.
-
 **Plans:**
 - [x] 47-01: Pattern-D decision for separate-origin and per-org APIs.
 - [x] 47-02: GAPI bridge decision for Google Workspace APIs.
 - [x] 47-03: CI gate, negative controls, and closeout.
 
-## Phase 48: High-Value Read Ports — Second Batch
-
-- [x] Phase 48: High-Value Read Ports — Second Batch (completed 2026-06-29)
-
+### Phase 48: High-Value Read Ports — Second Batch
 **Goal:** Use the Phase 47 outcome to port another batch of read descriptors, including Pattern-D/GAPI candidates if the architecture is proven.
-
-**Depends on:** Phases 46 and 47.
-
 **Requirements:** T1R-06, T1R-07, T1R-08.
-
-**Success Criteria:**
-1. A second batch of read descriptors becomes executable T1/T1b using either same-origin handlers, declarative recipes, Pattern-D, or GAPI bridge paths.
-2. The coverage report shows a measurable increase in apps with at least one executable read path.
-3. Apps still unsuitable for T1 are documented with the reason: denied, ToS-sensitive, auth unavailable, cross-origin unsafe, or live-UAT missing.
-
 **Plans:**
 - [x] 48-01: Vercel same-origin read head.
 - [x] 48-02: CircleCI same-origin read expansion.
 - [x] 48-03: Gate, search, and readiness-report closeout.
 
-## Phase 49: Guarded Writes Activation Pipeline
-
-- [x] Phase 49: Guarded Writes Activation Pipeline (completed 2026-06-29)
-
+### Phase 49: Guarded Writes Activation Pipeline
 **Goal:** Turn fail-closed write/destructive candidates into executable T1 only after live mutation-body capture, consent gate verification, and redacted audit proof.
-
-**Depends on:** Phases 44-48.
-
 **Requirements:** T1R-10, T1R-11.
-
-**Success Criteria:**
-1. Existing fail-closed writes are either activated with live evidence or remain explicitly fail-closed with current reasons.
-2. A reusable live UAT template records method/path/body shape, CSRF/token location, Chrome/extension version, and redacted outcome without storing secrets.
-3. At least one low-risk write activation is completed end-to-end, or the milestone explicitly records why no write met the safety bar.
-
 **Plans:**
 - [x] 49-01: Write activation evidence ledger.
 - [x] 49-02: Evidence verifier and validation gate.
 - [x] 49-03: Live-UAT template and closeout decision.
 
-## Phase 50: T1 Expansion Gate + Next-Batch Plan
-
-- [x] Phase 50: T1 Expansion Gate + Next-Batch Plan (completed 2026-06-29)
-
+### Phase 50: T1 Expansion Gate + Next-Batch Plan
 **Goal:** Close the milestone with an honest T1 coverage gate, full regression suite, and a prioritized backlog for the remaining 2,288-descendant tail.
-
-**Depends on:** Phase 49.
-
 **Requirements:** T1R-12.
-
-**Success Criteria:**
-1. Full `npm test` and `npm run validate:extension` pass with the expanded T1 set.
-2. The readiness report is regenerated and checked into the milestone evidence with before/after counts.
-3. The next T1 batch is ranked by value, feasibility, and risk; no “all apps are T1-ready” claim is made unless every relevant descriptor has executable proof.
-
 **Plans:**
 - [x] 50-01: Regenerate readiness evidence and closeout counts.
 - [x] 50-02: Full regression gate.
 - [x] 50-03: Next-batch backlog and milestone closeout.
 
-## Phase 51: Full T1 Tail Migration Across Remaining Catalog
-
-- [x] Phase 51: Full T1 Tail Migration Across Remaining Catalog (completed 2026-06-30)
-
+### Phase 51: Full T1 Tail Migration Across Remaining Catalog
 **Goal:** Convert the Phase 51 catalog-tail descriptors to explicit terminal states: executable T1/T1b where safe and technically provable, guarded fail-closed where write/destructive UAT is still required, or blocked where denylist/product/legal policy says no.
-
-**Depends on:** Phase 50.
-
 **Requirements:** T1ALL-01, T1ALL-02, T1ALL-03, T1ALL-04, T1ALL-05.
-
-**Success Criteria:**
-1. A generated Phase 51 worklist covers every non-ready catalog-tail row and partitions it by app, side-effect class, route feasibility, origin class, and required proof.
-2. Every non-denied read descriptor is either backed by a verified handler/recipe or assigned to an approved bridge/UAT workstream with a concrete blocking reason.
-3. Every write/destructive descriptor remains fail-closed until live mutation-body evidence, consent/audit proof, and no-secret logging checks pass.
-4. Denied origins remain blocked; sensitive origins can be T1 only under the current audited invoke posture and any app-specific product/legal acceptance.
-5. Final closeout cannot claim “all apps are T1” unless `npm test`, `npm run validate:extension`, the T1 readiness gate, the port-contract gate, and the Phase 51 worklist all agree there are no untriaged non-denied tail rows.
-
 **Plans:**
 - [x] 51-01: Full-tail worklist generator, acceptance gate, and batch scheduler.
 - [x] 51-02: Existing-head and low-risk same-origin read bulk port.
@@ -206,24 +174,6 @@ No active milestone is currently defined. Run `$gsd-new-milestone` to define the
 - [x] 51-06: Sensitive consumer/social and blocked-policy triage.
 - [x] 51-07: Write/destructive live-UAT activation waves.
 - [x] 51-08: Final all-tail regression, UAT ledger, and closeout.
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 44. T1 Readiness Inventory + Status Surface | 3/3 | Complete | 2026-06-29 |
-| 45. T1 Porting Scaffold + Handler Contract Hardening | 3/3 | Complete | 2026-06-29 |
-| 46. Same-Origin Read Ports — First High-Value Batch | 3/3 | Complete | 2026-06-29 |
-| 47. Pattern-D + GAPI Bridge Architecture | 3/3 | Complete | 2026-06-29 |
-| 48. High-Value Read Ports — Second Batch | 3/3 | Complete | 2026-06-29 |
-| 49. Guarded Writes Activation Pipeline | 3/3 | Complete | 2026-06-29 |
-| 50. T1 Expansion Gate + Next-Batch Plan | 3/3 | Complete | 2026-06-29 |
-| 51. Full T1 Tail Migration Across Remaining Catalog | 8/8 | Complete | 2026-06-30 |
-
-## Completed Milestones
-
-<details>
-<summary>v1.1.0 T1 App Execution Expansion — Phases 44-51, SHIPPED 2026-06-30</summary>
 
 Archive files:
 
@@ -248,8 +198,6 @@ Archive files:
 Outcome: full OpenTabs-derived catalog/search/discovery surface shipped with 2,314 descriptors across 128 app stems / 129 services. The milestone deliberately fed the existing tier model rather than hand-porting every action: 26 descriptors resolve to T1/T1b today, 5 guarded writes remain fail-closed, and 2,288 descriptors remain T3 DOM/discovery-tail. Full milestone audit passed; non-blocking live UAT and T1 expansion debt are carried forward.
 
 </details>
-
-
 
 <details>
 <summary>v0.9.99 Native Capability Catalog (FSB API Execution) — Phases 26-34, CODE-COMPLETE 2026-06-23</summary>
@@ -349,8 +297,9 @@ Known deferred closeout evidence: 11 human-gated Chrome MV3/UAT verification ite
 
 ## Carry-Forward Candidates
 
-- **Consolidated Chrome MV3 UAT debt:** Run and capture archived v0.10/v0.11/v0.12 + v0.9.99 (UAT-27/29/30/31/32-01) browser evidence if release policy requires post-close proof. v1.0.0 does NOT block on it.
-- **v2 deferred capability families (acknowledged, out of v1.0.0):** GAPI-01 (gapi-bridge handler family for Google Workspace via the `window.gapi.client.request` trampoline); CLOUD-01 (cloud-console Pattern-D ports — aws-console/azure/google-cloud/terraform-cloud — pending per-app CORS verification); UATX-01 (per-app live guarded-write UAT closeout across the hand-ported depth tier).
+- **Consolidated Chrome MV3 UAT debt:** Run and capture archived v0.10/v0.11/v0.12 + v0.9.99 (UAT-27/29/30/31/32-01) browser evidence if release policy requires post-close proof. Does NOT block v1.2.0.
+- **v2 deferred capability families (acknowledged, out of v1.0.0/v1.1.0):** GAPI-01 (gapi-bridge handler family for Google Workspace); CLOUD-01 (cloud-console Pattern-D ports); UATX-01 (per-app live guarded-write UAT closeout).
+- **v1.2.0 v2 deferred (see REQUIREMENTS.md):** QA-01 (native-speaker/bilingual QA pass), I18N-FUTURE-01 (migrate stats page off ad hoc JSON mechanism into main XLIFF pipeline), I18N-FUTURE-02 (full automated per-locale visual regression pipeline), I18N-FUTURE-03 (translation-freshness/"last synced" reporting surface).
 - **Delegation primitive:** Parked from v0.10.0; re-scope as either a Lattice-owned primitive or an FSB-only consumer of Lattice receipt + tripwire surfaces.
 
 ## Backlog

@@ -67,25 +67,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | TBD | Pending |
-| AUDIT-02 | TBD | Pending |
-| RESYNC-01 | TBD | Pending |
-| RESYNC-02 | TBD | Pending |
-| RESYNC-03 | TBD | Pending |
-| CI-01 | TBD | Pending |
-| CI-02 | TBD | Pending |
-| CI-03 | TBD | Pending |
-| CI-04 | TBD | Pending |
-| CI-05 | TBD | Pending |
-| ROUTE-01 | TBD | Pending |
-| ROUTE-02 | TBD | Pending |
-| VISUAL-01 | TBD | Pending |
+| AUDIT-01 | Phase 52 | Pending |
+| AUDIT-02 | Phase 52 | Pending |
+| RESYNC-01 | Phase 53 | Pending |
+| RESYNC-02 | Phase 53 | Pending |
+| RESYNC-03 | Phase 53 | Pending |
+| CI-01 | Phase 54 | Pending |
+| CI-02 | Phase 55 | Pending |
+| CI-03 | Phase 55 | Pending |
+| CI-04 | Phase 55 | Pending |
+| CI-05 | Phase 54 | Pending |
+| ROUTE-01 | Phase 56 | Pending |
+| ROUTE-02 | Phase 56 | Pending |
+| VISUAL-01 | Phase 53 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️ (roadmap not yet created)
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after initial definition*
+*Last updated: 2026-07-07 after roadmap creation (Phases 52-56)*
