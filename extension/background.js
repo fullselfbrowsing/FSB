@@ -72,6 +72,11 @@ try { importScripts('utils/mcp-pricing.js'); } catch (e) { console.error('[FSB] 
 // (it calls fsbMcpPricing) and AFTER mcp-tool-dispatcher.js (dispatcher hooks
 // call globalThis.fsbMcpMetricsRecorder).
 try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-metrics-recorder.js:', e.message); }
+// Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher and
+// the metrics recorder: the dispatcher's finally-block sibling hooks call
+// globalThis.fsbMcpSessionRecorder lazily, and this placement keeps the
+// global ready before any WS dispatch can fire.
+try { importScripts('utils/mcp-session-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-recorder.js:', e.message); }
 // Phase 272 / v0.9.69 -- TelemetryCollector. Loaded AFTER mcp-metrics-recorder
 // (collector reads the rows the recorder writes to fsbUsageData). The alarm
 // handler in chrome.alarms.onAlarm + the install_announce setTimeout in

@@ -3454,6 +3454,9 @@ async function loadHistoryList() {
             '<span>' + formatSessionDate(session.startTime) + '</span>' +
             '<span>' + (session.actionCount || 0) + ' actions</span>' +
             costDisplay +
+            (session.mode === 'mcp-agent'
+              ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
+              : '<span class="history-source-badge">Autopilot</span>') +
             '<span class="history-status ' + (session.status || '') + '">' + escapeHtml(session.status || 'unknown') + '</span>' +
           '</div>' +
         '</div>' +

@@ -576,6 +576,27 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
         });
       }
     } catch (_e) { /* defence in depth -- never let metrics break dispatch */ }
+    // Quick 260707-7id -- MCP session recorder sibling hook. SEPARATE
+    // try/catch statement placed AFTER the metrics block so the Test 9
+    // regex spans over fsbMcpMetricsRecorder stay undisturbed. Same
+    // fire-and-forget contract: NOT awaited, never alters the dispatcher's
+    // resolved value or thrown error.
+    try {
+      if (
+        typeof globalThis !== 'undefined' &&
+        globalThis.fsbMcpSessionRecorder &&
+        typeof globalThis.fsbMcpSessionRecorder.recordDispatch === 'function'
+      ) {
+        globalThis.fsbMcpSessionRecorder.recordDispatch({
+          client: resolveMcpClientLabel(payload),
+          tool,
+          requestPayload: payload,
+          response,
+          success,
+          dispatcher_route: 'tool'
+        });
+      }
+    } catch (_e) { /* defence in depth -- never let session recording break dispatch */ }
   }
 }
 
@@ -660,6 +681,29 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
           });
         }
       } catch (_e) { /* defence in depth -- never let metrics break dispatch */ }
+      // Quick 260707-7id -- MCP session recorder sibling hook (message
+      // surface). INSIDE the !_mcpMetricsSuppressInner gate: alias-routed
+      // tools (run_task, read_page, ...) are recorded once by the outer
+      // dispatchMcpToolRoute, so the suppression flag MUST gate the session
+      // recorder too or aliased dispatches would be recorded twice.
+      // Separate sibling try/catch AFTER the metrics block (Test 9 regex
+      // spans undisturbed); fire-and-forget, NOT awaited, no return.
+      try {
+        if (
+          typeof globalThis !== 'undefined' &&
+          globalThis.fsbMcpSessionRecorder &&
+          typeof globalThis.fsbMcpSessionRecorder.recordDispatch === 'function'
+        ) {
+          globalThis.fsbMcpSessionRecorder.recordDispatch({
+            client: resolveMcpClientLabel(payload),
+            tool: type,
+            requestPayload: payload,
+            response,
+            success,
+            dispatcher_route: 'message'
+          });
+        }
+      } catch (_e) { /* defence in depth -- never let session recording break dispatch */ }
     }
   }
 }

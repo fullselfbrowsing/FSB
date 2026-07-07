@@ -737,6 +737,9 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           existing.totalCost = sessionData.totalCost || existing.totalCost || 0;
           existing.totalInputTokens = sessionData.totalInputTokens || existing.totalInputTokens || 0;
           existing.totalOutputTokens = sessionData.totalOutputTokens || existing.totalOutputTokens || 0;
+          // Quick 260707-7id: session source discriminator + MCP client label
+          existing.mode = sessionData.mode || existing.mode || 'autopilot';
+          existing.mcpClient = sessionData.mcpClient || existing.mcpClient || null;
           existing.outcome = normalizedOutcome.outcome;
           existing.outcomeDetails = normalizedOutcome.outcomeDetails;
           existing.result = normalizedOutcome.result;
@@ -771,6 +774,9 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
             endTime: Date.now(),
             status: sessionData.status || 'completed',
             tabId: sessionData.tabId || null,
+            // Quick 260707-7id: session source discriminator + MCP client label
+            mode: sessionData.mode || 'autopilot',
+            mcpClient: sessionData.mcpClient || null,
             actionCount: sessionData.actionHistory?.length || 0,
             iterationCount: sessionData.iterationCount || 0,
             conversationId: metadata.conversationId,
@@ -808,6 +814,10 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
           id: sessionId, task: savedSession.task, startTime: savedSession.startTime,
           endTime: savedSession.endTime, status: savedSession.status, actionCount: savedSession.actionCount,
           domSnapshotCount: snapshotCount,
+          // Quick 260707-7id: source badge fields (entries predating this
+          // change lack them and default to Autopilot in the UI)
+          mode: savedSession.mode || 'autopilot',
+          mcpClient: savedSession.mcpClient || null,
           totalCost: savedSession.totalCost || 0,
           outcome: savedSession.outcome || null,
           outcomeDetails: savedSession.outcomeDetails || null,

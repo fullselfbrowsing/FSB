@@ -615,8 +615,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // landed handlers).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
+  // Quick 260707-7id: 310 mentions (+1 new line for utils/mcp-session-recorder.js
+  // -- MCP session recorder; comment lines deliberately token-free).
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 309, 'background.js importScripts count = 309 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCount, 310, 'background.js importScripts count = 310 (current head set + the Quick 260707-7id mcp-session-recorder load)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -649,8 +651,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
+  // Quick 260707-7id adds 1 call site (utils/mcp-session-recorder.js) -> 306.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 305, 'background.js importScripts() call sites = 305 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCallSites, 306, 'background.js importScripts() call sites = 306 (current head set + the Quick 260707-7id mcp-session-recorder load)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
