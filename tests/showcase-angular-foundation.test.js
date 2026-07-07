@@ -35,6 +35,7 @@ console.log('\n--- showcase angular foundation contracts ---');
 
 const rootPackageSource = readIfPresent('package.json');
 const dockerfileSource = readIfPresent('Dockerfile');
+const dockerignoreSource = readIfPresent('.dockerignore');
 const angularConfigSource = readIfPresent('showcase/angular/angular.json');
 const mainSource = readIfPresent('showcase/angular/src/main.ts');
 const appConfigSource = readIfPresent('showcase/angular/src/app/app.config.ts');
@@ -116,6 +117,12 @@ assert(
 assert(
   /RUN npm run build -- --configuration production/.test(dockerfileSource),
   'Docker showcase build runs npm build so prebuild regenerates crawler files before deploy'
+);
+
+assert(
+  /COPY extension\/manifest\.json \.\.\/extension\/manifest\.json/.test(dockerfileSource) &&
+    /^!extension\/manifest\.json$/m.test(dockerignoreSource),
+  'Docker showcase build includes extension manifest for crawler version generation'
 );
 
 // outputPath can be a string or an object { base, browser }
