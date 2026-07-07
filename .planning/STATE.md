@@ -33,7 +33,7 @@ See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIRE
 Phase: none active
 Plan: none active
 Status: v1.1.0 milestone complete, audited, and archived
-Last activity: 2026-07-01 - Completed quick task 260701-iz0: Implement this Steam to be T1 ready
+Last activity: 2026-07-07 - Completed quick task 260707-7id: Record MCP agent sessions into logs, history, replay, and memory like autopilot runs
 
 Progress: [##########] 100%
 
@@ -154,6 +154,7 @@ None active.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260707-7id | Record MCP agent sessions into logs, history, replay, and memory like autopilot runs | 2026-07-07 | 721e2826 | [260707-7id-record-mcp-agent-sessions-into-logs-hist](./quick/260707-7id-record-mcp-agent-sessions-into-logs-hist/) |
 | 260701-e6c | Implement Supabase to be T1 ready | 2026-07-01 | 2619d949 | [260701-e6c-implement-this-supabase-to-be-t1-ready-u](./quick/260701-e6c-implement-this-supabase-to-be-t1-ready-u/) |
 | 260701-e6d | Implement Microsoft Teams to be T1 ready | 2026-07-01 | working-tree | [260701-e6d-implement-this-microsoft-teams-to-be-t1-](./quick/260701-e6d-implement-this-microsoft-teams-to-be-t1-/) |
 | 260701-e69 | Implement Steam T1 readiness as blocked-policy terminal coverage | 2026-07-01 | blocked-working-tree | [260701-e69-implement-steam-to-be-t1-ready-using-gsd](./quick/260701-e69-implement-steam-to-be-t1-ready-using-gsd/) |
