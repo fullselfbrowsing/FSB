@@ -33,9 +33,18 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
-## Current Milestone
+## Current Milestone: v1.2.0 Showcase i18n Completeness
 
-No active milestone is currently defined. Start the next cycle with `$gsd-new-milestone` after choosing the next product goal.
+**Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
+
+**Target features:**
+- Full-page audit: verify every translatable string on every showcase page (lattice, phantom-stream, prometheus, home, mobile nav, and other surfaces added since v0.9.63) is genuinely translated in all 5 non-English locales, not just marked with an `i18n` attribute.
+- Resync the 247 trans-units whose English source changed in commit `6d3ad363` ("chore(i18n): sync messages.xlf with showcase copy refinements") across all 5 translated locale files (es/de/ja/zh-CN/zh-TW).
+- Bring the stats page into full translation and drop it from the `lint:i18n` ignore-pattern in `showcase/angular/package.json` (dashboard stays excluded -- app surface, not marketing content, out of scope for this milestone).
+- Fix WARNING-02 (carried since v0.9.63): picker-set `fsb-locale` cookie no longer short-circuits the bare-`/` Accept-Language redirect for returning fresh-tab/shared-link visitors.
+- New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
+
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
 
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
@@ -415,7 +424,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.1.0 T1 App Execution Expansion -- requirements and roadmap defined on 2026-06-29; phases continue from v1.0.0's Phase 43 -> start at Phase 44. v1.0.0 Full App Catalog is archived with 2,314 searchable descriptors, 26 T1/T1b descriptors, and 2,288 DOM/discovery-tail descriptors carried forward as explicit T1 expansion work.)
+(Milestone v1.2.0 Showcase i18n Completeness -- requirements and roadmap to be defined; phases continue from v1.1.0's Phase 51 -> start at Phase 52. v1.1.0 T1 App Execution Expansion is archived; this milestone returns to the showcase-site i18n surface last touched in v0.9.63.)
 
 ### Validated (v0.9.99)
 
@@ -680,4 +689,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-29 -- v1.0.0 Full App Catalog archived; v1.1.0 T1 App Execution Expansion started. Phases continue at 44.*
+*Last updated: 2026-07-07 -- v1.1.0 T1 App Execution Expansion archived; v1.2.0 Showcase i18n Completeness started. Phases continue at 52.*

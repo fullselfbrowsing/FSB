@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1.0
-milestone_name: T1 App Execution Expansion
-status: completed
-stopped_at: "v1.1.0 T1 App Execution Expansion complete, audited, and archived. No active milestone is currently defined."
-last_updated: "2026-07-01T13:44:05-05:00"
-last_activity: 2026-07-01
+milestone: v1.2.0
+milestone_name: Showcase i18n Completeness
+status: planning
+last_updated: "2026-07-07T10:53:56.116Z"
+last_activity: 2026-07-07
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 29
-  completed_plans: 29
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -30,12 +29,10 @@ See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIRE
 
 ## Current Position
 
-Phase: none active
-Plan: none active
-Status: v1.1.0 milestone complete, audited, and archived
-Last activity: 2026-07-01 - Completed quick task 260701-iz0: Implement this Steam to be T1 ready
-
-Progress: [##########] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-07 — Milestone v1.2.0 started
 
 ## Roadmap At A Glance (v1.1.0, Phases 44-51)
 
