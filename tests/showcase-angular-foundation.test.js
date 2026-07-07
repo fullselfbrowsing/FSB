@@ -36,6 +36,7 @@ console.log('\n--- showcase angular foundation contracts ---');
 const rootPackageSource = readIfPresent('package.json');
 const angularConfigSource = readIfPresent('showcase/angular/angular.json');
 const mainSource = readIfPresent('showcase/angular/src/main.ts');
+const appConfigSource = readIfPresent('showcase/angular/src/app/app.config.ts');
 const routeSource = readIfPresent('showcase/angular/src/app/app.routes.ts');
 const indexSource = readIfPresent('showcase/angular/src/index.html');
 const appComponentSource = readIfPresent('showcase/angular/src/app/app.component.ts');
@@ -143,6 +144,13 @@ assert(
 );
 
 assert(
+  /withInMemoryScrolling/.test(appConfigSource) &&
+    /scrollPositionRestoration:\s*'enabled'/.test(appConfigSource) &&
+    /provideRouter\(routes,\s*withInMemoryScrolling/.test(appConfigSource),
+  'router config restores scroll position to top on route navigation'
+);
+
+assert(
   /path:\s*''/.test(routeSource) &&
     /path:\s*'about'/.test(routeSource) &&
     /path:\s*'dashboard'/.test(routeSource) &&
@@ -153,24 +161,27 @@ assert(
 );
 
 assert(
-  /localStorage\.getItem\('fsb-showcase-theme'\)/.test(indexSource),
-  'index pre-bootstrap script reads fsb-showcase-theme from localStorage'
+  /typeof window\.matchMedia !== 'function'/.test(indexSource) &&
+    /window\.matchMedia\('\(prefers-color-scheme: dark\)'\)\.matches/.test(indexSource),
+  'index pre-bootstrap script reads system color scheme with a prerender-safe matchMedia guard'
 );
 
 assert(
-  /if\s*\(saved\s*===\s*'light'\)\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(indexSource),
-  'index pre-bootstrap script applies data-theme=\"light\" only for stored light mode'
+  /if\s*\(\s*!window\.matchMedia\('\(prefers-color-scheme: dark\)'\)\.matches\s*\)\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(indexSource),
+  'index pre-bootstrap script applies data-theme=\"light\" for non-dark system theme'
+);
+
+const themeBootstrapIndex = indexSource.indexOf("window.matchMedia('(prefers-color-scheme: dark)'");
+assert(
+  themeBootstrapIndex !== -1 && themeBootstrapIndex < indexSource.indexOf('<app-root>'),
+  'theme pre-bootstrap system preference read occurs before app root bootstrap'
 );
 
 assert(
-  indexSource.indexOf('localStorage.getItem(\'fsb-showcase-theme\')') <
-    indexSource.indexOf('<app-root>'),
-  'theme pre-bootstrap read occurs before app root bootstrap'
-);
-
-assert(
-  /const STORAGE_KEY = 'fsb-showcase-theme'/.test(themeServiceSource),
-  'theme service uses fsb-showcase-theme storage key constant'
+  /function getSystemThemeMedia\(\): MediaQueryList \| null/.test(themeServiceSource) &&
+    /typeof window\.matchMedia !== 'function'/.test(themeServiceSource) &&
+    /window\.matchMedia\('\(prefers-color-scheme: dark\)'\)/.test(themeServiceSource),
+  'theme service uses prerender-safe system theme media query'
 );
 
 assert(
@@ -218,15 +229,13 @@ assert(
 );
 
 assert(
-  /localStorage\.setItem\(STORAGE_KEY,\s*'light'\)/.test(themeServiceSource) &&
-    /localStorage\.removeItem\(STORAGE_KEY\)/.test(themeServiceSource),
-  'theme service writes light mode and removes key when toggling off'
+  /media\.addEventListener\('change',\s*\(e\)\s*=>\s*this\.applyDark\(e\.matches\)\)/.test(themeServiceSource),
+  'theme service updates theme on system preference changes'
 );
 
 assert(
-  /localStorage\.getItem\(STORAGE_KEY\)/.test(themeServiceSource) &&
-    /setAttribute\('data-theme',\s*'light'\)/.test(themeServiceSource),
-  'theme service reapplies persisted light mode from storage'
+  /if\s*\(isDark\)\s*\{[\s\S]*removeAttribute\('data-theme'\)[\s\S]*\}\s*else\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(themeServiceSource),
+  'theme service maps dark mode to default theme and light mode to data-theme=\"light\"'
 );
 
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
