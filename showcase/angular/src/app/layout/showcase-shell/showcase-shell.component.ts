@@ -38,7 +38,10 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
     this.updateShellMode();
     this.routeSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
-      .subscribe(() => this.updateShellMode());
+      .subscribe(() => {
+        this.updateShellMode();
+        this.scrollToRouteTop();
+      });
   }
 
   ngOnDestroy(): void {
@@ -59,5 +62,22 @@ export class ShowcaseShellComponent implements OnInit, OnDestroy {
     if (this.shellless) {
       this.closeMobileMenu();
     }
+  }
+
+  private scrollToRouteTop(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      const scroller = document.scrollingElement || document.documentElement;
+      scroller.scrollTop = 0;
+      scroller.scrollLeft = 0;
+
+      window.requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        scroller.scrollTop = 0;
+        scroller.scrollLeft = 0;
+      });
+    });
   }
 }

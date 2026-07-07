@@ -34,6 +34,7 @@ function readIfPresent(relativePath) {
 console.log('\n--- showcase angular foundation contracts ---');
 
 const rootPackageSource = readIfPresent('package.json');
+const dockerfileSource = readIfPresent('Dockerfile');
 const angularConfigSource = readIfPresent('showcase/angular/angular.json');
 const mainSource = readIfPresent('showcase/angular/src/main.ts');
 const appConfigSource = readIfPresent('showcase/angular/src/app/app.config.ts');
@@ -41,6 +42,7 @@ const routeSource = readIfPresent('showcase/angular/src/app/app.routes.ts');
 const indexSource = readIfPresent('showcase/angular/src/index.html');
 const appComponentSource = readIfPresent('showcase/angular/src/app/app.component.ts');
 const appComponentTemplateSource = readIfPresent('showcase/angular/src/app/app.component.html');
+const shellComponentSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.ts');
 const shellTemplateSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.html');
 const shellStyleSource = readIfPresent('showcase/angular/src/app/layout/showcase-shell/showcase-shell.component.scss');
 const globalStylesSource = readIfPresent('showcase/angular/src/styles.scss');
@@ -111,6 +113,11 @@ assert(
   'root showcase scripts preserve deterministic npm --prefix workspace delegation'
 );
 
+assert(
+  /RUN npm run build -- --configuration production/.test(dockerfileSource),
+  'Docker showcase build runs npm build so prebuild regenerates crawler files before deploy'
+);
+
 // outputPath can be a string or an object { base, browser }
 const resolvedOutputPath = typeof angularOutputPath === 'string'
   ? angularOutputPath
@@ -148,6 +155,15 @@ assert(
     /scrollPositionRestoration:\s*'enabled'/.test(appConfigSource) &&
     /provideRouter\(routes,\s*withInMemoryScrolling/.test(appConfigSource),
   'router config restores scroll position to top on route navigation'
+);
+
+assert(
+  /event instanceof NavigationEnd/.test(shellComponentSource) &&
+    /this\.scrollToRouteTop\(\)/.test(shellComponentSource) &&
+    /window\.requestAnimationFrame/.test(shellComponentSource) &&
+    /window\.scrollTo\(0,\s*0\)/.test(shellComponentSource) &&
+    /scroller\.scrollTop = 0/.test(shellComponentSource),
+  'showcase shell explicitly resets window scroll after route navigation'
 );
 
 assert(
