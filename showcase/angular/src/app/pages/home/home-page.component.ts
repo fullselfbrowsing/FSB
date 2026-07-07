@@ -179,7 +179,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     const url = buildLocaleUrl(this.localeId, ROUTE_PATH);
     const t = $localize`:@@home.meta.title:FSB - Full Self-Browsing`;
-    const d = $localize`:@@home.meta.description:Open-source Chrome extension for AI-powered browser automation through natural language, with an MCP server for Claude Code, Codex, Cursor, and other agents.`;
+    const d = $localize`:@@home.meta.description:Local-first Chrome automation and MCP browser layer for AI agents, with trigger watchers, real uploads, and guarded first-party API capability calls.`;
     this.applyMeta(t, d, url);
     this.injectSoftwareApplicationJsonLd();
     if (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string') {
@@ -296,7 +296,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       name: 'FSB',
-      description: 'Open-source MCP browser automation layer that lets AI agents act, observe, verify, and iterate in a real Chrome browser',
+      description: 'Local-first Chrome automation and MCP browser layer that lets AI agents act, observe, verify, use trigger watchers, upload real files, and invoke guarded first-party API capabilities in the user browser',
       url: 'https://full-selfbrowsing.com',
       applicationCategory: 'BrowserApplication',
       applicationSubCategory: 'AI browser automation and MCP tools',
@@ -307,10 +307,13 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       featureList: [
         'MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw',
         'Real browser automation through a local Chrome extension',
-        'Direct API execution for supported logged-in apps',
-        'DOM-based page understanding, browser actions, visual feedback, and local memory',
+        'Trigger watchers for reactive DOM monitoring',
+        'Native first-party API capability catalog with guarded invoke_capability calls',
+        'Real file uploads through upload_file plus synthetic drop_file support',
+        'Vault and payment autofill boundary where raw secrets never cross the MCP bridge',
+        'DOM-based page understanding, browser actions, visual feedback, local memory, and BYO model keys',
       ],
-      keywords: 'MCP browser automation, AI browser agent, Claude Code browser testing, Codex browser testing, self-browsing automation',
+      keywords: 'MCP browser automation, AI browser agent, trigger watchers, first-party API capability calling, Claude Code browser testing, Codex browser testing, self-browsing automation',
       publisher: { '@id': 'https://full-selfbrowsing.com/#org' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     };

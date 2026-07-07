@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Phase 216 prebuild: regenerate sitemap.xml, llms-full.txt, and version.ts.
+// Phase 216 prebuild: regenerate sitemap.xml, llms.txt, llms-full.txt, and version.ts.
 // Wired via showcase/angular/package.json "prebuild" -- runs automatically before `ng build`.
 // Per CRAWL-05: zero new npm dependencies (node:fs + node:path + node:url only).
 
@@ -31,6 +31,7 @@ const ROUTES = [
   { path: '/prometheus',     changefreq: 'weekly',  priority: '0.8' },
   { path: '/sitemaps',       changefreq: 'monthly', priority: '0.6' },
 ];
+const MAX_LLMS_BYTES = 64000;
 const MAX_LLMS_FULL_BYTES = 256000;
 
 function normalizeRoutePath(path) {
@@ -98,19 +99,25 @@ function generateSitemap() {
   console.log(`[build-crawler-files] sitemap.xml written (${body.length} bytes, lastmod=${lastmod})`);
 }
 
-function copyLlmsFull() {
-  const sourcePath = join(SCRIPTS_DIR, 'llms-full.source.md');
+function copyCrawlerTextFile(sourceName, outputName, maxBytes) {
+  const sourcePath = join(SCRIPTS_DIR, sourceName);
   if (!existsSync(sourcePath)) {
-    throw new Error(`llms-full.source.md not found at ${sourcePath} (Plan 01 must commit this file first)`);
+    throw new Error(`${sourceName} not found at ${sourcePath}`);
   }
   const source = readFileSync(sourcePath, 'utf8');
-  const header = `<!-- generated ${todayIsoDate()} by build-crawler-files.mjs; edit llms-full.source.md -->\n`;
+  const header = `<!-- generated ${todayIsoDate()} by build-crawler-files.mjs; edit ${sourceName} -->\n`;
   const body = header + source;
-  if (Buffer.byteLength(body, 'utf8') >= MAX_LLMS_FULL_BYTES) {
-    throw new Error(`llms-full.txt exceeds ${MAX_LLMS_FULL_BYTES} bytes -- trim llms-full.source.md`);
+  const bytes = Buffer.byteLength(body, 'utf8');
+  if (bytes >= maxBytes) {
+    throw new Error(`${outputName} exceeds ${maxBytes} bytes -- trim ${sourceName}`);
   }
-  writeFileSync(join(PUBLIC_DIR, 'llms-full.txt'), body, 'utf8');
-  console.log(`[build-crawler-files] llms-full.txt written (${Buffer.byteLength(body, 'utf8')} bytes)`);
+  writeFileSync(join(PUBLIC_DIR, outputName), body, 'utf8');
+  console.log(`[build-crawler-files] ${outputName} written (${bytes} bytes)`);
+}
+
+function copyLlmsFiles() {
+  copyCrawlerTextFile('llms.source.md', 'llms.txt', MAX_LLMS_BYTES);
+  copyCrawlerTextFile('llms-full.source.md', 'llms-full.txt', MAX_LLMS_FULL_BYTES);
 }
 
 function writeVersion() {
@@ -142,7 +149,7 @@ function writeVersion() {
 async function main() {
   assertSitemapRoutesMatchPrerenderRoutes();
   generateSitemap();
-  copyLlmsFull();
+  copyLlmsFiles();
   writeVersion();
   console.log('[build-crawler-files] all crawler-file artifacts regenerated');
 }

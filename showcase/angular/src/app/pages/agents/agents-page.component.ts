@@ -57,7 +57,7 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     // tokens (FSB, OpenClaw, Claude, Codex, Cursor, MCP, Chrome) are preserved verbatim
     // by translators per showcase/angular/src/locale/DO-NOT-TRANSLATE.md.
     const t = $localize`:@@agents.meta.title:FSB - Agents (OpenClaw Skill + MCP)`;
-    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Claude, Codex, Cursor, and more. FSB gives agents a polished OpenClaw skill and 66 MCP tools to act, observe, verify.`;
+    const d = $localize`:@@agents.meta.description:Drive your real Chrome from OpenClaw, Hermes, Claude, Codex, Cursor, and more. FSB gives agents a skill plus 66 MCP tools to act, observe, verify.`;
     this.applyMeta(t, d, url);
     this.injectAgentsPageJsonLd();
 
@@ -202,16 +202,51 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     }
     const payload = {
       '@context': 'https://schema.org',
-      '@type': 'SoftwareApplication',
-      '@id': `${HOST}/agents#fsb-skill`,
-      name: $localize`:@@agents.schema.software.name:FSB OpenClaw Skill`,
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'macOS, Linux, Windows (via Node 18+)',
-      url: `${HOST}/agents`,
-      description: $localize`:@@agents.schema.software.description:Canonical OpenClaw onboarding path for FSB. Doctor flow, stdio config printer, and consent-gated multi-host installer for the FSB MCP server.`,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-      publisher: { '@id': `${HOST}/#org` },
-      isPartOf: { '@id': `${HOST}/#site` },
+      '@graph': [
+        {
+          '@type': 'SoftwareApplication',
+          '@id': `${HOST}/agents#fsb-skill`,
+          name: $localize`:@@agents.schema.software.name:FSB OpenClaw Skill`,
+          applicationCategory: 'DeveloperApplication',
+          operatingSystem: 'macOS, Linux, Windows (via Node 18+)',
+          url: `${HOST}/agents`,
+          description: $localize`:@@agents.schema.software.description:Canonical OpenClaw and Hermes onboarding path for FSB. Doctor flow, stdio config printer, consent-gated multi-host installer, and 66 MCP browser tools for the FSB MCP server.`,
+          featureList: [
+            '66 MCP tools for browser action, observation, verification, and recovery',
+            'Manual mode by default; run_task autopilot only on explicit delegation',
+            'Vault tools fill credentials and payment methods without exposing raw secrets',
+            'Trigger watcher tools for reactive page monitoring',
+            'Native capability tools for guarded first-party API actions',
+          ],
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          publisher: { '@id': `${HOST}/#org` },
+          isPartOf: { '@id': `${HOST}/#site` },
+        },
+        {
+          '@type': 'HowTo',
+          '@id': `${HOST}/agents#install-howto`,
+          name: 'Install FSB for an MCP agent',
+          description: 'Install the FSB MCP bridge, verify it with doctor, then let an MCP host drive the user real Chrome session.',
+          step: [
+            {
+              '@type': 'HowToStep',
+              name: 'Install the Chrome extension',
+              text: 'Install FSB from the Chrome Web Store or load the extension from source.',
+            },
+            {
+              '@type': 'HowToStep',
+              name: 'Configure the MCP server',
+              text: 'Use the FSB skill, ClawHub, or npx -y fsb-mcp-server install for a supported MCP host.',
+            },
+            {
+              '@type': 'HowToStep',
+              name: 'Run doctor verification',
+              text: 'Run npx -y fsb-mcp-server doctor and fix any failing package, bridge, extension, active-tab, content-script, or config layer.',
+            },
+          ],
+          isPartOf: { '@id': `${HOST}/agents#fsb-skill` },
+        },
+      ],
     };
     const json = JSON.stringify(payload).replace(/</g, '\\u003c');
     const script = this.renderer.createElement('script') as HTMLScriptElement;
