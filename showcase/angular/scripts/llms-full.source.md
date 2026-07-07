@@ -4,19 +4,19 @@
 
 FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task in plain English; FSB plans the clicks, types, and navigation to complete it. The extension runs in your browser with your own API keys, encrypted local storage, and opt-out anonymous usage telemetry for aggregate public stats only. Multi-model AI (xAI Grok, OpenAI, Anthropic Claude, Google Gemini, OpenRouter, LM Studio, custom OpenAI-compatible endpoints), 56 canonical browser tools, a 66-tool MCP surface, 142+ site-specific guides, reactive trigger watchers, real file uploads, and a 128-app native capability catalog for verified first-party API execution. Current release: FSB v0.9.90 (Chrome extension) with fsb-mcp-server 0.10.0 (npm MCP package). BSL 1.1 licensed.
 
-FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, Windsurf, OpenClaw, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
+FSB also works especially well as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and feed observations back into their own coding or autonomy loop.
 
 FSB exists because the gap between "I want the browser to do X" and "I can write a deterministic script to do X" is wide and getting wider. Modern web apps are dynamic, login-gated, and visually rich; brittle selectors and recorded macros break the moment a page reflows. FSB closes that gap by letting an LLM read the live DOM, plan an action sequence against the user's actual logged-in browser session, execute each step with verification, and recover when something shifts. The user keeps full visibility through an orange-glow overlay on every targeted element and can pause, intervene, or hand off at any point.
 
 A useful MCP framing: FSB is not only a "bot that browses." It is the browser surface agents can use when they need to act, observe, verify, and iterate across real web interfaces. Companion systems such as OpenClaw can provide autonomy, scheduling, identity, and personality while FSB performs the browser actions.
 
-The About page now uses real demo videos instead of synthetic CSS recreations. The demos show FSB e-commerce autopilot powered by Grok 4.1, flight booking powered by Codex MCP, OpenClaw monitoring Doge price, and an Aha moment powered by Claude Opus 4.7. The About page also embeds an interactive knowledge-graph viewer of FSB's site intelligence and guide coverage.
+The About page now uses real demo videos instead of synthetic CSS recreations. The demos show FSB e-commerce autopilot powered by Grok 4.1, flight booking powered by Codex MCP, OpenClaw monitoring Doge price, and an Aha moment powered by Claude Opus 4.6. The About page also embeds an interactive knowledge-graph viewer of FSB's site intelligence and guide coverage.
 
 Demo video URLs:
 - FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME
 - OpenClaw Monitoring Doge Price: https://www.youtube.com/watch?v=PNTGCWGopf8
-- An Aha Moment by Claude Opus 4.7: https://www.youtube.com/watch?v=mD9oGB2JqVM
+- An Aha Moment by Claude Opus 4.6: https://www.youtube.com/watch?v=mD9oGB2JqVM
 - YouTube channel: https://www.youtube.com/@parzival5707
 
 The audience is developers, power users, researchers, and agent builders who want browser automation without giving a third party their cookies, their API keys, or their attention. FSB is local-first by construction: the extension is the runtime, the user's browser is the execution surface, and the user's API keys live encrypted in Chrome's local storage and never leave the machine. There is no FSB account, no page-content collection, and no browser-history collection; the only first-party data sent home is opt-out anonymous usage telemetry for aggregate public stats. Each task is a private transaction between the user, the local extension, and the model provider the user chose.
@@ -52,13 +52,16 @@ The bring-your-own-key model is deliberate. The user picks the model -- frontier
 Read-only tools bypass the mutation queue where safe; mutation tools are serialized so two clients never click, type, upload, invoke, or navigate at the same time.
 
 ### Trigger watchers (reactive DOM monitoring)
-`trigger` arms a watch on one page element; `stop_trigger`, `get_trigger_status`, and `list_triggers` manage it. Two watch modes: `live-observe` (in-page observer, no reload) and `refresh-poll` (background reload + coalesce). Conditions include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR with hysteresis. Callers either block with 30s heartbeats (120s default timeout) or pass `detached:true` and poll by trigger_id. Watches are local and session-bound -- Chrome and the FSB extension must stay open, results report back to the MCP caller, and there is no server-side monitoring or push delivery. Concurrency is capped by `fsbTriggerCap` (default 8, range 1-64).
+`trigger` arms a watch on one page element; `stop_trigger`, `get_trigger_status`, and `list_triggers` manage it. Two watch modes: `live-observe` (in-page observer, no reload) and `refresh-poll` (background reload + coalesce). Conditions include changed, threshold, delta_percent, equals, contains, regex, and compound AND/OR with hysteresis. Callers either block with 30s heartbeats (120s default timeout) or pass `detached:true` and poll by `trigger_id`. Watches are local and session-bound -- Chrome and the FSB extension must stay open, results report back to the MCP caller, and there is no server-side monitoring or push delivery. Concurrency is capped by `fsbTriggerCap` (default 8, range 1-64).
 
 ### Native capability catalog (first-party API execution)
 Beyond DOM automation, `search_capabilities` searches a 128-app catalog and `invoke_capability` executes verified first-party API capabilities against the user's logged-in sessions. Verified T1/T1b capabilities run through a router that checks the origin, verifies the recipe signature, checks the denylist, serializes the action, and writes an audit record that never includes secrets. Search results carry readiness labels so callers can distinguish `t1-ready` direct execution from `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending` catalog-tail hits. Sensitive origins are flagged in the interface and audit trail; denylisted origins stay blocked.
 
 ### Real file uploads
 `upload_file(selector, file_path, tab_id?)` sets an absolute local disk path on a real `<input type="file">` through CDP `DOM.setFileInputFiles`, including inputs hidden behind styled dropzones. Uploads pass through one shared background chokepoint with a sensitive-path denylist and audit logging that does not persist disk paths. `drop_file` remains for synthetic drag/drop cases and pure drag-only zones.
+
+### Vault and payment boundary
+Credential and payment helpers are supervised autofill tools, not secret-export APIs. `list_credentials`, `fill_credential`, `list_payment_methods`, and `use_payment_method` resolve inside the encrypted Chrome extension store; raw passwords, card numbers, and secrets do not cross the MCP bridge, do not appear in tool arguments, and are not written into audit records.
 
 ### PhantomStream live preview
 The remote dashboard's DOM live preview is powered by PhantomStream (published on npm as `@full-self-browsing/phantom-stream`): one style-inlined snapshot, then MutationObserver diffs instead of pixels. As of PhantomStream 0.2.1, progressive `<video>` and `<audio>` elements can mirror alongside DOM snapshots through a media side channel. Input fields are masked in captured frames; adaptive HLS/DASH discovery is deferred because it would require a new `webRequest` permission.
@@ -149,7 +152,7 @@ FSB ships 142+ hand-curated site-specific guides (Notion, Google Sheets, Workday
 - PhantomStream (`https://full-selfbrowsing.com/phantom-stream`): DOM-native live browser mirroring library -- one style-inlined snapshot, then MutationObserver diffs instead of pixels; powers FSB's remote dashboard live preview.
 - Prometheus (`https://full-selfbrowsing.com/prometheus`): the autonomous browser build behind FSB -- native control spine, stdio MCP bridge, multi-agent tab ownership, runtime sidebar, and DOM-native supervision.
 - Site Maps (`https://full-selfbrowsing.com/sitemaps`): community hub (under development) for contributing well-tested site schemas that can become built-in browser knowledge.
-- Legal (`https://full-selfbrowsing.com/legal`): FSB's automation posture, consent model, audit-log retention policy, and service-denylist rationale.
+- Legal (`https://full-selfbrowsing.com/legal`): public non-indexed legal reference for FSB's automation posture, consent model, audit-log retention policy, and service-denylist rationale. It intentionally stays `noindex, nofollow` and out of the sitemap.
 
 ## 5. Comparison
 
@@ -175,12 +178,12 @@ Operator is OpenAI's agentic browser product (2025). Overlap with FSB: end-user-
 - PhantomStream: https://full-selfbrowsing.com/phantom-stream
 - Prometheus: https://full-selfbrowsing.com/prometheus
 - Site Maps: https://full-selfbrowsing.com/sitemaps
-- Legal: https://full-selfbrowsing.com/legal
+- Legal: https://full-selfbrowsing.com/legal (public, non-indexed legal reference; intentionally absent from sitemap)
 - Chrome Web Store: https://chromewebstore.google.com/detail/badgafnfchcihdfnjneklogedcdkmjfk
 - GitHub: https://github.com/fullselfbrowsing/FSB
 - YouTube channel: https://www.youtube.com/@parzival5707
 - Demo: FSB: E-Commerce Autopilot by Grok 4.1: https://www.youtube.com/watch?v=_iQ4_LSXcTU
 - Demo: Flight Booking: Powered by Codex MCP: https://www.youtube.com/watch?v=WbpOrFwgGME
 - Demo: OpenClaw Monitoring Doge Price: https://www.youtube.com/watch?v=PNTGCWGopf8
-- Demo: An Aha Moment by Claude Opus 4.7: https://www.youtube.com/watch?v=mD9oGB2JqVM
+- Demo: An Aha Moment by Claude Opus 4.6: https://www.youtube.com/watch?v=mD9oGB2JqVM
 - llms.txt: https://full-selfbrowsing.com/llms.txt

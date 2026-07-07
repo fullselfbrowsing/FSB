@@ -57,7 +57,7 @@ const SUPPORT_FAQ: ReadonlyArray<{ q: string; a: string }> = [
   },
   {
     q: $localize`:@@support.schema.faq.tools.q:What can I do with FSB through MCP tools?`,
-    a: $localize`:@@support.schema.faq.tools.a:FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 66 granular tools: navigate, click, type, scroll, read page state, take screenshots, fill spreadsheets, fill vault credentials, and more. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. Phrases like "use FSB autopilot", "delegate this", or naming run_task directly. For everything else the calling agent stays in the loop on every action, which is exactly what coding agents want when they're testing an app in-browser and feeding observations back into the editor.`,
+    a: $localize`:@@support.schema.faq.tools.a:FSB exposes two modes through MCP. Manual mode is the default and gives the calling agent 66 granular tools: navigate, click, type, scroll, read page state, take screenshots, upload real local files with upload_file, arm trigger watchers with trigger / get_trigger_status / list_triggers, and search or invoke guarded first-party API capabilities with search_capabilities and invoke_capability. Vault and payment helpers fill inside the encrypted extension store, so raw secrets do not cross the MCP bridge. Autopilot mode (run_task) only fires when the user explicitly delegates the whole task. For everything else the calling agent stays in the loop on every action.`,
   },
   {
     q: $localize`:@@support.schema.faq.openclawInstall.q:How do I install FSB on OpenClaw?`,

@@ -118,6 +118,11 @@
           <span class="ps-pkt ps-pkt-sec"><span class="bits">00111010</span></span>
         </div>
       </div>
+      <!-- Mobile-only scroll cue: hidden on desktop via component styles; text-free
+           and aria-hidden so it adds no i18n surface (messages.xlf must not change). -->
+      <a href="#overview" class="ps-scroll-cue" aria-hidden="true" tabindex="-1">
+        <span class="ps-cue-chevron"></span>
+      </a>
     </div>
   </header>
 

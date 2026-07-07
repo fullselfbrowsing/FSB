@@ -1065,3 +1065,202 @@
     padding: 9px 14px;
   }
 }
+
+/* Mobile-native hero + layout. Append-only region: these rules override the
+   media blocks above purely by source order — do not move or merge them
+   upward, and never edit the rules above. The .lat-scroll-cue element exists
+   only for phones; this base rule keeps desktop rendering byte-identical. */
+.lat-scroll-cue {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .lat-hero-inner {
+    align-content: center;
+    gap: 24px;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: 32px 20px 92px;
+  }
+
+  .lat-hero-inner > div:first-child {
+    text-align: center;
+  }
+
+  .lat-orb-wrap {
+    order: -1;
+  }
+
+  .lat-orb {
+    max-width: 160px;
+  }
+
+  .lat-tagline,
+  .lat-lead {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .lat-lead {
+    display: none;
+  }
+
+  .lat-cta-row {
+    align-items: center;
+    flex-direction: column;
+    margin-top: 24px;
+  }
+
+  .lat-cta-row .btn {
+    justify-content: center;
+    max-width: 320px;
+    padding: 14px 24px;
+    width: 100%;
+  }
+
+  .lat-chips {
+    justify-content: center;
+  }
+
+  .lat-scroll-cue {
+    align-items: center;
+    bottom: calc(22px + env(safe-area-inset-bottom));
+    color: #aebbd6;
+    display: flex;
+    height: 44px;
+    justify-content: center;
+    left: 50%;
+    position: absolute;
+    transform: translateX(-50%);
+    width: 44px;
+  }
+
+  .lat-cue-chevron {
+    animation: latCueNudge 2.6s ease-in-out infinite;
+    border-bottom: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    height: 12px;
+    transform: rotate(45deg);
+    width: 12px;
+  }
+
+  .lat-subnav a {
+    padding: 10px 15px;
+  }
+
+  .lat-shead {
+    margin-bottom: 32px;
+  }
+
+  .lat-feature {
+    padding: 20px 18px;
+  }
+
+  .lat-mods {
+    border: none;
+    border-radius: 0;
+    display: grid;
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .lat-mod {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+
+  .lat-cmd code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .lat-codecard code,
+  .lat-cli code {
+    font-size: 0.72rem;
+  }
+
+  .lat-codecard pre,
+  .lat-cli pre {
+    padding: 14px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lat-cbcopy {
+    padding: 8px 14px;
+  }
+
+  .lat-final {
+    padding: 64px 20px;
+  }
+}
+
+@keyframes latCueNudge {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: rotate(45deg) translate(0, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(45deg) translate(4px, 4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lat-cue-chevron {
+    animation: none;
+  }
+}
+
+/* Tablet band (769-920px): the base 2-col hero squeezes badly here (the 1-col
+   collapse only fired at <=768px). Compact centered content-first hero;
+   >=921px stays byte-identical. */
+@media (min-width: 769px) and (max-width: 920px) {
+  .lat-hero-inner {
+    gap: 28px;
+    grid-template-columns: 1fr;
+    padding: 48px 24px 72px;
+  }
+
+  .lat-hero-inner > div:first-child {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .lat-orb-wrap {
+    order: -1;
+  }
+
+  .lat-orb {
+    max-width: 220px;
+  }
+
+  .lat-tagline,
+  .lat-lead {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .lat-cta-row {
+    justify-content: center;
+    margin-top: 24px;
+  }
+
+  .lat-chips {
+    justify-content: center;
+  }
+}
+
+/* Docs-style nav comfort across the whole mobile/tablet range. */
+@media (max-width: 920px) {
+  .lat-subnav a {
+    padding: 10px 15px;
+  }
+
+  .lat-cmd code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

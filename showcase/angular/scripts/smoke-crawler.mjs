@@ -52,6 +52,33 @@ const MARKETING_ASSERTIONS = [
 ];
 
 const EXPECTED_SITEMAP_LOCS = MARKETING_ASSERTIONS.map(({ canonical }) => canonical);
+const EXCLUDED_SITEMAP_LOCS = ['/legal', '/dashboard', '/stats'].map((path) => `${PROD_HOST}${path}`);
+const AEO_MUST_CONTAIN = [
+  'trigger',
+  'stop_trigger',
+  'get_trigger_status',
+  'list_triggers',
+  'search_capabilities',
+  'invoke_capability',
+  'upload_file',
+  'drop_file',
+  '128-app',
+  't1-ready',
+  't1-guarded-fail-closed',
+  'fill_credential',
+  'use_payment_method',
+  'secrets do not cross the MCP bridge',
+  'OpenClaw',
+  'Hermes',
+  'FSB: E-Commerce Autopilot by Grok 4.1',
+  'Flight Booking: Powered by Codex MCP',
+  'OpenClaw Monitoring Doge Price',
+  'An Aha Moment by Claude Opus 4.6',
+];
+const AEO_MUST_NOT_CONTAIN = [
+  'Watch FSB drive Google, search Amazon, and book travel autonomously.',
+  'Claude Opus 4.7',
+];
 
 async function checkMarketingRoutes() {
   for (const { path, titleSubstr, canonical } of MARKETING_ASSERTIONS) {
@@ -79,14 +106,14 @@ async function checkMarketingRoutes() {
 }
 
 const CRAWLER_FILES = [
-  { path: '/robots.txt',    ctMatch: /text\/plain/i,        bodyMustContain: 'User-agent: GPTBot' },
-  { path: '/sitemap.xml',   ctMatch: /(application|text)\/xml/i, bodyMustContain: '<urlset' },
-  { path: '/llms.txt',      ctMatch: /text\/plain/i,        bodyMustContain: '# FSB (Full Self-Browsing)' },
-  { path: '/llms-full.txt', ctMatch: /text\/plain/i,        bodyMustContain: '' },
+  { path: '/robots.txt',    ctMatch: /text\/plain/i,        bodyMustContain: ['User-agent: GPTBot'] },
+  { path: '/sitemap.xml',   ctMatch: /(application|text)\/xml/i, bodyMustContain: ['<urlset'] },
+  { path: '/llms.txt',      ctMatch: /text\/plain/i,        bodyMustContain: ['# FSB (Full Self-Browsing)', ...AEO_MUST_CONTAIN], bodyMustNotContain: AEO_MUST_NOT_CONTAIN },
+  { path: '/llms-full.txt', ctMatch: /text\/plain/i,        bodyMustContain: AEO_MUST_CONTAIN, bodyMustNotContain: AEO_MUST_NOT_CONTAIN },
 ];
 
 async function checkCrawlerFiles() {
-  for (const { path, ctMatch, bodyMustContain } of CRAWLER_FILES) {
+  for (const { path, ctMatch, bodyMustContain, bodyMustNotContain } of CRAWLER_FILES) {
     const url = `${BASE_URL}${path}`;
     let r;
     try {
@@ -98,8 +125,11 @@ async function checkCrawlerFiles() {
     record(r.status === 200, `GET ${path} -> 200`, `actual ${r.status}`);
     record(ctMatch.test(r.contentType), `GET ${path} content-type matches ${ctMatch}`, r.contentType);
     record(r.body.length > 0, `GET ${path} body non-empty`, `${r.body.length} chars`);
-    if (bodyMustContain) {
-      record(r.body.includes(bodyMustContain), `GET ${path} body contains "${bodyMustContain}"`, '');
+    for (const expected of bodyMustContain || []) {
+      record(r.body.includes(expected), `GET ${path} body contains "${expected}"`, '');
+    }
+    for (const forbidden of bodyMustNotContain || []) {
+      record(!r.body.includes(forbidden), `GET ${path} body does not contain stale text "${forbidden}"`, '');
     }
     if (path === '/llms-full.txt') {
       const bytes = Buffer.byteLength(r.body, 'utf8');
@@ -124,10 +154,16 @@ async function checkSitemapLocs() {
   const locs = [...r.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
   const missing = EXPECTED_SITEMAP_LOCS.filter((loc) => !locs.includes(loc));
   const unexpected = locs.filter((loc) => !EXPECTED_SITEMAP_LOCS.includes(loc));
+  const excludedPresent = EXCLUDED_SITEMAP_LOCS.filter((loc) => locs.includes(loc));
   record(
     locs.length === EXPECTED_SITEMAP_LOCS.length && missing.length === 0 && unexpected.length === 0,
     `sitemap has exact expected <loc> set (${EXPECTED_SITEMAP_LOCS.length} entries)`,
     `actual ${locs.length}; missing ${missing.join(', ') || 'none'}; unexpected ${unexpected.join(', ') || 'none'}`
+  );
+  record(
+    excludedPresent.length === 0,
+    'sitemap excludes noindex/client-only routes',
+    excludedPresent.length === 0 ? '/legal, /dashboard, /stats absent' : `present ${excludedPresent.join(', ')}`
   );
   for (const loc of locs) {
     // When running locally, rewrite the prod-host URLs in sitemap.xml to BASE_URL

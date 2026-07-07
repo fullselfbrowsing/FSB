@@ -431,11 +431,15 @@
   grid-template-columns: auto 1fr;
   column-gap: 14px;
   align-items: center;
+  /* Hover lift uses top, not transform: transforming a multicol child makes
+     Chromium re-composite the fragmented box and the card blinks out. */
+  position: relative;
+  top: 0;
 }
 
 .feature-card:hover {
   border-color: var(--border-hover);
-  transform: translateY(-4px);
+  top: -4px;
   box-shadow: var(--shadow-md);
 }
 
@@ -1203,5 +1207,73 @@
 
   .mcp-callout {
     padding: 20px;
+  }
+}
+
+/* Mobile-native hero: first phone viewport holds only the FSB title, the two
+   CTAs, and the scroll cue. Append-only region: these rules override the
+   @media (max-width: 768px) block above purely by source order — do not move
+   or merge them upward, and never edit the rules above. */
+@media (max-width: 768px) {
+  .hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    padding-top: var(--nav-height);
+    padding-bottom: 0;
+  }
+
+  .hero-content {
+    padding: 24px 24px 88px;
+  }
+
+  .hero h1 {
+    /* Single line at every phone width: available width is 100vw - 48px, so
+       the size must track vw with a negative constant (title is ~8.5x its
+       font-size wide). */
+    font-size: clamp(1.75rem, 11.2vw - 0.4rem, 3.2rem);
+    margin-bottom: 36px;
+    white-space: nowrap;
+  }
+
+  .hero-subtitle {
+    display: none;
+  }
+
+  .hero-actions {
+    gap: 14px;
+    margin-bottom: 0;
+  }
+
+  .hero-actions .btn {
+    font-size: 1rem;
+    max-width: 320px;
+    padding: 14px 24px;
+  }
+
+  .scroll-cue {
+    display: flex;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .features {
+    scroll-margin-top: var(--nav-height);
+  }
+
+  /* The fan is a tap-toggled dropdown on touch; pills keep the blur but get
+     a near-opaque tint so overlapped content cannot be read through them,
+     and the desktop deck offsets/rotations collapse into a neat right-aligned
+     column so nine pills don't scatter across the following section. */
+  .install-fan {
+    gap: 8px;
+    z-index: 60;
+  }
+
+  .install-fan-item {
+    background: color-mix(in srgb, var(--bg-elevated) 93%, transparent);
+    transform: none;
+  }
+
+  .install-fan-item:hover {
+    transform: none;
   }
 }
