@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// install-host.mjs -- consent-gated multi-host installer (SKILL-05 / SKILL-06)
+// install-host.mjs -- confirmation-based multi-host installer (SKILL-05 / SKILL-06)
 // Detects other MCP hosts via `npx -y fsb-mcp-server install --list`,
 // prompts y/n per host, runs `npx -y fsb-mcp-server install --<host>` only on explicit yes.
 // NEVER passes --all. NEVER auto-writes OpenClaw's MCP config (use print-stdio.mjs).
