@@ -2,10 +2,17 @@
  * MCP Session Recorder -- assembles MCP-agent browsing sessions and lands
  * them in the SAME logs/history/replay/memory pipeline autopilot runs use.
  *
- * Quick task 260707-7id. Sibling of the Phase 271 metrics recorder at the two
- * dispatcher choke points in extension/ws/mcp-tool-dispatcher.js
- * (dispatchMcpToolRoute + dispatchMcpMessageRoute finally blocks). Each
- * recordDispatch() call folds one resolved MCP dispatch into an in-memory
+ * Quick task 260707-7id (+ review-fix follow-up). Two hook points feed it:
+ *   - Bridge-level ACTION tap: MCPBridgeClient._recordMcpSessionAction
+ *     (extension/ws/mcp-bridge-client.js, called from _handleExecuteAction)
+ *     invokes recordAction() for EVERY action tool -- content, cdp, and
+ *     background routes alike -- carrying the ownership-resolved tabId. The
+ *     dispatcher tool route only ever saw background-routed actions, so the
+ *     tap lives where all three routes converge.
+ *   - Dispatcher message-route hook: dispatchMcpMessageRoute's finally block
+ *     in extension/ws/mcp-tool-dispatcher.js calls recordDispatch() so
+ *     read-only/message traffic JOINs open sessions by agentId.
+ * Each recorded call folds one resolved MCP dispatch into an in-memory
  * open-session record keyed agentId+tabId; the visualSession sidecar drives
  * the lifecycle (birth on first action tool, close on isFinal or 60s idle).
  *
@@ -78,6 +85,20 @@
   // only payload.params is recorded, but the pattern also catches a
   // params-level token if one ever appears.
   var SENSITIVE_KEY_PATTERN = /pass(word)?|secret|token|credential|api[-_]?key|authorization/i;
+
+  // Wire-verb -> legacy replay-name map. The replay engine's whitelist
+  // (background.js loadReplayableSession replayableTools) speaks the content
+  // script's camelCase verb namespace, and almost every action tool's wire
+  // verb already matches it (type_text ships as 'type', press_enter as
+  // 'pressEnter', ...). The only replay-worthy mismatches are the
+  // background-routed history tools, whose wire verb is their snake_case
+  // tool name. Non-replayable verbs (cdp*, dragdrop, siteSearch, tab ops)
+  // store verbatim -- the replay filter drops them naturally, exactly as it
+  // does for autopilot sessions.
+  var MCP_REPLAY_TOOL_NAME_MAP = Object.freeze({
+    go_back: 'goBack',
+    go_forward: 'goForward'
+  });
 
   // ---- In-memory state ----------------------------------------------------
 
@@ -300,6 +321,20 @@
     return numericTabId === null ? 'none' : String(numericTabId);
   }
 
+  // Tab identity for session keying. Precedence mirrors the boundary
+  // conventions end to end: an explicitly resolved tabId from the bridge
+  // action tap wins; otherwise wire params carry snake_case tab_id (the MCP
+  // schema field, preserved by PARAM_TRANSFORMS -- same order as
+  // resolveAgentTabOrError in utils/agent-tab-resolver.js); camelCase tabId
+  // last for back-compat with dispatcher-injected routeParams.
+  function _resolveNumericTabId(entry, params) {
+    var explicit = _numericTabId(entry.tabId);
+    if (explicit !== null) return explicit;
+    var snake = _numericTabId(params.tab_id);
+    if (snake !== null) return snake;
+    return _numericTabId(params.tabId);
+  }
+
   // JOIN attribution fallback: the open session with matching agentId that
   // has the most recent lastActivityAt, any tabId -- mirrors
   // resolveMcpClientLabel's per-agent semantics.
@@ -461,8 +496,10 @@
    * never returns a meaningful value, never alters the dispatcher's resolved
    * value or thrown error (threat T-q7id-02).
    *
-   * Entry shape mirrors the metrics recorder hook exactly:
-   *   { client, tool, requestPayload, response, success, dispatcher_route }
+   * Entry shape mirrors the metrics recorder hook exactly, plus an optional
+   * resolved tab identity supplied by the bridge action tap:
+   *   { client, tool, requestPayload, response, success, dispatcher_route,
+   *     tabId? }
    *
    * @param {object} entry - The dispatch context from the dispatcher finally.
    */
@@ -483,7 +520,7 @@
       _sweepExpired(now);
 
       var params = (payload.params && typeof payload.params === 'object') ? payload.params : {};
-      var numericTabId = _numericTabId(params.tabId);
+      var numericTabId = _resolveNumericTabId(entry, params);
       var sidecar = (payload.visualSession && typeof payload.visualSession === 'object')
         ? payload.visualSession
         : null;
@@ -538,9 +575,12 @@
       }
 
       // Append the action in replay shape {tool, params, result, timestamp}.
+      // storedTool applies the replay-name map; the guards below (navigate
+      // lastUrl) keep matching on the raw wire verb.
+      var storedTool = MCP_REPLAY_TOOL_NAME_MAP[entry.tool] || entry.tool;
       var redactedParams = redactParams(params);
       session.actionHistory.push({
-        tool: entry.tool,
+        tool: storedTool,
         params: redactedParams,
         result: entry.response,
         timestamp: now
@@ -562,7 +602,7 @@
       var logger = _getAutomationLogger();
       if (logger && typeof logger.logAction === 'function') {
         try {
-          logger.logAction(session.sessionId, { tool: entry.tool, params: redactedParams }, entry.response);
+          logger.logAction(session.sessionId, { tool: storedTool, params: redactedParams }, entry.response);
         } catch (_e) { /* best-effort */ }
       }
 
@@ -590,6 +630,32 @@
         }
       } catch (_e) { /* ignore */ }
     }
+  }
+
+  /**
+   * Bridge-level action entry point (MCPBridgeClient._recordMcpSessionAction).
+   * Thin adapter onto recordDispatch: same fire-and-forget contract, plus the
+   * ownership-resolved tabId so session keying never depends on re-parsing
+   * caller params.
+   *
+   * @param {object} input - { client, tool, params, payload, response,
+   *   success, tabId }
+   */
+  function recordAction(input) {
+    try {
+      if (!input || typeof input !== 'object') return;
+      recordDispatch({
+        client: input.client,
+        tool: input.tool,
+        requestPayload: (input.payload && typeof input.payload === 'object')
+          ? input.payload
+          : { tool: input.tool, params: input.params || {}, agentId: input.agentId },
+        response: input.response,
+        success: input.success !== false,
+        dispatcher_route: 'bridge-action',
+        tabId: input.tabId
+      });
+    } catch (_e) { /* fire-and-forget */ }
   }
 
   // ---- Eviction restore -----------------------------------------------------
@@ -665,6 +731,7 @@
 
   var _api = {
     recordDispatch: recordDispatch,
+    recordAction: recordAction,
     redactParams: redactParams,
     FSB_MCP_SESSION_BUFFER_KEY: FSB_MCP_SESSION_BUFFER_KEY,
     MCP_SESSION_IDLE_DEATH_MS: MCP_SESSION_IDLE_DEATH_MS,

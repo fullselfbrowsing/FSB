@@ -701,6 +701,37 @@ class MCPBridgeClient {
     }
   }
 
+  /**
+   * Session-recorder tap at the bridge level so content- and cdp-routed
+   * action tools are recorded too -- the dispatcher choke points only ever
+   * see background-routed actions (executeFn's default branch sends straight
+   * to the content script). Fire-and-forget with the metrics-recorder
+   * discipline: NOT awaited, whole body guarded, never alters the action
+   * result. Placed ABOVE _handleExecuteAction so the 4500-char source gates
+   * in tests/action-tool-agent-scoped.test.js and
+   * tests/ownership-error-codes.test.js keep resolveAgentTabOrError in view.
+   */
+  _recordMcpSessionAction(payload, response, resolvedTabId) {
+    try {
+      if (typeof globalThis === 'undefined' ||
+          !globalThis.fsbMcpSessionRecorder ||
+          typeof globalThis.fsbMcpSessionRecorder.recordAction !== 'function') {
+        return;
+      }
+      globalThis.fsbMcpSessionRecorder.recordAction({
+        client: (typeof globalThis.resolveMcpClientLabel === 'function')
+          ? globalThis.resolveMcpClientLabel(payload)
+          : null,
+        tool: payload && payload.tool,
+        params: (payload && payload.params) || {},
+        payload: payload,
+        response: response,
+        success: !(response && typeof response === 'object' && response.success === false),
+        tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null
+      });
+    } catch (_e) { /* never let session recording break the action */ }
+  }
+
   async _handleExecuteAction(payload) {
     // Phase 246 D-13: resolver replaces _getActiveTab; legacy:* surfaces fall
     // through to active-tab via the resolver's first-line branch.
@@ -757,6 +788,7 @@ class MCPBridgeClient {
       if (dispatched && dispatched.success === true) {
         const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
         if (resolvedTabId !== null) {
+          this._recordMcpSessionAction(payload, dispatched, resolvedTabId);
           await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
           // Phase 257 -- explicit completion. When the caller marks this
           // bootstrap call as the final action of the task, clear the visual
@@ -782,6 +814,7 @@ class MCPBridgeClient {
         if (dispatched && dispatched.success === true) {
           const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
           if (resolvedTabId !== null) {
+            this._recordMcpSessionAction(payload, dispatched, resolvedTabId);
             await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
             await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
           }
@@ -844,6 +877,11 @@ class MCPBridgeClient {
     } else {
       actionResult = await executeFn();
     }
+
+    // Session-recorder action tap: all three routes (content, cdp,
+    // background) converge here with the resolver-approved tab identity.
+    // Resolver-failure returns above record nothing (nothing executed).
+    this._recordMcpSessionAction(payload, actionResult, tabId);
 
     // Phase 257 -- explicit completion. When the caller marks this action as
     // the final action of the task, clear the visual session immediately
