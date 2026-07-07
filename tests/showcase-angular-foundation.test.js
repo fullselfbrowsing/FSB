@@ -165,12 +165,20 @@ assert(
 );
 
 assert(
-  /event instanceof NavigationEnd/.test(shellComponentSource) &&
-    /this\.scrollToRouteTop\(\)/.test(shellComponentSource) &&
+    /event instanceof NavigationEnd/.test(shellComponentSource) &&
+    /event instanceof Scroll/.test(shellComponentSource) &&
+    /this\.scrollToRouteTop\(/.test(shellComponentSource) &&
+    /!event\.anchor/.test(shellComponentSource) &&
+    /window\.location\.hash/.test(shellComponentSource) &&
+    /window\.history\.scrollRestoration = 'manual'/.test(shellComponentSource) &&
+    /ROUTE_SCROLL_RESET_DELAYS_MS/.test(shellComponentSource) &&
+    /PERSISTENT_ROUTE_SCROLL_RESET_DELAYS_MS/.test(shellComponentSource) &&
+    /ROUTE_SCROLL_RESET_STORAGE_KEY/.test(shellComponentSource) &&
+    /window\.setTimeout/.test(shellComponentSource) &&
     /window\.requestAnimationFrame/.test(shellComponentSource) &&
     /window\.scrollTo\(0,\s*0\)/.test(shellComponentSource) &&
     /scroller\.scrollTop = 0/.test(shellComponentSource),
-  'showcase shell explicitly resets window scroll after route navigation'
+  'showcase shell explicitly resets window scroll after late route navigation events'
 );
 
 assert(
@@ -192,6 +200,17 @@ assert(
 assert(
   /if\s*\(\s*!window\.matchMedia\('\(prefers-color-scheme: dark\)'\)\.matches\s*\)\s*\{[\s\S]*setAttribute\('data-theme',\s*'light'\)/.test(indexSource),
   'index pre-bootstrap script applies data-theme=\"light\" for non-dark system theme'
+);
+
+assert(
+  /initRouteScrollRestoration/.test(indexSource) &&
+    /window\.history\.scrollRestoration = 'manual'/.test(indexSource) &&
+    /window\.location\.hash/.test(indexSource) &&
+    /fsb-route-scroll-top/.test(indexSource) &&
+    /document\.addEventListener\('click'/.test(indexSource) &&
+    /target\.closest\('footer a\[href\]'\)/.test(indexSource) &&
+    /window\.setTimeout\(reset,\s*delays\[i\]\)/.test(indexSource),
+  'index pre-bootstrap script disables browser scroll restoration and resets non-hash route loads to top'
 );
 
 const themeBootstrapIndex = indexSource.indexOf("window.matchMedia('(prefers-color-scheme: dark)'");
@@ -218,6 +237,12 @@ assert(
   /<div class="nav-links">[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource) &&
     /<div class="nav-mobile"[\s\S]*routerLink="\/"[\s\S]*routerLink="\/about"[\s\S]*routerLink="\/dashboard"[\s\S]*routerLink="\/privacy"[\s\S]*routerLink="\/support"/.test(shellTemplateSource),
   'shell template preserves canonical desktop and mobile routerLink contracts'
+);
+
+assert(
+  /prepareRouteTopNavigation\(\): void/.test(shellComponentSource) &&
+    (shellTemplateSource.match(/\(click\)="prepareRouteTopNavigation\(\)"/g) || []).length >= 11,
+  'footer internal router links reset scroll before route navigation starts'
 );
 
 assert(
