@@ -191,16 +191,24 @@ function extractMarkedIds(dirPath) {
 // comment above for why this must be derived per-route, not from a separate
 // hardcoded route-name list).
 function buildRouteMarkedIds(routeTable) {
-  const map = new Map(); // routePath -> Set<id>
+  const map = new Map(); // routePath -> Set<id> (union: own componentDir + shell/picker when applicable)
+  // routePath -> own componentDir marked-id count, captured BEFORE the shell/picker
+  // union below so a typo'd/renamed/emptied componentDir can be detected even for
+  // routes whose merged `ids.size` would otherwise stay non-zero via the shared
+  // shell+picker fallback (WR-01: the merged total alone cannot distinguish "this
+  // route's own directory is fine" from "this route's own directory resolved to
+  // zero ids and everything we're seeing is shell/picker fallback").
+  const ownCounts = new Map();
   for (const route of routeTable) {
     const ids = extractMarkedIds(join(APP_SRC, route.componentDir));
+    ownCounts.set(route.path, ids.size);
     if (!route.shellless) {
       for (const id of extractMarkedIds(SHELL_DIR)) ids.add(id);
       for (const id of extractMarkedIds(PICKER_DIR)) ids.add(id);
     }
     map.set(route.path, ids);
   }
-  return map;
+  return { map, ownCounts };
 }
 
 // ---------------------------------------------------------------------------
@@ -635,13 +643,18 @@ function main() {
   }
   console.log('');
 
-  const routeMarkedIds = buildRouteMarkedIds(ROUTE_TABLE);
+  const { map: routeMarkedIds, ownCounts: routeOwnMarkedIdCounts } = buildRouteMarkedIds(ROUTE_TABLE);
   for (const route of ROUTE_TABLE) {
     const ids = routeMarkedIds.get(route.path);
     const scopeNote = route.outOfScope ? ` (OUT OF SCOPE: ${route.outOfScope})` : '';
     console.log(`Route [${displayName(route.path)}]: ${ids.size} marked ids${scopeNote}`);
-    if (ids.size === 0 && !route.outOfScope) {
-      console.error(`FATAL: route [${displayName(route.path)}] resolved to 0 marked ids -- componentDir typo or ROUTE_TABLE drift from app.routes.ts?`);
+    // Check the route's OWN componentDir contribution, not just the merged
+    // shell/picker-union total (WR-01 follow-up): for the 8 non-shellless routes,
+    // `ids.size` can never drop below the shared SHELL_DIR + PICKER_DIR count, so a
+    // typo'd/renamed/emptied componentDir would otherwise silently masquerade as a
+    // plausible non-zero id count instead of tripping this fail-fast.
+    if (routeOwnMarkedIdCounts.get(route.path) === 0 && !route.outOfScope) {
+      console.error(`FATAL: route [${displayName(route.path)}]'s own componentDir (${route.componentDir}) resolved to 0 marked ids -- typo/drift masked by the shared shell+picker union?`);
       process.exit(2); // fatal precondition -- see Stage 9 comment above.
     }
   }
