@@ -10,8 +10,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Translation Audit
 
-- [ ] **AUDIT-01**: A full-page audit produces a per-page, per-locale, per-trans-unit verdict distinguishing "coverage" (i18n-marked + translated target exists) from "currency" (target still matches the current English source) across every current showcase route.
-- [ ] **AUDIT-02**: The audit traces the orphaned `translations.stats-274.*.json` artifacts end-to-end into (or explicitly out of) the live `messages.<locale>.xlf` files the build consumes.
+- [x] **AUDIT-01**: A full-page audit produces a per-page, per-locale, per-trans-unit verdict distinguishing "coverage" (i18n-marked + translated target exists) from "currency" (target still matches the current English source) across every current showcase route.
+- [x] **AUDIT-02**: The audit traces the orphaned `translations.stats-274.*.json` artifacts end-to-end into (or explicitly out of) the live `messages.<locale>.xlf` files the build consumes.
 
 ### Translation Resync
 
@@ -67,8 +67,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | Phase 52 | Pending |
-| AUDIT-02 | Phase 52 | Pending |
+| AUDIT-01 | Phase 52 | Complete |
+| AUDIT-02 | Phase 52 | Complete |
 | RESYNC-01 | Phase 53 | Pending |
 | RESYNC-02 | Phase 53 | Pending |
 | RESYNC-03 | Phase 53 | Pending |

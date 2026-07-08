@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2.0
 milestone_name: Showcase i18n Completeness
-status: executing
-stopped_at: v1.2.0 ROADMAP.md and REQUIREMENTS.md traceability written; all 13 v1 requirements mapped across Phases 52-56 with 0 orphaned. Roadmap awaiting user approval.
-last_updated: "2026-07-08T17:16:30.315Z"
-last_activity: 2026-07-08 -- Phase 52 planning complete
+status: verifying
+stopped_at: Completed 52-01-PLAN.md (Full-Page Translation Completeness Audit) -- script built, report generated and verified against confirmed baseline, ready for /gsd-verify-work
+last_updated: "2026-07-08T20:45:11.894Z"
+last_activity: 2026-07-08
 progress:
   total_phases: 14
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 30
-  completed_plans: 35
+  completed_plans: 36
   percent: 100
 ---
 
@@ -25,16 +25,16 @@ See: .planning/research/SUMMARY.md (phase sequencing rationale, confirmed 5-drif
 See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.2.0 does not touch the automation/T1 catalog surface; it closes a reopened i18n completeness gap on the showcase marketing site.
-**Current focus:** Phase 52 -- Full-Page Translation Completeness Audit (must run first; establishes the true drift/missing scope the rest of the milestone is scoped against).
+**Current focus:** Phase 52 — Full-Page Translation Completeness Audit
 
 ## Current Position
 
-Phase: 52 of 56 (Full-Page Translation Completeness Audit)
-Plan: Not yet planned
-Status: Ready to execute
-Last activity: 2026-07-08 -- Phase 52 planning complete
+Phase: 52 (Full-Page Translation Completeness Audit) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-07-08
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Roadmap At A Glance (v1.2.0, Phases 52-56)
 
@@ -68,6 +68,8 @@ v1.2.0-specific decisions so far:
 - [Roadmap]: Phase ordering follows the audit -> resync -> gate-flip -> drift-gate -> cookie-fix chain all 4 independent researchers converged on. The drift gate (Phase 55) is sequenced after Phases 52-54, not before, so it lands clean rather than immediately red.
 - [Roadmap]: VISUAL-01 (DE/CJK visual spot-check) is folded into Phase 53's success criteria rather than given its own phase, since it has a hard content dependency on RESYNC-01/02 landing first (needs final translated copy to visually check) and is small enough not to warrant a standalone phase.
 - [Roadmap]: The milestone brief's original "247 trans-units changed" framing is explicitly corrected in ROADMAP.md -- research confirmed only 5 of 247 touched blocks have real `<source>` drift; the true count is whatever Phase 52's audit finds, not a number fixed in advance.
+- [Phase 52]: Corrected the plan's stated 6 non-shellless routes to the verified-correct 8 (sitemaps and legal also render the shared shell); derived dynamically per-route from ROUTE_TABLE.shellless rather than a hardcoded route-name list
+- [Phase 52]: traceStats274's idDriftFromTemplate implemented exactly as specified (produces 13/locale); reported as explicitly unreconciled against 52-RESEARCH.md Open Questions #3's disputed 7/9/13 candidates rather than silently picking one
 
 ### Pending Todos
 
@@ -102,8 +104,8 @@ v2 deferred (see REQUIREMENTS.md v1.2.0 v2 section): QA-01 (native-speaker/bilin
 
 ## Session Continuity
 
-Last session: 2026-07-07
-Stopped at: v1.2.0 ROADMAP.md and REQUIREMENTS.md traceability written; all 13 v1 requirements mapped across Phases 52-56 with 0 orphaned. Roadmap awaiting user approval.
+Last session: 2026-07-08T20:45:11.890Z
+Stopped at: Completed 52-01-PLAN.md (Full-Page Translation Completeness Audit) -- script built, report generated and verified against confirmed baseline, ready for /gsd-verify-work
 Resume file: None
 
 ## Next Actions
