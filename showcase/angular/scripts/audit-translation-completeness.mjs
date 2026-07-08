@@ -572,6 +572,34 @@ function requireFile(path, label) {
   }
 }
 
+// Per the threat model's T-52-02 mitigation: wrap each XLIFF file read + parse
+// in try/catch so a malformed file (bad encoding, truncated mid-write, unlucky
+// permissions change) produces a clear FATAL message and a controlled exit(2),
+// not an unhandled exception with a raw stack trace. requireFile() above
+// already guards the "missing entirely" case; this guards "exists but reading
+// or parsing it throws."
+function readXliffOrExit(path, label) {
+  let text;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch (err) {
+    console.error(`FATAL: could not read ${label} (${path}): ${(err && err.message) || err}`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
+  let map;
+  try {
+    map = extractTransUnits(text);
+  } catch (err) {
+    console.error(`FATAL: could not parse ${label} (${path}): ${(err && err.message) || err}`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
+  if (map.size === 0) {
+    console.error(`FATAL: extracted zero trans-units from ${label} -- regex/file mismatch.`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
+  return map;
+}
+
 function main() {
   console.log('Phase 52 / AUDIT-01 + AUDIT-02 -- audit-translation-completeness.mjs starting...');
   console.log('');
@@ -589,22 +617,14 @@ function main() {
 
   const enXliffPath = join(LOCALE_DIR, 'messages.xlf');
   requireFile(enXliffPath, 'messages.xlf (EN source)');
-  const enMap = extractTransUnits(readFileSync(enXliffPath, 'utf8'));
-  if (enMap.size === 0) {
-    console.error('FATAL: extracted zero trans-units from messages.xlf -- regex/file mismatch.');
-    process.exit(2); // fatal precondition -- see Stage 9 comment above.
-  }
+  const enMap = readXliffOrExit(enXliffPath, 'messages.xlf (EN source)');
   console.log(`messages.xlf (EN): ${enMap.size} trans-units.`);
 
   const localeMaps = new Map();
   for (const locale of targetLocales) {
     const p = join(LOCALE_DIR, `messages.${locale}.xlf`);
     requireFile(p, `messages.${locale}.xlf`);
-    const map = extractTransUnits(readFileSync(p, 'utf8'));
-    if (map.size === 0) {
-      console.error(`FATAL: extracted zero trans-units from messages.${locale}.xlf -- regex/file mismatch.`);
-      process.exit(2); // fatal precondition -- see Stage 9 comment above.
-    }
+    const map = readXliffOrExit(p, `messages.${locale}.xlf`);
     localeMaps.set(locale, map);
     console.log(`messages.${locale}.xlf: ${map.size} trans-units.`);
   }
