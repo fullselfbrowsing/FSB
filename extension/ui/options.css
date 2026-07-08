@@ -934,6 +934,12 @@ textarea.form-input {
   transition: all var(--transition-base);
 }
 
+.settings-card.settings-card--select-open {
+  overflow: visible;
+  position: relative;
+  z-index: 20;
+}
+
 .settings-card:hover {
   border-color: var(--border-hover);
   box-shadow: var(--shadow-md);

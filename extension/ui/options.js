@@ -1067,6 +1067,19 @@ function syncFsbSelectLabels() {
   });
 }
 
+function setFsbSelectCardOpen(wrap, open) {
+  const card = typeof wrap.closest === 'function' ? wrap.closest('.settings-card') : null;
+  if (card) card.classList.toggle('settings-card--select-open', open);
+}
+
+function closeFsbSelect(wrap) {
+  const menu = wrap.querySelector('.fsb-select__menu'); if (menu) menu.hidden = true;
+  const btn = wrap.querySelector('.fsb-select__btn'); if (btn) btn.classList.remove('is-open');
+  const chev = wrap.querySelector('.fsb-select__chev');
+  if (chev) { chev.classList.add('fa-chevron-down'); chev.classList.remove('fa-chevron-up'); }
+  setFsbSelectCardOpen(wrap, false);
+}
+
 function initFsbSelects() {
   document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
     if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
@@ -1096,6 +1109,7 @@ function initFsbSelects() {
       btn.classList.toggle('is-open', open);
       chev.classList.toggle('fa-chevron-up', open);
       chev.classList.toggle('fa-chevron-down', !open);
+      setFsbSelectCardOpen(wrap, open);
     }
     function sync() {
       const v = sel.value;
@@ -1137,8 +1151,9 @@ function initFsbSelects() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const willOpen = menu.hidden;
-      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
-      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w !== wrap) closeFsbSelect(w);
+      });
       setOpen(willOpen);
     });
     btn.addEventListener('keydown', (e) => {
@@ -1152,11 +1167,7 @@ function initFsbSelects() {
     _fsbSelectOutsideClickBound = true;
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.fsb-select').forEach((w) => {
-        if (w.contains(e.target)) return;
-        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
-        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
-        const c = w.querySelector('.fsb-select__chev');
-        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+        if (!w.contains(e.target)) closeFsbSelect(w);
       });
     });
   }
