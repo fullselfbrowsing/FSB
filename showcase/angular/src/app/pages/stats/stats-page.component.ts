@@ -463,7 +463,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.viewState !== 'rate-limited') {
         this.viewState = 'ready';
         this.errorMessage = '';
-        this.redrawChart();
+        this.scheduleViewRedraw();
       }
     }
     // `error` and `loading` fall through silently; the headline row is
@@ -477,7 +477,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.viewState !== 'rate-limited') {
         this.viewState = 'ready';
         this.errorMessage = '';
-        this.redrawChart();
+        this.scheduleViewRedraw();
       }
     }
   }
@@ -517,7 +517,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.viewState !== 'rate-limited') {
       this.viewState = 'ready';
       this.errorMessage = '';
-      this.redrawChart();
+      this.scheduleViewRedraw();
     }
   }
 
