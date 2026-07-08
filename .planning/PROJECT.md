@@ -46,6 +46,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
 
+**Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
+
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
 **Status:** Archived on 2026-06-30. Audit passed; automated milestone gates met. Archive files live under `.planning/milestones/v1.1.0-*`.
@@ -689,4 +691,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-07 -- v1.1.0 T1 App Execution Expansion archived; v1.2.0 Showcase i18n Completeness started. Phases continue at 52.*
+*Last updated: 2026-07-08 -- Phase 52 (Full-Page Translation Completeness Audit) complete. Next: Phase 53 (Trans-Unit Resync, Stats Translation & Transcreation Review).*
