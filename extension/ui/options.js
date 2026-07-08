@@ -2781,6 +2781,9 @@ async function loadSessionList() {
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
             <span><i class="fas fa-play-circle"></i> ${session.actionCount || 0} actions</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(session.startTime, session.endTime)}</span>
+            ${session.mode === 'mcp-agent'
+              ? `<span class="session-source-badge mcp">MCP · ${escapeHtml(session.mcpClient || 'Agent')}</span>`
+              : `<span class="session-source-badge">Autopilot</span>`}
           </div>
         </div>
         <div class="session-item-status">
