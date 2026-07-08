@@ -60,6 +60,8 @@ const KnowledgeGraph = (function () {
   // ---------------------------------------------------------------
   var _state = null; // active render state
   var _taskMemories = []; // task memory data for knowledge graph integration
+  var DIMMED_NODE_ALPHA = 0.38;
+  var DIMMED_LINK_ALPHA = 0.32;
 
   // ---------------------------------------------------------------
   // Data consolidation -- free-floating sites, color-coded by category
@@ -81,115 +83,102 @@ const KnowledgeGraph = (function () {
       x3d: 0, y3d: 0, z3d: 0
     });
 
-    // Determine category order (for color assignment only)
+    // Category order (drives color + layout). Overview shows categories;
+    // Full Detail expands each category out to its actual sites.
     var orderedCats = CATEGORY_ORDER.filter(function (c) { return grouped[c]; });
     var extraCats = Object.keys(grouped).filter(function (c) { return CATEGORY_ORDER.indexOf(c) === -1; });
     var allCats = orderedCats.concat(extraCats);
 
-    // Build a flat list of all sites with their category color
-    var allSites = [];
-    for (var ci = 0; ci < allCats.length; ci++) {
+    var R_CAT = 180;   // category sphere radius
+    var R_SITE = 350;  // site shell radius
+    var goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    var nCat = allCats.length;
+    var expanded = detailLevel === 'full';
+
+    for (var ci = 0; ci < nCat; ci++) {
       var catName = allCats[ci];
       var guides = grouped[catName] || [];
-      var catColor = COLORS[ci % COLORS.length];
-      for (var si = 0; si < guides.length; si++) {
-        allSites.push({ guide: guides[si], color: catColor, catName: catName, ci: ci, si: si });
-      }
-    }
+      var colorIdx = ci % COLORS.length;
+      var catColor = COLORS[colorIdx];
 
-    // Distribute all sites freely on a sphere using golden-angle spiral
-    var R_SITE = 280; // site sphere radius
-    var R_DETAIL = 380; // detail leaf radius
-    var goldenAngle = Math.PI * (3 - Math.sqrt(5));
-    var totalSites = allSites.length;
+      // Category node placed on inner sphere via golden-angle spiral
+      var cTheta = goldenAngle * ci;
+      var cPhi = Math.acos(1 - 2 * (ci + 0.5) / nCat);
+      var ccx = R_CAT * Math.sin(cPhi) * Math.cos(cTheta);
+      var ccy = R_CAT * Math.cos(cPhi);
+      var ccz = R_CAT * Math.sin(cPhi) * Math.sin(cTheta);
 
-    for (var idx = 0; idx < totalSites; idx++) {
-      var entry = allSites[idx];
-      var guide = entry.guide;
-      var siteId = 'site:' + entry.ci + ':' + entry.si;
-      var siteName = guide.site || 'Unknown';
-
-      // Golden-angle spiral placement
-      var theta = goldenAngle * idx;
-      var phi = Math.acos(1 - 2 * (idx + 0.5) / totalSites);
-
-      var sx = R_SITE * Math.sin(phi) * Math.cos(theta);
-      var sy = R_SITE * Math.cos(phi);
-      var sz = R_SITE * Math.sin(phi) * Math.sin(theta);
-
-      var selectorCount = guide.selectors ? Object.keys(guide.selectors).length : 0;
-      var workflowCount = guide.workflows ? Object.keys(guide.workflows).length : 0;
-      var warningCount = guide.warnings ? guide.warnings.length : 0;
-
+      var catId = 'cat:' + ci;
       nodes.push({
-        id: siteId,
-        label: siteName,
-        fullLabel: entry.catName,
+        id: catId,
+        label: catName,
+        fullLabel: [catName].concat(guides.map(function (g) { return g.site || ''; })).join(' '),
         depth: 1,
         type: 'site',
-        color: entry.color,
-        colorIndex: entry.ci % COLORS.length,
-        categoryName: entry.catName,
-        selectorCount: selectorCount,
-        workflowCount: workflowCount,
-        warningCount: warningCount,
-        x3d: sx, y3d: sy, z3d: sz
+        isCat: true,
+        color: catColor,
+        colorIndex: colorIdx,
+        categoryName: catName,
+        siteCount: guides.length,
+        selectorCount: 0,
+        workflowCount: 0,
+        warningCount: 0,
+        x3d: ccx, y3d: ccy, z3d: ccz
       });
-      links.push({ source: 'root', target: siteId });
+      links.push({ source: 'root', target: catId });
 
-      // Detail nodes (Full mode only)
-      if (detailLevel === 'full') {
-        var detailItems = [];
-        if (guide.selectors) {
-          var selKeys = Object.keys(guide.selectors).slice(0, 3);
-          for (var k = 0; k < selKeys.length; k++) {
-            detailItems.push({ label: selKeys[k], dtype: 'selector' });
-          }
-        }
-        if (guide.workflows) {
-          var wfKeys = Object.keys(guide.workflows).slice(0, 2);
-          for (var k = 0; k < wfKeys.length; k++) {
-            detailItems.push({ label: wfKeys[k], dtype: 'workflow' });
-          }
-        }
+      if (!expanded || guides.length === 0) continue;
 
-        // Direction from center for this site
-        var sDir = normalize({ x: sx, y: sy, z: sz });
-        var perp1 = crossProduct(sDir, { x: 0, y: 1, z: 0 });
-        if (vecLen(perp1) < 0.01) perp1 = crossProduct(sDir, { x: 1, y: 0, z: 0 });
-        perp1 = normalize(perp1);
-        var perp2 = normalize(crossProduct(sDir, perp1));
+      // Expanded: scatter this category's sites in a cap around the
+      // category's outward direction so they branch off their parent.
+      var dir = normalize({ x: ccx, y: ccy, z: ccz });
+      var perp1 = crossProduct(dir, { x: 0, y: 1, z: 0 });
+      if (vecLen(perp1) < 0.01) perp1 = crossProduct(dir, { x: 1, y: 0, z: 0 });
+      perp1 = normalize(perp1);
+      var perp2 = normalize(crossProduct(dir, perp1));
+      var k = guides.length;
+      var capR = Math.min(165, 30 + k * 7);
 
-        for (var di = 0; di < detailItems.length; di++) {
-          var detId = 'det:' + entry.ci + ':' + entry.si + ':' + di;
-          var detAngle = (2 * Math.PI * di) / Math.max(detailItems.length, 1);
-          var spread = 40;
+      for (var si = 0; si < k; si++) {
+        var g = guides[si];
+        var a = goldenAngle * si;
+        var rr = capR * Math.sqrt((si + 0.5) / k);
+        var ox = (perp1.x * Math.cos(a) + perp2.x * Math.sin(a)) * rr;
+        var oy = (perp1.y * Math.cos(a) + perp2.y * Math.sin(a)) * rr;
+        var oz = (perp1.z * Math.cos(a) + perp2.z * Math.sin(a)) * rr;
+        var sx = dir.x * R_SITE + ox;
+        var sy = dir.y * R_SITE + oy;
+        var sz = dir.z * R_SITE + oz;
 
-          var dx = sDir.x * R_DETAIL + (perp1.x * Math.cos(detAngle) + perp2.x * Math.sin(detAngle)) * spread;
-          var dy = sDir.y * R_DETAIL + (perp1.y * Math.cos(detAngle) + perp2.y * Math.sin(detAngle)) * spread;
-          var dz = sDir.z * R_DETAIL + (perp1.z * Math.cos(detAngle) + perp2.z * Math.sin(detAngle)) * spread;
-
-          nodes.push({
-            id: detId,
-            label: detailItems[di].label,
-            depth: 2,
-            type: 'detail',
-            detailType: detailItems[di].dtype,
-            color: entry.color,
-            colorIndex: entry.ci % COLORS.length,
-            x3d: dx, y3d: dy, z3d: dz
-          });
-          links.push({ source: siteId, target: detId });
-        }
+        nodes.push({
+          id: 'site:' + ci + ':' + si,
+          label: g.site || 'Unknown',
+          fullLabel: [g.site || 'Unknown', catName].join(' '),
+          depth: 2,
+          type: 'site',
+          color: catColor,
+          colorIndex: colorIdx,
+          categoryName: catName,
+          selectorCount: g.selectors ? Object.keys(g.selectors).length : 0,
+          workflowCount: g.workflows ? Object.keys(g.workflows).length : 0,
+          warningCount: g.warnings ? g.warnings.length : 0,
+          x3d: sx, y3d: sy, z3d: sz
+        });
+        links.push({ source: catId, target: 'site:' + ci + ':' + si });
       }
     }
 
     // ---- Task Memory discovered sites ----
+    // Extension-only: surfaces domains the user has visited that aren't already
+    // part of the built-in site guides, as root-level siblings of category
+    // nodes (their own pseudo-category). One tier only, same as built-in sites
+    // stopping at one tier below their category.
     if (_taskMemories.length > 0) {
-      // Collect existing site labels to avoid duplicates
+      // Collect existing site labels to avoid duplicates (category nodes reuse
+      // type 'site' too, so exclude those via isCat)
       var existingLabels = {};
       for (var n = 0; n < nodes.length; n++) {
-        if (nodes[n].type === 'site') {
+        if (nodes[n].type === 'site' && !nodes[n].isCat) {
           existingLabels[nodes[n].label.toLowerCase()] = true;
         }
       }
@@ -202,7 +191,7 @@ const KnowledgeGraph = (function () {
                        (tm.metadata && tm.metadata.domain) || '';
         if (!tmDomain) continue;
         if (!domainMap[tmDomain]) {
-          domainMap[tmDomain] = { selectors: [], patterns: [] };
+          domainMap[tmDomain] = { selectors: [] };
         }
         var tmLearned = (tm.typeData && tm.typeData.learned) || {};
         if (tmLearned.selectors) {
@@ -212,32 +201,26 @@ const KnowledgeGraph = (function () {
             }
           }
         }
-        if (tmLearned.patterns) {
-          for (var p = 0; p < tmLearned.patterns.length; p++) {
-            if (domainMap[tmDomain].patterns.indexOf(tmLearned.patterns[p]) === -1) {
-              domainMap[tmDomain].patterns.push(tmLearned.patterns[p]);
-            }
-          }
-        }
       }
 
-      // Add task-site nodes for domains not already in site guides
+      // Add task-site nodes (root-level siblings of category nodes) for
+      // domains not already covered by the built-in site guides
       var taskDomains = Object.keys(domainMap);
-      var taskStartIdx = totalSites; // continue golden-angle indexing
+      var taskStartIdx = nCat; // continue golden-angle indexing after categories
+      var tTotal = nCat + taskDomains.length;
       for (var ti = 0; ti < taskDomains.length; ti++) {
         var tdName = taskDomains[ti];
         if (existingLabels[tdName.toLowerCase()]) continue;
 
         var tsId = 'task-site:' + ti;
         var tsIdx = taskStartIdx + ti;
-        var tTotal = totalSites + taskDomains.length;
 
         var tTheta = goldenAngle * tsIdx;
         var tPhi = Math.acos(1 - 2 * (tsIdx + 0.5) / tTotal);
 
-        var tsx = R_SITE * Math.sin(tPhi) * Math.cos(tTheta);
-        var tsy = R_SITE * Math.cos(tPhi);
-        var tsz = R_SITE * Math.sin(tPhi) * Math.sin(tTheta);
+        var tsx = R_CAT * Math.sin(tPhi) * Math.cos(tTheta);
+        var tsy = R_CAT * Math.cos(tPhi);
+        var tsz = R_CAT * Math.sin(tPhi) * Math.sin(tTheta);
 
         var domData = domainMap[tdName];
         nodes.push({
@@ -254,48 +237,6 @@ const KnowledgeGraph = (function () {
           x3d: tsx, y3d: tsy, z3d: tsz
         });
         links.push({ source: 'root', target: tsId });
-
-        // Detail nodes (full mode) -- selectors and patterns
-        if (detailLevel === 'full') {
-          var taskDetails = [];
-          var maxSel = Math.min(domData.selectors.length, 3);
-          for (var ds = 0; ds < maxSel; ds++) {
-            taskDetails.push({ label: domData.selectors[ds], dtype: 'selector' });
-          }
-          var maxPat = Math.min(domData.patterns.length, 2);
-          for (var dp = 0; dp < maxPat; dp++) {
-            taskDetails.push({ label: domData.patterns[dp], dtype: 'pattern' });
-          }
-
-          if (taskDetails.length > 0) {
-            var tsDir = normalize({ x: tsx, y: tsy, z: tsz });
-            var tsPerp1 = crossProduct(tsDir, { x: 0, y: 1, z: 0 });
-            if (vecLen(tsPerp1) < 0.01) tsPerp1 = crossProduct(tsDir, { x: 1, y: 0, z: 0 });
-            tsPerp1 = normalize(tsPerp1);
-            var tsPerp2 = normalize(crossProduct(tsDir, tsPerp1));
-
-            for (var tdi = 0; tdi < taskDetails.length; tdi++) {
-              var tdId = 'tdet:' + ti + ':' + tdi;
-              var tdAngle = (2 * Math.PI * tdi) / Math.max(taskDetails.length, 1);
-              var tSpread = 40;
-
-              var tdx = tsDir.x * R_DETAIL + (tsPerp1.x * Math.cos(tdAngle) + tsPerp2.x * Math.sin(tdAngle)) * tSpread;
-              var tdy = tsDir.y * R_DETAIL + (tsPerp1.y * Math.cos(tdAngle) + tsPerp2.y * Math.sin(tdAngle)) * tSpread;
-              var tdz = tsDir.z * R_DETAIL + (tsPerp1.z * Math.cos(tdAngle) + tsPerp2.z * Math.sin(tdAngle)) * tSpread;
-
-              nodes.push({
-                id: tdId,
-                label: taskDetails[tdi].label,
-                depth: 2,
-                type: 'detail',
-                detailType: taskDetails[tdi].dtype,
-                color: TASK_SITE_COLOR,
-                x3d: tdx, y3d: tdy, z3d: tdz
-              });
-              links.push({ source: tsId, target: tdId });
-            }
-          }
-        }
       }
     }
 
@@ -373,19 +314,25 @@ const KnowledgeGraph = (function () {
     var links = state.links;
     var t = state.time;
 
-    // Read CSS variables for theming
-    var computedStyle = getComputedStyle(state.container);
-    var bgColor = computedStyle.getPropertyValue('--bg-primary').trim() || '#ffffff';
-    var textColor = computedStyle.getPropertyValue('--text-primary').trim() || '#171717';
-    var textSecondary = computedStyle.getPropertyValue('--text-secondary').trim() || '#525252';
-    var borderColor = computedStyle.getPropertyValue('--border-color').trim() || '#e5e5e5';
-    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    // Read CSS variables for theming (cached; only recomputed when theme changes)
+    var themeEl = state._themeEl || (state._themeEl = (state.container.closest && state.container.closest('[data-theme]')) || document.documentElement);
+    var themeKey = (themeEl && themeEl.getAttribute('data-theme')) || '';
+    if (!state.colors || state._themeKey !== themeKey) {
+      var cs = getComputedStyle(state.container);
+      state.colors = {
+        text: cs.getPropertyValue('--text-primary').trim() || '#171717',
+        text2: cs.getPropertyValue('--text-secondary').trim() || '#525252'
+      };
+      state._themeKey = themeKey;
+    }
+    var textColor = state.colors.text;
+    var textSecondary = state.colors.text2;
+    var isDark = themeKey === 'dark';
 
-    // Clear
+    // Clear (transparent — let the themed CSS background of the container show through)
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, h);
 
     // Project all nodes
     var projected = [];
@@ -422,13 +369,19 @@ const KnowledgeGraph = (function () {
       // Depth-based opacity
       var avgZ = (src.z + tgt.z) / 2;
       var depthFactor = CAMERA_DISTANCE / (CAMERA_DISTANCE + avgZ);
-      var alpha = Math.max(0.08, Math.min(0.45, depthFactor * 0.5));
+      var alpha = Math.max(0.14, Math.min(0.58, depthFactor * 0.58));
+      var lineBoost = 1;
 
       // Dimming for highlight
       if (state.highlightQuery) {
         var srcMatch = isHighlighted(src.node, state.highlightQuery);
         var tgtMatch = isHighlighted(tgt.node, state.highlightQuery);
-        if (!srcMatch && !tgtMatch) alpha *= 0.15;
+        if (!srcMatch && !tgtMatch) {
+          alpha *= DIMMED_LINK_ALPHA;
+        } else {
+          alpha = Math.max(alpha, isDark ? 0.58 : 0.52);
+          lineBoost = 1.35;
+        }
       }
 
       var color = resolveColor(tgt.node, isDark);
@@ -437,7 +390,7 @@ const KnowledgeGraph = (function () {
       ctx.lineTo(tgt.x, tgt.y);
       ctx.strokeStyle = color;
       ctx.globalAlpha = alpha;
-      ctx.lineWidth = Math.max(0.5, 1.5 * depthFactor);
+      ctx.lineWidth = Math.max(0.75, 1.65 * depthFactor * lineBoost);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -458,15 +411,21 @@ const KnowledgeGraph = (function () {
       var highlighted = true;
       if (state.highlightQuery) {
         highlighted = isHighlighted(n, state.highlightQuery);
-        if (!highlighted) depthAlpha *= 0.15;
+        if (n.type === 'root') {
+          depthAlpha = Math.max(depthAlpha * 0.72, 0.55);
+        } else if (!highlighted) {
+          depthAlpha *= DIMMED_NODE_ALPHA;
+        } else {
+          depthAlpha = Math.max(depthAlpha, 0.92);
+        }
       }
 
       if (n.type === 'root') {
         drawRootNode(ctx, p.x, p.y, s, n, depthAlpha, textColor);
       } else if (n.type === 'site') {
-        drawSiteNode(ctx, p.x, p.y, s, n, depthAlpha, textColor, textSecondary, isDark);
+        drawSiteNode(ctx, p.x, p.y, s, n, depthAlpha, textColor, textSecondary, isDark, highlighted && !!state.highlightQuery);
       } else if (n.type === 'task-site') {
-        drawTaskSiteNode(ctx, p.x, p.y, s, n, depthAlpha, textColor, textSecondary, isDark);
+        drawTaskSiteNode(ctx, p.x, p.y, s, n, depthAlpha, textColor, textSecondary, isDark, highlighted && !!state.highlightQuery);
       } else if (n.type === 'detail') {
         drawDetailNode(ctx, p.x, p.y, s, n, depthAlpha, isDark);
       }
@@ -504,28 +463,36 @@ const KnowledgeGraph = (function () {
     ctx.globalAlpha = 1;
   }
 
-  function drawSiteNode(ctx, x, y, scale, node, alpha, textColor, textSecondary, isDark) {
-    var r = 8 * scale;
+  function drawSiteNode(ctx, x, y, scale, node, alpha, textColor, textSecondary, isDark, emphasized) {
+    var isCat = node.isCat;
+    var r = (isCat ? 13 : 7) * scale * (emphasized ? 1.12 : 1);
     var color = resolveColor(node, isDark);
 
     ctx.globalAlpha = alpha;
 
+    if (emphasized) {
+      ctx.beginPath();
+      ctx.arc(x, y, r + 7 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRgba(color, isDark ? 0.18 : 0.12);
+      ctx.fill();
+    }
+
     // Filled circle with category color
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = hexToRgba(color, 0.35);
+    ctx.fillStyle = hexToRgba(color, isCat ? 0.68 : 0.42);
     ctx.fill();
     ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1.5, 2 * scale);
+    ctx.lineWidth = Math.max(1.5, (isCat ? 2.7 : 1.9) * scale * (emphasized ? 1.25 : 1));
     ctx.stroke();
 
     // Label below
-    var fontSize = Math.max(8, Math.round(10 * scale));
+    var fontSize = Math.max(isCat ? 10 : 8, Math.round((isCat ? 13 : 9.5) * scale * (emphasized ? 1.04 : 1)));
     ctx.fillStyle = textColor;
-    ctx.font = '500 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = (isCat || emphasized ? '700 ' : '500 ') + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(truncate(node.label, 16), x, y + r + 3 * scale);
+    ctx.fillText(truncate(node.label, isCat ? 22 : 16), x, y + r + 3 * scale);
 
     ctx.globalAlpha = 1;
   }
@@ -542,11 +509,18 @@ const KnowledgeGraph = (function () {
     ctx.globalAlpha = 1;
   }
 
-  function drawTaskSiteNode(ctx, x, y, scale, node, alpha, textColor, textSecondary, isDark) {
-    var r = 8 * scale;
+  function drawTaskSiteNode(ctx, x, y, scale, node, alpha, textColor, textSecondary, isDark, emphasized) {
+    var r = 8 * scale * (emphasized ? 1.12 : 1);
     var color = isDark ? TASK_SITE_COLOR_DARK : TASK_SITE_COLOR;
 
     ctx.globalAlpha = alpha;
+
+    if (emphasized) {
+      ctx.beginPath();
+      ctx.arc(x, y, r + 6 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRgba(color, isDark ? 0.18 : 0.12);
+      ctx.fill();
+    }
 
     // Filled circle with teal color and dashed border
     ctx.beginPath();
@@ -586,7 +560,7 @@ const KnowledgeGraph = (function () {
   function truncate(str, maxLen) {
     if (!str) return '';
     if (str.length <= maxLen) return str;
-    return str.substring(0, maxLen - 1) + '\u2026';
+    return str.substring(0, maxLen - 1) + '…';
   }
 
   function resolveColor(node, isDark) {
@@ -615,6 +589,98 @@ const KnowledgeGraph = (function () {
     var full = (node.fullLabel || '').toLowerCase();
     var cat = (node.categoryName || '').toLowerCase();
     return label.indexOf(q) !== -1 || full.indexOf(q) !== -1 || cat.indexOf(q) !== -1;
+  }
+
+  function getDefaultZoom(container, detailLevel) {
+    if (!container || !container.getBoundingClientRect) return 1;
+    var rect = container.getBoundingClientRect();
+    var w = rect.width || container.clientWidth || 940;
+    var h = rect.height || container.clientHeight || 520;
+    var expanded = detailLevel === 'full';
+
+    // Desktop keeps the reference framing. Smaller viewports pull the 3D
+    // shell back so the graph reads as a map instead of clipped fragments.
+    if (w >= 760 && h >= 460) return expanded ? 0.82 : 1;
+
+    var targetW = expanded ? 760 : 520;
+    var targetH = expanded ? 560 : 430;
+    var minZoom = expanded ? 0.46 : 0.62;
+    var zoom = Math.min(w / targetW, h / targetH);
+    return Math.max(minZoom, Math.min(1, zoom));
+  }
+
+  function getFitZoom(state, detailLevel) {
+    var defaultZoom = getDefaultZoom(state.container, detailLevel);
+    if (!state || detailLevel !== 'full' || !state.canvas || !state.nodes || state.nodes.length === 0) {
+      return defaultZoom;
+    }
+
+    var w = state.canvas.width / state.dpr;
+    var h = state.canvas.height / state.dpr;
+    if (!w || !h) return defaultZoom;
+
+    var cx = w / 2;
+    var cy = h / 2;
+    var minX = Infinity;
+    var minY = Infinity;
+    var maxX = -Infinity;
+    var maxY = -Infinity;
+
+    for (var i = 0; i < state.nodes.length; i++) {
+      var n = state.nodes[i];
+      var p = project(n.x3d, n.y3d, n.z3d, state.rotY, state.rotX, 1, cx, cy);
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      return defaultZoom;
+    }
+
+    var halfGraphW = Math.max(maxX - cx, cx - minX);
+    var halfGraphH = Math.max(maxY - cy, cy - minY);
+    if (halfGraphW <= 0 || halfGraphH <= 0) return defaultZoom;
+
+    var marginX = Math.min(72, Math.max(36, w * 0.07));
+    var marginY = Math.min(58, Math.max(32, h * 0.09));
+    var fitZoom = Math.min((w / 2 - marginX) / halfGraphW, (h / 2 - marginY) / halfGraphH);
+    var minZoom = w >= 760 && h >= 460 ? 0.6 : 0.42;
+    return Math.max(minZoom, Math.min(defaultZoom, fitZoom));
+  }
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function animateZoomTo(state, targetZoom, duration) {
+    if (!state) return;
+    targetZoom = Math.max(0.3, Math.min(3.0, targetZoom));
+    if (state.zoomAnimId) {
+      cancelAnimationFrame(state.zoomAnimId);
+      state.zoomAnimId = null;
+    }
+
+    var startZoom = state.zoom;
+    if (Math.abs(startZoom - targetZoom) < 0.005) {
+      state.zoom = targetZoom;
+      return;
+    }
+
+    var startTime = performance.now();
+    function step(now) {
+      if (!state.running) return;
+      var t = Math.min(1, (now - startTime) / duration);
+      state.zoom = startZoom + (targetZoom - startZoom) * easeOutCubic(t);
+      if (t < 1) {
+        state.zoomAnimId = requestAnimationFrame(step);
+      } else {
+        state.zoom = targetZoom;
+        state.zoomAnimId = null;
+      }
+    }
+    state.zoomAnimId = requestAnimationFrame(step);
   }
 
   // ---------------------------------------------------------------
@@ -704,8 +770,15 @@ const KnowledgeGraph = (function () {
     // Scroll zoom
     canvas.addEventListener('wheel', function (e) {
       e.preventDefault();
+      // User zoom takes over: cancel any in-flight detail-level fit animation
+      // so its step() stops overwriting state.zoom.
+      if (state.zoomAnimId) {
+        cancelAnimationFrame(state.zoomAnimId);
+        state.zoomAnimId = null;
+      }
       var delta = e.deltaY > 0 ? -0.08 : 0.08;
       state.zoom = Math.max(0.3, Math.min(3.0, state.zoom + delta));
+      state.userZoomed = true;
     }, { passive: false });
 
     // Touch support
@@ -784,7 +857,10 @@ const KnowledgeGraph = (function () {
     if (!tooltip) return;
 
     var html = '';
-    if (node.type === 'site' || node.type === 'task-site') {
+    if (node.isCat) {
+      html = '<strong>' + escapeHtml(node.label) + '</strong>';
+      html += '<br><span style="opacity:0.7">' + (node.siteCount || 0) + ' sites</span>';
+    } else if (node.type === 'site' || node.type === 'task-site') {
       html = '<strong>' + escapeHtml(node.label) + '</strong>';
       if (node.categoryName) html += '<br><span style="opacity:0.6">' + escapeHtml(node.categoryName) + '</span>';
       var meta = [];
@@ -870,7 +946,8 @@ const KnowledgeGraph = (function () {
       detailLevel: opts.detailLevel,
       rotY: 0,
       rotX: 0.15,
-      zoom: 1.0,
+      zoom: typeof opts.initialZoom === 'number' ? opts.initialZoom : getDefaultZoom(container, opts.detailLevel),
+      userZoomed: typeof opts.initialZoom === 'number',
       isDragging: false,
       dragStartX: 0,
       dragStartY: 0,
@@ -880,6 +957,7 @@ const KnowledgeGraph = (function () {
       lastDragY: 0,
       momentumX: 0,
       momentumY: 0,
+      zoomAnimId: null,
       time: 0,
       running: true,
       animId: null,
@@ -893,7 +971,10 @@ const KnowledgeGraph = (function () {
 
     // Handle resize -- re-sync canvas buffer to CSS layout
     state._syncCanvasSize = syncCanvasSize;
-    state._resizeHandler = function () { syncCanvasSize(); };
+    state._resizeHandler = function () {
+      syncCanvasSize();
+      if (!state.userZoomed) state.zoom = getDefaultZoom(container, state.detailLevel);
+    };
     window.addEventListener('resize', state._resizeHandler);
 
     setupInteraction(state);
@@ -906,6 +987,7 @@ const KnowledgeGraph = (function () {
     if (state) {
       state.running = false;
       if (state.animId) cancelAnimationFrame(state.animId);
+      if (state.zoomAnimId) cancelAnimationFrame(state.zoomAnimId);
       if (state._resizeHandler) window.removeEventListener('resize', state._resizeHandler);
       if (state.canvas) state.canvas.remove();
       if (state.tooltip) state.tooltip.remove();
@@ -927,6 +1009,12 @@ const KnowledgeGraph = (function () {
     var data = buildKnowledgeGraphData(level);
     _state.nodes = data.nodes;
     _state.links = data.links;
+    if (level === 'full') {
+      _state.userZoomed = false;
+      animateZoomTo(_state, getFitZoom(_state, level), 650);
+    } else if (!_state.userZoomed) {
+      animateZoomTo(_state, getDefaultZoom(_state.container, level), 420);
+    }
   }
 
   function highlight(query) {
