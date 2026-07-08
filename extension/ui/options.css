@@ -159,6 +159,7 @@ html {
   font-size: 16px;
   scroll-behavior: smooth;
   height: 100vh;
+  overflow: hidden;
 }
 
 body {
@@ -169,6 +170,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   height: 100vh;
+  overflow: hidden;
   margin: 0;
   padding: 0;
 }
@@ -205,7 +207,9 @@ body {
   --dashboard-help-icon-size: 2.75rem;
   --dashboard-help-icon-glyph-size: 1.3rem;
   --dashboard-branding-logo-height: 260px;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   font-size: 14px;
@@ -340,7 +344,9 @@ body {
 /* Main Layout */
 .dashboard-main {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Floating Sidebar */
@@ -488,9 +494,11 @@ body {
 
 /* Content Area */
 .dashboard-content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: var(--space-lg);
   margin-left: calc(var(--dashboard-sidebar-width) + 26px) !important;
   padding-left: 16px;
