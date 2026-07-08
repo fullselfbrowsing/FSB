@@ -635,6 +635,10 @@ function main() {
     const ids = routeMarkedIds.get(route.path);
     const scopeNote = route.outOfScope ? ` (OUT OF SCOPE: ${route.outOfScope})` : '';
     console.log(`Route [${displayName(route.path)}]: ${ids.size} marked ids${scopeNote}`);
+    if (ids.size === 0 && !route.outOfScope) {
+      console.error(`FATAL: route [${displayName(route.path)}] resolved to 0 marked ids -- componentDir typo or ROUTE_TABLE drift from app.routes.ts?`);
+      process.exit(2); // fatal precondition -- see Stage 9 comment above.
+    }
   }
   console.log('');
 
