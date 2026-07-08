@@ -597,6 +597,11 @@ function readXliffOrExit(path, label) {
     console.error(`FATAL: extracted zero trans-units from ${label} -- regex/file mismatch.`);
     process.exit(2); // fatal precondition -- see Stage 9 comment above.
   }
+  const tagCount = (text.match(/<trans-unit /g) || []).length;
+  if (map.size !== tagCount) {
+    console.error(`FATAL: extracted ${map.size} trans-units but found ${tagCount} <trans-unit> tags in ${label} -- regex/attribute-order mismatch.`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
   return map;
 }
 
