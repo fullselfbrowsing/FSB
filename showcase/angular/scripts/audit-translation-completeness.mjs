@@ -199,16 +199,24 @@ function buildRouteMarkedIds(routeTable) {
   // route's own directory is fine" from "this route's own directory resolved to
   // zero ids and everything we're seeing is shell/picker fallback").
   const ownCounts = new Map();
+  // SHELL_DIR/PICKER_DIR's own extraction is computed ONCE here (not once per
+  // non-shellless route as before) and its size is returned as shellCount/pickerCount
+  // so the caller can independently fail-fast if either shared directory itself
+  // silently resolves to 0 ids -- the same "silent zero masked by a union" failure
+  // mode the ownCounts check above closes at the per-route level, one level up the
+  // call graph (WR-01 follow-up).
+  const shellIds = extractMarkedIds(SHELL_DIR);
+  const pickerIds = extractMarkedIds(PICKER_DIR);
   for (const route of routeTable) {
     const ids = extractMarkedIds(join(APP_SRC, route.componentDir));
     ownCounts.set(route.path, ids.size);
     if (!route.shellless) {
-      for (const id of extractMarkedIds(SHELL_DIR)) ids.add(id);
-      for (const id of extractMarkedIds(PICKER_DIR)) ids.add(id);
+      for (const id of shellIds) ids.add(id);
+      for (const id of pickerIds) ids.add(id);
     }
     map.set(route.path, ids);
   }
-  return { map, ownCounts };
+  return { map, ownCounts, shellCount: shellIds.size, pickerCount: pickerIds.size };
 }
 
 // ---------------------------------------------------------------------------
@@ -648,7 +656,21 @@ function main() {
   }
   console.log('');
 
-  const { map: routeMarkedIds, ownCounts: routeOwnMarkedIdCounts } = buildRouteMarkedIds(ROUTE_TABLE);
+  const { map: routeMarkedIds, ownCounts: routeOwnMarkedIdCounts, shellCount, pickerCount } = buildRouteMarkedIds(ROUTE_TABLE);
+  // WR-01 follow-up: fail fast if the shared shell/picker directories themselves
+  // resolve to 0 marked ids -- the per-route ownCounts check below cannot catch
+  // this, since a route's own componentDir count stays non-zero even when the
+  // shell/picker union it also relies on has silently gone to 0 (typo'd/renamed
+  // SHELL_DIR/PICKER_DIR, or the shared shell/picker templates lost their
+  // i18n="@@..." markers).
+  if (shellCount === 0) {
+    console.error(`FATAL: SHELL_DIR (${SHELL_DIR}) resolved to 0 marked ids -- shared shell nav/footer i18n markers missing or directory drifted?`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
+  if (pickerCount === 0) {
+    console.error(`FATAL: PICKER_DIR (${PICKER_DIR}) resolved to 0 marked ids -- language-picker i18n markers missing or directory drifted?`);
+    process.exit(2); // fatal precondition -- see Stage 9 comment above.
+  }
   for (const route of ROUTE_TABLE) {
     const ids = routeMarkedIds.get(route.path);
     const scopeNote = route.outOfScope ? ` (OUT OF SCOPE: ${route.outOfScope})` : '';
