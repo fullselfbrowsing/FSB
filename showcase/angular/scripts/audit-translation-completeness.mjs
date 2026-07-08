@@ -245,8 +245,13 @@ function traceStats274(locale, jsonPath, xliffMap, currentTemplateIds) {
   const report = { merged: [], missingFromXliff: [], staleValue: [], idDriftFromTemplate: [] };
   for (const id of jsonIds) {
     const xliffEntry = xliffMap.get(id);
-    if (!xliffEntry || xliffEntry.target === null) {
-      report.missingFromXliff.push(id); // covers "id absent" AND "id present but has no <target> at all"
+    // !xliffEntry.target (not just === null) also catches a present-but-empty
+    // <target></target> (target === ''), mirroring verdictForId's own
+    // truthiness-based coverage check elsewhere in this file -- an empty tag is
+    // just as "not translated" as a missing one and must not fall through to
+    // the staleValue comparison below.
+    if (!xliffEntry || !xliffEntry.target) {
+      report.missingFromXliff.push(id); // covers "id absent", "no <target> at all", AND "present but empty"
       continue;
     }
     const merged = xliffEntry.target === json[id];
