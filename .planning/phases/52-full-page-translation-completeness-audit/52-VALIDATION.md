@@ -27,7 +27,7 @@ created: 2026-07-07
 
 ## Sampling Rate
 
-- **After every task commit:** Run the script manually against the real repo files; spot-check output against this phase's confirmed ground-truth numbers (5 drifted ids, 54 orphans/locale, 21/21 stats-274 merge, 9-per-locale stats-274 id-drift-from-template).
+- **After every task commit:** Run the script manually against the real repo files; spot-check output against this phase's confirmed ground-truth numbers (5 drifted ids, 54 orphans/locale, 15/21 stats-274 merge [6 missing]; id-drift-from-template count not yet re-verified — see 52-RESEARCH.md Open Questions #3, don't assume a specific number).
 - **After every plan wave:** Same manual smoke check, plus confirm `52-AUDIT-REPORT.md` was written to the exact path CONTEXT.md specifies and covers all 12 confirmed routes.
 - **Before `/gsd-verify-work`:** Report exists, lists all 12 routes (or 11 + 1 explicitly-excluded row), and numeric findings are internally consistent (coverage% + failure-list counts add up).
 - **Max feedback latency:** ~2 seconds (script execution time) — no watch mode, no long-running process.
@@ -40,7 +40,7 @@ created: 2026-07-07
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | TBD (assigned during planning) | TBD | TBD | AUDIT-01 | — | N/A (read-only script, no attack surface) | manual | `node showcase/angular/scripts/audit-translation-completeness.mjs && grep -A2 "agents.meta.description" 52-AUDIT-REPORT.md` | ❌ W0 (script doesn't exist yet) | ⬜ pending |
 | TBD (assigned during planning) | TBD | TBD | AUDIT-01 | — | N/A | manual | Compare report's orphan-count section against confirmed `54` per locale | ❌ W0 | ⬜ pending |
-| TBD (assigned during planning) | TBD | TBD | AUDIT-02 | — | N/A | manual | Compare report's stats-274 section against confirmed 21/21 merge + 9-per-locale drift findings | ❌ W0 | ⬜ pending |
+| TBD (assigned during planning) | TBD | TBD | AUDIT-02 | — | N/A | manual | Compare report's stats-274 section against confirmed 15/21 merge (6 missing) findings; id-drift-from-template not yet re-verified | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -58,7 +58,7 @@ Existing infrastructure covers all phase requirements. No test-framework scaffol
 |----------|-------------|------------|-------------------|
 | Script flags the 5 known-drifted ids (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`) as currency FAILs in all 5 locales | AUDIT-01 | One-shot diagnostic script, not CI-gated application behavior; a persisted unit-test suite for a temporary/diagnostic tool is disproportionate per ARCHITECTURE.md's Anti-Pattern 2 guidance | Run the script, grep the report for each of the 5 ids, confirm currency=FAIL in all 5 locale columns |
 | Script reports 54 orphaned ids per locale | AUDIT-01 | Same as above | Run the script, compare orphan-count section to this phase's confirmed baseline (54/locale) |
-| Script reports stats-274 as 21/21 merged per locale with a 9-per-locale id-drift-from-template subset | AUDIT-02 | Same as above | Run the script, compare stats-274 section to confirmed baseline (21/21 merged, 9/locale drifted-from-template) |
+| Script reports stats-274 as 15/21 merged per locale (6 missing) with the id-drift-from-template subset populated | AUDIT-02 | Same as above | Run the script, compare stats-274 section to confirmed baseline (15/21 merged, 6 missing); id-drift-from-template subset not yet re-verified |
 
 ---
 
