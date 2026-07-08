@@ -237,8 +237,8 @@ function traceStats274(locale, jsonPath, xliffMap, currentTemplateIds) {
   const report = { merged: [], missingFromXliff: [], staleValue: [], idDriftFromTemplate: [] };
   for (const id of jsonIds) {
     const xliffEntry = xliffMap.get(id);
-    if (!xliffEntry) {
-      report.missingFromXliff.push(id);
+    if (!xliffEntry || xliffEntry.target === null) {
+      report.missingFromXliff.push(id); // covers "id absent" AND "id present but has no <target> at all"
       continue;
     }
     const merged = xliffEntry.target === json[id];
