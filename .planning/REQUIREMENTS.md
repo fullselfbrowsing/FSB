@@ -15,9 +15,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Translation Resync
 
-- [ ] **RESYNC-01**: Every trans-unit the audit identifies as drifted (English source changed without a matching translation update) is resynced across all 5 translated locales (es, de, ja, zh-CN, zh-TW), preserving `DO-NOT-TRANSLATE.md` brand/term rules and `<x id=.../>` placeholder alignment.
-- [ ] **RESYNC-02**: The stats page reaches full translation coverage across all 5 locales.
-- [ ] **RESYNC-03**: Hero headlines and primary CTAs (~10-20 strings) receive a transcreation-lens review rather than literal translation.
+- [x] **RESYNC-01**: Every trans-unit the audit identifies as drifted (English source changed without a matching translation update) is resynced across all 5 translated locales (es, de, ja, zh-CN, zh-TW), preserving `DO-NOT-TRANSLATE.md` brand/term rules and `<x id=.../>` placeholder alignment.
+- [x] **RESYNC-02**: The stats page reaches full translation coverage across all 5 locales.
+- [x] **RESYNC-03**: Hero headlines and primary CTAs (~10-20 strings) receive a transcreation-lens review rather than literal translation.
 
 ### CI Enforcement
 
@@ -69,9 +69,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | AUDIT-01 | Phase 52 | Complete |
 | AUDIT-02 | Phase 52 | Complete |
-| RESYNC-01 | Phase 53 | Pending |
-| RESYNC-02 | Phase 53 | Pending |
-| RESYNC-03 | Phase 53 | Pending |
+| RESYNC-01 | Phase 53 | Complete |
+| RESYNC-02 | Phase 53 | Complete |
+| RESYNC-03 | Phase 53 | Complete |
 | CI-01 | Phase 54 | Pending |
 | CI-02 | Phase 55 | Pending |
 | CI-03 | Phase 55 | Pending |
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CI-05 | Phase 54 | Pending |
 | ROUTE-01 | Phase 56 | Pending |
 | ROUTE-02 | Phase 56 | Pending |
-| VISUAL-01 | Phase 53 | Pending |
+| VISUAL-01 | Phase 53 | human_needed |
 
 **Coverage:**
 - v1 requirements: 13 total

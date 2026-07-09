@@ -23,7 +23,7 @@
 - Decimal phases (52.1, 52.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
-- [ ] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
+- [x] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
 - [ ] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
 - [ ] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
 - [ ] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
@@ -49,7 +49,7 @@
   2. The stats page has a `<target>` for every trans-unit across all 5 non-English locales -- full coverage, not partial.
   3. The ~10-20 hero headline and primary CTA strings read as natural, locale-appropriate marketing copy rather than literal word-for-word translation, reviewed explicitly through a transcreation lens.
   4. A targeted manual visual spot-check of German (text-expansion risk) and zh-CN/zh-TW (CJK line-wrap risk) on the highest-copy-density routes shows no broken layout, truncation, or overflow -- performed only after the resynced/transcreated copy above has landed, since it needs final translated text to check against.
-**Plans**: 53-01, 53-02, 53-03
+**Plans**: 53-01 ✅, 53-02 ✅, 53-03 ✅
 
 ### Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation
 **Goal**: The stats page is held to the same CI translation-completeness bar as every other marketing page, and the dashboard's permanent exclusion from that bar is written down as an explicit architectural decision rather than left as unstated deferred debt.
@@ -87,7 +87,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
 | Phase | Plans Complete | Status | Completed |
 |-------|-----------------|--------|-----------|
 | 52. Full-Page Translation Completeness Audit | 1/1 | Complete    | 2026-07-08 |
-| 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 0/3 | In progress | - |
+| 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 3/3 | Complete | 2026-07-09 |
 | 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 0/TBD | Not started | - |
 | 55. CI Drift-Detection Gate | 0/TBD | Not started | - |
 | 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
