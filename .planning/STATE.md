@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2.0
 milestone_name: Showcase i18n Completeness
-status: in_progress
-stopped_at: Phase 55 complete -- ready to plan Phase 56
+status: complete
+stopped_at: All v1.2.0 phases 52-56 complete -- ready for milestone lifecycle
 last_updated: "2026-07-09T19:18:40.000Z"
 last_activity: 2026-07-09
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 4
   completed_plans: 4
-  percent: 80
+  percent: 100
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.2.0 milestone (Phases 52-56) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy 14-phase/9-complete count and misidentifies "999.1" (an unrelated Backlog item) as the next phase -- both are artifacts of that tooling scanning the whole ROADMAP.md file, including the collapsed `## Completed Milestones` archive and `## Backlog` sections, rather than just the active milestone's phases. Phases 44-51 are archived v1.1.0 work; 999.1 is unrelated backlog. Treat this file's own numbers as authoritative for v1.2.0 progress.*
@@ -27,7 +27,7 @@ See: .planning/research/SUMMARY.md (phase sequencing rationale, confirmed 5-drif
 See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.2.0 does not touch the automation/T1 catalog surface; it closes a reopened i18n completeness gap on the showcase marketing site.
-**Current focus:** Phase 56 — Locale-Cookie Redirect Fix (WARNING-02)
+**Current focus:** v1.2.0 milestone complete — ready for audit/complete
 
 ## Current Position
 
@@ -36,7 +36,7 @@ Plan: Not yet planned
 Status: Ready to plan -- Phase 53 complete (resync + stats reconciliation + transcreation); visual UAT deferred human_needed
 Last activity: 2026-07-09
 
-Progress: [████████░░] 80% (4/5 phases in v1.2.0)
+Progress: [██████████] 100% (5/5 phases in v1.2.0)
 
 ## Roadmap At A Glance (v1.2.0, Phases 52-56)
 
@@ -46,7 +46,7 @@ Progress: [████████░░] 80% (4/5 phases in v1.2.0)
 | 53 | Trans-Unit Resync, Stats Translation & Transcreation Review | RESYNC-01, RESYNC-02, RESYNC-03, VISUAL-01 | Complete (2026-07-09; VISUAL-01 human_needed deferred) |
 | 54 | Stats Lint Gate Flip & Dashboard Boundary Documentation | CI-01, CI-05 | Complete (2026-07-09) |
 | 55 | CI Drift-Detection Gate | CI-02, CI-03, CI-04 | Complete (2026-07-09) |
-| 56 | Locale-Cookie Redirect Fix (WARNING-02) | ROUTE-01, ROUTE-02 | Not started |
+| 56 | Locale-Cookie Redirect Fix (WARNING-02) | ROUTE-01, ROUTE-02 | Complete (2026-07-09) |
 
 Coverage: 13/13 v1.2.0 requirements mapped, 0 orphaned. Dependency chain: 52 -> 53 -> 54 -> 55 (hard sequential dependency: each gate must land on the clean baseline the prior phase verified). Phase 56 is fully independent of 52-55 and could run in parallel if desired, but executes last in numeric order.
 
@@ -98,7 +98,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 | uat_gap | Phase 33 / 33-HUMAN-UAT.md (live media playback fidelity) | human_needed | v0.9.99 Phase 33 |
 | uat_gap | Phase 34 / 34-HUMAN-UAT.md (live upload fidelity) | partial: UAT-34-02 pass; UAT-34-01 MCP text-file smoke pass, binary/submit checks still human_needed; UAT-34-03/04 still human_needed | v0.9.99 Phase 34 |
 | uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
-| i18n_debt | WARNING-02 picker-cookie short-circuits bare-`/` Accept-Language redirect | now active as v1.2.0 Phase 56 (ROUTE-01/02) -- no longer just deferred prose | v0.9.63, carried 6+ milestones |
+| i18n_debt | WARNING-02 picker-cookie short-circuits bare-`/` Accept-Language redirect | closed in v1.2.0 Phase 56 (ROUTE-01/02) | v0.9.63, carried 6+ milestones |
 
 Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication. None of this blocks v1.2.0.
 
@@ -113,4 +113,4 @@ Resume file: None
 
 ## Next Actions
 
-Plan and execute Phase 56 (Locale-Cookie Redirect Fix / WARNING-02): cookie-directed redirect from bare `/` for non-default fsb-locale values; keep en fall-through.
+Run milestone lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone` → `/gsd-cleanup`. Optional: human VISUAL-01 browser UAT for Phase 53.

@@ -79,8 +79,8 @@ check(
 );
 
 check(
-  'GET / + Accept-Language ja + Cookie fsb-locale=de -> next() (cookie wins)',
-  { nextCalled: true, redirectArgs: null },
+  'GET / + Accept-Language ja + Cookie fsb-locale=de -> 302 /de/ (cookie wins via redirect)',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/de/' } },
   mockReqRes('GET', '/', { 'accept-language': 'ja,en;q=0.8', 'cookie': 'fsb-locale=de' })
 );
 
@@ -88,6 +88,12 @@ check(
   'GET / + Cookie fsb-locale=en -> next() (cookie wins, even for default)',
   { nextCalled: true, redirectArgs: null },
   mockReqRes('GET', '/', { 'accept-language': 'ja', 'cookie': 'fsb-locale=en' })
+);
+
+check(
+  'GET / + Cookie fsb-locale=es (no Accept-Language) -> 302 /es/ (ROUTE-01)',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/es/' } },
+  mockReqRes('GET', '/', { 'cookie': 'fsb-locale=es' })
 );
 
 check(

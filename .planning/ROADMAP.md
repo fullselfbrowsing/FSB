@@ -26,7 +26,7 @@
 - [x] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
 - [x] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
 - [x] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
-- [ ] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
+- [x] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
 
 ## Phase Details
 
@@ -77,7 +77,7 @@
 **Success Criteria** (what must be TRUE):
   1. A request to `/` carrying an `fsb-locale` cookie set to a non-default supported locale (es, de, ja, zh-CN, or zh-TW) redirects to that locale's subpath rather than serving the EN prerender.
   2. A request to `/` carrying an `fsb-locale` cookie set to `en` (the default) still falls through correctly to the EN prerender without redirecting to a 404ing `/en/` path.
-**Plans**: TBD
+**Plans**: 56-01 ✅
 
 ## Progress
 
@@ -90,7 +90,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
 | 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 3/3 | Complete | 2026-07-09 |
 | 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 1/1 | Complete | 2026-07-09 |
 | 55. CI Drift-Detection Gate | 1/1 | Complete | 2026-07-09 |
-| 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
+| 56. Locale-Cookie Redirect Fix (WARNING-02) | 1/1 | Complete | 2026-07-09 |
 
 ## Completed Milestones
 

@@ -29,8 +29,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Locale Routing
 
-- [ ] **ROUTE-01**: A picker-set `fsb-locale` cookie naming a valid, non-default supported locale redirects the bare-`/` request to that locale's subpath instead of short-circuiting to the EN prerender (closes WARNING-02).
-- [ ] **ROUTE-02**: The default-locale case (cookie value = `en`) still falls through correctly without redirecting to a 404ing `/en/` path.
+- [x] **ROUTE-01**: A picker-set `fsb-locale` cookie naming a valid, non-default supported locale redirects the bare-`/` request to that locale's subpath instead of short-circuiting to the EN prerender (closes WARNING-02).
+- [x] **ROUTE-02**: The default-locale case (cookie value = `en`) still falls through correctly without redirecting to a 404ing `/en/` path.
 
 ### Visual QA
 
@@ -77,8 +77,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CI-03 | Phase 55 | Complete |
 | CI-04 | Phase 55 | Complete |
 | CI-05 | Phase 54 | Complete |
-| ROUTE-01 | Phase 56 | Pending |
-| ROUTE-02 | Phase 56 | Pending |
+| ROUTE-01 | Phase 56 | Complete |
+| ROUTE-02 | Phase 56 | Complete |
 | VISUAL-01 | Phase 53 | human_needed |
 
 **Coverage:**
