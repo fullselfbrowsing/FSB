@@ -84,6 +84,16 @@ function parseCookieHeader(rawCookieHeader, name) {
   return null;
 }
 
+function getQuerySuffix(req) {
+  const rawUrl = (req && typeof req.originalUrl === 'string')
+    ? req.originalUrl
+    : (req && typeof req.url === 'string')
+      ? req.url
+      : '';
+  const queryStart = rawUrl.indexOf('?');
+  return queryStart >= 0 ? rawUrl.slice(queryStart) : '';
+}
+
 function createAcceptLanguageMiddleware(options) {
   const supported = options && Array.isArray(options.supported) ? options.supported : [];
   const defaultLocale = (options && options.defaultLocale) || 'en';
@@ -101,7 +111,7 @@ function createAcceptLanguageMiddleware(options) {
         if (cookieVal === defaultLocale) return next();
         // Valid non-default picker cookie: redirect to that locale's subpath.
         if (supportedSet.has(cookieVal)) {
-          return res.redirect(302, '/' + cookieVal + '/');
+          return res.redirect(302, '/' + cookieVal + '/' + getQuerySuffix(req));
         }
         // Unknown cookie value: ignore and fall through to Accept-Language.
       }
