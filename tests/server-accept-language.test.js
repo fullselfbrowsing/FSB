@@ -60,10 +60,14 @@ check('whitespace-tolerant: fsb-locale = ja -> ja', 'ja', parseCookieHeader(' fs
 console.log('--- middleware (mocked req/res) ---');
 const mw = createAcceptLanguageMiddleware({ supported: SUPPORTED, defaultLocale: 'en', cookieName: 'fsb-locale' });
 
-function mockReqRes(method, urlPath, headers) {
+function mockReqRes(method, urlPath, headers, requestUrl) {
   let nextCalled = false;
   let redirectArgs = null;
   const req = { method, path: urlPath, headers: headers || {} };
+  if (requestUrl) {
+    if (requestUrl.originalUrl) req.originalUrl = requestUrl.originalUrl;
+    if (requestUrl.url) req.url = requestUrl.url;
+  }
   const res = {
     redirect(status, location) { redirectArgs = { status, location }; },
   };
@@ -79,8 +83,8 @@ check(
 );
 
 check(
-  'GET / + Accept-Language ja + Cookie fsb-locale=de -> next() (cookie wins)',
-  { nextCalled: true, redirectArgs: null },
+  'GET / + Accept-Language ja + Cookie fsb-locale=de -> 302 /de/ (cookie wins via redirect)',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/de/' } },
   mockReqRes('GET', '/', { 'accept-language': 'ja,en;q=0.8', 'cookie': 'fsb-locale=de' })
 );
 
@@ -88,6 +92,24 @@ check(
   'GET / + Cookie fsb-locale=en -> next() (cookie wins, even for default)',
   { nextCalled: true, redirectArgs: null },
   mockReqRes('GET', '/', { 'accept-language': 'ja', 'cookie': 'fsb-locale=en' })
+);
+
+check(
+  'GET / + Cookie fsb-locale=es (no Accept-Language) -> 302 /es/ (ROUTE-01)',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/es/' } },
+  mockReqRes('GET', '/', { 'cookie': 'fsb-locale=es' })
+);
+
+check(
+  'GET /?utm_source=ad&ref=abc + Cookie fsb-locale=de -> 302 /de/?utm_source=ad&ref=abc',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/de/?utm_source=ad&ref=abc' } },
+  mockReqRes('GET', '/', { 'cookie': 'fsb-locale=de' }, { originalUrl: '/?utm_source=ad&ref=abc' })
+);
+
+check(
+  'GET /?utm_source=ad + Cookie fsb-locale=ja -> 302 /ja/?utm_source=ad (url fallback)',
+  { nextCalled: false, redirectArgs: { status: 302, location: '/ja/?utm_source=ad' } },
+  mockReqRes('GET', '/', { 'cookie': 'fsb-locale=ja' }, { url: '/?utm_source=ad' })
 );
 
 check(

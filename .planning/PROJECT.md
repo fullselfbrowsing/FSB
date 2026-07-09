@@ -10,28 +10,13 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
+**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 **Recent shipping cadence:**
+- v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
-- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
-- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
-- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
-- v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
-- v0.9.63 Showcase i18n -- shipped 2026-05-13
-- v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
-- v0.9.61 FSB Skill (OpenClaw) -- shipped 2026-05-08
-- v0.9.60 Multi-Agent Tab Concurrency (MCP 0.8.0) -- shipped 2026-05-08
-- v0.9.50 Autopilot Refinement (MCP-Parity) -- shipped 2026-05-03
-- v0.9.49 Remote Control Rebrand & Showcase Metrics Wire-up -- shipped 2026-05-02
-- v0.9.48 Angular 20 Migration -- shipped 2026-05-02
-- v0.9.47 Workspace Reorganization -- shipped 2026-05-02
-- v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
-
-**CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
 ## Current Milestone: v1.2.0 Showcase i18n Completeness
 
@@ -45,6 +30,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
 
 **Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
+
+**Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
 
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
@@ -689,4 +676,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-07 -- v1.1.0 T1 App Execution Expansion archived; v1.2.0 Showcase i18n Completeness started. Phases continue at 52.*
+*Last updated: 2026-07-08 -- Phase 52 (Full-Page Translation Completeness Audit) complete. Next: Phase 53 (Trans-Unit Resync, Stats Translation & Transcreation Review).*

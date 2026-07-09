@@ -64,6 +64,8 @@ jobs:
         run: node showcase/angular/scripts/verify-locale-sync.mjs
       - name: Lint i18n template marking (CI-03 promoted from Phase 261)
         run: npm --prefix showcase/angular run lint:i18n
+      - name: Verify translation source drift (Phase 55 / CI-02..CI-04)
+        run: npm --prefix showcase/angular run verify:translation-drift
       - name: Verify ng extract-i18n produces no diff (CI-02)
         run: |
           mkdir -p /tmp/extract-check
