@@ -12,7 +12,8 @@
     "smoke:crawler:local": "node scripts/smoke-crawler-local.mjs",
     "serve:ssr:showcase-angular": "node ../dist/showcase-angular/server/server.mjs",
     "lint:i18n": "eslint \"src/**/*.html\" --ignore-pattern \"src/app/pages/dashboard/**\"",
-    "verify:hreflang": "node scripts/verify-hreflang.mjs"
+    "verify:hreflang": "node scripts/verify-hreflang.mjs",
+    "verify:translation-drift": "node scripts/verify-translation-drift.mjs"
   },
   "dependencies": {
     "@angular/animations": "^20.3.19",

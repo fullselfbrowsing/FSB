@@ -22,9 +22,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### CI Enforcement
 
 - [x] **CI-01**: The `lint:i18n` ignore-pattern for `src/app/pages/stats/**` is removed only after RESYNC-02 is verified complete.
-- [ ] **CI-02**: A new `verify-translation-drift.mjs` CI gate fails the build when any trans-unit's English `<source>` text changes without a matching update in one of the 5 translated locale files, diffing per trans-unit `id` (not whole-file/line-count).
-- [ ] **CI-03**: The new drift gate is back-tested against this repo's own git history (known-clean churn commits plus commit `6d3ad363`) before being wired hard-fail into CI, so it doesn't chronically false-positive on routine `ng extract-i18n` re-extraction churn.
-- [ ] **CI-04**: The drift gate's target-locale list is derived dynamically from the existing locale registry, not hardcoded.
+- [x] **CI-02**: A new `verify-translation-drift.mjs` CI gate fails the build when any trans-unit's English `<source>` text changes without a matching update in one of the 5 translated locale files, diffing per trans-unit `id` (not whole-file/line-count).
+- [x] **CI-03**: The new drift gate is back-tested against this repo's own git history (known-clean churn commits plus commit `6d3ad363`) before being wired hard-fail into CI, so it doesn't chronically false-positive on routine `ng extract-i18n` re-extraction churn.
+- [x] **CI-04**: The drift gate's target-locale list is derived dynamically from the existing locale registry, not hardcoded.
 - [x] **CI-05**: The dashboard page's `lint:i18n` exclusion is documented as a permanent, intentional architectural boundary (authenticated app surface, not marketing content) rather than left as open deferred debt.
 
 ### Locale Routing
@@ -73,9 +73,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RESYNC-02 | Phase 53 | Complete |
 | RESYNC-03 | Phase 53 | Complete |
 | CI-01 | Phase 54 | Complete |
-| CI-02 | Phase 55 | Pending |
-| CI-03 | Phase 55 | Pending |
-| CI-04 | Phase 55 | Pending |
+| CI-02 | Phase 55 | Complete |
+| CI-03 | Phase 55 | Complete |
+| CI-04 | Phase 55 | Complete |
 | CI-05 | Phase 54 | Complete |
 | ROUTE-01 | Phase 56 | Pending |
 | ROUTE-02 | Phase 56 | Pending |

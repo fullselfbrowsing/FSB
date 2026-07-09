@@ -25,7 +25,7 @@
 - [x] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
 - [x] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
 - [x] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
-- [ ] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
+- [x] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
 - [ ] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
 
 ## Phase Details
@@ -68,7 +68,7 @@
   1. `verify-translation-drift.mjs` exists, follows the zero-dependency style of the existing `verify-locale-sync.mjs`/`verify-hreflang.mjs` scripts, and fails the build when any trans-unit's English `<source>` text changes without a corresponding update in one of the 5 translated locale files -- diffing per trans-unit `id`, never whole-file or line-count.
   2. The gate is back-tested against this repo's own git history (known-clean pure-churn commits plus commit `6d3ad363` itself) and demonstrably stays silent on clean churn while firing on `6d3ad363`-shaped drift, before being wired hard-fail into CI.
   3. The gate's target-locale list is read dynamically from the existing locale registry at runtime, not hardcoded as a literal list in the script.
-**Plans**: TBD
+**Plans**: 55-01 ✅
 
 ### Phase 56: Locale-Cookie Redirect Fix (WARNING-02)
 **Goal**: A returning visitor whose picker-set `fsb-locale` cookie names a valid, non-default supported locale is correctly redirected to that locale's subpath from the bare-`/` route, instead of the cookie being ignored in favor of the EN prerender.
@@ -89,7 +89,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
 | 52. Full-Page Translation Completeness Audit | 1/1 | Complete    | 2026-07-08 |
 | 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 3/3 | Complete | 2026-07-09 |
 | 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 1/1 | Complete | 2026-07-09 |
-| 55. CI Drift-Detection Gate | 0/TBD | Not started | - |
+| 55. CI Drift-Detection Gate | 1/1 | Complete | 2026-07-09 |
 | 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
 
 ## Completed Milestones
