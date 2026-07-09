@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T20:40:12.442Z",
+  "generatedAt": "2026-07-09T19:16:35.226Z",
   "targetLocales": [
     "es",
     "de",
@@ -743,7 +743,7 @@
       "locale": "es",
       "id": "home.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "",
@@ -1688,7 +1688,7 @@
       "locale": "de",
       "id": "home.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "",
@@ -2633,7 +2633,7 @@
       "locale": "ja",
       "id": "home.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "",
@@ -3578,7 +3578,7 @@
       "locale": "zh-CN",
       "id": "home.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "",
@@ -4523,7 +4523,7 @@
       "locale": "zh-TW",
       "id": "home.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "",
@@ -12160,7 +12160,7 @@
       "locale": "es",
       "id": "agents.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -12174,7 +12174,7 @@
       "locale": "es",
       "id": "agents.schema.software.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -12811,7 +12811,7 @@
       "locale": "de",
       "id": "agents.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -12825,7 +12825,7 @@
       "locale": "de",
       "id": "agents.schema.software.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -13462,7 +13462,7 @@
       "locale": "ja",
       "id": "agents.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -13476,7 +13476,7 @@
       "locale": "ja",
       "id": "agents.schema.software.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -14113,7 +14113,7 @@
       "locale": "zh-CN",
       "id": "agents.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -14127,7 +14127,7 @@
       "locale": "zh-CN",
       "id": "agents.schema.software.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -14764,7 +14764,7 @@
       "locale": "zh-TW",
       "id": "agents.meta.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -14778,7 +14778,7 @@
       "locale": "zh-TW",
       "id": "agents.schema.software.description",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "agents",
@@ -21561,7 +21561,7 @@
       "locale": "es",
       "id": "support.faq.q.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -21876,7 +21876,7 @@
       "locale": "es",
       "id": "support.schema.faq.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -22401,7 +22401,7 @@
       "locale": "de",
       "id": "support.faq.q.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -22716,7 +22716,7 @@
       "locale": "de",
       "id": "support.schema.faq.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -23241,7 +23241,7 @@
       "locale": "ja",
       "id": "support.faq.q.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -23556,7 +23556,7 @@
       "locale": "ja",
       "id": "support.schema.faq.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -24081,7 +24081,7 @@
       "locale": "zh-CN",
       "id": "support.faq.q.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -24396,7 +24396,7 @@
       "locale": "zh-CN",
       "id": "support.schema.faq.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -24921,7 +24921,7 @@
       "locale": "zh-TW",
       "id": "support.faq.q.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
@@ -25236,7 +25236,7 @@
       "locale": "zh-TW",
       "id": "support.schema.faq.tools.a",
       "coverage": "PASS",
-      "currency": "FAIL"
+      "currency": "PASS"
     },
     {
       "route": "support",
