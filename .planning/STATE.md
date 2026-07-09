@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.2.0
 milestone_name: Showcase i18n Completeness
-status: complete
-stopped_at: All v1.2.0 phases 52-56 complete -- ready for milestone lifecycle
+status: milestone_complete
+stopped_at: v1.2.0 archived -- ready for /gsd-new-milestone
 last_updated: "2026-07-09T19:18:40.000Z"
 last_activity: 2026-07-09
 progress:
@@ -113,4 +113,4 @@ Resume file: None
 
 ## Next Actions
 
-Run milestone lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone` → `/gsd-cleanup`. Optional: human VISUAL-01 browser UAT for Phase 53.
+v1.2.0 complete and archived. Optional: finish VISUAL-01 human UAT. Start next milestone with `/gsd-new-milestone`.

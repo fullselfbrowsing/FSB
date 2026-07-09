@@ -10,28 +10,13 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
+**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 **Recent shipping cadence:**
+- v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
-- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
-- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
-- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
-- v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
-- v0.9.63 Showcase i18n -- shipped 2026-05-13
-- v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
-- v0.9.61 FSB Skill (OpenClaw) -- shipped 2026-05-08
-- v0.9.60 Multi-Agent Tab Concurrency (MCP 0.8.0) -- shipped 2026-05-08
-- v0.9.50 Autopilot Refinement (MCP-Parity) -- shipped 2026-05-03
-- v0.9.49 Remote Control Rebrand & Showcase Metrics Wire-up -- shipped 2026-05-02
-- v0.9.48 Angular 20 Migration -- shipped 2026-05-02
-- v0.9.47 Workspace Reorganization -- shipped 2026-05-02
-- v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
-
-**CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
 
 ## Current Milestone: v1.2.0 Showcase i18n Completeness
 
