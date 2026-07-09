@@ -22,7 +22,7 @@
 - Integer phases (52, 53, 54, 55, 56): Planned milestone work, continuing from v1.1.0's Phase 51
 - Decimal phases (52.1, 52.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
+- [x] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
 - [ ] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
 - [ ] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
 - [ ] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
@@ -38,7 +38,7 @@
   1. A generated audit report lists, for every current showcase route (lattice, phantom-stream, prometheus, home, mobile nav, stats, and the original v0.9.63 routes) and every one of the 5 non-English locales, a per-trans-unit verdict of coverage AND currency as two distinct checks -- not a single pass/fail signal.
   2. The audit's true drift count is authoritative and supersedes the milestone brief's original "247 trans-units" estimate; the 5 confirmed `6d3ad363`-drifted units are validated as a subset of (not a substitute for) the full audit findings.
   3. The orphaned `translations.stats-274.*.json` artifacts are explicitly resolved: either shown to already be merged into the live `messages.<locale>.xlf` files, or shown to still be outstanding work with no ambiguity left for Phase 53 to inherit.
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 ### Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review
 **Goal**: Every trans-unit the Phase 52 audit flagged as drifted is resynced across all 5 translated locales, the stats page reaches full translation coverage, hero/CTA copy gets a transcreation-quality pass instead of literal translation, and German/CJK rendering is confirmed clean on the highest-copy-density routes.
@@ -49,7 +49,7 @@
   2. The stats page has a `<target>` for every trans-unit across all 5 non-English locales -- full coverage, not partial.
   3. The ~10-20 hero headline and primary CTA strings read as natural, locale-appropriate marketing copy rather than literal word-for-word translation, reviewed explicitly through a transcreation lens.
   4. A targeted manual visual spot-check of German (text-expansion risk) and zh-CN/zh-TW (CJK line-wrap risk) on the highest-copy-density routes shows no broken layout, truncation, or overflow -- performed only after the resynced/transcreated copy above has landed, since it needs final translated text to check against.
-**Plans**: TBD
+**Plans**: 53-01, 53-02, 53-03
 
 ### Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation
 **Goal**: The stats page is held to the same CI translation-completeness bar as every other marketing page, and the dashboard's permanent exclusion from that bar is written down as an explicit architectural decision rather than left as unstated deferred debt.
@@ -87,7 +87,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
 | Phase | Plans Complete | Status | Completed |
 |-------|-----------------|--------|-----------|
 | 52. Full-Page Translation Completeness Audit | 1/1 | Complete    | 2026-07-08 |
-| 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 0/TBD | Not started | - |
+| 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 0/3 | In progress | - |
 | 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 0/TBD | Not started | - |
 | 55. CI Drift-Detection Gate | 0/TBD | Not started | - |
 | 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
