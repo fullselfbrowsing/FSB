@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2.0
 milestone_name: Showcase i18n Completeness
 status: in_progress
-stopped_at: Phase 53 complete (visual UAT human_needed deferred) -- ready to plan Phase 54
+stopped_at: Phase 54 complete -- ready to plan Phase 55
 last_updated: "2026-07-09T19:18:40.000Z"
 last_activity: 2026-07-09
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
   completed_plans: 4
-  percent: 40
+  percent: 60
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.2.0 milestone (Phases 52-56) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy 14-phase/9-complete count and misidentifies "999.1" (an unrelated Backlog item) as the next phase -- both are artifacts of that tooling scanning the whole ROADMAP.md file, including the collapsed `## Completed Milestones` archive and `## Backlog` sections, rather than just the active milestone's phases. Phases 44-51 are archived v1.1.0 work; 999.1 is unrelated backlog. Treat this file's own numbers as authoritative for v1.2.0 progress.*
@@ -27,7 +27,7 @@ See: .planning/research/SUMMARY.md (phase sequencing rationale, confirmed 5-drif
 See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
 
 **Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.2.0 does not touch the automation/T1 catalog surface; it closes a reopened i18n completeness gap on the showcase marketing site.
-**Current focus:** Phase 54 — Stats Lint Gate Flip & Dashboard Boundary Documentation
+**Current focus:** Phase 55 — CI Drift-Detection Gate
 
 ## Current Position
 
@@ -36,7 +36,7 @@ Plan: Not yet planned
 Status: Ready to plan -- Phase 53 complete (resync + stats reconciliation + transcreation); visual UAT deferred human_needed
 Last activity: 2026-07-09
 
-Progress: [████░░░░░░] 40% (2/5 phases in v1.2.0)
+Progress: [██████░░░░] 60% (3/5 phases in v1.2.0)
 
 ## Roadmap At A Glance (v1.2.0, Phases 52-56)
 
@@ -44,7 +44,7 @@ Progress: [████░░░░░░] 40% (2/5 phases in v1.2.0)
 |-------|------|--------------|--------|
 | 52 | Full-Page Translation Completeness Audit | AUDIT-01, AUDIT-02 | Complete (2026-07-08) |
 | 53 | Trans-Unit Resync, Stats Translation & Transcreation Review | RESYNC-01, RESYNC-02, RESYNC-03, VISUAL-01 | Complete (2026-07-09; VISUAL-01 human_needed deferred) |
-| 54 | Stats Lint Gate Flip & Dashboard Boundary Documentation | CI-01, CI-05 | Not started |
+| 54 | Stats Lint Gate Flip & Dashboard Boundary Documentation | CI-01, CI-05 | Complete (2026-07-09) |
 | 55 | CI Drift-Detection Gate | CI-02, CI-03, CI-04 | Not started |
 | 56 | Locale-Cookie Redirect Fix (WARNING-02) | ROUTE-01, ROUTE-02 | Not started |
 
@@ -113,4 +113,4 @@ Resume file: None
 
 ## Next Actions
 
-Plan and execute Phase 54 (Stats Lint Gate Flip & Dashboard Boundary Documentation): remove stats `lint:i18n` ignore-pattern now that RESYNC-02 is verified, and document dashboard exclusion as permanent (CI-05).
+Plan and execute Phase 55 (CI Drift-Detection Gate): add verify-translation-drift.mjs, back-test against clean churn + 6d3ad363, wire hard-fail into CI with dynamic locale list.

@@ -24,7 +24,7 @@
 
 - [x] **Phase 52: Full-Page Translation Completeness Audit** - Establish the true per-page, per-locale, per-trans-unit coverage/currency verdict and trace the orphaned stats artifacts
 - [x] **Phase 53: Trans-Unit Resync, Stats Translation & Transcreation Review** - Close every audit-identified drift, bring the stats page to full coverage, apply a transcreation lens to hero copy, and spot-check DE/CJK rendering
-- [ ] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
+- [x] **Phase 54: Stats Lint Gate Flip & Dashboard Boundary Documentation** - Remove the stats-page `lint:i18n` exclusion now that coverage is verified, and document the dashboard exclusion as permanent
 - [ ] **Phase 55: CI Drift-Detection Gate** - Add a permanent, back-tested CI gate that fails the build on future undetected translation drift
 - [ ] **Phase 56: Locale-Cookie Redirect Fix (WARNING-02)** - Fix the picker-set locale cookie so it correctly redirects returning visitors instead of short-circuiting to EN
 
@@ -58,7 +58,7 @@
 **Success Criteria** (what must be TRUE):
   1. The `lint:i18n` ignore-pattern for `src/app/pages/stats/**` in `showcase/angular/package.json` is removed, and `npm run lint:i18n` passes clean against the stats page's own templates.
   2. The dashboard page's `lint:i18n` exclusion is documented in-repo as a permanent, intentional architectural boundary (authenticated app surface, not marketing content) with an explicit rationale, not a bare ignore-pattern with no explanation.
-**Plans**: TBD
+**Plans**: 54-01 ✅
 
 ### Phase 55: CI Drift-Detection Gate
 **Goal**: A new, permanent CI gate automatically fails the build the moment `messages.xlf`'s English source content changes without a matching update in one of the 5 translated locale files -- landing only once the tree is verified drift-free, so it passes clean on day one instead of immediately failing on residual debt.
@@ -88,7 +88,7 @@ Phases execute in numeric order: 52 → 53 → 54 → 55 → 56
 |-------|-----------------|--------|-----------|
 | 52. Full-Page Translation Completeness Audit | 1/1 | Complete    | 2026-07-08 |
 | 53. Trans-Unit Resync, Stats Translation & Transcreation Review | 3/3 | Complete | 2026-07-09 |
-| 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 0/TBD | Not started | - |
+| 54. Stats Lint Gate Flip & Dashboard Boundary Documentation | 1/1 | Complete | 2026-07-09 |
 | 55. CI Drift-Detection Gate | 0/TBD | Not started | - |
 | 56. Locale-Cookie Redirect Fix (WARNING-02) | 0/TBD | Not started | - |
 
