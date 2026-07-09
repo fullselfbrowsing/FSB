@@ -13,6 +13,11 @@
 // over messages.{lang}.xlf -- if the assemble step throws (a missing
 // key in the merged JSON), the existing file is left intact.
 //
+// Phase 53 note: the translations.stats-274.*.json inputs were retired after
+// live-XLIFF stats coverage was verified complete (see 53-STATS-RECONCILIATION.md).
+// This helper is kept as historical tooling; re-running it will fail until those
+// JSON sidecars are restored (not expected).
+//
 // Usage:
 //   node scripts/merge-and-assemble-274.mjs es
 //   node scripts/merge-and-assemble-274.mjs de

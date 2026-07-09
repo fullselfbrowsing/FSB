@@ -280,6 +280,13 @@ function runStats274Trace(targetLocales, localeMaps, enMap) {
   const results = new Map();
   for (const locale of targetLocales) {
     const jsonPath = join(LOCALE_DIR, `translations.stats-274.${locale}.json`);
+    // Phase 53 retired the stats-274 JSON sidecars after verifying live-XLIFF
+    // stats coverage is complete. Missing files are expected (not a tool failure).
+    if (!existsSync(jsonPath)) {
+      results.set(locale, { ok: true, retired: true, merged: [], missingFromXliff: [], staleValue: [], idDriftFromTemplate: [] });
+      record(true, `stats-274 trace [${locale}]`, 'retired (JSON sidecar absent; see Phase 53 reconciliation)');
+      continue;
+    }
     try {
       const report = traceStats274(locale, jsonPath, localeMaps.get(locale), currentTemplateIds);
       results.set(locale, { ok: true, ...report });
@@ -528,6 +535,15 @@ function buildReport(ctx) {
     lines.push('');
     if (!r.ok) {
       lines.push(`ERROR: ${r.error}`);
+      lines.push('');
+      continue;
+    }
+    if (r.retired) {
+      lines.push(
+        'RETIRED: `translations.stats-274.*.json` sidecars were removed in Phase 53 after ' +
+        'confirming live XLIFF stats coverage is 100%/100%. See ' +
+        '`.planning/phases/53-trans-unit-resync-stats-translation-transcreation-review/53-STATS-RECONCILIATION.md`.'
+      );
       lines.push('');
       continue;
     }
