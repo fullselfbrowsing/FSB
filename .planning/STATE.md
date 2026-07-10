@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2.0
-milestone_name: Showcase i18n Completeness
-status: milestone_complete
-stopped_at: v1.2.0 archived -- ready for /gsd-new-milestone
-last_updated: "2026-07-09T19:18:40.000Z"
-last_activity: 2026-07-09
+milestone: v0.9.91
+milestone_name: MCP Clients as Providers
+status: planning
+last_updated: "2026-07-10T18:23:53.880Z"
+last_activity: 2026-07-10
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.2.0 milestone (Phases 52-56) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy 14-phase/9-complete count and misidentifies "999.1" (an unrelated Backlog item) as the next phase -- both are artifacts of that tooling scanning the whole ROADMAP.md file, including the collapsed `## Completed Milestones` archive and `## Backlog` sections, rather than just the active milestone's phases. Phases 44-51 are archived v1.1.0 work; 999.1 is unrelated backlog. Treat this file's own numbers as authoritative for v1.2.0 progress.*
@@ -31,12 +30,10 @@ See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIRE
 
 ## Current Position
 
-Phase: 54 of 56 (Stats Lint Gate Flip & Dashboard Boundary Documentation)
-Plan: Not yet planned
-Status: Ready to plan -- Phase 53 complete (resync + stats reconciliation + transcreation); visual UAT deferred human_needed
-Last activity: 2026-07-09
-
-Progress: [██████████] 100% (5/5 phases in v1.2.0)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-10 — Milestone v0.9.91 started
 
 ## Roadmap At A Glance (v1.2.0, Phases 52-56)
 
@@ -109,7 +106,6 @@ v2 deferred (see REQUIREMENTS.md v1.2.0 v2 section): QA-01 (native-speaker/bilin
 Last session: 2026-07-09
 Stopped at: Phase 53 complete — 5 drifted units resynced, stats-274 JSON retired, 19 hero/CTA strings transcreated; VISUAL-01 browser UAT deferred as human_needed. Continuing autonomously into Phase 54.
 Resume file: None
-
 
 ## Next Actions
 

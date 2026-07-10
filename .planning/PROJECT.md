@@ -18,7 +18,28 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
 
 
-## Current Milestone: v1.2.0 Showcase i18n Completeness
+## Current Milestone: v0.9.91 MCP Clients as Providers
+
+**Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
+
+**Target features:**
+- **Agent identity capture** -- persist which install command(s) the user copies during onboarding (multi-client, `extension/ui/onboarding.js` copy handler already has the client id); capture `clientInfo` from the MCP initialize handshake (currently discarded -- zero references in `mcp/`) and thread it through the existing `agent:register` round-trip (payload is empty `{}` today); detect installed clients from the `platforms.ts` registry's per-OS config paths (21 clients); surface connected/installed agents in the control panel.
+- **Providers panel** -- rename "API Configuration" -> "Providers" (`extension/ui/control_panel.html:146`); introduce `api` vs `agent` provider kinds; agent providers hide the API-key field; recommended default driven by ground truth (connected > installed > copy-clicked).
+- **Side-panel delegation (Claude Code MVP)** -- new extension->hub reverse-request channel over the existing ws://localhost:7225 bridge; daemon spawns `claude -p` headless (stream-json output, strict permission defaults, hermetic `--strict-mcp-config`, shipped `fsb` agent definition instead of prompt stuffing); the spawned CLI connects back as its own FSB agent with tab ownership; live progress streamed into the side panel; kill switch; graceful "agent offline -> doctor" state.
+- **Multi-agent adapters** -- `AgentProviderAdapter` contract (detect / build / events / kill / caps); OpenCode -> Codex -> Gemini after Claude Code; task-mode vs chat-mode (`--resume`) where supported.
+
+**Key context:**
+- The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
+- Daemon lifecycle constraint: the extension has NO nativeMessaging permission and cannot wake any process. Delegation requires a live MCP server process (`fsb-mcp-server serve` or an open agent session). MVP ships honest offline UX + `doctor` handoff; a native-messaging host is a deferred option.
+- INV-01 carries forward: MCP wire contracts stay byte-stable -- all bridge message types and tools are additive.
+- Test suite has source-pin tripwires on extension files (token counts/substrings); extension-side wiring must run the suite from the first commit.
+- Delegation becomes the fifth `EXECUTION_MODES` entry in `extension/ai/engine-config.js` (autopilot, mcp-manual, mcp-agent, dashboard-remote, + delegated).
+- This milestone completes the v0.9.45rc1 arc (background agents retired in favor of external agent runtimes) and the v0.9.36 deferred item "derive trusted MCP client identity from connection/handshake metadata".
+- Phases continue from 57.
+
+## Last Milestone: v1.2.0 Showcase i18n Completeness
+
+**Status:** Archived 2026-07-09. Phases 52-56 shipped; audit passed. Archive files under `.planning/milestones/v1.2.0-*`. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 **Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
 
@@ -411,7 +432,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.2.0 Showcase i18n Completeness -- requirements and roadmap to be defined; phases continue from v1.1.0's Phase 51 -> start at Phase 52. v1.1.0 T1 App Execution Expansion is archived; this milestone returns to the showcase-site i18n surface last touched in v0.9.63.)
+(Milestone v0.9.91 MCP Clients as Providers -- requirements and roadmap being defined; phases continue from v1.2.0's Phase 56 -> start at Phase 57. v1.2.0 Showcase i18n Completeness is archived; this milestone returns to the extension/MCP surface last touched in v0.9.99/v0.9.60-62.)
 
 ### Validated (v0.9.99)
 
@@ -676,4 +697,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-08 -- Phase 52 (Full-Page Translation Completeness Audit) complete. Next: Phase 53 (Trans-Unit Resync, Stats Translation & Transcreation Review).*
+*Last updated: 2026-07-10 -- Milestone v0.9.91 MCP Clients as Providers started. Next: requirements definition.*
