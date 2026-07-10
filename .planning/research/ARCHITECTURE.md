@@ -1,403 +1,341 @@
-# Architecture Research: v1.2.0 Showcase i18n Completeness
+# Architecture Research: v0.9.91 MCP Clients as Providers
 
-**Domain:** Angular-i18n translation-completeness verification + drift detection, integrated into an existing Express-prerender showcase pipeline
-**Milestone:** v1.2.0 Showcase i18n Completeness — SUBSEQUENT milestone; re-opens and closes a gap left as accepted debt by v0.9.63 (Showcase i18n). Does not redesign the existing locale-registry/build/CI substrate.
-**Researched:** 2026-07-07
-**Confidence:** HIGH (all findings verified directly against the repo's own source files, CI workflow, and git history — this is an internal-architecture question about an existing system, not an ecosystem-discovery question)
+**Domain:** Chrome MV3 extension + local MCP server ecosystem — installed agent CLIs as first-class side-panel providers
+**Milestone:** v0.9.91 — SUBSEQUENT milestone; maps four features onto the existing FSB architecture (extension SW + ws://7225 hub/relay bridge + fsb-mcp-server stdio/serve). Existing architecture is mapped, not redesigned.
+**Researched:** 2026-07-10
+**Confidence:** HIGH (every integration point verified against source at file:line; SDK `getClientVersion` verified via Context7; spawned-CLI flag surface is MEDIUM-LOW — see Open Questions)
 
-> Canonical-path note: per this directory's established convention (see `PITFALLS-EXCALIDRAW.md`, `PITFALLS-v0.9.69-TELEMETRY.md` as precedent), this document replaces the prior milestone's content at the canonical `ARCHITECTURE.md` path. The superseded v1.0.0 (Full App Catalog / OpenTabs Parity) architecture research is preserved on-disk at `ARCHITECTURE-v1.0.0-OPENTABS-CATALOG.md`.
+> Canonical-path note: per this directory's convention (see the header of `ARCHITECTURE-v1.2.0-SHOWCASE-I18N.md`), this document replaces the prior milestone's content at the canonical `ARCHITECTURE.md` path. The superseded v1.2.0 research is preserved at `ARCHITECTURE-v1.2.0-SHOWCASE-I18N.md`.
 
----
-
-## 0. Correction to Milestone Framing (read this first)
-
-PROJECT.md states: *"Resync the 247 trans-units whose English source changed in commit `6d3ad363`."* I verified this directly by diffing `messages.xlf` at `6d3ad363~1` vs `6d3ad363` and matching trans-units **by `id`, not by line position**:
-
-- Total trans-units in `messages.xlf`: 942 (996 in each target locale file — the small gap is target-file-only housekeeping units, irrelevant here)
-- Trans-unit **IDs whose `<source>` text actually changed**: **5** (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`)
-- Trans-unit IDs added or removed: 0
-
-The `247 insertions(+), 247 deletions(-)` git-diff stat is **XML line churn**, not trans-unit count: 242 of those line-pairs are `<context-group><context context-type="linenumber">` shifts caused by unrelated TS/HTML edits moving `$localize`/`i18n` call sites up or down in their source files (harmless location-metadata noise), and only 5 are genuine `<source>` text changes. A naive `git diff --stat` or line-count/hash-based drift check would overcount by roughly 48x, and would also false-positive on every future commit that merely reformats a component file without touching any translatable string.
-
-**This has a direct architectural consequence:** the new drift-detection gate MUST diff `<source>` text keyed by `trans-unit id`, not do a raw-text/line-count/whole-file-hash comparison. This is elaborated in Pattern 1 below. The full-page audit (Phase 1 of this milestone) should re-derive the true scope from scratch — it will very likely surface MORE than these 5 units, since the milestone's own stated goal ("every translatable string on every showcase page... genuinely translated") is broader than the blast radius of one named commit. Treat "5" and "247" both as lower/upper bounds discovered so far, not as the audit's answer.
+This is a brownfield integration map answering: (a) exact seams per feature, (b) new components, (c) data flows, (d) build order, (e) which process owns spawning, (f) delegation coexistence with the extension's own agent loop.
 
 ---
 
-## 1. Standard Architecture
-
-### System Overview
+## 1. Existing System Overview (verified)
 
 ```
-+-----------------------------------------------------------------------+
-|                  SOURCE OF TRUTH (author-edited)                       |
-+-----------------------------------------------------------------------+
-|  Component .html/.ts (i18n / $localize markers)                       |
-|  angular.json  i18n.locales{}         (locale -> file + subPath map)  |
-|  locale-constants.ts (Angular) <-verify-locale-sync.mjs-> .js (Express)|
-+------------------------------+------------------------------------------+
-                               | ng extract-i18n
-                               v
-+-----------------------------------------------------------------------+
-|              messages.xlf  (EN source-of-truth XLIFF)                 |
-|              -- one <trans-unit id="..."><source> per marker            |
-+------------------------------+------------------------------------------+
-                               | (manual / AI-fill, historically)
-                               v
-+-----------------------------------------------------------------------+
-|   messages.{es,de,ja,zh-CN,zh-TW}.xlf  (5 translated copies)          |
-|   -- mirrors EN's <trans-unit id> set; <source> COPIED verbatim from   |
-|      EN at fill-time, <target state="translated"> is the translation  |
-|   PROBLEM: nothing re-syncs the mirrored <source> when EN's <source>  |
-|   changes later -- these files silently go stale (this milestone's    |
-|   core gap)                                                           |
-+------------------------------+------------------------------------------+
-                               |
-        +----------------------+-----------------------------+
-        |                  EXISTING CI GATES               |
-        |  (structural / build-time correctness only)      |
-        |  1. verify-locale-sync.mjs   -- registry parity   |
-        |     (Angular LOCALES[] == Express LOCALES[])      |
-        |     Does NOT touch messages.xlf content at all.   |
-        |  2. lint:i18n (eslint)       -- every visible      |
-        |     template string carries an i18n attribute      |
-        |     Does NOT check translation content.            |
-        |  3. "ng extract-i18n" + diff -u  ("extract-i18n-   |
-        |     clean")  -- messages.xlf byte-equal to a fresh |
-        |     extract. Verifies EN source is fully harvested;|
-        |     says NOTHING about the 5 target files.         |
-        |  4. ng build --localize (i18nMissingTranslation:   |
-        |     error) -- fails if a target XLIFF is MISSING a |
-        |     <target> for an id present in source. Does NOT |
-        |     fail if <target> exists but is a STALE/WRONG   |
-        |     translation of a since-changed <source>. This  |
-        |     is the exact blind spot: all 5 locale files    |
-        |     sit at 996/996 state="translated" today, and   |
-        |     that number does not move even when 5 units    |
-        |     drift.                                          |
-        +------------------------+---------------------------+
-                               |
-                               v  (NEW, this milestone)
-        +---------------------------------------------------+
-        |  NEW GATE: verify-translation-drift.mjs             |
-        |  Diffs EN <source> text (keyed by trans-unit id)   |
-        |  against the <source> mirror embedded in each of   |
-        |  the 5 target XLIFFs. Fails the build if any id's  |
-        |  EN <source> != that id's mirrored <source> in ANY |
-        |  target file. This is the ONLY gate in the whole   |
-        |  chain that can catch semantic staleness, because  |
-        |  it is the only one that compares SOURCE content   |
-        |  across files rather than checking structural      |
-        |  presence within one file.                         |
-        +------------------------+---------------------------+
-                               |
-                               v
-+-----------------------------------------------------------------------+
-|  ng build --localize  emits per-locale prerendered HTML under          |
-|  dist/showcase-angular/browser/{en-root,es,de,ja,zh-CN,zh-TW}/**        |
-+------------------------------+------------------------------------------+
-                               |
-                               v
-+-----------------------------------------------------------------------+
-|  showcase/server/server.js (Express)                                   |
-|  - Accept-Language middleware (bare `/` only) -- WARNING-02 lives here |
-|  - express.static(dist) with redirect:false                            |
-|  - marketingRoutes whitelist + locale subPath splitter                 |
-+-----------------------------------------------------------------------+
++------------------------------ Chrome (MV3) -------------------------------+
+|  Side panel (ui/sidepanel.js)      Control panel (ui/options.js +         |
+|   startAutomation/stopAutomation     control_panel.html "API Config")     |
+|   runtime msgs :1506/:1558           modelProvider select :146/:157       |
+|          |                                    |                           |
+|          v                                    v                           |
+|  background.js service worker -- fsbHandleRuntimeMessage :7610            |
+|   handleStartAutomation :8912 --> agent-loop.js runAgentLoop :1180        |
+|   handleStopAutomation  :9559     (BYOK via universal-provider.js)        |
+|   fsbAgentRegistryInstance (utils/agent-registry.js, global export :1468) |
+|          ^                                                                |
+|          | dispatchMcpMessageRoute / dispatchMcpToolRoute                 |
+|  ws/mcp-bridge-client.js <---- ws://localhost:7225 ----+                  |
+|   (_connectionId minted at onopen :127;                |                  |
+|    routes agent:register et al :391-415)               |                  |
++--------------------------------------------------------+------------------+
+                                                          |
+        +--------------------- Node processes ------------+----------------+
+        |  WebSocketBridge (mcp/src/bridge.ts)                             |
+        |   hub (port 7225 owner) <-- relay:hello -- relay clients         |
+        |   hub-exit promotion with jitter :756-783                        |
+        |                                                                  |
+        |  fsb-mcp-server stdio (per MCP client; index.ts :243)            |
+        |  fsb-mcp-server serve  (HTTP daemon; index.ts :266, http.ts)     |
+        |   each createRuntime(): McpServer + AgentScope (runtime.ts :31)  |
+        |   AgentScope.ensure -> agent:register payload {} (:59-62)        |
+        +------------------------------------------------------------------+
+                          ^
+                          | MCP stdio / Streamable HTTP
+              External MCP clients (Claude Code, Cursor, Codex, ...)
+              installed via install.ts / platforms.ts PLATFORMS (:77)
 ```
 
-### Component Responsibilities
+### Component Responsibilities (existing components this milestone touches)
 
-| Component | Responsibility | Today's Implementation |
-|-----------|-----------------|-------------------------|
-| `angular.json` `i18n` block | Declares the 5 target locales + `subPath` + translation file path; drives `ng build --localize` fan-out | Static config, hand-edited; `sourceLocale.subPath` is `""`, each target locale's `subPath` matches its code exactly (`es`, `de`, `ja`, `zh-CN`, `zh-TW`) |
-| `locale-constants.ts` / `.js` | Runtime-consumable locale list (`LOCALES`, `LOCALE_SUBPATHS`, native labels) for Angular UI + Express middleware | Two hand-mirrored files, kept honest by `verify-locale-sync.mjs` |
-| `verify-locale-sync.mjs` | Registry parity ONLY — asserts the two `LOCALES` arrays match | Regex-extracts array literal, string-compares |
-| `lint:i18n` (eslint) | Marking completeness — every visible template string has an `i18n`/`i18n-*` attribute | ESLint template-syntax rule, run via `npx eslint "src/**/*.html"` with 2 ignore-patterns (`dashboard/**`, `stats/**` — the latter is exactly what this milestone must remove) |
-| `ng extract-i18n` + `diff -u` | EN-source completeness — `messages.xlf` matches what a fresh harvest of `i18n`-marked templates would produce | Shell pipeline in `ci.yml`, not a named npm script (nicknamed "extract-i18n-clean" in docs/plans; `showcase/angular/package.json` has no script literally named that — confirmed by the codebase's own Phase-275 discovery note) |
-| `ng build --localize` (`i18nMissingTranslation: error`) | Per-locale structural completeness — every EN trans-unit id has a corresponding `<target>` in each target XLIFF | Angular CLI build-time i18n compiler flag in `angular.json` |
-| **(NEW) `verify-translation-drift.mjs`** | Semantic freshness — every EN trans-unit id's `<source>` text matches its mirrored `<source>` in all 5 target XLIFFs | Does not exist yet; this milestone's job |
-| `verify-hreflang.mjs` | Post-build SEO/HTML assertion (hreflang tags, canonical, `lang` attr) on emitted prerender output | Walks `dist/`, regex-checks tags |
-| Accept-Language middleware (`server.js`) | Bare-`/` locale redirect for first-visit + returning users | Cookie short-circuits today (WARNING-02); needs a redirect-to-cookie-locale fix this milestone |
+| Component | Responsibility | Evidence |
+|-----------|----------------|----------|
+| `extension/ui/onboarding.js` | Install-command copy UX; already knows the clicked client id | `INSTALL_CLIENTS` :35-45; fan-item click -> `copyCommand(client.cmd, client.id)` :522-525; `copyCommand()` :784-794 keeps `state.copied` in memory only (:67, :787) — **nothing is persisted today** |
+| `extension/ui/control_panel.html` | "API Configuration" section to rename | `<section id="api-config">` :144, `<h2>API Configuration</h2>` :146, `#modelProvider` select with 7 API providers :157-165, per-provider key groups (e.g. `#xaiApiKeyGroup` :196) |
+| `extension/ui/options.js` | Provider select load/save + key-field visibility | default `modelProvider: 'xai'` :5; change listener :613-624; `updateApiKeyVisibility(provider)` :1301-1309; settings object built :1632; persisted flat to `chrome.storage.local` :1677 |
+| `extension/ui/sidepanel.js` | Task entry; sends `startAutomation` with legacy agent identity | `ensureLegacySidepanelAgent()` :1503; `chrome.runtime.sendMessage({action:'startAutomation', task, tabId, agentId, ownershipToken})` :1506-1513; `stopAutomation()` :1545-1560 |
+| `extension/background.js` | Session orchestration, kill switch, registry host | `fsbHandleRuntimeMessage` :7610; `handleStartAutomation` :8912; `startAutomationLoop` :11853; `handleStopAutomation` :9559 (storage-restore fallback; `fsbBroadcastAutomationLifecycle` on stop :9612) |
+| `extension/utils/agent-registry.js` | Mints `agent_<uuid>`, tab ownership, connection grace | `registerAgent()` :305 (AgentRecord `{agentId, createdAt, tabIds, ...}` :263, :333); `stampConnectionId()` :634 (the pattern to clone for clientInfo); staged releases keyed by connectionId :286; exported `global.FsbAgentRegistry` :1468 |
+| `extension/ws/mcp-bridge-client.js` | Extension side of ws://7225; per-connect `connectionId`; routes server-to-extension requests | `_ws.onopen` mints `crypto.randomUUID()` :112-144 (:127); onclose stages release via `stageReleaseByConnectionId` :185-186; keepalive `mcp:ping` send :329-330, `mcp:pong` ignore :373; `_handleMessage` switch :364/:391 routes `agent:register`/`agent:release`/`agent:status` :395-397 |
+| `extension/ws/mcp-tool-dispatcher.js` | Route handlers incl. agent identity | `handleAgentRegisterRoute` :1935-1994 — mints via registry, stamps `connectionId` :1965-1970, returns `{success, agentId, agentIdShort, ownershipTokens:{}, connectionId}` :1993; cap rejection `AGENT_CAP_REACHED` :1947-1954. **`clientInfo` appears nowhere in this payload today** |
+| `extension/ai/engine-config.js` | Named execution modes | `EXECUTION_MODES` :63-108 — exactly four: `autopilot`, `mcp-manual`, `mcp-agent`, `dashboard-remote`; `loadSessionConfig(modeName)` :126 |
+| `mcp/src/bridge.ts` | Hub/relay WS topology on 7225 | hub start :264-295; browser-origin gate :297-309 (`allowedBrowserOrigins ['chrome-extension://']` :90); relay handshake `relay:hello` :328-333, `relay:welcome` :453-462, `relay:state` broadcast :502-509; `_handleExtensionMessage` :515-572 (understands ONLY `mcp:ping`, `mcp:progress`, and id-matched responses — **extension-initiated requests have no protocol today**); hub-exit promotion :756-783; reject-message contract `BRIDGE_DISCONNECT_MESSAGES` :34-38 |
+| `mcp/src/agent-scope.ts` | Per-process (stdio) / per-session (HTTP) agent identity | `ensure()` sends `{type:'agent:register', payload:{}}` :59-62 — **the empty payload is the clientInfo seam**; defensive optional-field consumption pattern :77-101 |
+| `mcp/src/agent-bridge.ts` | Threads agentId/ownershipToken/connectionId into every tool payload | `sendAgentScopedBridgeMessage` :70-93 |
+| `mcp/src/runtime.ts` | Assembles server+bridge+queue+AgentScope | `createRuntime()` :31-50; `agentScope: options.agentScope ?? new AgentScope()` :34 |
+| `mcp/src/http.ts` | `serve` daemon; per-HTTP-session McpServer sharing ONE bridge/queue | initialize creates `createRuntime({bridge, queue})` :123-143 — each HTTP session gets its **own AgentScope + own McpServer** (so its own clientInfo), shared bridge |
+| `mcp/src/index.ts` | CLI entry: stdio/serve/status/doctor/install | stdio :243-264; `serve` -> `runHttpMode` :381-383/:266-294; `doctor` -> `runDoctor` :388-389/:334-348; help claims "install (21 platforms)" :93 |
+| `mcp/src/platforms.ts` | Client registry with per-OS config paths | `PLATFORMS` :77 (23 entries: 18 file-mode, 1 cli-mode `claude-code` :95-103 with `configPath: null`, 4 instructions-mode :314/:324/:334/:344); disk detection = `resolvePlatformTarget()` :437-490 via `existsSync` on config file :455-466 then parent dir :468-479 |
+| `mcp/src/install.ts` | Writes client configs / prints commands | `getClaudeCodeInstallCommand()` :31-33 (`claude mcp add --scope user fsb -- npx -y fsb-mcp-server`) |
+| `mcp/src/tools/autopilot.ts` | `run_task` -> `mcp:start-automation` with onProgress heartbeats | :33, :51, :124-131 |
+| `mcp/src/types.ts` | Bridge wire vocabulary (INV-01 additive-only) | `MCPMessageType` :8-48 (server-to-extension requests + `agent:*`); `MCPResponse` union `mcp:result|mcp:progress|mcp:error` :51-55 |
+| `mcp/src/diagnostics.ts` | doctor layer classification | `collectBridgeDiagnostics()` :422 (offline-UX handoff target) |
 
-## Recommended Project Structure
+---
 
-```
-showcase/angular/
-├── scripts/
-│   ├── verify-locale-sync.mjs          # existing -- registry parity (UNCHANGED)
-│   ├── verify-hreflang.mjs             # existing -- post-build HTML assertions (UNCHANGED)
-│   ├── verify-bundle-budgets.mjs       # existing -- gzip size gate (UNCHANGED)
-│   ├── verify-translation-drift.mjs    # NEW -- source-text drift gate (this milestone, permanent)
-│   └── audit-translation-completeness.mjs   # NEW, TEMPORARY -- one-shot full-page audit script
-│                                        #   (see "Suggested Build Order" -- this is a diagnostic
-│                                        #    tool for the audit phase of this milestone, not a
-│                                        #    permanent CI gate; retire or demote to a manual
-│                                        #    `npm run audit:i18n` script post-milestone)
-├── src/locale/
-│   ├── messages.xlf                    # EN source-of-truth (UNCHANGED structurally)
-│   ├── messages.{es,de,ja,zh-CN,zh-TW}.xlf   # 5 target files -- CONTENT resync happens here,
-│   │                                    #   not a new file format
-│   └── DO-NOT-TRANSLATE.md             # existing -- machine-token allowlist (UNCHANGED)
-├── package.json                        # ADD: "verify:translation-drift": "node scripts/verify-translation-drift.mjs"
-│                                        # MODIFY: lint:i18n -- remove `--ignore-pattern "src/app/pages/stats/**"`
-│                                        #   (only after stats-page translation work lands, see build order)
-└── angular.json                        # UNCHANGED (no new locale, no new subPath)
+## 2. Integration Seams Per Feature (question a)
 
-showcase/server/
-├── src/middleware/
-│   └── accept-language.js              # MODIFY -- fix WARNING-02 cookie-short-circuit semantics
-│                                        #   (see Pattern 2 below)
-└── server.js                           # UNCHANGED mount point/order; same middleware, same
-                                         #   position (before express.static)
+### Feature 1 — Agent identity capture
 
-tests/
-├── server-accept-language.test.js      # MODIFY -- flip one existing assertion + add new ones for
-│                                        #   the fixed cookie-redirect behavior
-└── translation-drift.test.js           # NEW -- unit tests for verify-translation-drift.mjs's
-                                         #   trans-unit-id-keyed diff logic (mirrors the existing
-                                         #   test style: pure Node assert, in-repo fixtures)
+| Seam | File:line | Change kind |
+|------|-----------|-------------|
+| Copy-click persistence | `extension/ui/onboarding.js:508-509` (base-command binds), `:522-525` (per-client fan binds), `:784-794` (`copyCommand` body) | MODIFY: add `persistCopyClick(clientId)` inside `copyCommand`; today `state.copied` is render-only |
+| `initialize` clientInfo capture | `mcp/src/server.ts:9-21` (McpServer creation), `mcp/src/runtime.ts:31-50` | MODIFY: read `server.server.getClientVersion()` -> `Implementation {name, version}` after initialize. Verified via Context7: functional in SDK v1.x (repo pins `@modelcontextprotocol/sdk ^1.29.0`, `mcp/package.json:54`); deprecated only in the SDK v2 migration. Capture point: `oninitialized` hook or lazily inside `AgentScope.ensure` |
+| Thread clientInfo through register | `mcp/src/agent-scope.ts:59-62` — `payload: {}` today | MODIFY: `payload: { clientInfo: {name, version} }` (additive; INV-01 safe). `AgentScope` needs a clientInfo supplier injected via `createRuntime` (runtime.ts:31) since it currently has no server handle |
+| Extension-side stamping | `extension/ws/mcp-tool-dispatcher.js:1935-1994`; precedent: `connectionId` capture :1965-1970 | MODIFY: read `payload.clientInfo`, call new `reg.stampClientInfo(agentId, clientInfo)` |
+| Registry record | `extension/utils/agent-registry.js:263` (AgentRecord shape), `:305` (registerAgent), `:634` (`stampConnectionId` — clone this) | MODIFY: `clientInfo` on AgentRecord + `stampClientInfo()`; surface in status/list snapshots |
+| Installed-client disk detection | `mcp/src/platforms.ts:437-490` (`detected` flag) | REUSE server-side; NEW inventory push to extension (Section 3). Pitfall: `claude-code` is cli-mode with `configPath: null` (:95-103) so `resolvePlatformTarget` always reports `detected:false` for it — Claude Code detection must check the `claude` binary / `~/.claude.json` instead |
+| Control-panel surfacing | `extension/ui/options.js` + `control_panel.html` | MODIFY: read new storage keys + new `getMcpClients` runtime message answered from the registry. Do NOT revive the commented background-agents `listAgents` surface (`options.js:5767`, `sidepanel.js:3651`) — that is the sunset v0.9.45rc1 path (INV-05) |
 
-.github/workflows/ci.yml                 # MODIFY -- insert one new step in the `website` job
-```
+### Feature 2 — Providers panel
 
-### Structure Rationale
+| Seam | File:line | Change kind |
+|------|-----------|-------------|
+| Section rename | `extension/ui/control_panel.html:144-148` (`id="api-config"`, `<h2>API Configuration</h2>` :146) | MODIFY copy to "Providers"; keep element ids stable where tests pin them (source-pin tripwires — run suite from first commit) |
+| Provider select | `control_panel.html:157-165` (`#modelProvider`: xai/gemini/openai/anthropic/openrouter/lmstudio/custom) | MODIFY: add agent-provider entries (e.g. grouped optgroups) + recommended badge |
+| Kind-aware key visibility | `extension/ui/options.js:1301-1309` (`updateApiKeyVisibility`) + change listener :613-624 | MODIFY: `agent` kind hides ALL key groups, shows connected/installed status instead |
+| Settings model | `options.js:5` (default), `:1632` (save object), `:1677` (`chrome.storage.local.set`), `:1337-1376` (load) | MODIFY: introduce `providerKind` (`api`\|`agent`) + `agentProviderId` alongside `modelProvider`; `modelProvider` keeps its 7 API values so `universal-provider.js` (provider switches :196/:550) never sees an agent value |
+| Recommended defaulting | new `fsbAgentProviders` storage | NEW: precedence connected > installed > copy-clicked |
 
-- **`verify-translation-drift.mjs` lives alongside the other `verify-*.mjs` scripts, not inside a new subfolder.** This repo's established convention (`verify-locale-sync.mjs`, `verify-hreflang.mjs`, `verify-bundle-budgets.mjs`) is one flat `scripts/verify-*.mjs` file per concern, each independently invocable via a matching `npm run verify:*` script, each wired as its own named step in `ci.yml`'s `website` job. A new script that follows this exact naming and invocation pattern is the path of least surprise for anyone who already knows this codebase's i18n tooling, and it keeps each gate single-purpose and independently debuggable (a red `verify:translation-drift` step in CI immediately tells you it's a semantic-drift failure, not a registry-parity or hreflang failure).
-- **The full-page completeness audit is NOT the same artifact as the CI drift gate**, and should not be built as one script that tries to do both. The audit is a one-time (or infrequent, manually-invoked) diagnostic that answers "what is untranslated or drifted RIGHT NOW across the whole surface" — it needs to walk every showcase page/component and cross-reference against every `i18n`-marked template string (or the rendered per-locale output), and produce a human-readable report. The drift gate is a permanent, fast, CI-blocking check that answers a narrower question: "did this commit's EN source change leave any of the 5 target files' mirrored source out of sync." Conflating them either makes the audit too slow/heavy to run on every PR, or makes the permanent gate too broad and fragile (e.g. if it tries to also assert "target text differs meaningfully from source text" as a proxy for "was this ever actually translated," it will misfire on short EN loanwords that are legitimately identical across locales, like "FSB" or brand names already carved out in `DO-NOT-TRANSLATE.md`).
-- **No new locale-registry file, no new XLIFF format, no new translation-storage layer.** The milestone's job is drift *detection* and *resync*, not a new translation pipeline. `angular.json`'s `i18n.locales` block and `locale-constants.{ts,js}` are correctly the single source of truth for "which locales exist" and stay untouched; this milestone only adds a new comparison over the *content* of files that already exist in that structure.
-- **`accept-language.js` gets modified in place, not replaced.** The bug is a semantics change to one branch of existing logic (see Pattern 2), not a rewrite. The existing `pickBestLocale`, `parseCookieHeader`, and BCP-47 alias-matching logic (`aliasTag`, `ZH_HANS_TARGETS`/`ZH_HANT_TARGETS`) are correct and heavily tested (42 assertions in `server-accept-language.test.js`) — none of that needs to move.
+### Feature 3 — Side-panel delegation (Claude Code MVP)
 
-## Architectural Patterns
+| Seam | File:line | Change kind |
+|------|-----------|-------------|
+| Side panel send | `sidepanel.js:1506-1513` | MODIFY: when selected provider kind is `agent`, dispatch new `startDelegatedTask` runtime message instead of the BYOK path |
+| Background coordinator | `background.js:7610` (router), alongside `handleStartAutomation` :8912 | NEW `handleStartDelegatedTask`: lightweight delegated session record (UI state only), forwards over the reverse channel |
+| Extension reverse-request send | `mcp-bridge-client.js` — precedent: fire-and-forget `mcp:ping` :329-330; `_handleMessage` switch :364-415 | NEW: extension-initiated request/response (`ext:*` frames) with own pending-map + id namespace; today the client can only *respond* to server requests |
+| Bridge protocol | `mcp/src/bridge.ts:515-572` (`_handleExtensionMessage` drops unknown frames), `:328-333` (`relay:hello`), `:441-489` (relay registration), `types.ts:8-55` | NEW additive frames: `ext:request`/`ext:response`/`ext:event` + supervisor capability advertisement on `relay:hello`/`relay:welcome`/`relay:state` (additive fields; INV-01) |
+| Spawner | none today | NEW `mcp/src/spawn-supervisor.ts` (Section 3 + Section 5) |
+| Spawned CLI re-entry | entire existing pipeline: child runs `fsb-mcp-server` stdio -> relay on 7225 -> `agent:register` (`agent-scope.ts:53`) -> own agentId + tab ownership -> tool dispatch | REUSE unchanged — the core reuse win of the milestone |
+| Progress to side panel | bridge `mcp:progress` origin-routing precedent :541-551; extension-to-UI precedent `fsbBroadcastAutomationLifecycle` `background.js:2456` | NEW `ext:event` frames supervisor -> hub -> extension -> runtime message -> `sidepanel.js` renderer |
+| Kill switch | `sidepanel.js:1545-1560` -> `background.js:9559`; grace release `mcp-bridge-client.js:185-186` + registry :286 | MODIFY stop path for delegated sessions: `ext:request delegate.cancel` (supervisor SIGTERMs child); child's WS close then reuses existing `stageReleaseByConnectionId` cleanup |
+| Offline UX | `mcp/src/diagnostics.ts:422`, `index.ts:334-348` (doctor) | NEW side-panel state: no supervisor answers -> "agent offline — run `fsb-mcp-server serve` / `doctor`" (extension has no nativeMessaging; it cannot wake any process) |
+| Execution mode | `extension/ai/engine-config.js:63-108` | MODIFY: fifth `EXECUTION_MODES` entry `delegated` |
 
-### Pattern 1: ID-Keyed Source-Text Diff (the drift gate itself)
+### Feature 4 — Multi-agent adapters
 
-**What:** Parse `messages.xlf` and each of the 5 target XLIFFs into `Map<trans-unit id, source text>`. For every id present in the EN map, assert the corresponding entry in each target map has byte-identical `<source>` text (after whitespace normalization). Report every (`id`, `locale`) pair that fails, then exit 1 if any failures exist.
+| Seam | File:line | Change kind |
+|------|-----------|-------------|
+| Adapter contract | new `mcp/src/agent-providers/` | NEW `AgentProviderAdapter`: `detect() / buildSpawn(task, ctx) / parseEvents(stream) / kill(child) / caps()` |
+| Claude Code adapter | `install.ts:31-33` (CLI command precedent); platforms cli-mode nuance :95-103 | NEW `claude-code.ts` — built as an adapter from day one so OpenCode/Codex/Gemini slot in |
+| Detection reuse | `platforms.ts:437-490` | REUSE for file-mode clients; per-adapter binary checks for cli-mode |
+| Provider list wiring | Providers panel model (Feature 2) | MODIFY: adapter ids become `agent` provider ids; `caps()` gates task-mode vs chat-mode (`--resume`) UI |
 
-**When to use:** This is the correct check because XLIFF's `<trans-unit>` structure (per the XLIFF 1.2 spec, `urn:oasis:names:tc:xliff:document:1.2`, used here) mirrors the EN `<source>` into every target file as an audit trail — the whole point of that mirrored `<source>` field in a translated XLIFF is "this is what was translated FROM." When the real EN source changes but that mirror doesn't get refreshed, the mirror becomes evidence of drift, and this is exactly what to diff against. This is a well-known TMS (translation management system) pattern, often called "source drift" or "fuzzy-match invalidation" — professional i18n pipelines (Phrase, Lokalise, Crowdin, and similar) typically auto-flag or fuzzy-mark units whose source changed since last translation. This project has no TMS; a small custom script fills that exact role.
+---
 
-**Trade-offs:**
-- Pro: Cheap (regex/text parse of 5 files, roughly 1MB each, sub-second), zero new dependencies — matching this repo's stated preference (`verify-hreflang.mjs`'s comment: "Zero new npm dependencies — regex-based, no jsdom"; `accept-language.js`'s comment: "Zero new dependencies — inline cookie parse + Node stdlib only").
-- Pro: Catches exactly the failure mode this milestone cares about (5 real drifted units from the named commit, not 247 phantom ones — see the framing correction above), and generalizes correctly to whatever additional drift the full-page audit surfaces.
-- Con: A pure text-diff cannot tell you the target *translation* is wrong, only that the EN source moved out from under it. It is necessarily a heuristic proxy for "needs re-review," not a semantic-correctness checker. This is fine and expected — closing the loop on translation *quality* is a human/AI-fill review step downstream of this gate, not something the gate itself can verify.
-- Con (must design around): must be robust to legitimate structural/whitespace differences that XLIFF tooling introduces (e.g. `<x id="INTERPOLATION"/>` placeholder ordering should usually stay stable, but Angular's extractor can reformat attribute quoting or context-group ordering across regenerations). Normalize whitespace before comparing, and compare only the `<source>` inner content, not the full `<trans-unit>` block (which also contains `<context-group>` linenumber metadata that legitimately differs commit-to-commit and MUST be ignored — per the framing-correction finding above, 242 of 247 diff lines in the named commit were exactly this kind of noise).
+## 3. New Components (question b)
 
-**Example (regex-based parse matching the codebase's existing `verify-locale-sync.mjs` style, dependency-free):**
-```javascript
-// scripts/verify-translation-drift.mjs
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { LOCALES, SOURCE_LOCALE } from '../src/app/core/i18n/locale-constants.js';
-// (Illustrative import path -- actual implementation should reuse whichever locale
-// registry module is import-compatible from a .mjs script; derive TARGET_LOCALES
-// from it rather than hardcoding, exactly per the WARNING-01 lesson below.)
+| Component | Location | Kind | Contents |
+|-----------|----------|------|----------|
+| Reverse-request protocol frames | `mcp/src/types.ts` (+ `bridge.ts` + `mcp-bridge-client.js`) | NEW wire types (additive) | `ext:request {id, method, payload, secret}` extension->hub; `ext:response {id, payload}` hub->extension; `ext:event {id, payload}` streamed supervisor->extension. Plus additive `capabilities: ['agent-spawn']` on `RelayHello` and supervisor presence on `RelayWelcome`/`RelayState` (types.ts:70-80 region) |
+| Spawner/supervisor | `mcp/src/spawn-supervisor.ts` | NEW module | Consent + shared-secret validation; adapter lookup; `child_process.spawn` with adapter-built argv (never `shell:true`); stream-json stdout parse -> `ext:event` fan-out; kill (SIGTERM -> SIGKILL escalation); child bookkeeping keyed by `delegationId`; exit-watch emits terminal event |
+| Adapter registry | `mcp/src/agent-providers/{index,adapter,claude-code}.ts` | NEW | `AgentProviderAdapter` contract; registry keyed by client ids aligned with `INSTALL_CLIENTS` (`onboarding.js:35-45`) and `PLATFORMS` keys (`platforms.ts:77`) |
+| Client-identity capture glue | inline in `runtime.ts` / `agent-scope.ts` | NEW glue | `getClientVersion()` read + supplier threading into `agent:register` payload |
+| Extension reverse-channel client | `extension/ws/mcp-bridge-client.js` | MODIFY (new capability) | `sendExtRequest(method, payload, {timeout})` with pending map + `ext:` id prefix; `ext:event` subscription routed to background listeners |
+| Delegation coordinator | `extension/background.js` | MODIFY (new handlers) | `startDelegatedTask`/`stopDelegatedTask` runtime messages; delegated session-lite records; event relay to side panel |
+| Captured-identity storage schema | `chrome.storage.local` | NEW schema (additive keys) | `fsbAgentProviders: { copyClicks: {<clientId>: {count, lastCopiedAt}}, connected: {<clientName>: {lastSeenAt, version}}, installed: {<platformKey>: {detected, configPath, checkedAt}}, selected: {kind:'api'|'agent', id} }`. Registry AgentRecord carries `clientInfo` as session-scoped truth; `fsbAgentProviders.connected` is the durable rollup |
+| Provider-kind model | `extension/ui/options.js` + engine read sites | MODIFY | `providerKind` setting + guard so BYOK engine paths only ever see the existing 7 API providers |
+| Fifth execution mode | `extension/ai/engine-config.js:63-108` | MODIFY | `delegated: { uiFeedbackChannel:'popup-sidepanel', animatedHighlights:true, safetyLimits: wall-clock watchdog (iterations N/A — loop runs in the external CLI) }` |
 
-const LOCALE_DIR = join(process.cwd(), 'src', 'locale');
-const SOURCE_FILE = join(LOCALE_DIR, 'messages.xlf');
-const TARGET_LOCALES = LOCALES.filter((l) => l !== SOURCE_LOCALE);
+---
 
-// Extracts { id -> raw inner-XML of <source>...</source> } keyed by trans-unit id.
-// Deliberately ignores everything else in the <trans-unit> block (context-group,
-// linenumber, notes) -- those legitimately churn on every unrelated code edit and
-// MUST NOT be treated as drift (see the 242-line-noise finding in this document's
-// framing-correction section: only 5 of 247 diff lines in commit 6d3ad363 were
-// real source-text changes).
-function extractSourceMap(xliffText) {
-  const map = new Map();
-  const unitRe = /<trans-unit id="([^"]+)"[^>]*>([\s\S]*?)<\/trans-unit>/g;
-  let m;
-  while ((m = unitRe.exec(xliffText)) !== null) {
-    const [, id, body] = m;
-    const sourceMatch = /<source>([\s\S]*?)<\/source>/.exec(body);
-    if (sourceMatch) map.set(id, sourceMatch[1].trim());
-  }
-  return map;
-}
+## 4. Data Flows (question c)
 
-const sourceMap = extractSourceMap(readFileSync(SOURCE_FILE, 'utf8'));
-const failures = [];
-
-for (const locale of TARGET_LOCALES) {
-  const targetPath = join(LOCALE_DIR, `messages.${locale}.xlf`);
-  const targetMap = extractSourceMap(readFileSync(targetPath, 'utf8'));
-  for (const [id, enSource] of sourceMap) {
-    const mirroredSource = targetMap.get(id);
-    if (mirroredSource === undefined) {
-      failures.push({ locale, id, reason: 'missing trans-unit (should already be caught by ng build)' });
-    } else if (mirroredSource !== enSource) {
-      failures.push({ locale, id, reason: 'source drift', en: enSource, mirrored: mirroredSource });
-    }
-  }
-}
-
-if (failures.length > 0) {
-  console.error(`Translation drift detected: ${failures.length} (locale, id) pairs out of sync.`);
-  for (const f of failures) console.error(`  [${f.locale}] ${f.id}: ${f.reason}`);
-  process.exit(1);
-}
-console.log(`Translation drift check passed: ${sourceMap.size} trans-units x ${TARGET_LOCALES.length} locales, zero drift.`);
-```
-
-### Pattern 2: Cookie-Directed Redirect (WARNING-02 fix)
-
-**What:** Change the Accept-Language middleware's cookie branch from "cookie present and valid -> `next()` (do nothing, let whatever static file exists at `/` serve)" to "cookie present, valid, and NOT the default locale -> actively 302 redirect to `/{cookieLocale}/`." Only fall through to Accept-Language-header-based detection when there is no usable cookie. The default-locale case (`cookieVal === defaultLocale`, i.e. `en`) still correctly falls through to `next()` since there's no redirect needed to reach the EN root.
-
-**When to use:** This directly closes the gap documented in `v0.9.63-INTEGRATION-CHECK.md`'s WARNING-02 and the audit's own suggested follow-up: *"flip cookie-precedence semantics from 'skip middleware' to 'redirect to cookie locale.'"* The audit already flagged the one real risk this introduces — a **redirect loop** — and named its own mitigation requirement: *"opens T-267-02 redirect-loop surface, needs explicit `/{locale}/` skip guard."* That guard is already structurally present and must be preserved: the middleware only runs `if (req.path !== '/') return next();` (`accept-language.js` line 93), so a redirect to `/{locale}/` (any non-root path) can never re-enter this same middleware branch on the very next request — the loop-guard is the existing path check, not something that needs to be newly invented. The only new invariant to add explicitly is: never redirect if the cookie's locale IS the default locale (`en`), because `/en/` is not a valid subPath in this project's `subPath` scheme (EN's `subPath` is `""`, per `angular.json`'s `sourceLocale.subPath` and `locale-constants.js`'s `LOCALE_SUBPATHS.en === ''`) — redirecting to `/en/` would 404.
-
-**Trade-offs:**
-- Pro: Closes exactly the UX gap the milestone names (returning fresh-tab/shared-link visitors with a previously-set locale cookie now land on their locale, not EN).
-- Pro: Minimal diff — this is a roughly 5-line change to one function (`createAcceptLanguageMiddleware`'s cookie-branch), not a new module. All the hard parsing/matching work (`pickBestLocale`, `aliasTag`, `parseCookieHeader`) is reused unchanged.
-- Con (must test explicitly): the existing test `'GET / + Accept-Language ja + Cookie fsb-locale=de -> next() (cookie wins)'` at `tests/server-accept-language.test.js:81-85` currently asserts `nextCalled: true, redirectArgs: null` for this exact case and encodes the OLD (short-circuit) semantics. Under the fixed behavior this assertion must flip to `nextCalled: false, redirectArgs: { status: 302, location: '/de/' }`. This is a deliberate, expected test-behavior change and should be called out explicitly in the phase/plan doc, not silently altered. The adjacent test `'GET / + Cookie fsb-locale=en -> next() (cookie wins, even for default)'` (lines 87-91) keeps its current expected outcome unchanged — the default-locale case still correctly falls through to `next()`.
-- Con: a returning visitor whose cookie locale no longer matches their live preference (e.g. they set `fsb-locale=de` once, months ago, but their browser's Accept-Language has since changed) will now be forced back to `/de/` on every bare-`/` visit, with no Accept-Language override, until they use the in-page picker again. This is the correct, intentional trade-off implied by "cookie wins" (matches how this repo's picker semantics have always been described), but is worth a one-line note in the phase's SUMMARY so a future WARNING doesn't reopen it as a new bug.
-
-**Example:**
-```javascript
-// showcase/server/src/middleware/accept-language.js -- inside createAcceptLanguageMiddleware's
-// returned function, replacing the current cookie branch (lines 95-98 today):
-
-const cookieVal = parseCookieHeader(req.headers && req.headers.cookie, cookieName);
-if (cookieVal && cookieVal !== defaultLocale && supportedSet.has(cookieVal)) {
-  // WARNING-02 fix: cookie now actively redirects instead of short-circuiting.
-  // Loop-safe: this middleware only ever runs on req.path === '/' (checked above),
-  // and this redirect always targets a non-'/' subpath, so the redirected request
-  // never re-enters this branch.
-  return res.redirect(302, '/' + cookieVal + '/');
-}
-if (cookieVal && cookieVal === defaultLocale) {
-  // Cookie explicitly says default locale (en) -- already at the right place; no redirect.
-  return next();
-}
-
-const best = pickBestLocale(req.headers && req.headers['accept-language'], supported);
-if (!best || best === defaultLocale) return next();
-res.redirect(302, '/' + best + '/');
-```
-
-## Data Flow
-
-### Drift-Gate Data Flow (new)
+### Flow 1 — Onboarding capture -> storage
 
 ```
-git commit changes showcase/angular/src/locale/messages.xlf (EN source)
-    v
-CI `website` job runs (existing steps, unchanged order):
-    verify-locale-sync.mjs -> lint:i18n -> [ng extract-i18n + diff -u]
-    v
-NEW STEP inserted here (see Suggested Build Order for exact position):
-    verify-translation-drift.mjs
-    - reads messages.xlf -> Map<id, source>
-    - reads each messages.{locale}.xlf -> Map<id, mirroredSource>
-    - diffs by id; exit 1 on any mismatch
-    v (pass)
-ng build (i18nMissingTranslation: error) -- existing, unchanged
-    v
-verify:hreflang -> verify-bundle-budgets.mjs -- existing, unchanged
+User hovers copy fan, clicks a client (e.g. "Cursor")
+  onboarding.js:522-525  (button dataset.copyClient -> INSTALL_CLIENTS lookup)
+    -> copyCommand(client.cmd, client.id)      onboarding.js:784
+        -> writeClipboard(text)                :796
+        -> NEW persistCopyClick(client.id)     -> chrome.storage.local
+              fsbAgentProviders.copyClicks['cursor'] = {count+1, lastCopiedAt}
+Control panel Providers section reads fsbAgentProviders on load
+  (options.js load path :1337-1376) -> renders "copy-clicked" tier (weakest signal)
 ```
+Base-command copies (`:508-509`) copy the currently rolled client's flag (`state.token` :63) — persist `{clientId: current, source:'base'}` so those clicks are not lost.
 
-### Cookie-Redirect Data Flow (WARNING-02 fix)
+### Flow 2 — initialize clientInfo -> agent:register -> extension registry -> control panel
 
 ```
-Returning visitor, fresh tab / shared link, GET /
-    v
-Request headers carry Cookie: fsb-locale=de (set by picker in a prior session)
-    v
-accept-language middleware (mounted before express.static, server.js:175)
-    v
-    cookieVal = 'de'; cookieVal !== 'en' (default); supportedSet.has('de') -- TRUE
-    v  (NEW behavior)
-    res.redirect(302, '/de/')
-    v
-Browser re-requests GET /de/
-    v
-req.path !== '/' -> middleware calls next() immediately (loop-safe, existing guard)
-    v
-express.static serves dist/showcase-angular/browser/de/index.html (prerendered German)
+Claude Code launches `npx -y fsb-mcp-server` (stdio)     [or connects to serve HTTP]
+  SDK initialize handshake carries clientInfo {name, version}
+  stdio: one runtime/process (index.ts:243-247); HTTP: one runtime/session (http.ts:123-143)
+    server.server.getClientVersion() -> {name, version}  [SDK v1.x accessor, verified]
+First tool call -> AgentScope.ensure(bridge)             agent-scope.ts:53
+  payload {} -> NEW payload {clientInfo}                 agent-scope.ts:59-62
+  bridge.sendAndWait('agent:register')                   bridge.ts:180-228
+    hub -> extension WS                                  bridge.ts:219-222
+      mcp-bridge-client.js _handleMessage :364, case 'agent:register' :395
+        dispatchMcpMessageRoute -> handleAgentRegisterRoute   mcp-tool-dispatcher.js:1935
+          reg.registerAgent() mints agent_<uuid>         agent-registry.js:305
+          reg.stampConnectionId(...)                     dispatcher :1965-1970 (existing)
+          NEW reg.stampClientInfo(agentId, clientInfo)   (clone of registry :634 pattern)
+          NEW rollup: fsbAgentProviders.connected['claude-code'] = {lastSeenAt, version}
+        response {agentId, agentIdShort, connectionId}   dispatcher :1993 -> AgentScope caches
+Control panel: NEW getMcpClients runtime message -> background reads registry + fsbAgentProviders
+  -> Providers panel shows "Claude Code — connected (agent_ab12...)"
+     (trusted-label precedent: visual-session clientLabel, dispatcher :1902)
+```
+Topology note: each stdio MCP client is its own process -> own AgentScope -> own clientInfo. In `serve` mode each HTTP session gets its own McpServer+AgentScope (http.ts:125 passes only bridge+queue; runtime.ts:34 defaults a fresh AgentScope) — clientInfo is correctly per-client on both transports.
+
+### Flow 3 — Side-panel delegation round trip
+
+```
+[side panel]  provider kind=agent (claude-code) selected; user types task, Send
+  sidepanel.js NEW branch at the :1506 send site -> runtime msg
+    startDelegatedTask {task, tabId(hint), providerId}
+[background]  NEW handleStartDelegatedTask -> delegated session-lite record (UI state)
+  -> mcp-bridge-client NEW sendExtRequest('delegate.start',
+       {task, providerId, tabHint, consentTier, secret})
+[ws 7225]     ext:request -> hub _handleExtensionMessage (bridge.ts:515) NEW ext:* branch
+  hub is supervisor?  yes -> handle locally
+                      no  -> forward to the relay that advertised capabilities:['agent-spawn']
+                      none -> ext:response {error:'agent_provider_offline'}
+[supervisor = serve daemon]  SpawnSupervisor.validate(secret, consent)
+  -> adapter('claude-code').buildSpawn(task)
+  -> spawn claude -p ... --output-format stream-json --strict-mcp-config
+       + hermetic mcp-config pointing ONLY at fsb + shipped `fsb` agent definition
+       (exact flags: verify in phase research)
+  -> ext:response {delegationId} -> extension -> side panel "delegating..."
+[spawned CLI] launches its own `npx fsb-mcp-server` (stdio) -> connects 7225 as relay
+  -> agent:register (Flow 2) -> OWN agentId + clientInfo
+  -> MCP tools (read_page/click/run_task/...) -> bridge -> extension dispatcher
+     -> tab actions under ITS OWN ownership (agent-registry bindTab :492-500) + visible glow
+[events]      supervisor parses child stream-json
+  -> ext:event {delegationId, phase, text, toolUse} -> hub -> extension bridge client
+  -> runtime message -> sidepanel.js progress renderer
+[stop]        side panel Stop (sidepanel.js:1545) -> background NEW stopDelegatedTask
+  -> sendExtRequest('delegate.cancel', {delegationId}) -> supervisor SIGTERM child
+  -> child exits -> child's stdio server WS closes -> extension-side grace release
+     (stageReleaseByConnectionId, mcp-bridge-client.js:185-186 / registry :286)
+  -> supervisor ext:event {status:'cancelled'} -> side panel terminal state
 ```
 
-## Scaling Considerations
+### State Management
 
-| Scale | Architecture Adjustments |
-|-------|---------------------------|
-| Current (6 locales, ~942 trans-units, 5 target files) | The `Map`-based, single-pass regex parse in Pattern 1 runs in well under a second; no optimization needed. This is a build-time/CI-time script, not a runtime hot path — it never touches production request latency. |
-| If locale count grows (e.g. adding a 7th/8th locale) | `TARGET_LOCALES` in the new script must be derived from `locale-constants.js`'s `LOCALES` array (filtered to exclude `SOURCE_LOCALE`), exactly the pattern `v0.9.63-INTEGRATION-CHECK.md`'s own WARNING-01 already recommended for `server.js` (`supported = LOCALES.filter(l => l !== SOURCE_LOCALE)`). Hardcoding the array in the new script would reproduce WARNING-01's exact mistake in a new file; the real implementation should import from the locale registry instead of hardcoding, keeping the single-source-of-truth property intact. |
-| If trans-unit count grows by 10x (e.g. thousands of marketing strings) | Still trivially fast for a single-pass Map diff; no architectural change needed until file sizes reach tens of MB, which is far outside this project's marketing-copy scope. |
-| If translation workflow moves to a real TMS (Phrase/Lokalise/Crowdin) in a future milestone | Those platforms have first-class "source changed since last translation" flagging built in, which would make this custom script redundant. Not a near-term concern; flagged here only so a future milestone doesn't have to rediscover this trade-off. |
+- Delegated-task UI state: background session-lite records + `chrome.storage.session` for SW-eviction survival. The MV3 SW WILL be evicted during long delegations; on WS reconnect the extension mints a fresh `_connectionId` (mcp-bridge-client.js:112-144), so `delegationId` must live in storage and re-associate on wake — mirror the `handleStopAutomation` storage-restore fallback pattern (background.js:9567-9586).
+- Identity ground truth: `fsbAgentProviders` (durable rollup) + live registry AgentRecords.
 
-### Scaling Priorities
+---
 
-1. **Not a scaling concern at this project's size.** The real risk this milestone's gate should optimize against is **false positives from the linenumber-churn noise already characterized above**, not runtime/CI performance. Keeping the diff strictly `<source>`-text-scoped (not whole-`<trans-unit>`-scoped) is the single most important design decision for this script's long-term reliability.
-2. **Second-order risk: the audit script and the drift-gate script overlapping in scope over time.** If the one-time audit script (the diagnostic tool from the audit phase) accretes CI-gate-like assertions and never gets retired or demoted, the project ends up with two overlapping i18n-completeness checks that can disagree with each other. See Suggested Build Order for how to sequence these to avoid that outcome.
+## 5. Spawner Ownership: hub vs relay vs serve daemon (question e)
 
-## Anti-Patterns
+**Recommendation: the `serve` daemon owns spawning. `SpawnSupervisor` lives in the `fsb-mcp-server serve` process regardless of whether its bridge is currently hub or relay. The hub's only new job is routing `ext:*` frames to whichever connected process advertises the `agent-spawn` capability — handling locally when it is itself the supervisor.**
 
-### Anti-Pattern 1: Whole-File Hash/Byte Comparison for Drift Detection
+Rationale:
 
-**What people do:** Compare a checksum or raw byte-diff of `messages.xlf` against a checksum of each target file, or treat any git diff on `messages.xlf` as "translations are now stale, re-review everything."
-**Why it's wrong:** As demonstrated by the actual commit `6d3ad363` in this repo (247 diff lines, only 5 real source-text changes), the overwhelming majority of `messages.xlf` diffs are `<context-group><linenumber>` churn from unrelated code motion. A whole-file or byte-level check would flag 242 units of pure noise as "drifted," creating alert fatigue and, worse, sending false-positive re-translation work to the 5-locale AI-fill/translator pipeline for units that never actually changed.
-**Instead:** Parse and compare only the `<source>` inner-text, keyed by `trans-unit id` (Pattern 1). This is the only comparison granularity that isolates true content drift from harmless structural churn.
+1. **Process lifetime.** Hub identity is unstable by design: any stdio server owned by an unrelated client session can hold the port, and hub-exit promotion (bridge.ts:756-783, jittered race, exercised by `tests/mcp-bridge-topology.test.js` `runHubExitPromotion` :242) reshuffles roles whenever that client exits. A spawned CLI's stream-json stdout must be read for the whole delegation; if the reader were "whoever is hub", a Cursor session quitting mid-delegation would orphan the child and its event stream. The serve daemon is the only intentionally long-lived process (index.ts:266-294, explicit SIGTERM/SIGINT shutdown :284-293).
+2. **Consent and security posture.** Spawning is RCE-adjacent. Binding it to a process the user explicitly started gives a clean consent story and a single holder for the shared secret and consent tiers. Arbitrary stdio hubs launched by third-party clients must never gain spawn authority implicitly.
+3. **Hub-exit promotion safety.** The daemon's bridge already reconnects/promotes automatically (`_attemptPromotion` :756, `_scheduleRelayReconnect` :785). Every reconnect re-sends `relay:hello`, so the additive `capabilities:['agent-spawn']` field re-advertises the supervisor to each new hub. Children are attached to the daemon process; hub churn never touches them — only frame routing pauses briefly (extension retries `ext:request` on disconnect-class rejections; extend `BRIDGE_DISCONNECT_MESSAGES` semantics, bridge.ts:34-38, if new reject sites are added — the comment there makes this mandatory).
+4. **Matches the honest-offline constraint.** The extension cannot wake processes (no nativeMessaging). "Supervisor present = serve daemon running (or a hub that opted in)" is exactly the state `doctor` (index.ts:334-348) can diagnose and the side panel can message.
 
-### Anti-Pattern 2: Merging the One-Time Audit and the Permanent CI Gate Into One Script
+Concrete hub routing rule (new code in bridge.ts): on `ext:request` from the extension — if this process registered a local SpawnSupervisor, handle; else forward to the first relay whose hello advertised `agent-spawn`; else reply `ext:response {error:'agent_provider_offline'}`. This stays inside the milestone's "reverse channel over the existing ws://7225 bridge" decision and is byte-additive on the wire (INV-01: new frame types + optional hello fields only; all existing `MCPMessageType` values untouched, types.ts:8-48).
 
-**What people do:** Write a single "do everything i18n" script that both (a) walks every page/component to check completeness against the live DOM/render output, and (b) runs on every CI push as the hard-fail drift gate.
-**Why it's wrong:** These have fundamentally different cost/frequency profiles. A full-page completeness audit that inspects every locale's output for every route is inherently heavier (potentially needs a built `dist/` to inspect, or headless-browser assertions) and is meant to run once (or occasionally, on-demand) to find the current gap — not on every commit. Baking it into the permanent CI gate either makes CI slow, or forces the audit logic to be watered down to something fast enough for every-push execution, defeating the audit's own purpose of being thorough. It also risks the exact trap PROJECT.md's milestone framing already fell into: conflating "247 lines changed" with "247 units need resync" — a heavier, less-precise tool is more likely to produce an inflated, misleading count.
-**Instead:** Two artifacts with two different lifecycles (see Suggested Build Order): a temporary/manually-invoked audit script for the audit phase (find the current gap, including anything beyond the one named commit), and a small, fast, permanent `verify-translation-drift.mjs` for every subsequent commit (Pattern 1). The audit's findings feed the resync work; the gate prevents recurrence going forward.
+Rejected alternatives:
+- **Hub-owned spawning:** simplest routing (frames already land at bridge.ts:515) but fails lifetime + consent as above.
+- **Any-process spawning:** ambiguous ownership; duplicate spawns on retries; kill-switch routing becomes a search problem.
+- **Separate supervisor port (e.g. 7226):** cleanest isolation, zero forwarding — but contradicts the milestone's existing-bridge decision and adds a second listener to the doctor/firewall surface. Keep as documented fallback if hub-forwarding proves fragile during implementation.
 
-### Anti-Pattern 3: Treating the Cookie Fix as "Just Flip a Boolean"
+Edge case to handle explicitly: two `serve` daemons (user runs `serve` twice). First-advertised-supervisor-wins at the hub, with a diagnostics note; do not fan out to multiple supervisors.
 
-**What people do:** Change the cookie branch to always redirect whenever a cookie is present, without re-checking the default-locale case or the loop-safety invariant.
-**Why it's wrong:** `en`'s `subPath` is `""` in this project's locale scheme (`LOCALE_SUBPATHS.en === ''`, `angular.json`'s `sourceLocale.subPath === ''`). A blind "always redirect to `/{cookieLocale}/`" would produce `res.redirect(302, '/en/')` when the cookie says `en`, and `/en/` is not a real subPath in this build's output — that would 404. The fix must special-case `cookieVal === defaultLocale` to still fall through to `next()` (already at the correct root), exactly as Pattern 2 shows.
-**Instead:** Preserve the three-way branch: (1) cookie says default locale -> `next()`; (2) cookie says a valid non-default supported locale -> active redirect; (3) no usable cookie -> fall through to existing Accept-Language-header logic. Also explicitly re-verify (and update, not silently break) the existing test at `tests/server-accept-language.test.js:81-85`, which currently encodes the pre-fix "cookie short-circuits" behavior as the expected/passing result for the `cookie=de, header=ja` case.
+---
 
-## Integration Points
+## 6. Delegation Coexistence With the Extension's Agent Loop (question f)
+
+1. **Execution modes.** `delegated` becomes the fifth `EXECUTION_MODES` entry (engine-config.js:63-108). Delegated tasks never enter `runAgentLoop` (agent-loop.js:1180) — background keeps a session-lite record for UI state; the reasoning loop runs in the spawned CLI, which drives the browser through the same MCP tool surface (INV-02 parity holds because no new tool stack exists). `loadSessionConfig('delegated')` (engine-config.js:126) supplies wall-clock watchdog + event-silence timeout instead of iteration caps.
+2. **Tab ownership.** The spawned CLI's stdio server registers its own agent (Flow 2) and binds tabs on first action (agent-registry.js:492-500). Two guards: (a) the side panel's `ensureLegacySidepanelAgent` pre-bind (sidepanel.js:1503) must NOT run for delegated sends, or the target tab is owned by `legacy:sidepanel` and the CLI's agent hits `TAB_NOT_OWNED` — pass the tab as a hint in the delegate payload and let the CLI's agent own it; (b) the spawned agent counts against the concurrency cap (`AGENT_CAP_REACHED`, dispatcher :1947-1954) — surface as a typed side-panel error.
+3. **Kill-switch paths (two; both required).**
+   - UI stop: side panel -> `stopDelegatedTask` -> `ext:request delegate.cancel` -> supervisor SIGTERM child. Distinct from BYOK stop (`handleStopAutomation` background.js:9559), which stays untouched for non-delegated sessions.
+   - Process-death fallback: child or daemon dies -> child's WS closes -> existing `stageReleaseByConnectionId` grace release (mcp-bridge-client.js:185-186; registry staged releases :286) frees tabs/overlays; the supervisor's exit-watch emits a terminal `ext:event` so the panel never hangs on "running". If the daemon itself dies, the extension's pending `ext:request` map times out -> offline state.
+4. **Simultaneity.** BYOK autopilot on tab A + delegated CLI on tab B coexist — exactly the v0.9.60 multi-agent ownership model. The only shared per-process resource is each MCP server's mutation queue (queue.ts), which serializes only that client's mutations.
+5. **UI feedback.** Delegated progress arrives via `ext:event` -> runtime messages, not loop `statusUpdate`s. Side panel adds a renderer branch reusing existing status components (`addStatusMessage` pattern, sidepanel.js:1525).
+6. **Test tripwires.** Every extension file touched (background.js, engine-config.js, sidepanel.js, mcp-bridge-client.js, dispatcher, agent-registry.js, onboarding.js, options.js) sits under source-pin tests (token counts/substrings). Run the full suite from the first commit of every phase.
+
+---
+
+## 7. Recommended Build Order (question d)
+
+Phases continue from 57. Dependency chain: identity capture -> providers UI -> delegation MVP -> multi-adapter.
+
+| Step | Scope | Depends on | Why this position |
+|------|-------|-----------|-------------------|
+| 1. Identity capture (copy-clicks + clientInfo) | onboarding persist; `getClientVersion` capture; `agent:register` payload `{clientInfo}`; `stampClientInfo`; `fsbAgentProviders` schema + connected rollup; `getMcpClients` runtime message | nothing | Pure additive data layer on both sides of the wire; unblocks everything later; closes the v0.9.36 deferred "trusted MCP client identity from handshake metadata" item |
+| 2. Installed-client detection + inventory | reuse `resolvePlatformTarget`; NEW inventory delivery server->extension (additive `system:client-inventory` request on extension-connect, or piggyback on register — decide with payload measurements); claude-code binary detection | 1 (schema exists) | Server-side disk access only; completes connected > installed > copy-clicked ground truth |
+| 3. Providers panel | rename :146; provider-kind model; agent rows + status; key-field hiding; recommended defaulting; BYOK guard | 1, 2 (needs real data) | Visible value before the risky spawn work; establishes the selection the delegation UI reads |
+| 4. Reverse-request channel + security | `ext:request/response/event`; hub routing + supervisor advertisement; extension pending-map; shared secret + origin gating + consent tiers; topology tests alongside `tests/mcp-bridge-topology.test.js` | independent, but sequence after 3 | Security-critical seam isolated in its own phase with its own tests; INV-01 additive proof lives here |
+| 5. Delegation MVP (Claude Code) | SpawnSupervisor in serve daemon; `claude-code` adapter (built AS an adapter); `delegated` EXECUTION_MODES entry; side-panel send/progress/stop; offline->doctor UX; SW-eviction re-association | 3 (provider selection), 4 (channel) | The integration payoff; the child CLI reuses the entire existing agent pipeline unchanged |
+| 6. Multi-agent adapters | registry hardening; OpenCode -> Codex -> Gemini adapters; `caps()`-gated task-mode vs chat-mode (`--resume`) | 5 | Contract proven by one real implementation before generalizing |
+
+Parallelization: 1 and 2 can interleave; 4 can start while 3 is in review. 5 must not start before 4's security tests are green.
+
+---
+
+## 8. Anti-Patterns (repo-specific)
+
+### Anti-Pattern 1: Prompt-stuffing the spawned CLI
+**What people do:** encode task + tool guidance into one giant `-p` prompt.
+**Why it's wrong:** brittle, unauditable; the milestone already chose a shipped `fsb` agent definition + hermetic `--strict-mcp-config`.
+**Do this instead:** adapter `buildSpawn` emits argv referencing the shipped agent definition; the task is the only variable input.
+
+### Anti-Pattern 2: Reviving the sunset background-agents surface
+**What people do:** resurrect `listAgents`/`getAgentStats` (commented at options.js:5767/6049, sidepanel.js:3651) or `extension/agents/*` for "agents in the panel".
+**Why it's wrong:** INV-05 freezes those modules; the new surface is MCP-client identity, a different concept.
+**Do this instead:** new `getMcpClients` message backed by `fsbAgentRegistryInstance` + `fsbAgentProviders`.
+
+### Anti-Pattern 3: Making `modelProvider` polymorphic
+**What people do:** store `modelProvider:'claude-code'` and branch everywhere.
+**Why it's wrong:** `universal-provider.js` (:196/:550), engine reads, and MCP diagnostics (`status` prints `modelProvider`, index.ts:152-156) all assume the 7 API values; an agent value leaks into request builders.
+**Do this instead:** separate `providerKind` + `agentProviderId`; `modelProvider` stays the last-used API provider.
+
+### Anti-Pattern 4: Letting "whoever is hub" spawn
+**Why it's wrong:** Section 5 — child lifetime tied to an unrelated client session; consent ambiguity; kill-switch routing breaks across hub-exit promotion.
+**Do this instead:** serve-daemon-owned SpawnSupervisor + capability-advertised routing.
+
+### Anti-Pattern 5: Editing bridge wire contracts in place
+**Why it's wrong:** INV-01 — every existing `MCPMessageType` (types.ts:8-48) and tool schema is byte-stable; register consumers tolerate only additive optional fields (see the defensive pattern in agent-scope.ts:77-101).
+**Do this instead:** new frame types + optional payload fields only; update `BRIDGE_DISCONNECT_MESSAGES` (bridge.ts:34-38) for any new reject-on-disconnect site — its comment makes this mandatory.
+
+---
+
+## 9. Integration Points
 
 ### External Services
 
-None. This entire milestone's scope (i18n completeness audit, drift gate, cookie-redirect fix) is internal-repo tooling with zero new third-party services, npm dependencies, or external APIs. This matches the codebase's explicit stated preference across every relevant existing script (`verify-hreflang.mjs`: "Zero new npm dependencies"; `accept-language.js`: "Zero new dependencies — inline cookie parse + Node stdlib only").
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Agent CLIs (claude, opencode, codex, gemini) | `spawn` with adapter-built argv; stream-json stdout; SIGTERM kill | Verify flags per CLI in phase research; never `shell:true` |
+| MCP SDK ^1.29.0 | `server.server.getClientVersion()` / `oninitialized` | Functional in v1.x; deprecated in SDK v2 in favor of per-request `ctx.mcpReq.envelope` — note for any future SDK major upgrade (Context7, HIGH) |
+| Client config files on disk | `resolvePlatformTarget` existsSync detection (platforms.ts:437-490) | cli-mode (`claude-code`) and instructions-mode entries need per-adapter detection |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
-|----------|-----------------|-------|
-| `verify-translation-drift.mjs` (new) ↔ `src/locale/*.xlf` | Direct filesystem read, regex-based XML parse (no XML library dependency, matching existing script style) | Must read the locale registry's `LOCALES`/`SOURCE_LOCALE` to derive the target-locale list dynamically, not hardcode it (avoids reproducing WARNING-01) |
-| `verify-translation-drift.mjs` (new) ↔ `ci.yml` `website` job | New named step, inserted into the existing linear step sequence | See Suggested Build Order for exact insertion point |
-| Full-page audit script (new, temporary) ↔ showcase pages/components | Either static-analysis (walk `.html` templates + cross-reference `i18n` attributes against XLIFF ids, similar to how `lint:i18n`'s eslint rule already inspects templates) or post-build inspection of `dist/showcase-angular/browser/{locale}/**` prerendered HTML | Recommend static-analysis-first (cheaper, no build required) since the goal is finding gaps in marking/translation coverage, not verifying rendered pixel output; the existing `verify-hreflang.mjs` precedent shows post-build HTML inspection is also an available pattern in this repo if the audit needs to verify what's actually rendered per-locale, not just what's marked |
-| `accept-language.js` (modified) ↔ `server.js` mount point | Unchanged — same `app.use(createAcceptLanguageMiddleware({...}))` call, same position (line 175, before `express.static` at line 182) | The fix is entirely internal to the middleware factory's returned function; the mount contract (options shape: `supported`, `defaultLocale`, `cookieName`) does not change |
-| `lint:i18n` (modified) ↔ `stats/` page components | Remove `--ignore-pattern "src/app/pages/stats/**"` from the `lint:i18n` npm script once stats-page translation work lands | Must land AFTER the stats page's own translation work is complete (see Suggested Build Order), not before, or `lint:i18n` will immediately hard-fail CI on pre-existing untranslated stats-page markup |
+|----------|---------------|-------|
+| side panel <-> background | runtime messages (`startAutomation` :1506; NEW `startDelegatedTask`/`stopDelegatedTask`/`getMcpClients`) | keep `startAutomation` payload backward-compatible |
+| background <-> hub | ws://7225; today server-initiated only; NEW `ext:*` extension-initiated frames | origin gate bridge.ts:297-309 + NEW shared secret for `ext:*` |
+| hub <-> supervisor relay | `relay:hello` capability advertisement (additive) + `ext:*` forwarding | mirrors existing `messageOrigin` response routing bridge.ts:538-571 |
+| supervisor <-> child CLI | argv/agent-definition in; stream-json out | watchdog + exit-code mapping to terminal `ext:event` |
+| child's MCP server <-> extension | unchanged existing pipeline (register/tools/ownership) | the deliberate reuse core of the milestone |
 
-## Suggested Build Order
-
-This directly answers the "audit the existing gap first, then add the permanent drift gate" sequencing concern from the milestone context. The dependency chain is:
-
-1. **Full-page completeness audit (temporary/diagnostic script or manual walkthrough).** Goal: enumerate every genuinely-untranslated-but-marked-translated string across all pages (lattice, phantom-stream, prometheus, home, mobile nav, stats, and anything else added since v0.9.63), not just the 5 units from commit `6d3ad363`. This step must run and complete BEFORE the permanent drift gate is wired into CI as hard-fail, because:
-   - The audit will very likely surface MORE than the 5 known-drifted units (the milestone's own goal statement — "every translatable string on every showcase page" — is broader than one commit's blast radius).
-   - If the permanent gate is wired hard-fail before this pre-existing debt is resolved, CI goes red immediately on the first commit that includes the new gate, for reasons unrelated to that commit (the classic "gate discovers pre-existing debt it didn't cause" problem).
-2. **Resync all units found in step 1** across the 5 target locale files (the 5 units from `6d3ad363` at minimum, plus whatever the broader audit finds). This includes the stats-page translation work (currently `lint:i18n`-ignored) since that's explicitly named as in-scope this milestone.
-3. **Un-ignore the stats page in `lint:i18n`** only after step 2's stats-page translation work is actually complete — removing `--ignore-pattern "src/app/pages/stats/**"` from `showcase/angular/package.json`'s `lint:i18n` script is itself a small, separate, ordered change that must come after the stats-page strings are marked and translated, not before.
-4. **Add `verify-translation-drift.mjs`** (Pattern 1) and wire it into `ci.yml`'s `website` job now that the tree is drift-free — it will pass on first wiring instead of immediately failing on residual debt from steps 1-3.
-   - Insertion point in `ci.yml`: after the "Verify ng extract-i18n produces no diff (CI-02)" step and before "Build Angular showcase" — this mirrors the existing ordering logic (cheap static-analysis / text-comparison gates run before the expensive `ng build` step) and matches the audit trail's own documented gate order (`verify-locale-sync → lint:i18n → extract-i18n-clean → ng build → verify:hreflang → verify-bundle-budgets`); the new gate slots in as `verify-locale-sync → lint:i18n → extract-i18n-clean → verify-translation-drift → ng build → verify:hreflang → verify-bundle-budgets`.
-5. **WARNING-02 cookie-redirect fix (Pattern 2)** has no dependency on steps 1-4 and can be built in parallel / any order relative to them — it touches a completely different file (`accept-language.js`) and a completely different concern (runtime redirect behavior, not build-time translation content). Sequence it wherever convenient in the phase/plan breakdown; it does not need to wait on the audit or the drift gate.
-6. **Retire or demote the audit script from step 1** once steps 1-4 are done. It served its purpose (finding and closing the gap); keeping it around as a stale, unmaintained "second i18n checker" that can silently diverge from the real permanent gate (`verify-translation-drift.mjs`) is the exact risk named in Anti-Pattern 2. Either delete it, or explicitly demote it to a manual/occasional `npm run audit:i18n` script with a comment clarifying it is NOT a CI gate and NOT guaranteed to stay in sync with `verify-translation-drift.mjs`'s logic.
+---
 
 ## Sources
 
-All findings in this document are verified directly against this repository's own source files and git history (internal-architecture research, not external-ecosystem research):
+- Direct source reads (this repo; all `file:line` citations above): `mcp/src/{bridge,agent-scope,agent-bridge,runtime,server,http,index,types,platforms,install}.ts`, `mcp/src/tools/autopilot.ts`, `mcp/src/diagnostics.ts`; `extension/ws/{mcp-bridge-client,mcp-tool-dispatcher}.js`; `extension/utils/agent-registry.js`; `extension/ui/{onboarding,options,sidepanel}.js`, `extension/ui/control_panel.html`; `extension/ai/engine-config.js`; `extension/background.js` — HIGH
+- graphify graph queries (symbol locations: `handleAgentRegisterRoute` dispatcher:1935, `handleStartAutomation` background:8912, `handleStopAutomation` background:9559, `createRuntime` runtime:31, `PLATFORMS` platforms:77; topology tests `tests/mcp-bridge-topology.test.js` incl. `runHubExitPromotion` :242 and `runRejectsUntrustedBrowserOrigin` :215) — HIGH
+- Context7 `/modelcontextprotocol/typescript-sdk` — server-side `getClientVersion()` exists and is functional in v1.x; deprecated in the v2 migration; 2026-era transports return `undefined` and move identity to `ctx.mcpReq.envelope` — HIGH for the pinned `^1.29.0` (`mcp/package.json:54`)
+- `.planning/PROJECT.md` v0.9.91 milestone section (INV-01, no-nativeMessaging constraint, security tiers, phases from 57) — HIGH
+- Claude Code headless flag surface (`-p`, `--output-format stream-json`, `--strict-mcp-config`, agent definitions): training data + milestone context only — **MEDIUM-LOW; verify exact flags against the installed CLI during the Delegation MVP phase**
 
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/PROJECT.md` (milestone goal, target features, key context, WARNING-02 history across 5+ milestone mentions)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/package.json` (existing `lint:i18n` script, confirmed `stats/**` ignore-pattern currently present)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/angular.json` (`i18n.locales` block, `i18nMissingTranslation: error` build option, `sourceLocale.subPath` = `""`)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/scripts/verify-locale-sync.mjs` (confirmed scope: registry-parity only, no content diffing)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/scripts/verify-hreflang.mjs` (existing script style/conventions precedent)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/server.js` (middleware mount order, lines 171-179; static-serving setup)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/src/middleware/accept-language.js` (full source of the WARNING-02 bug, cookie-branch logic)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/src/utils/locale-constants.js` and Angular's `.ts` mirror (locale registry single-source-of-truth)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/tests/server-accept-language.test.js` (42-assertion existing test coverage, including the exact assertion that must flip under the WARNING-02 fix)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.github/workflows/ci.yml` (exact `website` job step order — this is the literal insertion point for the new gate)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/phases/v0.9.63-INTEGRATION-CHECK.md` (original WARNING-01/WARNING-02/WARNING-03 audit findings, E2E flow traces, requirements integration map)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/milestones/v0.9.63-*.md` and `.planning/MILESTONES.md` (audit trail confirming WARNING-02 was deliberately deferred as a design lock, not an oversight)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/milestones/v0.9.69-phases/275-privacy-policy-cws-listing-ci-guard-integration-smoke/275-SUMMARY.md` (confirms `extract-i18n-clean` is not a literal npm script name — it's shorthand for the CI shell pipeline)
-- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/src/locale/messages*.xlf` (direct file inspection: confirmed 996/996 `state="translated"` in every target file today, proving the structural gate is fully green while semantic drift silently exists)
-- Git commit `6d3ad363619a731336ffb5f4480a92346339201a` (`chore(i18n): sync messages.xlf with showcase copy refinements`) — directly diffed both as raw git-stat (247/247) and as an id-keyed trans-unit comparison (5 real changes), which is the basis for this document's central framing correction
-- XLIFF 1.2 specification (OASIS, `urn:oasis:names:tc:xliff:document:1.2`) — background on the `<source>`/`<target>` mirroring convention that Pattern 1's diff logic exploits; general industry knowledge of TMS "source drift" / "fuzzy match invalidation" conventions (Phrase, Lokalise, Crowdin all implement variants of this), offered as context for why this pattern is a recognized approach rather than an ad hoc invention — MEDIUM confidence on the general industry-convention claim (not verified against those specific vendors' docs in this session), HIGH confidence on everything else in this document since it was verified directly against this repo's own files
+### Open Questions for Phase Research
+
+1. Exact current `claude` CLI headless flags, permission-mode defaults, and stream-json event schema (verify against the installed CLI at implementation time).
+2. Inventory delivery trigger: on-extension-connect push vs piggyback on `agent:register` vs on-demand `ext:request clients.detect` — decide in Step 2 with payload-size measurements.
+3. Shared-secret provisioning for `ext:*` frames (the extension has no pre-shared channel with the daemon other than the bridge itself): TOFU pairing on first `serve` connect vs a user-visible pairing code in the control panel — decide in Step 4 security research.
+4. Whether the Providers panel should also surface HTTP-session clients from `serve` mode distinctly from stdio clients (both produce clientInfo; UX question only).
 
 ---
-*Architecture research for: Angular-i18n showcase site — translation-completeness verification and drift-detection CI gate design*
-*Researched: 2026-07-07*
+*Architecture research for: FSB v0.9.91 MCP Clients as Providers*
+*Researched: 2026-07-10*

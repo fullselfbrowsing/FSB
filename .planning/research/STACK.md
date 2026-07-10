@@ -1,130 +1,269 @@
 # Stack Research
 
-**Domain:** Angular i18n translation-completeness audit tooling + XLIFF drift-detection CI gate (showcase marketing site, v1.2.0)
-**Researched:** 2026-07-07
-**Confidence:** HIGH
+**Domain:** Headless agent-CLI spawning/supervision from a Node daemon (MCP-clients-as-providers, v0.9.91)
+**Researched:** 2026-07-10
+**Confidence:** HIGH (flag matrices verified against live local binaries + current official docs; see per-section notes)
 
-> **Note:** This supersedes the prior v1.0.0 (OpenTabs Full App Catalog) `STACK.md` that occupied this path -- that research is unrelated to this milestone and has been overwritten per the current research task. Recover it from git history (`ARCHITECTURE-v1.0.0-OPENTABS-CATALOG.md` in this same directory preserves that milestone's architecture notes as a renamed sibling; the equivalent stack notes are recoverable from git log on this path if ever needed).
+> **Note:** This supersedes the v1.2.0 (Showcase i18n) `STACK.md` that occupied this path — unrelated to this milestone, recoverable from git history (same convention as the previous overwrite noted in that file's own header).
 
-## Ground-Truth Finding (verified against live repo files, not hypothetical)
+> **Scope guard:** Existing validated stack (MV3 extension, vanilla JS, `fsb-mcp-server` on `@modelcontextprotocol/sdk ^1.29`, ws 8.x bridge on 7225, streamable-HTTP on 7226, platforms.ts registry, install.ts writers, universal-provider.js) is NOT re-researched. Everything below is only what the four NEW features need.
 
-Before recommending tooling, I parsed the actual `showcase/angular/src/locale/messages*.xlf` files with a throwaway script to confirm the milestone's premise and validate the detection algorithm end-to-end. Results, run against the current working tree:
+---
 
-| Locale | Missing (never extracted+translated) | Orphaned (stale id, not in current `messages.xlf`) | Drifted (id matches, `<source>` text differs from current source) |
-|--------|----|----|----|
-| es | 0 | 54 | 5 |
-| de | 0 | 54 | 5 |
-| ja | 0 | 54 | 5 |
-| zh-CN | 0 | 54 | 5 |
-| zh-TW | 0 | 54 | 5 |
+## Headline Recommendation
 
-The 5 "drifted" units are a **live, reproducible instance of exactly the bug this milestone targets**: e.g. `trans-unit id="home.meta.description"` in `messages.xlf` currently reads *"Local-first Chrome automation and MCP browser layer for AI agents, with trigger watchers, real uploads, and guarded first-party API capability calls."* -- but `messages.es.xlf`'s matching trans-unit still carries the **old** English source text cached inline, and its `<target>` is a translation of that stale sentence, not the current one. No `state` attribute anywhere in the shipped locale files flags this (every unit reads `state="translated"`) -- so the existing pipeline is structurally blind to source drift. This confirms the gap is real, current, and exactly as described in `.planning/PROJECT.md`.
+**Add zero new runtime dependencies to `mcp/`.** Every new capability — spawning agent CLIs, supervising them, parsing their JSONL streams, capturing `clientInfo`, detecting installed clients — is achievable with Node built-ins (`node:child_process`, `node:readline`, `node:fs`, `node:os`) plus APIs already present in the pinned `@modelcontextprotocol/sdk`. Shell out to the **user's own installed CLIs** (subscription auth preserved); do **not** embed the Claude Agent SDK (API-key-only auth, policy-prohibited subscription use — see tradeoff section).
 
-The 54 "orphaned" units per locale are pre-existing (`SHOWCASE_STATS_*` ids, matching the stats-page carry-forward debt) -- a secondary but related finding: orphaned units are a weaker signal than drift (they may reflect intentionally-excluded surfaces) but should still be visible in the audit report.
+---
+
+## Verified CLI Flag Matrices
+
+Verification method: flags run against **locally installed binaries** where available (strongest evidence), cross-checked against official docs fetched 2026-07-10. Do not trust flag names from memory at build time — each adapter should version-probe (`<cli> --version`) and treat the matrices below as the contract for the listed versions.
+
+### 1. Claude Code CLI — MVP adapter target
+
+**Verified against:** local `claude` **2.1.177** (`--help` output, verbatim) + https://code.claude.com/docs/en/cli-reference + /docs/en/headless + /docs/en/permissions (fetched 2026-07-10). Confidence: **HIGH**.
+
+| Capability | Flag (verbatim) | Notes |
+|---|---|---|
+| Headless run | `-p, --print` | "Print response and exit". All other flags compose with it. Prompt via argv or stdin pipe (stdin capped at 10MB since v2.1.128) |
+| Streaming output | `--output-format stream-json` | Choices: `text` (default), `json` (single result), `stream-json` (newline-delimited JSON). Print mode only |
+| Token-level partials | `--include-partial-messages` | "only works with --print and --output-format=stream-json". Emits `stream_event` lines with `text_delta` |
+| Verbose (required) | `--verbose` | Docs' stream-json examples always include it; historically `-p --output-format stream-json` errors without `--verbose`. Include it unconditionally |
+| Streaming input | `--input-format stream-json` | "realtime streaming input" — enables a persistent child receiving user turns as JSONL on stdin (chat-mode without respawn). Pairs with `--replay-user-messages` |
+| Resume (chat-mode) | `-r, --resume [sessionId]` / `-c, --continue` | Session ID lookup is **scoped to the current project directory** and its worktrees — the daemon must use a stable per-provider cwd for resume to work |
+| Fork / pin session | `--fork-session`, `--session-id <uuid>` | UUID must be valid; fork creates new ID on resume |
+| Ephemeral (task-mode) | `--no-session-persistence` | "sessions will not be saved to disk and cannot be resumed (only works with --print)" |
+| Agent persona | `--agent <name>` | "Agent for the current session. Overrides the 'agent' setting." |
+| Inline agent definition | `--agents <json>` | Session-only, never written to disk — "useful for quick testing or automation scripts". Accepts full frontmatter fields: `description`, `prompt`, `tools`, `disallowedTools`, `model`, `permissionMode`, `mcpServers`, `hooks`, `maxTurns`, `skills`, `initialPrompt`, `memory`, `effort`, `background`, `isolation`, `color` |
+| Tool allowlist | `--allowedTools` / `--allowed-tools <tools...>` | Comma or space separated; permission-rule syntax |
+| Tool denylist | `--disallowedTools` / `--disallowed-tools` | Bare tool name removes tool from context entirely |
+| Built-in tool restriction | `--tools ""` \| `"default"` \| `"Bash,Edit,Read"` | `--tools ""` strips ALL built-ins — strongest "browser-only" lockdown when combined with an MCP allowlist. Verify quoting behavior in a spike |
+| Permission mode | `--permission-mode <mode>` | Choices at 2.1.177 (verbatim from --help): `"acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"`. (`manual` alias exists only ≥2.1.200.) **`dontAsk` is the delegation default we want:** "Auto-denies tools unless pre-approved via `permissions.allow` rules" |
+| Hermetic MCP | `--mcp-config <configs...>` + `--strict-mcp-config` | Verbatim: "Only use MCP servers from --mcp-config, ignoring all other MCP configurations". `--mcp-config` accepts JSON **files or strings** |
+| System prompt | `--append-system-prompt <text>`, `--append-system-prompt-file <path>` | Also `--system-prompt(-file)` for full replacement — avoid; keep CC defaults |
+| Budget rails | `--max-turns <n>` (print only), `--max-budget-usd <amt>` | Both exist at current versions; belt-and-suspenders alongside daemon wall-clock timeout |
+| Non-interactive permission broker | `--permission-prompt-tool <mcp-tool>` | Optional later: route approval asks back through an FSB MCP tool instead of hard-deny |
+
+**MCP tool wildcard semantics (verified verbatim, code.claude.com/docs/en/permissions, 2026-07-10):**
+
+- `mcp__fsb` — "matches any tool provided by the `fsb` server"
+- `mcp__fsb__*` — "uses wildcard syntax and also matches all tools from the server" (both forms valid today; older docs disallowed the `__*` form — this HAS changed)
+- `mcp__fsb__read_page` — single tool
+- Allow rules accept globs **only after a literal `mcp__<server>__` prefix** (`mcp__fsb__get_*` works); unanchored allow globs like `mcp__*` are "skipped with a warning". `mcp__*` works in **deny/ask** rules only.
+- Recommendation: use bare `mcp__fsb` in `--allowedTools` (both forms equivalent; bare form is the one that has been stable across doc generations).
+
+**Critical auth gotcha (verified):** `--bare` mode "skips OAuth and keychain reads. Anthropic authentication must come from `ANTHROPIC_API_KEY` or an `apiKeyHelper`". Docs recommend `--bare` for scripts, **but FSB must NOT use it** — subscription auth is the entire point of agent providers. Hermeticity comes from `--strict-mcp-config` + `--agents` + `--settings` instead, which leaves OAuth intact.
+
+**stream-json event contract (verified, code.claude.com/docs/en/headless):** first line is `system` subtype `init` (session_id, model, tools, mcp_servers, plus a `capabilities` string array ≥2.1.205 — feature-detect from it, not from version strings); then `assistant`/`user` message lines, `stream_event` partials (with `--include-partial-messages`), `system/api_retry` on retryable API errors (fields: `attempt`, `max_retries`, `retry_delay_ms`, `error_status`, `error` category incl. `authentication_failed`, `billing_error`, `rate_limit`), terminal `result` line (includes `total_cost_usd`, per-model usage, `session_id`). One JSON object per line.
+
+**Reference delegation invocation (MVP shape):**
+
+```bash
+claude -p --verbose \
+  --output-format stream-json --include-partial-messages \
+  --mcp-config '{"mcpServers":{"fsb":{"type":"http","url":"http://127.0.0.1:7226/mcp"}}}' \
+  --strict-mcp-config \
+  --agents "$(cat fsb-agent.json)" --agent fsb \
+  --permission-mode dontAsk \
+  --allowedTools "mcp__fsb" \
+  --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch" \
+  --max-turns 40 \
+  --no-session-persistence          # task-mode only; omit + capture session_id for chat-mode
+# prompt written to stdin (never argv — Windows quoting + length limits)
+```
+
+Two spike items flagged for the phase (5-minute checks, not blockers): (a) whether `--agent fsb` can select an agent defined inline via `--agents` in the same invocation (documented composition is indirect; fallback is `--append-system-prompt-file`, which is fully documented); (b) exact `--tools ""` quoting on Windows.
+
+Note the injected `--mcp-config` uses FSB's **existing streamable-HTTP endpoint (port 7226)** so the spawned CLI joins the already-running daemon/hub instead of forking a second stdio server process (which would spawn a competing hub and force relay promotion on 7225).
+
+### 2. Codex CLI
+
+**Verified against:** local `codex` **0.142.5** (`codex exec --help`, `codex mcp --help`, verbatim) + https://developers.openai.com/codex/noninteractive (→ redirects to learn.chatgpt.com/docs/non-interactive-mode) + config reference (learn.chatgpt.com/docs/config-file/config-reference), fetched 2026-07-10. npm latest: `@openai/codex` **0.144.1**. Confidence: **HIGH**.
+
+| Capability | Flag (verbatim from 0.142.5 --help) | Notes |
+|---|---|---|
+| Headless run | `codex exec [PROMPT]` | Prompt as arg, or `-` / piped stdin ("If stdin is piped and a prompt is also provided, stdin is appended as a `<stdin>` block") |
+| Streaming output | `--json` | "Print events to stdout as JSONL". Event types: `thread.started`, `turn.started`, `turn.completed`, `turn.failed`, `item.started`, `item.completed`; item types: `agent_message`, `reasoning`, `command_execution`, `mcp_tool_call`, `file_changes`, `web_search`, `plan_updates` |
+| Final answer only | `-o, --output-last-message <FILE>` | Written to file, not stdout |
+| Structured output | `--output-schema <FILE>` | JSON Schema for final response |
+| Resume (chat-mode) | `codex exec resume <SESSION_ID>` / `codex exec resume --last "next instruction"` | Subcommand, not a flag |
+| Ephemeral (task-mode) | `--ephemeral` | "Run without persisting session files to disk" — Codex's `--no-session-persistence` equivalent |
+| Hermetic config | `--ignore-user-config` + `-c key=value` | "Do not load `$CODEX_HOME/config.toml`; **auth still uses `CODEX_HOME`**" — exactly the strict-MCP + subscription-auth combination FSB needs. `-c` takes dotted TOML paths, e.g. `-c 'mcp_servers.fsb.url="http://127.0.0.1:7226/mcp"'` |
+| Profiles (alt hermetic path) | `-p, --profile <name>` | Layers `$CODEX_HOME/<name>.config.toml` on top of base config ("CONFIG_PROFILE_V2") — FSB could install a `fsb-delegation.config.toml` |
+| Sandbox | `-s, --sandbox <read-only\|workspace-write\|danger-full-access>` | Default read-only. `--full-auto` is **deprecated** (docs: "prints warning; prefer --sandbox workspace-write") — do not emit it |
+| Full bypass | `--dangerously-bypass-approvals-and-sandbox` | "EXTREMELY DANGEROUS" — never emit from FSB |
+| Repo guard | `--skip-git-repo-check`, `-C, --cd <DIR>` | Needed: daemon scratch cwd is not a git repo |
+| MCP config (persistent) | `[mcp_servers.<id>]` in `config.toml` | Keys verbatim: `command`, `args`, `cwd`, `env`, `enabled`, `startup_timeout_sec`, `tool_timeout_sec`, `enabled_tools`, `disabled_tools`; HTTP servers: `url`, `http_headers`, `bearer_token_env_var`. `codex mcp list|get|add|remove|login|logout` exists (0.142.5) |
+| Auth | ChatGPT login (subscription) by default; `CODEX_API_KEY` env only for CI | Matches key-less provider model |
+
+**Drift alert (MEDIUM confidence):** current config reference lists `approval_policy` values as `"untrusted"`, `"on-request"`, `"never"` plus a granular object — `on-failure` (present in training-data-era docs) is no longer listed. Since `codex exec` is non-interactive, FSB's adapter should rely on sandbox mode, not approval_policy; re-verify if approval_policy is ever emitted.
+
+### 3. Gemini CLI
+
+**Verified against:** https://github.com/google-gemini/gemini-cli `docs/cli/cli-reference.md`, `docs/cli/headless.md`, `docs/tools/mcp-server.md` (main branch, fetched 2026-07-10). npm latest: `@google/gemini-cli` **0.50.0**. Not installed locally — no binary cross-check. Confidence: **MEDIUM-HIGH** (current official docs, single source class).
+
+| Capability | Flag (verbatim from docs) | Notes |
+|---|---|---|
+| Headless run | `-p, --prompt` | "Appended to stdin input if provided. Forces non-interactive mode." Headless also triggers in non-TTY environments |
+| Streaming output | `-o, --output-format stream-json` | Choices: `text`, `json`, `stream-json`. JSONL events: `init`, `message`, `tool_use`, `tool_result`, `error`, `result`. Exit codes: 0 success, 1 error, 42 input error, 53 turn-limit |
+| Approval | `--approval-mode <default\|auto_edit\|yolo\|plan>` | `-y/--yolo` is **deprecated** ("Use --approval-mode=yolo instead") — do not emit `--yolo` |
+| Tool allowlist | `--allowed-tools` **deprecated** ("Use the Policy Engine instead") | MCP-server-level gating is the supported path: `--allowed-mcp-server-names` (array) |
+| Resume (chat-mode) | `-r, --resume <"latest"\|index>` | Plus `--list-sessions`, `--delete-session`. Resume support now exists (newer than training data) |
+| MCP config | `mcpServers` in `~/.gemini/settings.json` or project `.gemini/settings.json` | Keys verbatim: `command`, `args`, `env`, `cwd`, `timeout` (ms, default 600000), `trust` (true "bypasses all tool call confirmations for this server"), `includeTools`, `excludeTools`; HTTP: `httpUrl` + `headers`; SSE: `url`. `gemini mcp add|list|remove|enable|disable` exists |
+| Hermetic MCP | No per-invocation MCP flag | Achieve hermeticity by having the daemon own a scratch workspace dir containing `.gemini/settings.json` (project scope) + `--allowed-mcp-server-names fsb`; `trust: true` on the fsb entry to suppress per-tool confirmations |
+| ACP | `--experimental-acp` | Alternative structured integration channel (see ACP note under OpenCode) |
+| Model | `-m auto\|pro\|flash\|flash-lite` | |
+
+### 4. OpenCode
+
+**Verified against:** local `opencode` **1.14.25** (`opencode run --help`, verbatim) + https://opencode.ai/docs/cli/, /docs/mcp-servers/, /docs/agents/ (docs stamped "Last updated: Jul 10, 2026"). npm latest: `opencode-ai` **1.17.18**. Repo now lives at **anomalyco/opencode**. Confidence: **HIGH** for 1.14.25 flags, MEDIUM for renames in ≥1.15.
+
+| Capability | Flag | Notes |
+|---|---|---|
+| Headless run | `opencode run [message..]` | Message as positional args |
+| Streaming output | `--format json` | Choices verbatim: `"default", "json"` — json = "raw JSON events". Event schema is NOT formally documented — adapter must treat it as best-effort and pin against fixtures |
+| Agent persona | `--agent <name>` | Selects agent by name |
+| Agent definitions | `opencode.json` `"agent"` key, or markdown in `~/.config/opencode/agents/` / `.opencode/agents/` | Fields: `description`, `mode` (`primary`\|`subagent`\|`all`), `model` (`provider/model`), `prompt` (`{file:./path}` supported), `permission` (`allow`\|`ask`\|`deny` per tool: `read`,`edit`,`bash`,`webfetch`,…), `temperature`, `steps` (max iterations). `opencode agent create` = interactive generator |
+| Resume (chat-mode) | `-c, --continue`, `-s, --session <id>`, `--fork` | |
+| Permission bypass | 1.14.25: `--dangerously-skip-permissions` ("auto-approve permissions that are not explicitly denied (dangerous!)"); current docs list `--auto` with identical wording | **Rename in flight between 1.14.x and 1.17.x** — adapter must NOT hard-code either; prefer a shipped `fsb` agent with explicit `permission` config so no bypass flag is ever needed |
+| MCP config | `opencode.json` / `opencode.jsonc` (project) or `~/.config/opencode/opencode.json` (global), `"mcp"` key | Local: `{"type":"local","command":["npx","-y","fsb-mcp-server"],"environment":{},"enabled":true,"timeout":5000}`; Remote: `{"type":"remote","url":"http://127.0.0.1:7226/mcp","headers":{},"enabled":true}`. Per-agent tool toggles support globs: `"tools": {"fsb*": true}` |
+| Server modes | `opencode serve` (HTTP, `--port`/`--hostname`), `--attach <url>`, `opencode acp` (ACP over stdio JSON-RPC) | `--attach` lets `run` reuse a running server — cheap process reuse for repeat delegations |
+
+**ACP note (applies to OpenCode + Gemini + future Zed-ecosystem agents):** both `opencode acp` and `gemini --experimental-acp` speak the Agent Client Protocol (JSON-RPC over stdio, zed.dev/acp). ACP is a *better long-term* delegation transport than scraping per-CLI JSONL (uniform session/permission/streaming semantics across agents), but it is the wrong MVP choice: Claude Code exposes no ACP server mode, and adding the `@zed-industries/agent-client-protocol` client library is a new dependency for adapters 2-4 only. Record it as the designated evolution path for the `AgentProviderAdapter` contract, not an MVP dependency.
+
+---
 
 ## Recommended Stack
 
-### Core Technologies (already in place -- do not change)
+### Core Technologies (all built-in — zero new runtime deps)
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Angular CLI `ng extract-i18n` | `^20.3.25` (`@angular/build`) | Source-of-truth extraction into `messages.xlf` | Already pinned; producing the XLIFF 1.2 files this milestone must audit. No version change needed or suggested. |
-| XLIFF | `1.2` (OASIS) | Translation file format | Already the format in use (`xliff version="1.2"`); do not migrate to XLIFF 2.0 -- would touch all 6 files + Angular config for zero milestone-relevant benefit. |
-| Node.js | `>=24.0.0` (repo `engines.node` floor) | Script runtime for new tooling | Matches root `package.json` engines constraint already enforced repo-wide. |
+| `node:child_process` `spawn` | Node ≥18.20.0 (mcp/ engines floor, unchanged) | Spawn + supervise agent CLIs | Only primitive that gives streaming stdio + `AbortSignal` + `detached` process groups. `signal` option verified in official docs: abort ≈ `.kill()` with `killSignal` (default `'SIGTERM'`), child errors with `AbortError` |
+| `node:readline` (`createInterface({ input: child.stdout, crlfDelay: Infinity })`) | built-in | JSONL line framing for all four CLIs' stream output | Handles partial lines across chunk boundaries; zero deps; volume (LLM event streams) is far below any throughput where a Transform-stream splitter would matter. Wrap each line in `try { JSON.parse } catch` — all four CLIs may interleave non-JSON warnings on stderr, and OpenCode's event schema is undocumented |
+| `@modelcontextprotocol/sdk` (existing pin ^1.29) | 1.29.0 | Capture `clientInfo` from `initialize` | **Verified in the pinned tag's source** (`src/server/index.ts` @ v1.29.0): `Server._oninitialize` stores `request.params.clientInfo` (L441) and exposes `getClientVersion(): Implementation | undefined` (L463) + `oninitialized` callback (L144). For the `McpServer` wrapper used in `mcp/src/server.ts`, access via `mcpServer.server.getClientVersion()` after `oninitialized` fires. Zero new code paths on the wire — INV-01 safe |
+| `node:fs` / `node:os` | built-in | Installed-client detection | `platforms.ts` already carries per-OS config paths for 21 clients; detection = existence/mtime sweep over that registry. No library needed |
+| `ws` (existing pin ^8.19) | 8.19+ | Reverse-request channel extension→daemon | New **additive** message types over the existing 7225 bridge (INV-01: additive only). No new transport |
 
-### New Tooling for This Milestone
+### Supporting Libraries
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Custom Node script, `node:fs`/`node:path` only (no XML library) | n/a (write in-repo) | **CI drift-detection gate**: parse `messages.xlf` + all 5 translated locale files, classify every trans-unit id as `ok` / `missing` / `orphaned` / `drifted`, exit 1 on any `drifted` or `missing` (see Recommendation below for why `orphaned` is warn-only) | This repo already has 2 precedents for exactly this shape of tool -- `showcase/angular/scripts/verify-locale-sync.mjs` and `showcase/angular/scripts/verify-hreflang.mjs` -- both zero-dependency ESM scripts using regex/string parsing over structured text and `process.exit(0/1/2)`. XLIFF's `trans-unit`/`source`/`target` structure is simple enough (as demonstrated by the validated prototype above, directly portable to Node) that a real XML parser is unnecessary. This keeps the new gate dependency-free, consistent with the repo's existing no-build-system/eval-free-tooling posture, and avoids introducing `ng-extract-i18n-merge`'s `xmldoc`/`sax` dependency chain into `devDependencies` for what is fundamentally a read-only CI check. |
-| (Optional, NOT required) `ng-extract-i18n-merge` | `3.4.0` (published 2026-06-06, actively maintained, 221 GitHub stars) | Local dev-time convenience: auto-syncs new/changed/removed trans-units into all 5 target files on `ng extract-i18n`, auto-marks drifted units `state="new"` | See "Alternatives Considered" below -- recommended as an optional future adoption for the human/AI translation workflow itself, but explicitly NOT required to satisfy this milestone's CI-gate requirement, and introducing it changes `angular.json`'s `extract-i18n` builder (see Pitfall below), which is a bigger footprint than the milestone's stated scope needs. |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| — (none recommended) | | | The supervisor is ~200-300 lines of deliberate code; every candidate lib below was evaluated and rejected for this footprint (see Alternatives) |
 
-### Supporting Reference (no new runtime dependency -- informs the script's logic)
+### Development Tools
 
-| Reference | Version/Date | Purpose | When to Use |
-|-----------|---------|---------|-------------|
-| XLIFF 1.2 OASIS spec, `state`/`state-qualifier` attribute vocabulary | 1.2 (2008, still current for this format) | Defines the canonical values a `<target state="...">` may hold: `new`, `needs-translation`, `needs-review-translation`, `needs-adaptation`, `needs-l10n`, `translated`, `signed-off`, `final` | Use `state="needs-review-translation"` (not a made-up value) if the new gate or its companion fix-up script writes a `state` attribute onto locale files to flag drift -- this keeps output spec-compliant and compatible with any future translation-tool ingestion (e.g. if a paid TMS is adopted later, per the note below). |
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| Recorded JSONL fixtures per CLI (`tests/fixtures/agent-streams/`) | Contract tests for stream parsers | Record real `claude -p --output-format stream-json`, `codex exec --json`, `gemini -o stream-json`, `opencode run --format json` outputs once per adapter; parsers tested offline. Protects against the repo's source-pin-style CI without live CLI calls |
+| `claude --version` / `codex --version` / etc. probes | Adapter `detect()` capability gating | Known-good baselines verified in this research: claude 2.1.177, codex 0.142.5, opencode 1.14.25; gemini 0.50.0 (npm latest, docs-verified only). Claude ≥2.1.205 additionally exposes a `capabilities` array in `system/init` — prefer feature-detection over version compares where available |
+
+## Process Supervision Design Facts (verified from nodejs.org/api/child_process.html, 2026-07-10)
+
+These verbatim-verified behaviors dictate the supervisor implementation; encode them as tests:
+
+1. **Kill trees, POSIX:** `subprocess.kill()` does NOT kill grandchildren ("child processes of child processes will not be terminated when attempting to kill their parent"). Spawn with `detached: true` → child becomes "the leader of a new process group and session" → kill the whole tree with `process.kill(-child.pid, 'SIGTERM')`, escalate to `SIGKILL` after a ~5s grace. Do NOT call `subprocess.unref()` — the daemon must keep supervising.
+2. **Kill trees, Windows:** negative-PID kill doesn't exist; `detached: true` gives the child "its own console window" instead. Use `spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'])` (no graceful tier on Windows). Set `windowsHide: true` explicitly (verified default: `false`).
+3. **Kill switch wiring:** one `AbortController` per delegation; `spawn(..., { signal })`. Abort kills with `killSignal` (default `'SIGTERM'`) and surfaces `AbortError` on the child's `error` event — map that to the side panel's "stopped by user" state, distinct from crash.
+4. **Backpressure:** verbatim — "These pipes have limited (and platform-specific) capacity. If the subprocess writes to stdout in excess of that limit without the output being consumed, the subprocess blocks". Therefore attach stdout AND stderr consumers synchronously at spawn; keep stderr in a bounded ring buffer (e.g. last 64KB) for `doctor` diagnostics.
+5. **Exit sequencing:** `'exit'` can fire while stdio is still open; "The `'close'` event will always emit after `'exit'`". Resolve the delegation only on `'close'` so trailing `result` lines are never lost.
+6. **Prompt transport:** always write the task prompt to **stdin** (all four CLIs accept it), never argv — avoids shell quoting entirely, Windows ~32KB command-line limits, and prompt leakage in process listings. Close stdin after writing (Claude/codex read to EOF), EXCEPT in Claude chat-mode with `--input-format stream-json` where stdin stays open for subsequent user turns.
+7. **Windows `.cmd` shims:** npm-installed CLIs (`claude`, `gemini`, `codex` via npm) are `.cmd` shims on Windows; since Node 18.20/20.12 (CVE-2024-27980) `spawn("claude.cmd")` without `shell: true` throws `EINVAL`. Resolve the real entry (prefer detecting the native binary; fall back to `{ shell: true }` with a fully fixed argv — safe here only because the prompt travels via stdin, never through the shell string). Confidence: MEDIUM-HIGH (well-documented Node security release; exact per-CLI installer layout to confirm during the Windows adapter phase).
+8. **Env hygiene:** spawn with a copied, scrubbed env — explicitly delete `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`/`CODEX_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY` from the child env. Presence of these silently flips CLIs from subscription auth to API-key billing, breaking the "key-less agent provider" contract (verified for Claude: `system/init`→`api_retry` `billing_error` category exists precisely for this failure class).
+9. **Timeouts:** two-tier — wall-clock cap per delegation AND an idle watchdog (no JSONL event for N seconds → probe/kill). `--max-turns` (Claude) / `steps` (OpenCode agent config) / exit code 53 (Gemini turn limit) provide agent-side backstops; the daemon-side timer is authoritative.
+
+## Claude Agent SDK vs. shelling to the CLI (explicit tradeoff)
+
+**Decision: shell to the user's installed `claude` binary. Do not add `@anthropic-ai/claude-agent-sdk`.**
+
+| Dimension | Shell to installed CLI | Embed `@anthropic-ai/claude-agent-sdk` (0.3.206) |
+|---|---|---|
+| Auth / billing | Uses whatever the user's CLI is logged in with — **Pro/Max subscription included**. This IS the product promise ("agent kind = no API key") | Docs verbatim (code.claude.com/docs/en/agent-sdk/overview, 2026-07-10): "Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK. Please use the API key authentication methods". API key / Bedrock / Vertex / Foundry only |
+| Distribution weight | 0 bytes — binary already on the user's machine (that's what "installed client detected" means) | SDK "bundles a native Claude Code binary for your platform as an optional dependency" — a second full Claude Code shipped inside `fsb-mcp-server`'s npm install, version-skewed from the user's own |
+| Multi-agent symmetry | Same `spawn + JSONL` supervisor pattern for all four CLIs → one `AgentProviderAdapter` contract | Claude-only; Codex/Gemini/OpenCode still need the spawn path anyway → two runtimes to maintain |
+| Programmatic ergonomics | Parse documented stream-json; in-process `canUseTool`-style brokering only via `--permission-prompt-tool` MCP indirection | Native message objects, `canUseTool` callback, in-process MCP servers — genuinely nicer API |
+| Branding/policy | FSB launches the user's own installed tool (config-writer precedent: `claude mcp add` delegation already ships in install.ts) | SDK products may not present as "Claude Code"; adds compliance surface |
+| Update coupling | User updates their CLI; adapter feature-detects (`system/init.capabilities`) | FSB owns the pinned SDK version and its update cadence |
+
+The ergonomics column is real but decisively outweighed: the SDK's auth policy alone disqualifies it for a feature whose definition is "use the subscription the user already pays for." If FSB ever wants an API-key-billed embedded execution path, that's what the existing `universal-provider.js` (7 providers) already is.
 
 ## Installation
 
 ```bash
-# No new npm install needed for the CI gate itself -- it is a plain Node ESM
-# script added under showcase/angular/scripts/, invoked directly with `node`,
-# exactly like the existing verify-locale-sync.mjs / verify-hreflang.mjs.
+# Runtime: nothing to install — Node built-ins + existing deps only.
 
-# OPTIONAL (not required for milestone completion) -- only if the team also
-# wants the dev-time auto-merge convenience:
-npm install -D ng-extract-i18n-merge --prefix showcase/angular
-# then: npx ng add ng-extract-i18n-merge --prefix showcase/angular
-# (rewrites angular.json's extract-i18n builder -- read the Pitfalls section
-# below before doing this; it is a build-editing step, evaluate separately
-# from the CI-gate work.)
+# mcp/ package: new modules, no package.json dependency changes
+#   mcp/src/agents/supervisor.ts      (spawn/kill-tree/watchdog, ~200 lines)
+#   mcp/src/agents/adapters/*.ts      (claude.ts first; codex/gemini/opencode later)
+#   mcp/src/agents/stream-parsers.ts  (per-CLI JSONL event normalization)
+#   + additive WS message types in bridge.ts / agent-bridge.ts
+
+# Dev only: recorded stream fixtures under tests/fixtures/agent-streams/
 ```
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Custom zero-dependency Node script for the CI gate | `ng-extract-i18n-merge@3.4.0` as the CI gate itself | If the team wants ONE tool to do both dev-time merging AND CI drift-checking, and is willing to accept it rewriting `angular.json`'s `extract-i18n` builder (`@angular/build:extract-i18n` -> `ng-extract-i18n-merge:ng-extract-i18n-merge`). Its `resetTranslationState: true` default already does the "mark stale on source change" work by setting the target unit's `state` to `new` and, per its own merge logic, copies the new English `source` text into `target` as a placeholder (`syncTarget = syncSourceLang || isUntranslated(...)`) -- i.e. it doesn't just flag drift, it partially "fixes" it by giving an English fallback pending real translation. This is a legitimate choice but changes CI-02's existing `diff -u messages.xlf /tmp/extract-check/messages.xlf` semantics (see Pitfall below), which is a broader footprint than "add one CI gate." |
-| `ng-extract-i18n-merge@3.4.0` | `ngx-i18nsupport` / `xliffmerge` | Never for new adoption in 2026 -- **confirmed dead**: last published to npm 2018-09-21 (8 years stale), predates Angular's builder-based extraction pipeline entirely, will not resolve against `@angular/build ^20.x`. Do not use, do not reference as a "standard" tool going forward; it surfaces in search results only because of historical popularity from the pre-Ivy Angular era. |
-| Read-only source-drift CI check (custom script or wrapped `ng-extract-i18n-merge` in check-only mode) | Full commercial Translation Management System (Lokalise, Crowdin, Smartling, Phrase, doloc.io) | Only if the team decides ongoing translation-maintenance labor (not just drift *detection*) should be outsourced. `doloc.io` (built by the same author as `ng-extract-i18n-merge`, explicitly cross-promoted in its README) is a **paid per-source-text SaaS** with a 14-day trial and no stated indefinite free tier for production use. This milestone's explicit brief is "usable without a paid translation-management SaaS" -- do not adopt doloc.io or any TMS as part of this milestone. Flag as an explicit, separate decision if ever revisited, not a default. |
+| Hand-rolled supervisor on `spawn` | `execa` 9.6.1 | If mcp/ ever grows many ad-hoc script invocations where its `cleanup`/template ergonomics pay off. For ONE long-lived supervised child shape it adds deps to a published npm package without solving tree-kill on POSIX (it also only signals the direct child) |
+| `detached` + `kill(-pid)` / `taskkill /T` | `tree-kill` 1.2.2 | If FSB cannot use `detached: true` (e.g. a CLI misbehaves as a session leader). tree-kill walks `ps`/`pgrep` output — race-prone vs. atomic process-group kill; keep as fallback knowledge, not a dep |
+| `node:readline` line framing | `split2` 4.2.0 | If a future stream needs true Transform-stream backpressure into a pipeline. Current consumer (WS fan-out to side panel) is push-based; readline suffices |
+| Per-CLI JSONL adapters (MVP) | ACP client (`@zed-industries/agent-client-protocol`) via `opencode acp` / `gemini --experimental-acp` | Adapter v2, once ≥2 non-Claude agents are in scope — uniform protocol beats N bespoke parsers, but Claude Code (the MVP) doesn't speak it |
+| `claude --resume` respawn per turn (chat-mode) | Persistent child with `--input-format stream-json` + `--output-format stream-json` | If per-turn respawn latency (CLI cold start) proves unacceptable in the side panel. More capable but adds lifetime management (idle child, SW-eviction interplay); benchmark before committing |
+| Claude Code via its own CLI | `claude --permission-prompt-tool mcp__fsb__<approval-tool>` consent brokering | Later consent-tier phase: lets FSB surface CLI permission asks in the side panel instead of blanket `dontAsk` denial |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `ngx-i18nsupport` (xliffmerge) | Unmaintained since 2018; predates the Angular CLI builder-based extraction model entirely; will not function correctly (if it even installs) against Angular 20's `@angular/build:extract-i18n` output shape. | `ng-extract-i18n-merge@3.4.0` if a merge tool is wanted at all; otherwise the custom script recommended above. |
-| A full XML/DOM parser dependency (e.g. `xmldoc`, `fast-xml-parser`, `xml2js`) added solely for this one CI script | Overkill for a read-only structural check over a well-known, narrow XLIFF 1.2 shape (`<trans-unit id="..."><source>...</source></trans-unit>`), and this repo has an established zero-dependency precedent (`verify-locale-sync.mjs`, `verify-hreflang.mjs`) for exactly this class of script. Adding a parser dependency here is inconsistent with that precedent and adds supply-chain surface for no material robustness gain at this file's actual complexity. Note: if the same script also needs to *write* XLIFF (not just read/diff it), hand-rolled regex-based mutation of XML becomes materially riskier -- see Pitfall below. | Plain regex/string-based extraction (`<trans-unit id="([^"]+)"[^>]*>(.*?)</trans-unit>` block splitting, then `<source>` / `<target[^>]*>` sub-matches) for **read-only** comparison. This is the exact approach validated against the live files above. |
-| A paid Translation Management SaaS (Lokalise, Crowdin, Smartling, Phrase, doloc.io) as a *requirement* of this milestone | Milestone brief explicitly requires a no-paid-SaaS solution; introducing a recurring per-source-text billing dependency for what is fundamentally a CI-gate + audit-script problem is disproportionate and would need explicit stakeholder sign-off as a new operating cost, not a research-driven default. | Custom script (drift detection) + the same AI-filled-XLIFF workflow already used in v0.9.63 (per `.planning/PROJECT.md`: "AI-filled XLIFFs") for the actual re-translation labor. |
-| Writing ad-hoc, non-spec `state` values (e.g. `state="stale"`, `state="drifted"`) into the `.xlf` files if the drift-fix script also mutates locale files | XLIFF 1.2's `state` attribute has an OASIS-defined enumeration; non-spec values break interoperability with any XLIFF-aware tool (including Angular's own tooling, other CAT tools, or a future TMS import) and would need to be undone later. | `state="needs-review-translation"` (source changed, existing translation may still be partially valid and worth keeping as a starting point for a human/AI reviewer) or `state="needs-translation"` (no usable prior translation) -- both are OASIS-standard values already implicitly supported by tooling in this ecosystem, including `ng-extract-i18n-merge`'s own `initialTranslationState` concept (which defaults to the equivalent `'new'` for XLIFF 1.2). |
+| `@anthropic-ai/claude-agent-sdk` | Policy-prohibited subscription auth for third-party products; bundles a duplicate CC binary; Claude-only | Spawn the user's installed `claude` (tradeoff table above) |
+| `node-pty` (or any PTY layer) | All four CLIs have first-class non-interactive modes with clean piped stdio; PTY adds native-build deps to a published npm package and ANSI-garbage parsing | `spawn` with `stdio: ['pipe','pipe','pipe']` |
+| `child_process.exec` / `execFile` for delegation | Buffers output until exit (`maxBuffer` kills long streams); no streaming | `spawn` + readline |
+| `--dangerously-skip-permissions` (Claude), `--dangerously-bypass-approvals-and-sandbox` (Codex), `--approval-mode=yolo` (Gemini), `--auto`/`--dangerously-skip-permissions` (OpenCode) | Blanket bypass on a channel that is already RCE-adjacent; violates the milestone's "strict permission defaults, explicit consent tiers" | Claude: `--permission-mode dontAsk` + `--allowedTools "mcp__fsb"`; Codex: default `read-only` sandbox; Gemini: `--allowed-mcp-server-names fsb` + `trust` on the fsb server only; OpenCode: shipped agent `permission` map |
+| `--bare` (Claude) | Skips OAuth/keychain → breaks subscription auth | `--strict-mcp-config` + `--agents` + explicit flags for hermeticity |
+| Deprecated flags: `--full-auto` (Codex), `-y/--yolo` and `--allowed-tools` (Gemini) | Verified deprecated in current docs; emit warnings today, removal risk tomorrow | Current equivalents listed in the matrices |
+| Pinning agent CLI versions in FSB | User-owned binaries update on their own cadence | `detect()` = version probe + capability gate (+ `system/init.capabilities` for Claude ≥2.1.205); fixtures pin the parser contract, not the binary |
 
 ## Stack Patterns by Variant
 
-**If the milestone's drift-detection gate is read-only (recommended default):**
-- Write one script, e.g. `showcase/angular/scripts/verify-translation-currency.mjs`, that:
-  1. Parses `messages.xlf` into an `id -> sourceText` map (source of truth).
-  2. For each of the 5 translated locale files, parses into `id -> {sourceText, targetText}`.
-  3. Classifies every id into `ok` (present, source text matches), `missing` (present in current source, absent from locale file), `orphaned` (present in locale file, absent from current source), `drifted` (present in both, but `<source>` text differs between the two files).
-  4. Hard-fails (`process.exit(1)`) on any `missing` or `drifted` count > 0 across any locale.
-  5. Reports `orphaned` counts as a warning only (non-fatal) unless the milestone's stats-page resync work explicitly wants them to fail too -- these represent debt from previously-excluded surfaces, not newly-introduced drift, and conflating them with true drift will make the gate noisy on day one given the 54-per-locale baseline already present.
-- Because: it adds zero new dependencies, mirrors the two existing verification scripts in this codebase exactly, and is trivially auditable (a reviewer can read the whole script in one sitting, same bar as `verify-locale-sync.mjs`).
+**Task-mode (MVP, per-delegation spawn):**
+- Claude: `-p` + `--no-session-persistence` + stdin prompt; Codex: `codex exec --ephemeral`; ephemeral = no session litter in the user's CLI history.
 
-**If the team ALSO wants to reduce translator busywork (separate decision from the CI gate, optional):**
-- Adopt `ng-extract-i18n-merge@3.4.0` as a local `ng extract-i18n` builder replacement to auto-sync + auto-mark-stale trans-units across all 5 target files whenever `ng extract-i18n` runs.
-- Because: it eliminates hand-editing 5 XLIFF files every time a template string changes, and its `resetTranslationState`/fuzzy-match behavior is exactly the "mark drifted units for re-translation" mechanic this milestone wants -- but as a *workflow* aid, not the CI gate itself.
-- Do this only as an explicit, separate decision -- it changes `angular.json`'s existing `extract-i18n` architect target and interacts with CI-02 (see Pitfalls below); don't bundle it silently into "add a drift gate."
+**Chat-mode (where supported):**
+- Claude: omit `--no-session-persistence`, capture `session_id` from `system/init`/`result`, respawn with `--resume <id>` — **must reuse the same daemon-owned cwd** (session lookup is directory-scoped, verified). Codex: `codex exec resume <id>`. Gemini: `-r <index|"latest">` (weaker: index-based). OpenCode: `-s <session-id>`.
 
-## Integration with Existing CI Gates (avoiding duplication)
+**If the user's Claude ≥2.1.205:** read `system/init.capabilities` for feature detection instead of version parsing.
 
-This repo's existing i18n-related CI steps, verified directly from `.github/workflows/ci.yml` and `showcase/angular/package.json`:
-
-| Existing gate | What it actually checks | Overlap risk with new drift gate |
-|---|---|---|
-| `lint:i18n` (`eslint "src/**/*.html" --ignore-pattern ... @angular-eslint/template/i18n`) | Every translatable template node/attribute in `.html` files carries an `i18n`/`i18n-*` marker. Operates purely on `.html` source; has no knowledge of `.xlf` file contents. | **None.** Confirmed via the rule's own docs/source that it never reads `.xlf` files. A string can pass `lint:i18n` (properly marked) while still being unextracted or drifted in `.xlf` -- these are genuinely separate failure modes, not the same check twice. |
-| CI-02, "Verify `ng extract-i18n` produces no diff" (`ng extract-i18n --output-path /tmp/extract-check && diff -u messages.xlf /tmp/extract-check/messages.xlf`) | Catches new/removed/changed `i18n`-marked strings in templates that were never re-extracted into the committed `messages.xlf` (source-file-only omission). Note: `.planning/PROJECT.md` calls this `extract-i18n-clean`, but there is no npm script by that literal name in `showcase/angular/package.json` -- the check is an inline shell step in `.github/workflows/ci.yml`; treat "extract-i18n-clean" as descriptive shorthand for this diff step, not a script to `grep` for. | **Adjacent, not overlapping.** CI-02 only ever compares `messages.xlf` (source) against a freshly regenerated copy of itself -- it never looks at the 5 translated locale files at all. It catches (a) from the research question (new strings never extracted); the new gate this milestone needs must specifically catch (b) (translated-locale drift) plus close the remaining gap in (a) (strings extracted into `messages.xlf` correctly, per CI-02, but never actually propagated/re-translated into the 5 target files -- the "missing" classification above). |
-| `verify-locale-sync.mjs` | Confirms the locale-constants TS module and `angular.json`'s locale list agree (registry parity, not content parity). | **None** -- entirely different concern (which locales exist, not whether their content is current). |
-| `i18nMissingTranslation: "error"` (Angular compiler option in `angular.json`) | Fails the Angular *build* if a trans-unit id referenced by a template has **no** `<target>` at all in a locale file. | **Partial overlap on "missing", none on "drifted".** This compiler option already hard-fails on completely absent translations at build time -- so a pure "missing" check in the new CI gate is somewhat redundant with what a full `ng build` would already catch per-locale. The genuinely new value this milestone's gate adds is the **drift** case: a `<target>` exists, is non-empty, and the build succeeds, yet it translates *stale* source text that no longer matches -- something `i18nMissingTranslation` structurally cannot detect (it only checks presence/absence, never content-equivalence against source). Recommendation: keep the new gate's primary value proposition framed as "source-drift detection" (the "b" case in the research question) and treat "missing" reporting as a bonus/earlier-signal (catching it as a fast standalone script is cheaper than waiting for a full per-locale `ng build` to fail), not the headline feature.
-
-**Net conclusion:** none of the 4 existing gates read `<source>` text in the 5 translated locale files and compare it against the current `messages.xlf` `<source>` for the same id. This is a genuine, unfilled gap -- the new gate is additive, not duplicative, provided it's scoped to this specific check.
+**If delegation target is OpenCode with a running server:** prefer `opencode run --attach http://localhost:<port>` over cold spawn.
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|------------------|-------|
-| `ng-extract-i18n-merge@3.4.0` | `@angular/build ^20.0.0 || ^21.0.0 || ^22.0.0` | This repo pins `@angular/build@^20.3.25` -- within range. `engines.node >=20.19.0` required by the package; this repo's floor is `>=24.0.0`, comfortably above. |
-| `ng-extract-i18n-merge@3.4.0` | `xmldoc@^1.1.3` (transitive dep pinned in its own `package.json`, distinct from the newer `xmldoc@3.0.0` on npm's `latest` tag) | `xmldoc` itself depends only on `sax@^1.6.0`, a long-established pure-JS SAX parser with no native bindings and no `eval`/`new Function` usage -- acceptable supply-chain profile if this path is chosen, but still a net-new dependency the zero-dependency custom-script approach avoids entirely. |
-| Custom drift-detection script (recommended) | Node `>=24.0.0` (already the repo floor) | Uses only `node:fs`/`node:path`; no version sensitivity. |
+| Package/Binary | Compatible With | Notes |
+|-----------|-----------------|-------|
+| mcp/ `engines.node >=18.20.0` | All recommended built-ins | `spawn` `signal` (15.5+), `readline` promises (17+), `.cmd` EINVAL behavior starts exactly at 18.20 — floor unchanged, no bump needed |
+| `@modelcontextprotocol/sdk` ^1.29 | `getClientVersion()` / `oninitialized` | Verified present in tag v1.29.0 source; note upstream repo `main` is now a v2 monorepo (`packages/server/src/server/server.ts` keeps the same accessor) — pin stays on 1.x |
+| claude 2.1.177 (local baseline) | All matrix-1 flags | `manual` permission-mode alias needs ≥2.1.200; `capabilities` array needs ≥2.1.205 |
+| codex 0.142.5 (local baseline) / npm 0.144.1 | All matrix-2 flags | `--ephemeral`, `--ignore-user-config`, `-c` overrides all present at 0.142.5 |
+| opencode 1.14.25 (local) vs 1.17.18 (npm) | `run --format json`, `--agent`, sessions | Permission-bypass flag renamed between these versions (`--dangerously-skip-permissions` → docs' `--auto`) — adapter avoids both |
+| gemini 0.50.0 (npm latest) | Matrix-3 flags | Docs-verified only; no local binary — first Gemini adapter phase must start with a live `--help` capture |
 
 ## Sources
 
-- Live repository inspection (HIGH confidence, ground truth): `showcase/angular/src/locale/messages.xlf` and `messages.{es,de,ja,zh-CN,zh-TW}.xlf`, `showcase/angular/package.json`, `showcase/angular/angular.json`, `showcase/angular/scripts/verify-locale-sync.mjs`, `showcase/angular/scripts/verify-hreflang.mjs`, `showcase/angular/eslint.config.js`, `.github/workflows/ci.yml` -- confirmed exact CI-02 mechanism is a raw shell step (`ng extract-i18n --output-path /tmp/extract-check && diff -u messages.xlf /tmp/extract-check/messages.xlf`) in `ci.yml`, not an npm script literally named `extract-i18n-clean`; confirmed live drift instances (5 units x 5 locales) and orphan baseline (54 units x 5 locales) via direct XLIFF parsing against the actual files.
-- npm registry API (`registry.npmjs.org`), HIGH confidence: `ng-extract-i18n-merge@3.4.0` published 2026-06-06T19:31:58Z, `peerDependencies: {"@angular/build": "^20.0.0 || ^21.0.0 || ^22.0.0"}`, `engines: {"node": ">=20.19.0"}`; `ngx-i18nsupport@0.17.1` last published 2018-09-21T11:05:09Z (confirms dead/abandoned).
-- GitHub repo metadata + raw source (`daniel-sc/ng-extract-i18n-merge`, `master` branch), HIGH confidence: `README.md` (options table, upgrade notes, doloc.io cross-promotion), `src/merger.ts` (confirmed `state: isSourceLang ? 'final' : (onlyWhitespaceChanged ? destUnit.state : this.initialTranslationState)` -- the exact drift-marking mechanic), `src/builder.ts` (confirmed `STATE_INITIAL_XLF_1_2 = 'new'` literal and that the builder mutates files on disk, i.e. it's a write path not a read-only checker), `schematics/ng-add/index.ts` (confirmed `target.builder = 'ng-extract-i18n-merge:ng-extract-i18n-merge'` overwrite of the `extract-i18n` architect target in `angular.json`); repo health: not archived, pushed 2026-06-06, 221 stars, 14 open issues -- actively maintained.
-- `angular.dev/guide/i18n/merge` (official Angular docs, fetched via WebFetch), HIGH confidence: confirmed Angular's first-party i18n merge guide has **no built-in mechanism** for detecting stale/drifted translations when source text changes -- this is an acknowledged gap in core tooling, not something this research overlooked.
-- WebSearch (multiple queries, cross-referenced against the primary sources above for MEDIUM->HIGH confidence upgrade): XLIFF 1.2 OASIS `state` attribute vocabulary (`new`, `needs-translation`, `needs-review-translation`, `needs-adaptation`, `needs-l10n`, `translated`, `signed-off`, `final`) -- corroborated directly by the `oasis-open.org` spec reference in search results and independently by the `STATE_INITIAL_XLF_1_2` constant found in `ng-extract-i18n-merge`'s own source.
-- WebSearch, MEDIUM confidence (single-source via search snippet, doloc.io's pricing page not independently fetched in full): doloc.io is a paid-tier SaaS (per-source-text pricing, 14-day trial, no stated indefinite free tier) -- sufficient confidence to flag it as "do not adopt as part of this milestone" per the explicit brief constraint, but if a future milestone considers doloc.io seriously, re-verify current pricing directly against `doloc.io/pricing/`.
-- `@angular-eslint/template/i18n` rule docs + GitHub issues (WebSearch, MEDIUM confidence, corroborated by direct inspection of this repo's own `eslint.config.js`): confirmed this rule operates purely on `.html` template source (checks for missing `i18n`/`i18n-*` markers) and has no awareness of `.xlf` file contents -- no overlap/duplication risk with a new XLIFF-drift gate.
+- Local binaries (strongest evidence, run 2026-07-10): `claude --help` @ 2.1.177; `codex exec --help` + `codex mcp --help` @ 0.142.5; `opencode run --help` @ 1.14.25 — all flags quoted verbatim
+- https://code.claude.com/docs/en/cli-reference — full flag list incl. `--agents` fields, `--tools`, `--permission-mode` values (HIGH)
+- https://code.claude.com/docs/en/headless — stream-json event contract, `system/init` capabilities, `--bare` auth caveat, resume cwd-scoping, 10MB stdin cap (HIGH)
+- https://code.claude.com/docs/en/permissions — MCP rule syntax `mcp__server` / `mcp__server__*` / anchored allow-globs, verbatim (HIGH)
+- https://code.claude.com/docs/en/agent-sdk/overview — SDK auth policy quote, bundled-binary note, branding rules (HIGH)
+- https://code.claude.com/docs/en/sub-agents — `--agents` JSON full field list, scope precedence (HIGH)
+- Codex non-interactive docs: developers.openai.com/codex/noninteractive → learn.chatgpt.com/docs/non-interactive-mode; config: learn.chatgpt.com/docs/config-file/config-reference (fetched 2026-07-10) — JSONL events, resume, deprecated `--full-auto`, `[mcp_servers]` keys, approval_policy drift (HIGH for exec flags via local binary; MEDIUM for approval_policy set)
+- google-gemini/gemini-cli `docs/cli/cli-reference.md`, `docs/cli/headless.md`, `docs/tools/mcp-server.md` @ main, 2026-07-10 (MEDIUM-HIGH; no local binary)
+- https://opencode.ai/docs/cli/ + /docs/mcp-servers/ + /docs/agents/ (page-stamped "Jul 10, 2026") + [anomalyco/opencode issue #8463](https://github.com/anomalyco/opencode/issues/8463) / [#23370](https://github.com/anomalyco/opencode/issues/23370) re: bypass-flag naming (HIGH for 1.14.25 via local binary)
+- OpenCode ACP: https://opencode.ai/docs/acp/ + https://zed.dev/acp/agent/opencode + https://zed.dev/acp (MEDIUM-HIGH)
+- modelcontextprotocol/typescript-sdk tag v1.29.0 `src/server/index.ts` L135/L144/L441/L456-465 — `clientInfo` storage + `getClientVersion()` verified at the exact pinned version (HIGH)
+- https://nodejs.org/api/child_process.html — detached/process-group, kill-tree limitation, AbortSignal, killSignal default, windowsHide default false, exit-vs-close, pipe backpressure block, shell warning, maxBuffer scope — all quoted verbatim (HIGH)
+- npm registry (`npm view`, 2026-07-10): @anthropic-ai/claude-agent-sdk 0.3.206, @google/gemini-cli 0.50.0, opencode-ai 1.17.18, @openai/codex 0.144.1, tree-kill 1.2.2, execa 9.6.1, split2 4.2.0 (HIGH)
 
 ---
-*Stack research for: Angular i18n / XLIFF translation-completeness auditing and drift-detection tooling*
-*Researched: 2026-07-07*
+*Stack research for: v0.9.91 MCP Clients as Providers — agent-CLI spawning, supervision, and stream parsing*
+*Researched: 2026-07-10*
