@@ -113,6 +113,19 @@ providerLabels.forEach((label, index) => {
   assert.strictEqual(attribute(label.slice(0, label.indexOf('>') + 1), 'data-provider-kind'), expectedContract[index].kind);
   assert.strictEqual(attribute(label.slice(0, label.indexOf('>') + 1), 'data-provider-id'), expectedContract[index].id);
   assert.doesNotMatch(label, /<(?:a|button|select|textarea)\b/i, 'provider labels contain no nested secondary controls');
+  const nameSpan = label.match(/<span\b[^>]*\bid="([^"]+)"[^>]*\bclass="provider-row__name"[^>]*>([^<]+)<\/span>/);
+  const radio = label.match(/<input\b[^>]*\bname="fsbProviderSelection"[^>]*>/);
+  assert.ok(nameSpan && radio, 'provider row contains a named span and radio');
+  assert.strictEqual(attribute(radio[0], 'aria-labelledby'), nameSpan[1],
+    'radio accessible name resolves only from its stable provider-name span');
+  assert.strictEqual(nameSpan[2], PROVIDERS.getProviderDefinition(expectedContract[index].kind, expectedContract[index].id).displayName,
+    'stable accessible name is exactly the provider display name');
+  const dynamicBadges = label.match(/<span\b[^>]*\bclass="provider-badge [^"]+"[^>]*>/g) || [];
+  assert.strictEqual(dynamicBadges.length, 2);
+  dynamicBadges.forEach((badge) => {
+    assert.strictEqual(attribute(badge, 'aria-hidden'), 'true',
+      'changing recommendation and evidence text is excluded from the radio name');
+  });
 });
 
 const modelProviderMatch = HTML.match(/<select\b[^>]*\bid="modelProvider"[^>]*>[\s\S]*?<\/select>/);
