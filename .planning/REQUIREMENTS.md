@@ -14,7 +14,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **IDENT-02**: When an MCP client completes its `initialize` handshake with `fsb-mcp-server` (over any transport: stdio, streamable-HTTP, or the ws://7225 bridge), FSB captures the caller's `clientInfo.name` and `clientInfo.version` and threads them to the extension via an additive field on the existing `agent:register` bridge payload without breaking any existing consumer of that payload (INV-01).
 - [x] **IDENT-03**: The extension's agent registry stamps captured `clientInfo` onto each live `AgentRecord` and rolls the identity up into a durable `fsbAgentProviders.connected` entry that survives service-worker eviction and Chrome restart, keyed so re-connections update rather than duplicate.
 - [x] **IDENT-04**: `fsb-mcp-server` can enumerate installed MCP-capable clients on the current machine by inspecting the paths already known to `platforms.ts` (per-OS `configPath` for file-mode clients; `<bin> --version` probe for cli-mode `claude-code`) and report each as `installed` / `not-installed` with any parseable version.
-- [ ] **IDENT-05**: A `getMcpClients` extension runtime message returns a merged view (`clicked` ∪ `installed` ∪ `connected`) with per-client status, so UI surfaces read one consistent structure instead of assembling it themselves.
+- [x] **IDENT-05**: A `getMcpClients` extension runtime message returns a merged view (`clicked` ∪ `installed` ∪ `connected`) with per-client status, so UI surfaces read one consistent structure instead of assembling it themselves.
 
 ### PROV -- Providers Panel
 
@@ -134,7 +134,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | IDENT-02 | Phase 57 | Complete |
 | IDENT-03 | Phase 57 | Complete |
 | IDENT-04 | Phase 57 | Complete |
-| IDENT-05 | Phase 57 | Pending |
+| IDENT-05 | Phase 57 | Complete |
 | PROV-01 | Phase 58 | Pending |
 | PROV-02 | Phase 58 | Pending |
 | PROV-03 | Phase 58 | Pending |

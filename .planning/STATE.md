@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: executing
-stopped_at: Completed 57-02-PLAN.md
-last_updated: "2026-07-12T13:07:48.173Z"
+status: verifying
+stopped_at: Completed 57-03-PLAN.md
+last_updated: "2026-07-12T13:44:46.360Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 18
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 4
+  completed_plans: 5
   percent: 100
 ---
 
@@ -35,7 +35,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 Phase: 57 (Agent Identity Capture) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-12
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
@@ -91,6 +91,10 @@ v0.9.91-specific decisions so far:
 - [Phase 57]: Keep MCP clientInfo observational and bounded — Only sanitized name/version evidence is persisted; authority, cap, ownership, and routing logic remain unchanged.
 - [Phase 57]: Converge both installed-inventory delivery paths on replaceInstalled — Registration piggybacks and system frames replace only installed evidence while preserving clicked, connected, and unknown siblings.
 - [Phase 57]: Persist onboarding intent without awaiting storage — Resolve current at click time and serialize same-page writes so feedback timing is unchanged and rapid clicks retain counts.
+- [Phase 57]: Join known MCP identities only through a frozen exact alias vocabulary — Unknown names remain visible as raw, non-authoritative entries; no fuzzy matching or Gemini aliasing.
+- [Phase 57]: Re-read durable provider evidence for every merged query — Clicked, installed, connected, and live evidence stay separate and no recommendation is derived.
+- [Phase 57]: Guard getMcpClients with the existing own-extension sender check and direct registry access — This preserves same-context service-worker dispatch without self-send.
+- [Phase 57]: Expose getMergedClients as a non-enumerable additive helper — Direct consumers gain the method while the locked enumerable API remains compatible.
 
 ### Pending Todos
 
@@ -132,8 +136,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T13:07:48.170Z
-Stopped at: Completed 57-02-PLAN.md
+Last session: 2026-07-12T13:44:46.297Z
+Stopped at: Completed 57-03-PLAN.md
 Resume file: None
 
 ## Next Actions
