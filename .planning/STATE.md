@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 57 UI-SPEC approved
-last_updated: "2026-07-12T12:16:32.190Z"
-last_activity: 2026-07-12 -- Phase 57 planning complete
+stopped_at: Completed 57-01-PLAN.md
+last_updated: "2026-07-12T12:34:38.983Z"
+last_activity: 2026-07-12
 progress:
   total_phases: 18
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 1
+  percent: 33
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** v0.9.91 milestone — planning Phase 57 (Agent Identity Capture) as the first executable phase.
+**Current focus:** Phase 57 — Agent Identity Capture
 
 ## Current Position
 
-Phase: 57 (Agent Identity Capture) — ready for `/gsd-plan-phase 57`
-Plan: —
+Phase: 57 (Agent Identity Capture) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-07-12 -- Phase 57 planning complete
+Last activity: 2026-07-12
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -85,6 +85,9 @@ v0.9.91-specific decisions so far:
 - [Roadmap]: NATIVE is INCLUDED in v0.9.91 (Phase 63) per user confirmation; the additive `nativeMessaging` permission is the only permission change in the milestone.
 - [Roadmap]: Every `agent`-kind cost row displays "included in your subscription" + real token/turn/duration counts — never a fabricated dollar amount (PROV-06). The Codex adapter's per-auth-state copy (Phase 65) is the strictest test of this discipline.
 - [Roadmap]: The reverse-request channel reuses the existing `ws://localhost:7225` bridge; no new port is added (SUMMARY.md architecture decision; a separate supervisor port is a documented fallback if hub-forwarding proves fragile during Phase 59 implementation).
+- [Phase 57]: Read MCP client identity and inventory lazily through feature-detected AgentScope suppliers so bare scopes and structural mocks remain compatible.
+- [Phase 57]: Reuse PLATFORMS and resolvePlatformTarget for installed-client detection, with fixed shell-free Claude Code version probes.
+- [Phase 57]: Deliver one memoized client inventory through both system:client-inventory and agent:register payload.platforms.
 
 ### Pending Todos
 
@@ -126,9 +129,9 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T11:26:42.239Z
-Stopped at: Phase 57 UI-SPEC approved
-Resume file: .planning/phases/57-agent-identity-capture/57-UI-SPEC.md
+Last session: 2026-07-12T12:33:46.860Z
+Stopped at: Completed 57-01-PLAN.md
+Resume file: None
 
 ## Next Actions
 
