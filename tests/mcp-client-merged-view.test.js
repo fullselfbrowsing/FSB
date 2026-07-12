@@ -30,9 +30,11 @@ function plain(value) {
 function createStorage(initial) {
   let store = clone(initial || {});
   let reads = 0;
+  let rejected = false;
   return {
     area: {
       async get(keys) {
+        if (rejected) throw new Error('sensitive storage failure');
         reads++;
         const list = Array.isArray(keys) ? keys : [keys];
         const result = {};
@@ -48,10 +50,77 @@ function createStorage(initial) {
     replace(next) {
       store = clone(next || {});
     },
+    setRejected(value) {
+      rejected = value === true;
+    },
     get readCount() {
       return reads;
     }
   };
+}
+
+function extractBackgroundRouter() {
+  const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
+  const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, 'background router source can be extracted');
+  return backgroundSource.slice(start, end);
+}
+
+function extractInternalDispatcher() {
+  const startMarker = 'function fsbDispatchInternalMessage(request) {';
+  const endMarker = '\n\nif (typeof globalThis !== \'undefined\') {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, 'internal dispatcher source can be extracted');
+  return backgroundSource.slice(start, end);
+}
+
+function createRuntimeHarness(initial, options = {}) {
+  const storage = createStorage(initial);
+  const context = {
+    chrome: {
+      runtime: { id: 'mcp-client-test-extension' },
+      storage: { local: storage.area }
+    },
+    console,
+    Object,
+    Array,
+    String,
+    Date,
+    Promise,
+    setTimeout,
+    clearTimeout,
+    armMcpBridge() {},
+    automationLogger: { logComm() {} }
+  };
+  context.globalThis = context;
+  if (Object.prototype.hasOwnProperty.call(options, 'registry')) {
+    context.fsbAgentRegistryInstance = options.registry;
+  }
+  vm.runInNewContext(
+    `${aliasesSource}\n${providersSource}\n${extractBackgroundRouter()}\n` +
+      `const FSB_INTERNAL_DISPATCH_TIMEOUT_MS = 20000;\n${extractInternalDispatcher()}\n` +
+      'this.__runtimeHandler = fsbHandleRuntimeMessage;\n' +
+      'this.__internalDispatch = fsbDispatchInternalMessage;',
+    context,
+    { filename: 'background.js#getMcpClients-harness' }
+  );
+  return {
+    context,
+    storage,
+    handler: context.__runtimeHandler,
+    dispatch: context.__internalDispatch
+  };
+}
+
+function callRuntimeHandler(harness, sender) {
+  let keepOpen;
+  const response = new Promise((resolve) => {
+    keepOpen = harness.handler({ action: 'getMcpClients' }, sender, resolve);
+  });
+  return { keepOpen, response };
 }
 
 function createHarness(initial) {
@@ -289,6 +358,99 @@ async function main() {
   assert.equal(rawMerged['raw:geminicli'].clicked, null);
   assert.equal(rawMerged['raw:geminicli'].installed, null);
 
+  const runtimeClicked = { count: 1, firstClickedAt: 80, lastClickedAt: 80, source: 'base' };
+  const runtimeLive = {
+    agentId: 'agent_runtime_cursor',
+    tabIds: [8],
+    clientInfo: { name: 'Cursor', version: '1.0.0' }
+  };
+  const registryCalls = [];
+  const runtimeHarness = createRuntimeHarness({
+    fsbAgentProviders: {
+      clicked: { cursor: runtimeClicked },
+      installed: {},
+      connected: {}
+    }
+  }, {
+    registry: {
+      listAgents() {
+        registryCalls.push('listAgents');
+        return [clone(runtimeLive)];
+      }
+    }
+  });
+  const crossContext = callRuntimeHandler(runtimeHarness, {
+    id: 'mcp-client-test-extension',
+    url: 'chrome-extension://mcp-client-test-extension/ui/onboarding.html'
+  });
+  assert.equal(crossContext.keepOpen, true, 'getMcpClients keeps the async runtime channel open');
+  const crossContextResponse = plain(await crossContext.response);
+  assert.deepEqual(crossContextResponse, {
+    success: true,
+    clients: {
+      cursor: {
+        id: 'cursor',
+        raw: false,
+        displayName: 'Cursor',
+        clicked: runtimeClicked,
+        installed: null,
+        connected: null,
+        live: runtimeLive
+      }
+    }
+  }, 'own-extension cross-context request receives the exact successful envelope');
+  assert.deepEqual(registryCalls, ['listAgents'], 'live records come only from the registry clone API');
+
+  let rejectedResponse;
+  const rejectedReturn = runtimeHarness.handler(
+    { action: 'getMcpClients' },
+    { id: 'external-extension' },
+    (value) => { rejectedResponse = value; }
+  );
+  assert.equal(rejectedReturn, undefined, 'external sender exits through the existing guard');
+  assert.deepEqual(plain(rejectedResponse), { success: false, error: 'Unauthorized sender' },
+    'external sender receives only the existing bounded rejection');
+  assert.deepEqual(registryCalls, ['listAgents'], 'external request never reaches live registry evidence');
+
+  const sameContextResponse = plain(await runtimeHarness.dispatch({ action: 'getMcpClients' }));
+  assert.deepEqual(sameContextResponse, crossContextResponse,
+    'same-service-worker dispatch reaches the same handler and exact envelope');
+  assert.deepEqual(registryCalls, ['listAgents', 'listAgents'],
+    'same-context dispatch performs one fresh live registry read');
+
+  const emptyRegistryHarness = createRuntimeHarness({
+    fsbAgentProviders: {
+      clicked: {},
+      installed: {},
+      connected: {}
+    }
+  });
+  const emptyRegistryCall = callRuntimeHandler(emptyRegistryHarness, { id: 'mcp-client-test-extension' });
+  assert.equal(emptyRegistryCall.keepOpen, true, 'missing registry still uses the async response path');
+  assert.deepEqual(plain(await emptyRegistryCall.response), { success: true, clients: {} },
+    'missing registry is treated as an empty live clone set');
+
+  emptyRegistryHarness.storage.setRejected(true);
+  const storageFailureCall = callRuntimeHandler(emptyRegistryHarness, { id: 'mcp-client-test-extension' });
+  assert.equal(storageFailureCall.keepOpen, true, 'storage rejection keeps the async channel contract');
+  assert.deepEqual(plain(await storageFailureCall.response), {
+    success: false,
+    error: 'mcp_client_inventory_unavailable'
+  }, 'storage exceptions collapse to the bounded inventory error code');
+
+  const registryFailureHarness = createRuntimeHarness({}, {
+    registry: {
+      listAgents() {
+        throw new Error('private registry failure');
+      }
+    }
+  });
+  const registryFailureCall = callRuntimeHandler(registryFailureHarness, { id: 'mcp-client-test-extension' });
+  assert.deepEqual(plain(await registryFailureCall.response), {
+    success: false,
+    error: 'mcp_client_inventory_unavailable'
+  }, 'registry exceptions do not leak through the runtime response');
+
   const aliasesImport = backgroundSource.indexOf("importScripts('utils/mcp-client-aliases.js')");
   const providersImport = backgroundSource.indexOf("importScripts('utils/mcp-agent-providers.js')");
   assert.ok(aliasesImport >= 0 && aliasesImport < providersImport,
@@ -298,6 +460,13 @@ async function main() {
     backgroundSource.slice(afterAliasesImport, providersImport).includes("importScripts('utils/"),
     false,
     'no utility import interrupts alias-before-provider load order'
+  );
+  assert.equal((backgroundSource.match(/case 'getMcpClients'/g) || []).length, 1,
+    'background contains exactly one getMcpClients runtime case');
+  assert.doesNotMatch(
+    backgroundSource,
+    /chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]getMcpClients['"]/,
+    'background never sends getMcpClients through same-context runtime messaging'
   );
 
   console.log('mcp-client-merged-view.test.js: PASS');

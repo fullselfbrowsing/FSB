@@ -501,6 +501,25 @@ async function runWrapperBehaviorCases() {
     assertEqual(result.success, false, 'timeout yields success:false');
     assert(/timed out after 20000ms for action: getFullPaymentMethod/.test(result.error || ''), 'timeout envelope names the timeout and action');
   }
+
+  // B8: the Phase 57 client inventory action uses the same exact async path.
+  {
+    const clients = {
+      cursor: {
+        id: 'cursor', raw: false, displayName: 'Cursor',
+        clicked: null, installed: null, connected: null,
+        live: { agentId: 'agent_cursor', clientInfo: { name: 'Cursor' } }
+      }
+    };
+    const harness = buildWrapperHarness((request, sender, sendResponse) => {
+      assertEqual(request.action, 'getMcpClients', 'inventory wrapper forwards the exact action');
+      Promise.resolve().then(() => sendResponse({ success: true, clients }));
+      return true;
+    });
+    const result = await harness.dispatch({ action: 'getMcpClients' });
+    assertDeepEqual(result, { success: true, clients }, 'same-context inventory response passes through unchanged');
+    assertEqual(harness.handlerCalls[0].sender.fsbInternal, 'mcp-bridge', 'inventory wrapper uses the synthetic MCP bridge sender');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -520,6 +539,14 @@ function runSourceContractCase() {
   for (const snippet of backgroundSnippets) {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
   }
+  assertEqual((backgroundSource.match(/case 'getMcpClients'/g) || []).length, 1, 'background.js contains exactly one getMcpClients case');
+  assert(backgroundSource.includes("error: 'mcp_client_inventory_unavailable'"), 'getMcpClients carries the bounded failure code');
+  assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]getMcpClients['"]/.test(backgroundSource),
+    'background.js never self-sends getMcpClients');
+  const sunsetListAgents = backgroundSource.indexOf("//     case 'listAgents':");
+  assert(sunsetListAgents >= 0, 'sunset listAgents runtime case remains commented out');
+  assert(backgroundSource.indexOf("case 'getMcpClients'") < sunsetListAgents,
+    'new inventory action is independent from the later sunset listAgents block');
 
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');

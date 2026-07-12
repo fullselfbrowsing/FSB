@@ -7678,6 +7678,26 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       return true; // async response
     }
 
+    case 'getMcpClients': {
+      (async () => {
+        try {
+          const registry = globalThis.fsbAgentRegistryInstance;
+          const liveRecords = registry && typeof registry.listAgents === 'function'
+            ? await Promise.resolve(registry.listAgents())
+            : [];
+          const providers = globalThis.FsbMcpAgentProviders;
+          if (!providers || typeof providers.getMergedClients !== 'function') {
+            throw new Error('MCP client inventory helper unavailable');
+          }
+          const clients = await providers.getMergedClients(liveRecords);
+          sendResponse({ success: true, clients });
+        } catch (_error) {
+          sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        }
+      })();
+      return true;
+    }
+
     case 'startAutomation':
       handleStartAutomation(request, sender, sendResponse);
       return true; // Will respond asynchronously
