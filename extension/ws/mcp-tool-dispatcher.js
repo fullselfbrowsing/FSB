@@ -1932,6 +1932,31 @@ async function handleEndVisualSessionRoute({ payload }) {
 // surface (globalThis.fsbAgentRegistryInstance). Phase 240 will validate
 // ownership at every dispatch boundary; Phase 238 is structural setup only.
 
+function sanitizeMcpClientInfo(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const sanitized = {};
+  if (typeof value.name === 'string') sanitized.name = value.name.slice(0, 200);
+  if (typeof value.version === 'string') sanitized.version = value.version.slice(0, 200);
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}
+
+function isPlainMcpEvidenceMap(value) {
+  return !!value && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function runMcpAgentProviderWrite(method, ...args) {
+  try {
+    const providers = globalThis.FsbMcpAgentProviders;
+    if (!providers || typeof providers[method] !== 'function') return;
+    const result = providers[method](...args);
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => { /* best-effort evidence write */ });
+    }
+  } catch (_e) { /* best-effort evidence write */ }
+}
+
 async function handleAgentRegisterRoute({ payload, client } = {}) {
   const reg = globalThis.fsbAgentRegistryInstance;
   if (!reg || typeof reg.registerAgent !== 'function') {
@@ -1967,6 +1992,16 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
     : (client && typeof client.getConnectionId === 'function' ? client.getConnectionId() : null);
   if (connectionId && typeof reg.stampConnectionId === 'function') {
     try { reg.stampConnectionId(agentId, connectionId); } catch (_e) { /* best-effort */ }
+  }
+  const clientInfo = sanitizeMcpClientInfo(payload && payload.clientInfo);
+  if (clientInfo) {
+    if (typeof reg.stampClientInfo === 'function') {
+      try { reg.stampClientInfo(agentId, clientInfo); } catch (_e) { /* best-effort */ }
+    }
+    runMcpAgentProviderWrite('recordConnected', agentId, clientInfo);
+  }
+  if (isPlainMcpEvidenceMap(payload && payload.platforms)) {
+    runMcpAgentProviderWrite('replaceInstalled', payload.platforms);
   }
   console.log('[FSB MCP Dispatcher] agent:register minted ' + agentIdShort);
   // Phase 272 / BEAT-09 sub-requirement: active-agent counter feeds the

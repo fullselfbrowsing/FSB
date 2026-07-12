@@ -29,6 +29,12 @@ const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
 // SW-eviction-during-grace case via the persisted stagedReleases envelope.
 const RECONNECT_GRACE_MS = 10000;
 
+function isPlainMcpClientInventory(value) {
+  return !!value && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.prototype.toString.call(value) === '[object Object]';
+}
+
 class MCPBridgeClient {
   constructor() {
     this._ws = null;
@@ -389,6 +395,18 @@ class MCPBridgeClient {
    */
   async _routeMessage(type, payload, id) {
     switch (type) {
+      case 'system:client-inventory': {
+        if (!isPlainMcpClientInventory(payload && payload.platforms)) {
+          throw new Error('Invalid MCP client inventory payload');
+        }
+        const providers = globalThis.FsbMcpAgentProviders;
+        if (!providers || typeof providers.replaceInstalled !== 'function') {
+          throw new Error('MCP client inventory storage unavailable');
+        }
+        await providers.replaceInstalled(payload.platforms);
+        return { accepted: true };
+      }
+
       // Phase 240/246 agent lifecycle handshake. Server opens every connection
       // with agent:register; without these cases the switch's default throws
       // "Unknown MCP message type" and every subsequent tool rejects.

@@ -10,8 +10,7 @@
 
   function isPlainObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    var proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
+    return Object.prototype.toString.call(value) === '[object Object]';
   }
 
   function cloneMap(value) {

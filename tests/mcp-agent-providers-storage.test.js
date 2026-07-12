@@ -9,11 +9,14 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const providersPath = path.join(repoRoot, 'extension', 'utils', 'mcp-agent-providers.js');
 const registryPath = require.resolve('../extension/utils/agent-registry.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
+const dispatcherPath = require.resolve('../extension/ws/mcp-tool-dispatcher.js');
+const bridgePath = path.join(repoRoot, 'extension', 'ws', 'mcp-bridge-client.js');
 
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -76,6 +79,40 @@ function freshProviders() {
 function freshRegistry() {
   delete require.cache[registryPath];
   return require(registryPath);
+}
+
+function freshDispatcher() {
+  delete require.cache[dispatcherPath];
+  return require(dispatcherPath);
+}
+
+function loadBridgeHarness() {
+  class FakeWebSocket {}
+  FakeWebSocket.OPEN = 1;
+  FakeWebSocket.CONNECTING = 0;
+  const context = {
+    chrome: globalThis.chrome,
+    WebSocket: FakeWebSocket,
+    console,
+    Math,
+    Date,
+    EventTarget,
+    CustomEvent: globalThis.CustomEvent || class CustomEvent {},
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    dispatchMcpMessageRoute: async () => ({ success: true })
+  };
+  context.globalThis = context;
+  const providersSource = fs.readFileSync(providersPath, 'utf8');
+  const bridgeSource = fs.readFileSync(bridgePath, 'utf8');
+  vm.runInNewContext(
+    `${providersSource}\n${bridgeSource}\nthis.__bridgeClient = mcpBridgeClient;`,
+    context,
+    { filename: 'mcp-agent-providers-bridge-harness.js' }
+  );
+  return { context, client: context.__bridgeClient };
 }
 
 function tick() {
@@ -296,7 +333,157 @@ async function main() {
       'provider helper imports before dispatcher and bridge evaluation');
   }
 
+  {
+    const { localArea } = installChrome();
+    const providers = freshProviders();
+    const stampCalls = [];
+    const forbiddenOwnershipCalls = [];
+    const mintedIds = ['agent_identity_1', 'agent_identity_2', 'agent_identity_3'];
+    const registry = {
+      async registerAgent() {
+        const agentId = mintedIds.shift();
+        return { agentId, agentIdShort: agentId };
+      },
+      stampConnectionId() { return true; },
+      stampClientInfo(agentId, clientInfo) {
+        stampCalls.push({ agentId, clientInfo: clone(clientInfo) });
+        return true;
+      },
+      isOwnedBy() { forbiddenOwnershipCalls.push('isOwnedBy'); throw new Error('identity reached ownership'); },
+      getOwner() { forbiddenOwnershipCalls.push('getOwner'); throw new Error('identity reached ownership'); }
+    };
+    globalThis.fsbAgentRegistryInstance = registry;
+    globalThis.FsbMcpAgentProviders = providers;
+    const { handleAgentRegisterRoute } = freshDispatcher();
+
+    const longName = 'N'.repeat(240);
+    const longVersion = 'V'.repeat(240);
+    const firstResponse = await handleAgentRegisterRoute({
+      payload: {
+        agentId: 'attacker-supplied',
+        connectionId: 'connection-identity-1',
+        clientInfo: { name: longName, version: longVersion, authority: 'admin' },
+        platforms: {
+          cursor: { detected: true, configPath: '/tmp/cursor.json', checkedAt: 400 }
+        }
+      }
+    });
+    assert.deepEqual(firstResponse, {
+      success: true,
+      agentId: 'agent_identity_1',
+      agentIdShort: 'agent_identity_1',
+      ownershipTokens: {},
+      connectionId: 'connection-identity-1'
+    }, 'registration response remains the exact legacy/additive connectionId shape');
+    assert.deepEqual(stampCalls[0], {
+      agentId: 'agent_identity_1',
+      clientInfo: { name: 'N'.repeat(200), version: 'V'.repeat(200) }
+    }, 'dispatcher caps both identity strings at 200 and drops unknown fields');
+
+    await handleAgentRegisterRoute({ payload: { clientInfo: { name: 'Cursor', ignored: true } } });
+    await handleAgentRegisterRoute({ payload: { clientInfo: { version: '0.142.5', ignored: true } } });
+    await providers.mutateSubmap('clicked', (clicked) => clicked);
+    assert.deepEqual(stampCalls.slice(1), [
+      { agentId: 'agent_identity_2', clientInfo: { name: 'Cursor' } },
+      { agentId: 'agent_identity_3', clientInfo: { version: '0.142.5' } }
+    ], 'name-only and version-only identities remain valid sanitized evidence');
+    assert.deepEqual(forbiddenOwnershipCalls, [], 'clientInfo never enters ownership checks');
+
+    const envelope = localArea.dump().fsbAgentProviders;
+    assert.deepEqual(envelope.installed, {
+      cursor: { detected: true, configPath: '/tmp/cursor.json', checkedAt: 400 }
+    }, 'agent:register platforms piggyback reaches the installed map');
+    assert.equal(Object.keys(envelope.connected).includes('cursor'), true,
+      'name-only connected identity is recorded');
+    assert.equal(Object.keys(envelope.connected).includes('unknown:0.142.5'), true,
+      'version-only connected identity is recorded');
+  }
+
+  {
+    installChrome({ localOptions: { rejectSet: true } });
+    const providers = freshProviders();
+    globalThis.FsbMcpAgentProviders = providers;
+    globalThis.fsbAgentRegistryInstance = {
+      async registerAgent() {
+        return { agentId: 'agent_storage_failure', agentIdShort: 'agent_storage_failure' };
+      },
+      stampConnectionId() { return true; },
+      stampClientInfo() { return true; }
+    };
+    const { handleAgentRegisterRoute } = freshDispatcher();
+    const response = await handleAgentRegisterRoute({
+      payload: {
+        connectionId: 'connection-storage-failure',
+        clientInfo: { name: 'Claude Code' },
+        platforms: {
+          codex: { detected: true, configPath: null, checkedAt: 500 }
+        }
+      }
+    });
+    assert.deepEqual(response, {
+      success: true,
+      agentId: 'agent_storage_failure',
+      agentIdShort: 'agent_storage_failure',
+      ownershipTokens: {},
+      connectionId: 'connection-storage-failure'
+    }, 'storage/helper rejection leaves successful registration byte-stable');
+    await tick();
+  }
+
+  {
+    const { localArea } = installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: { cursor: { count: 1 } },
+          connected: { cursor: { name: 'Cursor' } },
+          installed: { stale: { detected: true } },
+          unknownSibling: 'keep'
+        }
+      }
+    });
+    const harness = loadBridgeHarness();
+    const validPayload = vm.runInNewContext(`({ platforms: {
+      codex: { detected: true, configPath: null, version: '0.142.5', checkedAt: 600 }
+    } })`, harness.context);
+    const accepted = await harness.client._routeMessage('system:client-inventory', validPayload, 'inventory-1');
+    assert.deepEqual(clone(accepted), { accepted: true }, 'system inventory route returns accepted:true');
+    assert.deepEqual(localArea.dump().fsbAgentProviders, {
+      clicked: { cursor: { count: 1 } },
+      connected: { cursor: { name: 'Cursor' } },
+      installed: {
+        codex: { detected: true, configPath: null, checkedAt: 600, version: '0.142.5' }
+      },
+      unknownSibling: 'keep'
+    }, 'system frame converges through replaceInstalled without clobbering siblings');
+
+    harness.client._ws = {
+      readyState: 1,
+      sent: [],
+      send(value) { this.sent.push(value); }
+    };
+    await harness.client._handleMessage(JSON.stringify({
+      id: 'inventory-bad',
+      type: 'system:client-inventory',
+      payload: { platforms: [] }
+    }));
+    const errorFrame = JSON.parse(harness.client._ws.sent[0]);
+    assert.deepEqual(errorFrame, {
+      id: 'inventory-bad',
+      type: 'mcp:error',
+      payload: { success: false, error: 'Invalid MCP client inventory payload' }
+    }, 'malformed inventory becomes a bounded existing error response');
+
+    vm.runInNewContext('delete globalThis.FsbMcpAgentProviders;', harness.context);
+    const unavailablePayload = vm.runInNewContext('({ platforms: {} })', harness.context);
+    await assert.rejects(
+      harness.client._routeMessage('system:client-inventory', unavailablePayload, 'inventory-2'),
+      /MCP client inventory storage unavailable/,
+      'missing provider helper rejects with a bounded error'
+    );
+  }
+
   delete globalThis.FsbMcpAgentProviders;
+  delete globalThis.fsbAgentRegistryInstance;
   delete globalThis.chrome;
   console.log('mcp-agent-providers-storage tests passed');
 }
