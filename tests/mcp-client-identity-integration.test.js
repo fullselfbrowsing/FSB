@@ -315,7 +315,7 @@ async function main() {
   let durable = storage.local.dump().fsbAgentProviders;
   assert.deepEqual(durable.installed['claude-code'], registerPayload.platforms['claude-code'],
     'agent:register piggyback persists installed evidence');
-  assert.equal(durable.connected.claudecode.version, '2.1.177',
+  assert.equal(durable.connected['claude-code'].version, '2.1.177',
     'dispatcher persists sanitized connected identity');
   assert.deepEqual(registry.listAgents().find((record) => record.agentId === first.agentId).clientInfo, {
     name: 'Claude Code', version: '2.1.177'
@@ -328,9 +328,10 @@ async function main() {
   assertRegisterResponse(reconnect, 'connection-phase57');
   await settleWrites();
   durable = storage.local.dump().fsbAgentProviders;
-  assert.deepEqual(Object.keys(durable.connected).filter((key) => key === 'claudecode'), ['claudecode'],
+  assert.deepEqual(Object.keys(durable.connected).filter((key) => key === 'claude-code'), ['claude-code'],
     'reconnect updates one durable connected key rather than appending');
-  assert.equal(durable.connected.claudecode.version, '2.1.178', 'reconnect refreshes connected evidence');
+  assert.equal(durable.connected['claude-code'].version, '2.1.178',
+    'reconnect refreshes connected evidence');
 
   const longName = 'N'.repeat(240);
   const longVersion = 'V'.repeat(240);

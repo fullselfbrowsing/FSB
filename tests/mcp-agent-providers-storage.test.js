@@ -12,6 +12,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
+const aliasesPath = path.join(repoRoot, 'extension', 'utils', 'mcp-client-aliases.js');
 const providersPath = path.join(repoRoot, 'extension', 'utils', 'mcp-agent-providers.js');
 const registryPath = require.resolve('../extension/utils/agent-registry.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
@@ -70,8 +71,11 @@ function installChrome({ local, session, localOptions, sessionOptions, tabs } = 
 }
 
 function freshProviders() {
+  delete globalThis.FsbMcpClientAliases;
   delete globalThis.FsbMcpAgentProviders;
+  try { delete require.cache[require.resolve(aliasesPath)]; } catch (_e) { /* fresh */ }
   try { delete require.cache[require.resolve(providersPath)]; } catch (_e) { /* fresh */ }
+  require(aliasesPath);
   require(providersPath);
   return globalThis.FsbMcpAgentProviders;
 }
@@ -105,10 +109,11 @@ function loadBridgeHarness() {
     dispatchMcpMessageRoute: async () => ({ success: true })
   };
   context.globalThis = context;
+  const aliasesSource = fs.readFileSync(aliasesPath, 'utf8');
   const providersSource = fs.readFileSync(providersPath, 'utf8');
   const bridgeSource = fs.readFileSync(bridgePath, 'utf8');
   vm.runInNewContext(
-    `${providersSource}\n${bridgeSource}\nthis.__bridgeClient = mcpBridgeClient;`,
+    `${aliasesSource}\n${providersSource}\n${bridgeSource}\nthis.__bridgeClient = mcpBridgeClient;`,
     context,
     { filename: 'mcp-agent-providers-bridge-harness.js' }
   );
@@ -155,7 +160,7 @@ async function main() {
     });
     assert.deepEqual(localArea.dump().fsbAgentProviders, {
       clicked: { cursor: { count: 2 }, vscode: { count: 1 } },
-      connected: { claude: { name: 'Claude' } },
+      connected: { 'claude-code': { name: 'Claude' } },
       installed: { codex: { detected: false } },
       schemaHint: { keep: true }
     }, 'a mutation preserves both sibling maps and unknown envelope keys');
@@ -194,24 +199,54 @@ async function main() {
       Date.now = () => 100;
       await providers.recordConnected('agent_one', { name: 'Claude Code', version: '2.1.177' });
       Date.now = () => 200;
-      await providers.recordConnected('agent_two', { name: 'Claude Code', version: '2.1.178' });
+      await providers.recordConnected('agent_two', { name: 'Anthropic Claude', version: '2.1.178' });
+      Date.now = () => 150;
+      await providers.recordConnected('agent_stale', { name: 'Claude', version: '2.1.176' });
+      Date.now = () => 250;
       await providers.recordConnected('agent_three', { version: ' 3.4.5 ' });
     } finally {
       Date.now = originalNow;
     }
     const connected = localArea.dump().fsbAgentProviders.connected;
-    assert.deepEqual(Object.keys(connected).sort(), ['claudecode', 'unknown:3.4.5']);
-    assert.deepEqual(connected.claudecode, {
-      name: 'Claude Code',
+    assert.deepEqual(Object.keys(connected).sort(), ['claude-code', 'raw:unknown:3.4.5']);
+    assert.deepEqual(connected['claude-code'], {
+      name: 'Anthropic Claude',
       version: '2.1.178',
       lastSeenAt: 200
-    }, 'reconnect overwrites one stable name key and refreshes lastSeenAt');
-    assert.deepEqual(connected['unknown:3.4.5'], {
+    }, 'known aliases converge on one canonical row and retain the newest evidence');
+    assert.deepEqual(connected['raw:unknown:3.4.5'], {
       name: '',
       version: ' 3.4.5 ',
-      lastSeenAt: 200
-    }, 'version-only identity uses the normalized unknown fallback key');
-    assert.equal(Array.isArray(connected.claudecode), false, 'connected evidence is never an append-only array');
+      lastSeenAt: 250
+    }, 'version-only identity uses a namespaced raw fallback key');
+    assert.equal(Array.isArray(connected['claude-code']), false,
+      'connected evidence is never an append-only array');
+  }
+
+  {
+    installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: {},
+          installed: {},
+          connected: {
+            claude: { name: 'Claude', version: 'old', lastSeenAt: 100 },
+            claudecode: { name: 'Claude Code', version: 'newest', lastSeenAt: 300 },
+            'claude-code': { name: 'Anthropic Claude', version: 'middle', lastSeenAt: 200 },
+            invalidTime: { name: 'Claude', version: 'invalid', lastSeenAt: '400' }
+          }
+        }
+      }
+    });
+    const providers = freshProviders();
+    const connected = (await providers.read()).connected;
+    assert.deepEqual(Object.keys(connected), ['claude-code'],
+      'legacy alias keys coalesce into one canonical row on read');
+    assert.deepEqual(connected['claude-code'], {
+      name: 'Claude Code',
+      version: 'newest',
+      lastSeenAt: 300
+    }, 'legacy coalescing retains the record with the greatest finite lastSeenAt');
   }
 
   {
@@ -246,7 +281,7 @@ async function main() {
     });
     assert.deepEqual(localArea.dump().fsbAgentProviders, {
       clicked: { cursor: { count: 4 } },
-      connected: { claude: { name: 'Claude' } },
+      connected: { 'claude-code': { name: 'Claude' } },
       installed: {
         cursor: {
           detected: true,
@@ -395,7 +430,7 @@ async function main() {
     }, 'agent:register platforms piggyback reaches the installed map');
     assert.equal(Object.keys(envelope.connected).includes('cursor'), true,
       'name-only connected identity is recorded');
-    assert.equal(Object.keys(envelope.connected).includes('unknown:0.142.5'), true,
+    assert.equal(Object.keys(envelope.connected).includes('raw:unknown:0.142.5'), true,
       'version-only connected identity is recorded');
   }
 

@@ -17,6 +17,61 @@
     return isPlainObject(value) ? Object.assign({}, value) : {};
   }
 
+  function connectedRecordTime(record) {
+    return isPlainObject(record)
+        && typeof record.lastSeenAt === 'number'
+        && Number.isFinite(record.lastSeenAt)
+      ? record.lastSeenAt
+      : null;
+  }
+
+  function shouldReplaceConnectedRecord(current, candidate) {
+    if (!isPlainObject(current)) return true;
+    var currentTime = connectedRecordTime(current);
+    var candidateTime = connectedRecordTime(candidate);
+    if (candidateTime === null) return currentTime === null;
+    return currentTime === null || candidateTime > currentTime;
+  }
+
+  function resolveConnectedKey(name, version, agentId, legacyKey) {
+    var aliases = getAliasApi();
+    var canonicalId = aliases.resolveMcpClientAlias(name)
+      || aliases.resolveMcpClientAlias(legacyKey || '');
+    if (canonicalId) return canonicalId;
+
+    var normalizedName = aliases.normalizeMcpClientName(name || '');
+    if (normalizedName) return 'raw:' + normalizedName;
+    if (typeof legacyKey === 'string' && legacyKey.indexOf('raw:') === 0) {
+      return legacyKey;
+    }
+    if (typeof legacyKey === 'string' && legacyKey.indexOf('unknown:') === 0) {
+      return 'raw:' + legacyKey;
+    }
+
+    var fallback = normalizeIdentityPart(version)
+      || normalizeIdentityPart(agentId)
+      || aliases.normalizeMcpClientName(legacyKey || '')
+      || 'unknown';
+    return 'raw:unknown:' + fallback;
+  }
+
+  function normalizeConnected(value) {
+    if (!isPlainObject(value)) return {};
+    var connected = {};
+    Object.keys(value).forEach(function(legacyKey) {
+      var record = value[legacyKey];
+      if (!isPlainObject(record)) {
+        connected[legacyKey] = record;
+        return;
+      }
+      var key = resolveConnectedKey(record.name, record.version, '', legacyKey);
+      if (shouldReplaceConnectedRecord(connected[key], record)) {
+        connected[key] = record;
+      }
+    });
+    return connected;
+  }
+
   function normalizeEnvelope(value) {
     var source = isPlainObject(value) ? value : {};
     var envelope = {};
@@ -24,7 +79,7 @@
       envelope[key] = source[key];
     });
     envelope.clicked = cloneMap(source.clicked);
-    envelope.connected = cloneMap(source.connected);
+    envelope.connected = normalizeConnected(source.connected);
     envelope.installed = cloneMap(source.installed);
     return envelope;
   }
@@ -89,17 +144,17 @@
     var info = isPlainObject(clientInfo) ? clientInfo : {};
     var name = typeof info.name === 'string' ? info.name : '';
     var version = typeof info.version === 'string' ? info.version : '';
-    var normalizedName = normalizeIdentityPart(name);
-    var fallback = normalizeIdentityPart(version)
-      || (typeof agentId === 'string' ? agentId : 'unknown');
-    var key = normalizedName || ('unknown:' + fallback);
+    var key = resolveConnectedKey(name, version, agentId, '');
 
     return await mutateSubmap('connected', function(connected) {
-      connected[key] = {
+      var record = {
         name: name,
         version: version,
         lastSeenAt: Date.now()
       };
+      if (shouldReplaceConnectedRecord(connected[key], record)) {
+        connected[key] = record;
+      }
     });
   }
 

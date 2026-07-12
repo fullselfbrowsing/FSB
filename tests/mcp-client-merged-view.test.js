@@ -348,10 +348,10 @@ async function main() {
   ]);
   assert.deepEqual(Object.keys(rawMerged), [
     'cursor',
-    'raw:unknown-0',
     'raw:geminicli',
+    'raw:unknown-0',
     'raw:unknown-1'
-  ], 'unknown empty identities receive stable unique keys and normalized unknown names join raw-only');
+  ], 'canonicalized durable keys keep unknown identities deterministic and raw-only');
   assert.equal(rawMerged['raw:geminicli'].raw, true, 'Gemini identity remains raw');
   assert.equal(rawMerged['raw:geminicli'].connected.name, 'Gemini CLI');
   assert.equal(rawMerged['raw:geminicli'].live.clientInfo.name, 'Gemini_CLI');
