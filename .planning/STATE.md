@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 58-01; ready for 58-02
-last_updated: "2026-07-12T20:45:38Z"
-last_activity: 2026-07-12 -- Phase 58 Plan 01 completed
+stopped_at: Completed 58-02; ready for 58-03
+last_updated: "2026-07-12T21:22:50Z"
+last_activity: 2026-07-12 -- Phase 58 Plan 02 completed
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 11
 ---
 
@@ -34,16 +34,16 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 58 (Providers Panel) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute Phase 58 Plan 02
-Last activity: 2026-07-12 -- Phase 58 Plan 01 completed
+Plan: 3 of 3
+Status: Ready to execute Phase 58 Plan 03
+Last activity: 2026-07-12 -- Phase 58 Plan 02 completed
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
-| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Executing — Plan 2/3 |
+| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Executing — Plan 3/3 |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Not started (SECURITY-CRITICAL, load-bearing) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
@@ -96,10 +96,11 @@ v0.9.91-specific decisions so far:
 - [Phase 57]: Guard getMcpClients with the existing own-extension sender check and direct registry access — This preserves same-context service-worker dispatch without self-send.
 - [Phase 57]: Expose getMergedClients as a non-enumerable additive helper — Direct consumers gain the method while the locked enumerable API remains compatible.
 - [Phase 58]: Keep provider settings and recommendation evidence separate — modelProvider remains closed to seven API ids, agent intent stays in agentProviderId, and fixed live/installed/clicked evidence changes only one advisory recommendation.
+- [Phase 58]: Keep the radio roster as an in-form projection — API and agent selections use the existing Save/Discard boundary, inactive-kind values survive switching, and agent ids never enter modelProvider or discovery maps.
 
 ### Pending Todos
 
-None. Phase 58 Plan 01 is complete; Plan 02 is ready to execute.
+None. Phase 58 Plans 01-02 are complete; Plan 03 is ready to execute.
 
 ### Blockers/Concerns
 
@@ -136,12 +137,12 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T20:45:38Z
-Stopped at: Completed 58-01; ready for 58-02
-Resume file: .planning/phases/58-providers-panel/58-02-PLAN.md
+Last session: 2026-07-12T21:22:50Z
+Stopped at: Completed 58-02; ready for 58-03
+Resume file: .planning/phases/58-providers-panel/58-03-PLAN.md
 
 ## Next Actions
 
-Execute Phase 58 Plan 02: `/gsd-execute-phase 58 --no-transition`
+Execute Phase 58 Plan 03: `/gsd-execute-phase 58 --no-transition`
 
-Plan 02 builds the accessible provider roster and kind-aware settings UI on 58-01's verified pure contract.
+Plan 03 wires Phase 57 evidence, recommendation badges, honest agent detail states, and final phase verification onto the saved provider chooser.
