@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: ready
-stopped_at: Phase 58 planned and verified; ready to execute 58-01
-last_updated: "2026-07-12T20:21:58.853Z"
-last_activity: 2026-07-12 -- Phase 58 planning complete
+status: executing
+stopped_at: Phase 58 execution started; executing 58-01
+last_updated: "2026-07-12T20:24:05.406Z"
+last_activity: 2026-07-12 -- Phase 58 execution started
 progress:
   total_phases: 9
   completed_phases: 1
@@ -33,17 +33,17 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 ## Current Position
 
-Phase: 58 (Providers Panel) — READY TO EXECUTE
-Plan: 3 plans ready (58-01 through 58-03); 0/3 executed
-Status: Planning and plan-check verification passed
-Last activity: 2026-07-12 -- Phase 58 planning complete
+Phase: 58 (Providers Panel) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 58
+Last activity: 2026-07-12 -- Phase 58 execution started
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
-| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Planned — 3 plans ready |
+| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Executing — Plan 1/3 |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Not started (SECURITY-CRITICAL, load-bearing) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
@@ -136,7 +136,7 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 ## Session Continuity
 
 Last session: 2026-07-12T20:21:58.853Z
-Stopped at: Phase 58 planned and verified; ready to execute 58-01
+Stopped at: Phase 58 execution started; executing 58-01
 Resume file: .planning/phases/58-providers-panel/58-01-PLAN.md
 
 ## Next Actions
