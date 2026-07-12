@@ -240,6 +240,18 @@ assert.match(providerCss, /padding:\s*16px/);
 assert.match(providerCss, /gap:\s*12px/);
 assert.match(providerCss, /border:\s*2px solid var\(--border-color\)/);
 assert.match(providerCss, /border-color:\s*var\(--primary-color\)/);
+assert.match(providerCss,
+  /(?:^|\n)\.provider-row\.is-selected\s*\{[^}]*background:\s*var\(--primary-light\);[^}]*border-color:\s*var\(--primary-color\);[^}]*\}/,
+  'Chrome 88 receives selected styling from a standalone class rule');
+assert.doesNotMatch(providerCss, /\.provider-row\.is-selected\s*,[^\{]*:has\(/,
+  'the compatibility selected rule never shares a selector list with :has()');
+assert.match(providerCss, /\.provider-row:focus-within\s*\{[^}]*var\(--fsb-focus-ring\)/,
+  'Chrome 88 receives row focus styling through focus-within');
+assert.match(providerCss, /@supports selector\(\.provider-row:has\(\.provider-radio:checked\)\)/,
+  ':has() selected-state enhancement is feature-gated');
+assert.doesNotMatch(providerCss,
+  /\[data-theme="dark"\] \.provider-row\.is-selected\s*,[^\{]*:has\(/,
+  'dark-mode selected baseline also remains independent of :has()');
 assert.match(providerCss, /\.provider-badge--recommended[\s\S]*var\(--info-light\)/);
 assert.match(providerCss, /var\(--fsb-focus-ring\)/);
 assert.match(providerCss, /@media \(min-width: 900px\)/);
