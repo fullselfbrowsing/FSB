@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: verifying
-stopped_at: Completed 57-03-PLAN.md
-last_updated: "2026-07-12T13:44:46.360Z"
+status: ready
+stopped_at: Phase 57 verified and complete; Phase 58 ready for discussion
+last_updated: "2026-07-12T14:32:41.663Z"
 last_activity: 2026-07-12
 progress:
-  total_phases: 18
+  total_phases: 9
   completed_phases: 1
   total_plans: 3
-  completed_plans: 5
-  percent: 100
+  completed_plans: 3
+  percent: 11
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -22,27 +22,27 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 0/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 5/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 57 — Agent Identity Capture
+**Current focus:** Phase 58 — Providers Panel
 
 ## Current Position
 
-Phase: 57 (Agent Identity Capture) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 58 (Providers Panel) — READY FOR DISCUSSION
+Plan: Not started
+Status: Phase 57 passed verification (14/14) and is complete; Phase 58 is ready for discussion
 Last activity: 2026-07-12
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Not started |
+| 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Not started |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Not started (SECURITY-CRITICAL, load-bearing) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
@@ -52,7 +52,7 @@ Last activity: 2026-07-12
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
+Coverage: 51/51 v0.9.91 requirements mapped, 5/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
 
 ## Hard Invariants (v0.9.91)
 
@@ -98,13 +98,12 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None yet — planning is at the roadmap stage; per-phase todos will populate as `/gsd-plan-phase` runs for each phase.
+None. Phase 57 is complete; Phase 58 has not yet been discussed or planned.
 
 ### Blockers/Concerns
 
-None yet. Two open judgment calls flagged by research to resolve during Phase 57 / Phase 59 planning (not blockers, but decisions to make explicitly rather than let default-implicitly):
+No active blocker. One open judgment call remains for Phase 59 planning (not a blocker, but a decision to make explicitly rather than let default-implicitly):
 
-- **Phase 57 planning:** Inventory delivery trigger — on-extension-connect push vs piggyback on `agent:register` vs on-demand `ext:request clients.detect`. SUMMARY.md flagged this as a "decide with payload-size measurements" call; the decision should be recorded in the Phase 57 plan.
 - **Phase 59 planning:** Shared-secret provisioning UX — TOFU pairing on first `serve` connect vs a user-visible pairing code from `fsb-mcp-server pair`. Research recommends deciding explicitly in Phase 59 planning; both paths meet the CHAN-04 requirement.
 
 Three additional Phase-60-time verifications flagged from research (SUMMARY.md Confidence Assessment):
@@ -136,17 +135,17 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T13:44:46.297Z
-Stopped at: Completed 57-03-PLAN.md
+Last session: 2026-07-12T14:32:41.663Z
+Stopped at: Phase 57 verified and complete; Phase 58 ready for discussion
 Resume file: None
 
 ## Next Actions
 
-Start Phase 57 planning: `/gsd-plan-phase 57`
+Start Phase 58 discussion: `/gsd-discuss-phase 58`
 
-Phase 57 planning inputs (already in-repo):
+Phase 58 inputs (already in-repo):
 
-- REQUIREMENTS.md IDENT-01..05
-- research/ARCHITECTURE.md Feature 1 seams table (`extension/ui/onboarding.js:508/522/784`, `mcp/src/agent-scope.ts:59-62`, `mcp/src/runtime.ts:31-50`, `extension/ws/mcp-tool-dispatcher.js:1935-1994`, `extension/utils/agent-registry.js:263/305/634`, `mcp/src/platforms.ts:437-490`)
-- research/PITFALLS.md #11 (source-pin tripwires) — full suite from commit 1
-- research/SUMMARY.md open question: inventory delivery trigger (record decision in the plan)
+- REQUIREMENTS.md PROV-01..06
+- Phase 57's verified `getMcpClients` data contract and durable `fsbAgentProviders` evidence maps
+- research/ARCHITECTURE.md Providers-panel seams and recommended-default cascade
+- research/PITFALLS.md source-pin tripwire discipline and no-fabrication cost/usage constraints

@@ -30,7 +30,7 @@
 - Integer phases (57, 58, 59, 60, 61, 62, 63, 64, 65): Planned milestone work, continuing from v1.2.0's Phase 56
 - Decimal phases (57.1, 57.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 57: Agent Identity Capture** - Persist copy-clicks, capture MCP `initialize` `clientInfo`, thread it through `agent:register`, add disk-scan detection, expose a unified `getMcpClients` view — additive on both sides of the wire (INV-01 safe), unblocks everything downstream
+- [x] **Phase 57: Agent Identity Capture** - Persist copy-clicks, capture MCP `initialize` `clientInfo`, thread it through `agent:register`, add disk-scan detection, expose a unified `getMcpClients` view — additive on both sides of the wire (INV-01 safe), unblocks everything downstream (completed 2026-07-12)
 - [ ] **Phase 58: Providers Panel** - Rename "API Configuration" → "Providers", introduce `api` vs `agent` provider kinds, hide the key input for agent kind, badge exactly one "Recommended" provider via the connected > installed > copy-clicked cascade, keep `universal-provider.js` unaware of agent values (INV-03 BYOK parity)
 - [ ] **Phase 59: Reverse-Request Channel & Security Foundation** - **SECURITY-CRITICAL, load-bearing**. Additive `ext:*` frames on ws://localhost:7225, strict Origin allowlist + Host loopback + per-install rotating shared secret in `Sec-WebSocket-Protocol`, log redaction, hub-exit-mid-delegation topology tests, permanent CI grep gate against `--dangerously-skip-permissions` / `--yolo` / `--auto` — ships BEFORE any spawn code exists
 - [ ] **Phase 60: Adapter Contract & Claude Code MVP** - `AgentProviderAdapter` interface, `SpawnSupervisor` in the `serve` daemon with argv-only spawn / scrubbed env / SIGTERM-at-process-group / Windows `taskkill /T /F` / orphan scan on startup, Claude Code adapter with verified 2.1.177 flag set + shipped `fsb` agent definition + recorded stream-json JSONL fixture — the integration payoff
@@ -52,7 +52,10 @@
   3. `fsb-mcp-server` can enumerate installed MCP-capable clients on the current machine by inspecting the paths already known to `platforms.ts` (per-OS `configPath` for file-mode clients; `claude --version` binary probe for cli-mode `claude-code`) and report each as `installed` / `not-installed` with any parseable version.
   4. A single `getMcpClients` extension runtime message returns a merged `clicked ∪ installed ∪ connected` view with per-client status, so UI surfaces read one consistent structure instead of assembling it themselves — and the merged view survives MV3 service-worker eviction.
   5. INV-01 holds: no existing `MCPMessageType` value, no existing tool schema, and no existing consumer of the `agent:register` payload breaks — the additive `clientInfo` field is optional and existing `payload: {}` handlers keep working byte-for-byte.
-**Plans**: TBD
+**Plans**: 3/3 complete
+- [x] 57-01: Capture lazy MCP client identity and daemon-side installed-client inventory.
+- [x] 57-02: Persist durable clicked, connected, and installed evidence in the extension.
+- [x] 57-03: Expose the canonical merged MCP-client evidence view with compatibility locks.
 
 ### Phase 58: Providers Panel
 **Goal**: The control panel's "API Configuration" section becomes the "Providers" panel — distinguishing BYOK API providers from installed agent CLIs, badging exactly one provider "Recommended" from ground truth (never auto-switching selection), and shipping honest no-fabrication cost/usage copy for agent-kind providers.
@@ -158,7 +161,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 
 | Phase | Plans Complete | Status | Completed |
 |-------|-----------------|--------|-----------|
-| 57. Agent Identity Capture | 3/3 | Complete   | 2026-07-12 |
+| 57. Agent Identity Capture | 3/3 | Complete    | 2026-07-12 |
 | 58. Providers Panel | 0/0 | Not started | — |
 | 59. Reverse-Request Channel & Security Foundation | 0/0 | Not started | — |
 | 60. Adapter Contract & Claude Code MVP | 0/0 | Not started | — |
