@@ -207,6 +207,7 @@ function cacheElements() {
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
   elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
@@ -1162,7 +1163,26 @@ function initFsbSelects() {
   }
 }
 
+function setProviderStatusRefreshing(isRefreshing) {
+  const button = elements.refreshProviderStatusBtn;
+  if (!button) return;
+  const refreshing = isRefreshing === true;
+  const label = button.querySelector('.provider-roster__refresh-label');
+  const pending = button.querySelector('.provider-roster__refresh-pending');
+  button.disabled = refreshing;
+  button.setAttribute('aria-busy', refreshing ? 'true' : 'false');
+  button.classList.toggle('is-refreshing', refreshing);
+  if (label) label.hidden = refreshing;
+  if (pending) pending.hidden = !refreshing;
+}
+
+function normalizeSectionId(sectionId) {
+  return sectionId === 'api-config' ? 'providers' : sectionId;
+}
+
 function switchSection(sectionId) {
+  sectionId = normalizeSectionId(sectionId);
+
   // Update navigation
   elements.navItems.forEach(item => {
     item.classList.toggle('active', item.dataset.section === sectionId);
@@ -1191,7 +1211,7 @@ function switchSection(sectionId) {
 
 function initializeSections() {
   // Check URL hash for initial section
-  const hash = window.location.hash.slice(1);
+  const hash = normalizeSectionId(window.location.hash.slice(1));
   if (hash && document.getElementById(hash)) {
     switchSection(hash);
   }
