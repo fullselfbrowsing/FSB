@@ -796,6 +796,11 @@ function createProviderHarness(initialStorage, harnessOptions) {
       const callbacks = pendingRuntimeCallbacks.splice(0);
       callbacks.forEach((callback) => deliverRuntime(callback, response, error));
     },
+    resolveNextRuntime(response, error) {
+      const callback = pendingRuntimeCallbacks.shift();
+      assert.ok(callback, 'a held runtime callback is available');
+      deliverRuntime(callback, response, error);
+    },
     emitStorage(changes, area) {
       storageListeners.slice().forEach((listener) => listener(changes, area));
     },
@@ -1397,6 +1402,37 @@ async function runProviderEvidenceTests() {
   await flushHarness();
   assert.strictEqual(selectedRadio(coalesced).dataset.providerId, 'opencode',
     'storage, section, and manual refreshes all preserve in-form selection');
+
+  const queuedStorage = createProviderHarness({}, {
+    holdRuntime: true,
+    heldTimerDelays: [5000]
+  });
+  queuedStorage.context.setupEventListeners();
+  const heldFirstRefresh = queuedStorage.context.refreshProviderEvidence();
+  queuedStorage.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
+  queuedStorage.emitStorage({ fsbAgentRegistry: { newValue: {} } }, 'session');
+  await flushHarness();
+  assert.strictEqual(queuedStorage.runtimeCalls.length, 1,
+    'storage invalidations do not join direct callers or start a parallel request');
+  queuedStorage.resolveNextRuntime({
+    success: true,
+    clients: { 'claude-code': { live: {} } }
+  });
+  await heldFirstRefresh;
+  assert.strictEqual(queuedStorage.runtimeCalls.length, 2,
+    'local and session invalidations queue exactly one post-settlement refresh');
+  queuedStorage.resolveNextRuntime({
+    success: true,
+    clients: { codex: { live: {} } }
+  });
+  await flushHarness();
+  assert.strictEqual(queuedStorage.runtimeCalls.length, 2,
+    'queued storage refresh performs exactly two total runtime calls');
+  assert.deepStrictEqual(visibleRecommendationIds(queuedStorage), ['codex'],
+    'the queued response wins as the final recommendation');
+  assert.strictEqual(evidenceBadge(queuedStorage, 'codex').textContent, 'Connected now');
+  assert.strictEqual(evidenceBadge(queuedStorage, 'claude-code').textContent, 'Not installed',
+    'the first response cannot overwrite the queued final view');
 
   console.log('Providers panel UI: bounded held-runtime recovery');
   const timedOut = createProviderHarness({}, { holdRuntime: true });

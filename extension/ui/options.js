@@ -132,6 +132,7 @@ const providerPanelState = {
 
 let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
+let providerEvidenceRefreshQueued = false;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
 let providerSettingsModelLoadTimer = null;
 let providerSettingsLoadGeneration = 0;
@@ -763,18 +764,34 @@ function refreshProviderEvidence({ announce = false } = {}) {
       renderProviderEvidence();
       renderSelectedAgentDetails();
       providerEvidenceRefreshPromise = null;
+      if (providerEvidenceRefreshQueued) {
+        providerEvidenceRefreshQueued = false;
+        refreshProviderEvidence();
+      }
     });
 
   return providerEvidenceRefreshPromise;
 }
 
 function scheduleProviderEvidenceRefresh() {
+  if (providerEvidenceRefreshPromise) {
+    if (providerEvidenceRefreshDebounceHandle !== null) {
+      clearTimeout(providerEvidenceRefreshDebounceHandle);
+      providerEvidenceRefreshDebounceHandle = null;
+    }
+    providerEvidenceRefreshQueued = true;
+    return;
+  }
   if (providerEvidenceRefreshDebounceHandle !== null) {
     clearTimeout(providerEvidenceRefreshDebounceHandle);
   }
   providerEvidenceRefreshDebounceHandle = setTimeout(() => {
     providerEvidenceRefreshDebounceHandle = null;
-    refreshProviderEvidence();
+    if (providerEvidenceRefreshPromise) {
+      providerEvidenceRefreshQueued = true;
+    } else {
+      refreshProviderEvidence();
+    }
   }, 100);
 }
 
