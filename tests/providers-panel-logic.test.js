@@ -265,6 +265,30 @@ function main() {
   assertRecommendation(deepFreeze(hostileClients), {
     providerKind: 'api', providerId: 'xai', reason: 'fallback'
   }, 'unknown, raw, prototype-like, and malformed rows never become recommendations');
+  for (const providerId of providers.AGENT_PROVIDER_IDS) {
+    const rawCollision = {
+      [providerId]: {
+        id: providerId,
+        raw: true,
+        live: {},
+        installed: { detected: true, checkedAt: 99 },
+        connected: {},
+        clicked: {}
+      }
+    };
+    assertRecommendation(deepFreeze(rawCollision), {
+      providerKind: 'api', providerId: 'xai', reason: 'fallback'
+    }, `raw collision under ${providerId} cannot recommend a canonical provider`);
+    assert.deepEqual(providers.getAgentStatus(rawCollision[providerId]), {
+      live: false,
+      installed: false,
+      seenBefore: false,
+      clicked: false,
+      primaryLabel: 'Not installed',
+      authLabel: 'Not reported',
+      checkedAt: null
+    }, `raw collision under ${providerId} has no canonical status`);
+  }
   const inheritedClients = Object.create({ 'claude-code': { live: {} } });
   inheritedClients.codex = { clicked: {} };
   assertRecommendation(inheritedClients, {

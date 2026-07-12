@@ -541,12 +541,8 @@ function setProviderEvidenceBadgeClass(badge, status) {
 function hasSupportedAgentEvidence(helper) {
   return helper.AGENT_PROVIDER_IDS.some((providerId) => {
     const row = getOwnDataValue(providerPanelState.clients, providerId);
-    if (!isProviderDataRecord(row)) return false;
-    const installed = getOwnDataValue(row, 'installed');
-    return isProviderDataRecord(getOwnDataValue(row, 'clicked'))
-      || (isProviderDataRecord(installed) && getOwnDataValue(installed, 'detected') === true)
-      || isProviderDataRecord(getOwnDataValue(row, 'connected'))
-      || isProviderDataRecord(getOwnDataValue(row, 'live'));
+    const status = helper.getAgentStatus(row);
+    return status.clicked || status.installed || status.seenBefore || status.live;
   });
 }
 

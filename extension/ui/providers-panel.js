@@ -139,8 +139,12 @@
     return isRecord(clients) ? getOwnValue(clients, providerId) : undefined;
   }
 
+  function isCanonicalSupportedRow(row) {
+    return isRecord(row) && getOwnValue(row, 'raw') !== true;
+  }
+
   function hasRecordEvidence(row, evidenceKey) {
-    return isRecord(row) && isRecord(getOwnValue(row, evidenceKey));
+    return isCanonicalSupportedRow(row) && isRecord(getOwnValue(row, evidenceKey));
   }
 
   function getRecommendation(clients) {
@@ -159,7 +163,7 @@
     for (index = 0; index < AGENT_PROVIDER_IDS.length; index++) {
       providerId = AGENT_PROVIDER_IDS[index];
       row = getClientRow(clients, providerId);
-      var installed = isRecord(row) ? getOwnValue(row, 'installed') : undefined;
+      var installed = isCanonicalSupportedRow(row) ? getOwnValue(row, 'installed') : undefined;
       if (isRecord(installed) && getOwnValue(installed, 'detected') === true) {
         return { providerKind: 'agent', providerId: providerId, reason: 'installed' };
       }
@@ -177,7 +181,7 @@
   }
 
   function getAgentStatus(row) {
-    var safeRow = isRecord(row) ? row : {};
+    var safeRow = isCanonicalSupportedRow(row) ? row : {};
     var live = isRecord(getOwnValue(safeRow, 'live'));
     var installedEvidence = getOwnValue(safeRow, 'installed');
     var installed = isRecord(installedEvidence)

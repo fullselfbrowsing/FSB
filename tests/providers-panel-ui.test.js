@@ -1109,6 +1109,34 @@ async function runProviderEvidenceTests() {
     'no supported agent evidence reveals the exact static empty-state block');
   assert.deepStrictEqual(visibleRecommendationIds(harness), ['xai']);
 
+  for (const providerId of PROVIDERS.AGENT_PROVIDER_IDS) {
+    harness.setRuntimeResponse({
+      success: true,
+      clients: {
+        [providerId]: {
+          id: providerId,
+          raw: true,
+          displayName: 'Raw ' + providerId,
+          clicked: {},
+          installed: { detected: true, checkedAt: 123 },
+          connected: {},
+          live: {}
+        }
+      }
+    });
+    await harness.context.refreshProviderEvidence();
+    assert.deepStrictEqual(visibleRecommendationIds(harness), ['xai'],
+      'raw collision under ' + providerId + ' cannot become the canonical recommendation');
+    assert.strictEqual(evidenceBadge(harness, providerId).textContent, 'Not installed',
+      'raw collision under ' + providerId + ' cannot show canonical evidence');
+    assert.strictEqual(harness.agentEmptyState.hidden, false,
+      'raw collision under ' + providerId + ' cannot suppress the supported-agent empty state');
+    assert.strictEqual(harness.otherSummary.textContent, 'Other MCP clients (1)');
+    assert.deepStrictEqual(harness.otherList.children.map((item) => item.textContent), [
+      'Raw ' + providerId + ' — Observed MCP client'
+    ], 'raw collision under ' + providerId + ' remains safely informational');
+  }
+
   harness.setRuntimeResponse({
     success: true,
     clients: {
