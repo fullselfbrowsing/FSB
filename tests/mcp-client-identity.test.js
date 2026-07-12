@@ -14,6 +14,7 @@ const { pathToFileURL } = require('node:url');
 const repoRoot = path.resolve(__dirname, '..');
 const agentScopeBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-scope.js');
 const runtimeBuildPath = path.join(repoRoot, 'mcp', 'build', 'runtime.js');
+const inventoryBuildPath = path.join(repoRoot, 'mcp', 'build', 'client-inventory.js');
 
 class MockBridge {
   constructor() {
@@ -58,6 +59,7 @@ async function main() {
 
   const { AgentScope } = await import(pathToFileURL(agentScopeBuildPath).href);
   const { createRuntime } = await import(pathToFileURL(runtimeBuildPath).href);
+  const { __configureClientInventoryForTests } = await import(pathToFileURL(inventoryBuildPath).href);
 
   {
     const { message } = await captureRegistration(
@@ -106,16 +108,21 @@ async function main() {
   }
 
   {
-    const runtime = createRuntime();
-    let initializedClient = null;
-    runtime.server.server.getClientVersion = () => initializedClient;
-    initializedClient = { name: 'Cursor', version: '1.2.3' };
+    __configureClientInventoryForTests({ platforms: {} });
+    try {
+      const runtime = createRuntime();
+      let initializedClient = null;
+      runtime.server.server.getClientVersion = () => initializedClient;
+      initializedClient = { name: 'Cursor', version: '1.2.3' };
 
-    const bridge = new MockBridge();
-    await runtime.agentScope.ensure(bridge);
-    assert.deepEqual(bridge.calls[0].payload, {
-      clientInfo: { name: 'Cursor', version: '1.2.3' },
-    }, 'createRuntime injects a lazy SDK client-version supplier');
+      const bridge = new MockBridge();
+      await runtime.agentScope.ensure(bridge);
+      assert.deepEqual(bridge.calls[0].payload, {
+        clientInfo: { name: 'Cursor', version: '1.2.3' },
+      }, 'createRuntime injects a lazy SDK client-version supplier');
+    } finally {
+      __configureClientInventoryForTests(null);
+    }
   }
 
   assert.doesNotThrow(

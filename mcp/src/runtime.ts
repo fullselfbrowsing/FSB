@@ -3,6 +3,7 @@ import { createServer } from './server.js';
 import { WebSocketBridge } from './bridge.js';
 import { TaskQueue } from './queue.js';
 import { AgentScope } from './agent-scope.js';
+import { detectMcpClientInventory } from './client-inventory.js';
 import { registerAutopilotTools } from './tools/autopilot.js';
 import { registerVisualSessionTools } from './tools/visual-session.js';
 import { registerTriggerTools } from './tools/triggers.js';
@@ -36,6 +37,9 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
 
   if (typeof agentScope.setClientInfoSupplier === 'function') {
     agentScope.setClientInfoSupplier(() => server.server.getClientVersion?.() ?? null);
+  }
+  if (typeof agentScope.setClientInventorySupplier === 'function') {
+    agentScope.setClientInventorySupplier(() => detectMcpClientInventory());
   }
 
   registerVisualSessionTools(server, bridge, queue, agentScope);

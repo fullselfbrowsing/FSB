@@ -11,6 +11,7 @@
 // the FSB family ([FSB AGT], [FSB DLG], [FSB BG], ...).
 
 import type { WebSocketBridge } from './bridge.js';
+import type { McpClientInventory } from './client-inventory.js';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
 
@@ -20,11 +21,13 @@ export type ClientInfo = {
 };
 
 export type ClientInfoSupplier = () => ClientInfo | null;
+export type ClientInventorySupplier = () => McpClientInventory | Promise<McpClientInventory>;
 
 export class AgentScope {
   private agentId: string | null = null;
   private pending: Promise<string> | null = null;
   private clientInfoSupplier: ClientInfoSupplier | null = null;
+  private clientInventorySupplier: ClientInventorySupplier | null = null;
   // Phase 240 Open Q1 resolution: ownership tokens are minted per-bindTab on
   // the extension side. Each bindTab-firing handler returns the freshly
   // minted token in its response under `ownershipToken`. AgentScope captures
@@ -54,6 +57,10 @@ export class AgentScope {
     this.clientInfoSupplier = supplier;
   }
 
+  setClientInventorySupplier(supplier: ClientInventorySupplier): void {
+    this.clientInventorySupplier = supplier;
+  }
+
   /**
    * Returns the per-process agent_id, lazy-minting on first call via the
    * agent:register bridge message. Concurrent first callers share one
@@ -68,7 +75,7 @@ export class AgentScope {
 
     this.pending = (async () => {
       try {
-        const payload: { clientInfo?: ClientInfo } = {};
+        const payload: { clientInfo?: ClientInfo; platforms?: McpClientInventory } = {};
         const suppliedClientInfo = this.clientInfoSupplier?.();
         if (suppliedClientInfo) {
           const clientInfo: ClientInfo = {};
@@ -81,6 +88,16 @@ export class AgentScope {
           if (Object.keys(clientInfo).length > 0) {
             payload.clientInfo = clientInfo;
           }
+        }
+
+        const suppliedPlatforms = await this.clientInventorySupplier?.();
+        if (
+          suppliedPlatforms &&
+          typeof suppliedPlatforms === 'object' &&
+          !Array.isArray(suppliedPlatforms) &&
+          Object.keys(suppliedPlatforms).length > 0
+        ) {
+          payload.platforms = { ...suppliedPlatforms };
         }
 
         const result = await bridge.sendAndWait(

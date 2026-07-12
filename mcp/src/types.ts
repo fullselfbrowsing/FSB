@@ -45,7 +45,8 @@ export type MCPMessageType =
   | 'mcp:capabilities-invoke' // Phase 28: queued capability invoke (serialized, invoke_capability)
   | 'agent:register'         // Phase 238: lazy-mint per-process agent_id
   | 'agent:release'          // Phase 238: handler only; server caller in Phase 241
-  | 'agent:status';          // Phase 238: caller-self introspection
+  | 'agent:status'           // Phase 238: caller-self introspection
+  | 'system:client-inventory'; // Phase 57: additive installed MCP-client inventory
 
 // Messages FROM extension TO MCP server (responses)
 export interface MCPResponse {

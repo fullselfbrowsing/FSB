@@ -19,6 +19,7 @@ import {
   FSB_MCP_VERSION,
 } from './version.js';
 import { getSetupSections, runInstall, runUninstall } from './install.js';
+import { pushMcpClientInventory } from './client-inventory.js';
 
 type FlagValue = boolean | string;
 
@@ -247,6 +248,7 @@ async function runStdioServer(): Promise<void> {
 
   try {
     await runtime.bridge.connect();
+    void pushMcpClientInventory(runtime.bridge);
   } catch (err: unknown) {
     console.error('[FSB MCP] WebSocket bridge failed to start (running in disconnected mode):', err);
   }
@@ -271,6 +273,7 @@ async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
 
   try {
     await bridge.connect();
+    void pushMcpClientInventory(bridge);
   } catch (err: unknown) {
     console.error('[FSB MCP] WebSocket bridge failed to start (running in disconnected mode):', err);
   }
