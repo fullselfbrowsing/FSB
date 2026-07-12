@@ -132,6 +132,7 @@ const providerPanelState = {
 
 let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
+const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
 
 // Initialize analytics
 let analytics = null;
@@ -408,25 +409,41 @@ function requestMcpClients() {
       return;
     }
 
+    let settled = false;
+    let timeoutHandle = null;
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      callback(value);
+    };
+    timeoutHandle = setTimeout(() => {
+      settle(reject, new Error('provider_status_unavailable'));
+    }, PROVIDER_EVIDENCE_TIMEOUT_MS);
+
     try {
       runtime.sendMessage({ action: 'getMcpClients' }, (response) => {
+        if (settled) return;
         if (runtime.lastError) {
-          reject(new Error('provider_status_unavailable'));
+          settle(reject, new Error('provider_status_unavailable'));
           return;
         }
         if (!isProviderDataRecord(response) || getOwnDataValue(response, 'success') !== true) {
-          reject(new Error('provider_status_unavailable'));
+          settle(reject, new Error('provider_status_unavailable'));
           return;
         }
         const clients = copyProviderClientMap(getOwnDataValue(response, 'clients'));
         if (!clients) {
-          reject(new Error('provider_status_unavailable'));
+          settle(reject, new Error('provider_status_unavailable'));
           return;
         }
-        resolve(clients);
+        settle(resolve, clients);
       });
     } catch (_error) {
-      reject(new Error('provider_status_unavailable'));
+      settle(reject, new Error('provider_status_unavailable'));
     }
   });
 }
@@ -665,6 +682,7 @@ function refreshProviderEvidence({ announce = false } = {}) {
   providerPanelState.evidenceStatus = 'loading';
   setProviderStatusRefreshing(true);
   setProviderEvidenceAnnouncement('Refreshing provider status…');
+  renderProviderRecommendation();
   renderProviderEvidence();
   renderSelectedAgentDetails();
 

@@ -294,10 +294,18 @@ assert.match(requestClientsSource, /sendMessage\(\{ action: 'getMcpClients' \}/,
   'evidence uses the one Phase 57 runtime action');
 assert.match(requestClientsSource, /runtime\.lastError/);
 assert.match(requestClientsSource, /getOwnDataValue\(response, 'success'\) !== true/);
+assert.match(JS, /const PROVIDER_EVIDENCE_TIMEOUT_MS\s*=\s*5000/);
+assert.match(requestClientsSource, /clearTimeout\(timeoutHandle\)/,
+  'runtime request timer is cleared on callback settlement');
 assert.match(refreshEvidenceSource, /providerEvidenceRefreshPromise/);
 assert.match(refreshEvidenceSource, /hasSuccessfulEvidence/);
 assert.match(refreshEvidenceSource, /evidenceStatus = 'stale'/);
 assert.match(refreshEvidenceSource, /evidenceStatus = 'unavailable'/);
+assert.ok(
+  refreshEvidenceSource.indexOf('renderProviderRecommendation()')
+    < refreshEvidenceSource.indexOf('requestMcpClients()'),
+  'fallback or last recommendation renders before the runtime request starts'
+);
 assert.doesNotMatch(recommendationRenderSource,
   /setProviderSelection|\.checked\s*=|modelProvider|chrome\.storage|markUnsavedChanges/,
   'recommendation rendering cannot write selection or settings');
@@ -541,6 +549,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const storageListeners = [];
   const runtimeCalls = [];
   const pendingRuntimeCallbacks = [];
+  const scheduledTimeoutDelays = [];
   const openedSetupPages = [];
   let runtimeResponse = Object.prototype.hasOwnProperty.call(options, 'runtimeResponse')
     ? options.runtimeResponse
@@ -608,7 +617,10 @@ function createProviderHarness(initialStorage, harnessOptions) {
     FSBProvidersPanel: PROVIDERS,
     FSBAnalytics: function() {},
     Event: class { constructor(type) { this.type = type; } },
-    setTimeout(fn) { return setTimeout(fn, 0); },
+    setTimeout(fn, delay) {
+      scheduledTimeoutDelays.push(delay || 0);
+      return setTimeout(fn, delay === 5000 ? 1 : 0);
+    },
     clearTimeout,
     requestAnimationFrame(fn) { return setTimeout(fn, 0); },
     cancelAnimationFrame: clearTimeout,
@@ -639,6 +651,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     calls,
     writes,
     runtimeCalls,
+    scheduledTimeoutDelays,
     radios,
     recommendationBadges,
     evidenceBadges,
@@ -1130,6 +1143,41 @@ async function runProviderEvidenceTests() {
   await flushHarness();
   assert.strictEqual(selectedRadio(coalesced).dataset.providerId, 'opencode',
     'storage, section, and manual refreshes all preserve in-form selection');
+
+  console.log('Providers panel UI: bounded held-runtime recovery');
+  const timedOut = createProviderHarness({}, { holdRuntime: true });
+  timedOut.context.setProviderSelection('agent', 'codex', { markDirty: false });
+  const pendingTimeout = timedOut.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(visibleRecommendationIds(timedOut), ['xai'],
+    'deterministic fallback is visible while the first request is pending');
+  assert.strictEqual(timedOut.refreshButton.disabled, true);
+  await pendingTimeout;
+  assert.ok(timedOut.scheduledTimeoutDelays.includes(5000),
+    'the harness shortens the production five-second timeout deterministically');
+  assert.strictEqual(timedOut.state().evidenceStatus, 'unavailable');
+  assert.strictEqual(timedOut.refreshButton.disabled, false,
+    'timeout restores the Refresh action');
+  assert.strictEqual(timedOut.refreshButton.getAttribute('aria-busy'), 'false');
+  assert.deepStrictEqual(visibleRecommendationIds(timedOut), ['xai'],
+    'timeout retains exactly one fallback badge');
+  assert.strictEqual(selectedRadio(timedOut).dataset.providerId, 'codex',
+    'timeout preserves the in-form selection');
+
+  const staleTimeout = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      clients: { codex: { installed: { detected: true, checkedAt: 500 } } }
+    }
+  });
+  staleTimeout.context.setProviderSelection('api', 'openai', { markDirty: false });
+  await staleTimeout.context.refreshProviderEvidence();
+  staleTimeout.holdRuntime();
+  await staleTimeout.context.refreshProviderEvidence({ announce: true });
+  assert.strictEqual(staleTimeout.state().evidenceStatus, 'stale');
+  assert.deepStrictEqual(visibleRecommendationIds(staleTimeout), ['codex'],
+    'a timeout after success preserves exactly one last-known recommendation');
+  assert.strictEqual(selectedRadio(staleTimeout).dataset.providerId, 'openai');
+  assert.strictEqual(staleTimeout.refreshButton.disabled, false);
 }
 
 runProviderRuntimeTests()
