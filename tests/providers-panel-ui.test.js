@@ -56,6 +56,30 @@ function extractElement(source, tagName, id) {
   throw new Error('Unclosed #' + id);
 }
 
+function assertBalancedHtmlFragment(fragment, label) {
+  const voidTags = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr'
+  ]);
+  const stack = [];
+  const source = fragment.replace(/<!--[\s\S]*?-->/g, '');
+  const tags = /<\/?([a-z][a-z0-9:-]*)\b[^>]*>/gi;
+  let match;
+  while ((match = tags.exec(source))) {
+    const token = match[0];
+    const tag = match[1].toLowerCase();
+    if (token.startsWith('</')) {
+      const open = stack.pop();
+      assert.ok(open, label + ' has an unexpected </' + tag + '>');
+      assert.strictEqual(tag, open.tag,
+        label + ' closes </' + tag + '> while <' + open.tag + '> from offset ' + open.offset + ' is open');
+    } else if (!voidTags.has(tag) && !token.endsWith('/>')) {
+      stack.push({ tag, offset: match.index });
+    }
+  }
+  assert.deepStrictEqual(stack, [], label + ' has no unclosed tags');
+}
+
 const HTML = read('extension/ui/control_panel.html');
 const CSS = read('extension/ui/options.css');
 const JS = read('extension/ui/options.js');
@@ -66,6 +90,11 @@ console.log('Providers panel UI: canonical route and static roster');
 assert.match(HTML, /data-section="providers"/);
 assert.match(HTML, /<section class="content-section" id="providers">/);
 assert.match(HTML, /<h2>Providers<\/h2>/);
+const providersSection = extractElement(HTML, 'section', 'providers');
+assertBalancedHtmlFragment(providersSection, '#providers section');
+assert.match(providersSection,
+  /<div class="form-card provider-details-card">[\s\S]*?<\/div>\s*<\/section>$/,
+  'Providers detail card is explicitly closed before the section');
 assert.match(
   HTML,
   /Choose how FSB runs AI tasks\. API providers use keys stored locally; agent CLIs use their existing local sign-in\./
