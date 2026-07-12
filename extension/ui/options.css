@@ -5922,8 +5922,7 @@ textarea.form-input {
   border-color: var(--error-color);
 }
 
-.provider-badge--neutral,
-.provider-badge--status {
+.provider-badge--neutral {
   color: var(--text-muted);
   background: var(--bg-tertiary);
   border-color: var(--border-color);

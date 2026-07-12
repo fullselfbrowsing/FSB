@@ -253,6 +253,13 @@ assert.doesNotMatch(providerCss,
   /\[data-theme="dark"\] \.provider-row\.is-selected\s*,[^\{]*:has\(/,
   'dark-mode selected baseline also remains independent of :has()');
 assert.match(providerCss, /\.provider-badge--recommended[\s\S]*var\(--info-light\)/);
+const neutralBadgeRule = providerCss.match(/\.provider-badge--neutral\s*\{[^}]*\}/);
+assert.ok(neutralBadgeRule, 'neutral evidence badge has an explicit fallback rule');
+assert.doesNotMatch(neutralBadgeRule[0], /\.provider-badge--status/,
+  'permanent status base class cannot override semantic evidence modifiers');
+assert.doesNotMatch(providerCss,
+  /\.provider-badge--neutral\s*,\s*\.provider-badge--status\s*\{/,
+  'neutral colors are never grouped with the permanent status base class');
 assert.match(providerCss, /var\(--fsb-focus-ring\)/);
 assert.match(providerCss, /@media \(min-width: 900px\)/);
 assert.match(providerCss, /@media \(max-width: 640px\)/);
