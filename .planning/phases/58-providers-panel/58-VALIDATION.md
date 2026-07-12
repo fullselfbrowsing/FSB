@@ -27,7 +27,7 @@ created: 2026-07-12
 
 ## Sampling Rate
 
-- **After every task commit:** Run the new focused test for that task plus directly touched contract tests.
+- **After every extension-touching task commit:** Run the focused/compatibility command for that task, then `npm test`; Phase 58's source-pin invariant requires the full suite from the first implementation commit.
 - **After every plan wave:** Run `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && node tests/model-discovery-ui.test.js && node tests/model-combobox-ui.test.js && node tests/lattice-provider-bridge-smoke.test.js && node tests/mcp-client-merged-view.test.js && node tests/agent-sunset-control-panel.test.js`.
 - **Before `$gsd-verify-work`:** `npm test` must pass from a clean worktree at the committed phase source HEAD.
 - **Max feedback latency:** 15 seconds for task-level sampling.
@@ -38,12 +38,13 @@ created: 2026-07-12
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 58-01-01 | 01 | 1 | PROV-02, PROV-04, PROV-05 | T-58-01, T-58-02, T-58-03 | Closed allowlists; recommendation cannot mutate selection; agent ids cannot become API ids | unit | `node tests/providers-panel-logic.test.js` | ❌ W0 | ⬜ pending |
-| 58-01-02 | 01 | 1 | PROV-05 | T-58-01, T-58-02 | Helper loads before options code and source pins retain existing provider bridge invariants | contract | `node tests/providers-panel-logic.test.js && node tests/lattice-provider-bridge-smoke.test.js` | ❌ W0 | ⬜ pending |
-| 58-02-01 | 02 | 2 | PROV-01, PROV-02, PROV-03 | — | Canonical hash, native radio semantics, and inactive controls removed from keyboard flow | DOM/source | `node tests/providers-panel-ui.test.js && node tests/agent-sunset-control-panel.test.js` | ❌ W0 | ⬜ pending |
-| 58-02-02 | 02 | 2 | PROV-03, PROV-04 | T-58-02, T-58-03 | Load/save round-trip preserves both kinds; model discovery sees API ids only | VM/contract | `node tests/providers-panel-ui.test.js && node tests/model-discovery-ui.test.js && node tests/model-combobox-ui.test.js && node tests/lattice-provider-bridge-smoke.test.js` | ❌ W0 | ⬜ pending |
-| 58-03-01 | 03 | 3 | PROV-05, PROV-06 | T-58-02, T-58-04, T-58-05, T-58-06 | Evidence is defensive and advisory; billing/status copy is non-fabricated and links are fixed HTTPS destinations | VM/DOM | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && node tests/mcp-client-merged-view.test.js` | ❌ W0 | ⬜ pending |
-| 58-03-02 | 03 | 3 | PROV-01..PROV-06 | T-58-01..T-58-06 | All focused and legacy contracts pass from committed source | regression | `npm test` | ✅ | ⬜ pending |
+| 58-01-01 | 01 | 1 | PROV-02, PROV-04, PROV-05, PROV-06 | T-58-01..T-58-05 | Closed allowlists; recommendation cannot mutate selection; agent ids cannot become API ids; billing definitions are fixed | unit/regression | `node tests/providers-panel-logic.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-01-02 | 01 | 1 | PROV-05 | T-58-01, T-58-02 | Helper loads before options code and the extension remains fully green | contract/regression | `node tests/providers-panel-logic.test.js && node tests/model-discovery-ui.test.js && node tests/model-combobox-ui.test.js && node tests/agent-sunset-control-panel.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-02-01 | 02 | 2 | PROV-01, PROV-02, PROV-03 | — | Canonical hash, native radio semantics, explicit refresh/empty/raw-client UI, and inactive controls removed from keyboard flow | DOM/source/regression | `node tests/providers-panel-ui.test.js && node tests/agent-sunset-control-panel.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-02-02 | 02 | 2 | PROV-03, PROV-04 | T-58-02, T-58-03 | Load/save round-trip preserves both kinds; model discovery sees API ids only | VM/contract/regression | `node tests/providers-panel-ui.test.js && node tests/providers-panel-logic.test.js && node tests/model-discovery-ui.test.js && node tests/model-combobox-ui.test.js && node tests/lattice-provider-bridge-smoke.test.js && node tests/universal-provider-lmstudio.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-03-01 | 03 | 3 | PROV-05 | T-58-01, T-58-02, T-58-06 | Evidence is defensive/advisory; raw clients are informational; refresh preserves selection | VM/DOM/regression | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && node tests/mcp-client-merged-view.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-03-02 | 03 | 3 | PROV-03, PROV-06 | T-58-04, T-58-05 | Account/usage/billing copy is non-fabricated and links are fixed HTTPS destinations | unit/DOM/regression | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && npm test` | ❌ W0 | ⬜ pending |
+| 58-03-03 | 03 | 3 | PROV-01..PROV-06 | T-58-01..T-58-06 | All focused/full contracts pass from committed source and visual status is evidence-backed or human-needed | regression/visual | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && node tests/model-discovery-ui.test.js && node tests/model-combobox-ui.test.js && node tests/lattice-provider-bridge-smoke.test.js && node tests/mcp-client-merged-view.test.js && node tests/agent-sunset-control-panel.test.js && node tests/universal-provider-lmstudio.test.js && npm test` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
