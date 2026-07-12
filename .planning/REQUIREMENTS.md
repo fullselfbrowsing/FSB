@@ -19,11 +19,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### PROV -- Providers Panel
 
 - [ ] **PROV-01**: The control panel section formerly labeled "API Configuration" is labeled "Providers" (heading, nav label, and any anchor `#api-config` continues to work as a redirect to the new `#providers` anchor for existing bookmarks).
-- [ ] **PROV-02**: Each provider has an explicit `providerKind` value of either `api` (the existing 7 BYOK LLM providers) or `agent` (a locally installed agent CLI); the kind determines which fields render.
+- [x] **PROV-02**: Each provider has an explicit `providerKind` value of either `api` (the existing 7 BYOK LLM providers) or `agent` (a locally installed agent CLI); the kind determines which fields render.
 - [ ] **PROV-03**: When an `agent`-kind provider is selected, the API-key input, key-URL hint, and per-model key-format hint are hidden; the panel shows instead the provider's install status, auth status (from the CLI's own login state where surfaceable), connection status, and a short "uses your subscription -- no API key needed" caption.
-- [ ] **PROV-04**: When the user has both an active `agent` provider selection and a valid BYOK key for an `api` provider, `universal-provider.js` continues to see only `api`-kind provider values; the two selections do not collide, and switching between them preserves the other's configuration (INV-03 provider parity for the BYOK side).
-- [ ] **PROV-05**: The panel visually marks exactly one provider as "Recommended" per session, chosen by a ground-truth cascade: highest-priority = a provider whose CLI is currently connected via MCP `initialize`, next = a provider whose CLI is installed on disk, next = a provider whose copy button the user clicked during onboarding, fallback = the current xAI-default recommendation. The panel never auto-switches the user's selection; the badge is advisory only.
-- [ ] **PROV-06**: Cost/usage rows for `agent`-kind providers never display fabricated dollar amounts; they display token count, turn count, and duration and label the run as "included in your subscription", with a link to the vendor's current billing page (copy must not promise "free" or "unlimited").
+- [x] **PROV-04**: When the user has both an active `agent` provider selection and a valid BYOK key for an `api` provider, `universal-provider.js` continues to see only `api`-kind provider values; the two selections do not collide, and switching between them preserves the other's configuration (INV-03 provider parity for the BYOK side).
+- [x] **PROV-05**: The panel visually marks exactly one provider as "Recommended" per session, chosen by a ground-truth cascade: highest-priority = a provider whose CLI is currently connected via MCP `initialize`, next = a provider whose CLI is installed on disk, next = a provider whose copy button the user clicked during onboarding, fallback = the current xAI-default recommendation. The panel never auto-switches the user's selection; the badge is advisory only.
+- [x] **PROV-06**: Cost/usage rows for `agent`-kind providers never display fabricated dollar amounts; they display token count, turn count, and duration and label the run as "included in your subscription", with a link to the vendor's current billing page (copy must not promise "free" or "unlimited").
 
 ### CHAN -- Delegation Channel & Security Foundation
 
@@ -136,11 +136,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 | IDENT-04 | Phase 57 | Complete |
 | IDENT-05 | Phase 57 | Complete |
 | PROV-01 | Phase 58 | Pending |
-| PROV-02 | Phase 58 | Pending |
+| PROV-02 | Phase 58 | Complete |
 | PROV-03 | Phase 58 | Pending |
-| PROV-04 | Phase 58 | Pending |
-| PROV-05 | Phase 58 | Pending |
-| PROV-06 | Phase 58 | Pending |
+| PROV-04 | Phase 58 | Complete |
+| PROV-05 | Phase 58 | Complete |
+| PROV-06 | Phase 58 | Complete |
 | CHAN-01 | Phase 59 | Pending |
 | CHAN-02 | Phase 59 | Pending |
 | CHAN-03 | Phase 59 | Pending |
