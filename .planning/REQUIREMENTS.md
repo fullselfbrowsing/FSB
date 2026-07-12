@@ -10,9 +10,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### IDENT -- Agent Identity Capture
 
-- [ ] **IDENT-01**: When the user clicks a copy-to-clipboard button on the onboarding MCP-install screen for a specific client (`claude-code`, `cursor`, `vscode`, `windsurf`, `codex`, `opencode`, `openclaw`, `claude-desktop`, `all`), FSB records that client id (with timestamp, deduplicated, all-clients aggregated for multi-select cases) into a durable `fsbAgentProviders.clicked` list in `chrome.storage.local`.
+- [x] **IDENT-01**: When the user clicks a copy-to-clipboard button on the onboarding MCP-install screen for a specific client (`claude-code`, `cursor`, `vscode`, `windsurf`, `codex`, `opencode`, `openclaw`, `claude-desktop`, `all`), FSB records that client id (with timestamp, deduplicated, all-clients aggregated for multi-select cases) into a durable `fsbAgentProviders.clicked` list in `chrome.storage.local`.
 - [x] **IDENT-02**: When an MCP client completes its `initialize` handshake with `fsb-mcp-server` (over any transport: stdio, streamable-HTTP, or the ws://7225 bridge), FSB captures the caller's `clientInfo.name` and `clientInfo.version` and threads them to the extension via an additive field on the existing `agent:register` bridge payload without breaking any existing consumer of that payload (INV-01).
-- [ ] **IDENT-03**: The extension's agent registry stamps captured `clientInfo` onto each live `AgentRecord` and rolls the identity up into a durable `fsbAgentProviders.connected` entry that survives service-worker eviction and Chrome restart, keyed so re-connections update rather than duplicate.
+- [x] **IDENT-03**: The extension's agent registry stamps captured `clientInfo` onto each live `AgentRecord` and rolls the identity up into a durable `fsbAgentProviders.connected` entry that survives service-worker eviction and Chrome restart, keyed so re-connections update rather than duplicate.
 - [x] **IDENT-04**: `fsb-mcp-server` can enumerate installed MCP-capable clients on the current machine by inspecting the paths already known to `platforms.ts` (per-OS `configPath` for file-mode clients; `<bin> --version` probe for cli-mode `claude-code`) and report each as `installed` / `not-installed` with any parseable version.
 - [ ] **IDENT-05**: A `getMcpClients` extension runtime message returns a merged view (`clicked` ∪ `installed` ∪ `connected`) with per-client status, so UI surfaces read one consistent structure instead of assembling it themselves.
 
@@ -130,9 +130,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| IDENT-01 | Phase 57 | Pending |
+| IDENT-01 | Phase 57 | Complete |
 | IDENT-02 | Phase 57 | Complete |
-| IDENT-03 | Phase 57 | Pending |
+| IDENT-03 | Phase 57 | Complete |
 | IDENT-04 | Phase 57 | Complete |
 | IDENT-05 | Phase 57 | Pending |
 | PROV-01 | Phase 58 | Pending |

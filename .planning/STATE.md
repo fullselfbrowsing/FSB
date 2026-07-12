@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 57-01-PLAN.md
-last_updated: "2026-07-12T12:34:38.983Z"
+stopped_at: Completed 57-02-PLAN.md
+last_updated: "2026-07-12T13:07:48.173Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 18
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 4
+  percent: 100
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 57 (Agent Identity Capture) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-07-12
 
@@ -88,6 +88,9 @@ v0.9.91-specific decisions so far:
 - [Phase 57]: Read MCP client identity and inventory lazily through feature-detected AgentScope suppliers so bare scopes and structural mocks remain compatible.
 - [Phase 57]: Reuse PLATFORMS and resolvePlatformTarget for installed-client detection, with fixed shell-free Claude Code version probes.
 - [Phase 57]: Deliver one memoized client inventory through both system:client-inventory and agent:register payload.platforms.
+- [Phase 57]: Keep MCP clientInfo observational and bounded — Only sanitized name/version evidence is persisted; authority, cap, ownership, and routing logic remain unchanged.
+- [Phase 57]: Converge both installed-inventory delivery paths on replaceInstalled — Registration piggybacks and system frames replace only installed evidence while preserving clicked, connected, and unknown siblings.
+- [Phase 57]: Persist onboarding intent without awaiting storage — Resolve current at click time and serialize same-page writes so feedback timing is unchanged and rapid clicks retain counts.
 
 ### Pending Todos
 
@@ -129,8 +132,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T12:33:46.860Z
-Stopped at: Completed 57-01-PLAN.md
+Last session: 2026-07-12T13:07:48.170Z
+Stopped at: Completed 57-02-PLAN.md
 Resume file: None
 
 ## Next Actions
