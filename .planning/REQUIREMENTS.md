@@ -130,13 +130,74 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| IDENT-01 | Phase 57 | Pending |
+| IDENT-02 | Phase 57 | Pending |
+| IDENT-03 | Phase 57 | Pending |
+| IDENT-04 | Phase 57 | Pending |
+| IDENT-05 | Phase 57 | Pending |
+| PROV-01 | Phase 58 | Pending |
+| PROV-02 | Phase 58 | Pending |
+| PROV-03 | Phase 58 | Pending |
+| PROV-04 | Phase 58 | Pending |
+| PROV-05 | Phase 58 | Pending |
+| PROV-06 | Phase 58 | Pending |
+| CHAN-01 | Phase 59 | Pending |
+| CHAN-02 | Phase 59 | Pending |
+| CHAN-03 | Phase 59 | Pending |
+| CHAN-04 | Phase 59 | Pending |
+| CHAN-05 | Phase 59 | Pending |
+| CHAN-06 | Phase 59 | Pending |
+| CHAN-07 | Phase 59 | Pending |
+| ADAPT-01 | Phase 60 | Pending |
+| ADAPT-02 | Phase 60 | Pending |
+| ADAPT-03 | Phase 60 | Pending |
+| ADAPT-04 | Phase 60 | Pending |
+| ADAPT-05 | Phase 60 | Pending |
+| CLAUDE-01 | Phase 60 | Pending |
+| CLAUDE-02 | Phase 60 | Pending |
+| CLAUDE-03 | Phase 60 | Pending |
+| CLAUDE-04 | Phase 60 | Pending |
+| UX-01 | Phase 61 | Pending |
+| UX-02 | Phase 61 | Pending |
+| UX-03 | Phase 61 | Pending |
+| UX-04 | Phase 61 | Pending |
+| UX-05 | Phase 61 | Pending |
+| UX-06 | Phase 61 | Pending |
+| LIFE-01 | Phase 61 | Pending |
+| LIFE-02 | Phase 61 | Pending |
+| LIFE-03 | Phase 61 | Pending |
+| LIFE-04 | Phase 61 | Pending |
+| DRIFT-01 | Phase 62 | Pending |
+| DRIFT-02 | Phase 62 | Pending |
+| DRIFT-03 | Phase 62 | Pending |
+| DRIFT-04 | Phase 62 | Pending |
+| NATIVE-01 | Phase 63 | Pending |
+| NATIVE-02 | Phase 63 | Pending |
+| NATIVE-03 | Phase 63 | Pending |
+| NATIVE-04 | Phase 63 | Pending |
+| MULTI-01 | Phase 64 | Pending |
+| MULTI-02 | Phase 64 | Pending |
+| MULTI-03 | Phase 64 | Pending |
+| MULTI-04 | Phase 65 | Pending |
+| MULTI-05 | Phase 65 | Pending |
+| MULTI-06 | Phase 65 | Pending |
 
 **Coverage:**
 - v1 requirements: 51 total
-- Mapped to phases: (populated by roadmapper)
-- Unmapped: (populated by roadmapper)
+- Mapped to phases: 51 / 51 (100%)
+- Unmapped: 0
+
+**Phase distribution:**
+- Phase 57 (IDENT): 5 requirements
+- Phase 58 (PROV): 6 requirements
+- Phase 59 (CHAN): 7 requirements
+- Phase 60 (ADAPT + CLAUDE): 9 requirements
+- Phase 61 (UX + LIFE): 10 requirements
+- Phase 62 (DRIFT): 4 requirements
+- Phase 63 (NATIVE): 4 requirements
+- Phase 64 (MULTI-OpenCode): 3 requirements
+- Phase 65 (MULTI-Codex): 3 requirements
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-11 after milestone-scoping questions*
+*Last updated: 2026-07-11 after roadmap creation (Phases 57-65 mapped)*

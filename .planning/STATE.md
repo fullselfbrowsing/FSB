@@ -3,90 +3,112 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: planning
-last_updated: "2026-07-10T18:23:53.880Z"
-last_activity: 2026-07-10
+last_updated: "2026-07-11T00:00:00.000Z"
+last_activity: 2026-07-11
 progress:
-  total_phases: 0
+  total_phases: 9
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
 ---
 
-*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v1.2.0 milestone (Phases 52-56) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy 14-phase/9-complete count and misidentifies "999.1" (an unrelated Backlog item) as the next phase -- both are artifacts of that tooling scanning the whole ROADMAP.md file, including the collapsed `## Completed Milestones` archive and `## Backlog` sections, rather than just the active milestone's phases. Phases 44-51 are archived v1.1.0 work; 999.1 is unrelated backlog. Treat this file's own numbers as authoritative for v1.2.0 progress.*
+*Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (v1.2.0 Showcase i18n Completeness framing)
-See: .planning/ROADMAP.md (v1.2.0 active, Phases 52-56; v1.1.0/v1.0.0/v0.9.99/etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (13 v1 requirements, mapped to Phases 52-56, 0/13 complete)
-See: .planning/research/SUMMARY.md (phase sequencing rationale, confirmed 5-drifted/54-orphaned baseline)
-See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIREMENTS.md, .planning/milestones/v1.1.0-MILESTONE-AUDIT.md (archived T1 App Execution Expansion milestone)
+See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
+See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 0/51 complete)
+See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
+See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
+See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
+See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
-**Core value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely. v1.2.0 does not touch the automation/T1 catalog surface; it closes a reopened i18n completeness gap on the showcase marketing site.
-**Current focus:** v1.2.0 milestone complete — ready for audit/complete
+**Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
+**Current focus:** v0.9.91 milestone — planning Phase 57 (Agent Identity Capture) as the first executable phase.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 57 (Agent Identity Capture) — ready for `/gsd-plan-phase 57`
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-10 — Milestone v0.9.91 started
+Status: Planning first phase
+Last activity: 2026-07-11 — Milestone v0.9.91 roadmap defined, 51 requirements mapped, phase structure approved
 
-## Roadmap At A Glance (v1.2.0, Phases 52-56)
+## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 52 | Full-Page Translation Completeness Audit | AUDIT-01, AUDIT-02 | Complete (2026-07-08) |
-| 53 | Trans-Unit Resync, Stats Translation & Transcreation Review | RESYNC-01, RESYNC-02, RESYNC-03, VISUAL-01 | Complete (2026-07-09; VISUAL-01 human_needed deferred) |
-| 54 | Stats Lint Gate Flip & Dashboard Boundary Documentation | CI-01, CI-05 | Complete (2026-07-09) |
-| 55 | CI Drift-Detection Gate | CI-02, CI-03, CI-04 | Complete (2026-07-09) |
-| 56 | Locale-Cookie Redirect Fix (WARNING-02) | ROUTE-01, ROUTE-02 | Complete (2026-07-09) |
+| 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Not started |
+| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Not started |
+| 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Not started (SECURITY-CRITICAL, load-bearing) |
+| 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
+| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
+| 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
+| 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 13/13 v1.2.0 requirements mapped, 0 orphaned. Dependency chain: 52 -> 53 -> 54 -> 55 (hard sequential dependency: each gate must land on the clean baseline the prior phase verified). Phase 56 is fully independent of 52-55 and could run in parallel if desired, but executes last in numeric order.
+Coverage: 51/51 v0.9.91 requirements mapped, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
 
-## Hard Invariants (v1.2.0)
+## Hard Invariants (v0.9.91)
 
-- Supported locale list stays fixed at en (source) + es/de/ja/zh-CN/zh-TW -- not up for debate this milestone.
-- No commercial TMS adoption (Lokalise, Crowdin, Smartling, Phrase, doloc.io) -- explicit no-paid-SaaS constraint.
-- No `ng-extract-i18n-merge` adoption this milestone -- legitimate future option, not required to satisfy the CI-gate requirement.
-- Dashboard page translation stays explicitly out of scope (authenticated app surface, not marketing content) -- Phase 54 documents this as permanent, not deferred.
-- The new drift gate (Phase 55) must diff `<source>` text per trans-unit `id`, never whole-file/line-count, to avoid the false-positive/bypass-habit failure mode that let WARNING-02 (Phase 56) sit unaddressed for 6+ milestones.
-- The drift gate must land only after Phases 52-54 verify a clean, drift-free baseline -- wiring it earlier guarantees either an immediately-red CI or a gate built loose enough to miss real drift.
+- **Security-first hard rule.** All CHAN-01..CHAN-07 land in Phase 59 together, BEFORE any spawn code exists in Phase 60. Not deferrable to a "hardening" phase.
+- **INV-01 (byte-stable MCP wire).** Every wire addition is additive: new frame types (`ext:request` / `ext:response` / `ext:event`) + optional payload fields only. No existing `MCPMessageType` value or tool schema changes across the entire milestone; a byte-freeze regression test proves this in every wire-touching phase.
+- **INV-03 (BYOK provider parity).** `universal-provider.js` continues to see only the existing 7 `api`-kind provider values across the whole milestone; `agent`-kind values never leak into request-builders.
+- **INV-04 (MV3 SW-survivability).** The `setTimeout`-chained iterator pattern is preserved; delegation lifecycle persists to `chrome.storage.session` per progress event and heartbeats WS every 20 s.
+- **INV-05 (no resurrection of sunset modules).** `extension/agents/*` background-agents surface (retired in v0.9.45rc1) stays frozen; the new provider surface is MCP-client identity, a different concept.
+- **Task-mode only for v0.9.91.** Every adapter's `caps.chatMode: false`. Chat-mode continuity via `--resume` / `codex resume` / `opencode --continue` is v2 scope (CHAT-FUTURE-01/02).
+- **No `--dangerously-skip-permissions` / `--yolo` / `--auto` in the spawn path.** Anywhere. Ever. CHAN-07 makes this a permanent invariant enforced by a CI grep gate; the Codex adapter (Phase 65) explicitly must NOT reference `--full-auto`.
+- **No `@anthropic-ai/claude-agent-sdk` embedded in FSB.** Anthropic banned third-party products from using consumer subscription auth via the SDK (enforcement Apr 4 2026). Shell to the user's installed `claude` binary only.
+- **No native-messaging permission through Phases 57-62.** The extension has NO way to wake the daemon in those phases; delegation UX must ship an honest "Agent offline → `doctor`" state (LIFE-03). Phase 63 (NATIVE) adds the optional wake-host later without relaxing any CHAN rule — the host itself never spawns agent CLIs (NATIVE-03).
+- **Source-pin tripwire discipline.** Test suite pins exact token counts + substrings on extension source. Every extension-touching commit updates paired tripwires in the same commit; the full suite runs green from commit 1 of every phase.
+- **Same-context dispatch in the MV3 SW.** Delegation dispatcher integrates through `globalThis.fsbDispatchInternalMessage` / the Phase 225-01 bus, NOT `chrome.runtime.sendMessage` (auto-memory: sendMessage never loops back in-SW).
+- **Adapter breadth: Claude Code + OpenCode + Codex; NO Gemini.** GEMINI-FUTURE-01 defers Gemini until a live `--help` capture + JSONL schema pinning are done.
 
 ## Accumulated Context
 
 ### Decisions
 
-Full decision log for prior milestones (v0.9.99 Phase 26-34, v1.0.0, v1.1.0 T1/Wall/consent decisions) lives in PROJECT.md and the archived `.planning/milestones/v1.0.0-*` / `.planning/milestones/v1.1.0-*` files. Those decisions concern the T1 capability-catalog surface and have zero shared surface with v1.2.0's showcase-i18n work; not repeated here to keep this file a digest.
+Full decision log for prior milestones (v0.9.99 Phase 26-34, v1.0.0, v1.1.0, v1.2.0) lives in PROJECT.md, ROADMAP.md's `## Completed Milestones` section, and the archived `.planning/milestones/*` files. Those decisions concern the T1 capability-catalog surface and the showcase-i18n surface; they have zero shared surface with v0.9.91's provider/delegation work and are not repeated here to keep this file a digest.
 
-v1.2.0-specific decisions so far:
+v0.9.91-specific decisions so far:
 
-- [Roadmap]: Phase ordering follows the audit -> resync -> gate-flip -> drift-gate -> cookie-fix chain all 4 independent researchers converged on. The drift gate (Phase 55) is sequenced after Phases 52-54, not before, so it lands clean rather than immediately red.
-- [Roadmap]: VISUAL-01 (DE/CJK visual spot-check) is folded into Phase 53's success criteria rather than given its own phase, since it has a hard content dependency on RESYNC-01/02 landing first (needs final translated copy to visually check) and is small enough not to warrant a standalone phase.
-- [Roadmap]: The milestone brief's original "247 trans-units changed" framing is explicitly corrected in ROADMAP.md -- research confirmed only 5 of 247 touched blocks have real `<source>` drift; the true count is whatever Phase 52's audit finds, not a number fixed in advance.
-- [Phase 52]: Corrected the plan's stated 6 non-shellless routes to the verified-correct 8 (sitemaps and legal also render the shared shell); derived dynamically per-route from ROUTE_TABLE.shellless rather than a hardcoded route-name list
-- [Phase 52]: traceStats274's idDriftFromTemplate implemented exactly as specified (produces 13/locale); reported as explicitly unreconciled against 52-RESEARCH.md Open Questions #3's disputed 7/9/13 candidates rather than silently picking one
+- [Roadmap]: Phase structure follows the research SUMMARY.md's dependency chain (identity → provider UI → security → adapter contract + Claude MVP → UX/lifecycle → drift → native → OpenCode → Codex). ADAPT and CLAUDE combined in one phase (60) because the Claude Code MVP is the contract's first real implementation; UX and LIFE combined in one phase (61) because the UX affordances (kill switch reclaims tabs, offline state, take-control) are inseparable from the persistence semantics that make them SW-eviction-safe.
+- [Roadmap]: MULTI split across two phases (64 = OpenCode, 65 = Codex) rather than combined into one, because each adapter has its own version-pinning spike, fixture capture, and auth-detection story — the incremental phase cost is small versus the risk of one adapter's drift blocking the other's ship.
+- [Roadmap]: NATIVE placed at Phase 63 (after DRIFT) rather than immediately after UX, so the doctor extensions from DRIFT (compatibility matrix, per-adapter section) exist before the native host reports its own state; NATIVE cannot ship BEFORE UX because it augments UX's "Agent offline" state.
+- [Roadmap]: Security-first hard rule is enforced by phase ordering AND by the CHAN-07 CI grep gate landing in Phase 59; the gate protects future patches (including Phase 65's Codex adapter, which must NEVER reference `--full-auto`).
+- [Roadmap]: DRIFT is INCLUDED in v0.9.91 (Phase 62) per user confirmation; the drift gate is scoped to Claude Code from its first commit and extended per-adapter as OpenCode and Codex land in Phases 64/65.
+- [Roadmap]: NATIVE is INCLUDED in v0.9.91 (Phase 63) per user confirmation; the additive `nativeMessaging` permission is the only permission change in the milestone.
+- [Roadmap]: Every `agent`-kind cost row displays "included in your subscription" + real token/turn/duration counts — never a fabricated dollar amount (PROV-06). The Codex adapter's per-auth-state copy (Phase 65) is the strictest test of this discipline.
+- [Roadmap]: The reverse-request channel reuses the existing `ws://localhost:7225` bridge; no new port is added (SUMMARY.md architecture decision; a separate supervisor port is a documented fallback if hub-forwarding proves fragile during Phase 59 implementation).
 
 ### Pending Todos
 
-None yet.
+None yet — planning is at the roadmap stage; per-phase todos will populate as `/gsd-plan-phase` runs for each phase.
 
 ### Blockers/Concerns
 
-None yet. Two open judgment calls flagged by research to resolve during Phase 52/55 planning (not blockers, but decisions to make explicitly rather than let default-implicitly):
+None yet. Two open judgment calls flagged by research to resolve during Phase 57 / Phase 59 planning (not blockers, but decisions to make explicitly rather than let default-implicitly):
 
-- Whether "orphaned" trans-unit IDs (present in a locale file but absent from current `messages.xlf`) should be hard-fail or warning-only in the Phase 55 drift gate.
-- Which canonical staleness-tracking mechanism to use (source-hash sidecar vs. XLIFF `state=` attribute vs. the drift gate's own commit-to-commit diff) -- research recommends deciding this explicitly during Phase 55, not implicitly.
+- **Phase 57 planning:** Inventory delivery trigger — on-extension-connect push vs piggyback on `agent:register` vs on-demand `ext:request clients.detect`. SUMMARY.md flagged this as a "decide with payload-size measurements" call; the decision should be recorded in the Phase 57 plan.
+- **Phase 59 planning:** Shared-secret provisioning UX — TOFU pairing on first `serve` connect vs a user-visible pairing code from `fsb-mcp-server pair`. Research recommends deciding explicitly in Phase 59 planning; both paths meet the CHAN-04 requirement.
+
+Three additional Phase-60-time verifications flagged from research (SUMMARY.md Confidence Assessment):
+
+- Whether Claude Code's `--agent fsb` selects an agent defined inline via `--agents` — 5-minute spike in Phase 60; fallback is `--append-system-prompt-file`.
+- `--tools ""` Windows quoting + `.cmd` shim resolution (Node CVE-2024-27980 EINVAL behavior).
+- OpenCode HTTP-server-vs-spawn shape (Phase 64) — `opencode serve` + `run --attach` may be a cheaper reuse path than cold spawn.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). None of this debt blocks v1.2.0, which does not touch the automation/T1 surface.
+Items acknowledged and carried forward from previous milestone closes (Chrome MV3/manual UAT evidence gaps, not fabricated passes; procedures archived under `.planning/milestones/*/` and `.planning/phases/*/`). None of this debt blocks v0.9.91.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | human_needed | v1.2.0 Phase 53 |
 | uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | human_needed; 3 scenarios | v0.9.99 Phase 27 |
 | uat_gap | Phase 29 / 29-HUMAN-UAT.md ([ASSUMED] internal-endpoint live capture) | human_needed | v0.9.99 Phase 29 |
 | uat_gap | Phase 30 / 30-HUMAN-UAT.md (UAT-30-01 live render/Grant/badge smoke) | human_needed | v0.9.99 Phase 30 |
@@ -97,16 +119,22 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 | uat_gap | Phases 01/16/20/25 (v0.10/v0.11/v0.12 live-browser) | human_needed/partial | prior closes |
 | i18n_debt | WARNING-02 picker-cookie short-circuits bare-`/` Accept-Language redirect | closed in v1.2.0 Phase 56 (ROUTE-01/02) | v0.9.63, carried 6+ milestones |
 
-Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0; `clawhub publish "skills/FSB Skill"`; public package publication. None of this blocks v1.2.0.
+Carry-forward publish/tag gates (pre-existing, user-gated): `npm publish fsb-mcp-server@0.9.0`; `npm publish fsb-mcp-server@0.10.0`; branch + tag pushes for v0.9.62 / v0.9.63 / v0.9.69 / v0.10.0 / v0.11.0 / v0.12.0 / v1.2.0; `clawhub publish "skills/FSB Skill"`; public package publication. None of this blocks v0.9.91.
 
-v2 deferred (see REQUIREMENTS.md v1.2.0 v2 section): QA-01 (native-speaker/bilingual QA pass), I18N-FUTURE-01 (migrate stats page off ad hoc JSON mechanism), I18N-FUTURE-02 (automated visual regression pipeline), I18N-FUTURE-03 (translation-freshness reporting).
+v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mode continuity via `--resume` / `codex resume` / `opencode --continue` + per-thread cwd pinning); GEMINI-FUTURE-01 (Gemini CLI adapter after live `--help` capture + JSONL schema pinning); ACP-FUTURE-01 (`@zed-industries/agent-client-protocol` unification once ≥2 non-Claude adapters have shipped); REMOTE-FUTURE-01 (remote/mobile delegation surfaces — v0.9.91 is explicitly localhost-only).
 
 ## Session Continuity
 
-Last session: 2026-07-09
-Stopped at: Phase 53 complete — 5 drifted units resynced, stats-274 JSON retired, 19 hero/CTA strings transcreated; VISUAL-01 browser UAT deferred as human_needed. Continuing autonomously into Phase 54.
+Last session: 2026-07-11
+Stopped at: v0.9.91 milestone roadmap defined — 51 v1 requirements across 9 categories (IDENT/PROV/CHAN/ADAPT/CLAUDE/UX/LIFE/DRIFT/NATIVE/MULTI) mapped to Phases 57-65 with 100% coverage and 0 orphans; ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability table populated. Ready for `/gsd-plan-phase 57`.
 Resume file: None
 
 ## Next Actions
 
-v1.2.0 complete and archived. Optional: finish VISUAL-01 human UAT. Start next milestone with `/gsd-new-milestone`.
+Start Phase 57 planning: `/gsd-plan-phase 57`
+
+Phase 57 planning inputs (already in-repo):
+- REQUIREMENTS.md IDENT-01..05
+- research/ARCHITECTURE.md Feature 1 seams table (`extension/ui/onboarding.js:508/522/784`, `mcp/src/agent-scope.ts:59-62`, `mcp/src/runtime.ts:31-50`, `extension/ws/mcp-tool-dispatcher.js:1935-1994`, `extension/utils/agent-registry.js:263/305/634`, `mcp/src/platforms.ts:437-490`)
+- research/PITFALLS.md #11 (source-pin tripwires) — full suite from commit 1
+- research/SUMMARY.md open question: inventory delivery trigger (record decision in the plan)
