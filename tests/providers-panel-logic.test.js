@@ -1,0 +1,411 @@
+'use strict';
+
+/**
+ * Phase 58 Plan 01 -- pure provider settings and recommendation contracts.
+ *
+ * Run: node tests/providers-panel-logic.test.js
+ */
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const repoRoot = path.resolve(__dirname, '..');
+const helperPath = path.join(repoRoot, 'extension', 'ui', 'providers-panel.js');
+const helperSource = fs.readFileSync(helperPath, 'utf8');
+
+delete globalThis.FSBProvidersPanel;
+delete require.cache[require.resolve(helperPath)];
+const providers = require(helperPath);
+
+function clone(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const key of Object.keys(value)) deepFreeze(value[key]);
+  return value;
+}
+
+function assertRecommendation(clients, expected, message) {
+  const snapshot = clone(clients);
+  const result = providers.getRecommendation(clients);
+  assert.deepEqual(result, expected, message);
+  assert.deepEqual(clone(clients), snapshot, `${message}: input is unchanged`);
+  assert.deepEqual(Object.keys(result), ['providerKind', 'providerId', 'reason'],
+    `${message}: result has the closed shape`);
+  return result;
+}
+
+function main() {
+  assert.equal(fs.existsSync(helperPath), true, 'provider helper exists');
+  assert.deepEqual(Object.keys(providers), [
+    'API_PROVIDER_IDS',
+    'AGENT_PROVIDER_IDS',
+    'PROVIDER_DEFINITIONS',
+    'isApiProvider',
+    'isAgentProvider',
+    'normalizeSettings',
+    'getRecommendation',
+    'getAgentStatus',
+    'getProviderDefinition'
+  ], 'helper exports only the nine declared interface members');
+  assert.equal(globalThis.FSBProvidersPanel, providers,
+    'CommonJS and classic-script consumers receive the same namespace');
+  assert.equal(Object.isFrozen(providers), true, 'exported namespace is frozen');
+
+  const classicContext = { Object, Array, Number };
+  classicContext.globalThis = classicContext;
+  vm.runInNewContext(helperSource, classicContext, { filename: 'providers-panel.js' });
+  assert.equal(Object.isFrozen(classicContext.FSBProvidersPanel), true,
+    'classic-script execution assigns one frozen global namespace');
+  assert.deepEqual(Array.from(classicContext.FSBProvidersPanel.API_PROVIDER_IDS), [
+    'xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'
+  ], 'classic-script export retains the API allowlist');
+
+  assert.deepEqual(providers.API_PROVIDER_IDS, [
+    'xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'
+  ], 'API ids remain the existing seven BYOK values in order');
+  assert.deepEqual(providers.AGENT_PROVIDER_IDS, [
+    'claude-code', 'opencode', 'codex'
+  ], 'agent ids retain the fixed recommendation tie order');
+  assert.equal(Object.isFrozen(providers.API_PROVIDER_IDS), true, 'API ids are frozen');
+  assert.equal(Object.isFrozen(providers.AGENT_PROVIDER_IDS), true, 'agent ids are frozen');
+
+  const definitionIds = [...providers.API_PROVIDER_IDS, ...providers.AGENT_PROVIDER_IDS];
+  assert.deepEqual(Object.keys(providers.PROVIDER_DEFINITIONS), definitionIds,
+    'definitions contain exactly the ten closed provider ids in display order');
+  assert.equal(Object.isFrozen(providers.PROVIDER_DEFINITIONS), true,
+    'provider definition map is frozen');
+  const expectedNames = {
+    xai: 'xAI',
+    gemini: 'Google Gemini',
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    openrouter: 'OpenRouter',
+    lmstudio: 'LM Studio',
+    custom: 'Custom',
+    'claude-code': 'Claude Code',
+    opencode: 'OpenCode',
+    codex: 'Codex'
+  };
+  for (const id of definitionIds) {
+    const definition = providers.PROVIDER_DEFINITIONS[id];
+    assert.equal(Object.isFrozen(definition), true, `${id} definition is frozen`);
+    assert.equal(definition.id, id, `${id} definition retains its closed id`);
+    assert.equal(definition.providerKind,
+      providers.API_PROVIDER_IDS.includes(id) ? 'api' : 'agent',
+      `${id} definition has the correct kind`);
+    assert.equal(definition.displayName, expectedNames[id], `${id} has its display name`);
+    assert.equal(providers.getProviderDefinition(id), definition,
+      `${id} resolves through the one-argument lookup`);
+    assert.equal(providers.getProviderDefinition(definition.providerKind, id), definition,
+      `${id} resolves through the kind-qualified lookup`);
+  }
+  assert.equal(providers.getProviderDefinition('api', 'codex'), null,
+    'kind-qualified lookup rejects cross-domain ids');
+  assert.equal(providers.getProviderDefinition('__proto__'), null,
+    'prototype-like definition ids fail closed');
+  assert.equal(providers.getProviderDefinition('unknown'), null, 'unknown definitions fail closed');
+
+  for (const id of providers.API_PROVIDER_IDS) {
+    assert.equal(providers.isApiProvider(id), true, `${id} is an API provider`);
+    assert.equal(providers.isAgentProvider(id), false, `${id} is not an agent provider`);
+  }
+  for (const id of providers.AGENT_PROVIDER_IDS) {
+    assert.equal(providers.isAgentProvider(id), true, `${id} is an agent provider`);
+    assert.equal(providers.isApiProvider(id), false, `${id} is not an API provider`);
+  }
+  for (const id of ['__proto__', 'constructor', 'prototype', 'cursor', 'gemini-cli', '', null]) {
+    assert.equal(providers.isApiProvider(id), false, `${String(id)} is outside the API allowlist`);
+    assert.equal(providers.isAgentProvider(id), false, `${String(id)} is outside the agent allowlist`);
+  }
+
+  assert.equal(providers.normalizeSettings.length, 1,
+    'settings normalization accepts no recommendation-evidence argument');
+  for (const modelProvider of providers.API_PROVIDER_IDS) {
+    assert.deepEqual(providers.normalizeSettings({ modelProvider }), {
+      providerKind: 'api',
+      modelProvider,
+      agentProviderId: ''
+    }, `legacy ${modelProvider} settings migrate without evidence`);
+  }
+  assert.deepEqual(providers.normalizeSettings({ modelProvider: 'anthropic' }), {
+    providerKind: 'api',
+    modelProvider: 'anthropic',
+    agentProviderId: ''
+  }, 'legacy Anthropic selection is retained');
+  for (const input of [undefined, null, [], 'anthropic', {}, { modelProvider: 'codex' }, {
+    providerKind: 'invalid', modelProvider: '__proto__', agentProviderId: 'cursor'
+  }]) {
+    assert.deepEqual(providers.normalizeSettings(input), {
+      providerKind: 'api',
+      modelProvider: 'xai',
+      agentProviderId: ''
+    }, 'missing or invalid API values fail closed to API/xAI');
+  }
+  for (const agentProviderId of providers.AGENT_PROVIDER_IDS) {
+    assert.deepEqual(providers.normalizeSettings({
+      providerKind: 'agent',
+      modelProvider: 'openrouter',
+      agentProviderId
+    }), {
+      providerKind: 'agent',
+      modelProvider: 'openrouter',
+      agentProviderId
+    }, `${agentProviderId} activates without entering modelProvider`);
+  }
+  assert.deepEqual(providers.normalizeSettings({
+    providerKind: 'api',
+    modelProvider: 'gemini',
+    agentProviderId: 'codex'
+  }), {
+    providerKind: 'api',
+    modelProvider: 'gemini',
+    agentProviderId: 'codex'
+  }, 'API kind preserves a valid latent agent selection');
+  assert.deepEqual(providers.normalizeSettings({
+    providerKind: 'invalid',
+    modelProvider: 'openai',
+    agentProviderId: 'opencode'
+  }), {
+    providerKind: 'api',
+    modelProvider: 'openai',
+    agentProviderId: 'opencode'
+  }, 'invalid kind migrates to API while preserving a valid latent agent');
+  assert.deepEqual(providers.normalizeSettings({
+    providerKind: 'agent',
+    modelProvider: 'anthropic',
+    agentProviderId: 'cursor'
+  }), {
+    providerKind: 'api',
+    modelProvider: 'anthropic',
+    agentProviderId: ''
+  }, 'invalid active agent fails closed without replacing the valid API selection');
+
+  const frozenSettings = deepFreeze({
+    providerKind: 'agent',
+    modelProvider: 'custom',
+    agentProviderId: 'claude-code',
+    nested: { recommendation: 'codex' }
+  });
+  const normalized = providers.normalizeSettings(frozenSettings);
+  assert.deepEqual(normalized, {
+    providerKind: 'agent',
+    modelProvider: 'custom',
+    agentProviderId: 'claude-code'
+  }, 'frozen settings normalize without mutation');
+  normalized.modelProvider = 'xai';
+  assert.equal(frozenSettings.modelProvider, 'custom', 'mutating a result cannot mutate settings');
+  assert.notEqual(providers.normalizeSettings(frozenSettings), providers.normalizeSettings(frozenSettings),
+    'normalization returns a fresh object every time');
+
+  const liveRows = deepFreeze({
+    codex: { live: { agentId: 'codex-live' }, installed: { detected: true }, clicked: {} },
+    opencode: { live: { agentId: 'opencode-live' } },
+    'claude-code': { live: { agentId: 'claude-live' } }
+  });
+  assertRecommendation(liveRows, {
+    providerKind: 'agent', providerId: 'claude-code', reason: 'live'
+  }, 'live tier wins with fixed Claude/OpenCode/Codex tie order');
+  assertRecommendation(deepFreeze({
+    codex: { live: { agentId: 'codex-live' } },
+    'claude-code': { installed: { detected: true } },
+    opencode: { clicked: {} }
+  }), {
+    providerKind: 'agent', providerId: 'codex', reason: 'live'
+  }, 'a later-order live row outranks earlier-order lower-tier evidence');
+  assertRecommendation(deepFreeze({
+    codex: { installed: { detected: true } },
+    opencode: { installed: { detected: true } },
+    'claude-code': { installed: { detected: true } }
+  }), {
+    providerKind: 'agent', providerId: 'claude-code', reason: 'installed'
+  }, 'installed tier uses the fixed tie order instead of insertion order');
+  assertRecommendation(deepFreeze({
+    'claude-code': { installed: { detected: false }, clicked: null },
+    codex: { installed: { detected: true } },
+    opencode: { clicked: {} }
+  }), {
+    providerKind: 'agent', providerId: 'codex', reason: 'installed'
+  }, 'installed false is ineligible while a detected installation wins');
+  assertRecommendation(deepFreeze({
+    codex: { clicked: { count: 1 } },
+    opencode: { clicked: { count: 9 } },
+    'claude-code': { clicked: { count: 1 } }
+  }), {
+    providerKind: 'agent', providerId: 'claude-code', reason: 'clicked'
+  }, 'clicked tier ignores counts, recency, and insertion order');
+  assertRecommendation(deepFreeze({
+    'claude-code': { connected: { lastSeenAt: 999 } },
+    opencode: { connected: { lastSeenAt: 1000 } },
+    codex: { connected: { lastSeenAt: 1001 } }
+  }), {
+    providerKind: 'api', providerId: 'xai', reason: 'fallback'
+  }, 'historical connected evidence cannot win a recommendation');
+
+  const hostileClients = JSON.parse(`{
+    "raw:claude": { "live": {} },
+    "cursor": { "installed": { "detected": true } },
+    "__proto__": { "clicked": {} },
+    "constructor": { "live": {} },
+    "prototype": { "installed": { "detected": true } },
+    "claude-code": { "live": null, "installed": { "detected": false }, "clicked": null },
+    "opencode": [],
+    "codex": "connected"
+  }`);
+  assertRecommendation(deepFreeze(hostileClients), {
+    providerKind: 'api', providerId: 'xai', reason: 'fallback'
+  }, 'unknown, raw, prototype-like, and malformed rows never become recommendations');
+  const inheritedClients = Object.create({ 'claude-code': { live: {} } });
+  inheritedClients.codex = { clicked: {} };
+  assertRecommendation(inheritedClients, {
+    providerKind: 'agent', providerId: 'codex', reason: 'clicked'
+  }, 'inherited allowlisted rows are ignored');
+  const reorderedA = {
+    codex: { clicked: {} },
+    opencode: { clicked: {} }
+  };
+  const reorderedB = {
+    opencode: { clicked: {} },
+    codex: { clicked: {} }
+  };
+  assert.deepEqual(providers.getRecommendation(reorderedA), providers.getRecommendation(reorderedB),
+    'reordering the client map cannot change a same-tier recommendation');
+  for (const malformed of [undefined, null, [], 'clients', 0, true, {}, { codex: null }]) {
+    assertRecommendation(malformed, {
+      providerKind: 'api', providerId: 'xai', reason: 'fallback'
+    }, 'every malformed or empty client value still returns one fallback');
+  }
+  const firstRecommendation = providers.getRecommendation({ codex: { live: {} } });
+  const secondRecommendation = providers.getRecommendation({ codex: { live: {} } });
+  assert.notEqual(firstRecommendation, secondRecommendation,
+    'recommendation returns a fresh result object every time');
+  firstRecommendation.providerId = 'xai';
+  assert.equal(secondRecommendation.providerId, 'codex',
+    'mutating one recommendation cannot affect the next result');
+
+  const statusCases = [
+    [{ live: {}, installed: { detected: true, checkedAt: 10 }, connected: {}, clicked: {} }, {
+      live: true, installed: true, seenBefore: false, clicked: true,
+      primaryLabel: 'Connected now', authLabel: 'Not reported', checkedAt: 10
+    }, 'live status has primary precedence'],
+    [{ installed: { detected: true, checkedAt: 20 }, connected: {}, clicked: {} }, {
+      live: false, installed: true, seenBefore: true, clicked: true,
+      primaryLabel: 'Installed', authLabel: 'Not reported', checkedAt: 20
+    }, 'installed status has precedence over historical and clicked evidence'],
+    [{ connected: { lastSeenAt: 30 } }, {
+      live: false, installed: false, seenBefore: true, clicked: false,
+      primaryLabel: 'Seen before', authLabel: 'Not reported', checkedAt: null
+    }, 'historical evidence is seen before rather than connected now'],
+    [{ clicked: { count: 1 } }, {
+      live: false, installed: false, seenBefore: false, clicked: true,
+      primaryLabel: 'Setup copied', authLabel: 'Not reported', checkedAt: null
+    }, 'clicked-only evidence is setup copied'],
+    [{ installed: { detected: false, checkedAt: 40 } }, {
+      live: false, installed: false, seenBefore: false, clicked: false,
+      primaryLabel: 'Not installed', authLabel: 'Not reported', checkedAt: 40
+    }, 'installed false remains not installed while retaining its finite check time'],
+    [{}, {
+      live: false, installed: false, seenBefore: false, clicked: false,
+      primaryLabel: 'Not installed', authLabel: 'Not reported', checkedAt: null
+    }, 'missing evidence returns status-safe defaults']
+  ];
+  for (const [row, expected, message] of statusCases) {
+    const frozenRow = deepFreeze(row);
+    assert.deepEqual(providers.getAgentStatus(frozenRow), expected, message);
+  }
+  for (const row of [undefined, null, [], 'row', 42, true]) {
+    assert.deepEqual(providers.getAgentStatus(row), {
+      live: false,
+      installed: false,
+      seenBefore: false,
+      clicked: false,
+      primaryLabel: 'Not installed',
+      authLabel: 'Not reported',
+      checkedAt: null
+    }, 'malformed rows return safe status defaults');
+  }
+  for (const checkedAt of [NaN, Infinity, -Infinity, '50', null, undefined]) {
+    const status = providers.getAgentStatus({
+      installed: { detected: true, checkedAt },
+      clicked: { checkedAt: 101 },
+      connected: { lastSeenAt: 102 },
+      live: { connectedAt: 103 }
+    });
+    assert.equal(status.checkedAt, null, `${String(checkedAt)} is not a finite installed check time`);
+  }
+  assert.equal(providers.getAgentStatus({
+    installed: { detected: true },
+    clicked: { checkedAt: 201 },
+    connected: { lastSeenAt: 202 },
+    live: { connectedAt: 203 }
+  }).checkedAt, null, 'unrelated evidence timestamps never substitute for installed checkedAt');
+
+  const claude = providers.PROVIDER_DEFINITIONS['claude-code'];
+  const opencode = providers.PROVIDER_DEFINITIONS.opencode;
+  const codex = providers.PROVIDER_DEFINITIONS.codex;
+  assert.equal(claude.billingUrl, 'https://claude.com/pricing');
+  assert.equal(opencode.billingUrl, 'https://opencode.ai/docs/providers/');
+  assert.equal(opencode.secondaryBillingUrl, 'https://opencode.ai/docs/zen/');
+  assert.equal(codex.billingUrl,
+    'https://help.openai.com/en/articles/20001106-codex-rate-card-2');
+  assert.equal(claude.billingCopy,
+    "Uses the account signed into Claude Code. FSB does not need your Anthropic credential. Usage and charges follow that account's Claude plan or API configuration.");
+  assert.equal(opencode.billingCopy,
+    'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.');
+  assert.equal(codex.billingCopy,
+    "Uses the account signed into Codex. FSB does not need your OpenAI credential. Usage, credits, and charges follow that account's current OpenAI plan or API configuration.");
+  const urls = providers.AGENT_PROVIDER_IDS.flatMap((id) => {
+    const definition = providers.PROVIDER_DEFINITIONS[id];
+    return [definition.billingUrl, definition.secondaryBillingUrl].filter(Boolean);
+  });
+  assert.deepEqual(urls, [
+    'https://claude.com/pricing',
+    'https://opencode.ai/docs/providers/',
+    'https://opencode.ai/docs/zen/',
+    'https://help.openai.com/en/articles/20001106-codex-rate-card-2'
+  ], 'agent definitions expose exactly the four approved official HTTPS destinations');
+  for (const url of urls) assert.match(url, /^https:\/\//, `${url} is HTTPS`);
+  const billingContract = providers.AGENT_PROVIDER_IDS
+    .map((id) => JSON.stringify(providers.PROVIDER_DEFINITIONS[id]))
+    .join('\n');
+  assert.doesNotMatch(billingContract, /\b(?:included|free|unlimited)\b/i,
+    'agent definitions make no blanket subscription or zero-cost promise');
+  assert.doesNotMatch(billingContract, /\$\s*\d|\d+(?:\.\d+)?\s*(?:usd|dollars?)/i,
+    'agent definitions contain no fabricated dollar amount');
+
+  assert.match(helperSource, /^\(function\(global\) \{\n  'use strict';/,
+    'helper is a strict-mode classic-script IIFE');
+  assert.match(helperSource, /global\.FSBProvidersPanel = api;/,
+    'helper assigns the classic-script namespace');
+  assert.match(helperSource, /module\.exports = api;/,
+    'helper supports direct CommonJS assertions');
+  for (const forbidden of [
+    /chrome\./,
+    /\bdocument\b/,
+    /\bwindow\b/,
+    /\bfetch\b/,
+    /\beval\b/,
+    /\bsetTimeout\b/,
+    /\bsetInterval\b/
+  ]) {
+    assert.doesNotMatch(helperSource, forbidden,
+      `pure helper source excludes ${String(forbidden)}`);
+  }
+  assert.doesNotMatch(helperSource, /\.\.\.\s*(?:clients|row|settings)/,
+    'untrusted state is never spread');
+
+  console.log('providers-panel-logic.test.js: PASS');
+}
+
+try {
+  main();
+} catch (error) {
+  console.error('providers-panel-logic.test.js: FAIL');
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
+}
