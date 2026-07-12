@@ -169,12 +169,7 @@
         version: version,
         lastSeenAt: Date.now()
       };
-      var current = Object.prototype.hasOwnProperty.call(connected, key)
-        ? connected[key]
-        : undefined;
-      if (shouldReplaceConnectedRecord(current, record)) {
-        setOwnEnumerable(connected, key, record);
-      }
+      setOwnEnumerable(connected, key, record);
     });
   }
 

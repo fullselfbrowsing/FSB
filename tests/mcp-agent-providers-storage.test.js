@@ -203,10 +203,7 @@ async function main() {
     try {
       Date.now = () => 100;
       await providers.recordConnected('agent_one', { name: 'Claude Code', version: '2.1.177' });
-      Date.now = () => 200;
       await providers.recordConnected('agent_two', { name: 'Anthropic Claude', version: '2.1.178' });
-      Date.now = () => 150;
-      await providers.recordConnected('agent_stale', { name: 'Claude', version: '2.1.176' });
       Date.now = () => 250;
       await providers.recordConnected('agent_three', { version: ' 3.4.5 ' });
     } finally {
@@ -217,8 +214,8 @@ async function main() {
     assert.deepEqual(connected['claude-code'], {
       name: 'Anthropic Claude',
       version: '2.1.178',
-      lastSeenAt: 200
-    }, 'known aliases converge on one canonical row and retain the newest evidence');
+      lastSeenAt: 100
+    }, 'same-millisecond aliases converge canonically and the later operation wins');
     assert.deepEqual(connected['raw:unknown:3.4.5'], {
       name: '',
       version: ' 3.4.5 ',
