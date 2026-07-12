@@ -1002,6 +1002,36 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(harness.otherDisclosure.hidden, true,
     'Other MCP clients disclosure disappears when the count returns to zero');
 
+  const emptyState = createProviderHarness();
+  emptyState.state().hasSuccessfulEvidence = true;
+  emptyState.state().clients = Object.fromEntries(PROVIDERS.AGENT_PROVIDER_IDS.map((providerId) => [
+    providerId,
+    { installed: { detected: false, checkedAt: 123 } }
+  ]));
+  emptyState.state().evidenceStatus = 'ready';
+  emptyState.context.renderProviderEvidence();
+  assert.strictEqual(emptyState.agentEmptyState.hidden, false,
+    'a ready sweep with three detected-false rows confirms no supported CLI');
+  for (const evidenceStatus of ['loading', 'unavailable', 'stale']) {
+    emptyState.state().evidenceStatus = evidenceStatus;
+    emptyState.context.renderProviderEvidence();
+    assert.strictEqual(emptyState.agentEmptyState.hidden, true,
+      evidenceStatus + ' evidence cannot claim that no agent CLI is detected');
+  }
+  const evidenceShapes = [
+    { clicked: {} },
+    { installed: { detected: true, checkedAt: 123 } },
+    { connected: { lastSeenAt: 123 } },
+    { live: { agentId: 'live-agent' } }
+  ];
+  for (const row of evidenceShapes) {
+    emptyState.state().clients = { codex: row };
+    emptyState.state().evidenceStatus = 'ready';
+    emptyState.context.renderProviderEvidence();
+    assert.strictEqual(emptyState.agentEmptyState.hidden, true,
+      'real supported clicked, installed, connected, or live evidence suppresses the empty state');
+  }
+
   const priorClients = JSON.stringify(harness.state().clients);
   const priorRecommendation = JSON.stringify(harness.state().recommendation);
   harness.setRuntimeError('private transport detail must not surface');

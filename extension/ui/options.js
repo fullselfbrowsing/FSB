@@ -476,9 +476,11 @@ function hasSupportedAgentEvidence(helper) {
   return helper.AGENT_PROVIDER_IDS.some((providerId) => {
     const row = getOwnDataValue(providerPanelState.clients, providerId);
     if (!isProviderDataRecord(row)) return false;
-    return ['clicked', 'installed', 'connected', 'live'].some((key) =>
-      isProviderDataRecord(getOwnDataValue(row, key))
-    );
+    const installed = getOwnDataValue(row, 'installed');
+    return isProviderDataRecord(getOwnDataValue(row, 'clicked'))
+      || (isProviderDataRecord(installed) && getOwnDataValue(installed, 'detected') === true)
+      || isProviderDataRecord(getOwnDataValue(row, 'connected'))
+      || isProviderDataRecord(getOwnDataValue(row, 'live'));
   });
 }
 
@@ -561,7 +563,9 @@ function renderProviderEvidence() {
   });
 
   if (elements.agentEvidenceEmptyState) {
-    elements.agentEvidenceEmptyState.hidden = hasSupportedAgentEvidence(helper);
+    const absenceConfirmed = providerPanelState.evidenceStatus === 'ready'
+      && !hasSupportedAgentEvidence(helper);
+    elements.agentEvidenceEmptyState.hidden = !absenceConfirmed;
   }
   renderOtherMcpClients(helper);
 }
