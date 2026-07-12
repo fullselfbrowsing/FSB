@@ -2,6 +2,8 @@
 
 // Default settings
 const defaultSettings = {
+  providerKind: 'api',
+  agentProviderId: '',
   modelProvider: 'xai',
   modelName: 'grok-4-1-fast',
   apiKey: '',
@@ -116,6 +118,17 @@ const dashboardState = {
   wsConnected: false
 };
 
+// Provider intent is kept separate from advisory inventory evidence. The
+// existing hidden #modelProvider select remains the API-only source of truth;
+// an agent id is never written into it.
+const providerPanelState = {
+  providerKind: 'api',
+  agentProviderId: '',
+  recommendation: { providerKind: 'api', providerId: 'xai', reason: 'fallback' },
+  clients: Object.create(null),
+  evidenceStatus: 'idle'
+};
+
 // Initialize analytics
 let analytics = null;
 
@@ -207,7 +220,30 @@ function cacheElements() {
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.providerRoster = document.getElementById('providerRoster');
+  elements.providerSelectionRadios = document.querySelectorAll('input[name="fsbProviderSelection"]');
   elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
+  elements.apiProviderDetails = document.getElementById('apiProviderDetails');
+  elements.agentProviderDetails = document.getElementById('agentProviderDetails');
+  elements.agentProviderDetailsHeading = document.getElementById('agentProviderDetailsHeading');
+  elements.agentNoCredentialCaption = document.getElementById('agentNoCredentialCaption');
+  elements.agentEvidenceEmptyState = document.getElementById('agentEvidenceEmptyState');
+  elements.agentInstallationStatus = document.getElementById('agentInstallationStatus');
+  elements.agentConnectionStatus = document.getElementById('agentConnectionStatus');
+  elements.agentAccountStatus = document.getElementById('agentAccountStatus');
+  elements.agentSetupStatus = document.getElementById('agentSetupStatus');
+  elements.openAgentSetupGuideBtn = document.getElementById('openAgentSetupGuideBtn');
+  elements.agentUsageTokens = document.getElementById('agentUsageTokens');
+  elements.agentUsageTurns = document.getElementById('agentUsageTurns');
+  elements.agentUsageDuration = document.getElementById('agentUsageDuration');
+  elements.agentUsageEmptyState = document.getElementById('agentUsageEmptyState');
+  elements.agentBillingStatus = document.getElementById('agentBillingStatus');
+  elements.agentBillingCopy = document.getElementById('agentBillingCopy');
+  elements.agentBillingLink = document.getElementById('agentBillingLink');
+  elements.agentBillingLinkLabel = document.getElementById('agentBillingLinkLabel');
+  elements.otherMcpClientsDisclosure = document.getElementById('otherMcpClientsDisclosure');
+  elements.otherMcpClientsSummary = document.getElementById('otherMcpClientsSummary');
+  elements.otherMcpClientsList = document.getElementById('otherMcpClientsList');
   elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
@@ -311,6 +347,75 @@ function cacheElements() {
   elements.auditClearBtn = document.getElementById('auditClearBtn');
 }
 
+function getProviderPanelHelper() {
+  const helper = (typeof globalThis !== 'undefined') ? globalThis.FSBProvidersPanel : null;
+  return helper
+    && typeof helper.isApiProvider === 'function'
+    && typeof helper.isAgentProvider === 'function'
+    && typeof helper.normalizeSettings === 'function'
+    ? helper
+    : null;
+}
+
+function renderProviderSelection() {
+  const activeKind = providerPanelState.providerKind;
+  const activeId = activeKind === 'agent'
+    ? providerPanelState.agentProviderId
+    : elements.modelProvider?.value;
+  const radios = elements.providerSelectionRadios || [];
+
+  Array.prototype.forEach.call(radios, (radio) => {
+    const selected = radio.dataset?.providerKind === activeKind
+      && radio.dataset?.providerId === activeId;
+    radio.checked = selected;
+    radio.setAttribute('aria-checked', selected ? 'true' : 'false');
+    const row = typeof radio.closest === 'function' ? radio.closest('.provider-row') : null;
+    if (row) row.classList.toggle('is-selected', selected);
+  });
+}
+
+function renderProviderKind() {
+  const showAgentDetails = providerPanelState.providerKind === 'agent';
+  if (elements.apiProviderDetails) elements.apiProviderDetails.hidden = showAgentDetails;
+  if (elements.agentProviderDetails) elements.agentProviderDetails.hidden = !showAgentDetails;
+}
+
+function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey) {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && ui.IN_SCOPE_PROVIDERS && ui.IN_SCOPE_PROVIDERS[provider]) {
+    const discoveryOptions = { previousSelection: previousSelection };
+    if (silentIfNoKey) discoveryOptions.silentIfNoKey = true;
+    ui.runDiscovery(provider, discoveryOptions);
+  } else {
+    updateModelOptions(provider);
+  }
+  updateApiKeyVisibility(provider);
+}
+
+function setProviderSelection(kind, id, { markDirty = true } = {}) {
+  const helper = getProviderPanelHelper();
+  if (!helper) return false;
+
+  if (kind === 'api') {
+    if (!helper.isApiProvider(id)) return false;
+    const previousSelection = elements.modelName?.value;
+    providerPanelState.providerKind = 'api';
+    if (elements.modelProvider) elements.modelProvider.value = id;
+    runApiProviderSelectionPath(id, previousSelection, !markDirty);
+  } else if (kind === 'agent') {
+    if (!helper.isAgentProvider(id)) return false;
+    providerPanelState.providerKind = 'agent';
+    providerPanelState.agentProviderId = id;
+  } else {
+    return false;
+  }
+
+  renderProviderSelection();
+  renderProviderKind();
+  if (markDirty) markUnsavedChanges();
+  return true;
+}
+
 function setupEventListeners() {
   // Navigation
   elements.navItems.forEach(item => {
@@ -327,6 +432,16 @@ function setupEventListeners() {
       if (!mode) return;
       setThemePreference(mode);
       showToast(`${mode} theme`, 'info');
+    });
+  }
+
+  // One delegated handler covers click and keyboard-driven native-radio
+  // changes. Selection stays in form state until the existing Save action.
+  if (elements.providerRoster) {
+    elements.providerRoster.addEventListener('change', (event) => {
+      const radio = event.target;
+      if (!radio || radio.name !== 'fsbProviderSelection') return;
+      setProviderSelection(radio.dataset?.providerKind, radio.dataset?.providerId);
     });
   }
 
@@ -1054,7 +1169,8 @@ let _fsbSelectOutsideClickBound = false;
 // truth -- picking a custom option sets its .value and redispatches a real
 // 'change' event, so every existing change-listener elsewhere keeps working
 // untouched. modelName is excluded (it's the model-combobox's own hidden
-// native select, already driven by a separate custom combobox).
+// native select), as is modelProvider (the visible Providers radio roster
+// mirrors that compatibility select).
 // After loadSettings' async storage callback assigns `.value` on the underlying
 // native <select>s, call this to bring the wrapped custom-select labels back
 // into sync. Uses each select's already-attached `sync()` (stashed on the DOM
@@ -1070,7 +1186,9 @@ function syncFsbSelectLabels() {
 
 function initFsbSelects() {
   document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
-    if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
+    if (sel.getAttribute('data-enh') === '1'
+        || sel.classList.contains('model-combobox__native')
+        || sel.classList.contains('provider-roster__native')) return;
     sel.setAttribute('data-enh', '1');
     sel.style.display = 'none';
 
@@ -1341,6 +1459,21 @@ function updateApiKeyVisibility(provider) {
   }
 }
 
+function stageLatentApiModel(modelName) {
+  if (!elements.modelName || !modelName) return;
+  elements.modelName.value = modelName;
+  if (elements.modelName.value === modelName) return;
+
+  // #modelName starts empty. When an agent is active we intentionally skip
+  // API discovery, so retain the saved API model as a hidden placeholder until
+  // the user switches back and the normal provider path repopulates the list.
+  const option = document.createElement('option');
+  option.value = modelName;
+  option.textContent = modelName;
+  elements.modelName.appendChild(option);
+  elements.modelName.value = modelName;
+}
+
 function loadSettings() {
   chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
     data = data || {};
@@ -1348,7 +1481,12 @@ function loadSettings() {
     const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
       && typeof data.fsbAgentCap === 'number'
       && Number.isFinite(data.fsbAgentCap);
-    const settings = { ...defaultSettings, ...data };
+    const mergedSettings = { ...defaultSettings, ...data };
+    const providerHelper = getProviderPanelHelper();
+    const normalizedProviderSettings = providerHelper
+      ? providerHelper.normalizeSettings(mergedSettings)
+      : { providerKind: 'api', modelProvider: 'xai', agentProviderId: '' };
+    const settings = { ...mergedSettings, ...normalizedProviderSettings };
     if (!hasStoredAgentCap) {
       settings.fsbAgentCap = fsbRecommendedAgentCap;
     }
@@ -1359,26 +1497,16 @@ function loadSettings() {
       settings.modelName = 'grok-4-1-fast'; // All legacy modes map to new default
     }
     
-    // Update model provider and options
-    if (elements.modelProvider) {
-      const initialProvider = settings.modelProvider || 'xai';
-      elements.modelProvider.value = initialProvider;
-      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-      if (ui && ui.IN_SCOPE_PROVIDERS[initialProvider]) {
-        // Phase 232: discoverModels() now hydrates from chrome.storage.local
-        // before checking cache, so a previously-discovered list shows
-        // immediately on page open (no need to re-click Discover after a
-        // service-worker restart). Sticky selection in renderModelDropdown
-        // ensures settings.modelName is preserved even if not in the list.
-        ui.runDiscovery(initialProvider, {
-          previousSelection: settings.modelName,
-          silentIfNoKey: true
-        });
-      } else {
-        updateModelOptions(initialProvider);
-      }
-      updateApiKeyVisibility(initialProvider);
-    }
+    // Restore both latent provider choices before applying the saved kind.
+    // Staging the model gives the existing discovery path its sticky previous
+    // selection while allowing saved-agent loads to avoid API work entirely.
+    stageLatentApiModel(settings.modelName);
+    if (elements.modelProvider) elements.modelProvider.value = settings.modelProvider;
+    providerPanelState.agentProviderId = settings.agentProviderId;
+    const activeProviderId = settings.providerKind === 'agent'
+      ? settings.agentProviderId
+      : settings.modelProvider;
+    setProviderSelection(settings.providerKind, activeProviderId, { markDirty: false });
     
     // Update model name
     if (elements.modelName && settings.modelName) {
@@ -1393,13 +1521,15 @@ function loadSettings() {
         if (selectedModel) {
           updateModelDescription(selectedModel.description);
         }
-        updateApiKeyVisibility(settings.modelProvider || 'xai');
-        // Load-order fix: run the API-connection check inside this model-name timer.
-        // By the time it fires, the callback's synchronous body has already populated
-        // the apiKey + provider inputs and modelName was just applied above, so
-        // checkApiConnection reads populated inputs -- not the empty fields the old
-        // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
-        checkApiConnection();
+        if (settings.providerKind === 'api') {
+          updateApiKeyVisibility(settings.modelProvider || 'xai');
+          // Load-order fix: run the API-connection check inside this model-name timer.
+          // By the time it fires, the callback's synchronous body has already populated
+          // the apiKey + provider inputs and modelName was just applied above, so
+          // checkApiConnection reads populated inputs -- not the empty fields the old
+          // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
+          checkApiConnection();
+        }
       }, 100);
     }
     
@@ -1647,8 +1777,30 @@ function refreshActiveTriggerCount() {
   }
 }
 
+function normalizeProviderFormSelection() {
+  const providerHelper = getProviderPanelHelper();
+  const normalizedProviderSettings = providerHelper
+    ? providerHelper.normalizeSettings({
+        providerKind: providerPanelState.providerKind,
+        modelProvider: elements.modelProvider?.value,
+        agentProviderId: providerPanelState.agentProviderId
+      })
+    : { providerKind: 'api', modelProvider: 'xai', agentProviderId: '' };
+  providerPanelState.providerKind = normalizedProviderSettings.providerKind;
+  providerPanelState.agentProviderId = normalizedProviderSettings.agentProviderId;
+  if (elements.modelProvider) {
+    elements.modelProvider.value = normalizedProviderSettings.modelProvider;
+  }
+  renderProviderSelection();
+  renderProviderKind();
+  return normalizedProviderSettings;
+}
+
 function saveSettings() {
+  const normalizedProviderSettings = normalizeProviderFormSelection();
   const settings = {
+    providerKind: normalizedProviderSettings.providerKind,
+    agentProviderId: normalizedProviderSettings.agentProviderId,
     modelProvider: elements.modelProvider?.value || 'xai',
     modelName: elements.modelName?.value || 'grok-4-1-fast',
     apiKey: (elements.apiKey?.value || '').trim(),
@@ -1701,7 +1853,7 @@ function saveSettings() {
     addLog('info', 'Settings saved successfully');
     
     // Update connection status if API key changed
-    if (settings.apiKey) {
+    if (settings.providerKind === 'api' && settings.apiKey) {
       checkApiConnection();
     }
   });

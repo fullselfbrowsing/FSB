@@ -437,14 +437,19 @@ function main() {
 
   const testCommands = JSON.parse(packageSource).scripts.test.split(' && ');
   const providerCommand = 'node tests/providers-panel-logic.test.js';
+  const providerUiCommand = 'node tests/providers-panel-ui.test.js';
   const identityCommand = 'node tests/mcp-client-identity-integration.test.js';
   const turnResultCommand = 'node tests/turn-result.test.js';
   assert.equal(testCommands.filter((command) => command === providerCommand).length, 1,
     'root npm test includes the provider contract exactly once');
   assert.equal(testCommands.indexOf(providerCommand), testCommands.indexOf(identityCommand) + 1,
     'provider contract follows MCP client identity integration');
-  assert.equal(testCommands.indexOf(turnResultCommand), testCommands.indexOf(providerCommand) + 1,
-    'provider contract precedes the existing turn/provider test cluster');
+  assert.equal(testCommands.filter((command) => command === providerUiCommand).length, 1,
+    'root npm test includes the provider UI contract exactly once');
+  assert.equal(testCommands.indexOf(providerUiCommand), testCommands.indexOf(providerCommand) + 1,
+    'provider UI contract immediately follows provider logic');
+  assert.equal(testCommands.indexOf(turnResultCommand), testCommands.indexOf(providerUiCommand) + 1,
+    'provider contracts precede the existing turn/provider test cluster');
 
   console.log('providers-panel-logic.test.js: PASS');
 }

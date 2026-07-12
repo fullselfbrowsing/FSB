@@ -808,8 +808,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (after apiKey + provider + modelName are all populated).
   passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
     "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
-  passAssert(/checkApiConnection\(\);\s*\}, 100\);/.test(optionsSrc),
-    'checkApiConnection() now runs as the last statement of the loadSettings model-name setTimeout (inputs populated first)');
+  passAssert(
+    /if\s*\(settings\.providerKind\s*===\s*['"]api['"]\)\s*\{[\s\S]*?checkApiConnection\(\);\s*\}\s*\}, 100\);/.test(optionsSrc),
+    'checkApiConnection() stays last in the loadSettings model-name timer and is guarded to API kind'
+  );
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');
