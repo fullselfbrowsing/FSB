@@ -34,11 +34,12 @@ created: 2026-07-12
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 57-01-01 | 01 | 1 | IDENT-02 | T57-01 | Optional handshake identity cannot change the legacy empty register payload when absent | unit/contract | `npm --prefix mcp run build && node tests/agent-scope.test.js && node tests/mcp-client-identity.test.js` | ❌ task creates | ⬜ pending |
 | 57-01-02 | 01 | 1 | IDENT-04 | T57-02 | Binary detection uses fixed argv, timeout, and no shell | unit/contract | `npm --prefix mcp run build && node tests/mcp-client-inventory.test.js && node tests/mcp-install-platforms.test.js` | ❌ task creates | ⬜ pending |
-| 57-02-01 | 02 | 1 | IDENT-01 | T57-03 | Durable click evidence does not block or alter clipboard feedback | VM/source contract | `node tests/onboarding-agent-provider-clicks.test.js` | ❌ task creates | ⬜ pending |
-| 57-02-02 | 02 | 1 | IDENT-03 | T57-01 | Untrusted clientInfo is sanitized, length-capped, and used only as evidence | VM/unit | `node tests/mcp-agent-providers-storage.test.js && node tests/agent-registry.test.js` | ❌ task creates | ⬜ pending |
-| 57-02-03 | 02 | 1 | IDENT-04 | T57-04 | Inventory ingestion preserves sibling evidence and stale timestamps | VM/contract | `node tests/mcp-bridge-background-dispatch.test.js && node tests/mcp-agent-providers-storage.test.js` | ❌ task creates | ⬜ pending |
+| 57-02-01 | 02 | 1 | IDENT-03 | T57-04 | Durable evidence mutations preserve siblings and live clientInfo persists without gaining authority | VM/unit | `node tests/mcp-agent-providers-storage.test.js && node tests/agent-registry.test.js` | ❌ task creates | ⬜ pending |
+| 57-02-02 | 02 | 1 | IDENT-03, IDENT-04 | T57-01, T57-04 | Sanitized connected identity and both inventory paths converge without breaking registration | VM/contract | `node tests/mcp-agent-providers-storage.test.js && node tests/mcp-bridge-background-dispatch.test.js` | ✅ extended | ⬜ pending |
+| 57-02-03 | 02 | 1 | IDENT-01 | T57-03 | Durable click evidence does not block or alter clipboard feedback | VM/source contract | `node tests/onboarding-agent-provider-clicks.test.js && node tests/runtime-contracts.test.js` | ❌ task creates | ⬜ pending |
 | 57-03-01 | 03 | 2 | IDENT-05 | T57-05 | Explicit aliases merge; unknown client names remain visible and never gain authority | unit/VM | `node tests/mcp-client-merged-view.test.js` | ❌ task creates | ⬜ pending |
-| 57-03-02 | 03 | 2 | IDENT-01..05 | T57-06 | Cross-stack flow is additive and source/wire freezes remain intact | integration/regression | `npm --prefix mcp run build && node tests/mcp-client-identity.test.js && node tests/mcp-client-inventory.test.js && node tests/mcp-agent-providers-storage.test.js && node tests/mcp-client-merged-view.test.js && node tests/onboarding-agent-provider-clicks.test.js && npm test` | ❌ task creates | ⬜ pending |
+| 57-03-02 | 03 | 2 | IDENT-05 | T57-05 | Sender-guarded cross-context and same-context queries return the same bounded envelope | VM/runtime contract | `node tests/mcp-client-merged-view.test.js && node tests/mcp-bridge-background-dispatch.test.js && node tests/runtime-contracts.test.js` | ✅ extended | ⬜ pending |
+| 57-03-03 | 03 | 2 | IDENT-01..05 | T57-06 | Cross-stack flow is additive and source/wire freezes remain intact | integration/regression | `npm --prefix mcp run build && node tests/mcp-client-identity-integration.test.js && npm test` | ❌ task creates | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -71,4 +72,3 @@ All Phase 57 behaviors have automated verification. The phase adds no new render
 - [x] `nyquist_compliant: true` is set in frontmatter.
 
 **Approval:** approved 2026-07-12
-
