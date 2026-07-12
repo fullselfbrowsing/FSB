@@ -13,7 +13,11 @@ const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const helperPath = path.join(repoRoot, 'extension', 'ui', 'providers-panel.js');
+const controlPanelPath = path.join(repoRoot, 'extension', 'ui', 'control_panel.html');
+const packagePath = path.join(repoRoot, 'package.json');
 const helperSource = fs.readFileSync(helperPath, 'utf8');
+const controlPanelSource = fs.readFileSync(controlPanelPath, 'utf8');
+const packageSource = fs.readFileSync(packagePath, 'utf8');
 
 delete globalThis.FSBProvidersPanel;
 delete require.cache[require.resolve(helperPath)];
@@ -398,6 +402,49 @@ function main() {
   }
   assert.doesNotMatch(helperSource, /\.\.\.\s*(?:clients|row|settings)/,
     'untrusted state is never spread');
+
+  const providersScriptToken = '<script src="providers-panel.js"></script>';
+  const optionsScriptToken = '<script src="options.js"></script>';
+  assert.equal(controlPanelSource.split(providersScriptToken).length - 1, 1,
+    'control panel loads providers-panel.js exactly once');
+  assert.equal(controlPanelSource.split(optionsScriptToken).length - 1, 1,
+    'control panel loads options.js exactly once');
+  assert.ok(
+    controlPanelSource.indexOf(providersScriptToken) < controlPanelSource.indexOf(optionsScriptToken),
+    'provider helper loads before options.js'
+  );
+  assert.match(
+    controlPanelSource,
+    /<script src="providers-panel\.js"><\/script>\s*<script src="options\.js"><\/script>/,
+    'provider helper is immediately before options.js'
+  );
+  const controlPanelMarkup = controlPanelSource.replace(/<!--[\s\S]*?-->/g, '');
+  assert.equal((controlPanelMarkup.match(/<script(?![^>]*\bsrc=)[^>]*>/g) || []).length, 0,
+    'control panel contains no inline script block');
+
+  const modelProviderSelect = controlPanelSource.match(
+    /<select id="modelProvider"[\s\S]*?<\/select>/
+  );
+  assert.ok(modelProviderSelect, 'current modelProvider select remains present');
+  assert.deepEqual(
+    Array.from(modelProviderSelect[0].matchAll(/<option value="([^"]+)"/g), (match) => match[1]),
+    providers.API_PROVIDER_IDS,
+    'current modelProvider select remains the same seven-value API surface'
+  );
+  for (const id of ['modelCombobox', 'modelSearch', 'modelListbox', 'modelName']) {
+    assert.match(controlPanelSource, new RegExp(`id="${id}"`), `${id} markup remains present`);
+  }
+
+  const testCommands = JSON.parse(packageSource).scripts.test.split(' && ');
+  const providerCommand = 'node tests/providers-panel-logic.test.js';
+  const identityCommand = 'node tests/mcp-client-identity-integration.test.js';
+  const turnResultCommand = 'node tests/turn-result.test.js';
+  assert.equal(testCommands.filter((command) => command === providerCommand).length, 1,
+    'root npm test includes the provider contract exactly once');
+  assert.equal(testCommands.indexOf(providerCommand), testCommands.indexOf(identityCommand) + 1,
+    'provider contract follows MCP client identity integration');
+  assert.equal(testCommands.indexOf(turnResultCommand), testCommands.indexOf(providerCommand) + 1,
+    'provider contract precedes the existing turn/provider test cluster');
 
   console.log('providers-panel-logic.test.js: PASS');
 }
