@@ -34,9 +34,9 @@ Rename the control panel's API Configuration surface to Providers and make provi
 
 ### Agent Details and Billing Honesty
 - When an agent row is selected, hide the API model combobox, all API-key/server/endpoint groups, key URLs, and model/key-format hints. Show install status, live connection status, historical-seen evidence where applicable, auth status, and the agent usage panel instead.
-- Use the caption “Uses your subscription — no API key needed in FSB. Billing and limits follow your current vendor plan.” Never describe an agent as free or unlimited and never infer auth or subscription state from installation alone.
+- Scope the no-key caption to FSB: FSB uses the CLI's existing sign-in and does not need its credential. Provider-specific copy must say that billing and limits follow the account or provider configured in that CLI; never infer subscription state from installation alone.
 - Show auth as “Not reported” until a current CLI/adapter contract supplies a real auth state. Later adapter phases may enrich the same field without changing the Phase 58 selection model.
-- Show token count, turn count, and duration without any dollar-value field. Before delegated-run data exists, render an honest “No delegated runs yet”/em-dash state rather than fabricated zeros, alongside “Included in your subscription” and a current official vendor billing/account link.
+- Show token count, turn count, and duration without any dollar-value field. Before delegated-run data exists, render an honest “No delegated runs yet”/em-dash state rather than fabricated zeros, plus a current official vendor billing/account link. Show “Included in your subscription” only when adapter auth metadata confirms subscription-backed usage; otherwise show provider-specific billed/unknown wording.
 - Keep unavailable agent rows visible and selectable as configuration intent. Mark them “Not installed” and provide an installation action; recommendation eligibility still comes only from Phase 57 evidence and never from a UI guess.
 
 ### the agent's Discretion
