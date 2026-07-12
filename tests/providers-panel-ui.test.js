@@ -271,6 +271,9 @@ assert.ok(loadSource.indexOf('normalizeSettings(mergedSettings)') < loadSource.i
   'settings normalize before controls render');
 assert.match(loadSource, /setProviderSelection\(settings\.providerKind, activeProviderId, \{ markDirty: false \}\)/);
 assert.match(loadSource, /if \(settings\.providerKind === 'api'\)[\s\S]*checkApiConnection\(\)/);
+assert.match(loadSource,
+  /providerPanelState\.providerKind !== 'api'[\s\S]*elements\.modelProvider\?\.value !== settings\.modelProvider/,
+  'delayed API load rechecks current kind and provider before applying saved model state');
 assert.match(saveSource, /providerKind:\s*normalizedProviderSettings\.providerKind/);
 assert.match(saveSource, /agentProviderId:\s*normalizedProviderSettings\.agentProviderId/);
 assert.match(saveSource, /modelProvider:\s*elements\.modelProvider\?\.value \|\| 'xai'/);
@@ -563,6 +566,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const runtimeCalls = [];
   const pendingRuntimeCallbacks = [];
   const scheduledTimeoutDelays = [];
+  const heldTimeouts = new Map();
+  let nextHeldTimeoutId = -1;
   const openedSetupPages = [];
   let runtimeResponse = Object.prototype.hasOwnProperty.call(options, 'runtimeResponse')
     ? options.runtimeResponse
@@ -622,6 +627,20 @@ function createProviderHarness(initialStorage, harnessOptions) {
       create(properties) { openedSetupPages.push({ ...properties }); }
     }
   };
+  function setHarnessTimeout(fn, delay) {
+    scheduledTimeoutDelays.push(delay || 0);
+    if (Array.isArray(options.heldTimerDelays) && options.heldTimerDelays.includes(delay)) {
+      const id = nextHeldTimeoutId;
+      nextHeldTimeoutId -= 1;
+      heldTimeouts.set(id, { fn, delay });
+      return id;
+    }
+    return setTimeout(fn, delay === 5000 ? 1 : 0);
+  }
+  function clearHarnessTimeout(handle) {
+    if (heldTimeouts.delete(handle)) return;
+    clearTimeout(handle);
+  }
   const context = {
     console,
     document,
@@ -630,11 +649,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
     FSBProvidersPanel: PROVIDERS,
     FSBAnalytics: function() {},
     Event: class { constructor(type) { this.type = type; } },
-    setTimeout(fn, delay) {
-      scheduledTimeoutDelays.push(delay || 0);
-      return setTimeout(fn, delay === 5000 ? 1 : 0);
-    },
-    clearTimeout,
+    setTimeout: setHarnessTimeout,
+    clearTimeout: clearHarnessTimeout,
     requestAnimationFrame(fn) { return setTimeout(fn, 0); },
     cancelAnimationFrame: clearTimeout,
     location: { hash: '' },
@@ -719,6 +735,14 @@ function createProviderHarness(initialStorage, harnessOptions) {
     },
     emitStorage(changes, area) {
       storageListeners.slice().forEach((listener) => listener(changes, area));
+    },
+    advanceTimersBy(delay) {
+      const ready = Array.from(heldTimeouts.entries())
+        .filter(([, timer]) => timer.delay === delay);
+      ready.forEach(([id, timer]) => {
+        if (!heldTimeouts.delete(id)) return;
+        timer.fn();
+      });
     },
     state() { return vm.runInContext('providerPanelState', context); },
     dashboardState() { return vm.runInContext('dashboardState', context); }
@@ -839,6 +863,25 @@ async function runProviderRuntimeTests() {
     'invalid user agent id is rejected');
   assert.strictEqual(selectedRadio(harness).dataset.providerId, currentSelection,
     'invalid selection cannot disturb current choice');
+
+  const delayedLoad = createProviderHarness({
+    providerKind: 'api',
+    modelProvider: 'anthropic',
+    modelName: 'saved-api-model'
+  }, { heldTimerDelays: [100] });
+  delayedLoad.context.loadSettings();
+  await Promise.resolve();
+  await Promise.resolve();
+  delayedLoad.modelName.appendChild(makeOption('agent-kept-model', 'agent-kept-model'));
+  delayedLoad.modelName.value = 'agent-kept-model';
+  delayedLoad.context.setProviderSelection('agent', 'codex');
+  const connectionBeforeDelayedLoad = delayedLoad.calls.connection;
+  delayedLoad.advanceTimersBy(100);
+  assert.strictEqual(delayedLoad.state().providerKind, 'agent');
+  assert.strictEqual(delayedLoad.modelName.value, 'agent-kept-model',
+    'cancelled saved-API timer cannot overwrite a model after switching to agent');
+  assert.strictEqual(delayedLoad.calls.connection, connectionBeforeDelayedLoad,
+    'cancelled saved-API timer cannot run an API connection check in agent mode');
 }
 
 function visibleRecommendationIds(harness) {

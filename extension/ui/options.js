@@ -133,6 +133,8 @@ const providerPanelState = {
 let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
+let providerSettingsModelLoadTimer = null;
+let providerSettingsLoadGeneration = 0;
 
 // Initialize analytics
 let analytics = null;
@@ -767,22 +769,31 @@ function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey)
   updateApiKeyVisibility(provider);
 }
 
+function cancelPendingProviderSettingsModelLoad() {
+  providerSettingsLoadGeneration += 1;
+  if (providerSettingsModelLoadTimer !== null) {
+    clearTimeout(providerSettingsModelLoadTimer);
+    providerSettingsModelLoadTimer = null;
+  }
+}
+
 function setProviderSelection(kind, id, { markDirty = true } = {}) {
   const helper = getProviderPanelHelper();
   if (!helper) return false;
+  const validSelection = kind === 'api'
+    ? helper.isApiProvider(id)
+    : (kind === 'agent' && helper.isAgentProvider(id));
+  if (!validSelection) return false;
+  if (markDirty) cancelPendingProviderSettingsModelLoad();
 
   if (kind === 'api') {
-    if (!helper.isApiProvider(id)) return false;
     const previousSelection = elements.modelName?.value;
     providerPanelState.providerKind = 'api';
     if (elements.modelProvider) elements.modelProvider.value = id;
     runApiProviderSelectionPath(id, previousSelection, !markDirty);
   } else if (kind === 'agent') {
-    if (!helper.isAgentProvider(id)) return false;
     providerPanelState.providerKind = 'agent';
     providerPanelState.agentProviderId = id;
-  } else {
-    return false;
   }
 
   renderProviderSelection();
@@ -1866,9 +1877,12 @@ function stageLatentApiModel(modelName) {
 }
 
 function loadSettings() {
+  cancelPendingProviderSettingsModelLoad();
+  const loadGeneration = providerSettingsLoadGeneration;
   chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
     data = data || {};
     fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
+    if (loadGeneration !== providerSettingsLoadGeneration) return;
     const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
       && typeof data.fsbAgentCap === 'number'
       && Number.isFinite(data.fsbAgentCap);
@@ -1902,7 +1916,11 @@ function loadSettings() {
     // Update model name
     if (elements.modelName && settings.modelName) {
       // Wait for options to be populated
-      setTimeout(() => {
+      providerSettingsModelLoadTimer = setTimeout(() => {
+        providerSettingsModelLoadTimer = null;
+        if (loadGeneration !== providerSettingsLoadGeneration
+            || providerPanelState.providerKind !== 'api'
+            || elements.modelProvider?.value !== settings.modelProvider) return;
         elements.modelName.value = settings.modelName;
         if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
           globalThis.FSBModelCombobox.refresh();
