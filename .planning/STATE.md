@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: verifying
-stopped_at: Completed 58-03; awaiting independent Phase 58 verification
-last_updated: "2026-07-12T21:52:43Z"
-last_activity: 2026-07-12 -- Phase 58 Plan 03 completed; all plans executed
+stopped_at: Phase 58 automated verification passed; awaiting 12-item live UAT approval
+last_updated: "2026-07-12T23:14:01Z"
+last_activity: 2026-07-12 -- Phase 58 verified 8/8 automated; human UAT persisted
 progress:
   total_phases: 9
   completed_phases: 1
@@ -35,15 +35,15 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 Phase: 58 (Providers Panel) — VERIFYING
 Plan: 3 of 3
-Status: All plans executed; awaiting independent phase verification
-Last activity: 2026-07-12 -- Phase 58 Plan 03 completed
+Status: Automated verification passed; awaiting 12-item human UAT approval
+Last activity: 2026-07-12 -- Phase 58 verified 8/8 automated; human UAT persisted
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
-| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Verifying — Plans 3/3 executed |
+| 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Human UAT — 12 visual items pending |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Not started (SECURITY-CRITICAL, load-bearing) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
@@ -103,13 +103,13 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phase 58 Plans 01-03 are executed; independent phase verification is next.
+Phase 58 automated/source verification is complete (8/8 must-haves, 6/6 PROV requirements satisfied). Twelve live visual/interaction checks await human approval in `58-HUMAN-UAT.md`.
 
 ### Blockers/Concerns
 
 No active blocker. One open judgment call remains for Phase 59 planning (not a blocker, but a decision to make explicitly rather than let default-implicitly):
 
-- **Phase 58 visual QA:** The in-app Browser exposed no available backend, so the live theme/responsive/keyboard/motion checklist remains `human_needed` with exact procedures in `58-VISUAL-QA.md`. Automated focused and clean-worktree acceptance is green; no visual pass was inferred.
+- **Phase 58 visual QA:** The in-app Browser target list is empty, so the live theme/responsive/keyboard/motion checklist remains `human_needed` with exact procedures in `58-HUMAN-UAT.md` and `58-VISUAL-QA.md`. Automated verification is 8/8 and the final code review is clean; no visual pass was inferred.
 
 - **Phase 59 planning:** Shared-secret provisioning UX — TOFU pairing on first `serve` connect vs a user-visible pairing code from `fsb-mcp-server pair`. Research recommends deciding explicitly in Phase 59 planning; both paths meet the CHAN-04 requirement.
 
@@ -143,12 +143,12 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-12T21:52:43Z
-Stopped at: Completed 58-03; awaiting independent Phase 58 verification
-Resume file: .planning/phases/58-providers-panel/58-03-SUMMARY.md
+Last session: 2026-07-12T23:14:01Z
+Stopped at: Phase 58 automated verification passed; awaiting 12-item live UAT approval
+Resume file: .planning/phases/58-providers-panel/58-HUMAN-UAT.md
 
 ## Next Actions
 
-Run independent Phase 58 verification without pre-marking PROV requirements complete.
+Review the 12 live checks in `58-HUMAN-UAT.md`; reply `approved` to accept the human gate or report any issues for gap closure.
 
-After verification, plan Phase 59's security-critical reverse-request channel; the shared-secret provisioning UX remains an explicit planning decision.
+After approval and Phase 58 closeout, plan Phase 59's security-critical reverse-request channel; the shared-secret provisioning UX remains an explicit planning decision.
