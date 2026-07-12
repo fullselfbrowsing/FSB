@@ -830,9 +830,11 @@ function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey)
   updateApiKeyVisibility(provider);
 }
 
-function invalidateProviderDiscovery() {
+function invalidateProviderDiscovery(restoreUi) {
   const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-  if (ui && typeof ui.invalidateDiscovery === 'function') ui.invalidateDiscovery();
+  if (ui && typeof ui.invalidateDiscovery === 'function') {
+    ui.invalidateDiscovery({ restoreUi: restoreUi === true });
+  }
 }
 
 function cancelPendingProviderSettingsModelLoad() {
@@ -855,7 +857,9 @@ function setProviderSelection(kind, id, { markDirty = true } = {}) {
   const previousId = previousKind === 'agent'
     ? providerPanelState.agentProviderId
     : elements.modelProvider?.value;
-  if (previousKind !== kind || previousId !== id) invalidateProviderDiscovery();
+  if (previousKind !== kind || previousId !== id) {
+    invalidateProviderDiscovery(kind === 'agent');
+  }
 
   if (kind === 'api') {
     const previousSelection = elements.modelName?.value;
@@ -8182,6 +8186,7 @@ function initializeSyncSection() {
   let _currentModels = [];
   let _currentSearchQuery = '';
   let _discoveryGeneration = 0;
+  let _activeDiscoveryRun = null;
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -8194,8 +8199,66 @@ function initializeSyncSection() {
     return (el && typeof el.value === 'string') ? el.value.trim() : '';
   }
 
-  function invalidateDiscovery() {
+  function _captureDiscoveryUiState() {
+    const doc = _doc();
+    if (!doc) return null;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    const optionSource = select && (select.options || select.children);
+    return {
+      options: optionSource ? Array.prototype.map.call(optionSource, option => ({
+        value: option.value,
+        textContent: option.textContent,
+        disabled: option.disabled === true
+      })) : [],
+      value: select ? select.value : '',
+      selectDisabled: select ? select.disabled === true : false,
+      refreshDisabled: refresh ? refresh.disabled === true : false,
+      statusText: status ? status.textContent : '',
+      statusHidden: status ? status.hidden === true : true,
+      statusClasses: status && status.classList
+        ? ['info', 'warning', 'error', 'loading'].filter(name => status.classList.contains(name))
+        : []
+    };
+  }
+
+  function _restoreDiscoveryUiState(snapshot) {
+    const doc = _doc();
+    if (!doc || !snapshot) return;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    if (select) {
+      select.innerHTML = '';
+      snapshot.options.forEach(saved => {
+        const option = doc.createElement('option');
+        option.value = saved.value;
+        option.textContent = saved.textContent;
+        option.disabled = saved.disabled;
+        select.appendChild(option);
+      });
+      select.value = snapshot.value;
+      select.disabled = snapshot.selectDisabled;
+    }
+    if (refresh) refresh.disabled = snapshot.refreshDisabled;
+    if (status) {
+      ['info', 'warning', 'error', 'loading'].forEach(name => status.classList.remove(name));
+      snapshot.statusClasses.forEach(name => status.classList.add(name));
+      status.textContent = snapshot.statusText;
+      status.hidden = snapshot.statusHidden;
+      if (snapshot.statusHidden) status.setAttribute('hidden', '');
+      else status.removeAttribute('hidden');
+    }
+  }
+
+  function invalidateDiscovery(options) {
+    const activeRun = _activeDiscoveryRun;
     _discoveryGeneration += 1;
+    _activeDiscoveryRun = null;
+    if (options && options.restoreUi === true && activeRun) {
+      _restoreDiscoveryUiState(activeRun.snapshot);
+    }
   }
 
   function _isDiscoveryCurrent(generation) {
@@ -8390,106 +8453,117 @@ function initializeSyncSection() {
    */
   async function runDiscovery(provider, opts) {
     const options = opts || {};
-    const generation = _discoveryGeneration + 1;
-    _discoveryGeneration = generation;
     if (!IN_SCOPE_PROVIDERS[provider]) {
       // Out-of-scope provider — do nothing; legacy updateModelOptions handles it.
       return { ok: false, reason: 'out-of-scope', provider };
     }
+    const priorSnapshot = _activeDiscoveryRun && _activeDiscoveryRun.snapshot;
+    const generation = _discoveryGeneration + 1;
+    _discoveryGeneration = generation;
+    _activeDiscoveryRun = {
+      generation,
+      snapshot: priorSnapshot || _captureDiscoveryUiState()
+    };
 
-    const apiKey = _getInputValueForProvider(provider);
-    if (!apiKey) {
-      // No key yet. Phase 232: prefer the persistent discovery cache
-      // (chrome.storage.local) so a list discovered in a prior session is
-      // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
-      // the persistent cache is empty/expired.
-      let cachedIds = [];
-      if (typeof global.hydrateDiscoveryCache === 'function') {
-        try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
-        if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
-      }
-      if (typeof global.getDiscoveredModelIds === 'function') {
-        try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
-      }
-      if (cachedIds.length) {
-        const list = cachedIds.map(id => ({ id, displayName: id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus(options.silentIfNoKey
-          ? { kind: 'hidden' }
-          : { kind: 'info', text: list.length + ' models (cached)' });
-        return { ok: true, models: list, source: 'persistent-cache', provider };
-      }
-      if (options.silentIfNoKey) {
-        const fallbackTable = global.FALLBACK_MODELS || {};
-        const list = (fallbackTable[provider] || []).map(m => ({ id: m.id, displayName: m.name || m.id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus({ kind: 'hidden' });
-      } else {
-        _renderFallback(provider, 'Enter an API key to discover live models');
-      }
-      return { ok: false, reason: 'missing-api-key', provider };
-    }
-
-    if (options.force && typeof global.clearDiscoveryCache === 'function') {
-      try { global.clearDiscoveryCache(provider); } catch (_) { /* noop */ }
-    }
-
-    if (typeof global.discoverModels !== 'function') {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'discovery-unavailable', provider };
-    }
-
-    _renderLoading();
-
-    let result;
     try {
-      result = await global.discoverModels(provider, apiKey);
-    } catch (err) {
+      const apiKey = _getInputValueForProvider(provider);
+      if (!apiKey) {
+        // No key yet. Phase 232: prefer the persistent discovery cache
+        // (chrome.storage.local) so a list discovered in a prior session is
+        // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
+        // the persistent cache is empty/expired.
+        let cachedIds = [];
+        if (typeof global.hydrateDiscoveryCache === 'function') {
+          try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
+          if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+        }
+        if (typeof global.getDiscoveredModelIds === 'function') {
+          try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
+        }
+        if (cachedIds.length) {
+          const list = cachedIds.map(id => ({ id, displayName: id }));
+          renderModelDropdown(list, options.previousSelection);
+          setDiscoveryStatus(options.silentIfNoKey
+            ? { kind: 'hidden' }
+            : { kind: 'info', text: list.length + ' models (cached)' });
+          return { ok: true, models: list, source: 'persistent-cache', provider };
+        }
+        if (options.silentIfNoKey) {
+          const fallbackTable = global.FALLBACK_MODELS || {};
+          const list = (fallbackTable[provider] || []).map(m => ({ id: m.id, displayName: m.name || m.id }));
+          renderModelDropdown(list, options.previousSelection);
+          setDiscoveryStatus({ kind: 'hidden' });
+        } else {
+          _renderFallback(provider, 'Enter an API key to discover live models');
+        }
+        return { ok: false, reason: 'missing-api-key', provider };
+      }
+
+      if (options.force && typeof global.clearDiscoveryCache === 'function') {
+        try { global.clearDiscoveryCache(provider); } catch (_) { /* noop */ }
+      }
+
+      if (typeof global.discoverModels !== 'function') {
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return { ok: false, reason: 'discovery-unavailable', provider };
+      }
+
+      _renderLoading();
+
+      let result;
+      try {
+        result = await global.discoverModels(provider, apiKey);
+      } catch (err) {
+        if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
+      }
+
       if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+
+      if (result && result.ok) {
+        const list = (result.models || []).map(m => ({
+          id: m.id,
+          displayName: m.displayName || m.name || m.id,
+          name: m.name,
+          description: m.description,
+          provider
+        }));
+        const chosen = renderModelDropdown(list, options.previousSelection);
+        _setControlsDisabled(false);
+        const cached = result.source === 'cache';
+        const text = cached
+          ? list.length + ' models (cached)'
+          : list.length + ' models discovered';
+        setDiscoveryStatus({ kind: 'info', text });
+        // Phase 232: when the user's saved model is not in the discovered list,
+        // renderModelDropdown now keeps it selected as a synthetic "(saved)"
+        // entry, so chosen === previousSelection and no reassignment happens.
+        return result;
+      }
+
+      // Failure path
+      const reason = result && result.reason;
+      if (reason === 'auth-failed') {
+        _renderAuthFailed(result && result.message);
+        return result;
+      }
+      if (reason === 'network-failed' || reason === 'timeout' || reason === 'empty-response') {
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return result;
+      }
+      if (reason === 'missing-api-key') {
+        _renderFallback(provider, 'Enter an API key to discover live models');
+        return result;
+      }
+      // Unknown failure — best-effort fallback
       _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
+      return result || { ok: false, reason: 'unknown', provider };
+    } finally {
+      if (_activeDiscoveryRun && _activeDiscoveryRun.generation === generation) {
+        _activeDiscoveryRun = null;
+      }
     }
-
-    if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
-
-    if (result && result.ok) {
-      const list = (result.models || []).map(m => ({
-        id: m.id,
-        displayName: m.displayName || m.name || m.id,
-        name: m.name,
-        description: m.description,
-        provider
-      }));
-      const chosen = renderModelDropdown(list, options.previousSelection);
-      _setControlsDisabled(false);
-      const cached = result.source === 'cache';
-      const text = cached
-        ? list.length + ' models (cached)'
-        : list.length + ' models discovered';
-      setDiscoveryStatus({ kind: 'info', text });
-      // Phase 232: when the user's saved model is not in the discovered list,
-      // renderModelDropdown now keeps it selected as a synthetic "(saved)"
-      // entry, so chosen === previousSelection and no reassignment happens.
-      return result;
-    }
-
-    // Failure path
-    const reason = result && result.reason;
-    if (reason === 'auth-failed') {
-      _renderAuthFailed(result && result.message);
-      return result;
-    }
-    if (reason === 'network-failed' || reason === 'timeout' || reason === 'empty-response') {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return result;
-    }
-    if (reason === 'missing-api-key') {
-      _renderFallback(provider, 'Enter an API key to discover live models');
-      return result;
-    }
-    // Unknown failure — best-effort fallback
-    _renderFallback(provider, 'Using fallback models — discovery unavailable');
-    return result || { ok: false, reason: 'unknown', provider };
   }
 
   function scheduleDiscoveryFromKeyChange(provider, opts) {

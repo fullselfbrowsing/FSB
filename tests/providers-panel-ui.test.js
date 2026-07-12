@@ -1008,11 +1008,6 @@ async function runProviderRuntimeTests() {
       discoveryCalls += 1;
       return deferred.promise;
     };
-    const pending = held.context.FSBDiscoveryUI.runDiscovery('xai', {
-      previousSelection: 'latent-api-model'
-    });
-    assert.strictEqual(discoveryCalls, 1, heldCase.name + ' discovery begins once');
-    held.context.setProviderSelection('agent', 'codex');
     held.modelName.appendChild(makeOption('latent-api-model', 'latent-api-model'));
     held.modelName.value = 'latent-api-model';
     held.modelName.disabled = false;
@@ -1020,6 +1015,23 @@ async function runProviderRuntimeTests() {
     held.modelDiscoveryStatus.textContent = 'Latent API status';
     held.modelDiscoveryStatus.hidden = false;
     held.modelDiscoveryStatus.classList.add('info');
+    const pending = held.context.FSBDiscoveryUI.runDiscovery('xai', {
+      previousSelection: 'latent-api-model'
+    });
+    assert.strictEqual(discoveryCalls, 1, heldCase.name + ' discovery begins once');
+    assert.strictEqual(held.modelDiscoveryStatus.textContent, 'Discovering models...',
+      heldCase.name + ' enters the normal API loading state before cancellation');
+    held.context.setProviderSelection('agent', 'codex');
+    assert.strictEqual(held.modelName.value, 'latent-api-model',
+      heldCase.name + ' agent selection restores the latent API model');
+    assert.strictEqual(held.modelDiscoveryStatus.textContent, 'Latent API status',
+      heldCase.name + ' agent selection restores the latent API status');
+    assert.strictEqual(held.modelDiscoveryStatus.classList.contains('info'), true,
+      heldCase.name + ' agent selection restores the latent API status class');
+    assert.strictEqual(held.modelName.disabled, false,
+      heldCase.name + ' agent selection restores the model control');
+    assert.strictEqual(held.refreshModelsBtn.disabled, false,
+      heldCase.name + ' agent selection restores the refresh control');
     const connectionBeforeSettlement = held.calls.connection;
     heldCase.settle(deferred);
     const result = await pending;
@@ -1047,16 +1059,20 @@ async function runProviderRuntimeTests() {
     cacheReads += 1;
     return ['late-cached-model'];
   };
-  const pendingHydration = heldHydration.context.FSBDiscoveryUI.runDiscovery('xai', {
-    previousSelection: 'latent-cache-model'
-  });
-  heldHydration.context.setProviderSelection('agent', 'codex');
   heldHydration.modelName.appendChild(makeOption('latent-cache-model', 'latent-cache-model'));
   heldHydration.modelName.value = 'latent-cache-model';
   heldHydration.modelName.disabled = false;
   heldHydration.refreshModelsBtn.disabled = false;
   heldHydration.modelDiscoveryStatus.textContent = 'Latent cache status';
   heldHydration.modelDiscoveryStatus.hidden = false;
+  const pendingHydration = heldHydration.context.FSBDiscoveryUI.runDiscovery('xai', {
+    previousSelection: 'latent-cache-model'
+  });
+  heldHydration.context.setProviderSelection('agent', 'codex');
+  assert.strictEqual(heldHydration.modelName.value, 'latent-cache-model',
+    'agent selection preserves the latent model during cache hydration');
+  assert.strictEqual(heldHydration.modelDiscoveryStatus.textContent, 'Latent cache status',
+    'agent selection preserves the latent status during cache hydration');
   const connectionBeforeHydration = heldHydration.calls.connection;
   hydrationDeferred.resolve();
   const hydrationResult = await pendingHydration;
