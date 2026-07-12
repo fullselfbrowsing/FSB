@@ -19,7 +19,15 @@ function attribute(tag, name) {
 function extractFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.notStrictEqual(start, -1, 'options.js defines ' + name + '()');
-  const open = source.indexOf('{', start);
+  const paramsOpen = source.indexOf('(', start);
+  let paramsDepth = 1;
+  let paramsCursor = paramsOpen + 1;
+  while (paramsCursor < source.length && paramsDepth > 0) {
+    if (source[paramsCursor] === '(') paramsDepth += 1;
+    if (source[paramsCursor] === ')') paramsDepth -= 1;
+    paramsCursor += 1;
+  }
+  const open = source.indexOf('{', paramsCursor);
   let depth = 1;
   let cursor = open + 1;
   while (cursor < source.length && depth > 0) {
@@ -255,6 +263,38 @@ const logicTestIndex = rootTestCommands.indexOf('node tests/providers-panel-logi
 assert.strictEqual(rootTestCommands[logicTestIndex + 1], 'node tests/providers-panel-ui.test.js',
   'root npm test runs providers-panel-ui immediately after provider logic');
 
+console.log('Providers panel UI: advisory evidence source boundaries');
+
+const requestClientsSource = extractFunction(JS, 'requestMcpClients');
+const refreshEvidenceSource = extractFunction(JS, 'refreshProviderEvidence');
+const recommendationRenderSource = extractFunction(JS, 'renderProviderRecommendation');
+const evidenceRenderSource = extractFunction(JS, 'renderProviderEvidence');
+const otherClientsRenderSource = extractFunction(JS, 'renderOtherMcpClients');
+const eventSetupSource = extractFunction(JS, 'setupEventListeners');
+assert.match(requestClientsSource, /sendMessage\(\{ action: 'getMcpClients' \}/,
+  'evidence uses the one Phase 57 runtime action');
+assert.match(requestClientsSource, /runtime\.lastError/);
+assert.match(requestClientsSource, /getOwnDataValue\(response, 'success'\) !== true/);
+assert.match(refreshEvidenceSource, /providerEvidenceRefreshPromise/);
+assert.match(refreshEvidenceSource, /hasSuccessfulEvidence/);
+assert.match(refreshEvidenceSource, /evidenceStatus = 'stale'/);
+assert.match(refreshEvidenceSource, /evidenceStatus = 'unavailable'/);
+assert.doesNotMatch(recommendationRenderSource,
+  /setProviderSelection|\.checked\s*=|modelProvider|chrome\.storage|markUnsavedChanges/,
+  'recommendation rendering cannot write selection or settings');
+assert.match(evidenceRenderSource, /status\.checkedAt/);
+assert.doesNotMatch(evidenceRenderSource, /lastSeenAt|connectedAt|lastClickedAt/,
+  'evidence rendering cannot substitute non-installed timestamps');
+assert.match(otherClientsRenderSource, /item\.textContent/);
+assert.doesNotMatch(otherClientsRenderSource, /innerHTML|insertAdjacentHTML/,
+  'raw client names use text-only DOM population');
+assert.match(eventSetupSource, /area === 'local' && changes && changes\.fsbAgentProviders/);
+assert.match(eventSetupSource, /area === 'session' && changes && changes\.fsbAgentRegistry/);
+assert.match(JS, /setTimeout\(\(\) => \{[\s\S]*?refreshProviderEvidence\(\);[\s\S]*?\}, 100\)/);
+assert.doesNotMatch(refreshEvidenceSource + eventSetupSource,
+  /setInterval|visibilitychange|focus\s*\)|scan|detectInstalled/i,
+  'provider evidence has no polling, focus refresh, or disk-scan trigger');
+
 function makeClassList(initial) {
   const names = new Set(initial || []);
   return {
@@ -281,7 +321,7 @@ function makeElement(id, options) {
     checked: !!config.checked,
     hidden: !!config.hidden,
     disabled: false,
-    textContent: config.textContent || '',
+    open: false,
     dataset: { ...(config.dataset || {}) },
     attributes: Object.create(null),
     classList: makeClassList(config.classes),
@@ -320,6 +360,15 @@ function makeElement(id, options) {
   };
 
   let currentValue = config.value === undefined ? '' : String(config.value);
+  let currentTextContent = config.textContent || '';
+  Object.defineProperty(element, 'textContent', {
+    get() { return currentTextContent; },
+    set(value) {
+      currentTextContent = String(value);
+      element.children = [];
+      if (element.tagName === 'SELECT') element.options = [];
+    }
+  });
   Object.defineProperty(element, 'value', {
     get() { return currentValue; },
     set(value) {
@@ -355,10 +404,13 @@ function makeSelect(id, values, initialValue, classes) {
   return select;
 }
 
-function createProviderHarness(initialStorage) {
+function createProviderHarness(initialStorage, harnessOptions) {
+  const options = harnessOptions || {};
   const registry = Object.create(null);
   const providerRows = [];
   const radios = [];
+  const recommendationBadges = [];
+  const evidenceBadges = [];
   const providerIds = [
     ...PROVIDERS.AGENT_PROVIDER_IDS.map((id) => ['agent', id]),
     ...PROVIDERS.API_PROVIDER_IDS.map((id) => ['api', id])
@@ -371,10 +423,26 @@ function createProviderHarness(initialStorage) {
       name: 'fsbProviderSelection',
       dataset: { providerKind: kind, providerId: id }
     });
+    const recommendationBadge = makeElement('', {
+      hidden: true,
+      classes: ['provider-badge', 'provider-badge--recommended'],
+      dataset: { providerRecommendation: id },
+      textContent: 'Recommended'
+    });
+    const evidenceBadge = makeElement('', {
+      hidden: true,
+      classes: ['provider-badge', 'provider-badge--status'],
+      dataset: { providerEvidence: id },
+      textContent: 'Status unavailable'
+    });
     radio._providerRow = row;
+    row.appendChild(recommendationBadge);
+    row.appendChild(evidenceBadge);
     row.appendChild(radio);
     providerRows.push(row);
     radios.push(radio);
+    recommendationBadges.push(recommendationBadge);
+    evidenceBadges.push(evidenceBadge);
     registry[radio.id] = radio;
   });
 
@@ -389,6 +457,21 @@ function createProviderHarness(initialStorage) {
   const modelName = makeSelect('modelName', [], '', ['model-combobox__native']);
   const apiDetails = makeElement('apiProviderDetails');
   const agentDetails = makeElement('agentProviderDetails', { hidden: true });
+  const agentDetailsHeading = makeElement('agentProviderDetailsHeading');
+  const agentEmptyState = makeElement('agentEvidenceEmptyState', { hidden: true });
+  const agentInstallationStatus = makeElement('agentInstallationStatus');
+  const agentConnectionStatus = makeElement('agentConnectionStatus');
+  const agentAccountStatus = makeElement('agentAccountStatus');
+  const agentSetupStatus = makeElement('agentSetupStatus');
+  const refreshLabel = makeElement('', { textContent: 'Refresh status' });
+  const refreshPending = makeElement('', { hidden: true, textContent: 'Refreshing…' });
+  const refreshButton = makeElement('refreshProviderStatusBtn', { tagName: 'button' });
+  refreshButton.querySelector = (selector) => selector.endsWith('refresh-label')
+    ? refreshLabel
+    : (selector.endsWith('refresh-pending') ? refreshPending : null);
+  const otherDisclosure = makeElement('otherMcpClientsDisclosure', { tagName: 'details', hidden: true });
+  const otherSummary = makeElement('otherMcpClientsSummary', { textContent: 'Other MCP clients (0)' });
+  const otherList = makeElement('otherMcpClientsList', { tagName: 'ul' });
   const apiKey = makeElement('apiKey', { tagName: 'input' });
   const geminiApiKey = makeElement('geminiApiKey', { tagName: 'input' });
   const openaiApiKey = makeElement('openaiApiKey', { tagName: 'input' });
@@ -398,24 +481,44 @@ function createProviderHarness(initialStorage) {
   const openrouterApiKey = makeElement('openrouterApiKey', { tagName: 'input' });
   const lmstudioBaseUrl = makeElement('lmstudioBaseUrl', { tagName: 'input', value: 'http://localhost:1234' });
   [
-    providerRoster, modelProvider, modelName, apiDetails, agentDetails, apiKey,
+    providerRoster, modelProvider, modelName, apiDetails, agentDetails,
+    agentDetailsHeading, agentEmptyState, agentInstallationStatus,
+    agentConnectionStatus, agentAccountStatus, agentSetupStatus,
+    refreshButton, otherDisclosure, otherSummary, otherList, apiKey,
     geminiApiKey, openaiApiKey, anthropicApiKey, customApiKey, customEndpoint,
     openrouterApiKey, lmstudioBaseUrl
   ].forEach((element) => { registry[element.id] = element; });
 
   let storage = { ...(initialStorage || {}) };
   const writes = [];
+  const storageListeners = [];
+  const runtimeCalls = [];
+  const pendingRuntimeCallbacks = [];
+  let runtimeResponse = Object.prototype.hasOwnProperty.call(options, 'runtimeResponse')
+    ? options.runtimeResponse
+    : { success: true, clients: {} };
+  let runtimeError = null;
+  let holdRuntime = options.holdRuntime === true;
   const document = {
     getElementById(id) { return registry[id] || null; },
     querySelectorAll(selector) {
       if (selector === '.nav-item' || selector === '.content-section') return [];
       if (selector === 'input[name="fsbProviderSelection"]') return radios;
+      if (selector === '[data-provider-recommendation]') return recommendationBadges;
+      if (selector === '[data-provider-evidence]') return evidenceBadges;
       if (selector === '.form-select, .chart-select') return [modelProvider];
       return [];
     },
     createElement(tagName) { return makeElement('', { tagName: tagName }); },
     addEventListener() {}
   };
+  function deliverRuntime(callback, response, error) {
+    Promise.resolve().then(() => {
+      chrome.runtime.lastError = error ? { message: String(error) } : null;
+      callback(response);
+      chrome.runtime.lastError = null;
+    });
+  }
   const chrome = {
     storage: {
       local: {
@@ -432,11 +535,16 @@ function createProviderHarness(initialStorage) {
           if (callback) callback();
         }
       },
-      onChanged: { addListener() {} }
+      session: {},
+      onChanged: { addListener(listener) { storageListeners.push(listener); } }
     },
     runtime: {
       lastError: null,
-      sendMessage(_message, callback) { if (callback) callback({ ok: true }); },
+      sendMessage(message, callback) {
+        runtimeCalls.push(JSON.parse(JSON.stringify(message)));
+        if (holdRuntime) pendingRuntimeCallbacks.push(callback);
+        else deliverRuntime(callback, runtimeResponse, runtimeError);
+      },
       onMessage: { addListener() {} }
     }
   };
@@ -467,7 +575,7 @@ function createProviderHarness(initialStorage) {
     IN_SCOPE_PROVIDERS: { xai: 'apiKey', gemini: 'geminiApiKey', openai: 'openaiApiKey', anthropic: 'anthropicApiKey', openrouter: 'openrouterApiKey' },
     runDiscovery(provider, options) { calls.discovery.push({ provider, options: { ...options } }); }
   };
-  context.FSBModelCombobox = { refresh() {} };
+  context.FSBModelCombobox = { init() {}, refresh() {} };
   context.updateApiKeyVisibility = (provider) => { calls.visibility.push(provider); };
   context.checkApiConnection = () => { calls.connection += 1; };
   context.addLog = () => {};
@@ -477,15 +585,48 @@ function createProviderHarness(initialStorage) {
     context,
     calls,
     writes,
+    runtimeCalls,
     radios,
+    recommendationBadges,
+    evidenceBadges,
     modelProvider,
     modelName,
     apiDetails,
     agentDetails,
+    refreshButton,
+    refreshLabel,
+    refreshPending,
+    agentEmptyState,
+    agentInstallationStatus,
+    agentConnectionStatus,
+    agentAccountStatus,
+    agentSetupStatus,
+    otherDisclosure,
+    otherSummary,
+    otherList,
     apiKey,
     anthropicApiKey,
     get storage() { return storage; },
     setStorage(next) { storage = { ...next }; },
+    setRuntimeResponse(response) {
+      runtimeResponse = response;
+      runtimeError = null;
+      holdRuntime = false;
+    },
+    setRuntimeError(error) {
+      runtimeResponse = undefined;
+      runtimeError = error || 'runtime unavailable';
+      holdRuntime = false;
+    },
+    holdRuntime() { holdRuntime = true; },
+    resolveRuntime(response, error) {
+      holdRuntime = false;
+      const callbacks = pendingRuntimeCallbacks.splice(0);
+      callbacks.forEach((callback) => deliverRuntime(callback, response, error));
+    },
+    emitStorage(changes, area) {
+      storageListeners.slice().forEach((listener) => listener(changes, area));
+    },
     state() { return vm.runInContext('providerPanelState', context); },
     dashboardState() { return vm.runInContext('dashboardState', context); }
   };
@@ -607,8 +748,217 @@ async function runProviderRuntimeTests() {
     'invalid selection cannot disturb current choice');
 }
 
+function visibleRecommendationIds(harness) {
+  return harness.recommendationBadges
+    .filter((badge) => !badge.hidden)
+    .map((badge) => badge.dataset.providerRecommendation);
+}
+
+function evidenceBadge(harness, providerId) {
+  return harness.evidenceBadges.find((badge) => badge.dataset.providerEvidence === providerId);
+}
+
+async function runProviderEvidenceTests() {
+  console.log('Providers panel UI: runtime evidence, recommendation, and failure safety');
+
+  const harness = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      clients: {
+        codex: {
+          id: 'codex', raw: false, displayName: 'Codex', clicked: null,
+          installed: { detected: true, configPath: null, checkedAt: 500 },
+          connected: null, live: null
+        },
+        opencode: {
+          id: 'opencode', raw: false, displayName: 'OpenCode', clicked: { lastClickedAt: 900 },
+          installed: null, connected: null, live: { agentId: 'agent_open' }
+        },
+        'claude-code': {
+          id: 'claude-code', raw: false, displayName: 'Claude Code', clicked: null,
+          installed: null, connected: { lastSeenAt: 800 }, live: { agentId: 'agent_claude' }
+        }
+      }
+    }
+  });
+  harness.context.setupEventListeners();
+  harness.context.setProviderSelection('api', 'anthropic', { markDirty: false });
+  harness.modelName.appendChild(makeOption('claude-model', 'claude-model'));
+  harness.modelName.value = 'claude-model';
+  harness.anthropicApiKey.value = 'preserve-this-key';
+  const beforeRefresh = {
+    selected: selectedRadio(harness).dataset.providerId,
+    modelProvider: harness.modelProvider.value,
+    modelName: harness.modelName.value,
+    key: harness.anthropicApiKey.value,
+    dirty: harness.dashboardState().hasUnsavedChanges,
+    writes: harness.writes.length
+  };
+
+  await harness.context.refreshProviderEvidence();
+  assert.deepStrictEqual(harness.runtimeCalls, [{ action: 'getMcpClients' }]);
+  assert.deepStrictEqual(visibleRecommendationIds(harness), ['claude-code'],
+    'fixed Claude tie order yields exactly one visible live recommendation');
+  assert.strictEqual(evidenceBadge(harness, 'claude-code').textContent, 'Connected now');
+  assert.strictEqual(evidenceBadge(harness, 'opencode').textContent, 'Connected now');
+  assert.strictEqual(evidenceBadge(harness, 'codex').textContent, 'Installed');
+  assert.deepStrictEqual({
+    selected: selectedRadio(harness).dataset.providerId,
+    modelProvider: harness.modelProvider.value,
+    modelName: harness.modelName.value,
+    key: harness.anthropicApiKey.value,
+    dirty: harness.dashboardState().hasUnsavedChanges,
+    writes: harness.writes.length
+  }, beforeRefresh, 'evidence refresh preserves selection, API values, Save state, and storage');
+
+  harness.setRuntimeResponse({
+    success: true,
+    clients: {
+      'claude-code': {
+        id: 'claude-code', raw: false, displayName: 'Claude Code', clicked: null,
+        installed: null, connected: { lastSeenAt: 999999 }, live: null
+      }
+    }
+  });
+  await harness.context.refreshProviderEvidence();
+  assert.deepStrictEqual(visibleRecommendationIds(harness), ['xai'],
+    'historical-only evidence retains the xAI fallback recommendation');
+  assert.strictEqual(evidenceBadge(harness, 'claude-code').textContent, 'Seen before');
+  assert.strictEqual(evidenceBadge(harness, 'claude-code').getAttribute('title'), null,
+    'historical timestamp is never displayed as the installed check time');
+
+  harness.setRuntimeResponse({
+    success: true,
+    clients: {
+      'raw:markup': {
+        id: 'raw:markup', raw: true, displayName: '<img src=x onerror=alert(1)>',
+        clicked: null, installed: null, connected: {}, live: null
+      },
+      cursor: {
+        id: 'cursor', raw: false, displayName: 'Cursor',
+        clicked: {}, installed: null, connected: null, live: null
+      }
+    }
+  });
+  await harness.context.refreshProviderEvidence();
+  assert.strictEqual(harness.otherDisclosure.hidden, false);
+  assert.strictEqual(harness.otherSummary.textContent, 'Other MCP clients (2)');
+  assert.deepStrictEqual(harness.otherList.children.map((item) => item.textContent), [
+    '<img src=x onerror=alert(1)> — Observed MCP client',
+    'Cursor — Observed MCP client'
+  ], 'unsupported clients are sorted and rendered as inert text');
+  assert.strictEqual(harness.agentEmptyState.hidden, false,
+    'no supported agent evidence reveals the exact static empty-state block');
+  assert.deepStrictEqual(visibleRecommendationIds(harness), ['xai']);
+
+  harness.setRuntimeResponse({
+    success: true,
+    clients: {
+      codex: {
+        id: 'codex', raw: false, displayName: 'Codex', clicked: {},
+        installed: null, connected: null, live: null
+      }
+    }
+  });
+  await harness.context.refreshProviderEvidence();
+  assert.strictEqual(harness.agentEmptyState.hidden, true,
+    'any supported clicked/installed/connected/live evidence hides the empty state');
+  assert.strictEqual(harness.otherDisclosure.hidden, true,
+    'Other MCP clients disclosure disappears when the count returns to zero');
+
+  const priorClients = JSON.stringify(harness.state().clients);
+  const priorRecommendation = JSON.stringify(harness.state().recommendation);
+  harness.setRuntimeError('private transport detail must not surface');
+  await harness.context.refreshProviderEvidence({ announce: true });
+  assert.strictEqual(harness.state().evidenceStatus, 'stale');
+  assert.strictEqual(JSON.stringify(harness.state().clients), priorClients,
+    'runtime failure retains the previous successful evidence snapshot');
+  assert.strictEqual(JSON.stringify(harness.state().recommendation), priorRecommendation,
+    'runtime failure retains the previous recommendation');
+  assert.strictEqual(harness.agentDetails.getAttribute('role'), 'alert');
+  assert.match(evidenceBadge(harness, 'codex').textContent, /Status may be stale/);
+  assert.match(evidenceBadge(harness, 'codex').getAttribute('title'), /Status may be stale/);
+  assert.doesNotMatch(evidenceBadge(harness, 'codex').getAttribute('title'), /private transport detail/);
+  assert.deepStrictEqual(visibleRecommendationIds(harness), ['codex'],
+    'preserved clicked recommendation remains exactly one after a stale failure');
+  assert.strictEqual(selectedRadio(harness).dataset.providerId, beforeRefresh.selected);
+
+  const malformed = createProviderHarness({}, {
+    runtimeResponse: { success: true, clients: [] }
+  });
+  malformed.context.setProviderSelection('agent', 'codex', { markDirty: false });
+  await malformed.context.refreshProviderEvidence();
+  assert.strictEqual(malformed.state().evidenceStatus, 'unavailable');
+  assert.deepStrictEqual(visibleRecommendationIds(malformed), ['xai']);
+  assert.strictEqual(selectedRadio(malformed).dataset.providerId, 'codex',
+    'malformed first response does not clear the checked agent radio');
+  assert.strictEqual(evidenceBadge(malformed, 'codex').textContent, 'Status unavailable');
+
+  const missingRuntime = createProviderHarness();
+  missingRuntime.context.setProviderSelection('api', 'openai', { markDirty: false });
+  delete missingRuntime.context.chrome.runtime.sendMessage;
+  await missingRuntime.context.refreshProviderEvidence();
+  assert.strictEqual(missingRuntime.state().evidenceStatus, 'unavailable');
+  assert.deepStrictEqual(visibleRecommendationIds(missingRuntime), ['xai']);
+  assert.strictEqual(selectedRadio(missingRuntime).dataset.providerId, 'openai');
+
+  console.log('Providers panel UI: coalescing, manual refresh, storage debounce, and section entry');
+  const coalesced = createProviderHarness({}, { holdRuntime: true });
+  coalesced.context.setupEventListeners();
+  coalesced.context.setProviderSelection('agent', 'opencode', { markDirty: false });
+  const first = coalesced.context.refreshProviderEvidence();
+  const second = coalesced.context.refreshProviderEvidence();
+  assert.strictEqual(first, second, 'concurrent refresh callers share one in-flight promise');
+  assert.deepStrictEqual(coalesced.runtimeCalls, [{ action: 'getMcpClients' }]);
+  assert.strictEqual(coalesced.refreshButton.disabled, true);
+  assert.strictEqual(coalesced.refreshButton.getAttribute('aria-busy'), 'true');
+  assert.strictEqual(coalesced.refreshLabel.hidden, true);
+  assert.strictEqual(coalesced.refreshPending.hidden, false);
+  coalesced.resolveRuntime({ success: true, clients: {} });
+  await first;
+  assert.strictEqual(coalesced.refreshButton.disabled, false);
+  assert.strictEqual(coalesced.refreshButton.getAttribute('aria-busy'), 'false');
+  assert.strictEqual(coalesced.refreshLabel.hidden, false);
+  assert.strictEqual(coalesced.refreshPending.hidden, true);
+  assert.strictEqual(selectedRadio(coalesced).dataset.providerId, 'opencode');
+
+  const callsBeforeIrrelevantStorage = coalesced.runtimeCalls.length;
+  coalesced.emitStorage({ unrelated: { newValue: true } }, 'local');
+  await flushHarness();
+  assert.strictEqual(coalesced.runtimeCalls.length, callsBeforeIrrelevantStorage,
+    'unrelated storage events do not refresh provider evidence');
+
+  coalesced.holdRuntime();
+  coalesced.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
+  coalesced.emitStorage({ fsbAgentRegistry: { newValue: {} } }, 'session');
+  await flushHarness();
+  assert.strictEqual(coalesced.runtimeCalls.length, callsBeforeIrrelevantStorage + 1,
+    'local and session evidence changes debounce/coalesce to one refresh');
+  coalesced.resolveRuntime({ success: true, clients: {} });
+  await flushHarness();
+
+  coalesced.holdRuntime();
+  const callsBeforeSection = coalesced.runtimeCalls.length;
+  coalesced.context.switchSection('providers');
+  assert.strictEqual(coalesced.runtimeCalls.length, callsBeforeSection + 1,
+    'canonical Providers entry requests fresh evidence');
+  coalesced.resolveRuntime({ success: true, clients: {} });
+  await flushHarness();
+
+  coalesced.holdRuntime();
+  const callsBeforeManual = coalesced.runtimeCalls.length;
+  coalesced.refreshButton.dispatchEvent({ type: 'click' });
+  assert.strictEqual(coalesced.runtimeCalls.length, callsBeforeManual + 1,
+    'Refresh status invokes one explicit refresh');
+  coalesced.resolveRuntime({ success: true, clients: {} });
+  await flushHarness();
+  assert.strictEqual(selectedRadio(coalesced).dataset.providerId, 'opencode',
+    'storage, section, and manual refreshes all preserve in-form selection');
+}
+
 runProviderRuntimeTests()
-  .then(() => console.log('PASS providers-panel-ui static and runtime shell'))
+  .then(runProviderEvidenceTests)
+  .then(() => console.log('PASS providers-panel-ui static and runtime evidence'))
   .catch((error) => {
     console.error(error && error.stack ? error.stack : error);
     process.exitCode = 1;

@@ -126,8 +126,12 @@ const providerPanelState = {
   agentProviderId: '',
   recommendation: { providerKind: 'api', providerId: 'xai', reason: 'fallback' },
   clients: Object.create(null),
-  evidenceStatus: 'idle'
+  evidenceStatus: 'idle',
+  hasSuccessfulEvidence: false
 };
+
+let providerEvidenceRefreshPromise = null;
+let providerEvidenceRefreshDebounceHandle = null;
 
 // Initialize analytics
 let analytics = null;
@@ -222,6 +226,8 @@ function cacheElements() {
   elements.modelProvider = document.getElementById('modelProvider');
   elements.providerRoster = document.getElementById('providerRoster');
   elements.providerSelectionRadios = document.querySelectorAll('input[name="fsbProviderSelection"]');
+  elements.providerRecommendationBadges = document.querySelectorAll('[data-provider-recommendation]');
+  elements.providerEvidenceBadges = document.querySelectorAll('[data-provider-evidence]');
   elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
   elements.apiProviderDetails = document.getElementById('apiProviderDetails');
   elements.agentProviderDetails = document.getElementById('agentProviderDetails');
@@ -357,6 +363,298 @@ function getProviderPanelHelper() {
     : null;
 }
 
+function getOwnDataValue(object, key) {
+  if (!object || typeof object !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function isProviderDataRecord(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    return Object.prototype.toString.call(value) === '[object Object]';
+  } catch (_error) {
+    return false;
+  }
+}
+
+function copyProviderClientMap(value) {
+  if (!isProviderDataRecord(value)) return null;
+  const copy = Object.create(null);
+  try {
+    Object.keys(value).forEach((key) => {
+      const row = getOwnDataValue(value, key);
+      if (isProviderDataRecord(row)) copy[key] = row;
+    });
+  } catch (_error) {
+    return null;
+  }
+  return copy;
+}
+
+function requestMcpClients() {
+  return new Promise((resolve, reject) => {
+    const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
+    if (!runtime || typeof runtime.sendMessage !== 'function') {
+      reject(new Error('provider_status_unavailable'));
+      return;
+    }
+
+    try {
+      runtime.sendMessage({ action: 'getMcpClients' }, (response) => {
+        if (runtime.lastError) {
+          reject(new Error('provider_status_unavailable'));
+          return;
+        }
+        if (!isProviderDataRecord(response) || getOwnDataValue(response, 'success') !== true) {
+          reject(new Error('provider_status_unavailable'));
+          return;
+        }
+        const clients = copyProviderClientMap(getOwnDataValue(response, 'clients'));
+        if (!clients) {
+          reject(new Error('provider_status_unavailable'));
+          return;
+        }
+        resolve(clients);
+      });
+    } catch (_error) {
+      reject(new Error('provider_status_unavailable'));
+    }
+  });
+}
+
+function renderProviderRecommendation() {
+  const helper = getProviderPanelHelper();
+  const recommendation = providerPanelState.recommendation;
+  const badges = elements.providerRecommendationBadges || [];
+  let shown = false;
+
+  Array.prototype.forEach.call(badges, (badge) => {
+    badge.hidden = true;
+    const providerId = badge.dataset?.providerRecommendation;
+    const providerKind = helper && helper.isAgentProvider(providerId) ? 'agent' : 'api';
+    if (!shown && recommendation
+        && recommendation.providerKind === providerKind
+        && recommendation.providerId === providerId) {
+      badge.hidden = false;
+      shown = true;
+    }
+  });
+}
+
+function setProviderEvidenceBadgeClass(badge, status) {
+  if (!badge || !badge.classList) return;
+  badge.classList.remove(
+    'provider-badge--connected',
+    'provider-badge--installed',
+    'provider-badge--seen',
+    'provider-badge--error',
+    'provider-badge--neutral'
+  );
+  if (providerPanelState.evidenceStatus === 'unavailable') {
+    badge.classList.add('provider-badge--error');
+  } else if (status.live) {
+    badge.classList.add('provider-badge--connected');
+  } else if (status.installed) {
+    badge.classList.add('provider-badge--installed');
+  } else if (status.seenBefore) {
+    badge.classList.add('provider-badge--seen');
+  } else {
+    badge.classList.add('provider-badge--neutral');
+  }
+}
+
+function hasSupportedAgentEvidence(helper) {
+  return helper.AGENT_PROVIDER_IDS.some((providerId) => {
+    const row = getOwnDataValue(providerPanelState.clients, providerId);
+    if (!isProviderDataRecord(row)) return false;
+    return ['clicked', 'installed', 'connected', 'live'].some((key) =>
+      isProviderDataRecord(getOwnDataValue(row, key))
+    );
+  });
+}
+
+function safeObservedClientName(id, row) {
+  const displayName = getOwnDataValue(row, 'displayName');
+  const candidate = typeof displayName === 'string' && displayName.trim()
+    ? displayName.trim()
+    : id;
+  return String(candidate).slice(0, 200);
+}
+
+function renderOtherMcpClients(helper) {
+  const disclosure = elements.otherMcpClientsDisclosure;
+  const summary = elements.otherMcpClientsSummary;
+  const list = elements.otherMcpClientsList;
+  if (!disclosure || !summary || !list) return;
+
+  const rows = [];
+  Object.keys(providerPanelState.clients).forEach((id) => {
+    const row = getOwnDataValue(providerPanelState.clients, id);
+    if (!isProviderDataRecord(row)) return;
+    const raw = getOwnDataValue(row, 'raw') === true;
+    if (!raw && (helper.isApiProvider(id) || helper.isAgentProvider(id))) return;
+    rows.push({ id: id, name: safeObservedClientName(id, row) });
+  });
+  rows.sort((a, b) => {
+    const aName = a.name.toLocaleLowerCase();
+    const bName = b.name.toLocaleLowerCase();
+    if (aName < bName) return -1;
+    if (aName > bName) return 1;
+    return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+  });
+
+  summary.textContent = `Other MCP clients (${rows.length})`;
+  list.textContent = '';
+  rows.forEach((row) => {
+    const item = document.createElement('li');
+    item.textContent = `${row.name} — Observed MCP client`;
+    list.appendChild(item);
+  });
+  disclosure.hidden = rows.length === 0;
+  if (rows.length === 0) disclosure.open = false;
+}
+
+function renderProviderEvidence() {
+  const helper = getProviderPanelHelper();
+  if (!helper || typeof helper.getAgentStatus !== 'function') return;
+  const badges = elements.providerEvidenceBadges || [];
+
+  Array.prototype.forEach.call(badges, (badge) => {
+    const providerId = badge.dataset?.providerEvidence;
+    if (!helper.isAgentProvider(providerId)) {
+      badge.hidden = true;
+      return;
+    }
+    const row = getOwnDataValue(providerPanelState.clients, providerId);
+    const status = helper.getAgentStatus(row);
+    let label = status.primaryLabel;
+    if (providerPanelState.evidenceStatus === 'loading' && !providerPanelState.hasSuccessfulEvidence) {
+      label = 'Loading provider status…';
+    } else if (providerPanelState.evidenceStatus === 'unavailable') {
+      label = 'Status unavailable';
+    } else if (providerPanelState.evidenceStatus === 'stale') {
+      label = `${status.primaryLabel} · Status may be stale`;
+    }
+    badge.textContent = label;
+    badge.hidden = false;
+    setProviderEvidenceBadgeClass(badge, status);
+    if (providerPanelState.evidenceStatus === 'stale') {
+      badge.setAttribute('data-stale', 'true');
+      badge.setAttribute('title', 'Status may be stale. Refresh after the FSB server reconnects.');
+    } else {
+      badge.removeAttribute('data-stale');
+      if (status.checkedAt !== null) {
+        badge.setAttribute('title', `Installed status checked ${new Date(status.checkedAt).toLocaleString()}`);
+      } else {
+        badge.removeAttribute('title');
+      }
+    }
+  });
+
+  if (elements.agentEvidenceEmptyState) {
+    elements.agentEvidenceEmptyState.hidden = hasSupportedAgentEvidence(helper);
+  }
+  renderOtherMcpClients(helper);
+}
+
+function renderSelectedAgentDetails() {
+  const helper = getProviderPanelHelper();
+  if (!helper || providerPanelState.providerKind !== 'agent'
+      || !helper.isAgentProvider(providerPanelState.agentProviderId)) return;
+  const providerId = providerPanelState.agentProviderId;
+  const definition = helper.getProviderDefinition('agent', providerId);
+  const row = getOwnDataValue(providerPanelState.clients, providerId);
+  const status = helper.getAgentStatus(row);
+  const unavailable = providerPanelState.evidenceStatus === 'unavailable';
+
+  if (elements.agentProviderDetailsHeading && definition) {
+    elements.agentProviderDetailsHeading.textContent = `${definition.displayName} details`;
+  }
+  if (elements.agentInstallationStatus) {
+    elements.agentInstallationStatus.textContent = unavailable
+      ? 'Status unavailable'
+      : (status.installed ? 'Installed' : 'Not installed');
+  }
+  if (elements.agentConnectionStatus) {
+    elements.agentConnectionStatus.textContent = unavailable
+      ? 'Status unavailable'
+      : (status.live ? 'Connected now' : (status.seenBefore ? 'Seen before' : 'Not connected'));
+  }
+  if (elements.agentAccountStatus) elements.agentAccountStatus.textContent = 'Not reported';
+  if (elements.agentSetupStatus) {
+    if (providerPanelState.evidenceStatus === 'stale') {
+      elements.agentSetupStatus.textContent = 'Status may be stale. Refresh after the FSB server reconnects.';
+    } else if (unavailable) {
+      elements.agentSetupStatus.textContent = 'Agent status is unavailable. Your selection is unchanged.';
+    } else if (status.clicked && !status.installed) {
+      elements.agentSetupStatus.textContent = 'Setup was copied during onboarding. Installation is not confirmed.';
+    } else if (status.installed) {
+      elements.agentSetupStatus.textContent = 'This CLI is installed. Open the setup guide to review its FSB connection.';
+    } else {
+      elements.agentSetupStatus.textContent = 'Open the setup guide to connect this CLI to FSB.';
+    }
+  }
+}
+
+function refreshProviderEvidence({ announce = false } = {}) {
+  if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
+
+  providerPanelState.evidenceStatus = 'loading';
+  setProviderStatusRefreshing(true);
+  renderProviderEvidence();
+  renderSelectedAgentDetails();
+
+  providerEvidenceRefreshPromise = requestMcpClients()
+    .then((clients) => {
+      const helper = getProviderPanelHelper();
+      providerPanelState.clients = clients;
+      providerPanelState.hasSuccessfulEvidence = true;
+      providerPanelState.evidenceStatus = 'ready';
+      providerPanelState.recommendation = helper.getRecommendation(clients);
+      return clients;
+    })
+    .catch(() => {
+      const helper = getProviderPanelHelper();
+      if (providerPanelState.hasSuccessfulEvidence) {
+        providerPanelState.evidenceStatus = 'stale';
+      } else {
+        providerPanelState.clients = Object.create(null);
+        providerPanelState.evidenceStatus = 'unavailable';
+        providerPanelState.recommendation = helper.getRecommendation(providerPanelState.clients);
+      }
+      if (announce && elements.agentProviderDetails) {
+        elements.agentProviderDetails.setAttribute('role', 'alert');
+      }
+      return providerPanelState.clients;
+    })
+    .finally(() => {
+      setProviderStatusRefreshing(false);
+      renderProviderRecommendation();
+      renderProviderEvidence();
+      renderSelectedAgentDetails();
+      providerEvidenceRefreshPromise = null;
+    });
+
+  return providerEvidenceRefreshPromise;
+}
+
+function scheduleProviderEvidenceRefresh() {
+  if (providerEvidenceRefreshDebounceHandle !== null) {
+    clearTimeout(providerEvidenceRefreshDebounceHandle);
+  }
+  providerEvidenceRefreshDebounceHandle = setTimeout(() => {
+    providerEvidenceRefreshDebounceHandle = null;
+    refreshProviderEvidence();
+  }, 100);
+}
+
 function renderProviderSelection() {
   const activeKind = providerPanelState.providerKind;
   const activeId = activeKind === 'agent'
@@ -412,6 +710,7 @@ function setProviderSelection(kind, id, { markDirty = true } = {}) {
 
   renderProviderSelection();
   renderProviderKind();
+  renderSelectedAgentDetails();
   if (markDirty) markUnsavedChanges();
   return true;
 }
@@ -442,6 +741,11 @@ function setupEventListeners() {
       const radio = event.target;
       if (!radio || radio.name !== 'fsbProviderSelection') return;
       setProviderSelection(radio.dataset?.providerKind, radio.dataset?.providerId);
+    });
+  }
+  if (elements.refreshProviderStatusBtn) {
+    elements.refreshProviderStatusBtn.addEventListener('click', () => {
+      refreshProviderEvidence({ announce: true });
     });
   }
 
@@ -631,6 +935,9 @@ function setupEventListeners() {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'session' && changes && changes.fsbAgentRegistry) {
         scheduleRefreshActiveAgentCount();
+        scheduleProviderEvidenceRefresh();
+      } else if (area === 'local' && changes && changes.fsbAgentProviders) {
+        scheduleProviderEvidenceRefresh();
       } else if (area === 'local' && changes && changes.fsbAgentCap) {
         scheduleRefreshActiveAgentCount();
       } else if (area === 'session' && changes && changes.fsbTriggerRegistry) {
@@ -1316,6 +1623,10 @@ function switchSection(sectionId) {
   
   dashboardState.currentSection = sectionId;
 
+  if (sectionId === 'providers') {
+    refreshProviderEvidence();
+  }
+
   // Render the merged Consent & Audit cards when entering Advanced Settings (they
   // read the consent envelope + audit ring + classify on demand). The stale
   // '#consent-audit' hash also renders for back-compat.
@@ -1674,6 +1985,8 @@ function loadSettings() {
     // event, so app-level change listeners (markUnsavedChanges + discovery)
     // do not fire on page load.
     if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+
+    refreshProviderEvidence();
 
     addLog('info', 'Settings loaded successfully');
   });
