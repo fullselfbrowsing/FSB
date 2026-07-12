@@ -813,6 +813,11 @@ function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey)
   updateApiKeyVisibility(provider);
 }
 
+function invalidateProviderDiscovery() {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && typeof ui.invalidateDiscovery === 'function') ui.invalidateDiscovery();
+}
+
 function cancelPendingProviderSettingsModelLoad() {
   providerSettingsLoadGeneration += 1;
   if (providerSettingsModelLoadTimer !== null) {
@@ -829,6 +834,11 @@ function setProviderSelection(kind, id, { markDirty = true } = {}) {
     : (kind === 'agent' && helper.isAgentProvider(id));
   if (!validSelection) return false;
   if (markDirty) cancelPendingProviderSettingsModelLoad();
+  const previousKind = providerPanelState.providerKind;
+  const previousId = previousKind === 'agent'
+    ? providerPanelState.agentProviderId
+    : elements.modelProvider?.value;
+  if (previousKind !== kind || previousId !== id) invalidateProviderDiscovery();
 
   if (kind === 'api') {
     const previousSelection = elements.modelName?.value;
@@ -8154,6 +8164,7 @@ function initializeSyncSection() {
   const DEFAULT_DEBOUNCE_MS = 500;
   let _currentModels = [];
   let _currentSearchQuery = '';
+  let _discoveryGeneration = 0;
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -8164,6 +8175,18 @@ function initializeSyncSection() {
     if (!doc) return '';
     const el = doc.getElementById(inputId);
     return (el && typeof el.value === 'string') ? el.value.trim() : '';
+  }
+
+  function invalidateDiscovery() {
+    _discoveryGeneration += 1;
+  }
+
+  function _isDiscoveryCurrent(generation) {
+    return generation === _discoveryGeneration;
+  }
+
+  function _cancelledDiscoveryResult(provider) {
+    return { ok: false, reason: 'cancelled', provider };
   }
 
   function setDiscoveryStatus(state) {
@@ -8350,6 +8373,8 @@ function initializeSyncSection() {
    */
   async function runDiscovery(provider, opts) {
     const options = opts || {};
+    const generation = _discoveryGeneration + 1;
+    _discoveryGeneration = generation;
     if (!IN_SCOPE_PROVIDERS[provider]) {
       // Out-of-scope provider — do nothing; legacy updateModelOptions handles it.
       return { ok: false, reason: 'out-of-scope', provider };
@@ -8364,6 +8389,7 @@ function initializeSyncSection() {
       let cachedIds = [];
       if (typeof global.hydrateDiscoveryCache === 'function') {
         try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
+        if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
       }
       if (typeof global.getDiscoveredModelIds === 'function') {
         try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
@@ -8402,9 +8428,12 @@ function initializeSyncSection() {
     try {
       result = await global.discoverModels(provider, apiKey);
     } catch (err) {
+      if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
       _renderFallback(provider, 'Using fallback models — discovery unavailable');
       return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
     }
+
+    if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
 
     if (result && result.ok) {
       const list = (result.models || []).map(m => ({
@@ -8459,6 +8488,7 @@ function initializeSyncSection() {
   const api = {
     IN_SCOPE_PROVIDERS,
     runDiscovery,
+    invalidateDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
     renderModelDropdown,

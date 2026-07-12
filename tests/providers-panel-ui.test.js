@@ -491,6 +491,16 @@ function makeSelect(id, values, initialValue, classes) {
   return select;
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function createProviderHarness(initialStorage, harnessOptions) {
   const options = harnessOptions || {};
   const registry = Object.create(null);
@@ -550,6 +560,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
     ['form-select', 'provider-roster__native']
   );
   const modelName = makeSelect('modelName', [], '', ['model-combobox__native']);
+  const modelDiscoveryStatus = makeElement('modelDiscoveryStatus', { hidden: true });
+  const refreshModelsBtn = makeElement('refreshModelsBtn', { tagName: 'button' });
   const apiDetails = makeElement('apiProviderDetails');
   const agentDetails = makeElement('agentProviderDetails', { hidden: true });
   const agentDetailsHeading = makeElement('agentProviderDetailsHeading');
@@ -588,7 +600,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const openrouterApiKey = makeElement('openrouterApiKey', { tagName: 'input' });
   const lmstudioBaseUrl = makeElement('lmstudioBaseUrl', { tagName: 'input', value: 'http://localhost:1234' });
   [
-    providerRoster, modelProvider, modelName, apiDetails, agentDetails,
+    providerRoster, modelProvider, modelName, modelDiscoveryStatus, refreshModelsBtn,
+    apiDetails, agentDetails,
     agentDetailsHeading, agentNoCredentialCaption, agentEmptyState, agentInstallationStatus,
     agentConnectionStatus, agentAccountStatus, agentAccountHelp, agentSetupStatus,
     openAgentSetupGuideBtn, agentUsageTokens, agentUsageTurns, agentUsageDuration,
@@ -703,11 +716,19 @@ function createProviderHarness(initialStorage, harnessOptions) {
   vm.runInContext(JS, context, { filename: 'extension/ui/options.js' });
   context.cacheElements();
 
-  const calls = { discovery: [], visibility: [], connection: 0 };
-  context.FSBDiscoveryUI = {
-    IN_SCOPE_PROVIDERS: { xai: 'apiKey', gemini: 'geminiApiKey', openai: 'openaiApiKey', anthropic: 'anthropicApiKey', openrouter: 'openrouterApiKey' },
-    runDiscovery(provider, options) { calls.discovery.push({ provider, options: { ...options } }); }
-  };
+  const realDiscoveryUI = context.FSBDiscoveryUI;
+  const calls = { discovery: [], visibility: [], connection: 0, invalidations: 0 };
+  if (options.useRealDiscovery) {
+    context.FSBDiscoveryUI = realDiscoveryUI;
+  } else {
+    context.FSBDiscoveryUI = {
+      IN_SCOPE_PROVIDERS: { xai: 'apiKey', gemini: 'geminiApiKey', openai: 'openaiApiKey', anthropic: 'anthropicApiKey', openrouter: 'openrouterApiKey' },
+      runDiscovery(provider, discoveryOptions) {
+        calls.discovery.push({ provider, options: { ...discoveryOptions } });
+      },
+      invalidateDiscovery() { calls.invalidations += 1; }
+    };
+  }
   context.FSBModelCombobox = { init() {}, refresh() {} };
   context.updateApiKeyVisibility = (provider) => { calls.visibility.push(provider); };
   context.checkApiConnection = () => { calls.connection += 1; };
@@ -726,6 +747,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
     providerDescriptions,
     modelProvider,
     modelName,
+    modelDiscoveryStatus,
+    refreshModelsBtn,
     apiDetails,
     agentDetails,
     agentDetailsHeading,
@@ -922,6 +945,97 @@ async function runProviderRuntimeTests() {
     'cancelled saved-API timer cannot overwrite a model after switching to agent');
   assert.strictEqual(delayedLoad.calls.connection, connectionBeforeDelayedLoad,
     'cancelled saved-API timer cannot run an API connection check in agent mode');
+
+  console.log('Providers panel UI: in-flight API discovery cancellation');
+  const heldDiscoveryCases = [
+    {
+      name: 'success',
+      settle(deferred) {
+        deferred.resolve({
+          ok: true,
+          source: 'live',
+          models: [{ id: 'late-model', displayName: 'Late model' }]
+        });
+      }
+    },
+    {
+      name: 'auth failure',
+      settle(deferred) {
+        deferred.resolve({ ok: false, reason: 'auth-failed', message: 'late auth failure' });
+      }
+    }
+  ];
+  for (const heldCase of heldDiscoveryCases) {
+    const held = createProviderHarness({}, { useRealDiscovery: true });
+    const deferred = createDeferred();
+    let discoveryCalls = 0;
+    held.apiKey.value = 'held-api-key';
+    held.context.discoverModels = () => {
+      discoveryCalls += 1;
+      return deferred.promise;
+    };
+    const pending = held.context.FSBDiscoveryUI.runDiscovery('xai', {
+      previousSelection: 'latent-api-model'
+    });
+    assert.strictEqual(discoveryCalls, 1, heldCase.name + ' discovery begins once');
+    held.context.setProviderSelection('agent', 'codex');
+    held.modelName.appendChild(makeOption('latent-api-model', 'latent-api-model'));
+    held.modelName.value = 'latent-api-model';
+    held.modelName.disabled = false;
+    held.refreshModelsBtn.disabled = false;
+    held.modelDiscoveryStatus.textContent = 'Latent API status';
+    held.modelDiscoveryStatus.hidden = false;
+    held.modelDiscoveryStatus.classList.add('info');
+    const connectionBeforeSettlement = held.calls.connection;
+    heldCase.settle(deferred);
+    const result = await pending;
+    assert.strictEqual(result.reason, 'cancelled',
+      heldCase.name + ' result is discarded after selecting an agent');
+    assert.strictEqual(held.modelName.value, 'latent-api-model',
+      heldCase.name + ' cannot replace or clear the latent API model');
+    assert.strictEqual(held.modelName.disabled, false,
+      heldCase.name + ' cannot disable latent API model controls');
+    assert.strictEqual(held.refreshModelsBtn.disabled, false,
+      heldCase.name + ' cannot change the refresh control');
+    assert.strictEqual(held.modelDiscoveryStatus.textContent, 'Latent API status',
+      heldCase.name + ' cannot replace the latent API status');
+    assert.strictEqual(held.modelDiscoveryStatus.classList.contains('info'), true,
+      heldCase.name + ' cannot replace the latent API status class');
+    assert.strictEqual(held.calls.connection, connectionBeforeSettlement,
+      heldCase.name + ' performs no late API connection work');
+  }
+
+  const heldHydration = createProviderHarness({}, { useRealDiscovery: true });
+  const hydrationDeferred = createDeferred();
+  let cacheReads = 0;
+  heldHydration.context.hydrateDiscoveryCache = () => hydrationDeferred.promise;
+  heldHydration.context.getDiscoveredModelIds = () => {
+    cacheReads += 1;
+    return ['late-cached-model'];
+  };
+  const pendingHydration = heldHydration.context.FSBDiscoveryUI.runDiscovery('xai', {
+    previousSelection: 'latent-cache-model'
+  });
+  heldHydration.context.setProviderSelection('agent', 'codex');
+  heldHydration.modelName.appendChild(makeOption('latent-cache-model', 'latent-cache-model'));
+  heldHydration.modelName.value = 'latent-cache-model';
+  heldHydration.modelName.disabled = false;
+  heldHydration.refreshModelsBtn.disabled = false;
+  heldHydration.modelDiscoveryStatus.textContent = 'Latent cache status';
+  heldHydration.modelDiscoveryStatus.hidden = false;
+  const connectionBeforeHydration = heldHydration.calls.connection;
+  hydrationDeferred.resolve();
+  const hydrationResult = await pendingHydration;
+  assert.strictEqual(hydrationResult.reason, 'cancelled',
+    'cache hydration result is discarded after selecting an agent');
+  assert.strictEqual(cacheReads, 0,
+    'cancelled cache hydration performs no late cache read or model render');
+  assert.strictEqual(heldHydration.modelName.value, 'latent-cache-model');
+  assert.strictEqual(heldHydration.modelName.disabled, false);
+  assert.strictEqual(heldHydration.refreshModelsBtn.disabled, false);
+  assert.strictEqual(heldHydration.modelDiscoveryStatus.textContent, 'Latent cache status');
+  assert.strictEqual(heldHydration.calls.connection, connectionBeforeHydration,
+    'cancelled cache hydration performs no late API connection work');
 }
 
 function visibleRecommendationIds(harness) {
