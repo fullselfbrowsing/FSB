@@ -1086,6 +1086,38 @@ async function runProviderRuntimeTests() {
   assert.strictEqual(heldHydration.modelDiscoveryStatus.textContent, 'Latent cache status');
   assert.strictEqual(heldHydration.calls.connection, connectionBeforeHydration,
     'cancelled cache hydration performs no late API connection work');
+
+  const pendingDebounce = createProviderHarness({}, {
+    useRealDiscovery: true,
+    heldTimerDelays: [500]
+  });
+  let debouncedDiscoveryCalls = 0;
+  let debouncedCacheClears = 0;
+  pendingDebounce.context.discoverModels = () => {
+    debouncedDiscoveryCalls += 1;
+    return Promise.resolve({ ok: true, source: 'live', models: [] });
+  };
+  pendingDebounce.context.clearDiscoveryCache = () => {
+    debouncedCacheClears += 1;
+  };
+  pendingDebounce.modelName.appendChild(makeOption('debounce-latent-model', 'debounce-latent-model'));
+  pendingDebounce.modelName.value = 'debounce-latent-model';
+  pendingDebounce.modelDiscoveryStatus.textContent = 'Debounce latent status';
+  pendingDebounce.modelDiscoveryStatus.hidden = false;
+  pendingDebounce.context.FSBDiscoveryUI.scheduleDiscoveryFromKeyChange('xai');
+  assert.strictEqual(pendingDebounce.scheduledTimeoutDelays.includes(500), true,
+    'API-key discovery is pending inside the production debounce window');
+  pendingDebounce.context.setProviderSelection('agent', 'codex');
+  pendingDebounce.advanceTimersBy(500);
+  await Promise.resolve();
+  assert.strictEqual(debouncedDiscoveryCalls, 0,
+    'agent selection cancels a pending API-key discovery before it starts');
+  assert.strictEqual(debouncedCacheClears, 0,
+    'cancelled API-key debounce performs no late cache clear');
+  assert.strictEqual(pendingDebounce.modelName.value, 'debounce-latent-model',
+    'cancelled API-key debounce preserves the latent API model');
+  assert.strictEqual(pendingDebounce.modelDiscoveryStatus.textContent, 'Debounce latent status',
+    'cancelled API-key debounce preserves the latent API status');
 }
 
 function visibleRecommendationIds(harness) {

@@ -8254,6 +8254,11 @@ function initializeSyncSection() {
 
   function invalidateDiscovery(options) {
     const activeRun = _activeDiscoveryRun;
+    Object.keys(_debounceTimers).forEach(provider => {
+      const timer = _debounceTimers[provider];
+      if (timer !== null && timer !== undefined) clearTimeout(timer);
+      _debounceTimers[provider] = null;
+    });
     _discoveryGeneration += 1;
     _activeDiscoveryRun = null;
     if (options && options.restoreUi === true && activeRun) {
@@ -8572,6 +8577,13 @@ function initializeSyncSection() {
     if (_debounceTimers[provider]) clearTimeout(_debounceTimers[provider]);
     _debounceTimers[provider] = setTimeout(() => {
       _debounceTimers[provider] = null;
+      const doc = _doc();
+      const activeProvider = doc && doc.getElementById('modelProvider');
+      if (providerPanelState.providerKind !== 'api'
+          || !activeProvider
+          || activeProvider.value !== provider) {
+        return;
+      }
       runDiscovery(provider, { force: true });
     }, wait);
   }
