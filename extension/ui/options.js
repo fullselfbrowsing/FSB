@@ -231,6 +231,7 @@ function cacheElements() {
   elements.providerSelectionRadios = document.querySelectorAll('input[name="fsbProviderSelection"]');
   elements.providerRecommendationBadges = document.querySelectorAll('[data-provider-recommendation]');
   elements.providerEvidenceBadges = document.querySelectorAll('[data-provider-evidence]');
+  elements.providerDescriptions = document.querySelectorAll('[data-provider-description]');
   elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
   elements.providerEvidenceAnnouncement = document.getElementById('providerEvidenceAnnouncement');
   elements.apiProviderDetails = document.getElementById('apiProviderDetails');
@@ -450,6 +451,51 @@ function requestMcpClients() {
   });
 }
 
+function getProviderBadgeByData(badges, dataKey, providerId) {
+  let match = null;
+  Array.prototype.some.call(badges || [], (badge) => {
+    if (badge.dataset?.[dataKey] !== providerId) return false;
+    match = badge;
+    return true;
+  });
+  return match;
+}
+
+function renderProviderAccessibleDescriptions() {
+  const helper = getProviderPanelHelper();
+  if (!helper) return;
+  const descriptions = elements.providerDescriptions || [];
+
+  Array.prototype.forEach.call(descriptions, (description) => {
+    const providerId = description.dataset?.providerDescription;
+    const parts = [];
+    const recommendationBadge = getProviderBadgeByData(
+      elements.providerRecommendationBadges,
+      'providerRecommendation',
+      providerId
+    );
+    if (recommendationBadge && !recommendationBadge.hidden) {
+      parts.push('Recommended.');
+    }
+
+    if (helper.isAgentProvider(providerId)) {
+      const evidenceBadge = getProviderBadgeByData(
+        elements.providerEvidenceBadges,
+        'providerEvidence',
+        providerId
+      );
+      const evidenceText = evidenceBadge && !evidenceBadge.hidden
+        ? String(evidenceBadge.textContent || '').trim()
+        : '';
+      if (evidenceText) {
+        parts.push(/[.!?…]$/.test(evidenceText) ? evidenceText : `${evidenceText}.`);
+      }
+    }
+
+    description.textContent = parts.join(' ');
+  });
+}
+
 function renderProviderRecommendation() {
   const helper = getProviderPanelHelper();
   const recommendation = providerPanelState.recommendation;
@@ -467,6 +513,7 @@ function renderProviderRecommendation() {
       shown = true;
     }
   });
+  renderProviderAccessibleDescriptions();
 }
 
 function setProviderEvidenceBadgeClass(badge, status) {
@@ -580,6 +627,7 @@ function renderProviderEvidence() {
       }
     }
   });
+  renderProviderAccessibleDescriptions();
 
   if (elements.agentEvidenceEmptyState) {
     const absenceConfirmed = providerPanelState.evidenceStatus === 'ready'

@@ -114,10 +114,16 @@ providerLabels.forEach((label, index) => {
   assert.strictEqual(attribute(label.slice(0, label.indexOf('>') + 1), 'data-provider-id'), expectedContract[index].id);
   assert.doesNotMatch(label, /<(?:a|button|select|textarea)\b/i, 'provider labels contain no nested secondary controls');
   const nameSpan = label.match(/<span\b[^>]*\bid="([^"]+)"[^>]*\bclass="provider-row__name"[^>]*>([^<]+)<\/span>/);
+  const descriptionSpan = label.match(/<span\b[^>]*\bid="([^"]+)"[^>]*\bclass="visually-hidden"[^>]*\bdata-provider-description="([^"]+)"[^>]*><\/span>/);
   const radio = label.match(/<input\b[^>]*\bname="fsbProviderSelection"[^>]*>/);
-  assert.ok(nameSpan && radio, 'provider row contains a named span and radio');
+  assert.ok(nameSpan && descriptionSpan && radio,
+    'provider row contains stable name and description spans plus its radio');
   assert.strictEqual(attribute(radio[0], 'aria-labelledby'), nameSpan[1],
     'radio accessible name resolves only from its stable provider-name span');
+  assert.strictEqual(attribute(radio[0], 'aria-describedby'), descriptionSpan[1],
+    'radio references its stable recommendation and evidence description');
+  assert.strictEqual(descriptionSpan[2], expectedContract[index].id,
+    'description state is keyed to the same closed provider id');
   assert.strictEqual(nameSpan[2], PROVIDERS.getProviderDefinition(expectedContract[index].kind, expectedContract[index].id).displayName,
     'stable accessible name is exactly the provider display name');
   const dynamicBadges = label.match(/<span\b[^>]*\bclass="provider-badge [^"]+"[^>]*>/g) || [];
@@ -320,6 +326,7 @@ const requestClientsSource = extractFunction(JS, 'requestMcpClients');
 const refreshEvidenceSource = extractFunction(JS, 'refreshProviderEvidence');
 const recommendationRenderSource = extractFunction(JS, 'renderProviderRecommendation');
 const evidenceRenderSource = extractFunction(JS, 'renderProviderEvidence');
+const descriptionRenderSource = extractFunction(JS, 'renderProviderAccessibleDescriptions');
 const otherClientsRenderSource = extractFunction(JS, 'renderOtherMcpClients');
 const agentDetailsRenderSource = extractFunction(JS, 'renderSelectedAgentDetails');
 const setupGuideSource = extractFunction(JS, 'openAgentSetupGuide');
@@ -344,6 +351,10 @@ assert.ok(
 assert.doesNotMatch(recommendationRenderSource,
   /setProviderSelection|\.checked\s*=|modelProvider|chrome\.storage|markUnsavedChanges/,
   'recommendation rendering cannot write selection or settings');
+assert.match(descriptionRenderSource, /description\.textContent\s*=/,
+  'accessible descriptions are populated through text-only DOM assignment');
+assert.doesNotMatch(descriptionRenderSource, /innerHTML|insertAdjacentHTML/,
+  'recommendation and evidence descriptions cannot interpret markup');
 assert.match(evidenceRenderSource, /status\.checkedAt/);
 assert.doesNotMatch(evidenceRenderSource, /lastSeenAt|connectedAt|lastClickedAt/,
   'evidence rendering cannot substitute non-installed timestamps');
@@ -487,6 +498,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const radios = [];
   const recommendationBadges = [];
   const evidenceBadges = [];
+  const providerDescriptions = [];
   const providerIds = [
     ...PROVIDERS.AGENT_PROVIDER_IDS.map((id) => ['agent', id]),
     ...PROVIDERS.API_PROVIDER_IDS.map((id) => ['api', id])
@@ -511,15 +523,22 @@ function createProviderHarness(initialStorage, harnessOptions) {
       dataset: { providerEvidence: id },
       textContent: 'Status unavailable'
     });
+    const providerDescription = makeElement('provider-' + kind + '-' + id + '-description', {
+      classes: ['visually-hidden'],
+      dataset: { providerDescription: id }
+    });
     radio._providerRow = row;
     row.appendChild(recommendationBadge);
     row.appendChild(evidenceBadge);
+    row.appendChild(providerDescription);
     row.appendChild(radio);
     providerRows.push(row);
     radios.push(radio);
     recommendationBadges.push(recommendationBadge);
     evidenceBadges.push(evidenceBadge);
+    providerDescriptions.push(providerDescription);
     registry[radio.id] = radio;
+    registry[providerDescription.id] = providerDescription;
   });
 
   const providerRoster = makeElement('providerRoster', { tagName: 'fieldset' });
@@ -600,6 +619,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
       if (selector === 'input[name="fsbProviderSelection"]') return radios;
       if (selector === '[data-provider-recommendation]') return recommendationBadges;
       if (selector === '[data-provider-evidence]') return evidenceBadges;
+      if (selector === '[data-provider-description]') return providerDescriptions;
       if (selector === '.form-select, .chart-select') return [modelProvider];
       return [];
     },
@@ -703,6 +723,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     radios,
     recommendationBadges,
     evidenceBadges,
+    providerDescriptions,
     modelProvider,
     modelName,
     apiDetails,
@@ -913,6 +934,12 @@ function evidenceBadge(harness, providerId) {
   return harness.evidenceBadges.find((badge) => badge.dataset.providerEvidence === providerId);
 }
 
+function providerDescription(harness, providerId) {
+  return harness.providerDescriptions.find(
+    (description) => description.dataset.providerDescription === providerId
+  );
+}
+
 async function runAgentDetailsTests() {
   console.log('Providers panel UI: honest agent account, setup, usage, and billing details');
   const harness = createProviderHarness();
@@ -1026,6 +1053,10 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(evidenceBadge(harness, 'claude-code').textContent, 'Connected now');
   assert.strictEqual(evidenceBadge(harness, 'opencode').textContent, 'Connected now');
   assert.strictEqual(evidenceBadge(harness, 'codex').textContent, 'Installed');
+  assert.strictEqual(providerDescription(harness, 'claude-code').textContent,
+    'Recommended. Connected now.');
+  assert.strictEqual(providerDescription(harness, 'opencode').textContent, 'Connected now.');
+  assert.strictEqual(providerDescription(harness, 'codex').textContent, 'Installed.');
   assert.deepStrictEqual({
     selected: selectedRadio(harness).dataset.providerId,
     modelProvider: harness.modelProvider.value,
@@ -1048,6 +1079,9 @@ async function runProviderEvidenceTests() {
   assert.deepStrictEqual(visibleRecommendationIds(harness), ['xai'],
     'historical-only evidence retains the xAI fallback recommendation');
   assert.strictEqual(evidenceBadge(harness, 'claude-code').textContent, 'Seen before');
+  assert.strictEqual(providerDescription(harness, 'claude-code').textContent, 'Seen before.');
+  assert.strictEqual(providerDescription(harness, 'xai').textContent, 'Recommended.',
+    'API fallback exposes recommendation as description without agent evidence text');
   assert.strictEqual(evidenceBadge(harness, 'claude-code').getAttribute('title'), null,
     'historical timestamp is never displayed as the installed check time');
 
@@ -1152,6 +1186,9 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(selectedRadio(malformed).dataset.providerId, 'codex',
     'malformed first response does not clear the checked agent radio');
   assert.strictEqual(evidenceBadge(malformed, 'codex').textContent, 'Status unavailable');
+  assert.strictEqual(providerDescription(malformed, 'codex').textContent, 'Status unavailable.',
+    'unavailable agent evidence remains discoverable through the stable description');
+  assert.strictEqual(providerDescription(malformed, 'xai').textContent, 'Recommended.');
   assert.strictEqual(malformed.announcement.getAttribute('role'), 'status',
     'background failure retains polite status semantics');
   assert.strictEqual(malformed.announcement.getAttribute('aria-live'), 'polite');
