@@ -133,10 +133,92 @@
     });
   }
 
-  global.FsbMcpAgentProviders = {
+  function createMergedRow(id, raw, displayName) {
+    return {
+      id: id,
+      raw: raw,
+      displayName: displayName,
+      clicked: null,
+      installed: null,
+      connected: null,
+      live: null
+    };
+  }
+
+  function getAliasApi() {
+    var aliases = global && global.FsbMcpClientAliases;
+    if (!aliases
+        || typeof aliases.normalizeMcpClientName !== 'function'
+        || typeof aliases.resolveMcpClientAlias !== 'function') {
+      throw new Error('MCP client aliases are unavailable');
+    }
+    return aliases;
+  }
+
+  async function getMergedClients(liveRecords) {
+    var aliases = getAliasApi();
+    var envelope = await read();
+    var merged = {};
+    var unknownIndex = 0;
+
+    function ensureCanonicalRow(id) {
+      if (!Object.prototype.hasOwnProperty.call(merged, id)) {
+        merged[id] = createMergedRow(id, false, id);
+      }
+      return merged[id];
+    }
+
+    function resolveNamedRow(name) {
+      var originalName = typeof name === 'string' ? name : '';
+      var canonicalId = aliases.resolveMcpClientAlias(originalName);
+      if (canonicalId) {
+        var canonicalRow = ensureCanonicalRow(canonicalId);
+        if (canonicalRow.displayName === canonicalRow.id && originalName) {
+          canonicalRow.displayName = originalName;
+        }
+        return canonicalRow;
+      }
+
+      var normalizedName = aliases.normalizeMcpClientName(originalName);
+      var rawId = normalizedName
+        ? 'raw:' + normalizedName
+        : 'raw:unknown-' + unknownIndex++;
+      if (!Object.prototype.hasOwnProperty.call(merged, rawId)) {
+        merged[rawId] = createMergedRow(rawId, true, originalName);
+      }
+      return merged[rawId];
+    }
+
+    Object.keys(envelope.clicked).sort().forEach(function(id) {
+      ensureCanonicalRow(id).clicked = envelope.clicked[id];
+    });
+    Object.keys(envelope.installed).sort().forEach(function(id) {
+      ensureCanonicalRow(id).installed = envelope.installed[id];
+    });
+    Object.keys(envelope.connected).sort().forEach(function(key) {
+      var record = envelope.connected[key];
+      var name = isPlainObject(record) ? record.name : '';
+      resolveNamedRow(name).connected = record;
+    });
+
+    var records = Array.isArray(liveRecords) ? liveRecords : [];
+    records.forEach(function(record) {
+      if (!isPlainObject(record) || !isPlainObject(record.clientInfo)) return;
+      resolveNamedRow(record.clientInfo.name).live = record;
+    });
+
+    return merged;
+  }
+
+  var api = {
     read: read,
     mutateSubmap: mutateSubmap,
     recordConnected: recordConnected,
     replaceInstalled: replaceInstalled
   };
+  Object.defineProperty(api, 'getMergedClients', {
+    value: getMergedClients,
+    enumerable: false
+  });
+  global.FsbMcpAgentProviders = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
