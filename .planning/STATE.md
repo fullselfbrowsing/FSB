@@ -22,7 +22,7 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 9/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 5/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
@@ -52,7 +52,7 @@ Last activity: 2026-07-12 -- Phase 58 Plan 01 completed
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 9/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
+Coverage: 51/51 v0.9.91 requirements mapped, 5/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
 
 ## Hard Invariants (v0.9.91)
 
@@ -87,6 +87,7 @@ v0.9.91-specific decisions so far:
 - [Roadmap]: The reverse-request channel reuses the existing `ws://localhost:7225` bridge; no new port is added (SUMMARY.md architecture decision; a separate supervisor port is a documented fallback if hub-forwarding proves fragile during Phase 59 implementation).
 - [Phase 57]: Read MCP client identity and inventory lazily through feature-detected AgentScope suppliers so bare scopes and structural mocks remain compatible.
 - [Phase 57]: Reuse PLATFORMS and resolvePlatformTarget for installed-client detection, with fixed shell-free Claude Code version probes.
+- [Phase 57]: Deliver one memoized client inventory through both system:client-inventory and agent:register payload.platforms.
 - [Phase 57]: Keep MCP clientInfo observational and bounded — Only sanitized name/version evidence is persisted; authority, cap, ownership, and routing logic remain unchanged.
 - [Phase 57]: Converge both installed-inventory delivery paths on replaceInstalled — Registration piggybacks and system frames replace only installed evidence while preserving clicked, connected, and unknown siblings.
 - [Phase 57]: Persist onboarding intent without awaiting storage — Resolve current at click time and serialize same-page writes so feedback timing is unchanged and rapid clicks retain counts.
