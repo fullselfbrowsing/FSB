@@ -10,6 +10,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
+**Active milestone progress:** Phase 57 (Agent Identity Capture) completed and passed 14/14 verification on 2026-07-12. FSB now persists onboarding copy intent, captures initialized MCP client identity, enumerates installed clients, and exposes a durable canonical `getMcpClients` evidence view. Phase 58 (Providers Panel) is next.
+
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
 **Recent shipping cadence:**
@@ -23,7 +25,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 **Goal:** Make installed agent CLIs (Claude Code first) first-class side-panel providers -- FSB captures which MCP clients the user installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools.
 
 **Target features:**
-- **Agent identity capture** -- persist which install command(s) the user copies during onboarding (multi-client, `extension/ui/onboarding.js` copy handler already has the client id); capture `clientInfo` from the MCP initialize handshake (currently discarded -- zero references in `mcp/`) and thread it through the existing `agent:register` round-trip (payload is empty `{}` today); detect installed clients from the `platforms.ts` registry's per-OS config paths (21 clients); surface connected/installed agents in the control panel.
+- **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
 - **Providers panel** -- rename "API Configuration" -> "Providers" (`extension/ui/control_panel.html:146`); introduce `api` vs `agent` provider kinds; agent providers hide the API-key field; recommended default driven by ground truth (connected > installed > copy-clicked).
 - **Side-panel delegation (Claude Code MVP)** -- new extension->hub reverse-request channel over the existing ws://localhost:7225 bridge; daemon spawns `claude -p` headless (stream-json output, strict permission defaults, hermetic `--strict-mcp-config`, shipped `fsb` agent definition instead of prompt stuffing); the spawned CLI connects back as its own FSB agent with tab ownership; live progress streamed into the side panel; kill switch; graceful "agent offline -> doctor" state.
 - **Multi-agent adapters** -- `AgentProviderAdapter` contract (detect / build / events / kill / caps); OpenCode -> Codex -> Gemini after Claude Code; task-mode vs chat-mode (`--resume`) where supported.
@@ -432,7 +434,15 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- requirements and roadmap being defined; phases continue from v1.2.0's Phase 56 -> start at Phase 57. v1.2.0 Showcase i18n Completeness is archived; this milestone returns to the extension/MCP surface last touched in v0.9.99/v0.9.60-62.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phase 57 is verified complete; Phase 58 Providers Panel is next. Remaining active requirements are PROV-01..06, CHAN-01..07, ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
+
+### Validated (v0.9.91)
+
+- [x] IDENT-01: Onboarding copy actions persist durable, aggregated per-client intent without changing clipboard feedback -- Phase 57.
+- [x] IDENT-02: Stdio and streamable-HTTP MCP initialization identity crosses the existing bridge through optional additive registration evidence -- Phase 57.
+- [x] IDENT-03: Sanitized client identity persists on live AgentRecords and canonical durable connected rows, with reconnects updating in place -- Phase 57.
+- [x] IDENT-04: The daemon reports the full platform registry inventory with fixed, shell-free Claude Code version probing and dual tolerant delivery -- Phase 57.
+- [x] IDENT-05: A guarded fresh-on-read `getMcpClients` action returns the durable clicked/installed/connected plus live evidence union -- Phase 57.
 
 ### Validated (v0.9.99)
 
@@ -697,4 +707,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-10 -- Milestone v0.9.91 MCP Clients as Providers started. Next: requirements definition.*
+*Last updated: 2026-07-12 -- Phase 57 Agent Identity Capture verified complete. Next: Phase 58 Providers Panel discussion.*
