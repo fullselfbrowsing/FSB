@@ -615,8 +615,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // landed handlers).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
+  // Phase 57 Plan 02 adds the durable MCP-agent provider helper -> 310.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 309, 'background.js importScripts count = 309 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCount, 310, 'background.js importScripts count = 310 (including the Phase 57 MCP-agent provider helper)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -649,8 +650,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
+  // Phase 57 Plan 02 adds one helper call site -> 306.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 305, 'background.js importScripts() call sites = 305 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCallSites, 306, 'background.js importScripts() call sites = 306 (including the Phase 57 MCP-agent provider helper)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

@@ -223,6 +223,12 @@
     return typeof value === 'number' && Number.isFinite(value) && value > 0 && Math.floor(value) === value;
   }
 
+  function isPlainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    var proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+
   function cloneRecord(record) {
     if (!record || typeof record !== 'object') return null;
     try {
@@ -638,6 +644,29 @@
     record.connectionId = connectionId;
     // Best-effort persist; never throw. The mutator is sync from the caller's
     // perspective so the bridge does not need to await it.
+    try {
+      var p = this._persist();
+      if (p && typeof p.catch === 'function') {
+        p.catch(function() { /* best-effort */ });
+      }
+    } catch (_e) { /* swallow */ }
+    return true;
+  };
+
+  /**
+   * Stamp sanitized MCP initialize identity onto an existing live record.
+   * clientInfo is descriptive evidence only; ownership and authorization
+   * continue to depend exclusively on the minted agent id and tab token.
+   */
+  AgentRegistry.prototype.stampClientInfo = function(agentId, clientInfo) {
+    if (typeof agentId !== 'string' || !isPlainObject(clientInfo)) return false;
+    var next = {};
+    if (typeof clientInfo.name === 'string') next.name = clientInfo.name;
+    if (typeof clientInfo.version === 'string') next.version = clientInfo.version;
+    if (Object.keys(next).length === 0) return false;
+    var record = this._agents.get(agentId);
+    if (!record) return false;
+    record.clientInfo = next;
     try {
       var p = this._persist();
       if (p && typeof p.catch === 'function') {
@@ -1168,6 +1197,14 @@
         if (typeof record.connectionId === 'string') {
           rebuilt.connectionId = record.connectionId;
         }
+        if (isPlainObject(record.clientInfo)) {
+          var restoredClientInfo = {};
+          if (typeof record.clientInfo.name === 'string') restoredClientInfo.name = record.clientInfo.name;
+          if (typeof record.clientInfo.version === 'string') restoredClientInfo.version = record.clientInfo.version;
+          if (Object.keys(restoredClientInfo).length > 0) {
+            rebuilt.clientInfo = restoredClientInfo;
+          }
+        }
         if (Number.isFinite(record.selectedTabId) && tabIds.indexOf(record.selectedTabId) !== -1) {
           rebuilt.selectedTabId = record.selectedTabId;
         }
@@ -1367,6 +1404,14 @@
       // recovery path can match staged releases against rehydrated agents.
       if (typeof record.connectionId === 'string') {
         stored.connectionId = record.connectionId;
+      }
+      if (isPlainObject(record.clientInfo)) {
+        var storedClientInfo = {};
+        if (typeof record.clientInfo.name === 'string') storedClientInfo.name = record.clientInfo.name;
+        if (typeof record.clientInfo.version === 'string') storedClientInfo.version = record.clientInfo.version;
+        if (Object.keys(storedClientInfo).length > 0) {
+          stored.clientInfo = storedClientInfo;
+        }
       }
       if (Number.isFinite(record.selectedTabId) && tabSet && tabSet.has(record.selectedTabId)) {
         stored.selectedTabId = record.selectedTabId;
