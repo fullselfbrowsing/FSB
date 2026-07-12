@@ -214,6 +214,21 @@
     };
   }
 
+  function getBillingLabel(authState) {
+    var mode = typeof authState === 'string'
+      ? authState
+      : getOwnValue(authState, 'mode');
+    mode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
+
+    if (mode === 'subscription') {
+      return { label: 'Included in your subscription', confirmed: true };
+    }
+    if (mode === 'api' || mode === 'credits' || mode === 'zen' || mode === 'provider') {
+      return { label: 'Billed by your CLI provider', confirmed: true };
+    }
+    return { label: 'Billing not reported', confirmed: false };
+  }
+
   function getProviderDefinition(providerKind, providerId) {
     if (providerId === undefined) {
       providerId = providerKind;
@@ -234,6 +249,7 @@
     normalizeSettings: normalizeSettings,
     getRecommendation: getRecommendation,
     getAgentStatus: getAgentStatus,
+    getBillingLabel: getBillingLabel,
     getProviderDefinition: getProviderDefinition
   });
 

@@ -229,6 +229,7 @@ function cacheElements() {
   elements.providerRecommendationBadges = document.querySelectorAll('[data-provider-recommendation]');
   elements.providerEvidenceBadges = document.querySelectorAll('[data-provider-evidence]');
   elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
+  elements.providerEvidenceAnnouncement = document.getElementById('providerEvidenceAnnouncement');
   elements.apiProviderDetails = document.getElementById('apiProviderDetails');
   elements.agentProviderDetails = document.getElementById('agentProviderDetails');
   elements.agentProviderDetailsHeading = document.getElementById('agentProviderDetailsHeading');
@@ -237,6 +238,7 @@ function cacheElements() {
   elements.agentInstallationStatus = document.getElementById('agentInstallationStatus');
   elements.agentConnectionStatus = document.getElementById('agentConnectionStatus');
   elements.agentAccountStatus = document.getElementById('agentAccountStatus');
+  elements.agentAccountHelp = document.getElementById('agentAccountHelp');
   elements.agentSetupStatus = document.getElementById('agentSetupStatus');
   elements.openAgentSetupGuideBtn = document.getElementById('openAgentSetupGuideBtn');
   elements.agentUsageTokens = document.getElementById('agentUsageTokens');
@@ -570,24 +572,38 @@ function renderSelectedAgentDetails() {
       || !helper.isAgentProvider(providerPanelState.agentProviderId)) return;
   const providerId = providerPanelState.agentProviderId;
   const definition = helper.getProviderDefinition('agent', providerId);
+  if (!definition) return;
   const row = getOwnDataValue(providerPanelState.clients, providerId);
   const status = helper.getAgentStatus(row);
   const unavailable = providerPanelState.evidenceStatus === 'unavailable';
+  const initialLoading = providerPanelState.evidenceStatus === 'loading'
+    && !providerPanelState.hasSuccessfulEvidence;
+  const billing = helper.getBillingLabel(undefined);
 
-  if (elements.agentProviderDetailsHeading && definition) {
+  if (elements.agentProviderDetailsHeading) {
     elements.agentProviderDetailsHeading.textContent = `${definition.displayName} details`;
   }
+  if (elements.agentNoCredentialCaption) {
+    elements.agentNoCredentialCaption.textContent = "FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.";
+  }
   if (elements.agentInstallationStatus) {
-    elements.agentInstallationStatus.textContent = unavailable
+    elements.agentInstallationStatus.textContent = initialLoading
+      ? 'Loading provider status…'
+      : unavailable
       ? 'Status unavailable'
       : (status.installed ? 'Installed' : 'Not installed');
   }
   if (elements.agentConnectionStatus) {
-    elements.agentConnectionStatus.textContent = unavailable
+    elements.agentConnectionStatus.textContent = initialLoading
+      ? 'Loading provider status…'
+      : unavailable
       ? 'Status unavailable'
       : (status.live ? 'Connected now' : (status.seenBefore ? 'Seen before' : 'Not connected'));
   }
   if (elements.agentAccountStatus) elements.agentAccountStatus.textContent = 'Not reported';
+  if (elements.agentAccountHelp) {
+    elements.agentAccountHelp.textContent = 'The CLI has not reported its account type.';
+  }
   if (elements.agentSetupStatus) {
     if (providerPanelState.evidenceStatus === 'stale') {
       elements.agentSetupStatus.textContent = 'Status may be stale. Refresh after the FSB server reconnects.';
@@ -601,6 +617,42 @@ function renderSelectedAgentDetails() {
       elements.agentSetupStatus.textContent = 'Open the setup guide to connect this CLI to FSB.';
     }
   }
+  if (elements.agentUsageTokens) elements.agentUsageTokens.textContent = '—';
+  if (elements.agentUsageTurns) elements.agentUsageTurns.textContent = '—';
+  if (elements.agentUsageDuration) elements.agentUsageDuration.textContent = '—';
+  if (elements.agentUsageEmptyState) elements.agentUsageEmptyState.textContent = 'No delegated runs yet';
+  if (elements.agentBillingStatus) elements.agentBillingStatus.textContent = billing.label;
+  if (elements.agentBillingCopy) elements.agentBillingCopy.textContent = definition.billingCopy;
+  if (elements.agentBillingLink) {
+    elements.agentBillingLink.setAttribute('href', definition.billingUrl);
+    elements.agentBillingLink.setAttribute('target', '_blank');
+    elements.agentBillingLink.setAttribute('rel', 'noopener noreferrer');
+    elements.agentBillingLink.hidden = false;
+  }
+  if (elements.agentBillingLinkLabel) {
+    elements.agentBillingLinkLabel.textContent = definition.billingLinkLabel;
+  }
+}
+
+function openAgentSetupGuide() {
+  const runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
+  const setupUrl = runtime && typeof runtime.getURL === 'function'
+    ? runtime.getURL('ui/onboarding.html')
+    : 'onboarding.html';
+  if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.create === 'function') {
+    chrome.tabs.create({ url: setupUrl });
+  } else if (typeof window !== 'undefined' && typeof window.open === 'function') {
+    window.open(setupUrl, '_blank', 'noopener');
+  }
+}
+
+function setProviderEvidenceAnnouncement(message, isAlert = false) {
+  const announcement = elements.providerEvidenceAnnouncement;
+  if (!announcement) return;
+  announcement.textContent = message || '';
+  announcement.hidden = !message;
+  announcement.setAttribute('role', isAlert ? 'alert' : 'status');
+  announcement.setAttribute('aria-live', isAlert ? 'assertive' : 'polite');
 }
 
 function refreshProviderEvidence({ announce = false } = {}) {
@@ -608,6 +660,7 @@ function refreshProviderEvidence({ announce = false } = {}) {
 
   providerPanelState.evidenceStatus = 'loading';
   setProviderStatusRefreshing(true);
+  setProviderEvidenceAnnouncement('Refreshing provider status…');
   renderProviderEvidence();
   renderSelectedAgentDetails();
 
@@ -618,6 +671,7 @@ function refreshProviderEvidence({ announce = false } = {}) {
       providerPanelState.hasSuccessfulEvidence = true;
       providerPanelState.evidenceStatus = 'ready';
       providerPanelState.recommendation = helper.getRecommendation(clients);
+      setProviderEvidenceAnnouncement('Provider status refreshed.');
       return clients;
     })
     .catch(() => {
@@ -629,9 +683,10 @@ function refreshProviderEvidence({ announce = false } = {}) {
         providerPanelState.evidenceStatus = 'unavailable';
         providerPanelState.recommendation = helper.getRecommendation(providerPanelState.clients);
       }
-      if (announce && elements.agentProviderDetails) {
-        elements.agentProviderDetails.setAttribute('role', 'alert');
-      }
+      const message = providerPanelState.evidenceStatus === 'stale'
+        ? 'Provider status may be stale. Refresh after the FSB server reconnects.'
+        : 'Provider status is unavailable. Your selection is unchanged.';
+      setProviderEvidenceAnnouncement(message, announce);
       return providerPanelState.clients;
     })
     .finally(() => {
@@ -747,6 +802,9 @@ function setupEventListeners() {
     elements.refreshProviderStatusBtn.addEventListener('click', () => {
       refreshProviderEvidence({ announce: true });
     });
+  }
+  if (elements.openAgentSetupGuideBtn) {
+    elements.openAgentSetupGuideBtn.addEventListener('click', openAgentSetupGuide);
   }
 
   // Form inputs change detection

@@ -134,6 +134,8 @@ assert.match(HTML, /id="refreshProviderStatusBtn"/);
 assert.match(HTML, />Refresh status<\/span>/);
 assert.match(HTML, />Refreshing…<\/span>/);
 assert.match(HTML, /id="refreshProviderStatusBtn"[^>]*aria-busy="false"/);
+assert.match(HTML,
+  /id="providerEvidenceAnnouncement"[^>]*role="status"[^>]*aria-live="polite"[^>]*hidden/);
 
 const refreshingSource = extractFunction(JS, 'setProviderStatusRefreshing');
 const refreshingState = {
@@ -190,6 +192,18 @@ assert.match(agentDetails, /id="agentUsageTokens">—<\/dd>/);
 assert.match(agentDetails, /id="agentUsageTurns">—<\/dd>/);
 assert.match(agentDetails, /id="agentUsageDuration">—<\/dd>/);
 assert.match(agentDetails, /No delegated runs yet/);
+assert.strictEqual((agentDetails.match(/>—<\/dd>/g) || []).length, 3,
+  'agent usage begins with exactly three unknown metric values');
+assert.match(agentDetails, /id="agentAccountStatus">Not reported<\/dd>/);
+assert.match(agentDetails, /The CLI has not reported its account type\./);
+assert.match(agentDetails,
+  /FSB uses this CLI's existing sign-in and does not need its credential\. Billing and limits follow the account or provider configured in the CLI\./);
+assert.match(agentDetails,
+  /id="agentBillingLink"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/);
+assert.doesNotMatch(agentDetails, /id="[^"]*(?:cost|currency)[^"]*"|>\s*Cost\s*</i,
+  'agent details contain no cost or currency UI');
+assert.doesNotMatch(agentDetails, /Included in your subscription/,
+  'unknown Phase 58 auth never statically claims subscription inclusion');
 assert.match(agentDetails, /<h4>No agent CLI detected<\/h4>/);
 assert.match(
   agentDetails,
@@ -219,6 +233,8 @@ assert.match(providerCss, /@media \(min-width: 900px\)/);
 assert.match(providerCss, /@media \(max-width: 640px\)/);
 assert.match(providerCss, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(providerCss, /\[data-theme="dark"\] \.provider-row/);
+assert.match(providerCss, /\.provider-roster__announcement\[role="alert"\]/);
+assert.match(providerCss, /\.agent-provider-details__fact \.agent-provider-details__help/);
 assert.doesNotMatch(providerCss, /#[0-9a-f]{3,8}\b|rgba?\(/i, 'Providers CSS uses existing theme variables');
 assert.match(CSS, /html, body\s*\{\s*overflow-x:\s*hidden;/);
 
@@ -270,6 +286,9 @@ const refreshEvidenceSource = extractFunction(JS, 'refreshProviderEvidence');
 const recommendationRenderSource = extractFunction(JS, 'renderProviderRecommendation');
 const evidenceRenderSource = extractFunction(JS, 'renderProviderEvidence');
 const otherClientsRenderSource = extractFunction(JS, 'renderOtherMcpClients');
+const agentDetailsRenderSource = extractFunction(JS, 'renderSelectedAgentDetails');
+const setupGuideSource = extractFunction(JS, 'openAgentSetupGuide');
+const announcementSource = extractFunction(JS, 'setProviderEvidenceAnnouncement');
 const eventSetupSource = extractFunction(JS, 'setupEventListeners');
 assert.match(requestClientsSource, /sendMessage\(\{ action: 'getMcpClients' \}/,
   'evidence uses the one Phase 57 runtime action');
@@ -290,6 +309,20 @@ assert.doesNotMatch(otherClientsRenderSource, /innerHTML|insertAdjacentHTML/,
   'raw client names use text-only DOM population');
 assert.match(eventSetupSource, /area === 'local' && changes && changes\.fsbAgentProviders/);
 assert.match(eventSetupSource, /area === 'session' && changes && changes\.fsbAgentRegistry/);
+assert.match(agentDetailsRenderSource, /getBillingLabel\(undefined\)/,
+  'Phase 57 evidence is not treated as auth state');
+assert.match(agentDetailsRenderSource, /billing\.label/);
+assert.match(agentDetailsRenderSource, /definition\.billingCopy/);
+assert.match(agentDetailsRenderSource, /definition\.billingUrl/);
+assert.match(agentDetailsRenderSource, /noopener noreferrer/);
+assert.doesNotMatch(agentDetailsRenderSource, /\$\s*\d|currency|\bcost\b/i,
+  'agent renderer contains no fabricated cost or currency path');
+assert.match(setupGuideSource, /getURL\('ui\/onboarding\.html'\)/,
+  'setup action uses the existing extension onboarding page');
+assert.doesNotMatch(setupGuideSource, /exec|spawn|shell|command/i,
+  'setup action does not embed a shell command');
+assert.match(announcementSource, /isAlert \? 'alert' : 'status'/);
+assert.match(announcementSource, /isAlert \? 'assertive' : 'polite'/);
 assert.match(JS, /setTimeout\(\(\) => \{[\s\S]*?refreshProviderEvidence\(\);[\s\S]*?\}, 100\)/);
 assert.doesNotMatch(refreshEvidenceSource + eventSetupSource,
   /setInterval|visibilitychange|focus\s*\)|scan|detectInstalled/i,
@@ -458,14 +491,26 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const apiDetails = makeElement('apiProviderDetails');
   const agentDetails = makeElement('agentProviderDetails', { hidden: true });
   const agentDetailsHeading = makeElement('agentProviderDetailsHeading');
+  const agentNoCredentialCaption = makeElement('agentNoCredentialCaption');
   const agentEmptyState = makeElement('agentEvidenceEmptyState', { hidden: true });
   const agentInstallationStatus = makeElement('agentInstallationStatus');
   const agentConnectionStatus = makeElement('agentConnectionStatus');
   const agentAccountStatus = makeElement('agentAccountStatus');
+  const agentAccountHelp = makeElement('agentAccountHelp');
   const agentSetupStatus = makeElement('agentSetupStatus');
+  const openAgentSetupGuideBtn = makeElement('openAgentSetupGuideBtn', { tagName: 'button' });
+  const agentUsageTokens = makeElement('agentUsageTokens');
+  const agentUsageTurns = makeElement('agentUsageTurns');
+  const agentUsageDuration = makeElement('agentUsageDuration');
+  const agentUsageEmptyState = makeElement('agentUsageEmptyState');
+  const agentBillingStatus = makeElement('agentBillingStatus');
+  const agentBillingCopy = makeElement('agentBillingCopy');
+  const agentBillingLink = makeElement('agentBillingLink', { tagName: 'a', hidden: true });
+  const agentBillingLinkLabel = makeElement('agentBillingLinkLabel');
   const refreshLabel = makeElement('', { textContent: 'Refresh status' });
   const refreshPending = makeElement('', { hidden: true, textContent: 'Refreshing…' });
   const refreshButton = makeElement('refreshProviderStatusBtn', { tagName: 'button' });
+  const announcement = makeElement('providerEvidenceAnnouncement', { hidden: true });
   refreshButton.querySelector = (selector) => selector.endsWith('refresh-label')
     ? refreshLabel
     : (selector.endsWith('refresh-pending') ? refreshPending : null);
@@ -482,9 +527,11 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const lmstudioBaseUrl = makeElement('lmstudioBaseUrl', { tagName: 'input', value: 'http://localhost:1234' });
   [
     providerRoster, modelProvider, modelName, apiDetails, agentDetails,
-    agentDetailsHeading, agentEmptyState, agentInstallationStatus,
-    agentConnectionStatus, agentAccountStatus, agentSetupStatus,
-    refreshButton, otherDisclosure, otherSummary, otherList, apiKey,
+    agentDetailsHeading, agentNoCredentialCaption, agentEmptyState, agentInstallationStatus,
+    agentConnectionStatus, agentAccountStatus, agentAccountHelp, agentSetupStatus,
+    openAgentSetupGuideBtn, agentUsageTokens, agentUsageTurns, agentUsageDuration,
+    agentUsageEmptyState, agentBillingStatus, agentBillingCopy, agentBillingLink,
+    agentBillingLinkLabel, refreshButton, announcement, otherDisclosure, otherSummary, otherList, apiKey,
     geminiApiKey, openaiApiKey, anthropicApiKey, customApiKey, customEndpoint,
     openrouterApiKey, lmstudioBaseUrl
   ].forEach((element) => { registry[element.id] = element; });
@@ -494,6 +541,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const storageListeners = [];
   const runtimeCalls = [];
   const pendingRuntimeCallbacks = [];
+  const openedSetupPages = [];
   let runtimeResponse = Object.prototype.hasOwnProperty.call(options, 'runtimeResponse')
     ? options.runtimeResponse
     : { success: true, clients: {} };
@@ -540,12 +588,16 @@ function createProviderHarness(initialStorage, harnessOptions) {
     },
     runtime: {
       lastError: null,
+      getURL(relativePath) { return 'chrome-extension://test/' + relativePath; },
       sendMessage(message, callback) {
         runtimeCalls.push(JSON.parse(JSON.stringify(message)));
         if (holdRuntime) pendingRuntimeCallbacks.push(callback);
         else deliverRuntime(callback, runtimeResponse, runtimeError);
       },
       onMessage: { addListener() {} }
+    },
+    tabs: {
+      create(properties) { openedSetupPages.push({ ...properties }); }
     }
   };
   const context = {
@@ -562,6 +614,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     cancelAnimationFrame: clearTimeout,
     location: { hash: '' },
     history: { replaceState() {} },
+    open(url, target, features) { openedSetupPages.push({ url, target, features }); },
     addEventListener() {}
   };
   context.window = context;
@@ -593,14 +646,28 @@ function createProviderHarness(initialStorage, harnessOptions) {
     modelName,
     apiDetails,
     agentDetails,
+    agentDetailsHeading,
+    agentNoCredentialCaption,
     refreshButton,
     refreshLabel,
     refreshPending,
+    announcement,
     agentEmptyState,
     agentInstallationStatus,
     agentConnectionStatus,
     agentAccountStatus,
+    agentAccountHelp,
     agentSetupStatus,
+    openAgentSetupGuideBtn,
+    agentUsageTokens,
+    agentUsageTurns,
+    agentUsageDuration,
+    agentUsageEmptyState,
+    agentBillingStatus,
+    agentBillingCopy,
+    agentBillingLink,
+    agentBillingLinkLabel,
+    openedSetupPages,
     otherDisclosure,
     otherSummary,
     otherList,
@@ -758,6 +825,75 @@ function evidenceBadge(harness, providerId) {
   return harness.evidenceBadges.find((badge) => badge.dataset.providerEvidence === providerId);
 }
 
+async function runAgentDetailsTests() {
+  console.log('Providers panel UI: honest agent account, setup, usage, and billing details');
+  const harness = createProviderHarness();
+  harness.context.setupEventListeners();
+  harness.state().hasSuccessfulEvidence = true;
+  harness.state().evidenceStatus = 'ready';
+  harness.state().clients = {
+    'claude-code': { live: { agentId: 'claude-live' } },
+    opencode: { connected: { lastSeenAt: 20 } },
+    codex: { installed: { detected: true, checkedAt: 30 } }
+  };
+
+  const expected = {
+    'claude-code': {
+      heading: 'Claude Code details',
+      installation: 'Not installed',
+      connection: 'Connected now',
+      copy: "Uses the account signed into Claude Code. FSB does not need your Anthropic credential. Usage and charges follow that account's Claude plan or API configuration.",
+      label: 'Review Claude plans and billing',
+      url: 'https://claude.com/pricing'
+    },
+    opencode: {
+      heading: 'OpenCode details',
+      installation: 'Not installed',
+      connection: 'Seen before',
+      copy: 'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.',
+      label: 'Review OpenCode providers and billing',
+      url: 'https://opencode.ai/docs/providers/'
+    },
+    codex: {
+      heading: 'Codex details',
+      installation: 'Installed',
+      connection: 'Not connected',
+      copy: "Uses the account signed into Codex. FSB does not need your OpenAI credential. Usage, credits, and charges follow that account's current OpenAI plan or API configuration.",
+      label: 'Review current Codex billing',
+      url: 'https://help.openai.com/en/articles/20001106-codex-rate-card-2'
+    }
+  };
+
+  for (const providerId of PROVIDERS.AGENT_PROVIDER_IDS) {
+    harness.context.setProviderSelection('agent', providerId, { markDirty: false });
+    const contract = expected[providerId];
+    assert.strictEqual(harness.agentDetailsHeading.textContent, contract.heading);
+    assert.strictEqual(harness.agentInstallationStatus.textContent, contract.installation);
+    assert.strictEqual(harness.agentConnectionStatus.textContent, contract.connection);
+    assert.strictEqual(harness.agentAccountStatus.textContent, 'Not reported');
+    assert.strictEqual(harness.agentAccountHelp.textContent,
+      'The CLI has not reported its account type.');
+    assert.strictEqual(harness.agentNoCredentialCaption.textContent,
+      "FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.");
+    assert.strictEqual(harness.agentUsageTokens.textContent, '—');
+    assert.strictEqual(harness.agentUsageTurns.textContent, '—');
+    assert.strictEqual(harness.agentUsageDuration.textContent, '—');
+    assert.strictEqual(harness.agentUsageEmptyState.textContent, 'No delegated runs yet');
+    assert.strictEqual(harness.agentBillingStatus.textContent, 'Billing not reported');
+    assert.strictEqual(harness.agentBillingCopy.textContent, contract.copy);
+    assert.strictEqual(harness.agentBillingLinkLabel.textContent, contract.label);
+    assert.strictEqual(harness.agentBillingLink.getAttribute('href'), contract.url);
+    assert.strictEqual(harness.agentBillingLink.getAttribute('target'), '_blank');
+    assert.strictEqual(harness.agentBillingLink.getAttribute('rel'), 'noopener noreferrer');
+    assert.strictEqual(harness.agentBillingLink.hidden, false);
+  }
+
+  harness.openAgentSetupGuideBtn.dispatchEvent({ type: 'click' });
+  assert.deepStrictEqual(harness.openedSetupPages, [
+    { url: 'chrome-extension://test/ui/onboarding.html' }
+  ], 'setup action opens the existing extension onboarding surface once');
+}
+
 async function runProviderEvidenceTests() {
   console.log('Providers panel UI: runtime evidence, recommendation, and failure safety');
 
@@ -875,7 +1011,12 @@ async function runProviderEvidenceTests() {
     'runtime failure retains the previous successful evidence snapshot');
   assert.strictEqual(JSON.stringify(harness.state().recommendation), priorRecommendation,
     'runtime failure retains the previous recommendation');
-  assert.strictEqual(harness.agentDetails.getAttribute('role'), 'alert');
+  assert.strictEqual(harness.agentDetails.getAttribute('role'), null,
+    'the full details region never becomes an assertive alert');
+  assert.strictEqual(harness.announcement.getAttribute('role'), 'alert');
+  assert.strictEqual(harness.announcement.getAttribute('aria-live'), 'assertive');
+  assert.strictEqual(harness.announcement.textContent,
+    'Provider status may be stale. Refresh after the FSB server reconnects.');
   assert.match(evidenceBadge(harness, 'codex').textContent, /Status may be stale/);
   assert.match(evidenceBadge(harness, 'codex').getAttribute('title'), /Status may be stale/);
   assert.doesNotMatch(evidenceBadge(harness, 'codex').getAttribute('title'), /private transport detail/);
@@ -893,6 +1034,11 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(selectedRadio(malformed).dataset.providerId, 'codex',
     'malformed first response does not clear the checked agent radio');
   assert.strictEqual(evidenceBadge(malformed, 'codex').textContent, 'Status unavailable');
+  assert.strictEqual(malformed.announcement.getAttribute('role'), 'status',
+    'background failure retains polite status semantics');
+  assert.strictEqual(malformed.announcement.getAttribute('aria-live'), 'polite');
+  assert.strictEqual(malformed.announcement.textContent,
+    'Provider status is unavailable. Your selection is unchanged.');
 
   const missingRuntime = createProviderHarness();
   missingRuntime.context.setProviderSelection('api', 'openai', { markDirty: false });
@@ -957,6 +1103,7 @@ async function runProviderEvidenceTests() {
 }
 
 runProviderRuntimeTests()
+  .then(runAgentDetailsTests)
   .then(runProviderEvidenceTests)
   .then(() => console.log('PASS providers-panel-ui static and runtime evidence'))
   .catch((error) => {

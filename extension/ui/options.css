@@ -5754,6 +5754,23 @@ textarea.form-input {
   animation: provider-status-spin 800ms linear infinite;
 }
 
+.provider-roster__announcement {
+  margin: -12px 0 24px;
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.provider-roster__announcement[role="alert"] {
+  color: var(--error-color);
+  background: var(--error-light);
+  border-color: var(--error-color);
+}
+
 @keyframes provider-status-spin {
   to { transform: rotate(360deg); }
 }
@@ -6008,6 +6025,14 @@ textarea.form-input {
   line-height: 1.4;
 }
 
+.agent-provider-details__fact .agent-provider-details__help {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
 .agent-provider-details__section {
   margin-top: 32px;
   padding-top: 24px;
@@ -6062,7 +6087,8 @@ textarea.form-input {
 [data-theme="dark"] .provider-row,
 [data-theme="dark"] .agent-provider-details__fact,
 [data-theme="dark"] .agent-usage-grid__item,
-[data-theme="dark"] .provider-empty-state {
+[data-theme="dark"] .provider-empty-state,
+[data-theme="dark"] .provider-roster__announcement {
   color: var(--text-primary);
   background: var(--bg-primary);
   border-color: var(--border-color);
@@ -6107,6 +6133,7 @@ textarea.form-input {
   .provider-row,
   .provider-roster__refresh,
   .provider-roster__refresh-icon,
+  .provider-roster__announcement,
   .provider-detail-action {
     animation: none !important;
     transform: none !important;

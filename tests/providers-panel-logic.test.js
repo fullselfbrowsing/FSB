@@ -55,8 +55,9 @@ function main() {
     'normalizeSettings',
     'getRecommendation',
     'getAgentStatus',
+    'getBillingLabel',
     'getProviderDefinition'
-  ], 'helper exports only the nine declared interface members');
+  ], 'helper exports only the ten declared interface members');
   assert.equal(globalThis.FSBProvidersPanel, providers,
     'CommonJS and classic-script consumers receive the same namespace');
   assert.equal(Object.isFrozen(providers), true, 'exported namespace is frozen');
@@ -348,6 +349,36 @@ function main() {
     connected: { lastSeenAt: 202 },
     live: { connectedAt: 203 }
   }).checkedAt, null, 'unrelated evidence timestamps never substitute for installed checkedAt');
+
+  for (const authState of ['subscription', ' SUBSCRIPTION ', { mode: 'subscription' }]) {
+    assert.deepEqual(providers.getBillingLabel(authState), {
+      label: 'Included in your subscription',
+      confirmed: true
+    }, 'only explicit normalized subscription auth reports inclusion');
+  }
+  for (const mode of ['api', 'credits', 'zen', 'provider']) {
+    assert.deepEqual(providers.getBillingLabel(mode), {
+      label: 'Billed by your CLI provider',
+      confirmed: true
+    }, `${mode} auth reports provider billing`);
+    assert.deepEqual(providers.getBillingLabel({ mode }), {
+      label: 'Billed by your CLI provider',
+      confirmed: true
+    }, `${mode} object auth reports provider billing`);
+  }
+  for (const authState of [undefined, null, '', 'unknown', {}, [], {
+    installed: { detected: true },
+    clicked: {},
+    connected: {},
+    live: {}
+  }]) {
+    assert.deepEqual(providers.getBillingLabel(authState), {
+      label: 'Billing not reported',
+      confirmed: false
+    }, 'unknown auth and provider evidence never imply billing');
+  }
+  assert.notEqual(providers.getBillingLabel('api'), providers.getBillingLabel('api'),
+    'billing derivation returns a fresh result object');
 
   const claude = providers.PROVIDER_DEFINITIONS['claude-code'];
   const opencode = providers.PROVIDER_DEFINITIONS.opencode;
