@@ -67,7 +67,7 @@
   3. Exactly one provider is badged "Recommended" per session, chosen by the strict ground-truth cascade (highest = a CLI currently connected via MCP `initialize`, next = a CLI installed on disk, next = a CLI whose copy button was clicked during onboarding, fallback = the existing xAI-default recommendation); the badge is advisory only — the user's selection is never auto-switched.
   4. `universal-provider.js` (the existing BYOK request builder) never observes an agent value: switching between an active agent provider and a BYOK api provider preserves the other's configuration, and INV-03 provider parity for the 7 BYOK providers holds unchanged.
   5. Cost/usage rows for `agent`-kind providers display token count, turn count, and duration alongside the label "included in your subscription", with a link to the vendor's current billing page — never a fabricated dollar amount and never the words "free" or "unlimited".
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 **UI hint**: yes
 
 ### Phase 59: Reverse-Request Channel & Security Foundation
@@ -162,7 +162,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | Phase | Plans Complete | Status | Completed |
 |-------|-----------------|--------|-----------|
 | 57. Agent Identity Capture | 3/3 | Complete    | 2026-07-12 |
-| 58. Providers Panel | 2/3 | In Progress | — |
+| 58. Providers Panel | 3/3 | In Progress | — |
 | 59. Reverse-Request Channel & Security Foundation | 0/0 | Not started | — |
 | 60. Adapter Contract & Claude Code MVP | 0/0 | Not started | — |
 | 61. Delegation UX & SW-Eviction Persistence | 0/0 | Not started | — |
