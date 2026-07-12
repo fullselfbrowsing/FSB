@@ -286,6 +286,38 @@ async function main() {
   assert.equal(Object.prototype.hasOwnProperty.call(merged, 'gemini'), false,
     'Gemini is not synthesized into a canonical row');
 
+  const protoHarness = createHarness(JSON.parse(`{
+    "fsbAgentProviders": {
+      "clicked": {},
+      "installed": {
+        "__proto__": { "detected": true, "configPath": null, "checkedAt": 42 }
+      },
+      "connected": {
+        "__proto__": { "name": "__proto__", "version": "1.0.0", "lastSeenAt": 43 }
+      }
+    }
+  }`));
+  const protoMerged = await protoHarness.providers.getMergedClients([]);
+  assert.deepEqual(Object.keys(protoMerged), ['__proto__', 'raw:proto'],
+    'special installed and connected identities both survive the merged output');
+  assert.equal(Object.prototype.hasOwnProperty.call(protoMerged, '__proto__'), true,
+    'merged output owns the __proto__ client id instead of invoking its inherited setter');
+  assert.equal(Object.getOwnPropertyDescriptor(protoMerged, '__proto__').enumerable, true,
+    'the special merged client id remains enumerable');
+  assert.notEqual(Object.getPrototypeOf(protoMerged), protoMerged['__proto__'],
+    'the special merged client row does not become the output map prototype');
+  assertExactRow(protoMerged['__proto__'], {
+    id: '__proto__',
+    raw: false,
+    displayName: '__proto__',
+    clicked: null,
+    installed: { detected: true, configPath: null, checkedAt: 42 },
+    connected: null,
+    live: null
+  }, '__proto__ installed evidence remains a complete merged row');
+  assert.equal(protoMerged['raw:proto'].connected.name, '__proto__',
+    'the special connected name remains visible as raw evidence');
+
   for (const row of Object.values(merged)) {
     for (const forbidden of ['tier', 'recommendation', 'recommended', 'selectedProvider', 'provider']) {
       assert.equal(Object.prototype.hasOwnProperty.call(row, forbidden), false,

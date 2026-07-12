@@ -13,8 +13,22 @@
     return Object.prototype.toString.call(value) === '[object Object]';
   }
 
+  function setOwnEnumerable(target, key, value) {
+    Object.defineProperty(target, key, {
+      value: value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  }
+
   function cloneMap(value) {
-    return isPlainObject(value) ? Object.assign({}, value) : {};
+    var clone = {};
+    if (!isPlainObject(value)) return clone;
+    Object.keys(value).forEach(function(key) {
+      setOwnEnumerable(clone, key, value[key]);
+    });
+    return clone;
   }
 
   function connectedRecordTime(record) {
@@ -61,12 +75,15 @@
     Object.keys(value).forEach(function(legacyKey) {
       var record = value[legacyKey];
       if (!isPlainObject(record)) {
-        connected[legacyKey] = record;
+        setOwnEnumerable(connected, legacyKey, record);
         return;
       }
       var key = resolveConnectedKey(record.name, record.version, '', legacyKey);
-      if (shouldReplaceConnectedRecord(connected[key], record)) {
-        connected[key] = record;
+      var current = Object.prototype.hasOwnProperty.call(connected, key)
+        ? connected[key]
+        : undefined;
+      if (shouldReplaceConnectedRecord(current, record)) {
+        setOwnEnumerable(connected, key, record);
       }
     });
     return connected;
@@ -76,7 +93,7 @@
     var source = isPlainObject(value) ? value : {};
     var envelope = {};
     Object.keys(source).forEach(function(key) {
-      envelope[key] = source[key];
+      setOwnEnumerable(envelope, key, source[key]);
     });
     envelope.clicked = cloneMap(source.clicked);
     envelope.connected = normalizeConnected(source.connected);
@@ -100,7 +117,7 @@
 
   async function write(envelope) {
     var payload = {};
-    payload[FSB_AGENT_PROVIDERS_STORAGE_KEY] = normalizeEnvelope(envelope);
+    setOwnEnumerable(payload, FSB_AGENT_PROVIDERS_STORAGE_KEY, normalizeEnvelope(envelope));
     await getStorageArea().set(payload);
     return payload[FSB_AGENT_PROVIDERS_STORAGE_KEY];
   }
@@ -108,7 +125,7 @@
   var mutationChain = Promise.resolve();
 
   function mutateSubmap(submap, mutator) {
-    if (!ALLOWED_SUBMAPS[submap]) {
+    if (!Object.prototype.hasOwnProperty.call(ALLOWED_SUBMAPS, submap)) {
       return Promise.reject(new Error('Unknown MCP agent provider submap'));
     }
     if (typeof mutator !== 'function') {
@@ -152,8 +169,11 @@
         version: version,
         lastSeenAt: Date.now()
       };
-      if (shouldReplaceConnectedRecord(connected[key], record)) {
-        connected[key] = record;
+      var current = Object.prototype.hasOwnProperty.call(connected, key)
+        ? connected[key]
+        : undefined;
+      if (shouldReplaceConnectedRecord(current, record)) {
+        setOwnEnumerable(connected, key, record);
       }
     });
   }
@@ -176,7 +196,7 @@
       if (typeof record.version === 'string') {
         normalized.version = record.version;
       }
-      installed[clientId] = normalized;
+      setOwnEnumerable(installed, clientId, normalized);
     });
     return installed;
   }
@@ -218,7 +238,7 @@
 
     function ensureCanonicalRow(id) {
       if (!Object.prototype.hasOwnProperty.call(merged, id)) {
-        merged[id] = createMergedRow(id, false, id);
+        setOwnEnumerable(merged, id, createMergedRow(id, false, id));
       }
       return merged[id];
     }
@@ -239,7 +259,7 @@
         ? 'raw:' + normalizedName
         : 'raw:unknown-' + unknownIndex++;
       if (!Object.prototype.hasOwnProperty.call(merged, rawId)) {
-        merged[rawId] = createMergedRow(rawId, true, originalName);
+        setOwnEnumerable(merged, rawId, createMergedRow(rawId, true, originalName));
       }
       return merged[rawId];
     }

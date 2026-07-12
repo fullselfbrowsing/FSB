@@ -169,6 +169,11 @@ async function main() {
       /Unknown MCP agent provider submap/,
       'unknown submaps reject'
     );
+    await assert.rejects(
+      providers.mutateSubmap('__proto__', () => {}),
+      /Unknown MCP agent provider submap/,
+      'inherited property names cannot bypass the submap allowlist'
+    );
   }
 
   {
@@ -247,6 +252,38 @@ async function main() {
       version: 'newest',
       lastSeenAt: 300
     }, 'legacy coalescing retains the record with the greatest finite lastSeenAt');
+  }
+
+  {
+    const { localArea } = installChrome();
+    const providers = freshProviders();
+    const installedInput = JSON.parse(
+      '{"__proto__":{"detected":false,"configPath":null,"checkedAt":1}}'
+    );
+    const installedInputPrototype = Object.getPrototypeOf(installedInput);
+
+    await providers.recordConnected('agent_proto', { name: '__proto__', version: '1.0.0' });
+    await providers.replaceInstalled(installedInput);
+
+    const stored = localArea.dump().fsbAgentProviders;
+    const envelope = await providers.read();
+    assert.equal(Object.prototype.hasOwnProperty.call(stored.connected, 'raw:proto'), true,
+      'a special connected name survives under its safe raw namespace');
+    assert.equal(Object.prototype.hasOwnProperty.call(stored.installed, '__proto__'), true,
+      'a JSON-supplied __proto__ platform id survives as durable installed evidence');
+    assert.deepEqual(stored.installed['__proto__'], {
+      detected: false,
+      configPath: null,
+      checkedAt: 1
+    }, 'the __proto__ installed record remains intact');
+    assert.equal(Object.getOwnPropertyDescriptor(envelope.installed, '__proto__').enumerable, true,
+      'the special installed id remains an enumerable own property after normalization');
+    assert.equal(Object.getPrototypeOf(envelope.connected), Object.prototype,
+      'connected evidence does not replace its map prototype');
+    assert.equal(Object.getPrototypeOf(envelope.installed), Object.prototype,
+      'installed evidence does not replace its map prototype');
+    assert.equal(Object.getPrototypeOf(installedInput), installedInputPrototype,
+      'normalizing untrusted platform ids does not mutate the caller map prototype');
   }
 
   {
