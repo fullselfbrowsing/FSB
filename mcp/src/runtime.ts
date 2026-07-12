@@ -34,6 +34,10 @@ export function createRuntime(options: RuntimeOptions = {}): FSBRuntime {
   const agentScope = options.agentScope ?? new AgentScope();
   const server = createServer();
 
+  if (typeof agentScope.setClientInfoSupplier === 'function') {
+    agentScope.setClientInfoSupplier(() => server.server.getClientVersion?.() ?? null);
+  }
+
   registerVisualSessionTools(server, bridge, queue, agentScope);
   registerTriggerTools(server, bridge, queue, agentScope);
   registerManualTools(server, bridge, queue, agentScope);

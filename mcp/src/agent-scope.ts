@@ -14,9 +14,17 @@ import type { WebSocketBridge } from './bridge.js';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
 
+export type ClientInfo = {
+  name?: string;
+  version?: string;
+};
+
+export type ClientInfoSupplier = () => ClientInfo | null;
+
 export class AgentScope {
   private agentId: string | null = null;
   private pending: Promise<string> | null = null;
+  private clientInfoSupplier: ClientInfoSupplier | null = null;
   // Phase 240 Open Q1 resolution: ownership tokens are minted per-bindTab on
   // the extension side. Each bindTab-firing handler returns the freshly
   // minted token in its response under `ownershipToken`. AgentScope captures
@@ -42,6 +50,10 @@ export class AgentScope {
   // lastOwnershipToken pattern.
   private connectionId: string | null = null;
 
+  setClientInfoSupplier(supplier: ClientInfoSupplier): void {
+    this.clientInfoSupplier = supplier;
+  }
+
   /**
    * Returns the per-process agent_id, lazy-minting on first call via the
    * agent:register bridge message. Concurrent first callers share one
@@ -56,8 +68,23 @@ export class AgentScope {
 
     this.pending = (async () => {
       try {
+        const payload: { clientInfo?: ClientInfo } = {};
+        const suppliedClientInfo = this.clientInfoSupplier?.();
+        if (suppliedClientInfo) {
+          const clientInfo: ClientInfo = {};
+          if (typeof suppliedClientInfo.name === 'string') {
+            clientInfo.name = suppliedClientInfo.name;
+          }
+          if (typeof suppliedClientInfo.version === 'string') {
+            clientInfo.version = suppliedClientInfo.version;
+          }
+          if (Object.keys(clientInfo).length > 0) {
+            payload.clientInfo = clientInfo;
+          }
+        }
+
         const result = await bridge.sendAndWait(
-          { type: 'agent:register', payload: {} },
+          { type: 'agent:register', payload },
           { timeout: 10_000 },
         );
         if (!result || result.success !== true || typeof result.agentId !== 'string') {

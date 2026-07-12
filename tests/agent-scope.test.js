@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const nodeAssert = require('node:assert/strict');
 const { pathToFileURL } = require('url');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -98,6 +99,11 @@ async function main() {
     assertEqual(bridge.registerCount(), 1, 'Test 1: exactly one agent:register call after first ensure');
     assertEqual(bridge.calls[0].type, 'agent:register', 'Test 1: call type is agent:register');
     assert(bridge.calls[0].payload && typeof bridge.calls[0].payload === 'object', 'Test 1: payload is an object');
+    nodeAssert.deepStrictEqual(
+      bridge.calls[0],
+      { type: 'agent:register', payload: {} },
+      'Test 1: no suppliers preserve the exact legacy registration message',
+    );
 
     // Subsequent calls return cached id; sendAndWait MUST NOT fire again.
     const id2 = await scope.ensure(bridge);
