@@ -40,6 +40,7 @@
     "node": ">=18.20.0"
   },
   "scripts": {
+    "prebuild": "node ../scripts/verify-agent-provider-flags.mjs",
     "clean": "node -e \"try{require('fs').unlinkSync('build/test-config-engine.js')}catch{}\"",
     "build": "npm run clean && tsc && cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs",
     "dev": "tsx src/index.ts",
