@@ -246,6 +246,35 @@ assert.match(agentDetails, /id="agentAccountStatus">Not reported<\/dd>/);
 assert.match(agentDetails, /The CLI has not reported its account type\./);
 assert.match(agentDetails,
   /FSB uses this CLI's existing sign-in and does not need its credential\. Billing and limits follow the account or provider configured in the CLI\./);
+const pairingInputTag = agentDetails.match(/<input\b[^>]*\bid="mcpBridgePairingCode"[^>]*>/);
+assert.ok(pairingInputTag, 'agent details include the local bridge pairing input');
+assert.strictEqual(attribute(pairingInputTag[0], 'type'), 'password');
+assert.strictEqual(attribute(pairingInputTag[0], 'autocomplete'), 'off');
+assert.strictEqual(attribute(pairingInputTag[0], 'spellcheck'), 'false');
+assert.match(agentDetails, /<label[^>]*for="mcpBridgePairingCode"[^>]*>Pairing code<\/label>/);
+assert.strictEqual((agentDetails.match(/id="mcpBridgePairingCode"/g) || []).length, 1,
+  'agent details contain exactly one pairing input');
+assert.match(agentDetails,
+  /Run fsb-mcp-server pair, then paste the code here\. The code stays in this browser session\./);
+assert.match(agentDetails, /id="pairMcpBridgeBtn"[^>]*>Pair bridge<\/button>/);
+assert.match(agentDetails, /id="removeMcpBridgePairingBtn"[^>]*>Remove pairing<\/button>/);
+assert.match(agentDetails,
+  /id="mcpBridgePairingStatus"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/);
+assert.ok(
+  agentDetails.indexOf('id="mcpBridgePairingCode"') < agentDetails.indexOf('id="pairMcpBridgeBtn"')
+    && agentDetails.indexOf('id="pairMcpBridgeBtn"') < agentDetails.indexOf('id="removeMcpBridgePairingBtn"')
+    && agentDetails.indexOf('id="removeMcpBridgePairingBtn"') < agentDetails.indexOf('id="mcpBridgePairingStatus"'),
+  'pairing controls follow a sensible keyboard and reading order'
+);
+assert.ok(
+  agentDetails.indexOf('id="agentSetupHeading"') < agentDetails.indexOf('id="mcpBridgePairingHeading"')
+    && agentDetails.indexOf('id="mcpBridgePairingHeading"') < agentDetails.indexOf('id="agentUsageHeading"'),
+  'local bridge pairing appears between Setup and Usage'
+);
+providerLabels.forEach((label) => {
+  assert.doesNotMatch(label, /mcpBridgePairing|Pair bridge|Remove pairing/,
+    'pairing controls stay outside provider radio labels');
+});
 assert.match(agentDetails,
   /id="agentBillingLink"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden/);
 assert.doesNotMatch(agentDetails, /id="[^"]*(?:cost|currency)[^"]*"|>\s*Cost\s*</i,
@@ -302,6 +331,13 @@ assert.match(providerCss, /@media \(prefers-reduced-motion: reduce\)/);
 assert.match(providerCss, /\[data-theme="dark"\] \.provider-row/);
 assert.match(providerCss, /\.provider-roster__announcement\[role="alert"\]/);
 assert.match(providerCss, /\.agent-provider-details__fact \.agent-provider-details__help/);
+assert.match(providerCss, /\.mcp-bridge-pairing__row\s*\{[^}]*display:\s*flex[^}]*gap:\s*12px/s);
+assert.match(providerCss, /\.mcp-bridge-pairing__input\s*\{[^}]*flex:\s*1 1 280px[^}]*min-width:\s*0/s);
+assert.match(providerCss, /\.mcp-bridge-pairing__actions \.form-secondary-btn\s*\{[^}]*min-height:\s*44px/s);
+assert.match(providerCss,
+  /\.mcp-bridge-pairing__input:focus-visible,[\s\S]*box-shadow:\s*var\(--fsb-focus-ring\)/);
+assert.match(providerCss, /\.mcp-bridge-pairing__status\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+assert.match(providerCss, /@media \(max-width: 640px\)[\s\S]*\.mcp-bridge-pairing__actions[\s\S]*width:\s*100%/);
 assert.doesNotMatch(providerCss, /#[0-9a-f]{3,8}\b|rgba?\(/i, 'Providers CSS uses existing theme variables');
 assert.match(CSS, /html, body\s*\{\s*overflow-x:\s*hidden;/);
 
@@ -320,6 +356,10 @@ assert.doesNotMatch(JS, /providerSelectionRadios[^;]*\.addEventListener/g,
 const loadSource = extractFunction(JS, 'loadSettings');
 const saveSource = extractFunction(JS, 'saveSettings');
 const discardSource = extractFunction(JS, 'discardChanges');
+const pairBridgeSource = extractFunction(JS, 'pairMcpBridge');
+const removeBridgeSource = extractFunction(JS, 'removeMcpBridgePairing');
+const loadBridgeSource = extractFunction(JS, 'loadMcpBridgePairingStatus');
+const reloadBridgeSource = extractFunction(JS, 'requestMcpBridgePairingReload');
 assert.match(loadSource, /normalizeSettings\(mergedSettings\)/);
 assert.ok(loadSource.indexOf('normalizeSettings(mergedSettings)') < loadSource.indexOf('setProviderSelection('),
   'settings normalize before controls render');
@@ -333,6 +373,19 @@ assert.match(saveSource, /agentProviderId:\s*normalizedProviderSettings\.agentPr
 assert.match(saveSource, /modelProvider:\s*elements\.modelProvider\?\.value \|\| 'xai'/);
 assert.match(saveSource, /settings\.providerKind === 'api' && settings\.apiKey/);
 assert.match(discardSource, /loadSettings\(\)/);
+assert.match(pairBridgeSource,
+  /session\.set\(\{[\s\S]*\[MCP_BRIDGE_PAIRING_KEY\]: \{ pairingCode: pairingCode, storedAt: Date\.now\(\) \}/);
+assert.match(removeBridgeSource, /session\.remove\(MCP_BRIDGE_PAIRING_KEY\)/);
+assert.match(reloadBridgeSource, /sendMessage\(\{ action: 'reloadMcpBridgePairing' \}/);
+assert.match(loadBridgeSource, /session\.get\(\[MCP_BRIDGE_STATE_KEY\]\)/);
+assert.doesNotMatch(loadBridgeSource, /MCP_BRIDGE_PAIRING_KEY|pairingCode/,
+  'status initialization never reads the pairing credential');
+assert.doesNotMatch(pairBridgeSource + removeBridgeSource,
+  /markUnsavedChanges|providerPanelState|defaultSettings|storage\.local|storage\.sync/,
+  'pairing actions remain independent from provider selection and Save state');
+assert.doesNotMatch(loadSource + saveSource + discardSource,
+  /MCP_BRIDGE_PAIRING_KEY|fsbMcpBridgePairing|pairingCode/,
+  'settings load, save, and discard paths never include pairing state');
 
 const apiGetterSource = extractFunction(JS, 'checkApiConnection');
 const discoveryMapStart = JS.indexOf('const IN_SCOPE_PROVIDERS = Object.freeze({');
@@ -602,6 +655,12 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const agentAccountHelp = makeElement('agentAccountHelp');
   const agentSetupStatus = makeElement('agentSetupStatus');
   const openAgentSetupGuideBtn = makeElement('openAgentSetupGuideBtn', { tagName: 'button' });
+  const mcpBridgePairingCode = makeElement('mcpBridgePairingCode', { tagName: 'input', type: 'password' });
+  const pairMcpBridgeBtn = makeElement('pairMcpBridgeBtn', { tagName: 'button' });
+  const removeMcpBridgePairingBtn = makeElement('removeMcpBridgePairingBtn', { tagName: 'button' });
+  const mcpBridgePairingStatus = makeElement('mcpBridgePairingStatus', {
+    textContent: 'No local bridge pairing is saved for this browser session.'
+  });
   const agentUsageTokens = makeElement('agentUsageTokens');
   const agentUsageTurns = makeElement('agentUsageTurns');
   const agentUsageDuration = makeElement('agentUsageDuration');
@@ -633,7 +692,9 @@ function createProviderHarness(initialStorage, harnessOptions) {
     apiDetails, agentDetails,
     agentDetailsHeading, agentNoCredentialCaption, agentEmptyState, agentInstallationStatus,
     agentConnectionStatus, agentAccountStatus, agentAccountHelp, agentSetupStatus,
-    openAgentSetupGuideBtn, agentUsageTokens, agentUsageTurns, agentUsageDuration,
+    openAgentSetupGuideBtn, mcpBridgePairingCode, pairMcpBridgeBtn,
+    removeMcpBridgePairingBtn, mcpBridgePairingStatus,
+    agentUsageTokens, agentUsageTurns, agentUsageDuration,
     agentUsageEmptyState, agentBillingStatus, agentBillingCopy, agentBillingLink,
     agentBillingLinkLabel, refreshButton, announcement, otherDisclosure, otherSummary, otherList, apiKey,
     geminiApiKey, openaiApiKey, anthropicApiKey, customApiKey, customEndpoint,
@@ -641,7 +702,11 @@ function createProviderHarness(initialStorage, harnessOptions) {
   ].forEach((element) => { registry[element.id] = element; });
 
   let storage = { ...(initialStorage || {}) };
+  let sessionStorage = { ...(options.initialSession || {}) };
   const writes = [];
+  const sessionWrites = [];
+  const sessionRemoves = [];
+  const sessionReads = [];
   const storageListeners = [];
   const runtimeCalls = [];
   const pendingRuntimeCallbacks = [];
@@ -653,6 +718,10 @@ function createProviderHarness(initialStorage, harnessOptions) {
     ? options.runtimeResponse
     : { success: true, clients: {} };
   let runtimeError = null;
+  const pairingRuntimeResponse = Object.prototype.hasOwnProperty.call(options, 'pairingRuntimeResponse')
+    ? options.pairingRuntimeResponse
+    : { success: true, pairingStatus: 'paired' };
+  const pairingRuntimeError = options.pairingRuntimeError || null;
   let holdRuntime = options.holdRuntime === true;
   const document = {
     getElementById(id) { return registry[id] || null; },
@@ -691,7 +760,32 @@ function createProviderHarness(initialStorage, harnessOptions) {
           if (callback) callback();
         }
       },
-      session: {},
+      session: {
+        get(keys) {
+          const requested = Array.isArray(keys) ? Array.from(keys, String) : [String(keys)];
+          sessionReads.push(requested);
+          const result = {};
+          requested.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(sessionStorage, key)) {
+              result[key] = sessionStorage[key];
+            }
+          });
+          return Promise.resolve(result);
+        },
+        set(next) {
+          sessionWrites.push(JSON.parse(JSON.stringify(next)));
+          if (options.sessionSetError) return Promise.reject(new Error(String(options.sessionSetError)));
+          sessionStorage = { ...sessionStorage, ...next };
+          return Promise.resolve();
+        },
+        remove(keys) {
+          const requested = Array.isArray(keys) ? Array.from(keys, String) : [String(keys)];
+          sessionRemoves.push(requested);
+          if (options.sessionRemoveError) return Promise.reject(new Error(String(options.sessionRemoveError)));
+          requested.forEach((key) => { delete sessionStorage[key]; });
+          return Promise.resolve();
+        }
+      },
       onChanged: { addListener(listener) { storageListeners.push(listener); } }
     },
     runtime: {
@@ -699,8 +793,13 @@ function createProviderHarness(initialStorage, harnessOptions) {
       getURL(relativePath) { return 'chrome-extension://test/' + relativePath; },
       sendMessage(message, callback) {
         runtimeCalls.push(JSON.parse(JSON.stringify(message)));
-        if (holdRuntime) pendingRuntimeCallbacks.push(callback);
-        else deliverRuntime(callback, runtimeResponse, runtimeError);
+        const isPairingReload = message && message.action === 'reloadMcpBridgePairing';
+        if (holdRuntime && !isPairingReload) pendingRuntimeCallbacks.push(callback);
+        else deliverRuntime(
+          callback,
+          isPairingReload ? pairingRuntimeResponse : runtimeResponse,
+          isPairingReload ? pairingRuntimeError : runtimeError
+        );
       },
       onMessage: { addListener() {} }
     },
@@ -768,6 +867,9 @@ function createProviderHarness(initialStorage, harnessOptions) {
     context,
     calls,
     writes,
+    sessionWrites,
+    sessionRemoves,
+    sessionReads,
     runtimeCalls,
     scheduledTimeoutDelays,
     radios,
@@ -793,6 +895,10 @@ function createProviderHarness(initialStorage, harnessOptions) {
     agentAccountHelp,
     agentSetupStatus,
     openAgentSetupGuideBtn,
+    mcpBridgePairingCode,
+    pairMcpBridgeBtn,
+    removeMcpBridgePairingBtn,
+    mcpBridgePairingStatus,
     agentUsageTokens,
     agentUsageTurns,
     agentUsageDuration,
@@ -808,6 +914,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     apiKey,
     anthropicApiKey,
     get storage() { return storage; },
+    get sessionStorage() { return sessionStorage; },
     setStorage(next) { storage = { ...next }; },
     setRuntimeResponse(response) {
       runtimeResponse = response;
@@ -1205,6 +1312,105 @@ async function runAgentDetailsTests() {
   ], 'setup action opens the existing extension onboarding surface once');
 }
 
+async function runMcpBridgePairingTests() {
+  console.log('Providers panel UI: session-only local bridge pairing');
+  const pairingCode = 'fsb-auth.' + 'A'.repeat(43);
+
+  const invalid = createProviderHarness();
+  invalid.mcpBridgePairingCode.value = 'fsb-auth.too-short';
+  const invalidResult = await invalid.context.pairMcpBridge();
+  assert.strictEqual(invalidResult.errorCode, 'invalid_pairing_code');
+  assert.deepStrictEqual(invalid.sessionWrites, []);
+  assert.deepStrictEqual(invalid.runtimeCalls, []);
+  assert.strictEqual(invalid.mcpBridgePairingStatus.getAttribute('role'), 'alert');
+  assert.strictEqual(invalid.mcpBridgePairingStatus.getAttribute('aria-live'), 'assertive');
+  assert.doesNotMatch(invalid.mcpBridgePairingStatus.textContent, /too-short/,
+    'validation feedback never echoes the rejected credential');
+
+  const paired = createProviderHarness({}, {
+    pairingRuntimeResponse: { success: true, pairingStatus: 'paired' }
+  });
+  paired.mcpBridgePairingCode.value = '  ' + pairingCode + '  ';
+  const pairPromise = paired.context.pairMcpBridge();
+  assert.strictEqual(paired.mcpBridgePairingCode.value, '',
+    'pairing input clears synchronously after the session write begins');
+  await pairPromise;
+  assert.strictEqual(paired.sessionWrites.length, 1);
+  assert.strictEqual(
+    paired.sessionWrites[0].fsbMcpBridgePairing.pairingCode,
+    pairingCode
+  );
+  assert.ok(Number.isFinite(paired.sessionWrites[0].fsbMcpBridgePairing.storedAt));
+  assert.deepStrictEqual(paired.runtimeCalls, [{ action: 'reloadMcpBridgePairing' }]);
+  assert.strictEqual(paired.mcpBridgePairingStatus.textContent,
+    'Local bridge paired for this browser session.');
+  assert.strictEqual(paired.mcpBridgePairingStatus.getAttribute('role'), 'status');
+  assert.deepStrictEqual(paired.writes, [], 'pairing writes nothing to local settings storage');
+  assert.strictEqual(paired.dashboardState().hasUnsavedChanges, false,
+    'pairing does not enter the provider Save/discard workflow');
+
+  const configured = createProviderHarness({}, {
+    pairingRuntimeResponse: { success: true, pairingStatus: 'configured' }
+  });
+  configured.mcpBridgePairingCode.value = pairingCode;
+  await configured.context.pairMcpBridge();
+  assert.strictEqual(configured.mcpBridgePairingStatus.textContent,
+    'Pairing saved. Start or restart fsb-mcp-server serve, then retry.');
+  assert.doesNotMatch(configured.mcpBridgePairingStatus.textContent, /paired/i,
+    'configured state does not claim an authenticated bridge');
+
+  const expired = createProviderHarness({}, {
+    pairingRuntimeResponse: { success: true, pairingStatus: 'expired' }
+  });
+  expired.mcpBridgePairingCode.value = pairingCode;
+  await expired.context.pairMcpBridge();
+  assert.strictEqual(expired.mcpBridgePairingStatus.textContent,
+    'Pairing code was rejected or expired. Run fsb-mcp-server pair again.');
+  assert.strictEqual(expired.mcpBridgePairingStatus.getAttribute('role'), 'alert');
+  assert.strictEqual(expired.mcpBridgePairingStatus.getAttribute('aria-live'), 'assertive');
+
+  const removed = createProviderHarness({}, {
+    initialSession: {
+      fsbMcpBridgePairing: { pairingCode, storedAt: 123 },
+      mcpBridgeState: { pairingStatus: 'paired' }
+    },
+    pairingRuntimeResponse: { success: true, pairingStatus: 'unpaired' }
+  });
+  removed.mcpBridgePairingCode.value = pairingCode;
+  const removeResult = await removed.context.removeMcpBridgePairing();
+  assert.strictEqual(removeResult.success, true);
+  assert.deepStrictEqual(removed.sessionRemoves, [['fsbMcpBridgePairing']]);
+  assert.strictEqual(removed.mcpBridgePairingCode.value, '');
+  assert.deepStrictEqual(removed.runtimeCalls, [{ action: 'reloadMcpBridgePairing' }]);
+  assert.strictEqual(removed.mcpBridgePairingStatus.textContent, 'Pairing removed.');
+
+  const loaded = createProviderHarness({}, {
+    initialSession: {
+      fsbMcpBridgePairing: { pairingCode, storedAt: 123 },
+      mcpBridgeState: { pairingStatus: 'paired' }
+    }
+  });
+  loaded.mcpBridgePairingCode.value = 'must-disappear';
+  await loaded.context.loadMcpBridgePairingStatus();
+  assert.strictEqual(loaded.mcpBridgePairingCode.value, '');
+  assert.strictEqual(loaded.mcpBridgePairingStatus.textContent,
+    'Local bridge paired for this browser session.');
+  assert.deepStrictEqual(loaded.sessionReads, [['mcpBridgeState']],
+    'initial status reads only the public bridge state record');
+
+  const failed = createProviderHarness({}, {
+    sessionSetError: 'sensitive write failure ' + pairingCode
+  });
+  failed.mcpBridgePairingCode.value = pairingCode;
+  await failed.context.pairMcpBridge();
+  assert.strictEqual(failed.mcpBridgePairingCode.value, '');
+  assert.strictEqual(failed.mcpBridgePairingStatus.textContent,
+    'Pairing could not be saved. Try again.');
+  assert.doesNotMatch(failed.mcpBridgePairingStatus.textContent, /fsb-auth/,
+    'storage errors cannot surface credential-bearing details');
+  assert.deepStrictEqual(failed.runtimeCalls, []);
+}
+
 async function runProviderEvidenceTests() {
   console.log('Providers panel UI: runtime evidence, recommendation, and failure safety');
 
@@ -1549,6 +1755,7 @@ async function runProviderEvidenceTests() {
 
 runProviderRuntimeTests()
   .then(runAgentDetailsTests)
+  .then(runMcpBridgePairingTests)
   .then(runProviderEvidenceTests)
   .then(() => console.log('PASS providers-panel-ui static and runtime evidence'))
   .catch((error) => {

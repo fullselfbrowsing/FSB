@@ -134,6 +134,15 @@ let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
 let providerEvidenceRefreshQueued = false;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
+const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
+const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
+const MCP_BRIDGE_PAIRING_COPY = Object.freeze({
+  paired: 'Local bridge paired for this browser session.',
+  configured: 'Pairing saved. Start or restart fsb-mcp-server serve, then retry.',
+  expired: 'Pairing code was rejected or expired. Run fsb-mcp-server pair again.',
+  unpaired: 'No local bridge pairing is saved for this browser session.'
+});
 let providerSettingsModelLoadTimer = null;
 let providerSettingsLoadGeneration = 0;
 
@@ -174,6 +183,7 @@ function initializeDashboard() {
 
   // Load saved settings
   loadSettings();
+  loadMcpBridgePairingStatus();
 
   // Replace native <select>s with the custom dropdown widget. Runs after
   // loadSettings() so each select's current .value/.selected already
@@ -246,6 +256,10 @@ function cacheElements() {
   elements.agentAccountHelp = document.getElementById('agentAccountHelp');
   elements.agentSetupStatus = document.getElementById('agentSetupStatus');
   elements.openAgentSetupGuideBtn = document.getElementById('openAgentSetupGuideBtn');
+  elements.mcpBridgePairingCode = document.getElementById('mcpBridgePairingCode');
+  elements.pairMcpBridgeBtn = document.getElementById('pairMcpBridgeBtn');
+  elements.removeMcpBridgePairingBtn = document.getElementById('removeMcpBridgePairingBtn');
+  elements.mcpBridgePairingStatus = document.getElementById('mcpBridgePairingStatus');
   elements.agentUsageTokens = document.getElementById('agentUsageTokens');
   elements.agentUsageTurns = document.getElementById('agentUsageTurns');
   elements.agentUsageDuration = document.getElementById('agentUsageDuration');
@@ -714,6 +728,136 @@ function openAgentSetupGuide() {
   }
 }
 
+function renderMcpBridgePairingStatus(status, isAlert = false) {
+  const statusElement = elements.mcpBridgePairingStatus;
+  const normalized = Object.prototype.hasOwnProperty.call(MCP_BRIDGE_PAIRING_COPY, status)
+    ? status
+    : 'unpaired';
+  if (!statusElement) return normalized;
+  statusElement.textContent = MCP_BRIDGE_PAIRING_COPY[normalized];
+  statusElement.setAttribute('role', isAlert ? 'alert' : 'status');
+  statusElement.setAttribute('aria-live', isAlert ? 'assertive' : 'polite');
+  statusElement.setAttribute('aria-atomic', 'true');
+  return normalized;
+}
+
+function requestMcpBridgePairingReload() {
+  return new Promise((resolve) => {
+    const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
+    if (!runtime || typeof runtime.sendMessage !== 'function') {
+      resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_unavailable' });
+      return;
+    }
+    try {
+      runtime.sendMessage({ action: 'reloadMcpBridgePairing' }, (response) => {
+        if (runtime.lastError) {
+          resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+          return;
+        }
+        resolve(response && typeof response === 'object'
+          ? response
+          : { success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+      });
+    } catch (_error) {
+      resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+    }
+  });
+}
+
+async function pairMcpBridge() {
+  const input = elements.mcpBridgePairingCode;
+  const pairingCode = String(input && input.value ? input.value : '').trim();
+  if (!MCP_BRIDGE_PAIRING_PATTERN.test(pairingCode)) {
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Enter the pairing code printed by fsb-mcp-server pair.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+      elements.mcpBridgePairingStatus.setAttribute('aria-atomic', 'true');
+    }
+    return { success: false, errorCode: 'invalid_pairing_code' };
+  }
+
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  if (!session || typeof session.set !== 'function') {
+    if (input) input.value = '';
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be saved. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_storage_unavailable' };
+  }
+
+  try {
+    const storageWrite = session.set({
+      [MCP_BRIDGE_PAIRING_KEY]: { pairingCode: pairingCode, storedAt: Date.now() }
+    });
+    // The DOM copy is cleared immediately after initiating the trusted session
+    // write and before any runtime message or network reconnect begins.
+    if (input) input.value = '';
+    await Promise.resolve(storageWrite);
+  } catch (_error) {
+    if (input) input.value = '';
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be saved. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_storage_failed' };
+  }
+
+  const response = await requestMcpBridgePairingReload();
+  const status = response && response.success === true
+    && Object.prototype.hasOwnProperty.call(MCP_BRIDGE_PAIRING_COPY, response.pairingStatus)
+    ? response.pairingStatus
+    : 'configured';
+  renderMcpBridgePairingStatus(status, status === 'expired');
+  return { success: response && response.success === true, pairingStatus: status };
+}
+
+async function removeMcpBridgePairing() {
+  const input = elements.mcpBridgePairingCode;
+  if (input) input.value = '';
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  try {
+    if (!session || typeof session.remove !== 'function') throw new Error('session unavailable');
+    await Promise.resolve(session.remove(MCP_BRIDGE_PAIRING_KEY));
+  } catch (_error) {
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be removed. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_remove_failed' };
+  }
+
+  await requestMcpBridgePairingReload();
+  if (elements.mcpBridgePairingStatus) {
+    elements.mcpBridgePairingStatus.textContent = 'Pairing removed.';
+    elements.mcpBridgePairingStatus.setAttribute('role', 'status');
+    elements.mcpBridgePairingStatus.setAttribute('aria-live', 'polite');
+    elements.mcpBridgePairingStatus.setAttribute('aria-atomic', 'true');
+  }
+  return { success: true, pairingStatus: 'unpaired' };
+}
+
+async function loadMcpBridgePairingStatus() {
+  if (elements.mcpBridgePairingCode) elements.mcpBridgePairingCode.value = '';
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  if (!session || typeof session.get !== 'function') {
+    return renderMcpBridgePairingStatus('unpaired');
+  }
+  try {
+    const stored = await session.get([MCP_BRIDGE_STATE_KEY]);
+    const status = stored && stored[MCP_BRIDGE_STATE_KEY]
+      ? stored[MCP_BRIDGE_STATE_KEY].pairingStatus
+      : 'unpaired';
+    return renderMcpBridgePairingStatus(status, status === 'expired');
+  } catch (_error) {
+    return renderMcpBridgePairingStatus('unpaired');
+  }
+}
+
 function setProviderEvidenceAnnouncement(message, isAlert = false) {
   const announcement = elements.providerEvidenceAnnouncement;
   if (!announcement) return;
@@ -914,6 +1058,12 @@ function setupEventListeners() {
   if (elements.openAgentSetupGuideBtn) {
     elements.openAgentSetupGuideBtn.addEventListener('click', openAgentSetupGuide);
   }
+  if (elements.pairMcpBridgeBtn) {
+    elements.pairMcpBridgeBtn.addEventListener('click', pairMcpBridge);
+  }
+  if (elements.removeMcpBridgePairingBtn) {
+    elements.removeMcpBridgePairingBtn.addEventListener('click', removeMcpBridgePairing);
+  }
 
   // Form inputs change detection
   const formInputs = [
@@ -1102,6 +1252,10 @@ function setupEventListeners() {
       if (area === 'session' && changes && changes.fsbAgentRegistry) {
         scheduleRefreshActiveAgentCount();
         scheduleProviderEvidenceRefresh();
+      } else if (area === 'session' && changes && changes.mcpBridgeState) {
+        const nextState = changes.mcpBridgeState.newValue;
+        const nextStatus = nextState && nextState.pairingStatus;
+        renderMcpBridgePairingStatus(nextStatus, nextStatus === 'expired');
       } else if (area === 'local' && changes && changes.fsbAgentProviders) {
         scheduleProviderEvidenceRefresh();
       } else if (area === 'local' && changes && changes.fsbAgentCap) {

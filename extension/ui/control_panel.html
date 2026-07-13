@@ -531,6 +531,20 @@
                 <button type="button" id="openAgentSetupGuideBtn" class="form-secondary-btn provider-detail-action">Open setup guide</button>
               </section>
 
+              <section class="agent-provider-details__section mcp-bridge-pairing" aria-labelledby="mcpBridgePairingHeading">
+                <h4 id="mcpBridgePairingHeading">Local bridge pairing</h4>
+                <p>Run fsb-mcp-server pair, then paste the code here. The code stays in this browser session.</p>
+                <label class="mcp-bridge-pairing__label" for="mcpBridgePairingCode">Pairing code</label>
+                <div class="mcp-bridge-pairing__row">
+                  <input type="password" id="mcpBridgePairingCode" class="form-input mcp-bridge-pairing__input" autocomplete="off" spellcheck="false">
+                  <div class="mcp-bridge-pairing__actions">
+                    <button type="button" id="pairMcpBridgeBtn" class="form-secondary-btn">Pair bridge</button>
+                    <button type="button" id="removeMcpBridgePairingBtn" class="form-secondary-btn">Remove pairing</button>
+                  </div>
+                </div>
+                <p id="mcpBridgePairingStatus" class="mcp-bridge-pairing__status" role="status" aria-live="polite" aria-atomic="true">No local bridge pairing is saved for this browser session.</p>
+              </section>
+
               <section class="agent-provider-details__section" aria-labelledby="agentUsageHeading">
                 <h4 id="agentUsageHeading">Usage</h4>
                 <dl class="agent-usage-grid">

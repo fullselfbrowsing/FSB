@@ -490,6 +490,32 @@ function main() {
     assert.match(controlPanelSource, new RegExp(`id="${id}"`), `${id} markup remains present`);
   }
 
+  const agentDetails = controlPanelSource.match(
+    /<div id="agentProviderDetails"[\s\S]*?<\/div>\s*<\/div>\s*<\/section>/
+  );
+  assert.ok(agentDetails, 'agent provider details markup remains present');
+  assert.match(agentDetails[0],
+    /<input type="password" id="mcpBridgePairingCode"[^>]*autocomplete="off"[^>]*spellcheck="false">/,
+    'bridge pairing uses a non-autofilled password input');
+  assert.match(agentDetails[0],
+    /Run fsb-mcp-server pair, then paste the code here\. The code stays in this browser session\./,
+    'bridge pairing explains the exact session-only workflow');
+  assert.ok(
+    agentDetails[0].indexOf('id="agentSetupHeading"')
+      < agentDetails[0].indexOf('id="mcpBridgePairingHeading"')
+      && agentDetails[0].indexOf('id="mcpBridgePairingHeading"')
+        < agentDetails[0].indexOf('id="agentUsageHeading"'),
+    'bridge pairing sits between agent Setup and Usage'
+  );
+  const providerLabels = controlPanelSource.match(
+    /<label\b[^>]*class="provider-row"[^>]*>[\s\S]*?<\/label>/g
+  ) || [];
+  assert.equal(providerLabels.length, 10, 'the provider roster keeps ten radio labels');
+  providerLabels.forEach((label) => {
+    assert.doesNotMatch(label, /mcpBridgePairing|Pair bridge|Remove pairing/,
+      'pairing controls never nest inside provider radio labels');
+  });
+
   const testCommands = JSON.parse(packageSource).scripts.test.split(' && ');
   const providerCommand = 'node tests/providers-panel-logic.test.js';
   const providerUiCommand = 'node tests/providers-panel-ui.test.js';

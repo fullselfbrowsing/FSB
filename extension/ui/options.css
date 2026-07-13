@@ -6058,6 +6058,49 @@ textarea.form-input {
   margin-top: 16px;
 }
 
+.mcp-bridge-pairing__label {
+  display: block;
+  margin: 16px 0 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mcp-bridge-pairing__row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mcp-bridge-pairing__input {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.mcp-bridge-pairing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mcp-bridge-pairing__actions .form-secondary-btn {
+  min-height: 44px;
+}
+
+.mcp-bridge-pairing__input:focus-visible,
+.mcp-bridge-pairing__actions .form-secondary-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--fsb-focus-ring);
+}
+
+.mcp-bridge-pairing__status {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .agent-usage-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6138,6 +6181,18 @@ textarea.form-input {
   .agent-usage-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .mcp-bridge-pairing__row,
+  .mcp-bridge-pairing__actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .mcp-bridge-pairing__actions .form-secondary-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6145,7 +6200,10 @@ textarea.form-input {
   .provider-roster__refresh,
   .provider-roster__refresh-icon,
   .provider-roster__announcement,
-  .provider-detail-action {
+  .provider-detail-action,
+  .mcp-bridge-pairing__input,
+  .mcp-bridge-pairing__actions .form-secondary-btn,
+  .mcp-bridge-pairing__status {
     animation: none !important;
     transform: none !important;
     transition: none !important;
