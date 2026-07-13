@@ -522,6 +522,80 @@ async function runWrapperBehaviorCases() {
   }
 }
 
+function buildPairingRuntimeHarness(reloadImpl) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
+  const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('runtime handler extraction markers missing');
+  const handlerSource = backgroundSource.slice(start, end);
+  const calls = [];
+  const context = {
+    chrome: { runtime: { id: 'pairing-runtime-extension' } },
+    armMcpBridge() {},
+    automationLogger: { logComm() {} },
+    mcpBridgeClient: {
+      reloadPairingAndReconnect() {
+        calls.push(true);
+        return reloadImpl();
+      },
+      getState() { return { pairingStatus: 'configured' }; }
+    },
+    console,
+    Promise,
+    Object
+  };
+  context.globalThis = context;
+  vm.runInNewContext(`${handlerSource}\nthis.__handler = fsbHandleRuntimeMessage;`, context, {
+    filename: 'background.js#reloadMcpBridgePairing'
+  });
+  return { handler: context.__handler, calls };
+}
+
+function dispatchPairingRuntime(harness, request) {
+  return new Promise((resolve) => {
+    const keepOpen = harness.handler(
+      request,
+      { id: 'pairing-runtime-extension' },
+      resolve
+    );
+    if (keepOpen !== true && request.action === 'reloadMcpBridgePairing') {
+      Promise.resolve().then(() => {});
+    }
+  });
+}
+
+async function runPairingRuntimeActionCases() {
+  console.log('\n--- B9: reloadMcpBridgePairing is secret-free ---');
+
+  {
+    const harness = buildPairingRuntimeHarness(async () => ({ pairingStatus: 'paired' }));
+    const response = await dispatchPairingRuntime(harness, { action: 'reloadMcpBridgePairing' });
+    assertDeepEqual(response, { success: true, pairingStatus: 'paired' }, 'secret-free reload returns only success and pairingStatus');
+    assertEqual(harness.calls.length, 1, 'secret-free reload invokes the bridge client exactly once');
+  }
+
+  for (const field of ['pairingCode', 'secret', 'token']) {
+    const harness = buildPairingRuntimeHarness(async () => ({ pairingStatus: 'paired' }));
+    const response = await dispatchPairingRuntime(harness, {
+      action: 'reloadMcpBridgePairing',
+      [field]: 'must-not-cross-runtime'
+    });
+    assertDeepEqual(response, { success: false, errorCode: 'pairing_secret_in_runtime_message' }, `${field}-bearing reload is rejected with a bounded code`);
+    assertEqual(harness.calls.length, 0, `${field}-bearing reload rejects before bridge invocation`);
+  }
+
+  {
+    const error = new Error('private detail');
+    error.code = 'bridge_topology_changed';
+    const harness = buildPairingRuntimeHarness(async () => { throw error; });
+    const response = await dispatchPairingRuntime(harness, { action: 'reloadMcpBridgePairing' });
+    assertDeepEqual(response, { success: false, errorCode: 'bridge_topology_changed' }, 'reload failure returns only the stable errorCode');
+    assert(!JSON.stringify(response).includes('private detail'), 'reload failure omits private error text');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Part C -- source-contract pins
 // ---------------------------------------------------------------------------
@@ -552,6 +626,10 @@ function runSourceContractCase() {
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');
   assert(bridgeSource.includes('agent_management_deprecated'), 'mcp-bridge-client.js carries the agent deprecation errorCode');
   assert(!bridgeSource.includes('fsb-mcp-internal'), 'dead fsb-mcp-internal CustomEvent scaffolding removed');
+  assert(backgroundSource.includes("case 'reloadMcpBridgePairing':"), 'background.js includes the secret-free pairing reload action');
+  assert(backgroundSource.includes('mcpBridgeClient.reloadPairingAndReconnect()'), 'background.js delegates pairing reload directly to the bridge client');
+  assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]reloadMcpBridgePairing['"]/.test(backgroundSource),
+    'background.js never self-sends the pairing reload action');
 }
 
 // ---------------------------------------------------------------------------
@@ -562,6 +640,7 @@ async function run() {
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
   await runWrapperBehaviorCases();
+  await runPairingRuntimeActionCases();
   runSourceContractCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

@@ -11,6 +11,14 @@
 
 const MCP_BRIDGE_URL = 'ws://localhost:7225';
 const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
+const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+const FSB_EXT_PROTOCOL = 'fsb-ext-v1';
+const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
+const DEFAULT_EXT_REQUEST_TIMEOUT_MS = 30000;
+const MIN_EXT_REQUEST_TIMEOUT_MS = 1000;
+const MAX_EXT_REQUEST_TIMEOUT_MS = 120000;
+const AUTH_STATUS_TIMEOUT_MS = 5000;
+const EXT_METHOD_PATTERN = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
 const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
@@ -60,12 +68,23 @@ class MCPBridgeClient {
     // can be cancelled on a fast reconnect (within RECONNECT_GRACE_MS).
     this._connectionId = null;
     this._lastKnownConnectionId = null;
+    this._pairingCode = null;
+    this._pairingLoaded = false;
+    this._pairingLoadPromise = null;
+    this._pairingReloadPromise = null;
+    this._pairingStatus = 'unpaired';
+    this._authProbePromise = null;
+    this._extPending = new Map();
+    this._extRequestCounter = 0;
+    this._replacementSockets = new Set();
+    this._socketWaiters = new Set();
   }
 
   getState() {
     return {
       status: this._status,
       connected: this._connected,
+      pairingStatus: this._pairingStatus,
       url: MCP_BRIDGE_URL,
       reconnectDelayMs: this._reconnectDelay,
       maxReconnectDelayMs: MCP_RECONNECT_MAX_MS,
@@ -91,6 +110,11 @@ class MCPBridgeClient {
    * Start the connection. Safe to call multiple times.
    */
   connect() {
+    if (!this._pairingLoaded) {
+      this._ensurePairingLoaded().then(() => this.connect()).catch(() => this.connect());
+      return;
+    }
+
     if (this._ws && (this._ws.readyState === WebSocket.OPEN || this._ws.readyState === WebSocket.CONNECTING)) {
       this._persistState();
       return;
@@ -102,20 +126,26 @@ class MCPBridgeClient {
     this._persistState();
 
     try {
-      this._ws = new WebSocket(MCP_BRIDGE_URL);
+      this._ws = this._pairingCode
+        ? new WebSocket(MCP_BRIDGE_URL, [FSB_EXT_PROTOCOL, this._pairingCode])
+        : new WebSocket(MCP_BRIDGE_URL);
     } catch (err) {
-      console.log('[FSB MCP Bridge] WebSocket construction failed:', err.message);
+      console.log('[FSB MCP Bridge] WebSocket construction failed');
       this._ws = null;
       this._connected = false;
       this._status = 'disconnected';
       this._lastDisconnectedAt = this._timestamp();
-      this._lastDisconnectReason = 'construct_failed:' + (err.message || 'unknown');
+      this._lastDisconnectReason = 'construct_failed';
       this._persistState();
       this._scheduleReconnect();
+      this._notifySocketWaiters('offline', null);
       return;
     }
 
-    this._ws.onopen = () => {
+    const socket = this._ws;
+
+    socket.onopen = () => {
+      if (this._ws !== socket) return;
       console.log('[FSB MCP Bridge] Connected to local MCP bridge');
       this._connected = true;
       this._status = 'connected';
@@ -166,13 +196,23 @@ class MCPBridgeClient {
       // run_task snapshots that survived an SW eviction. Authoritative
       // settle still lives server-side in autopilot.ts via sw_evicted.
       try { this._reconcileInFlightTasksOnConnect(); } catch (_e) { /* best-effort */ }
+      if (this._pairingCode) {
+        this._setPairingStatus('configured');
+        this._authProbePromise = this._probePairingStatus(socket);
+      } else {
+        this._setPairingStatus('unpaired');
+        this._authProbePromise = null;
+      }
+      this._notifySocketWaiters('open', socket);
     };
 
-    this._ws.onmessage = (event) => {
+    socket.onmessage = (event) => {
       this._handleMessage(event.data);
     };
 
-    this._ws.onclose = () => {
+    socket.onclose = () => {
+      const wasReplacement = this._replacementSockets.delete(socket);
+      if (this._ws === socket) this._ws = null;
       console.log('[FSB MCP Bridge] Disconnected from local MCP bridge');
       this._connected = false;
       this._status = 'disconnected';
@@ -197,14 +237,19 @@ class MCPBridgeClient {
       } catch (_e) { /* best-effort */ }
       // Phase 239 plan 03 -- arm reconciler for the next connect cycle.
       this._inFlightTasksReconciled = false;
+      this._rejectAllExtPending();
+      if (this._pairingStatus === 'paired') {
+        this._pairingStatus = this._pairingCode ? 'configured' : 'unpaired';
+      }
       this._persistState();
       this._stopPing();
-      if (!this._intentionalClose) {
+      this._notifySocketWaiters('close', socket);
+      if (!this._intentionalClose && !wasReplacement) {
         this._scheduleReconnect();
       }
     };
 
-    this._ws.onerror = (err) => {
+    socket.onerror = () => {
       // Errors are followed by onclose, so reconnect happens there
       this._lastDisconnectReason = 'socket_error';
     };
@@ -225,6 +270,7 @@ class MCPBridgeClient {
       this._ws.close();
       this._ws = null;
     }
+    this._rejectAllExtPending();
     this._connected = false;
     this._status = 'disconnected';
     this._lastDisconnectedAt = this._timestamp();
@@ -247,6 +293,298 @@ class MCPBridgeClient {
    */
   getConnectionId() {
     return this._connectionId || null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Pairing and extension reverse requests
+  // --------------------------------------------------------------------------
+
+  _isPlainRecord(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    if (Object.prototype.toString.call(value) !== '[object Object]') return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === null
+      || (prototype.constructor && prototype.constructor.name === 'Object');
+  }
+
+  _isValidPairingRecord(value) {
+    if (!this._isPlainRecord(value)) return false;
+    const keys = Object.keys(value).sort();
+    return keys.length === 2
+      && keys[0] === 'pairingCode'
+      && keys[1] === 'storedAt'
+      && typeof value.pairingCode === 'string'
+      && MCP_BRIDGE_PAIRING_PATTERN.test(value.pairingCode)
+      && Number.isFinite(value.storedAt);
+  }
+
+  _setPairingStatus(status) {
+    if (!['unpaired', 'configured', 'paired', 'expired'].includes(status)) return;
+    this._pairingStatus = status;
+    this._persistState({ pairingStatus: status });
+  }
+
+  async _readPairingFromSession() {
+    let record = null;
+    try {
+      const area = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+      if (area && typeof area.get === 'function') {
+        const stored = await area.get([MCP_BRIDGE_PAIRING_KEY]);
+        record = stored && stored[MCP_BRIDGE_PAIRING_KEY];
+      }
+    } catch (_error) {
+      record = null;
+    }
+
+    this._pairingCode = this._isValidPairingRecord(record) ? record.pairingCode : null;
+    this._pairingLoaded = true;
+    this._pairingStatus = this._pairingCode ? 'configured' : 'unpaired';
+    return this._pairingCode;
+  }
+
+  _ensurePairingLoaded() {
+    if (this._pairingLoaded) return Promise.resolve(this._pairingCode);
+    if (this._pairingLoadPromise) return this._pairingLoadPromise;
+    this._pairingLoadPromise = this._readPairingFromSession()
+      .catch(() => {
+        this._pairingCode = null;
+        this._pairingLoaded = true;
+        this._pairingStatus = 'unpaired';
+        return null;
+      })
+      .finally(() => {
+        this._pairingLoadPromise = null;
+      });
+    return this._pairingLoadPromise;
+  }
+
+  _notifySocketWaiters(event, socket) {
+    for (const waiter of [...this._socketWaiters]) {
+      try { waiter(event, socket); } catch (_error) { /* isolated waiter */ }
+    }
+  }
+
+  _waitForReplacementSocket() {
+    const current = this._ws;
+    if (current && current.readyState === WebSocket.OPEN) {
+      return Promise.resolve({ event: 'open', socket: current });
+    }
+    if (!current) return Promise.resolve({ event: 'offline', socket: null });
+
+    return new Promise((resolve) => {
+      let timer = null;
+      const finish = (event, socket) => {
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        resolve({ event, socket });
+      };
+      const waiter = (event, socket) => {
+        if (socket !== current && event !== 'offline') return;
+        if (event === 'open' || event === 'close' || event === 'offline') finish(event, socket);
+      };
+      this._socketWaiters.add(waiter);
+      timer = setTimeout(() => finish('offline', null), AUTH_STATUS_TIMEOUT_MS);
+    });
+  }
+
+  async _closeSocketForPairingReload() {
+    const socket = this._ws;
+    if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
+      this._ws = null;
+      return;
+    }
+
+    this._replacementSockets.add(socket);
+    await new Promise((resolve) => {
+      let timer = null;
+      const waiter = (event, closedSocket) => {
+        if (event !== 'close' || closedSocket !== socket) return;
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        resolve();
+      };
+      this._socketWaiters.add(waiter);
+      timer = setTimeout(() => {
+        this._socketWaiters.delete(waiter);
+        if (this._ws === socket) this._ws = null;
+        resolve();
+      }, 1000);
+      try {
+        socket.close();
+      } catch (_error) {
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        if (this._ws === socket) this._ws = null;
+        resolve();
+      }
+    });
+  }
+
+  reloadPairingAndReconnect() {
+    if (this._pairingReloadPromise) return this._pairingReloadPromise;
+    this._pairingReloadPromise = this._reloadPairingAndReconnect()
+      .finally(() => {
+        this._pairingReloadPromise = null;
+      });
+    return this._pairingReloadPromise;
+  }
+
+  async _reloadPairingAndReconnect() {
+    this._pairingLoaded = false;
+    this._pairingLoadPromise = null;
+    await this._ensurePairingLoaded();
+
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    this._clearReconnectAlarm();
+    await this._closeSocketForPairingReload();
+    this._intentionalClose = false;
+    this.connect();
+
+    if (!this._pairingCode) {
+      this._setPairingStatus('unpaired');
+      return { pairingStatus: 'unpaired' };
+    }
+
+    this._setPairingStatus('configured');
+    const outcome = await this._waitForReplacementSocket();
+    if (outcome.event !== 'open' || !outcome.socket) {
+      return { pairingStatus: 'configured' };
+    }
+
+    const probe = this._authProbePromise;
+    if (probe) await probe;
+    return { pairingStatus: this._pairingStatus };
+  }
+
+  async _probePairingStatus(socket) {
+    if (!this._pairingCode || this._ws !== socket || socket.readyState !== WebSocket.OPEN) {
+      return this._pairingStatus;
+    }
+    try {
+      const response = await this.sendExtRequest('bridge.auth-status', {}, { timeout: AUTH_STATUS_TIMEOUT_MS });
+      const exactAuthorized = this._isPlainRecord(response)
+        && Object.keys(response).length === 1
+        && response.authorized === true;
+      if (this._ws !== socket) return this._pairingStatus;
+      this._setPairingStatus(exactAuthorized ? 'paired' : 'expired');
+    } catch (_error) {
+      if (this._ws === socket) this._setPairingStatus('expired');
+    }
+    return this._pairingStatus;
+  }
+
+  _boundedExtTimeout(value) {
+    if (value === undefined) return DEFAULT_EXT_REQUEST_TIMEOUT_MS;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return DEFAULT_EXT_REQUEST_TIMEOUT_MS;
+    return Math.max(MIN_EXT_REQUEST_TIMEOUT_MS, Math.min(MAX_EXT_REQUEST_TIMEOUT_MS, numeric));
+  }
+
+  _makeExtError(message, code, retryable) {
+    const error = new Error(message);
+    error.code = code;
+    error.retryable = retryable === true;
+    return error;
+  }
+
+  sendExtRequest(method, payload, options = {}) {
+    if (typeof method !== 'string' || !EXT_METHOD_PATTERN.test(method)) {
+      return Promise.reject(this._makeExtError('Invalid extension request method', 'invalid_ext_request', false));
+    }
+    if (!this._isPlainRecord(payload) || Object.keys(payload).length > 100) {
+      return Promise.reject(this._makeExtError('Invalid extension request payload', 'invalid_ext_request', false));
+    }
+    const socket = this._ws;
+    if (!this._connected || !socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.reject(this._makeExtError('Local bridge is not connected', 'agent_provider_offline', true));
+    }
+
+    const connectionPart = this._connectionId
+      || (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2, 10));
+    const id = `ext_${connectionPart}_${++this._extRequestCounter}_${Date.now()}`;
+    const timeoutMs = this._boundedExtTimeout(options.timeout);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const pending = this._extPending.get(id);
+        if (!pending) return;
+        this._extPending.delete(id);
+        reject(this._makeExtError('Extension request timed out', 'ext_request_timeout', true));
+      }, timeoutMs);
+
+      this._extPending.set(id, {
+        resolve,
+        reject,
+        timer,
+        socket,
+        onEvent: typeof options.onEvent === 'function' ? options.onEvent : null,
+      });
+
+      try {
+        this._send({ id, type: 'ext:request', method, payload });
+      } catch (_error) {
+        clearTimeout(timer);
+        this._extPending.delete(id);
+        reject(this._makeExtError('Local bridge send failed', 'bridge_topology_changed', true));
+      }
+    });
+  }
+
+  _handleExtFrame(msg) {
+    if (!msg || (msg.type !== 'ext:event' && msg.type !== 'ext:response') || typeof msg.id !== 'string') {
+      return false;
+    }
+    const pending = this._extPending.get(msg.id);
+    if (!pending || pending.socket !== this._ws) return true;
+
+    if (msg.type === 'ext:event') {
+      if (typeof msg.event !== 'string' || !this._isPlainRecord(msg.payload)) return true;
+      if (pending.onEvent) {
+        try { pending.onEvent(msg.event, msg.payload); } catch (_error) { /* event observers do not settle */ }
+      }
+      return true;
+    }
+
+    const hasPayload = Object.prototype.hasOwnProperty.call(msg, 'payload');
+    const hasError = Object.prototype.hasOwnProperty.call(msg, 'error');
+    if (hasPayload === hasError) return true;
+    if (hasPayload && !this._isPlainRecord(msg.payload)) return true;
+    if (hasError && !this._isPlainRecord(msg.error)) return true;
+    clearTimeout(pending.timer);
+    this._extPending.delete(msg.id);
+
+    if (hasPayload) {
+      pending.resolve(msg.payload);
+      return true;
+    }
+    if (hasError) {
+      const code = typeof msg.error.code === 'string' ? msg.error.code : 'invalid_ext_request';
+      const retryable = msg.error.retryable === true;
+      if (code === 'ext_unauthorized') this._setPairingStatus('expired');
+      pending.reject(this._makeExtError(
+        typeof msg.error.message === 'string' ? msg.error.message : 'Extension request failed',
+        code,
+        retryable,
+      ));
+    }
+    return true;
+  }
+
+  _rejectAllExtPending() {
+    for (const [id, pending] of this._extPending) {
+      clearTimeout(pending.timer);
+      this._extPending.delete(id);
+      pending.reject(this._makeExtError(
+        'Bridge topology changed before the extension request completed',
+        'bridge_topology_changed',
+        true,
+      ));
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -372,6 +710,13 @@ class MCPBridgeClient {
     try {
       msg = JSON.parse(raw);
     } catch {
+      return;
+    }
+
+    // Reverse-channel responses/events are correlated independently from
+    // inbound MCP commands and must never reach the MCP dispatcher.
+    if (msg && (msg.type === 'ext:event' || msg.type === 'ext:response')) {
+      this._handleExtFrame(msg);
       return;
     }
 

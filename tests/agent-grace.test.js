@@ -499,6 +499,15 @@ this.__phase241bridge = {
     } catch (_e) { /* best-effort */ }
   }
 
+  async function connectBridgeClient(client) {
+    client.connect();
+    // Phase 59 validates trusted session pairing state before constructing
+    // either the legacy or credential-subprotocol socket.
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.ok(client._ws, 'pairing preload eventually constructs the bridge socket');
+    client._ws.open();
+  }
+
   console.log('--- Test 9 (bridge): onopen mints connection_id ---');
   {
     setupChromeMock();
@@ -515,9 +524,7 @@ this.__phase241bridge = {
         'bridge module exposes RECONNECT_GRACE_MS = 10000');
 
       assert.strictEqual(client._connectionId, null, 'no connectionId pre-connect');
-      client.connect();
-      // Trigger onopen via the fake socket.
-      client._ws.open();
+      await connectBridgeClient(client);
       assert.strictEqual(typeof client._connectionId, 'string',
         'connectionId is a string after onopen');
       assert.ok(client._connectionId.length > 8, 'connectionId is non-trivial in length');
@@ -546,8 +553,7 @@ this.__phase241bridge = {
 
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const conn = client._connectionId;
 
       const A = (await reg.registerAgent()).agentId;
@@ -585,8 +591,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const firstConn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, firstConn);
@@ -598,8 +603,7 @@ this.__phase241bridge = {
       assert.ok(reg._stagedReleases.has(firstConn), 'first conn staged');
 
       // Reconnect: assigns a NEW connection_id and cancels the prior staged release.
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const secondConn = client._connectionId;
       assert.notStrictEqual(secondConn, firstConn, 'reconnect mints a fresh connection_id');
       await new Promise((r) => setTimeout(r, 20));
@@ -633,8 +637,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const firstConn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, firstConn);
@@ -643,8 +646,7 @@ this.__phase241bridge = {
       await new Promise((r) => setTimeout(r, 20));
       assert.ok(reg._stagedReleases.has(firstConn), 'first conn staged');
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       await new Promise((r) => setTimeout(r, 100));
 
       assert.deepStrictEqual(ownerRelease.calls, [],
@@ -672,8 +674,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       // No agents stamped under this connection_id.
       client._ws.close();
       await new Promise((r) => setTimeout(r, 20));
@@ -701,8 +702,7 @@ this.__phase241bridge = {
       harness = buildBridgeWithRegistry(reg);
       const client = harness.exports.mcpBridgeClient;
 
-      client.connect();
-      client._ws.open();
+      await connectBridgeClient(client);
       const conn = client._connectionId;
       const A = (await reg.registerAgent()).agentId;
       reg.stampConnectionId(A, conn);

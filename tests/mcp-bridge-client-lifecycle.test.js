@@ -115,8 +115,8 @@ function createRuntimeOnMessageMock() {
   };
 }
 
-function createChromeMock() {
-  const session = createStorageArea();
+function createChromeMock(initialSession = {}) {
+  const session = createStorageArea(initialSession);
   const local = createStorageArea();
   const alarms = new Map();
   const cleared = [];
@@ -149,13 +149,15 @@ function createFakeWebSocketClass(options = {}) {
   const sockets = [];
 
   class FakeWebSocket {
-    constructor(url) {
+    constructor(url, protocols) {
       if (options.throwOnConstruct) {
         throw new Error('server unavailable');
       }
       this.url = url;
+      this.protocols = protocols;
       this.readyState = FakeWebSocket.CONNECTING;
       this.sent = [];
+      this.closeCount = 0;
       sockets.push(this);
     }
 
@@ -165,12 +167,19 @@ function createFakeWebSocketClass(options = {}) {
     }
 
     close() {
+      this.closeCount += 1;
       this.readyState = FakeWebSocket.CLOSED;
       if (typeof this.onclose === 'function') this.onclose();
     }
 
     send(payload) {
       this.sent.push(payload);
+    }
+
+    receive(payload) {
+      if (typeof this.onmessage === 'function') {
+        this.onmessage({ data: typeof payload === 'string' ? payload : JSON.stringify(payload) });
+      }
     }
   }
 
@@ -182,7 +191,7 @@ function createFakeWebSocketClass(options = {}) {
 }
 
 function buildClientHarness(options = {}) {
-  const chrome = createChromeMock();
+  const chrome = createChromeMock(options.session);
   const timers = createFakeTimers();
   const FakeWebSocket = createFakeWebSocketClass(options);
   const deterministicMath = Object.create(Math);
@@ -191,7 +200,7 @@ function buildClientHarness(options = {}) {
   const context = {
     chrome,
     WebSocket: FakeWebSocket,
-    console,
+    console: options.console || console,
     Math: deterministicMath,
     Date,
     EventTarget,
@@ -218,6 +227,8 @@ this.__phase198 = {
   MCP_BRIDGE_STATE_KEY: typeof MCP_BRIDGE_STATE_KEY !== 'undefined' ? MCP_BRIDGE_STATE_KEY : undefined,
   MCP_RECONNECT_ALARM: typeof MCP_RECONNECT_ALARM !== 'undefined' ? MCP_RECONNECT_ALARM : undefined,
   MCP_RECONNECT_MAX_MS: typeof MCP_RECONNECT_MAX_MS !== 'undefined' ? MCP_RECONNECT_MAX_MS : undefined,
+  MCP_BRIDGE_PAIRING_KEY: typeof MCP_BRIDGE_PAIRING_KEY !== 'undefined' ? MCP_BRIDGE_PAIRING_KEY : undefined,
+  FSB_EXT_PROTOCOL: typeof FSB_EXT_PROTOCOL !== 'undefined' ? FSB_EXT_PROTOCOL : undefined,
   lifecycleBus: typeof fsbAutomationLifecycleBus !== 'undefined' ? fsbAutomationLifecycleBus : null
 };
 `;
@@ -232,8 +243,7 @@ this.__phase198 = {
 }
 
 async function flushMicrotasks() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
 function assertNoSecrets(value, msg) {
@@ -294,6 +304,7 @@ async function runConnectedTransitionCase() {
   const client = harness.exports.mcpBridgeClient;
 
   client.connect();
+  await flushMicrotasks();
   const socket = harness.sockets[0];
   assert(socket, 'connect creates a WebSocket instance');
   if (socket) socket.open();
@@ -574,6 +585,247 @@ function runBackgroundArmingSourceCase() {
   }
 }
 
+const VALID_PAIRING_CODE = 'fsb-auth.' + 'A'.repeat(43);
+
+async function runPairingConstructionCases() {
+  console.log('\n--- Phase 59 pairing-aware connection construction ---');
+
+  {
+    const harness = buildClientHarness();
+    harness.exports.mcpBridgeClient.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    assertEqual(harness.exports.MCP_BRIDGE_PAIRING_KEY, 'fsbMcpBridgePairing', 'pairing storage key is exact');
+    assertEqual(harness.exports.FSB_EXT_PROTOCOL, 'fsb-ext-v1', 'stable extension subprotocol is exact');
+    assertEqual(socket.url, 'ws://localhost:7225', 'unpaired WebSocket uses the unchanged bridge URL');
+    assertEqual(socket.protocols, undefined, 'unpaired WebSocket preserves the legacy single-argument constructor');
+    assert(!/[?#]/.test(socket.url), 'unpaired bridge URL contains no query or hash credential transport');
+  }
+
+  {
+    const logs = [];
+    const harness = buildClientHarness({
+      session: {
+        fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: 1_783_900_000_000 }
+      },
+      console: {
+        log: (...args) => logs.push(args),
+        warn: (...args) => logs.push(args),
+        error: (...args) => logs.push(args)
+      }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    assertDeepEqual(toPlainObject(socket.protocols), ['fsb-ext-v1', VALID_PAIRING_CODE], 'configured WebSocket offers stable and credential subprotocols in order');
+    assertEqual(socket.url, 'ws://localhost:7225', 'configured WebSocket keeps the credential out of the URL');
+    assertEqual(client.getState().pairingStatus, 'configured', 'stored credential begins configured, not paired');
+    const publicState = JSON.stringify(client.getState());
+    const persistedState = JSON.stringify(harness.chrome.storage.session._dump().mcpBridgeState || {});
+    const capturedLogs = JSON.stringify(logs);
+    const interior = VALID_PAIRING_CODE.slice(15, 31);
+    for (const [value, label] of [[publicState, 'getState'], [persistedState, 'mcpBridgeState'], [capturedLogs, 'captured logs']]) {
+      assert(!value.includes(VALID_PAIRING_CODE), `${label} omits the full pairing credential`);
+      assert(!value.includes(interior), `${label} omits a 16-character interior credential substring`);
+    }
+  }
+
+  for (const record of [
+    { pairingCode: 'fsb-auth.short', storedAt: Date.now() },
+    { pairingCode: VALID_PAIRING_CODE, storedAt: Infinity },
+    { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now(), extra: true }
+  ]) {
+    const harness = buildClientHarness({ session: { fsbMcpBridgePairing: record } });
+    harness.exports.mcpBridgeClient.connect();
+    await flushMicrotasks();
+    assertEqual(harness.sockets[0].protocols, undefined, 'malformed or non-exact session record is ignored');
+    assertEqual(harness.exports.mcpBridgeClient.getState().pairingStatus, 'unpaired', 'invalid session record clears in-memory pairing state');
+  }
+}
+
+async function runPairingProbeAndReloadCases() {
+  console.log('\n--- Phase 59 authenticated pairing probe and reload ---');
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const probe = JSON.parse(socket.sent[0]);
+    assertEqual(client.getState().pairingStatus, 'configured', 'WebSocket open alone remains configured');
+    assertDeepEqual(
+      { type: probe.type, method: probe.method, payload: probe.payload },
+      { type: 'ext:request', method: 'bridge.auth-status', payload: {} },
+      'open configured socket sends the secret-free bridge.auth-status probe'
+    );
+    assert(!JSON.stringify(probe).includes(VALID_PAIRING_CODE), 'auth-status probe frame contains no credential');
+    socket.receive({ id: probe.id, type: 'ext:response', payload: { authorized: true } });
+    await flushMicrotasks();
+    assertEqual(client.getState().pairingStatus, 'paired', 'exact authorized:true probe promotes to paired');
+  }
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const probe = JSON.parse(socket.sent[0]);
+    socket.receive({
+      id: probe.id,
+      type: 'ext:response',
+      error: { code: 'ext_unauthorized', message: 'Extension authorization is unavailable', retryable: false }
+    });
+    await flushMicrotasks();
+    assertEqual(client.getState().pairingStatus, 'expired', 'unauthorized probe marks the stored credential expired');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const first = harness.sockets[0];
+    first.open();
+    await harness.chrome.storage.session.set({
+      fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() }
+    });
+    const reloadPromise = client.reloadPairingAndReconnect();
+    await flushMicrotasks();
+    const replacement = harness.sockets[1];
+    assertEqual(first.closeCount, 1, 'pairing reload closes the prior socket exactly once');
+    assert(replacement && replacement !== first, 'pairing reload creates one replacement socket');
+    assertDeepEqual(toPlainObject(replacement.protocols), ['fsb-ext-v1', VALID_PAIRING_CODE], 'replacement socket uses newly loaded authority');
+    replacement.open();
+    const probe = JSON.parse(replacement.sent[0]);
+    replacement.receive({ id: probe.id, type: 'ext:response', payload: { authorized: true } });
+    const result = await reloadPromise;
+    assertDeepEqual(toPlainObject(result), { pairingStatus: 'paired' }, 'reload resolves paired only after authenticated probe');
+  }
+
+  {
+    const harness = buildClientHarness({
+      throwOnConstruct: true,
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const result = await harness.exports.mcpBridgeClient.reloadPairingAndReconnect();
+    assertDeepEqual(toPlainObject(result), { pairingStatus: 'configured' }, 'offline reload retains honest configured status');
+  }
+}
+
+async function runExtRequestLifecycleCases() {
+  console.log('\n--- Phase 59 reverse request lifecycle ---');
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const events = [];
+    const resultPromise = client.sendExtRequest('agent.test', { task: 'one' }, {
+      timeout: 7000,
+      onEvent: (eventName, payload) => events.push({ eventName, payload: toPlainObject(payload) })
+    });
+    const request = JSON.parse(socket.sent[0]);
+    assertDeepEqual(
+      Object.keys(request).sort(),
+      ['id', 'method', 'payload', 'type'],
+      'ext request sends only id/type/method/payload'
+    );
+    assertDeepEqual(
+      { type: request.type, method: request.method, payload: request.payload },
+      { type: 'ext:request', method: 'agent.test', payload: { task: 'one' } },
+      'ext request JSON matches the additive frame contract'
+    );
+    socket.receive({ id: request.id, type: 'ext:event', event: 'progress', payload: { step: 1 } });
+    socket.receive({ id: request.id, type: 'ext:event', event: 'progress', payload: { step: 2 } });
+    assertEqual(client._extPending.size, 1, 'events do not settle the pending request');
+    socket.receive({ id: request.id, type: 'ext:response', payload: { ok: true } });
+    const result = await resultPromise;
+    assertDeepEqual(toPlainObject(events), [
+      { eventName: 'progress', payload: { step: 1 } },
+      { eventName: 'progress', payload: { step: 2 } }
+    ], 'zero-or-more ext events are delivered in order before final');
+    assertDeepEqual(toPlainObject(result), { ok: true }, 'first final response resolves the request payload');
+    assertEqual(client._extPending.size, 0, 'final response clears pending state');
+    socket.receive({ id: request.id, type: 'ext:response', payload: { ok: false } });
+    assertEqual(client._extPending.size, 0, 'duplicate final is dropped after settlement');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const rejected = client.sendExtRequest('agent.test', {});
+    const request = JSON.parse(socket.sent[0]);
+    socket.receive({
+      id: request.id,
+      type: 'ext:response',
+      error: { code: 'agent_provider_offline', message: 'No handler', retryable: true }
+    });
+    await rejected.then(
+      () => assert(false, 'error final rejects instead of resolving'),
+      (error) => {
+        assertEqual(error.code, 'agent_provider_offline', 'error final preserves stable error code');
+        assertEqual(error.retryable, true, 'error final preserves retryable flag');
+      }
+    );
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const timedOut = client.sendExtRequest('agent.timeout', {}, { timeout: 1000 });
+    const timeout = harness.timers.timeouts.find((timer) => timer.delay === 1000 && !timer.cleared);
+    timeout.fn();
+    await timedOut.then(
+      () => assert(false, 'timeout rejects instead of resolving'),
+      (error) => assertEqual(error.code, 'ext_request_timeout', 'timeout rejects with ext_request_timeout')
+    );
+    assertEqual(client._extPending.size, 0, 'timeout clears pending state');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const pending = client.sendExtRequest('agent.close', { once: true });
+    const originalFrame = socket.sent[0];
+    socket.close();
+    await pending.then(
+      () => assert(false, 'socket close rejects instead of resolving'),
+      (error) => assertEqual(error.code, 'bridge_topology_changed', 'socket close rejects with topology error')
+    );
+    assertEqual(client._extPending.size, 0, 'socket close clears every reverse pending entry');
+    const reconnectTimer = harness.timers.timeouts.find((timer) => !timer.cleared && timer.delay >= 2000);
+    reconnectTimer.fn();
+    await flushMicrotasks();
+    const replacement = harness.sockets[1];
+    replacement.open();
+    assert(!replacement.sent.includes(originalFrame), 'reconnect never replays an application ext request');
+  }
+}
+
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
@@ -584,6 +836,9 @@ async function run() {
   await runVisualSessionRouteCase();
   await runTriggerMessageRouteCase();
   runBackgroundArmingSourceCase();
+  await runPairingConstructionCases();
+  await runPairingProbeAndReloadCases();
+  await runExtRequestLifecycleCases();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

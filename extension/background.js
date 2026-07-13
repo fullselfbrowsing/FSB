@@ -7698,6 +7698,39 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       return true;
     }
 
+    case 'reloadMcpBridgePairing': {
+      // Pairing credentials cross only from the trusted options page directly
+      // into chrome.storage.session. Runtime messages carry no secret data.
+      const forbiddenPairingFields = ['pairingCode', 'secret', 'token'];
+      if (forbiddenPairingFields.some((field) => Object.prototype.hasOwnProperty.call(request, field))) {
+        sendResponse({ success: false, errorCode: 'pairing_secret_in_runtime_message' });
+        return false;
+      }
+      if (!mcpBridgeClient || typeof mcpBridgeClient.reloadPairingAndReconnect !== 'function') {
+        sendResponse({ success: false, errorCode: 'mcp_bridge_pairing_reload_unavailable' });
+        return false;
+      }
+      (async () => {
+        try {
+          const result = await mcpBridgeClient.reloadPairingAndReconnect();
+          sendResponse({
+            success: true,
+            pairingStatus: result && result.pairingStatus
+              ? result.pairingStatus
+              : mcpBridgeClient.getState().pairingStatus
+          });
+        } catch (error) {
+          sendResponse({
+            success: false,
+            errorCode: error && typeof error.code === 'string'
+              ? error.code
+              : 'mcp_bridge_pairing_reload_failed'
+          });
+        }
+      })();
+      return true;
+    }
+
     case 'startAutomation':
       handleStartAutomation(request, sender, sendResponse);
       return true; // Will respond asynchronously
