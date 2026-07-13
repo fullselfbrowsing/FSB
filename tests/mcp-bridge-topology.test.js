@@ -997,6 +997,160 @@ async function runActiveSocketRevocation(WebSocketBridge, auth, reset) {
   });
 }
 
+async function runHubExitWithActiveExtRequest(WebSocketBridge, auth) {
+  await withTempHome('bridge-hub-exit-active-ext', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 32_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://hub-exit-extension', authPath);
+    let handlerInvocations = 0;
+    let resolveHandler = null;
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'active-ext-original-hub',
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+    });
+    const relay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'active-ext-promoting-relay',
+      handshakeTimeoutMs: 25,
+      promotionJitterMs: 1,
+      maxReconnectDelayMs: 100,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        handlerInvocations++;
+        return new Promise((resolve) => {
+          resolveHandler = resolve;
+        });
+      },
+    });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://hub-exit-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      const extensionClose = waitForSocketClose(extension);
+      extension.send(JSON.stringify({
+        id: 'hub-exit-active-request',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: {},
+      }));
+      await waitFor(() => handlerInvocations === 1, 'hub-exit active relay invocation', 1000, 10);
+      assertEqual(hub.activeExtRequests.size, 1, 'hub tracks the active ext request before exit');
+      assertEqual(relay.relayActiveExtRequests.size, 1, 'selected relay tracks the active ext request before hub exit');
+
+      hub.disconnect();
+      await extensionClose;
+      await waitFor(
+        () => relay.currentMode === 'hub' && relay.topology.activeHubInstanceId === 'active-ext-promoting-relay',
+        'active ext relay promotion',
+        1000,
+        10,
+      );
+      assertEqual(messages.length, 0, 'hub exit is observed as socket loss without a fabricated final response');
+      assertEqual(hub.activeExtRequests.size, 0, 'exited hub clears its old reverse route state');
+      assertEqual(relay.relayActiveExtRequests.size, 0, 'promoted relay clears its old relayed request state');
+      assertEqual(handlerInvocations, 1, 'hub exit does not replay the request during promotion');
+
+      resolveHandler({ tooLate: true });
+      await sleep(20);
+      assertEqual(messages.length, 0, 'late selected-relay completion cannot reach the closed extension socket');
+      assertEqual(handlerInvocations, 1, 'late completion does not create a replay after promotion');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runCapableRelayExitMidExtFrame(WebSocketBridge, auth) {
+  await withTempHome('bridge-relay-exit-mid-ext', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 33_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://relay-exit-extension', authPath);
+    let firstInvocations = 0;
+    let secondInvocations = 0;
+    let resolveFirst = null;
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-exit-hub',
+      handshakeTimeoutMs: 25,
+    });
+    const firstRelay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-exit-first',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        firstInvocations++;
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      },
+    });
+    const secondRelay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-exit-second',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        secondInvocations++;
+        return { target: 'second' };
+      },
+    });
+    const resources = { sockets: [], bridges: [hub, firstRelay, secondRelay] };
+    try {
+      await hub.connect();
+      await firstRelay.connect();
+      await secondRelay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://relay-exit-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      extension.send(JSON.stringify({
+        id: 'relay-exit-mid-frame',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: {},
+      }));
+      await waitFor(() => firstInvocations === 1, 'selected relay invocation before exit', 1000, 10);
+      assertEqual(hub.activeExtRequests.size, 1, 'hub route exists while selected relay is active');
+
+      firstRelay.disconnect();
+      await waitFor(() => messages.length === 1, 'relay topology error response', 1000, 10);
+      assertEqual(messages[0]?.error?.code, 'bridge_topology_changed', 'selected relay exit returns one topology error');
+      assertEqual(messages.filter((message) => message.type === 'ext:response').length, 1, 'selected relay exit settles exactly once');
+      assertEqual(hub.activeExtRequests.size, 0, 'selected relay exit clears the reverse route');
+      assertEqual(hub.currentMode, 'hub', 'original hub stays up after selected relay exit');
+      assertEqual(secondRelay.currentMode, 'relay', 'second capable relay remains connected');
+      assertEqual(secondInvocations, 0, 'selected relay exit does not replay to the second capable relay');
+      assertEqual(hub.topology.relayCount, 1, 'hub retains the unselected capable relay');
+
+      resolveFirst({ tooLate: true });
+      await sleep(20);
+      assertEqual(messages.length, 1, 'late response from exited relay cannot create a second final');
+      assertEqual(secondInvocations, 0, 'late completion still does not trigger failover replay');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runHubExitPromotion(WebSocketBridge) {
   const resources = await createBridgePair(WebSocketBridge);
   try {
@@ -1035,6 +1189,8 @@ async function run() {
   await runCase('first capable relay routing and settlement', () => runRelayReverseRouting(WebSocketBridge, auth));
   await runCase('active socket revocation after external rotation', () => runActiveSocketRevocation(WebSocketBridge, auth, false));
   await runCase('active socket revocation and new-ID rebind after reset', () => runActiveSocketRevocation(WebSocketBridge, auth, true));
+  await runCase('hub exits with an active ext request', () => runHubExitWithActiveExtRequest(WebSocketBridge, auth));
+  await runCase('capable relay exits mid ext frame', () => runCapableRelayExitMidExtFrame(WebSocketBridge, auth));
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
