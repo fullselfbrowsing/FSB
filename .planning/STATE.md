@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: ready
-stopped_at: Phase 58 complete; live UAT deferred to milestone end; Phase 59 ready for discussion
-last_updated: "2026-07-13T01:18:30Z"
-last_activity: 2026-07-12 -- Phase 58 complete; UAT deferred; Phase 59 ready
+status: executing
+stopped_at: Phase 59 planned and independently checked; ready to execute Plan 01
+last_updated: "2026-07-13T02:23:19.276Z"
+last_activity: 2026-07-13 -- Phase 59 planning complete
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 6
+  total_plans: 10
   completed_plans: 6
   percent: 22
 ---
@@ -33,10 +33,10 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 ## Current Position
 
-Phase: 59 (Reverse-Request Channel & Security Foundation) — READY FOR DISCUSSION
-Plan: Not started
-Status: Phase 58 complete under milestone-end UAT deferral; Phase 59 is ready for discussion
-Last activity: 2026-07-12 -- Phase 58 complete; UAT deferred; Phase 59 ready
+Phase: 59 (Reverse-Request Channel & Security Foundation) — READY TO EXECUTE
+Plan: 0 of 4 complete
+Status: Ready to execute
+Last activity: 2026-07-13 -- Phase 59 planning complete
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -44,7 +44,7 @@ Last activity: 2026-07-12 -- Phase 58 complete; UAT deferred; Phase 59 ready
 |-------|------|--------------|--------|
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
-| 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Ready for discussion (SECURITY-CRITICAL, load-bearing) |
+| 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Planned; ready to execute (SECURITY-CRITICAL, load-bearing) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
@@ -104,15 +104,15 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phase 58 is complete; Phase 59 is ready for discussion.
+None. Phase 58 is complete; Phase 59 has four checker-approved plans and is ready to execute.
 
 ### Blockers/Concerns
 
-No active blocker. One open judgment call remains for Phase 59 planning (not a blocker, but a decision to make explicitly rather than let default-implicitly):
+No active blocker.
 
 - **Milestone-end UAT gate:** Phase 58's 12 live Providers checks remain pending in `58-HUMAN-UAT.md`. Per user instruction, all future live UAT is accumulated and audited at milestone end; automated verification is 8/8 and the final code review is clean, with no visual pass inferred.
 
-- **Phase 59 planning:** Shared-secret provisioning UX — TOFU pairing on first `serve` connect vs a user-visible pairing code from `fsb-mcp-server pair`. Research recommends deciding explicitly in Phase 59 planning; both paths meet the CHAN-04 requirement.
+- **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
 Three additional Phase-60-time verifications flagged from research (SUMMARY.md Confidence Assessment):
 
@@ -144,10 +144,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-13T01:18:30Z
-Stopped at: Phase 58 complete; live UAT deferred to milestone end; Phase 59 ready for discussion
+Last session: 2026-07-13T02:23:19Z
+Stopped at: Phase 59 planned and independently checked; ready to execute Plan 01
 Resume file: .planning/ROADMAP.md
 
 ## Next Actions
 
-Discuss Phase 59's security-critical reverse-request channel, explicitly resolving shared-secret provisioning UX before planning and execution.
+Execute Phase 59 Plans 01-04 sequentially; preserve every live Chrome pairing check for the milestone-end UAT gate.
