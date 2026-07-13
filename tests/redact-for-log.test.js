@@ -8,7 +8,12 @@
  */
 
 const assert = require('assert');
-const { redactForLog, rateLimitedWarn, _resetRateLimitTable } = require('../extension/utils/redactForLog.js');
+const {
+  redactBridgeSecretsInString,
+  redactForLog,
+  rateLimitedWarn,
+  _resetRateLimitTable
+} = require('../extension/utils/redactForLog.js');
 
 console.log('--- LOG-02 redaction rules (D-12) ---');
 
@@ -33,6 +38,27 @@ assert.strictEqual(errResult.message, 'boom', 'message preserved');
 assert.strictEqual(errResult.name, 'Error', 'name preserved');
 assert(!('stack' in errResult), 'NO stack disclosed (PITFALLS.md P11)');
 console.log('  PASS: Error -> name+message only, no stack');
+
+// Phase 59 bridge credentials: scrub the exact 32-byte base64url token shape
+// even when it is embedded in transport headers, query wrappers, or Errors.
+const bridgeSecret = 'fsb-auth.' + 'A'.repeat(43);
+const bridgeSecretInterior = 'A'.repeat(16);
+const bridgeSecretOutputs = {
+  direct: redactBridgeSecretsInString(bridgeSecret),
+  header: redactBridgeSecretsInString('Sec-WebSocket-Protocol: fsb-ext-v1, ' + bridgeSecret),
+  tokenParam: redactBridgeSecretsInString('token=' + bridgeSecret),
+  query: redactBridgeSecretsInString('https://localhost.invalid/?token=' + bridgeSecret),
+  error: redactForLog(new Error('failed ' + bridgeSecret)),
+  ordinaryString: redactForLog('header=' + bridgeSecret),
+  nestedString: redactBridgeSecretsInString(JSON.stringify({ nested: { credential: bridgeSecret } }))
+};
+assert.strictEqual(bridgeSecretOutputs.direct, '[REDACTED_FSB_BRIDGE_SECRET]', 'direct bridge token uses the stable replacement');
+assert.strictEqual(globalThis.redactBridgeSecretsInString, redactBridgeSecretsInString, 'bridge scrubber is exported globally');
+const bridgeSecretSerialized = JSON.stringify(bridgeSecretOutputs);
+assert(!bridgeSecretSerialized.includes(bridgeSecret), 'full bridge credential is absent from redactor output');
+assert(!bridgeSecretSerialized.includes(bridgeSecretInterior), 'bridge credential interior is absent from redactor output');
+assert(bridgeSecretSerialized.includes('[REDACTED_FSB_BRIDGE_SECRET]'), 'stable bridge-secret marker is retained');
+console.log('  PASS: bridge credentials scrubbed from header/query/Error/nested wrappers');
 
 // HTTP-Response-like.
 const respResult = redactForLog({ status: 404, statusText: 'Not Found', body: 'sensitive data' });

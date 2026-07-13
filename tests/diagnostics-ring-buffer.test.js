@@ -77,5 +77,90 @@ ring._resetRing();
   assert.strictEqual(result4.entries.length, 0, 'after clear, ring is empty');
   console.log('  PASS: clear: true empties ring and returns clearedAt');
 
+  console.log('--- CHAN-05 bridge-secret sink sanitization ---');
+  const bridgeSecret = 'fsb-auth.' + 'A'.repeat(43);
+  const bridgeSecretInterior = 'A'.repeat(16);
+  const secretEntry = {
+    ts: 54321,
+    level: 'warn',
+    prefix: 'WS ' + bridgeSecret,
+    category: 'Sec-WebSocket-Protocol: ' + bridgeSecret,
+    message: 'failed ?token=' + bridgeSecret,
+    redactedContext: {
+      header: 'Sec-WebSocket-Protocol: fsb-ext-v1, ' + bridgeSecret,
+      query: 'token=' + bridgeSecret,
+      error: new Error('nested failure ' + bridgeSecret),
+      nested: { values: ['safe', bridgeSecret] },
+      [bridgeSecret]: 'secret-bearing key'
+    }
+  };
+
+  const originalChrome = globalThis.chrome;
+  const originalSharedScrubber = globalThis.redactBridgeSecretsInString;
+  try {
+    delete globalThis.chrome;
+    delete globalThis.redactBridgeSecretsInString;
+    ring._resetRing();
+    await ring.appendDiagnosticEntry(secretEntry);
+    const memoryOutput = await ring.getDiagnosticEntries({});
+    const serializedMemory = JSON.stringify(memoryOutput);
+    assert(!serializedMemory.includes(bridgeSecret), 'full bridge token absent from in-memory ring output');
+    assert(!serializedMemory.includes(bridgeSecretInterior), 'bridge token interior absent from in-memory ring output');
+    assert(serializedMemory.includes('[REDACTED_FSB_BRIDGE_SECRET]'), 'fallback sanitizer emits stable replacement');
+
+    const storage = new Map();
+    globalThis.chrome = {
+      storage: {
+        local: {
+          get(keys, callback) {
+            const output = {};
+            for (const key of keys) {
+              if (storage.has(key)) output[key] = storage.get(key);
+            }
+            callback(output);
+          },
+          set(update, callback) {
+            for (const key of Object.keys(update)) storage.set(key, update[key]);
+            callback();
+          }
+        }
+      },
+      runtime: { lastError: null }
+    };
+    ring._resetRing();
+    await ring.appendDiagnosticEntry(secretEntry);
+    const storedOutput = storage.get(ring.STORAGE_KEY);
+    const serializedStorage = JSON.stringify(storedOutput);
+    assert(Array.isArray(storedOutput) && storedOutput.length === 1, 'mocked chrome.storage.local receives the entry');
+    assert(!serializedStorage.includes(bridgeSecret), 'full bridge token absent from persistent ring output');
+    assert(!serializedStorage.includes(bridgeSecretInterior), 'bridge token interior absent from persistent ring output');
+    assert(serializedStorage.includes('[REDACTED_FSB_BRIDGE_SECRET]'), 'persistent sink emits stable replacement');
+
+    await ring.appendDiagnosticEntry({
+      ts: 54322,
+      level: 'debug',
+      prefix: 'WS',
+      category: 'bounds',
+      message: 'bounded context',
+      redactedContext: {
+        items: Array.from({ length: 105 }, (_, index) => index),
+        many: Object.fromEntries(Array.from({ length: 25 }, (_, index) => ['key' + index, index])),
+        deep: { a: { b: { c: { credential: bridgeSecret } } } },
+        unsupported: function() {}
+      }
+    });
+    const boundedEntry = storage.get(ring.STORAGE_KEY).at(-1);
+    assert.strictEqual(boundedEntry.redactedContext.items.length, 100, 'nested arrays are bounded to 100 items');
+    assert.strictEqual(Object.keys(boundedEntry.redactedContext.many).length, 20, 'nested objects are bounded to 20 keys');
+    assert.strictEqual(boundedEntry.redactedContext.deep.a.b.c.kind, 'object', 'nested objects beyond depth 4 become shape-safe');
+    assert.strictEqual(boundedEntry.redactedContext.unsupported.kind, 'function', 'unsupported values become shape-safe');
+  } finally {
+    if (originalChrome === undefined) delete globalThis.chrome;
+    else globalThis.chrome = originalChrome;
+    if (originalSharedScrubber === undefined) delete globalThis.redactBridgeSecretsInString;
+    else globalThis.redactBridgeSecretsInString = originalSharedScrubber;
+  }
+  console.log('  PASS: bridge credentials scrubbed from memory and storage sinks without shared helper loaded');
+
   console.log('\nAll assertions passed.');
 })().catch((err) => { console.error('test failed:', err); process.exit(1); });
