@@ -97,6 +97,7 @@ export interface BridgeTopologyState {
 export interface RelayHello {
   type: 'relay:hello';
   instanceId: string;
+  capabilities?: BridgeCapability[];
 }
 
 // Relay protocol: hub -> MCP instance handshake ack
@@ -108,6 +109,7 @@ export interface RelayWelcome {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  capabilities?: BridgeCapability[];
 }
 
 export interface RelayState {
@@ -117,9 +119,39 @@ export interface RelayState {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  capabilities?: BridgeCapability[];
 }
 
 export type RelayMessage = RelayHello | RelayWelcome | RelayState;
+
+export type BridgeCapability = 'agent-spawn';
+
+export interface ExtRequest {
+  id: string;
+  type: 'ext:request';
+  method: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ExtError {
+  code: 'agent_provider_offline' | 'bridge_topology_changed' |
+    'ext_unauthorized' | 'invalid_ext_request' | 'ext_request_timeout';
+  message: string;
+  retryable: boolean;
+}
+
+export type ExtResponse =
+  | { id: string; type: 'ext:response'; payload: Record<string, unknown>; error?: never }
+  | { id: string; type: 'ext:response'; error: ExtError; payload?: never };
+
+export interface ExtEvent {
+  id: string;
+  type: 'ext:event';
+  event: string;
+  payload: Record<string, unknown>;
+}
+
+export type ExtMessage = ExtRequest | ExtResponse | ExtEvent;
 
 // Tool result wrapper
 export interface ToolResult {
