@@ -3,12 +3,14 @@ status: partial
 phase: 58-providers-panel
 source: [58-VERIFICATION.md]
 started: 2026-07-12T23:14:01Z
-updated: 2026-07-12T23:14:01Z
+updated: 2026-07-13T01:18:30Z
+deferred_until: milestone-end
+deferred_by: user
 ---
 
 ## Current Test
 
-[awaiting human testing]
+[deferred to the v0.9.91 milestone-end UAT sweep by user instruction]
 
 ## Tests
 
@@ -71,4 +73,4 @@ blocked: 0
 
 ## Gaps
 
-Live Chrome visual/interaction evidence is unavailable because the in-app Browser target list is empty. Automated/source verification is otherwise complete (8/8 must-haves and 6/6 PROV requirements satisfied).
+Live Chrome visual/interaction evidence is unavailable because the in-app Browser target list is empty. Automated/source verification is complete (8/8 must-haves and 6/6 PROV requirements satisfied). The user explicitly deferred all live UAT to the milestone-end gate so downstream phases can continue autonomously.

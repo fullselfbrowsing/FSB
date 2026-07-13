@@ -10,7 +10,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phase 57 (Agent Identity Capture) completed and passed 14/14 verification on 2026-07-12. FSB now persists onboarding copy intent, captures initialized MCP client identity, enumerates installed clients, and exposes a durable canonical `getMcpClients` evidence view. Phase 58 (Providers Panel) is next.
+**Active milestone progress:** Phases 57-58 are complete. Phase 58 passed all automated/source requirements and a clean code-review gate; its 12 live Providers checks are preserved for the user-directed milestone-end UAT sweep. Phase 59 (Reverse-Request Channel & Security Foundation) is next.
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
@@ -26,7 +26,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Target features:**
 - **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
-- **Providers panel** -- rename "API Configuration" -> "Providers" (`extension/ui/control_panel.html:146`); introduce `api` vs `agent` provider kinds; agent providers hide the API-key field; recommended default driven by ground truth (connected > installed > copy-clicked).
+- **Providers panel (Phase 58 complete)** -- "API Configuration" is now "Providers"; explicit `api` vs `agent` kinds preserve BYOK settings; agent details report evidence and conditional billing truth; one advisory recommendation follows live > installed > copy-clicked > xAI. Live visual/interaction UAT is deferred to the milestone-end sweep.
 - **Side-panel delegation (Claude Code MVP)** -- new extension->hub reverse-request channel over the existing ws://localhost:7225 bridge; daemon spawns `claude -p` headless (stream-json output, strict permission defaults, hermetic `--strict-mcp-config`, shipped `fsb` agent definition instead of prompt stuffing); the spawned CLI connects back as its own FSB agent with tab ownership; live progress streamed into the side panel; kill switch; graceful "agent offline -> doctor" state.
 - **Multi-agent adapters** -- `AgentProviderAdapter` contract (detect / build / events / kill / caps); OpenCode -> Codex -> Gemini after Claude Code; task-mode vs chat-mode (`--resume`) where supported.
 
@@ -38,6 +38,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - Delegation becomes the fifth `EXECUTION_MODES` entry in `extension/ai/engine-config.js` (autopilot, mcp-manual, mcp-agent, dashboard-remote, + delegated).
 - This milestone completes the v0.9.45rc1 arc (background agents retired in favor of external agent runtimes) and the v0.9.36 deferred item "derive trusted MCP client identity from connection/handshake metadata".
 - Phases continue from 57.
+- Per user instruction, all live/human UAT checklists accumulate without fabricated passes and are executed as one milestone-end gate; each phase still requires green automated/source verification and clean review before advancing.
 
 ## Last Milestone: v1.2.0 Showcase i18n Completeness
 
@@ -434,7 +435,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- Phase 57 is verified complete; Phase 58 Providers Panel is next. Remaining active requirements are PROV-01..06, CHAN-01..07, ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-58 are verified complete; Phase 59 Reverse-Request Channel & Security Foundation is next. Remaining active requirements are CHAN-01..07, ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
 
 ### Validated (v0.9.91)
 
@@ -443,6 +444,12 @@ Carry-forward backlog candidates:
 - [x] IDENT-03: Sanitized client identity persists on live AgentRecords and canonical durable connected rows, with reconnects updating in place -- Phase 57.
 - [x] IDENT-04: The daemon reports the full platform registry inventory with fixed, shell-free Claude Code version probing and dual tolerant delivery -- Phase 57.
 - [x] IDENT-05: A guarded fresh-on-read `getMcpClients` action returns the durable clicked/installed/connected plus live evidence union -- Phase 57.
+- [x] PROV-01: Providers is the canonical route and legacy `#api-config` normalizes without breaking source-pin contracts -- Phase 58.
+- [x] PROV-02: Seven API and three agent providers use explicit closed kind/id domains -- Phase 58.
+- [x] PROV-03: Agent mode removes API controls and presents truthful install, connection, account, setup, usage, and credential-boundary details -- Phase 58.
+- [x] PROV-04: Agent intent remains isolated from API-only `modelProvider`; latent BYOK state survives switching, refresh, delayed work, and cancellation races -- Phase 58.
+- [x] PROV-05: Exactly one non-selecting recommendation follows live > installed > clicked > xAI with raw identities excluded -- Phase 58.
+- [x] PROV-06: Usage and billing avoid fabricated currency or subscription claims; unknown auth reports Billing not reported and links fixed official destinations -- Phase 58.
 
 ### Validated (v0.9.99)
 
@@ -707,4 +714,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-12 -- Phase 57 Agent Identity Capture verified complete. Next: Phase 58 Providers Panel discussion.*
+*Last updated: 2026-07-12 -- Phase 58 Providers Panel complete; live UAT deferred to milestone end. Next: Phase 59 security-channel discussion.*

@@ -31,7 +31,7 @@
 - Decimal phases (57.1, 57.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 57: Agent Identity Capture** - Persist copy-clicks, capture MCP `initialize` `clientInfo`, thread it through `agent:register`, add disk-scan detection, expose a unified `getMcpClients` view — additive on both sides of the wire (INV-01 safe), unblocks everything downstream (completed 2026-07-12)
-- [ ] **Phase 58: Providers Panel** - Rename "API Configuration" → "Providers", introduce `api` vs `agent` provider kinds, hide the key input for agent kind, badge exactly one "Recommended" provider via the connected > installed > copy-clicked cascade, keep `universal-provider.js` unaware of agent values (INV-03 BYOK parity)
+- [x] **Phase 58: Providers Panel** - Rename "API Configuration" → "Providers", introduce `api` vs `agent` provider kinds, hide the key input for agent kind, badge exactly one "Recommended" provider via the connected > installed > copy-clicked cascade, keep `universal-provider.js` unaware of agent values (INV-03 BYOK parity) (completed 2026-07-12; live UAT deferred to milestone-end gate)
 - [ ] **Phase 59: Reverse-Request Channel & Security Foundation** - **SECURITY-CRITICAL, load-bearing**. Additive `ext:*` frames on ws://localhost:7225, strict Origin allowlist + Host loopback + per-install rotating shared secret in `Sec-WebSocket-Protocol`, log redaction, hub-exit-mid-delegation topology tests, permanent CI grep gate against `--dangerously-skip-permissions` / `--yolo` / `--auto` — ships BEFORE any spawn code exists
 - [ ] **Phase 60: Adapter Contract & Claude Code MVP** - `AgentProviderAdapter` interface, `SpawnSupervisor` in the `serve` daemon with argv-only spawn / scrubbed env / SIGTERM-at-process-group / Windows `taskkill /T /F` / orphan scan on startup, Claude Code adapter with verified 2.1.177 flag set + shipped `fsb` agent definition + recorded stream-json JSONL fixture — the integration payoff
 - [ ] **Phase 61: Delegation UX & SW-Eviction Persistence** - Fifth `EXECUTION_MODES` entry `delegated`, explicit first-use consent card, live per-tool-call streaming feed, default-background-tab + "Take control" affordance, kill switch that reclaims owned tabs, post-run usage summary, `chrome.storage.session` per-event persistence, 20 s WS heartbeat, "agent offline → `doctor`" deep-link, restart-is-clean semantics
@@ -67,7 +67,7 @@
   3. Exactly one provider is badged "Recommended" per session, chosen by the strict ground-truth cascade (highest = a CLI currently connected via MCP `initialize`, next = a CLI installed on disk, next = a CLI whose copy button was clicked during onboarding, fallback = the existing xAI-default recommendation); the badge is advisory only — the user's selection is never auto-switched.
   4. `universal-provider.js` (the existing BYOK request builder) never observes an agent value: switching between an active agent provider and a BYOK api provider preserves the other's configuration, and INV-03 provider parity for the 7 BYOK providers holds unchanged.
   5. Cost/usage rows for `agent`-kind providers display token count, turn count, and duration alongside the label "included in your subscription", with a link to the vendor's current billing page — never a fabricated dollar amount and never the words "free" or "unlimited".
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 complete
 **UI hint**: yes
 
 ### Phase 59: Reverse-Request Channel & Security Foundation
@@ -162,7 +162,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | Phase | Plans Complete | Status | Completed |
 |-------|-----------------|--------|-----------|
 | 57. Agent Identity Capture | 3/3 | Complete    | 2026-07-12 |
-| 58. Providers Panel | 3/3 | In Progress | — |
+| 58. Providers Panel | 3/3 | Complete    | 2026-07-12 |
 | 59. Reverse-Request Channel & Security Foundation | 0/0 | Not started | — |
 | 60. Adapter Contract & Claude Code MVP | 0/0 | Not started | — |
 | 61. Delegation UX & SW-Eviction Persistence | 0/0 | Not started | — |
