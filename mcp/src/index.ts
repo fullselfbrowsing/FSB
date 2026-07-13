@@ -20,6 +20,13 @@ import {
 } from './version.js';
 import { getSetupSections, runInstall, runUninstall } from './install.js';
 import { pushMcpClientInventory } from './client-inventory.js';
+import {
+  FSB_EXT_PROTOCOL,
+  formatPairingCode,
+  readBridgeAuthState,
+  resetBridgePairing,
+  rotateBridgeSessionSecret,
+} from './bridge-auth.js';
 
 type FlagValue = boolean | string;
 
@@ -87,6 +94,7 @@ Usage:
   fsb-mcp-server                     Start the stdio MCP server
   fsb-mcp-server stdio              Start the stdio MCP server
   fsb-mcp-server serve              Start a local Streamable HTTP MCP server
+  fsb-mcp-server pair [--reset]     Show or reset the current bridge pairing code
   fsb-mcp-server status             Show bridge and extension status
   fsb-mcp-server doctor             Diagnose the primary MCP failure layer
   fsb-mcp-server setup              Print install snippets for common MCP clients
@@ -268,6 +276,7 @@ async function runStdioServer(): Promise<void> {
 async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
   const host = readStringFlag(flags, 'host', DEFAULT_HTTP_HOST);
   const port = readNumberFlag(flags, 'port', DEFAULT_HTTP_PORT);
+  rotateBridgeSessionSecret();
   const bridge = new WebSocketBridge();
   const queue = new TaskQueue();
 
@@ -294,6 +303,42 @@ async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
+}
+
+export function runPair(flags: Record<string, FlagValue>): void {
+  let state = readBridgeAuthState();
+  if (!state) {
+    console.error('No current bridge session. Start `fsb-mcp-server serve` first.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const didReset = flags.reset === true;
+  if (didReset) {
+    state = resetBridgePairing();
+  }
+
+  if (isJson(flags)) {
+    if (didReset) {
+      console.error('Previous extension binding and bridge session revoked; the next authenticated extension Origin will be bound.');
+    }
+    console.log(JSON.stringify({
+      protocol: FSB_EXT_PROTOCOL,
+      pairingCode: formatPairingCode(state),
+      rotatedAt: state.rotatedAt,
+    }));
+    return;
+  }
+
+  const lines = [
+    ...(didReset
+      ? ['WARNING: Previous extension binding and bridge session revoked; the next authenticated extension Origin will be bound.']
+      : []),
+    'Pairing grants extension reverse-request authority for this local daemon session.',
+    'Paste this code only into the FSB extension pairing control:',
+    formatPairingCode(state),
+  ];
+  process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 async function runStatus(flags: Record<string, FlagValue>): Promise<void> {
@@ -390,6 +435,9 @@ async function main(): Promise<void> {
       return;
     case 'doctor':
       await runDoctor(flags);
+      return;
+    case 'pair':
+      runPair(flags);
       return;
     case 'setup':
       printSetup();
