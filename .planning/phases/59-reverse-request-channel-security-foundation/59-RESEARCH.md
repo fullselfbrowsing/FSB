@@ -133,10 +133,12 @@ Refactor hub startup to an explicit `node:http` server plus `WebSocketServer({ n
 1. Validate configured bind host before calling `listen`; allow only `127.0.0.1`, `::1`, or `localhost` and default to `127.0.0.1`.
 2. On `server.on('upgrade')`, parse a single Host header and require hostname/port equality with loopback and the active bridge port. Reject `evil.com:7225`, ambiguous/multiple headers, malformed IPv6, missing host, wrong port, `0.0.0.0`, and LAN values with an HTTP 403 before `handleUpgrade`.
 3. If Origin is present, parse it and require a `chrome-extension:` URL with no credentials/query/fragment. Reject every `http(s)` origin, `null`, malformed value, or wrong persisted extension origin before `handleUpgrade`.
-4. Read current auth state for this upgrade. Parse the offered subprotocol set, require `fsb-ext-v1`, and constant-time compare the `fsb-auth.*` candidate when present. Record an immutable authorization classification on the request using a private symbol or pass a closure result into the `connection` callback.
+4. Read current auth state for this upgrade. Parse the offered subprotocol set, require `fsb-ext-v1`, and constant-time compare the `fsb-auth.*` candidate when present. Record an immutable authorization classification plus the current non-secret `sessionId` on the request using a private symbol or pass a closure result into the `connection` callback.
 5. Call `handleUpgrade` only after trust checks. `handleProtocols` returns `fsb-ext-v1`, never the secret-bearing token.
 
 To preserve additive legacy behavior, an exact/syntactically valid extension Origin may connect without the credential as an unprivileged legacy MCP connection, but its immutable classification is `extAuthorized: false`; `_handleExtensionMessage` rejects every `ext:*` frame. Once a durable allowed Origin exists, any different extension Origin is rejected for all behavior. Origin-less Node relays remain possible but can become extension clients only through the existing relay handshake rules; they never acquire reverse-request authority.
+
+Upgrade-time comparison alone is insufficient when another long-lived MCP process owns port 7225 while `serve` rotates the shared auth file. Before every `ext:*` frame, compare the socket metadata's `sessionId` and Origin with freshly read current auth state. A missing/rotated/reset mismatch revokes and closes the socket before any local handler or relay invocation. This makes rotation effective for already-open sockets, not only future upgrades.
 
 This distinction is necessary: accepting an unauthenticated socket and later elevating it through an in-band “pair” frame would violate the upgrade-only credential rule. Pairing storage changes must close the old socket and build a new `WebSocket(MCP_BRIDGE_URL, ['fsb-ext-v1', 'fsb-auth.<secret>'])`.
 
@@ -147,8 +149,9 @@ The minimal end-to-end flow is:
 1. `serve` rotates `sessionSecret` before connecting its bridge and writes auth state atomically with mode `0600`; it retains an already-bound `allowedExtensionOrigin`.
 2. `fsb-mcp-server pair` reads the live session state and prints only the credential plus concise paste instructions. `--json` may output `{ protocol, pairingCode, rotatedAt }` but must not be called by status/doctor or logged to stderr.
 3. The existing Agent CLI details surface accepts the pasted code as an immediate pairing action, validates the exact token grammar, writes only to `chrome.storage.session`, clears the input value, and reconnects. It must not join the main Save Settings payload or `defaultSettings`.
-4. If no allowed Origin is bound, the first authenticated extension upgrade binds the exact Origin atomically. A different Origin never rebinds. Provide an explicit CLI reset/re-pair flag if needed; do not infer reset from failed handshakes.
-5. Wrong/expired credentials leave legacy bridge status available but mark reverse capability `unpaired`/`expired`. Do not distinguish “wrong extension ID” from “wrong credential” in remotely observable error text.
+4. If no allowed Origin is bound, the first authenticated extension upgrade binds the exact Origin atomically. A different Origin never rebinds. `fsb-mcp-server pair --reset` is the only reset path: it atomically clears the Origin and rotates secret/sessionId before showing a new code. Failed handshakes never reset state.
+5. Add the reserved secret-free method `bridge.auth-status`. After current session/Origin revalidation it returns only `{authorized:true}` locally and never consults or implies spawn capability. The extension uses this probe after reconnect so WebSocket-open/configured state is not mislabeled paired; unauthorized returns expired.
+6. Wrong/expired credentials leave legacy bridge status available but mark reverse capability `unpaired`/`expired`. Do not distinguish “wrong extension ID” from “wrong credential” in remotely observable error text.
 
 The manual paste is unavoidable in this milestone: the extension cannot read `~/.fsb/bridge-auth.json`, and no `nativeMessaging` permission/host exists until Phase 63. QR/deep-link delivery would either place the secret in a URL or introduce another transport and is out of scope.
 
@@ -166,7 +169,7 @@ Add a log-drift fixture containing a full 43-character base64url credential with
 |----|--------|----------|------------------------|-----------------|
 | T59-01 | Attacker page opens localhost WebSocket (CSWSH) | Critical | exact extension Origin before upgrade; ext authorization immutable | evil HTTPS Origin receives HTTP/close rejection before handler counter changes |
 | T59-02 | DNS rebinding sends `Host: evil.com:7225` to loopback | Critical | exact loopback Host + port check before upgrade | evil Host rejected even with correct IP target and plausible Origin |
-| T59-03 | Malicious extension or stale credential initiates reverse request | High | durable exact Origin + rotating 32-byte session credential + explicit pairing | wrong Origin, absent token, wrong token, old rotated token all fail ext routing |
+| T59-03 | Malicious extension, stale credential, or already-open stale socket initiates reverse request | High | durable exact Origin + rotating 32-byte credential/sessionId + per-frame session revalidation + explicit reset | wrong Origin/token, active-socket rotation, and reset/new-ID rebind all fail or recover explicitly |
 | T59-04 | Credential leaks through URL, payload, error, console, or diagnostic ring | High | subprotocol-only transport, session storage, centralized scrubber, sink re-sanitization | raw/interior substring absent from all fixtures and bridge state |
 | T59-05 | Hub/relay churn replays or misroutes a future spawn request | High | separate route map, capability target pinning, deterministic terminal errors, no auto replay | relay-mid-frame and hub-exit tests settle once and clear maps |
 | T59-06 | New frames mutate legacy MCP/tool/relay bytes | High | separate union, optional omitted fields, byte/hash freeze | existing version parity plus legacy relay serialization fixture |
@@ -197,7 +200,7 @@ The current workspace has user-owned deletions of old phase artifacts, while one
 | CHAN-01 | `tests/mcp-reverse-channel-contract.test.js`; unchanged `tests/mcp-version-parity.test.js` | source review confirms no ext member in `MCPMessageType` and no tool hash drift |
 | CHAN-02 | topology cases for local handler precedence, first capable relay, non-capable relay skip, and offline error | route-map source audit and topology snapshots |
 | CHAN-03 | raw upgrade fixtures for evil/missing/duplicate Origin and Host, wrong port, non-loopback bind; handler invocation count remains zero | source audit of upgrade ordering |
-| CHAN-04 | 32-byte generation, 0600 file, rotate/replay rejection, subprotocol capture, session-only extension storage | grep gate proving no secret in URL/payload/status |
+| CHAN-04 | 32-byte generation, 0600 file, future and active-socket rotate/replay rejection, explicit reset/rebind, auth-status probe, subprotocol capture, session-only extension storage | grep gate proving no secret in URL/payload/status |
 | CHAN-05 | redaction + diagnostic sink fixtures with full and interior token assertions | repository scan of tracked log fixtures |
 | CHAN-06 | hub exit mid-request, capable relay exit after request/before response, existing promotion case unchanged | single-settlement and map-count assertions |
 | CHAN-07 | scanner unit fixture and prebuild wiring; intentionally forbidden temp fixture exits nonzero | clean `mcp/src/agent-providers/**` scan in full suite |

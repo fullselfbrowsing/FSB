@@ -10,6 +10,8 @@ Providers pairing control
   -> chrome.storage.session bridge credential
   -> MCPBridgeClient reconnects with [fsb-ext-v1, fsb-auth.<secret>]
   -> HTTP upgrade gate validates bind + Host + Origin + credential
+  -> every ext frame revalidates socket sessionId against current auth state
+  -> bridge.auth-status confirms authority without spawn capability
   -> authorized extension socket sends ext:request
   -> hub local handler OR first relay with capability agent-spawn
   -> ext:event* / ext:response follows reverse-route map
@@ -23,7 +25,7 @@ The credential never enters the JSON flow. The authorization classification is f
 | Target file | Role | Closest analog | Pattern to preserve |
 |-------------|------|----------------|---------------------|
 | `mcp/src/types.ts` | additive ext and capability types | existing `MCPMessageType`, `RelayHello`, `RelayWelcome`, `RelayState` | keep ext family separate; optional fields omitted when absent |
-| `mcp/src/bridge-auth.ts` (new) | versioned auth state, rotation, compare, pairing output data | `scripts/cws-bootstrap-refresh-token.mjs` for `0o600`; `mcp/src/install.ts` for home/config path resolution | Node built-ins only; injectable path for tests; atomic temp write + rename; no logging |
+| `mcp/src/bridge-auth.ts` (new) | versioned auth state, rotation/reset, compare, pairing output data | `scripts/cws-bootstrap-refresh-token.mjs` for `0o600`; `mcp/src/install.ts` for home/config path resolution | Node built-ins only; injectable path for tests; atomic temp write + rename; no logging |
 | `mcp/src/bridge.ts` | HTTP upgrade gate and reverse router | existing `_startAsHub`, `_registerRelayClient`, `_handleExtensionMessage`, `messageOrigin`, disconnect cleanup | preserve EADDRINUSE relay fallback and promotion; add separate ext maps |
 | `mcp/src/index.ts` | `pair` CLI and `serve` rotation | existing `parseArgs`, `printHelp`, `runHttpMode`, main switch | one command function + one switch case; status/doctor never include secret |
 | `extension/ws/mcp-bridge-client.js` | session credential, protocol list, ext pending map | existing reconnect state, `pending`-style bridge server semantics, `_send`, `_handleMessage` | storage/session only; reconnect to elevate; settle pending on close/timeout |
@@ -130,7 +132,7 @@ switch (command) {
 }
 ```
 
-Add `runPair(flags)` and `case 'pair'`. Put secret generation/storage in `bridge-auth.ts`, not in `index.ts`; the CLI layer only formats explicit stdout. Keep secret output away from shared diagnostics formatters.
+Add `runPair(flags)` and `case 'pair'`. Put secret generation/storage/reset in `bridge-auth.ts`, not in `index.ts`; the CLI layer only formats explicit stdout. `pair --reset` is the sole Origin-reset path and rotates secret/sessionId atomically. Keep secret output away from shared diagnostics formatters.
 
 ### 6. User-private file mode
 
@@ -154,7 +156,7 @@ this._ws = new WebSocket(MCP_BRIDGE_URL);
 const result = chrome.storage.session.set({ [MCP_BRIDGE_STATE_KEY]: state });
 ```
 
-Add a credential storage key separate from `mcpBridgeState`; do not add the secret to `getState()`. Because storage reads are async and `connect()` is currently sync, use a guarded async preload/cache or make the pairing action set an in-memory credential before reconnect. Keep repeated `connect()` idempotent and retain existing reconnect alarms/timers.
+Add a credential storage key separate from `mcpBridgeState`; do not add the secret or sessionId to `getState()`. Because storage reads are async and `connect()` is currently sync, use a guarded async preload/cache or make the pairing action set an in-memory credential before reconnect. Keep repeated `connect()` idempotent and retain existing reconnect alarms/timers. WebSocket open means only configured; the reserved `bridge.auth-status` response is what promotes public state to paired.
 
 ### 8. Extension pending-map behavior
 
@@ -213,6 +215,7 @@ The executor should use `rg -n "<filename>" tests` before the edit and include e
 - Do not add `secret` to an ext JSON interface.
 - Do not use `verifyClient` or post-connection close as the primary upgrade security gate.
 - Do not cache auth state for the whole hub lifetime; another process may rotate the current session file.
+- Do not trust upgrade authorization forever; compare the socket's recorded sessionId/Origin with current state before every ext frame.
 - Do not advertise `agent-spawn` in production before Phase 60 supplies a real supervisor handler.
 - Do not reuse `messageOrigin` for reverse traffic.
 - Do not auto-replay after relay loss.

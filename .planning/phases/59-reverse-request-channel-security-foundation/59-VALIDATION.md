@@ -1,8 +1,8 @@
 ---
 phase: 59
 slug: reverse-request-channel-security-foundation
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-12
 ---
@@ -44,12 +44,12 @@ The current workspace has user-owned deletions of historical phase artifacts. Fo
 | 59-01-01 | 01 | 1 | CHAN-01 | T59-06 | Separate ext union; legacy MCP and relay bytes frozen | contract | `npm --prefix mcp run build && node tests/mcp-version-parity.test.js && node tests/mcp-reverse-channel-contract.test.js` | ❌ W0 | ⬜ pending |
 | 59-01-02 | 01 | 1 | CHAN-05 | T59-04 | Error and diagnostic strings contain no raw token substring | unit | `node tests/redact-for-log.test.js && node tests/diagnostics-ring-buffer.test.js` | ✅ extend | ⬜ pending |
 | 59-01-03 | 01 | 1 | CHAN-07 | T59-07 | Forbidden-flag scanner fails positive fixture and runs before MCP build | gate | `node tests/agent-provider-forbidden-flags.test.js && npm --prefix mcp run build` | ❌ W0 | ⬜ pending |
-| 59-02-01 | 02 | 2 | CHAN-04 | T59-03, T59-04 | 32-byte secret, `0600`, rotation, safe compare, no status leak | unit | `npm --prefix mcp run build && node tests/mcp-bridge-auth.test.js` | ❌ W0 | ⬜ pending |
-| 59-02-02 | 02 | 2 | CHAN-03 | T59-01, T59-02, T59-08 | Origin/Host/bind rejection occurs before connection handler | integration | `npm --prefix mcp run build && node tests/mcp-bridge-topology.test.js` | ✅ extend | ⬜ pending |
+| 59-02-01 | 02 | 2 | CHAN-04 | T59-03, T59-04 | 32-byte secret, `0600`, rotation, explicit reset/rebind, safe compare, no status leak | unit | `npm --prefix mcp run build && node tests/mcp-bridge-auth.test.js` | ❌ W0 | ⬜ pending |
+| 59-02-02 | 02 | 2 | CHAN-03, CHAN-04 | T59-01, T59-02, T59-03, T59-08 | Origin/Host/bind rejection occurs before handler; active sockets revoke on session rotation | integration | `npm --prefix mcp run build && node tests/mcp-bridge-topology.test.js` | ✅ extend | ⬜ pending |
 | 59-02-03 | 02 | 2 | CHAN-04 | T59-03, T59-04 | CLI pair/serve rotation emits only explicit credential output | CLI contract | `npm --prefix mcp run build && node tests/mcp-bridge-auth.test.js && node tests/mcp-version-parity.test.js` | ❌ W0 | ⬜ pending |
-| 59-03-01 | 03 | 3 | CHAN-02 | T59-05 | Local handler wins; otherwise first capable relay; offline typed error | integration | `npm --prefix mcp run build && node tests/mcp-reverse-channel-contract.test.js && node tests/mcp-bridge-topology.test.js` | ❌/extend W0 | ⬜ pending |
+| 59-03-01 | 03 | 3 | CHAN-02, CHAN-04 | T59-03, T59-05 | Auth-status probe is local/non-spawn; otherwise local handler wins, first capable relay, or offline error | integration | `npm --prefix mcp run build && node tests/mcp-reverse-channel-contract.test.js && node tests/mcp-bridge-topology.test.js` | ❌/extend W0 | ⬜ pending |
 | 59-03-02 | 03 | 3 | CHAN-06 | T59-05 | Relay/hub loss settles once, clears state, never replays | integration | `npm --prefix mcp run build && node tests/mcp-bridge-topology.test.js` | ✅ extend | ⬜ pending |
-| 59-04-01 | 04 | 4 | CHAN-01, CHAN-04 | T59-03, T59-05 | Client protocols, pending map, event/final/timeout/close behavior | VM integration | `node tests/mcp-bridge-client-lifecycle.test.js && node tests/mcp-reverse-channel-contract.test.js` | ✅ extend/❌ W0 | ⬜ pending |
+| 59-04-01 | 04 | 4 | CHAN-01, CHAN-04 | T59-03, T59-05 | Client protocols, authenticated probe, paired/expired distinction, pending event/final/timeout/close behavior | VM integration | `node tests/mcp-bridge-client-lifecycle.test.js && node tests/mcp-reverse-channel-contract.test.js` | ✅ extend/❌ W0 | ⬜ pending |
 | 59-04-02 | 04 | 4 | CHAN-04, CHAN-05 | T59-03, T59-04 | Pairing control uses session storage only and never persists/logs raw code | UI/source contract | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js && node tests/redact-for-log.test.js && node tests/diagnostics-ring-buffer.test.js` | ✅ extend | ⬜ pending |
 | 59-04-03 | 04 | 4 | CHAN-01–07 | T59-01–T59-08 | All focused gates and full suite green; no spawn implementation | system | `npm test` | ✅ | ⬜ pending |
 
@@ -89,7 +89,7 @@ All manual checks are preserved as `human_needed` and deferred to the milestone-
 |--------|----------|-----------------------------|
 | T59-01 CSWSH | Critical | evil Origin rejected before handler |
 | T59-02 DNS rebinding | Critical | evil Host rejected at real upgrade |
-| T59-03 stale/malicious credential | High | absent/wrong/rotated token and wrong Origin fail ext routing |
+| T59-03 stale/malicious credential | High | absent/wrong token, active-socket session rotation, explicit reset/rebind, and authenticated probe cases |
 | T59-04 secret disclosure | High | raw and interior token substrings absent from all fixtures/sinks/state |
 | T59-05 topology replay/confused deputy | High | single settlement, cleanup, no automatic replay |
 | T59-06 byte drift | High | MCP/tool hashes and legacy relay serialization unchanged |
@@ -109,6 +109,6 @@ No Critical/High threat may be deferred to Phase 60.
 - [ ] Full suite runs with the temporary historical fixture and removes it afterward.
 - [ ] Manual checks are captured in `59-HUMAN-UAT.md` and marked milestone-end deferred, never fabricated.
 - [ ] No `child_process`, SpawnSupervisor, adapter implementation, or production spawn capability enters Phase 59.
-- [ ] `nyquist_compliant: true` is set after plan checker approval.
+- [x] `nyquist_compliant: true` is set after plan checker approval.
 
-**Approval:** pending plan checker
+**Approval:** approved 2026-07-12
