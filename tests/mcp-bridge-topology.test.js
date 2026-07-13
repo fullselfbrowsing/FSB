@@ -653,6 +653,289 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
   });
 }
 
+async function runAuthStatusProbe(WebSocketBridge, auth) {
+  await withTempHome('bridge-auth-status', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 22_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://auth-status-extension', authPath);
+    let localInvocations = 0;
+    let relayInvocations = 0;
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'auth-status-hub',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        localInvocations++;
+        return { unexpected: true };
+      },
+    });
+    const relay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'auth-status-relay',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        relayInvocations++;
+        return { unexpected: true };
+      },
+    });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://auth-status-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      extension.send(JSON.stringify({
+        id: 'auth-status-current',
+        type: 'ext:request',
+        method: 'bridge.auth-status',
+        payload: {},
+      }));
+      await waitFor(() => messages.length === 1, 'auth-status response', 1000, 10);
+
+      assertEqual(
+        JSON.stringify(messages[0]),
+        '{"id":"auth-status-current","type":"ext:response","payload":{"authorized":true}}',
+        'bridge.auth-status returns only the secret-free authorization acknowledgement',
+      );
+      assertEqual(localInvocations, 0, 'bridge.auth-status invokes no local handler');
+      assertEqual(relayInvocations, 0, 'bridge.auth-status invokes no capable relay');
+      assertEqual(hub.activeExtRequests.size, 0, 'bridge.auth-status retains no reverse route');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runLocalReverseRouting(WebSocketBridge, auth) {
+  await withTempHome('bridge-local-route', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 23_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://local-route-extension', authPath);
+    let localInvocations = 0;
+    let relayInvocations = 0;
+    let lateEmit = null;
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'local-route-hub',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async (request, emit) => {
+        localInvocations++;
+        lateEmit = emit;
+        if (request.payload.fail === true) {
+          throw new Error(`handler rejected ${request.payload.marker}`);
+        }
+        emit({ id: request.id, type: 'ext:event', event: 'agent.progress', payload: { step: 1 } });
+        return { target: 'local' };
+      },
+    });
+    const relay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'local-route-relay',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        relayInvocations++;
+        return { target: 'relay' };
+      },
+    });
+    const resources = { sockets: [], bridges: [hub, relay] };
+    try {
+      await hub.connect();
+      await relay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://local-route-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+
+      extension.send(JSON.stringify({
+        id: 'malformed-local-route',
+        type: 'ext:request',
+        method: 'Bridge.Invalid',
+        payload: {},
+      }));
+      await waitFor(() => messages.length === 1, 'malformed request response', 1000, 10);
+      assertEqual(messages[0]?.error?.code, 'invalid_ext_request', 'malformed authorized request fails before routing');
+      assertEqual(localInvocations, 0, 'malformed request invokes no local handler');
+      assertEqual(relayInvocations, 0, 'malformed request invokes no relay handler');
+
+      extension.send(JSON.stringify({
+        id: 'local-route',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: { task: 'safe' },
+      }));
+      await waitFor(() => messages.length === 3, 'local event and response', 1000, 10);
+      assertEqual(messages[1]?.type, 'ext:event', 'local handler event is forwarded before final response');
+      assertEqual(messages[2]?.type, 'ext:response', 'local handler emits one final response');
+      assertEqual(messages[2]?.payload?.target, 'local', 'local capable handler wins over capable relay');
+      assertEqual(localInvocations, 1, 'local handler runs exactly once');
+      assertEqual(relayInvocations, 0, 'capable relay is not invoked when local handler exists');
+      assertEqual(hub.activeExtRequests.size, 0, 'local final response deletes reverse route state');
+
+      lateEmit({ id: 'local-route', type: 'ext:event', event: 'agent.progress', payload: { step: 2 } });
+      await sleep(20);
+      assertEqual(messages.length, 3, 'late local event after final response is dropped');
+
+      extension.send(JSON.stringify({
+        id: 'local-handler-throw',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: { fail: true, marker: 'RAW_HANDLER_INPUT' },
+      }));
+      await waitFor(() => messages.length === 4, 'handler throw response', 1000, 10);
+      assertEqual(messages[3]?.error?.code, 'invalid_ext_request', 'handler throw settles with the typed invalid request error');
+      assert(!JSON.stringify(messages[3]).includes('RAW_HANDLER_INPUT'), 'handler failure response omits raw request content');
+      assertEqual(hub.activeExtRequests.size, 0, 'handler throw settles and clears route exactly once');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
+async function runRelayReverseRouting(WebSocketBridge, auth) {
+  await withTempHome('bridge-relay-route', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 24_000);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://relay-route-extension', authPath);
+    let skippedInvocations = 0;
+    let firstInvocations = 0;
+    let secondInvocations = 0;
+    const pending = [];
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-route-hub',
+      handshakeTimeoutMs: 25,
+    });
+    const skippedRelay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-route-skipped',
+      handshakeTimeoutMs: 25,
+      handleExtRequest: async () => {
+        skippedInvocations++;
+        return { target: 'skipped' };
+      },
+    });
+    const firstRelay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-route-first',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: (request, emit) => {
+        firstInvocations++;
+        return new Promise((resolve) => pending.push({ request, emit, resolve }));
+      },
+    });
+    const secondRelay = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'relay-route-second',
+      handshakeTimeoutMs: 25,
+      capabilities: ['agent-spawn'],
+      handleExtRequest: async () => {
+        secondInvocations++;
+        return { target: 'second' };
+      },
+    });
+    const resources = { sockets: [], bridges: [hub, skippedRelay, firstRelay, secondRelay] };
+    try {
+      await hub.connect();
+      await skippedRelay.connect();
+      await firstRelay.connect();
+      await secondRelay.connect();
+      const extension = await createBrowserSocket(port, {
+        origin: 'chrome-extension://relay-route-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(extension);
+      const messages = collectSocketMessages(extension);
+      const request = {
+        id: 'relay-route',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: { task: 'relay' },
+      };
+      extension.send(JSON.stringify(request));
+      await waitFor(() => pending.length === 1, 'first capable relay invocation', 1000, 10);
+      assertEqual(skippedInvocations, 0, 'earlier non-capable relay is skipped');
+      assertEqual(firstInvocations, 1, 'first capable relay is selected exactly once');
+      assertEqual(secondInvocations, 0, 'later capable relay is not selected');
+      assertEqual(hub.activeExtRequests.size, 1, 'relay route is inserted before handler settlement');
+
+      secondRelay.hubConnection.send(JSON.stringify({
+        id: request.id,
+        type: 'ext:response',
+        payload: { target: 'spoof' },
+      }));
+      await sleep(20);
+      assertEqual(messages.length, 0, 'wrong capable relay cannot spoof the selected route');
+
+      extension.send(JSON.stringify(request));
+      await waitFor(() => messages.length === 1, 'duplicate active ID response', 1000, 10);
+      assertEqual(messages[0]?.error?.code, 'invalid_ext_request', 'duplicate active request ID is rejected before forwarding');
+      assertEqual(firstInvocations, 1, 'duplicate active ID never invokes the selected relay twice');
+
+      pending[0].emit({ id: request.id, type: 'ext:event', event: 'agent.progress', payload: { step: 1 } });
+      await waitFor(() => messages.length === 2, 'selected relay event', 1000, 10);
+      assertEqual(messages[1]?.type, 'ext:event', 'selected relay event forwards without settling');
+      assertEqual(hub.activeExtRequests.size, 1, 'event does not settle the selected relay route');
+
+      pending[0].resolve({ target: 'first' });
+      await waitFor(() => messages.length === 3, 'selected relay response', 1000, 10);
+      assertEqual(messages[2]?.payload?.target, 'first', 'first capable relay supplies the final response');
+      assertEqual(hub.activeExtRequests.size, 0, 'first relay final deletes hub reverse route');
+
+      firstRelay.hubConnection.send(JSON.stringify({
+        id: request.id,
+        type: 'ext:event',
+        event: 'agent.progress',
+        payload: { late: true },
+      }));
+      firstRelay.hubConnection.send(JSON.stringify({
+        id: request.id,
+        type: 'ext:response',
+        payload: { target: 'duplicate' },
+      }));
+      await sleep(20);
+      assertEqual(messages.length, 3, 'late event and duplicate final from selected relay are dropped');
+
+      extension.send(JSON.stringify({
+        id: 'extension-close-route',
+        type: 'ext:request',
+        method: 'agent.start',
+        payload: {},
+      }));
+      await waitFor(() => pending.length === 2, 'extension-close relay invocation', 1000, 10);
+      extension.close();
+      await waitFor(() => hub.activeExtRequests.size === 0, 'extension-close route cleanup', 1000, 10);
+      assertEqual(hub.activeExtRequests.size, 0, 'extension close clears its active reverse route');
+      pending[1].resolve({ target: 'too-late' });
+      await waitFor(() => firstRelay.relayActiveExtRequests.size === 0, 'relay handler cleanup after extension close', 1000, 10);
+      assertEqual(secondRelay.currentMode, 'relay', 'extension close retains other capable relays');
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runActiveSocketRevocation(WebSocketBridge, auth, reset) {
   const suffix = reset ? 'reset' : 'rotate';
   await withTempHome(`bridge-active-${suffix}`, async (home) => {
@@ -747,6 +1030,9 @@ async function run() {
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
   await runCase('pre-handler Host and Origin upgrade gate', () => runPreHandlerUpgradeGate(WebSocketBridge, auth));
   await runCase('pairing authority matrix', () => runPairingAuthorityMatrix(WebSocketBridge, auth));
+  await runCase('secret-free bridge auth-status probe', () => runAuthStatusProbe(WebSocketBridge, auth));
+  await runCase('local reverse routing precedence and settlement', () => runLocalReverseRouting(WebSocketBridge, auth));
+  await runCase('first capable relay routing and settlement', () => runRelayReverseRouting(WebSocketBridge, auth));
   await runCase('active socket revocation after external rotation', () => runActiveSocketRevocation(WebSocketBridge, auth, false));
   await runCase('active socket revocation and new-ID rebind after reset', () => runActiveSocketRevocation(WebSocketBridge, auth, true));
   await runCase('hub-exit-promotion', () => runHubExitPromotion(WebSocketBridge));

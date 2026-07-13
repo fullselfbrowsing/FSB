@@ -8,6 +8,9 @@ import type {
   BridgeCapability,
   BridgeOptions,
   BridgeTopologyState,
+  ExtEvent,
+  ExtRequest,
+  ExtResponse,
   ExtRequestHandler,
   MCPMessage,
   MCPResponse,
@@ -35,6 +38,14 @@ interface AcceptedSocketMetadata {
   extAuthorized: boolean;
   sessionId: string | null;
   unauthorizedSent: boolean;
+}
+
+interface ActiveExtRequest {
+  id: string;
+  originSocket: WsWebSocket;
+  target: 'local' | 'relay';
+  relayId?: string;
+  settled: boolean;
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -79,12 +90,14 @@ export class WebSocketBridge {
   private extensionClient: WsWebSocket | null = null;
   private relayClients = new Map<string, WsWebSocket>();
   private relayCapabilities = new Map<string, Set<BridgeCapability>>();
+  private activeExtRequests = new Map<string, ActiveExtRequest>();
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
 
   // Relay mode state
   private hubConnection: WebSocket | null = null;
+  private relayActiveExtRequests = new Map<string, WebSocket>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 0;
   private intentionalClose = false;
@@ -208,6 +221,8 @@ export class WebSocketBridge {
     this.progressListeners.clear();
     this.messageOrigin.clear();
     this.relayCapabilities.clear();
+    this.activeExtRequests.clear();
+    this.relayActiveExtRequests.clear();
     this.connected = false;
     this.hubConnected = false;
     this.activeHubInstanceId = null;
@@ -625,6 +640,10 @@ export class WebSocketBridge {
       }
       this.progressListeners.clear();
 
+      for (const [id, route] of this.activeExtRequests) {
+        if (route.originSocket === ws) this.activeExtRequests.delete(id);
+      }
+
       // Notify relay clients about pending requests that can't be fulfilled
       // (they'll get errors when they timeout)
       // Clean up messageOrigin entries for non-local origins
@@ -651,6 +670,7 @@ export class WebSocketBridge {
 
     if (this.relayClients.has(clientId)) {
       console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} reconnected, closing old`);
+      this._settleRoutesForRelay(clientId);
       this.relayClients.get(clientId)!.close();
     }
 
@@ -682,6 +702,7 @@ export class WebSocketBridge {
       if (this.relayClients.get(clientId) === ws) {
         this.relayClients.delete(clientId);
         this.relayCapabilities.delete(clientId);
+        this._settleRoutesForRelay(clientId);
       }
 
       // Clean up messageOrigin entries for this client
@@ -748,12 +769,17 @@ export class WebSocketBridge {
 
       const extFrame = parseExtFrame(parsed);
       if (extFrame?.type === 'ext:request') {
-        ws.send(JSON.stringify(makeExtError(
-          extFrame.id,
-          'agent_provider_offline',
-          'No extension request handler is available',
-          true,
-        )));
+        this._handleExtRequest(ws, extFrame);
+      } else {
+        const id = typeof parsed.id === 'string' && parsed.id.length > 0 && parsed.id.length <= 200
+          ? parsed.id
+          : 'invalid_ext_request';
+        this._sendExtResponse(ws, makeExtError(
+          id,
+          'invalid_ext_request',
+          'Extension request frame is invalid',
+          false,
+        ));
       }
       return;
     }
@@ -826,17 +852,166 @@ export class WebSocketBridge {
     }
   }
 
+  private _handleExtRequest(ws: WsWebSocket, request: ExtRequest): void {
+    if (request.method === 'bridge.auth-status') {
+      this._sendExtResponse(ws, {
+        id: request.id,
+        type: 'ext:response',
+        payload: { authorized: true },
+      });
+      return;
+    }
+
+    if (this.activeExtRequests.has(request.id)) {
+      this._sendExtResponse(ws, makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request ID is already active',
+        false,
+      ));
+      return;
+    }
+
+    if (this.capabilities.has('agent-spawn') && this.handleExtRequest) {
+      const route: ActiveExtRequest = {
+        id: request.id,
+        originSocket: ws,
+        target: 'local',
+        settled: false,
+      };
+      this.activeExtRequests.set(request.id, route);
+      void this._invokeLocalExtHandler(request, route);
+      return;
+    }
+
+    for (const [relayId, relaySocket] of this.relayClients) {
+      if (
+        relaySocket.readyState === WebSocket.OPEN
+        && this.relayCapabilities.get(relayId)?.has('agent-spawn')
+      ) {
+        const route: ActiveExtRequest = {
+          id: request.id,
+          originSocket: ws,
+          target: 'relay',
+          relayId,
+          settled: false,
+        };
+        this.activeExtRequests.set(request.id, route);
+        relaySocket.send(JSON.stringify(request));
+        return;
+      }
+    }
+
+    this._sendExtResponse(ws, makeExtError(
+      request.id,
+      'agent_provider_offline',
+      'No extension request handler is available',
+      true,
+    ));
+  }
+
+  private async _invokeLocalExtHandler(
+    request: ExtRequest,
+    route: ActiveExtRequest,
+  ): Promise<void> {
+    const handler = this.handleExtRequest;
+    if (!handler) return;
+    const emit = (event: ExtEvent): void => {
+      const current = this.activeExtRequests.get(request.id);
+      const parsedEvent = parseExtFrame(event);
+      if (
+        current !== route
+        || route.settled
+        || parsedEvent?.type !== 'ext:event'
+        || parsedEvent.id !== request.id
+      ) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid or late local extension event`);
+        return;
+      }
+      if (route.originSocket.readyState === WebSocket.OPEN) {
+        route.originSocket.send(JSON.stringify(parsedEvent));
+      }
+    };
+
+    try {
+      const payload = await handler(request, emit);
+      const response = parseExtFrame({
+        id: request.id,
+        type: 'ext:response',
+        payload,
+      });
+      if (response?.type !== 'ext:response' || !('payload' in response)) {
+        throw new Error('invalid handler result');
+      }
+      this._settleExtRoute(route, response);
+    } catch {
+      console.error(`[FSB Bridge ${this.instanceId}] Local extension request handler failed`);
+      this._settleExtRoute(route, makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request handler failed',
+        false,
+      ));
+    }
+  }
+
+  private _settleExtRoute(route: ActiveExtRequest, response: ExtResponse): void {
+    if (route.settled || this.activeExtRequests.get(route.id) !== route) return;
+    route.settled = true;
+    this.activeExtRequests.delete(route.id);
+    this._sendExtResponse(route.originSocket, response);
+  }
+
+  private _sendExtResponse(socket: WsWebSocket, response: ExtResponse): void {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+  }
+
+  private _settleRoutesForRelay(relayId: string): void {
+    for (const route of [...this.activeExtRequests.values()]) {
+      if (route.target !== 'relay' || route.relayId !== relayId) continue;
+      this._settleExtRoute(route, makeExtError(
+        route.id,
+        'bridge_topology_changed',
+        'Selected relay disconnected before responding',
+        true,
+      ));
+    }
+  }
+
   /**
    * Handle a message FROM a relay client (a request to forward to extension).
    */
   private _handleRelayClientMessage(clientId: string, raw: string): void {
-    let msg: MCPMessage;
+    let parsed: Record<string, unknown>;
     try {
-      msg = JSON.parse(raw) as MCPMessage;
+      parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
       console.error(`[FSB Bridge ${this.instanceId}] Failed to parse relay client message`);
       return;
     }
+
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+      const frame = parseExtFrame(parsed);
+      if (frame?.type !== 'ext:event' && frame?.type !== 'ext:response') {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid relay extension frame`);
+        return;
+      }
+      const route = this.activeExtRequests.get(frame.id);
+      if (route?.target !== 'relay' || route.relayId !== clientId || route.settled) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped extension frame from unselected relay`);
+        return;
+      }
+      if (frame.type === 'ext:event') {
+        if (route.originSocket.readyState === WebSocket.OPEN) {
+          route.originSocket.send(JSON.stringify(frame));
+        }
+        return;
+      }
+      this._settleExtRoute(route, frame);
+      return;
+    }
+
+    const msg = parsed as unknown as MCPMessage;
 
     if (!this.extensionClient) {
       // Can't forward -- send error back to relay client
@@ -951,6 +1126,16 @@ export class WebSocketBridge {
           return;
         }
 
+        if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+          const frame = parseExtFrame(parsed);
+          if (frame?.type === 'ext:request') {
+            this._handleRelayedExtRequest(frame);
+          } else {
+            console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid hub extension frame`);
+          }
+          return;
+        }
+
         // Handle responses routed back from hub
         this._handleRelayResponse(parsed as unknown as MCPResponse);
       });
@@ -976,6 +1161,7 @@ export class WebSocketBridge {
           this.pendingRequests.delete(id);
         }
         this.progressListeners.clear();
+        this.relayActiveExtRequests.clear();
 
         if (!this.intentionalClose) {
           // Try to promote to hub or reconnect as relay
@@ -988,6 +1174,76 @@ export class WebSocketBridge {
         // onclose fires after onerror, promotion/reconnect handled there
       });
     });
+  }
+
+  private _handleRelayedExtRequest(request: ExtRequest): void {
+    const hubSocket = this.hubConnection;
+    if (!hubSocket || hubSocket.readyState !== WebSocket.OPEN) return;
+    if (this.relayActiveExtRequests.has(request.id)) {
+      hubSocket.send(JSON.stringify(makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request ID is already active',
+        false,
+      )));
+      return;
+    }
+    if (!this.capabilities.has('agent-spawn') || !this.handleExtRequest) {
+      hubSocket.send(JSON.stringify(makeExtError(
+        request.id,
+        'agent_provider_offline',
+        'No extension request handler is available',
+        true,
+      )));
+      return;
+    }
+
+    this.relayActiveExtRequests.set(request.id, hubSocket);
+    void this._invokeRelayedExtHandler(request, hubSocket);
+  }
+
+  private async _invokeRelayedExtHandler(request: ExtRequest, hubSocket: WebSocket): Promise<void> {
+    const handler = this.handleExtRequest;
+    if (!handler) return;
+    const isActive = (): boolean => this.relayActiveExtRequests.get(request.id) === hubSocket;
+    const emit = (event: ExtEvent): void => {
+      const parsedEvent = parseExtFrame(event);
+      if (
+        !isActive()
+        || parsedEvent?.type !== 'ext:event'
+        || parsedEvent.id !== request.id
+      ) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid or late relayed extension event`);
+        return;
+      }
+      if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(JSON.stringify(parsedEvent));
+    };
+
+    let response: ExtResponse;
+    try {
+      const payload = await handler(request, emit);
+      const parsedResponse = parseExtFrame({
+        id: request.id,
+        type: 'ext:response',
+        payload,
+      });
+      if (parsedResponse?.type !== 'ext:response' || !('payload' in parsedResponse)) {
+        throw new Error('invalid handler result');
+      }
+      response = parsedResponse;
+    } catch {
+      console.error(`[FSB Bridge ${this.instanceId}] Relayed extension request handler failed`);
+      response = makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request handler failed',
+        false,
+      );
+    }
+
+    if (!isActive()) return;
+    this.relayActiveExtRequests.delete(request.id);
+    if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(JSON.stringify(response));
   }
 
   /**
