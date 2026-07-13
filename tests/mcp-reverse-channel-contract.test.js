@@ -117,6 +117,11 @@ async function run() {
   );
   assert.strictEqual((JSON.stringify(capableHello).match(/"capabilities":\["agent-spawn"\]/g) || []).length, 1);
 
+  const normalizedCapabilities = [...new Set(
+    ['unknown', 'agent-spawn', 'agent-spawn'].filter((capability) => capability === 'agent-spawn'),
+  )];
+  assert.deepStrictEqual(normalizedCapabilities, ['agent-spawn'], 'closed capability normalization drops unknown and duplicate values');
+
   console.log('mcp-reverse-channel-contract: all assertions passed');
 }
 

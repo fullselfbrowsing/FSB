@@ -79,6 +79,8 @@ export interface BridgeOptions {
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
   allowedBrowserOrigins?: string[];
+  capabilities?: BridgeCapability[];
+  handleExtRequest?: ExtRequestHandler;
 }
 
 export interface BridgeTopologyState {
@@ -152,6 +154,11 @@ export interface ExtEvent {
 }
 
 export type ExtMessage = ExtRequest | ExtResponse | ExtEvent;
+
+export type ExtRequestHandler = (
+  request: ExtRequest,
+  emit: (event: ExtEvent) => void,
+) => Promise<Record<string, unknown>>;
 
 // Tool result wrapper
 export interface ToolResult {

@@ -5,8 +5,10 @@ import WebSocket from 'ws';
 import { WebSocketServer, type WebSocket as WsWebSocket } from 'ws';
 import type {
   BridgeMode,
+  BridgeCapability,
   BridgeOptions,
   BridgeTopologyState,
+  ExtRequestHandler,
   MCPMessage,
   MCPResponse,
   RelayHello,
@@ -68,12 +70,15 @@ export class WebSocketBridge {
   private promotionJitterMs: number;
   private maxReconnectDelayMs: number;
   private allowedBrowserOrigins: string[];
+  private capabilities: Set<BridgeCapability>;
+  private handleExtRequest: ExtRequestHandler | null;
 
   // Hub mode state
   private wss: WebSocketServer | null = null;
   private httpServer: Server | null = null;
   private extensionClient: WsWebSocket | null = null;
   private relayClients = new Map<string, WsWebSocket>();
+  private relayCapabilities = new Map<string, Set<BridgeCapability>>();
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
   private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
@@ -110,6 +115,17 @@ export class WebSocketBridge {
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
     this.allowedBrowserOrigins = options.allowedBrowserOrigins ?? ['chrome-extension://'];
+    this.handleExtRequest = typeof options.handleExtRequest === 'function'
+      ? options.handleExtRequest
+      : null;
+    this.capabilities = new Set(
+      this.handleExtRequest && options.capabilities?.includes('agent-spawn')
+        ? ['agent-spawn']
+        : [],
+    );
+    if (options.capabilities?.includes('agent-spawn') && !this.handleExtRequest) {
+      console.error(`[FSB Bridge ${this.instanceId}] Ignoring agent-spawn capability without a handler`);
+    }
   }
 
   private static isLoopbackBindHost(host: string): boolean {
@@ -153,6 +169,7 @@ export class WebSocketBridge {
       for (const [id, ws] of this.relayClients) {
         ws.close();
         this.relayClients.delete(id);
+        this.relayCapabilities.delete(id);
       }
       // Close extension connection
       if (this.extensionClient) {
@@ -190,6 +207,7 @@ export class WebSocketBridge {
     }
     this.progressListeners.clear();
     this.messageOrigin.clear();
+    this.relayCapabilities.clear();
     this.connected = false;
     this.hubConnected = false;
     this.activeHubInstanceId = null;
@@ -625,6 +643,11 @@ export class WebSocketBridge {
 
   private _registerRelayClient(ws: WsWebSocket, hello: RelayHello): void {
     const clientId = hello.instanceId;
+    const capabilities = new Set<BridgeCapability>(
+      Array.isArray(hello.capabilities) && hello.capabilities.includes('agent-spawn')
+        ? ['agent-spawn']
+        : [],
+    );
 
     if (this.relayClients.has(clientId)) {
       console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} reconnected, closing old`);
@@ -632,6 +655,7 @@ export class WebSocketBridge {
     }
 
     this.relayClients.set(clientId, ws);
+    this.relayCapabilities.set(clientId, capabilities);
     console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} registered (total: ${this.relayClients.size})`);
 
     // Send welcome
@@ -657,6 +681,7 @@ export class WebSocketBridge {
       console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} disconnected`);
       if (this.relayClients.get(clientId) === ws) {
         this.relayClients.delete(clientId);
+        this.relayCapabilities.delete(clientId);
       }
 
       // Clean up messageOrigin entries for this client
@@ -891,7 +916,13 @@ export class WebSocketBridge {
 
       this.hubConnection.on('open', () => {
         // Send handshake
-        const hello: RelayHello = { type: 'relay:hello', instanceId: this.instanceId };
+        const hello: RelayHello = this.capabilities.size > 0
+          ? {
+              type: 'relay:hello',
+              instanceId: this.instanceId,
+              capabilities: [...this.capabilities],
+            }
+          : { type: 'relay:hello', instanceId: this.instanceId };
         this.hubConnection!.send(JSON.stringify(hello));
         console.error(`[FSB Bridge ${this.instanceId}] Relay mode: connected to hub, sent hello`);
       });

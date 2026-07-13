@@ -265,6 +265,82 @@ async function createBridgePair(WebSocketBridge) {
   return { port, hub, relay, sockets, bridges };
 }
 
+async function runRelayCapabilityAdvertisement(WebSocketBridge) {
+  const port = await getFreePort();
+  const seenHellos = [];
+  const hub = new WebSocketBridge({
+    port,
+    host: '127.0.0.1',
+    instanceId: 'capability-hub',
+    handshakeTimeoutMs: 25,
+  });
+  const registerRelay = hub._registerRelayClient.bind(hub);
+  hub._registerRelayClient = (socket, hello) => {
+    seenHellos.push(hello);
+    return registerRelay(socket, hello);
+  };
+  const defaultRelay = new WebSocketBridge({
+    port,
+    host: '127.0.0.1',
+    instanceId: 'default-relay',
+    handshakeTimeoutMs: 25,
+  });
+  const capableRelay = new WebSocketBridge({
+    port,
+    host: '127.0.0.1',
+    instanceId: 'capable-relay',
+    handshakeTimeoutMs: 25,
+    capabilities: ['unknown', 'agent-spawn', 'agent-spawn'],
+    handleExtRequest: async () => ({ accepted: true }),
+  });
+  const ignoredRelay = new WebSocketBridge({
+    port,
+    host: '127.0.0.1',
+    instanceId: 'ignored-relay',
+    handshakeTimeoutMs: 25,
+    capabilities: ['agent-spawn'],
+  });
+  const resources = { sockets: [], bridges: [hub, defaultRelay, capableRelay, ignoredRelay] };
+
+  try {
+    await hub.connect();
+    await defaultRelay.connect();
+    await capableRelay.connect();
+    await ignoredRelay.connect();
+
+    assertEqual(
+      JSON.stringify(seenHellos[0]),
+      '{"type":"relay:hello","instanceId":"default-relay"}',
+      'default relay hello remains byte-identical with no capabilities key',
+    );
+    assertEqual(
+      JSON.stringify(seenHellos[1]),
+      '{"type":"relay:hello","instanceId":"capable-relay","capabilities":["agent-spawn"]}',
+      'capable relay advertises the one closed capability exactly once',
+    );
+    assertEqual(
+      JSON.stringify(seenHellos[2]),
+      '{"type":"relay:hello","instanceId":"ignored-relay"}',
+      'capability without a handler is omitted from relay hello',
+    );
+    assertEqual(hub.relayCapabilities.get('default-relay')?.size, 0, 'default relay snapshots an empty capability set');
+    assertEqual(hub.relayCapabilities.get('capable-relay')?.size, 1, 'capable relay snapshots one capability');
+    assert(hub.relayCapabilities.get('capable-relay')?.has('agent-spawn'), 'capable relay snapshot contains agent-spawn');
+    assertEqual(hub.relayCapabilities.get('ignored-relay')?.size, 0, 'ignored relay cannot enter capable topology state');
+
+    capableRelay.disconnect();
+    await waitFor(
+      () => !hub.relayCapabilities.has('capable-relay'),
+      'capable relay capability cleanup',
+      1000,
+      10,
+    );
+    assert(!hub.relayCapabilities.has('capable-relay'), 'relay close removes its capability snapshot');
+  } finally {
+    await cleanup(resources);
+  }
+}
+
 async function cleanup(resources) {
   for (const socket of resources.sockets || []) {
     try {
@@ -665,6 +741,7 @@ async function run() {
 
   await runCase('rejects non-loopback bind before port use', () => runRejectsNonLoopbackBind(WebSocketBridge));
   await runCase('server-first topology', () => runServerFirstTopology(WebSocketBridge));
+  await runCase('optional relay capability advertisement', () => runRelayCapabilityAdvertisement(WebSocketBridge));
   await runCase('relay waits for extension reachability', () => runRelayWaitsForExtensionReachability(WebSocketBridge));
   await runCase('extension state broadcasts to relays', () => runExtensionStateBroadcastsToRelays(WebSocketBridge));
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
