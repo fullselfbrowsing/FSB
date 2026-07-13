@@ -505,6 +505,12 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
       instanceId: 'authority-hub',
       handshakeTimeoutMs: 25,
     });
+    let acceptedServerSocket = null;
+    const handleNewConnection = hub._handleNewConnection.bind(hub);
+    hub._handleNewConnection = (socket) => {
+      acceptedServerSocket = socket;
+      return handleNewConnection(socket);
+    };
     const resources = { sockets: [], bridges: [hub] };
     try {
       await hub.connect();
@@ -522,6 +528,10 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
         'chrome-extension://first-extension',
         'first authenticated upgrade durably binds the exact extension Origin',
       );
+      const acceptedMetadata = hub.acceptedSocketMetadata.get(acceptedServerSocket);
+      assertEqual(acceptedMetadata?.browserOrigin, 'chrome-extension://first-extension', 'accepted socket metadata records the exact browser Origin');
+      assertEqual(acceptedMetadata?.sessionId, initial.sessionId, 'accepted socket metadata records the current non-secret session ID');
+      assert(!Object.prototype.hasOwnProperty.call(acceptedMetadata || {}, 'sessionSecret'), 'accepted socket metadata never records the session credential');
       assertEqual(hub.topology.pendingRequestCount, 0, 'authorized no-router response retains no current route');
       first.close();
       await sleep(20);
