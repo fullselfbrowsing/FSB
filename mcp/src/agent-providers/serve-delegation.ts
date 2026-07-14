@@ -45,7 +45,10 @@ export interface ServeDelegationDependencies {
     bridge: ServeDelegationBridge;
     queue: unknown;
   }) => Promise<ServeDelegationHttpServer>;
-  readonly createSupervisor?: (endpoint: string) => SpawnSupervisor;
+  readonly createSupervisor?: (
+    endpoint: string,
+    onDegraded: (code: 'tree_unsettled' | 'runtime_cleanup_failed') => void,
+  ) => SpawnSupervisor;
   readonly pushInventory?: (bridge: ServeDelegationBridge) => Promise<void>;
   readonly registerSignal?: (
     signal: 'SIGTERM' | 'SIGINT',
@@ -94,7 +97,10 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       bridge: options.bridge as WebSocketBridge,
       queue: options.queue as TaskQueue,
     }),
-    createSupervisor: (endpoint) => createProductionSpawnSupervisor({ endpoint }),
+    createSupervisor: (endpoint, onDegraded) => createProductionSpawnSupervisor({
+      endpoint,
+      onDegraded,
+    }),
     pushInventory: async (bridge) => pushMcpClientInventory(bridge as WebSocketBridge),
     registerSignal: (signal, handler) => process.on(signal, handler),
     exit: (code) => process.exit(code),
@@ -121,6 +127,8 @@ export async function startServeDelegation(
   const dependencies = { ...defaultDependencies(), ...options.dependencies };
   let supervisor: SpawnSupervisor | null = null;
   let httpServer: ServeDelegationHttpServer | null = null;
+  let degraded = false;
+  let requestDegradedShutdown: (() => void) | null = null;
 
   const handleExtRequest: ExtRequestHandler = (request, emit) => {
     if (!supervisor) throw new ServeDelegationStartupError();
@@ -139,7 +147,10 @@ export async function startServeDelegation(
       bridge,
       queue,
     });
-    supervisor = dependencies.createSupervisor(httpServer.endpoint);
+    supervisor = dependencies.createSupervisor(httpServer.endpoint, () => {
+      degraded = true;
+      requestDegradedShutdown?.();
+    });
     const recovery = await supervisor.recover();
     if (!recovery.spawnAvailable) throw new ServeDelegationStartupError();
     await bridge.connect();
@@ -155,7 +166,7 @@ export async function startServeDelegation(
   const shutdown = (): Promise<ServeDelegationShutdownResult> => {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
-      let failed = false;
+      let failed = degraded;
       let supervisorResult = EMPTY_CLOSE_RESULT;
       try {
         supervisorResult = await readySupervisor.close();
@@ -180,6 +191,11 @@ export async function startServeDelegation(
     })();
     return shutdownPromise;
   };
+
+  requestDegradedShutdown = () => {
+    void shutdown().catch(() => undefined);
+  };
+  if (degraded) requestDegradedShutdown();
 
   dependencies.registerSignal('SIGTERM', () => { void shutdown().catch(() => undefined); });
   dependencies.registerSignal('SIGINT', () => { void shutdown().catch(() => undefined); });

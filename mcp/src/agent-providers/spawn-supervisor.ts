@@ -146,6 +146,9 @@ export interface SpawnSupervisorDependencies {
   readonly terminationGrace?: number;
   readonly activationAttempts?: number;
   readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
+  readonly onDegraded?: (
+    code: 'tree_unsettled' | 'runtime_cleanup_failed',
+  ) => void;
 }
 
 export interface ProductionSpawnSupervisorOptions {
@@ -154,6 +157,7 @@ export interface ProductionSpawnSupervisorOptions {
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
   readonly terminationGrace?: number;
+  readonly onDegraded?: SpawnSupervisorDependencies['onDegraded'];
 }
 
 interface RunTerminalResult {
@@ -398,6 +402,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly activationAttempts: number;
   private readonly allowSpawnOnPlatform: (platform: NodeJS.Platform) => boolean;
   private accepting = true;
+  private degraded = false;
   private closePromise: Promise<SpawnSupervisorCloseResult> | null = null;
 
   constructor(private readonly dependencies: SpawnSupervisorDependencies) {
@@ -636,6 +641,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         code = errorCode(cleanupError) === 'tree_unsettled'
           ? 'tree_unsettled'
           : 'runtime_cleanup_failed';
+      }
+      if (code === 'tree_unsettled' || code === 'runtime_cleanup_failed') {
+        this.markDegraded(code);
       }
       this.settleOnce(run, 'failed', diagnosticTerminal(code, profileVersion));
     }
@@ -924,8 +932,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         await Promise.allSettled([run.streams.parser, run.streams.stderr, run.streams.closed]);
       }
       this.settleOnce(run, 'cancelled', diagnosticTerminal('cancelled', run.profileVersion));
-    } catch {
-      this.settleOnce(run, 'failed', diagnosticTerminal('tree_unsettled', run.profileVersion));
+    } catch (error) {
+      const code = errorCode(error) === 'tree_unsettled'
+        ? 'tree_unsettled'
+        : 'runtime_cleanup_failed';
+      this.markDegraded(code);
+      this.settleOnce(run, 'failed', diagnosticTerminal(code, run.profileVersion));
     }
     if (!run.settled) {
       this.settleOnce(run, 'failed', diagnosticTerminal(reason, run.profileVersion));
@@ -944,6 +956,17 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (code === 'daemon_shutdown') return 'daemon_shutdown';
     if (code === 'route_lost') return 'route_lost';
     return 'spawn_failed';
+  }
+
+  private markDegraded(code: 'tree_unsettled' | 'runtime_cleanup_failed'): void {
+    this.accepting = false;
+    if (this.degraded) return;
+    this.degraded = true;
+    try {
+      this.dependencies.onDegraded?.(code);
+    } catch {
+      // The fail-closed latch is authoritative even if its owner cannot shut down cleanly.
+    }
   }
 
   private requireResultEvent(run: DelegationRun): AgentEvent {
@@ -1016,6 +1039,7 @@ export function createProductionSpawnSupervisor(
     platform,
     ...(options.environment ? { environment: options.environment } : {}),
     terminationGrace: options.terminationGrace,
+    onDegraded: options.onDegraded,
   });
   return supervisor;
 }

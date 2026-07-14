@@ -262,6 +262,7 @@ function makeHarness(supervisorModule, options = {}) {
   };
 
   const terminationCalls = [];
+  const degradations = [];
   const terminator = {
     async stop(entry, supervisedChild, stopOptions) {
       order.push('terminate');
@@ -338,6 +339,10 @@ function makeHarness(supervisorModule, options = {}) {
     terminationGrace: 25,
     activationAttempts: 3,
     allowSpawnOnPlatform: options.allowSpawnOnPlatform,
+    onDegraded(code) {
+      degradations.push(code);
+      if (options.onDegraded) options.onDegraded(code);
+    },
   });
 
   const emit = (event) => {
@@ -354,6 +359,7 @@ function makeHarness(supervisorModule, options = {}) {
     children,
     counters,
     terminationCalls,
+    degradations,
     runtimeFiles,
     inspector,
     terminator,
@@ -701,6 +707,12 @@ async function runCancelAndShutdownTests(supervisorModule) {
     assert.equal(terminal.status, 'failed');
     assert.equal(terminal.terminal.code, 'tree_unsettled');
     assert.equal(harness.counters.remove, 0, 'unsettled tree keeps journal state');
+    assert.deepEqual(harness.degradations, ['tree_unsettled'], 'unsettled cleanup latches degradation once');
+    await expectInvalid(() => harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'must not spawn after unsettled tree' }, { id: 'ext-start-after-unsettled' }),
+      harness.emit,
+    ));
+    assert.equal(harness.spawnCalls.length, 1, 'degraded supervisor emits no second spawn');
   }
 }
 

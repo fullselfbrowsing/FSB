@@ -275,6 +275,7 @@ function makeLifecycleFakes(overrides = {}) {
     httpCloseCalls: 0,
     disconnectCalls: 0,
     handlerCalls: 0,
+    onDegraded: null,
   };
   const bridge = {
     currentMode: 'hub',
@@ -357,8 +358,9 @@ function makeLifecycleFakes(overrides = {}) {
       if (overrides.httpError) throw overrides.httpError;
       return httpServer;
     },
-    createSupervisor(endpoint) {
+    createSupervisor(endpoint, onDegraded) {
       order.push(`supervisor.construct:${endpoint}`);
+      state.onDegraded = onDegraded;
       return supervisor;
     },
     async pushInventory() {
@@ -444,6 +446,29 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     'unsettled tree still closes resources in order before nonzero exit',
   );
   assertEqual(unsettled.exits.length, 1, 'unsettled tree requests nonzero process exit exactly once');
+
+  const degraded = makeLifecycleFakes();
+  const degradedRunning = await lifecycleModule.startServeDelegation({
+    host: '127.0.0.1',
+    port: 6015,
+    dependencies: degraded.dependencies,
+  });
+  assertEqual(typeof degraded.state.onDegraded, 'function', 'serve wires the supervisor degradation callback');
+  degraded.state.onDegraded('tree_unsettled');
+  let degradedError = null;
+  try {
+    await degradedRunning.shutdown();
+  } catch (caught) {
+    degradedError = caught;
+  }
+  assert(degradedError instanceof lifecycleModule.ServeDelegationShutdownError, 'runtime degradation forces typed nonzero shutdown');
+  assertEqual(
+    degraded.order.slice(-4).join(' > '),
+    'supervisor.close > http.close > bridge.disconnect > process.exit:1',
+    'runtime degradation withdraws the serve capability through orderly nonzero shutdown',
+  );
+  assertEqual(degraded.state.disconnectCalls, 1, 'runtime degradation disconnects the capable bridge once');
+  assertEqual(degraded.exits.length, 1, 'runtime degradation requests one nonzero process exit');
 
   for (const [name, overrides, expectedPrefix] of [
     ['HTTP bind', { httpError: new Error('bind') }, 'bridge.construct > queue.construct > http.bind'],
