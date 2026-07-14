@@ -769,6 +769,34 @@ this.__phase241bridge = {
   }
   console.log('  PASS: 20s/three-miss heartbeat and 10s agent grace are independent contracts');
 
+  console.log('--- Test 15 (bridge): heartbeat recovery has no native or restart authority ---');
+  {
+    const bridgeSource = fs.readFileSync(
+      path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'),
+      'utf8'
+    );
+    const heartbeatStart = bridgeSource.indexOf('retainDelegationHeartbeat(ownerId)');
+    const heartbeatEnd = bridgeSource.indexOf('// Message handling', heartbeatStart);
+    assert.ok(heartbeatStart >= 0 && heartbeatEnd > heartbeatStart,
+      'heartbeat implementation region is present for closed source audit');
+    const heartbeatSource = bridgeSource.slice(heartbeatStart, heartbeatEnd);
+    for (const pattern of [
+      /connectNative|sendNativeMessage|nativeMessaging/,
+      /child_process|\bprocess\s*\./,
+      /\b(?:execFile|execSync|spawn|spawnSync|fork)\s*\(/,
+      /restart|replay/i,
+      /sendExtRequest|dispatchMcpMessageRoute|chrome\.runtime\.sendMessage/,
+    ]) {
+      assert.strictEqual(pattern.test(heartbeatSource), false,
+        'heartbeat region has no native, restart, execute, or work-dispatch path matching ' + pattern);
+    }
+    assert.ok(
+      heartbeatSource.includes("this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now(), nonce }))"),
+      'heartbeat authority is limited to its exact mcp:ping frame'
+    );
+  }
+  console.log('  PASS: heartbeat classifies connectivity without native execution or restart inference');
+
   console.log('PASS grace');
 })().catch(err => {
   console.error('FAIL grace:', err && err.stack || err);

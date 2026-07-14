@@ -40,6 +40,19 @@ const prePhase57MessageTypes = [
   'agent:release', 'agent:status',
 ];
 const prePhase57ToolDefinitionsHash = '94ccbd785f8daefeea67032534ad6dd0864129e12569964254735086b93edac2';
+const prePhase61ExtensionPermissions = [
+  'activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs', 'windows',
+  'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
+  'offscreen', 'system.memory',
+];
+const prePhase61ContentScripts = [
+  {
+    matches: ['<all_urls>'],
+    js: ['canvas-interceptor.js'],
+    run_at: 'document_start',
+    world: 'MAIN',
+  },
+];
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -98,6 +111,10 @@ async function run() {
   const rootReadme = readText('README.md');
   const typesSource = readText('mcp/src/types.ts');
   const dispatcherSource = readText('extension/ws/mcp-tool-dispatcher.js');
+  const manifest = readJson('extension/manifest.json');
+  const backgroundSource = readText('extension/background.js');
+  const bridgeSource = readText('extension/ws/mcp-bridge-client.js');
+  const delegationUiSpec = readText('.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
 
   console.log('\n--- metadata parity ---');
   assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
@@ -147,6 +164,60 @@ async function run() {
     dispatcherSource.includes('return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };'),
     'agent:register response remains the exact established envelope',
   );
+
+  console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');
+  assertEqual(manifest.manifest_version, 3, 'extension remains on Manifest V3');
+  assertEqual(manifest.minimum_chrome_version, '116', 'extension minimum Chrome version is exactly string 116');
+  assert(
+    JSON.stringify(manifest.permissions) === JSON.stringify(prePhase61ExtensionPermissions),
+    'Chrome 116 pin leaves the established permission roster byte-for-byte ordered',
+  );
+  assert(
+    JSON.stringify(manifest.host_permissions) === JSON.stringify(['<all_urls>']),
+    'Chrome 116 pin adds no host permission',
+  );
+  assert(
+    JSON.stringify(manifest.background) === JSON.stringify({ service_worker: 'background.js' }),
+    'background service-worker declaration remains unchanged',
+  );
+  assert(
+    JSON.stringify(manifest.content_scripts) === JSON.stringify(prePhase61ContentScripts),
+    'content-script declarations remain unchanged',
+  );
+  for (const permission of ['nativeMessaging', 'downloads']) {
+    assert(!manifest.permissions.includes(permission), `${permission} permission remains absent`);
+  }
+  for (const manifestKey of ['optional_permissions', 'optional_host_permissions', 'externally_connectable']) {
+    assert(!Object.prototype.hasOwnProperty.call(manifest, manifestKey), `${manifestKey} authority remains absent`);
+  }
+
+  const bridgeImport = "try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }";
+  assertEqual(backgroundSource.split(bridgeImport).length - 1, 1, 'background loads the established bridge script exactly once');
+  assert(
+    backgroundSource.indexOf("importScripts('ws/mcp-tool-dispatcher.js')") < backgroundSource.indexOf(bridgeImport),
+    'bridge load order remains after the MCP dispatcher',
+  );
+
+  for (const pattern of [
+    /chrome\.runtime\.(?:connectNative|sendNativeMessage)\s*\(/,
+    /\bnativeMessaging\b/,
+    /\bchild_process\b/,
+    /\bprocess\s*\./,
+    /\b(?:execFile|execSync|spawn|spawnSync|fork)\s*\(/,
+    /\brestart(?:Daemon|Service|Process)\s*\(/i,
+  ]) {
+    assert(!pattern.test(bridgeSource), `extension bridge has no native, shell, process, or daemon-restart authority matching ${pattern}`);
+  }
+
+  for (const snippet of [
+    'Copy doctor command',
+    'Open provider setup',
+    'does not offer automatic retry or daemon restart',
+    'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
+  ]) {
+    assert(delegationUiSpec.includes(snippet), `approved future UI contract retains data-only recovery text: ${snippet}`);
+  }
+  assert(!/doctor|provider setup/i.test(bridgeSource), 'bridge does not implement or execute future doctor/setup UI dispositions');
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
