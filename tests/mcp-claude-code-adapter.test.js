@@ -57,6 +57,14 @@ async function main() {
   const shippedAgent = JSON.parse(fs.readFileSync(agentPath, 'utf8'));
   assert.equal(shippedAgent.name, 'fsb');
   assert.deepEqual(shippedAgent.tools, ['mcp__fsb']);
+  assert.deepEqual(shippedAgent.disallowedTools, [
+    'Bash',
+    'Edit',
+    'Write',
+    'NotebookEdit',
+    'WebFetch',
+    'WebSearch',
+  ]);
   assert.equal(shippedAgent.permissionMode, 'dontAsk');
   assert.equal(shippedAgent.maxTurns, 40);
 
@@ -279,6 +287,16 @@ async function main() {
     permissionMode: shippedAgent.permissionMode,
     maxTurns: shippedAgent.maxTurns,
   }, 'serialized agent definition is derived only from the shipped static asset');
+  assert.equal(
+    JSON.stringify(serializedAgents).includes(taskCanary),
+    false,
+    'serialized static policy contains no task-derived value',
+  );
+  assert.deepEqual(
+    Object.keys(serializedAgents.fsb).sort(),
+    ['description', 'disallowedTools', 'maxTurns', 'permissionMode', 'prompt', 'tools'],
+    'CLI agent definition excludes product metadata and dynamic fields',
+  );
   assert.equal(SHIPPED_FSB_AGENT_POLICY.name, 'fsb');
   assert.ok(Object.isFrozen(SHIPPED_FSB_AGENT_POLICY));
 

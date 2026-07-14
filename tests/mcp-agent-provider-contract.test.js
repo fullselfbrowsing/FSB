@@ -7,7 +7,9 @@
  */
 
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -16,6 +18,9 @@ const adapterSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', '
 const adapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'adapter.js');
 const registryBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'registry.js');
 const platformsBuildPath = path.join(repoRoot, 'mcp', 'build', 'platforms.js');
+const mcpRoot = path.join(repoRoot, 'mcp');
+const mcpPackagePath = path.join(mcpRoot, 'package.json');
+const shippedAgentPath = path.join(mcpRoot, 'ai', 'agents', 'fsb.json');
 
 function expectRegistryError(fn, ErrorType, code) {
   assert.throws(fn, (error) => {
@@ -171,6 +176,88 @@ async function main() {
   for (const forbidden of ['start', 'stop', 'close', 'init', 'dispose', 'spawn']) {
     assert.equal(signatures.includes(forbidden), false, `interface excludes ${forbidden}`);
   }
+
+  const shippedAgent = JSON.parse(fs.readFileSync(shippedAgentPath, 'utf8'));
+  assert.deepEqual(Object.keys(shippedAgent).sort(), [
+    'description',
+    'disallowedTools',
+    'maxTurns',
+    'name',
+    'permissionMode',
+    'prompt',
+    'tools',
+  ], 'shipped policy has the exact reviewed key set');
+  assert.equal(shippedAgent.name, 'fsb');
+  assert.equal(typeof shippedAgent.description, 'string');
+  assert.ok(shippedAgent.description.length >= 24 && shippedAgent.description.length <= 300);
+  assert.equal(typeof shippedAgent.prompt, 'string');
+  assert.ok(shippedAgent.prompt.length >= 200 && shippedAgent.prompt.length <= 4000);
+  assert.deepEqual(shippedAgent.tools, ['mcp__fsb']);
+  assert.deepEqual(shippedAgent.disallowedTools, [
+    'Bash',
+    'Edit',
+    'Write',
+    'NotebookEdit',
+    'WebFetch',
+    'WebSearch',
+  ]);
+  assert.equal(shippedAgent.permissionMode, 'dontAsk');
+  assert.equal(shippedAgent.maxTurns, 40);
+
+  const policyText = `${shippedAgent.description}\n${shippedAgent.prompt}`;
+  assert.match(policyText, /server mints your agent identity/i);
+  assert.match(policyText, /tabs owned by this agent/i);
+  assert.match(policyText, /vault-reference operations/i);
+  assert.match(policyText, /human handoff is required/i);
+  assert.match(policyText, /irreversible or consent-required/i);
+  assert.match(policyText, /fail closed/i);
+  for (const dynamicMarker of ['${', '{{', '}}', '<task>', '%TASK%', 'TASK_CANARY']) {
+    assert.equal(policyText.includes(dynamicMarker), false, `policy excludes ${dynamicMarker}`);
+  }
+  for (const credentialShape of [
+    /\bsk-[A-Za-z0-9_-]{8,}/,
+    /\bAKIA[A-Z0-9]{12,}/,
+    /\bBearer\s+[A-Za-z0-9._-]{8,}/i,
+    /\b(?:api[_-]?key|password|cvv)\s*[:=]\s*\S+/i,
+  ]) {
+    assert.equal(credentialShape.test(policyText), false, 'policy contains no credential value');
+  }
+  assert.deepEqual(
+    shippedAgent.tools.filter((tool) => ['Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', 'WebSearch'].includes(tool)),
+    [],
+    'policy grants no shell, filesystem-edit, or general web authority',
+  );
+
+  const mcpPackage = JSON.parse(fs.readFileSync(mcpPackagePath, 'utf8'));
+  assert.ok(mcpPackage.files.includes('ai/'), 'package manifest publishes the ai directory');
+
+  const packageArchivesBefore = fs.readdirSync(mcpRoot).filter((name) => name.endsWith('.tgz'));
+  const packDestination = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-pack-dry-run-'));
+  try {
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const packed = spawnSync(
+      npmCommand,
+      ['pack', '--dry-run', '--json', '--pack-destination', packDestination],
+      {
+        cwd: mcpRoot,
+        encoding: 'utf8',
+        shell: false,
+        maxBuffer: 4 * 1024 * 1024,
+      },
+    );
+    assert.equal(packed.status, 0, packed.stderr || 'npm pack dry-run failed');
+    const listing = JSON.parse(packed.stdout);
+    assert.ok(Array.isArray(listing) && listing.length === 1, 'npm emits one dry-run package listing');
+    const packagedPaths = listing[0].files.map((entry) => entry.path);
+    assert.ok(packagedPaths.includes('ai/agents/fsb.json'), 'dry-run package includes static FSB agent');
+  } finally {
+    fs.rmSync(packDestination, { recursive: true, force: true });
+  }
+  assert.deepEqual(
+    fs.readdirSync(mcpRoot).filter((name) => name.endsWith('.tgz')),
+    packageArchivesBefore,
+    'dry-run package validation leaves no workspace archive',
+  );
 
   console.log('mcp-agent-provider-contract.test.js: PASS');
 }
