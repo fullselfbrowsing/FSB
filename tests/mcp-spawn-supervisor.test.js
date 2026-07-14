@@ -273,6 +273,7 @@ function makeHarness(supervisorModule, options = {}) {
     async removeRun(delegationId) {
       counters.remove += 1;
       order.push(`remove:${delegationId}`);
+      if (options.removeGate) await options.removeGate.promise;
       if (options.removeError) throw new Error('fixture remove failure');
       runtimeRuns.delete(delegationId);
     },
@@ -689,6 +690,61 @@ async function runFailureBarrierTests(supervisorModule) {
 }
 
 async function runCancelAndShutdownTests(supervisorModule) {
+  for (const fixture of [
+    {
+      name: 'successful result',
+      result: normalizedEvent('result', { is_error: false }),
+      exit: { code: 0, signal: null },
+    },
+    {
+      name: 'is_error result',
+      result: normalizedEvent('result', { is_error: true }),
+      exit: { code: 0, signal: null },
+    },
+    {
+      name: 'process_exit failure',
+      result: normalizedEvent('result', { is_error: false }),
+      exit: { code: 1, signal: null },
+    },
+  ]) {
+    const route = new AbortController();
+    const removeGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      removeGate,
+      onStdinEnd: (controls) => controls.send([
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        fixture.result,
+      ], fixture.exit),
+    });
+    let settlements = 0;
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: `${fixture.name} held cleanup route loss` }),
+      harness.emit,
+      { signal: route.signal },
+    ).then((terminal) => {
+      settlements += 1;
+      return terminal;
+    });
+    await waitFor(
+      () => harness.counters.remove === 1,
+      `${fixture.name} held final cleanup`,
+    );
+    route.abort(new Error('fixture route lost during final cleanup'));
+    route.abort(new Error('duplicate route loss during final cleanup'));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(settlements, 0, `${fixture.name} cannot settle before held cleanup completes`);
+    assert.equal(harness.terminationCalls.length, 1, `${fixture.name} stops the tree once`);
+    assert.equal(harness.counters.remove, 1, `${fixture.name} shares one runtime cleanup`);
+    removeGate.resolve();
+    const terminal = await startPromise;
+    assert.equal(settlements, 1, `${fixture.name} has one observable terminal settlement`);
+    assert.equal(terminal.status, 'failed', `${fixture.name} route loss is non-success`);
+    assert.equal(terminal.terminal.code, 'route_lost', `${fixture.name} preserves route-loss precedence`);
+    assert.equal(harness.terminationCalls.length, 1, `${fixture.name} retains one tree stop`);
+    assert.equal(harness.counters.remove, 1, `${fixture.name} retains one runtime cleanup`);
+    assert.equal(harness.runtimeRuns.size, 0, `${fixture.name} removes all runtime state`);
+  }
+
   {
     const route = new AbortController();
     const harness = makeHarness(supervisorModule, { onStdinEnd: () => {} });

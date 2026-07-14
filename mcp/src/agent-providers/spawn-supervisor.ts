@@ -654,11 +654,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const exit = await run.streams.closed;
       if (resultEvent.payload.is_error === true) {
         await this.terminateAndCleanup(run);
+        if (run.stopRequested) return;
         this.settleOnce(run, 'failed', eventTerminal(resultEvent));
         return;
       }
       if (exit.code !== 0 || exit.signal !== null) throw new Error('process_exit');
       await this.terminateAndCleanup(run);
+      if (run.stopRequested) return;
       this.settleOnce(run, 'succeeded', eventTerminal(resultEvent));
     } catch (error) {
       if (run.settled) return;
@@ -666,6 +668,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       let code = this.failureCode(error);
       try {
         await this.terminateAndCleanup(run);
+        if (run.stopRequested) return;
       } catch (cleanupError) {
         code = errorCode(cleanupError) === 'tree_unsettled'
           ? 'tree_unsettled'
