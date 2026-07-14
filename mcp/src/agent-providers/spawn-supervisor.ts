@@ -15,6 +15,7 @@ import type {
 } from './adapter.js';
 import { CLAUDE_CODE_ADAPTER_ID } from './adapter.js';
 import type { AgentProviderRegistry } from './registry.js';
+import { createProductionAdapterRegistry } from './registry.js';
 import type {
   ActiveJournalEntry,
   AgentStartupRecovery,
@@ -23,12 +24,14 @@ import type {
   PreparedJournalEntry,
 } from './runtime-files.js';
 import type { AgentRuntimeFiles } from './runtime-files.js';
+import { createAgentRuntimeFiles, createAgentStartupRecovery } from './runtime-files.js';
 import type {
   ProcessInspection,
   ProcessInspector,
   ProcessTreeTerminator,
 } from './process-tree.js';
 import { createArgvSignature, TreeUnsettledError } from './process-tree.js';
+import { createProcessInspector, createProcessTreeTerminator } from './process-tree.js';
 import type { ExtEvent, ExtRequest, ExtRequestHandler } from '../types.js';
 
 const TASK_LIMIT_BYTES = 64 * 1024;
@@ -143,6 +146,14 @@ export interface SpawnSupervisorDependencies {
   readonly terminationGrace?: number;
   readonly activationAttempts?: number;
   readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
+}
+
+export interface ProductionSpawnSupervisorOptions {
+  readonly endpoint: string;
+  readonly cwd?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly environment?: NodeJS.ProcessEnv;
+  readonly terminationGrace?: number;
 }
 
 interface RunTerminalResult {
@@ -429,8 +440,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     };
   }
 
-  recover(): Promise<AgentStartupRecoveryResult> {
-    return this.dependencies.startupRecovery.recover();
+  async recover(): Promise<AgentStartupRecoveryResult> {
+    const result = await this.dependencies.startupRecovery.recover();
+    if (this.allowSpawnOnPlatform(this.platform)) return result;
+    return Object.freeze({
+      confirmedKilled: result.confirmedKilled,
+      staleCleared: result.staleCleared,
+      ambiguousFailClosed: result.ambiguousFailClosed + 1,
+      spawnAvailable: false,
+      profiles: result.profiles,
+    });
   }
 
   journalEntryForChild(child: SupervisedChild): JournalEntry | null {
@@ -962,6 +981,43 @@ export function createSpawnSupervisor(
   dependencies: SpawnSupervisorDependencies,
 ): SpawnSupervisor {
   return new ExactOnceSpawnSupervisor(dependencies);
+}
+
+export function createProductionSpawnSupervisor(
+  options: ProductionSpawnSupervisorOptions,
+): SpawnSupervisor {
+  const platform = options.platform ?? process.platform;
+  const runtimeFiles = createAgentRuntimeFiles({ platform });
+  const inspector = createProcessInspector({ platform });
+  const terminator = createProcessTreeTerminator({ platform, inspector });
+  const startupRecovery = createAgentStartupRecovery({
+    runtimeFiles,
+    inspector,
+    terminator,
+    terminationGrace: options.terminationGrace ?? 2_000,
+  });
+
+  let supervisor: SpawnSupervisor | null = null;
+  const registry = createProductionAdapterRegistry({
+    kill: async (child, killOptions) => {
+      const entry = supervisor?.journalEntryForChild(child) ?? null;
+      if (!entry) throw new TreeUnsettledError();
+      await terminator.stop(entry, child, killOptions);
+    },
+  });
+  supervisor = createSpawnSupervisor({
+    registry,
+    runtimeFiles,
+    inspector,
+    terminator,
+    startupRecovery,
+    endpoint: options.endpoint,
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    platform,
+    ...(options.environment ? { environment: options.environment } : {}),
+    terminationGrace: options.terminationGrace,
+  });
+  return supervisor;
 }
 
 export const DELEGATION_TASK_LIMIT_BYTES = TASK_LIMIT_BYTES;

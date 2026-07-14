@@ -256,6 +256,228 @@ async function loadAuthModule() {
   return import(authUrl);
 }
 
+async function loadServeDelegationModule() {
+  const lifecycleUrl = pathToFileURL(
+    path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'serve-delegation.js'),
+  ).href;
+  return import(lifecycleUrl);
+}
+
+function makeLifecycleFakes(overrides = {}) {
+  const order = [];
+  const signals = new Map();
+  const exits = [];
+  const state = {
+    bridgeOptions: null,
+    connectCalls: 0,
+    inventoryCalls: 0,
+    supervisorCloseCalls: 0,
+    httpCloseCalls: 0,
+    disconnectCalls: 0,
+    handlerCalls: 0,
+  };
+  const bridge = {
+    currentMode: 'hub',
+    topology: {
+      mode: 'hub',
+      activeHubInstanceId: 'serve-lifecycle-hub',
+      extensionConnected: false,
+      relayCount: 0,
+      lastExtensionHeartbeatAt: null,
+      lastDisconnectReason: null,
+    },
+    async connect() {
+      state.connectCalls++;
+      order.push('bridge.connect');
+      if (overrides.connectError) throw overrides.connectError;
+    },
+    disconnect() {
+      state.disconnectCalls++;
+      order.push('bridge.disconnect');
+    },
+  };
+  const httpServer = {
+    endpoint: 'http://127.0.0.1:6015/mcp',
+    healthEndpoint: 'http://127.0.0.1:6015/health',
+    async close() {
+      state.httpCloseCalls++;
+      order.push('http.close');
+      if (overrides.httpCloseError) throw overrides.httpCloseError;
+    },
+  };
+  const supervisor = {
+    async recover() {
+      order.push('supervisor.recover');
+      if (overrides.recoveryError) throw overrides.recoveryError;
+      return {
+        confirmedKilled: 0,
+        staleCleared: 0,
+        ambiguousFailClosed: overrides.spawnAvailable === false ? 1 : 0,
+        spawnAvailable: overrides.spawnAvailable !== false,
+        profiles: [],
+      };
+    },
+    async close() {
+      state.supervisorCloseCalls++;
+      order.push('supervisor.close');
+      if (overrides.supervisorCloseError) throw overrides.supervisorCloseError;
+      return {
+        cancelled: 0,
+        failed: overrides.supervisorFailed ? 1 : 0,
+        alreadySettled: 0,
+      };
+    },
+    journalEntryForChild() {
+      return null;
+    },
+    async handleExtRequest(request, emit) {
+      state.handlerCalls++;
+      emit({
+        id: request.id,
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: { delegationId: 'delegation_lifecycle_0001' },
+      });
+      return { delegationId: 'delegation_lifecycle_0001', status: 'completed', terminal: {} };
+    },
+  };
+  const dependencies = {
+    createBridge(options) {
+      order.push('bridge.construct');
+      state.bridgeOptions = options;
+      return bridge;
+    },
+    createQueue() {
+      order.push('queue.construct');
+      return { kind: 'queue' };
+    },
+    async startHttp(options) {
+      order.push('http.bind');
+      state.httpOptions = options;
+      if (overrides.httpError) throw overrides.httpError;
+      return httpServer;
+    },
+    createSupervisor(endpoint) {
+      order.push(`supervisor.construct:${endpoint}`);
+      return supervisor;
+    },
+    async pushInventory() {
+      state.inventoryCalls++;
+      order.push('inventory.push');
+      if (overrides.inventoryError) throw overrides.inventoryError;
+    },
+    registerSignal(signal, handler) {
+      signals.set(signal, handler);
+    },
+    exit(code) {
+      exits.push(code);
+      order.push(`process.exit:${code}`);
+    },
+  };
+  return { bridge, dependencies, exits, httpServer, order, signals, state, supervisor };
+}
+
+async function runServeDelegationLifecycle(lifecycleModule) {
+  const success = makeLifecycleFakes();
+  const running = await lifecycleModule.startServeDelegation({
+    host: '127.0.0.1',
+    port: 6015,
+    dependencies: success.dependencies,
+  });
+  assertEqual(
+    success.order.slice(0, 7).join(' > '),
+    'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push',
+    'serve binds HTTP, constructs and recovers supervisor, then connects and advertises',
+  );
+  assertEqual(
+    JSON.stringify(success.state.bridgeOptions.capabilities),
+    '["agent-spawn"]',
+    'serve bridge has the single closed spawn capability',
+  );
+  assertEqual(typeof success.state.bridgeOptions.handleExtRequest, 'function', 'serve bridge receives the supervisor handler closure');
+  assert(success.state.httpOptions.bridge === success.bridge, 'HTTP receives the same not-yet-connected capable bridge');
+  assertEqual(success.state.connectCalls, 1, 'capable bridge connects exactly once after recovery');
+  assertEqual(success.state.inventoryCalls, 1, 'inventory advertises exactly once after capable connect');
+
+  const routedEvents = [];
+  const routed = await success.state.bridgeOptions.handleExtRequest(
+    { id: 'lifecycle-route', type: 'ext:request', method: 'delegate.start', payload: { adapterId: 'claude-code', task: 'safe' } },
+    (event) => routedEvents.push(event),
+  );
+  assertEqual(success.state.handlerCalls, 1, 'ready handler closure routes to the recovered supervisor');
+  assertEqual(routedEvents[0]?.event, 'delegation.started', 'ready handler preserves the early delegation event');
+  assertEqual(routed.status, 'completed', 'ready handler preserves the terminal domain payload');
+
+  const firstShutdown = running.shutdown();
+  const secondShutdown = running.shutdown();
+  assert(firstShutdown === secondShutdown, 'repeated shutdown calls share one promise');
+  success.signals.get('SIGTERM')();
+  success.signals.get('SIGINT')();
+  const shutdownResult = await firstShutdown;
+  assertEqual(shutdownResult.exitCode, 0, 'clean shutdown reports exit code zero');
+  assertEqual(
+    success.order.slice(-4).join(' > '),
+    'supervisor.close > http.close > bridge.disconnect > process.exit:0',
+    'shutdown settles trees before HTTP, bridge, and process exit',
+  );
+  assertEqual(success.state.supervisorCloseCalls, 1, 'repeated signals close the supervisor once');
+  assertEqual(success.state.httpCloseCalls, 1, 'repeated signals close HTTP once');
+  assertEqual(success.state.disconnectCalls, 1, 'repeated signals disconnect the bridge once');
+  assertEqual(success.exits.length, 1, 'repeated signals request process exit once');
+
+  const unsettled = makeLifecycleFakes({ supervisorFailed: true });
+  const unsettledRunning = await lifecycleModule.startServeDelegation({
+    host: '127.0.0.1',
+    port: 6015,
+    dependencies: unsettled.dependencies,
+  });
+  let shutdownError = null;
+  try {
+    await unsettledRunning.shutdown();
+  } catch (caught) {
+    shutdownError = caught;
+  }
+  assert(shutdownError instanceof lifecycleModule.ServeDelegationShutdownError, 'unsettled tree yields a typed shutdown failure');
+  assertEqual(
+    unsettled.order.slice(-4).join(' > '),
+    'supervisor.close > http.close > bridge.disconnect > process.exit:1',
+    'unsettled tree still closes resources in order before nonzero exit',
+  );
+  assertEqual(unsettled.exits.length, 1, 'unsettled tree requests nonzero process exit exactly once');
+
+  for (const [name, overrides, expectedPrefix] of [
+    ['HTTP bind', { httpError: new Error('bind') }, 'bridge.construct > queue.construct > http.bind'],
+    ['recovery ambiguity', { spawnAvailable: false }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover'],
+    ['bridge connect', { connectError: new Error('connect') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect'],
+  ]) {
+    const failure = makeLifecycleFakes(overrides);
+    let error = null;
+    try {
+      await lifecycleModule.startServeDelegation({
+        host: '127.0.0.1',
+        port: 6015,
+        dependencies: failure.dependencies,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    assert(error instanceof lifecycleModule.ServeDelegationStartupError, `${name} failure is a typed startup failure`);
+    assertEqual(failure.order.slice(0, expectedPrefix.split(' > ').length).join(' > '), expectedPrefix, `${name} failure preserves startup order`);
+    if (name !== 'bridge connect') {
+      assertEqual(failure.state.connectCalls, 0, `${name} failure never connects a capable bridge`);
+    }
+    assertEqual(failure.state.inventoryCalls, 0, `${name} failure never advertises inventory`);
+    assertEqual(failure.exits.length, 0, `${name} startup cleanup never exits the process`);
+  }
+
+  const source = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
+  const runtimeSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'runtime.ts'), 'utf8');
+  const stdioSource = source.slice(source.indexOf('async function runStdioServer'), source.indexOf('async function runHttpMode'));
+  assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(stdioSource), 'stdio source contains no supervisor, handler, or spawn capability');
+  assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(runtimeSource), 'shared MCP runtime contains no supervisor, handler, or spawn capability');
+  assertEqual((source.match(/startServeDelegation\(/g) || []).length, 1, 'only serve mode starts the delegation lifecycle');
+}
+
 async function createBridgePair(WebSocketBridge) {
   const port = await getFreePort();
   const sockets = [];
@@ -838,6 +1060,8 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
     let localInvocations = 0;
     let relayInvocations = 0;
     let lateEmit = null;
+    const localPending = [];
+    const delegationId = 'delegation_local_0001';
     const hub = new WebSocketBridge({
       port,
       host: '127.0.0.1',
@@ -847,11 +1071,36 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
       handleExtRequest: async (request, emit) => {
         localInvocations++;
         lateEmit = emit;
+        if (request.method === 'delegate.cancel') {
+          return {
+            delegationId: request.payload.delegationId,
+            status: 'already_terminal',
+            terminal: { type: 'diagnostic', code: 'already_terminal' },
+          };
+        }
         if (request.payload.fail === true) {
           throw new Error(`handler rejected ${request.payload.marker}`);
         }
-        emit({ id: request.id, type: 'ext:event', event: 'agent.progress', payload: { step: 1 } });
-        return { target: 'local' };
+        if (request.payload.drift === true) {
+          emit({
+            id: request.id,
+            type: 'ext:event',
+            event: 'delegation.started',
+            payload: { delegationId: 'delegation_local_drift', adapterId: 'claude-code', profileVersion: '1' },
+          });
+          emit({
+            id: request.id,
+            type: 'ext:event',
+            event: 'delegation.event',
+            payload: { type: 'diagnostic', code: 'agent_protocol_drift', message: 'Agent protocol drift' },
+          });
+          return {
+            delegationId: 'delegation_local_drift',
+            status: 'failed',
+            terminal: { type: 'diagnostic', code: 'agent_protocol_drift' },
+          };
+        }
+        return new Promise((resolve) => localPending.push({ request, emit, resolve }));
       },
     });
     const relay = new WebSocketBridge({
@@ -890,30 +1139,84 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
       extension.send(JSON.stringify({
         id: 'local-route',
         type: 'ext:request',
-        method: 'agent.start',
-        payload: { task: 'safe' },
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'safe' },
       }));
-      await waitFor(() => messages.length === 3, 'local event and response', 1000, 10);
-      assertEqual(messages[1]?.type, 'ext:event', 'local handler event is forwarded before final response');
-      assertEqual(messages[2]?.type, 'ext:response', 'local handler emits one final response');
-      assertEqual(messages[2]?.payload?.target, 'local', 'local capable handler wins over capable relay');
+      await waitFor(() => localPending.length === 1, 'pending local delegation start', 1000, 10);
+      assertEqual(hub.activeExtRequests.size, 1, 'local start route remains open while delegation runs');
+      localPending[0].emit({
+        id: 'local-route',
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: { delegationId, adapterId: 'claude-code', profileVersion: '1' },
+      });
+      localPending[0].emit({
+        id: 'local-route',
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: { type: 'system', subtype: 'init', profileVersion: '1' },
+      });
+      localPending[0].emit({
+        id: 'local-route',
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: { type: 'assistant', text: 'progress' },
+      });
+      await waitFor(() => messages.length === 4, 'local early id and ordered events', 1000, 10);
+      assertEqual(messages[1]?.event, 'delegation.started', 'local start emits the early server id first');
+      assertEqual(messages[1]?.payload?.delegationId, delegationId, 'local early event carries the server-minted delegation id');
+      assertEqual(messages[2]?.event, 'delegation.event', 'local normalized init follows the early id');
+      assertEqual(messages[3]?.event, 'delegation.event', 'local normalized progress remains routable while pending');
+      assertEqual(hub.activeExtRequests.size, 1, 'multiple local events do not settle the start route');
+      localPending[0].resolve({
+        delegationId,
+        status: 'completed',
+        terminal: { type: 'result', isError: false },
+      });
+      await waitFor(() => messages.length === 5, 'local terminal response', 1000, 10);
+      assertEqual(messages[4]?.type, 'ext:response', 'local handler emits one final response after ordered events');
+      assertEqual(messages[4]?.payload?.delegationId, delegationId, 'local final response correlates to the early server id');
+      assertEqual(messages[4]?.payload?.status, 'completed', 'local final response carries domain completion status');
       assertEqual(localInvocations, 1, 'local handler runs exactly once');
       assertEqual(relayInvocations, 0, 'capable relay is not invoked when local handler exists');
       assertEqual(hub.activeExtRequests.size, 0, 'local final response deletes reverse route state');
 
-      lateEmit({ id: 'local-route', type: 'ext:event', event: 'agent.progress', payload: { step: 2 } });
+      lateEmit({ id: 'local-route', type: 'ext:event', event: 'delegation.event', payload: { type: 'assistant', text: 'late' } });
       await sleep(20);
-      assertEqual(messages.length, 3, 'late local event after final response is dropped');
+      assertEqual(messages.length, 5, 'late local event after final response is dropped');
+
+      extension.send(JSON.stringify({
+        id: 'local-cancel',
+        type: 'ext:request',
+        method: 'delegate.cancel',
+        payload: { delegationId },
+      }));
+      await waitFor(() => messages.length === 6, 'local cancel response', 1000, 10);
+      assertEqual(messages[5]?.payload?.delegationId, delegationId, 'cancel uses the server-minted delegation id');
+      assertEqual(messages[5]?.payload?.status, 'already_terminal', 'duplicate/late cancel is an idempotent domain response');
+
+      extension.send(JSON.stringify({
+        id: 'local-protocol-drift',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'safe', drift: true },
+      }));
+      await waitFor(() => messages.length === 9, 'local protocol drift settlement', 1000, 10);
+      assertEqual(messages[6]?.event, 'delegation.started', 'drift run still exposes its server id before diagnostics');
+      assertEqual(messages[7]?.payload?.code, 'agent_protocol_drift', 'drift is emitted as a domain diagnostic event');
+      assertEqual(messages[8]?.payload?.terminal?.code, 'agent_protocol_drift', 'drift settles in the domain terminal payload');
+      assertEqual(messages[8]?.payload?.status, 'failed', 'drift domain terminal is non-success');
+      assertEqual(messages[8]?.error, undefined, 'drift does not add a Phase 59 transport error code');
 
       extension.send(JSON.stringify({
         id: 'local-handler-throw',
         type: 'ext:request',
-        method: 'agent.start',
-        payload: { fail: true, marker: 'RAW_HANDLER_INPUT' },
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'safe', fail: true, marker: 'RAW_HANDLER_INPUT' },
       }));
-      await waitFor(() => messages.length === 4, 'handler throw response', 1000, 10);
-      assertEqual(messages[3]?.error?.code, 'invalid_ext_request', 'handler throw settles with the typed invalid request error');
-      assert(!JSON.stringify(messages[3]).includes('RAW_HANDLER_INPUT'), 'handler failure response omits raw request content');
+      await waitFor(() => messages.length === 10, 'handler throw response', 1000, 10);
+      assertEqual(messages[9]?.error?.code, 'invalid_ext_request', 'handler throw settles with the typed invalid request error');
+      assert(!JSON.stringify(messages[9]).includes('RAW_HANDLER_INPUT'), 'handler failure response omits raw request content');
       assertEqual(hub.activeExtRequests.size, 0, 'handler throw settles and clears route exactly once');
     } finally {
       await cleanup(resources);
@@ -931,6 +1234,7 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
     let firstInvocations = 0;
     let secondInvocations = 0;
     const pending = [];
+    const delegationId = 'delegation_relay_0001';
     const hub = new WebSocketBridge({
       port,
       host: '127.0.0.1',
@@ -955,6 +1259,13 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
       capabilities: ['agent-spawn'],
       handleExtRequest: (request, emit) => {
         firstInvocations++;
+        if (request.method === 'delegate.cancel') {
+          return Promise.resolve({
+            delegationId: request.payload.delegationId,
+            status: 'already_terminal',
+            terminal: { type: 'diagnostic', code: 'already_terminal' },
+          });
+        }
         return new Promise((resolve) => pending.push({ request, emit, resolve }));
       },
     });
@@ -984,8 +1295,8 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
       const request = {
         id: 'relay-route',
         type: 'ext:request',
-        method: 'agent.start',
-        payload: { task: 'relay' },
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'relay' },
       };
       extension.send(JSON.stringify(request));
       await waitFor(() => pending.length === 1, 'first capable relay invocation', 1000, 10);
@@ -1007,20 +1318,45 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
       assertEqual(messages[0]?.error?.code, 'invalid_ext_request', 'duplicate active request ID is rejected before forwarding');
       assertEqual(firstInvocations, 1, 'duplicate active ID never invokes the selected relay twice');
 
-      pending[0].emit({ id: request.id, type: 'ext:event', event: 'agent.progress', payload: { step: 1 } });
-      await waitFor(() => messages.length === 2, 'selected relay event', 1000, 10);
-      assertEqual(messages[1]?.type, 'ext:event', 'selected relay event forwards without settling');
-      assertEqual(hub.activeExtRequests.size, 1, 'event does not settle the selected relay route');
+      pending[0].emit({
+        id: request.id,
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: { delegationId, adapterId: 'claude-code', profileVersion: '1' },
+      });
+      pending[0].emit({
+        id: request.id,
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: { type: 'system', subtype: 'init', profileVersion: '1' },
+      });
+      pending[0].emit({
+        id: request.id,
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: { type: 'assistant', text: 'progress' },
+      });
+      await waitFor(() => messages.length === 4, 'selected relay ordered events', 1000, 10);
+      assertEqual(messages[1]?.event, 'delegation.started', 'selected relay forwards the early server id first');
+      assertEqual(messages[1]?.payload?.delegationId, delegationId, 'relayed early event carries the server-minted id');
+      assertEqual(messages[2]?.event, 'delegation.event', 'selected relay forwards normalized init without settling');
+      assertEqual(messages[3]?.event, 'delegation.event', 'selected relay forwards multiple normalized events while pending');
+      assertEqual(hub.activeExtRequests.size, 1, 'events do not settle the selected relay route');
 
-      pending[0].resolve({ target: 'first' });
-      await waitFor(() => messages.length === 3, 'selected relay response', 1000, 10);
-      assertEqual(messages[2]?.payload?.target, 'first', 'first capable relay supplies the final response');
+      pending[0].resolve({
+        delegationId,
+        status: 'completed',
+        terminal: { type: 'result', isError: false },
+      });
+      await waitFor(() => messages.length === 5, 'selected relay response', 1000, 10);
+      assertEqual(messages[4]?.payload?.delegationId, delegationId, 'first capable relay supplies one correlated final response');
+      assertEqual(messages[4]?.payload?.status, 'completed', 'relayed final response carries domain completion status');
       assertEqual(hub.activeExtRequests.size, 0, 'first relay final deletes hub reverse route');
 
       firstRelay.hubConnection.send(JSON.stringify({
         id: request.id,
         type: 'ext:event',
-        event: 'agent.progress',
+        event: 'delegation.event',
         payload: { late: true },
       }));
       firstRelay.hubConnection.send(JSON.stringify({
@@ -1029,13 +1365,24 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         payload: { target: 'duplicate' },
       }));
       await sleep(20);
-      assertEqual(messages.length, 3, 'late event and duplicate final from selected relay are dropped');
+      assertEqual(messages.length, 5, 'late event and duplicate final from selected relay are dropped');
+
+      extension.send(JSON.stringify({
+        id: 'relay-cancel',
+        type: 'ext:request',
+        method: 'delegate.cancel',
+        payload: { delegationId },
+      }));
+      await waitFor(() => messages.length === 6, 'selected relay cancel response', 1000, 10);
+      assertEqual(messages[5]?.payload?.delegationId, delegationId, 'relayed cancel uses the early server-minted id');
+      assertEqual(messages[5]?.payload?.status, 'already_terminal', 'relayed cancel remains idempotent after terminal settlement');
+      assertEqual(secondInvocations, 0, 'relayed cancel stays on the first capable relay without replay');
 
       extension.send(JSON.stringify({
         id: 'extension-close-route',
         type: 'ext:request',
-        method: 'agent.start',
-        payload: {},
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'close-route' },
       }));
       await waitFor(() => pending.length === 2, 'extension-close relay invocation', 1000, 10);
       extension.close();
@@ -1289,7 +1636,9 @@ async function runHubExitPromotion(WebSocketBridge) {
 async function run() {
   const WebSocketBridge = await loadBridgeClass();
   const auth = await loadAuthModule();
+  const lifecycleModule = await loadServeDelegationModule();
 
+  await runCase('serve-only delegation startup and shutdown lifecycle', () => runServeDelegationLifecycle(lifecycleModule));
   await runCase('rejects non-loopback bind before port use', () => runRejectsNonLoopbackBind(WebSocketBridge));
   await runCase('server-first topology', () => runServerFirstTopology(WebSocketBridge));
   await runCase('optional relay capability advertisement', () => runRelayCapabilityAdvertisement(WebSocketBridge));

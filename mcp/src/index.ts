@@ -9,9 +9,8 @@ import {
   waitForExtensionConnection,
   watchBridgeDiagnostics,
 } from './diagnostics.js';
-import { startHttpServer } from './http.js';
 import { WebSocketBridge } from './bridge.js';
-import { TaskQueue } from './queue.js';
+import { startServeDelegation } from './agent-providers/serve-delegation.js';
 import {
   DEFAULT_HTTP_HOST,
   DEFAULT_HTTP_PORT,
@@ -277,32 +276,11 @@ async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
   const host = readStringFlag(flags, 'host', DEFAULT_HTTP_HOST);
   const port = readNumberFlag(flags, 'port', DEFAULT_HTTP_PORT);
   rotateBridgeSessionSecret();
-  const bridge = new WebSocketBridge();
-  const queue = new TaskQueue();
+  const lifecycle = await startServeDelegation({ host, port });
 
-  try {
-    await bridge.connect();
-    void pushMcpClientInventory(bridge);
-  } catch (err: unknown) {
-    console.error('[FSB MCP] WebSocket bridge failed to start (running in disconnected mode):', err);
-  }
-
-  const httpServer = await startHttpServer({ host, port, bridge, queue });
-
-  console.error(`[FSB MCP] Streamable HTTP server started at ${httpServer.endpoint}`);
-  console.error(`[FSB MCP] Health endpoint: ${httpServer.healthEndpoint}`);
-  console.error(`[FSB MCP] Extension bridge mode: ${bridge.currentMode}`);
-
-  const shutdown = (): void => {
-    console.error('[FSB MCP] Shutting down...');
-    void httpServer.close().finally(() => {
-      bridge.disconnect();
-      process.exit(0);
-    });
-  };
-
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  console.error(`[FSB MCP] Streamable HTTP server started at ${lifecycle.endpoint}`);
+  console.error(`[FSB MCP] Health endpoint: ${lifecycle.healthEndpoint}`);
+  console.error(`[FSB MCP] Extension bridge mode: ${lifecycle.bridge.currentMode}`);
 }
 
 export function runPair(flags: Record<string, FlagValue>): void {

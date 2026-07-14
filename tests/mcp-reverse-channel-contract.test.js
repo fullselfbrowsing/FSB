@@ -17,8 +17,21 @@ async function run() {
 
   const validFrames = [
     { id: 'request-1', type: 'ext:request', method: 'bridge.ping', payload: { value: 1 } },
+    { id: 'delegate-start-1', type: 'ext:request', method: 'delegate.start', payload: { adapterId: 'claude-code', task: 'safe task' } },
+    { id: 'delegate-cancel-1', type: 'ext:request', method: 'delegate.cancel', payload: { delegationId: 'delegation_server_0001' } },
     { id: 'response-1', type: 'ext:response', payload: { authorized: true } },
-    { id: 'event-1', type: 'ext:event', event: 'agent.progress', payload: { progress: 50 } },
+    {
+      id: 'delegate-start-1',
+      type: 'ext:event',
+      event: 'delegation.started',
+      payload: { delegationId: 'delegation_server_0001', adapterId: 'claude-code', profileVersion: '1' },
+    },
+    {
+      id: 'delegate-start-1',
+      type: 'ext:event',
+      event: 'delegation.event',
+      payload: { type: 'assistant', text: 'bounded progress' },
+    },
   ];
 
   for (const frame of validFrames) {
@@ -33,6 +46,30 @@ async function run() {
     'ext_request_timeout',
   ];
   assert.deepStrictEqual([...EXT_ERROR_CODES], expectedErrorCodes, 'ext error codes remain the exact five-value set');
+
+  const domainDriftResponse = {
+    id: 'delegate-drift-1',
+    type: 'ext:response',
+    payload: {
+      delegationId: 'delegation_server_drift',
+      status: 'failed',
+      terminal: { type: 'diagnostic', code: 'agent_protocol_drift' },
+    },
+  };
+  assert.deepStrictEqual(
+    parseExtFrame(domainDriftResponse),
+    domainDriftResponse,
+    'agent protocol drift round-trips only as a domain terminal payload',
+  );
+  assert.strictEqual(domainDriftResponse.error, undefined, 'agent protocol drift is not a transport error');
+  assert(!EXT_ERROR_CODES.includes('agent_protocol_drift'), 'domain drift does not expand the exact-five transport union');
+
+  const delegationSequence = validFrames.filter((frame) => frame.id === 'delegate-start-1');
+  assert.deepStrictEqual(
+    delegationSequence.map((frame) => frame.type === 'ext:event' ? frame.event : frame.method),
+    ['delegate.start', 'delegation.started', 'delegation.event'],
+    'delegation contract exposes its server id before normalized events',
+  );
 
   for (const code of expectedErrorCodes) {
     const response = makeExtError('error-1', code, 'stable error', code !== 'ext_unauthorized');
