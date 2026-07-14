@@ -1091,12 +1091,456 @@ async function runTerminationTests(processTreeModule) {
   }
 }
 
+function recoveryRuntime(entries, options = {}) {
+  let remaining = [...entries];
+  const events = options.events ?? [];
+  const removed = [];
+  return {
+    events,
+    removed,
+    remaining: () => [...remaining],
+    readJournal() {
+      events.push('journal:read');
+      if (options.unavailable) {
+        return { status: 'unavailable', reason: options.unavailable };
+      }
+      return { status: 'ok', journal: { version: 1, entries: [...remaining] } };
+    },
+    async removeRun(delegationId) {
+      events.push(`remove:${delegationId}`);
+      if (options.failRemove?.has(delegationId)) throw new Error('injected remove failure');
+      removed.push(delegationId);
+      remaining = remaining.filter((entry) => entry.delegationId !== delegationId);
+    },
+  };
+}
+
+function plannedRecoveryInspector(plans, events = []) {
+  const calls = [];
+  const offsets = new Map();
+  return {
+    calls,
+    async inspect(entry) {
+      calls.push(entry);
+      events.push(`inspect:${entry.delegationId}`);
+      const plan = plans.get(entry.delegationId);
+      if (!plan) throw new Error('unexpected journal entry');
+      const offset = offsets.get(entry.delegationId) ?? 0;
+      offsets.set(entry.delegationId, offset + 1);
+      const value = plan[Math.min(offset, plan.length - 1)];
+      if (value instanceof Error) throw value;
+      return value;
+    },
+  };
+}
+
+function recoveryTerminator(options = {}) {
+  const calls = [];
+  const events = options.events ?? [];
+  return {
+    calls,
+    async stop(entry, child, stopOptions) {
+      calls.push({ entry, child, options: stopOptions });
+      events.push(`stop:${entry.delegationId}`);
+      if (options.fail?.has(entry.delegationId)) {
+        throw Object.assign(new Error('injected tree failure'), { code: 'tree_unsettled' });
+      }
+    },
+  };
+}
+
+async function runRecoveryTests(runtimeModule, processTreeModule) {
+  const { createAgentRuntimeFiles, createAgentStartupRecovery } = runtimeModule;
+  const { createProcessInspector } = processTreeModule;
+  const staleInspection = { classification: 'stale' };
+  const ambiguousIdentity = { classification: 'ambiguous', reason: 'identity_mismatch' };
+
+  {
+    const events = [];
+    const runtime = recoveryRuntime([], { events });
+    const inspector = plannedRecoveryInspector(new Map(), events);
+    const terminator = recoveryTerminator({ events });
+    const recovery = createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    });
+    const first = recovery.recoverBeforeAdvertise(async () => {
+      events.push('advertise');
+    });
+    const second = recovery.recoverBeforeAdvertise(async () => {
+      events.push('advertise:duplicate');
+    });
+    assert.strictEqual(first, second, 'startup recovery and advertisement are one-shot');
+    const result = await first;
+    assert.deepEqual(result, {
+      confirmedKilled: 0,
+      staleCleared: 0,
+      ambiguousFailClosed: 0,
+      spawnAvailable: true,
+      profiles: [],
+    });
+    assert.deepEqual(events, ['journal:read', 'advertise']);
+    assert(Object.isFrozen(result));
+    assert(Object.isFrozen(result.profiles));
+    assert.strictEqual(recovery.recover(), recovery.recover(), 'recovery itself is idempotent');
+  }
+
+  {
+    const entry = journalEntry(processTreeModule);
+    const events = [];
+    const runtime = recoveryRuntime([entry], { events });
+    const inspector = plannedRecoveryInspector(new Map([
+      [entry.delegationId, [confirmedInspection({ descendants: [41002] }), staleInspection]],
+    ]), events);
+    const terminator = recoveryTerminator({ events });
+    const recovery = createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 250,
+    });
+    const result = await recovery.recover();
+    assert.deepEqual(result, {
+      confirmedKilled: 1,
+      staleCleared: 0,
+      ambiguousFailClosed: 0,
+      spawnAvailable: true,
+      profiles: [{
+        adapterId: 'claude-code',
+        profileVersion: '2.1.177',
+        confirmedKilled: 1,
+        staleCleared: 0,
+        ambiguousFailClosed: 0,
+      }],
+    });
+    assert.deepEqual(events, [
+      'journal:read',
+      `inspect:${entry.delegationId}`,
+      `stop:${entry.delegationId}`,
+      `inspect:${entry.delegationId}`,
+      `remove:${entry.delegationId}`,
+    ]);
+    assert.equal(terminator.calls.length, 1);
+    assert.strictEqual(terminator.calls[0].entry, entry);
+    assert.equal(terminator.calls[0].child, null);
+    assert.deepEqual(terminator.calls[0].options, { grace: 250 });
+    assert.deepEqual(runtime.remaining(), []);
+    assert(Object.isFrozen(result.profiles[0]));
+  }
+
+  {
+    const prepared = journalEntry(processTreeModule, 'prepared', {
+      delegationId: 'delegation_fixture_0002',
+      envFingerprint: 'env_fingerprint_fixture_0002',
+    });
+    const staleActive = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0003',
+      envFingerprint: 'env_fingerprint_fixture_0003',
+      pid: 43001,
+      processGroupId: 43001,
+      processStartIdentity: '93001',
+    });
+    const ambiguousPrepared = journalEntry(processTreeModule, 'prepared', {
+      delegationId: 'delegation_fixture_0004',
+      envFingerprint: 'env_fingerprint_fixture_0004',
+    });
+    const entries = [prepared, staleActive, ambiguousPrepared];
+    const events = [];
+    const runtime = recoveryRuntime(entries, { events });
+    const inspector = plannedRecoveryInspector(new Map([
+      [prepared.delegationId, [confirmedInspection({ pid: 42001 }), staleInspection]],
+      [staleActive.delegationId, [staleInspection]],
+      [ambiguousPrepared.delegationId, [{
+        classification: 'ambiguous',
+        reason: 'multiple_matches',
+      }]],
+    ]), events);
+    const terminator = recoveryTerminator({ events });
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.deepEqual(result, {
+      confirmedKilled: 1,
+      staleCleared: 1,
+      ambiguousFailClosed: 1,
+      spawnAvailable: false,
+      profiles: [{
+        adapterId: 'claude-code',
+        profileVersion: '2.1.177',
+        confirmedKilled: 1,
+        staleCleared: 1,
+        ambiguousFailClosed: 1,
+      }],
+    });
+    assert.deepEqual(events, [
+      'journal:read',
+      `inspect:${prepared.delegationId}`,
+      `stop:${prepared.delegationId}`,
+      `inspect:${prepared.delegationId}`,
+      `remove:${prepared.delegationId}`,
+      `inspect:${staleActive.delegationId}`,
+      `remove:${staleActive.delegationId}`,
+      `inspect:${ambiguousPrepared.delegationId}`,
+    ], 'journal entries recover serially in journal order');
+    assert.deepEqual(
+      runtime.remaining().map((entry) => entry.delegationId),
+      [ambiguousPrepared.delegationId],
+      'ambiguous record remains durable',
+    );
+  }
+
+  {
+    const categories = [
+      ['delegation_fixture_0011', 'identity_mismatch'],
+      ['delegation_fixture_0012', 'multiple_matches'],
+      ['delegation_fixture_0013', 'evidence_partial'],
+      ['delegation_fixture_0014', 'evidence_unavailable'],
+      ['delegation_fixture_0015', 'platform_unsupported'],
+    ];
+    const entries = categories.map(([delegationId], index) => journalEntry(
+      processTreeModule,
+      index % 2 === 0 ? 'active' : 'prepared',
+      {
+        delegationId,
+        envFingerprint: `env_fingerprint_fixture_${String(index + 11).padStart(4, '0')}`,
+        ...(index % 2 === 0 ? {
+          pid: 50000 + index,
+          processGroupId: 50000 + index,
+          processStartIdentity: `start_${50000 + index}`,
+        } : {}),
+      },
+    ));
+    const plans = new Map(entries.map((entry, index) => [
+      entry.delegationId,
+      [{ classification: 'ambiguous', reason: categories[index][1] }],
+    ]));
+    const runtime = recoveryRuntime(entries);
+    const inspector = plannedRecoveryInspector(plans);
+    const terminator = recoveryTerminator();
+    let advertised = false;
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recoverBeforeAdvertise(() => { advertised = true; });
+    assert.equal(result.ambiguousFailClosed, categories.length);
+    assert.equal(result.spawnAvailable, false);
+    assert.equal(advertised, false, 'ambiguous recovery withholds capability advertisement');
+    assert.equal(terminator.calls.length, 0);
+    assert.deepEqual(runtime.removed, []);
+    assert.deepEqual(inspector.calls, entries, 'inspector receives only exact journal records');
+  }
+
+  {
+    const killFailure = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0021',
+      envFingerprint: 'env_fingerprint_fixture_0021',
+    });
+    const unsettled = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0022',
+      envFingerprint: 'env_fingerprint_fixture_0022',
+      pid: 42002,
+      processGroupId: 42002,
+      processStartIdentity: '92002',
+    });
+    const removeFailure = journalEntry(processTreeModule, 'prepared', {
+      delegationId: 'delegation_fixture_0023',
+      envFingerprint: 'env_fingerprint_fixture_0023',
+    });
+    const inspectorFailure = journalEntry(processTreeModule, 'prepared', {
+      delegationId: 'delegation_fixture_0024',
+      envFingerprint: 'env_fingerprint_fixture_0024',
+    });
+    const entries = [killFailure, unsettled, removeFailure, inspectorFailure];
+    const runtime = recoveryRuntime(entries, {
+      failRemove: new Set([removeFailure.delegationId]),
+    });
+    const inspector = plannedRecoveryInspector(new Map([
+      [killFailure.delegationId, [confirmedInspection()]],
+      [unsettled.delegationId, [confirmedInspection(), confirmedInspection({ descendants: [9] })]],
+      [removeFailure.delegationId, [staleInspection]],
+      [inspectorFailure.delegationId, [new Error('injected inspection failure')]],
+    ]));
+    const terminator = recoveryTerminator({
+      fail: new Set([killFailure.delegationId]),
+    });
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.equal(result.confirmedKilled, 0);
+    assert.equal(result.staleCleared, 0);
+    assert.equal(result.ambiguousFailClosed, 4);
+    assert.equal(result.spawnAvailable, false);
+    assert.deepEqual(runtime.remaining(), entries, 'every failure preserves its journal record');
+  }
+
+  {
+    const state = tempRoot('recovery-corrupt');
+    try {
+      fs.mkdirSync(state.root, { recursive: true, mode: 0o700 });
+      fs.chmodSync(state.root, 0o700);
+      const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
+      fs.writeFileSync(runtime.journalPath, '{"version":1,"entries":[', { mode: 0o600 });
+      fs.chmodSync(runtime.journalPath, 0o600);
+      let inspectCalls = 0;
+      let stopCalls = 0;
+      let advertised = false;
+      const result = await createAgentStartupRecovery({
+        runtimeFiles: runtime,
+        inspector: {
+          async inspect() {
+            inspectCalls += 1;
+            return staleInspection;
+          },
+        },
+        terminator: {
+          async stop() { stopCalls += 1; },
+        },
+        terminationGrace: 25,
+      }).recoverBeforeAdvertise(() => { advertised = true; });
+      assert.deepEqual(result, {
+        confirmedKilled: 0,
+        staleCleared: 0,
+        ambiguousFailClosed: 1,
+        spawnAvailable: false,
+        profiles: [],
+      });
+      assert.equal(inspectCalls, 0, 'corrupt journal supplies no inspection anchor');
+      assert.equal(stopCalls, 0);
+      assert.equal(advertised, false);
+      assert.equal(fs.existsSync(runtime.journalPath), true, 'corrupt journal remains for diagnosis');
+    } finally {
+      state.cleanup();
+    }
+  }
+
+  {
+    const prepared = journalEntry(processTreeModule, 'prepared', {
+      delegationId: 'delegation_fixture_0031',
+      envFingerprint: 'env_fingerprint_fixture_0031',
+    });
+    const unrelatedOnly = linuxRecords(prepared).filter((record) => record.pid === 42001);
+    const concreteInspector = createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(unrelatedOnly),
+    });
+    const runtime = recoveryRuntime([prepared]);
+    const terminator = recoveryTerminator();
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector: concreteInspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.equal(result.staleCleared, 1);
+    assert.equal(result.spawnAvailable, true);
+    assert.equal(terminator.calls.length, 0, 'unrelated running CLI receives no termination call');
+  }
+
+  {
+    const reused = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0032',
+      envFingerprint: 'env_fingerprint_fixture_0032',
+      processStartIdentity: 'old_process_start',
+    });
+    const concreteInspector = createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(linuxRecords(reused)),
+    });
+    const runtime = recoveryRuntime([reused]);
+    const terminator = recoveryTerminator();
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector: concreteInspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.equal(result.ambiguousFailClosed, 1);
+    assert.equal(result.spawnAvailable, false);
+    assert.equal(terminator.calls.length, 0, 'PID-reused candidate receives no termination call');
+    assert.deepEqual(runtime.remaining(), [reused]);
+  }
+
+  {
+    const entry = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0041',
+      envFingerprint: 'env_fingerprint_fixture_0041',
+    });
+    for (const inspector of [
+      createProcessInspector({ platform: 'aix' }),
+      createProcessInspector({
+        platform: 'win32',
+        systemRoot: 'C:\\Windows',
+        fs: { lstat: () => { throw new Error('missing'); } },
+      }),
+      createProcessInspector({
+        platform: 'darwin',
+        exec: async () => ({ stdout: 'partial native evidence\n', stderr: '' }),
+      }),
+    ]) {
+      const runtime = recoveryRuntime([entry]);
+      const terminator = recoveryTerminator();
+      const result = await createAgentStartupRecovery({
+        runtimeFiles: runtime,
+        inspector,
+        terminator,
+        terminationGrace: 25,
+      }).recover();
+      assert.equal(result.ambiguousFailClosed, 1);
+      assert.equal(result.spawnAvailable, false);
+      assert.equal(terminator.calls.length, 0);
+      assert.deepEqual(runtime.remaining(), [entry]);
+    }
+  }
+
+  {
+    const entry = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_fixture_0051',
+      envFingerprint: 'env_fingerprint_fixture_0051',
+    });
+    const runtime = recoveryRuntime([entry]);
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector: plannedRecoveryInspector(new Map([
+        [entry.delegationId, [ambiguousIdentity]],
+      ])),
+      terminator: recoveryTerminator(),
+      terminationGrace: 25,
+    }).recover();
+    const diagnostic = JSON.stringify(result);
+    for (const forbidden of [
+      entry.delegationId,
+      entry.binaryRealPath,
+      entry.argvSignature,
+      entry.envFingerprint,
+      'TASK_CANARY_DO_NOT_DIAGNOSE',
+      'raw command line',
+      'raw environment',
+      'provider output',
+    ]) {
+      assert.equal(diagnostic.includes(forbidden), false, `${forbidden} is absent from recovery diagnostics`);
+    }
+    assert(diagnostic.includes(entry.adapterId));
+    assert(diagnostic.includes(entry.profileVersion));
+  }
+}
+
 async function main() {
   const runtimeModule = await import(pathToFileURL(runtimeBuildPath).href);
   const processTreeModule = await import(pathToFileURL(processTreeBuildPath).href);
   await runRuntimeFilesTests(runtimeModule);
   await runConcreteInspectorTests(processTreeModule);
   await runTerminationTests(processTreeModule);
+  await runRecoveryTests(runtimeModule, processTreeModule);
   console.log('mcp-agent-orphan-recovery.test.js: PASS');
 }
 

@@ -3,6 +3,7 @@ import * as nodeFs from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { CLAUDE_CODE_ADAPTER_ID, type AgentProviderId } from './adapter.js';
+import type { ProcessInspector, ProcessTreeTerminator } from './process-tree.js';
 
 const DIRECTORY_MODE = 0o700;
 const FILE_MODE = 0o600;
@@ -131,6 +132,36 @@ export interface PreparedRun {
   readonly entry: PreparedJournalEntry;
   readonly runDirectory: string;
   readonly mcpConfigPath: string;
+}
+
+export interface AgentRecoveryProfileSummary {
+  readonly adapterId: AgentProviderId;
+  readonly profileVersion: string;
+  readonly confirmedKilled: number;
+  readonly staleCleared: number;
+  readonly ambiguousFailClosed: number;
+}
+
+export interface AgentStartupRecoveryResult {
+  readonly confirmedKilled: number;
+  readonly staleCleared: number;
+  readonly ambiguousFailClosed: number;
+  readonly spawnAvailable: boolean;
+  readonly profiles: readonly AgentRecoveryProfileSummary[];
+}
+
+export interface AgentStartupRecoveryDependencies {
+  readonly runtimeFiles: Pick<AgentRuntimeFiles, 'readJournal' | 'removeRun'>;
+  readonly inspector: ProcessInspector;
+  readonly terminator: ProcessTreeTerminator;
+  readonly terminationGrace: number;
+}
+
+export interface AgentStartupRecovery {
+  recover(): Promise<AgentStartupRecoveryResult>;
+  recoverBeforeAdvertise(
+    advertise: () => void | Promise<void>,
+  ): Promise<AgentStartupRecoveryResult>;
 }
 
 interface RuntimeFsDependencies {
@@ -477,8 +508,8 @@ export class AgentRuntimeFiles {
     return this.serializeMutation(() => {
       const journal = this.requireJournal();
       const entries = journal.entries.filter((entry) => entry.delegationId !== delegationId);
-      if (entries.length !== journal.entries.length) this.writeJournal(entries);
       this.cleanupRunDirectory(delegationId);
+      if (entries.length !== journal.entries.length) this.writeJournal(entries);
     });
   }
 
@@ -629,6 +660,153 @@ export class AgentRuntimeFiles {
 
 export function createAgentRuntimeFiles(options: RuntimeFilesOptions = {}): AgentRuntimeFiles {
   return new AgentRuntimeFiles(options);
+}
+
+type RecoveryCategory = 'confirmedKilled' | 'staleCleared' | 'ambiguousFailClosed';
+
+interface MutableRecoveryProfileSummary {
+  adapterId: AgentProviderId;
+  profileVersion: string;
+  confirmedKilled: number;
+  staleCleared: number;
+  ambiguousFailClosed: number;
+}
+
+class JournalStartupRecovery implements AgentStartupRecovery {
+  private recoveryPromise: Promise<AgentStartupRecoveryResult> | null = null;
+  private advertisePromise: Promise<AgentStartupRecoveryResult> | null = null;
+
+  constructor(private readonly dependencies: AgentStartupRecoveryDependencies) {
+    if (
+      !Number.isFinite(dependencies.terminationGrace)
+      || dependencies.terminationGrace < 0
+      || dependencies.terminationGrace > 60_000
+    ) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Recovery grace is invalid');
+    }
+  }
+
+  recover(): Promise<AgentStartupRecoveryResult> {
+    if (!this.recoveryPromise) this.recoveryPromise = this.recoverOnce();
+    return this.recoveryPromise;
+  }
+
+  recoverBeforeAdvertise(
+    advertise: () => void | Promise<void>,
+  ): Promise<AgentStartupRecoveryResult> {
+    if (!this.advertisePromise) {
+      this.advertisePromise = this.recover().then(async (result) => {
+        if (result.spawnAvailable) await advertise();
+        return result;
+      });
+    }
+    return this.advertisePromise;
+  }
+
+  private async recoverOnce(): Promise<AgentStartupRecoveryResult> {
+    const profiles = new Map<string, MutableRecoveryProfileSummary>();
+    const totals: Record<RecoveryCategory, number> = {
+      confirmedKilled: 0,
+      staleCleared: 0,
+      ambiguousFailClosed: 0,
+    };
+    const journal = this.dependencies.runtimeFiles.readJournal();
+    if (journal.status !== 'ok') {
+      totals.ambiguousFailClosed = 1;
+      return this.finish(totals, profiles);
+    }
+
+    for (const entry of journal.journal.entries) {
+      let inspection;
+      try {
+        inspection = await this.dependencies.inspector.inspect(entry);
+      } catch {
+        this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+        continue;
+      }
+
+      if (inspection.classification === 'ambiguous') {
+        this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+        continue;
+      }
+
+      if (inspection.classification === 'stale') {
+        try {
+          await this.dependencies.runtimeFiles.removeRun(entry.delegationId);
+          this.increment(totals, profiles, entry, 'staleCleared');
+        } catch {
+          this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+        }
+        continue;
+      }
+
+      try {
+        await this.dependencies.terminator.stop(
+          entry,
+          null,
+          { grace: this.dependencies.terminationGrace },
+        );
+        const settled = await this.dependencies.inspector.inspect(entry);
+        if (settled.classification !== 'stale') {
+          this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+          continue;
+        }
+        await this.dependencies.runtimeFiles.removeRun(entry.delegationId);
+        this.increment(totals, profiles, entry, 'confirmedKilled');
+      } catch {
+        this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+      }
+    }
+
+    return this.finish(totals, profiles);
+  }
+
+  private increment(
+    totals: Record<RecoveryCategory, number>,
+    profiles: Map<string, MutableRecoveryProfileSummary>,
+    entry: JournalEntry,
+    category: RecoveryCategory,
+  ): void {
+    totals[category] += 1;
+    const key = `${entry.adapterId}\u0000${entry.profileVersion}`;
+    let profile = profiles.get(key);
+    if (!profile) {
+      profile = {
+        adapterId: entry.adapterId,
+        profileVersion: entry.profileVersion,
+        confirmedKilled: 0,
+        staleCleared: 0,
+        ambiguousFailClosed: 0,
+      };
+      profiles.set(key, profile);
+    }
+    profile[category] += 1;
+  }
+
+  private finish(
+    totals: Record<RecoveryCategory, number>,
+    profiles: Map<string, MutableRecoveryProfileSummary>,
+  ): AgentStartupRecoveryResult {
+    const frozenProfiles = [...profiles.values()]
+      .sort((left, right) => (
+        left.adapterId.localeCompare(right.adapterId)
+        || left.profileVersion.localeCompare(right.profileVersion)
+      ))
+      .map((profile) => Object.freeze({ ...profile }));
+    return Object.freeze({
+      confirmedKilled: totals.confirmedKilled,
+      staleCleared: totals.staleCleared,
+      ambiguousFailClosed: totals.ambiguousFailClosed,
+      spawnAvailable: totals.ambiguousFailClosed === 0,
+      profiles: Object.freeze(frozenProfiles),
+    });
+  }
+}
+
+export function createAgentStartupRecovery(
+  dependencies: AgentStartupRecoveryDependencies,
+): AgentStartupRecovery {
+  return new JournalStartupRecovery(dependencies);
 }
 
 export const AGENT_RUNTIME_DIRECTORY_MODE = DIRECTORY_MODE;
