@@ -744,6 +744,17 @@ async function runPairingProbeAndReloadCases() {
     await flushMicrotasks();
     assertEqual(client.getState().pairingStatus, 'paired', 'incumbent socket is paired before delayed replacement close');
 
+    let oldRejectionCount = 0;
+    const oldApplicationRequest = client.sendExtRequest('agent.old-socket', { task: 'do not retain' });
+    const oldApplicationOutcome = oldApplicationRequest.then(
+      () => ({ resolved: true }),
+      (error) => {
+        oldRejectionCount++;
+        return { resolved: false, error };
+      }
+    );
+    assertEqual(client._extPending.size, 1, 'old socket owns one pending application request before reload');
+
     const reloadPromise = client.reloadPairingAndReconnect();
     await flushMicrotasks();
     const pairingCloseTimeout = harness.timers.timeouts.find((timer) => timer.delay === 1000 && !timer.cleared);
@@ -754,14 +765,18 @@ async function runPairingProbeAndReloadCases() {
     const replacement = harness.sockets[1];
     replacement.open();
     const replacementProbe = JSON.parse(replacement.sent[0]);
-    assertEqual(client._extPending.size, 1, 'replacement auth probe is pending before the old socket closes late');
+    assertEqual(client._extPending.size, 2, 'old application request and replacement auth probe are pending together');
 
     first.finishClose();
+    const oldOutcome = await oldApplicationOutcome;
+    assertEqual(oldOutcome.resolved, false, 'late old-socket close rejects its application request instead of resolving');
+    assertEqual(oldOutcome.error.code, 'bridge_topology_changed', 'old-socket application request rejects with topology error');
+    assertEqual(oldRejectionCount, 1, 'old-socket application request rejects exactly once');
     assertEqual(client._ws, replacement, 'late old-socket close preserves the replacement socket');
     assertEqual(client.isConnected, true, 'late old-socket close preserves replacement connectivity');
     assertEqual(client.getState().status, 'connected', 'late old-socket close preserves connected status');
     assertEqual(client.getState().pairingStatus, 'configured', 'late old-socket close does not expire the in-flight replacement probe');
-    assertEqual(client._extPending.size, 1, 'late old-socket close does not reject the replacement auth probe');
+    assertEqual(client._extPending.size, 1, 'late old-socket close clears only old work and preserves the replacement auth probe');
 
     replacement.receive({ id: replacementProbe.id, type: 'ext:response', payload: { authorized: true } });
     const result = await reloadPromise;

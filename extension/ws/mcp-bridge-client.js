@@ -213,6 +213,7 @@ class MCPBridgeClient {
     socket.onclose = () => {
       const wasReplacement = this._replacementSockets.delete(socket);
       if (this._ws !== socket) {
+        this._rejectExtPendingForSocket(socket);
         this._notifySocketWaiters('close', socket);
         return;
       }
@@ -582,6 +583,19 @@ class MCPBridgeClient {
 
   _rejectAllExtPending() {
     for (const [id, pending] of this._extPending) {
+      clearTimeout(pending.timer);
+      this._extPending.delete(id);
+      pending.reject(this._makeExtError(
+        'Bridge topology changed before the extension request completed',
+        'bridge_topology_changed',
+        true,
+      ));
+    }
+  }
+
+  _rejectExtPendingForSocket(socket) {
+    for (const [id, pending] of this._extPending) {
+      if (pending.socket !== socket) continue;
       clearTimeout(pending.timer);
       this._extPending.delete(id);
       pending.reject(this._makeExtError(
