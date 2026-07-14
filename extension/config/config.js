@@ -15,6 +15,8 @@ class Config {
     // Default configuration - Multi-model support
     this.defaults = {
       // Model configuration
+      providerKind: 'api', // api or agent; exact routing is resolved by delegation preflight
+      agentProviderId: '', // latent agent selection; empty remains the canonical legacy value
       modelProvider: 'xai', // xai, gemini, openai, anthropic, openrouter, lmstudio, custom
       modelName: 'grok-4-1-fast', // Current selected model - fast and efficient for automation
       

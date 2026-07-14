@@ -71,8 +71,59 @@ function formattedToolNames(formatted, provider) {
 
 const { formatToolsForProvider } = require(path.join(REPO_ROOT, 'extension', 'ai', 'tool-use-adapter.js'));
 const agentLoop = require(path.join(REPO_ROOT, 'extension', 'ai', 'agent-loop.js'));
+const delegationPreflight = require(path.join(REPO_ROOT, 'extension', 'utils', 'delegation-preflight.js'));
+const { Config } = require(path.join(REPO_ROOT, 'extension', 'config', 'config.js'));
+const optionsSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 'options.js'), 'utf8');
 
 async function run() {
+  // -------------------------------------------------------------------------
+  // (0) Phase 61 provider namespace parity. The seven BYOK ids remain the only
+  // API surface, while the first executable agent provider requires the exact
+  // authoritative kind/id pair. A latent agent choice under API kind is inert.
+  // -------------------------------------------------------------------------
+  console.log('\n--- (0) API and delegated provider namespaces remain disjoint (INV-03 / UX-01) ---');
+
+  check(JSON.stringify(PROVIDER_KEYS) === JSON.stringify([
+    'xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'
+  ]), 'the universal provider matrix remains exactly the existing seven API ids');
+  const defaults = new Config().defaults;
+  check(defaults.providerKind === 'api' && defaults.agentProviderId === '',
+    'background config keeps API kind and the canonical empty agent id as defaults');
+  check(/providerKind:\s*'api'/.test(optionsSource) && /agentProviderId:\s*''/.test(optionsSource),
+    'options keeps its canonical API/empty-agent default storage shape');
+
+  for (const modelProvider of PROVIDER_KEYS) {
+    const apiInput = {
+      providerKind: 'api',
+      agentProviderId: 'claude-code',
+      modelProvider,
+      bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
+    };
+    const apiResult = delegationPreflight.check(apiInput);
+    check(apiResult.ok === true
+        && apiResult.kind === 'api'
+        && apiResult.providerId === modelProvider
+        && apiResult.agentProviderId === '',
+    modelProvider + ': API routing ignores the latent agent id without rewriting storage');
+  }
+
+  for (const candidate of [
+    'claude-code', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex',
+    'xai', 'anthropic', '', '__proto__', 'constructor'
+  ]) {
+    const result = delegationPreflight.check({
+      providerKind: 'agent',
+      agentProviderId: candidate,
+      modelProvider: 'xai',
+      bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
+    });
+    check(result.ok === (candidate === 'claude-code')
+        && (candidate === 'claude-code'
+          ? result.kind === 'agent' && result.providerId === 'claude-code'
+          : result.code === 'unsupported_provider'),
+    (candidate || 'empty') + ': only the exact Phase 60 Claude agent pair is executable');
+  }
+
   // -------------------------------------------------------------------------
   // (a) FORMAT half (INV-01) -- the capability surface is provider-independent.
   // For each of the 7 providers the public tools format without error and NEITHER
