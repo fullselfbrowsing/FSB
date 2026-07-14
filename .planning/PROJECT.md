@@ -10,7 +10,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-58 are complete. Phase 58 passed all automated/source requirements and a clean code-review gate; its 12 live Providers checks are preserved for the user-directed milestone-end UAT sweep. Phase 59 (Reverse-Request Channel & Security Foundation) is next.
+**Active milestone progress:** Phases 57-59 are complete. Phase 59 passed CHAN-01..07, the full automated/source suite, and a clean security review; its four live pairing/lifecycle/accessibility checks join Phase 58's 12 Providers checks in the user-directed milestone-end UAT sweep. Phase 60 (Adapter Contract & Claude Code MVP) is next.
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
@@ -27,6 +27,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 **Target features:**
 - **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
 - **Providers panel (Phase 58 complete)** -- "API Configuration" is now "Providers"; explicit `api` vs `agent` kinds preserve BYOK settings; agent details report evidence and conditional billing truth; one advisory recommendation follows live > installed > copy-clicked > xAI. Live visual/interaction UAT is deferred to the milestone-end sweep.
+- **Reverse-request security foundation (Phase 59 complete)** -- additive `ext:*` frames now cross the existing loopback bridge behind exact Host/Origin/session authority, deterministic capable-relay routing, secret redaction, topology exact-once cleanup, and a permanent forbidden-flag prebuild gate. Four live pairing/lifecycle/accessibility checks remain pending for the milestone-end sweep.
 - **Side-panel delegation (Claude Code MVP)** -- new extension->hub reverse-request channel over the existing ws://localhost:7225 bridge; daemon spawns `claude -p` headless (stream-json output, strict permission defaults, hermetic `--strict-mcp-config`, shipped `fsb` agent definition instead of prompt stuffing); the spawned CLI connects back as its own FSB agent with tab ownership; live progress streamed into the side panel; kill switch; graceful "agent offline -> doctor" state.
 - **Multi-agent adapters** -- `AgentProviderAdapter` contract (detect / build / events / kill / caps); OpenCode -> Codex -> Gemini after Claude Code; task-mode vs chat-mode (`--resume`) where supported.
 
@@ -435,7 +436,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-58 are verified complete; Phase 59 Reverse-Request Channel & Security Foundation is next. Remaining active requirements are CHAN-01..07, ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-59 are verified complete; Phase 60 Adapter Contract & Claude Code MVP is next. Remaining active requirements are ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
 
 ### Validated (v0.9.91)
 
@@ -450,6 +451,13 @@ Carry-forward backlog candidates:
 - [x] PROV-04: Agent intent remains isolated from API-only `modelProvider`; latent BYOK state survives switching, refresh, delayed work, and cancellation races -- Phase 58.
 - [x] PROV-05: Exactly one non-selecting recommendation follows live > installed > clicked > xAI with raw identities excluded -- Phase 58.
 - [x] PROV-06: Usage and billing avoid fabricated currency or subscription claims; unknown auth reports Billing not reported and links fixed official destinations -- Phase 58.
+- [x] CHAN-01: A separate strict `ext:request` / `ext:event` / `ext:response` family crosses the existing bridge while historical MCP and default relay bytes remain frozen -- Phase 59.
+- [x] CHAN-02: Optional `agent-spawn` capabilities route reverse requests local-first, then to the first capable relay, with a typed offline fallback and no default production advertisement -- Phase 59.
+- [x] CHAN-03: Loopback bind, exact Host, exact extension Origin, pre-registration classification, and per-frame current-session checks enforce the browser-to-daemon trust boundary -- Phase 59.
+- [x] CHAN-04: Explicit session-only pairing uses a 32-byte daemon-session secret, durable exact Origin binding, reset/rebind, secret-free authorization probe, and rotation revocation -- Phase 59.
+- [x] CHAN-05: Caller and diagnostic-sink redaction remove bridge-secret tokens and raw/interior-token tests remain green -- Phase 59.
+- [x] CHAN-06: Hub/relay/stale-socket churn settles reverse work exactly once, clears ownership maps, and never replays automatically -- Phase 59.
+- [x] CHAN-07: Every MCP build recursively rejects forbidden agent auto-approval flags before TypeScript compilation -- Phase 59.
 
 ### Validated (v0.9.99)
 
@@ -714,4 +722,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-12 -- Phase 58 Providers Panel complete; live UAT deferred to milestone end. Next: Phase 59 security-channel discussion.*
+*Last updated: 2026-07-14 -- Phase 59 security foundation complete; four live checks deferred to milestone end. Next: Phase 60 Adapter Contract & Claude Code MVP.*

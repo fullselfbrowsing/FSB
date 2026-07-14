@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: executing
-stopped_at: Phase 59 execution complete; code review and verification pending
-last_updated: "2026-07-13T02:24:31.545Z"
-last_activity: 2026-07-13 -- Phase 59 Plans 01-04 complete; automated/source verification and review pending
+status: ready
+stopped_at: Phase 59 complete; Phase 60 ready for autonomous discussion and planning
+last_updated: "2026-07-14T14:56:59Z"
+last_activity: 2026-07-14 -- Phase 59 complete; CHAN-01..07 verified, review clean, four live checks deferred
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
   completed_plans: 10
-  percent: 22
+  percent: 33
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -22,21 +22,21 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 11/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 18/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 59 — Reverse-Request Channel & Security Foundation
+**Current focus:** Phase 60 — Adapter Contract & Claude Code MVP
 
 ## Current Position
 
-Phase: 59 (Reverse-Request Channel & Security Foundation) — EXECUTING
-Plan: 4 of 4 complete; review and verification pending
-Status: Executing Phase 59
-Last activity: 2026-07-13 -- Phase 59 execution complete
+Phase: 60 (Adapter Contract & Claude Code MVP) — READY
+Plan: Not yet planned
+Status: Ready for autonomous Phase 60 discussion and planning
+Last activity: 2026-07-14 -- Phase 59 completed with automated/source verification passed
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -44,7 +44,7 @@ Last activity: 2026-07-13 -- Phase 59 execution complete
 |-------|------|--------------|--------|
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
-| 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Executed (4/4); review and verification pending |
+| 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
@@ -52,7 +52,7 @@ Last activity: 2026-07-13 -- Phase 59 execution complete
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 11/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code lands.
+Coverage: 51/51 v0.9.91 requirements mapped, 18/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 is code-green before Phase 60 spawn code lands.
 
 ## Hard Invariants (v0.9.91)
 
@@ -104,13 +104,13 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phase 58 is complete; Phase 59 has four checker-approved plans and is ready to execute.
+None. Phases 57-59 are complete; Phase 60 is ready for autonomous discussion and planning.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks remain pending in `58-HUMAN-UAT.md`. Per user instruction, all future live UAT is accumulated and audited at milestone end; automated verification is 8/8 and the final code review is clean, with no visual pass inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks and Phase 59's 4 live pairing/lifecycle/accessibility checks remain pending in their `HUMAN-UAT` artifacts. Per user instruction, all live UAT is accumulated and audited at milestone end; both phases are automated/source green with clean final reviews, and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -126,6 +126,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | deferred to v0.9.91 milestone end; 4 scenarios | Phase 59 Plan 04 |
 | uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | deferred to v0.9.91 milestone end; 12 scenarios | Phase 58 Plan 03 |
 | uat_gap | v1.2.0 Phase 53 / 53-VISUAL-QA.md (VISUAL-01 live DE/CJK browser visual spot-check) | human_needed | v1.2.0 Phase 53 |
 | uat_gap | Phase 27 / 27-HUMAN-UAT.md (live FETCH-05 logged-in-shape UAT-27-01 + contrast + origin-pin) | human_needed; 3 scenarios | v0.9.99 Phase 27 |
@@ -144,10 +145,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-13T02:23:19Z
-Stopped at: Phase 59 planned and independently checked; ready to execute Plan 01
+Last session: 2026-07-14T14:56:59Z
+Stopped at: Phase 59 complete; Phase 60 ready for autonomous discussion and planning
 Resume file: .planning/ROADMAP.md
 
 ## Next Actions
 
-Execute Phase 59 Plans 01-04 sequentially; preserve every live Chrome pairing check for the milestone-end UAT gate.
+Discuss, research, plan, and execute Phase 60 autonomously; keep all live CLI/browser UAT pending for the milestone-end gate while requiring green automated/source verification and clean review.

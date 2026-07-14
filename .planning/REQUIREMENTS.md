@@ -27,13 +27,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### CHAN -- Delegation Channel & Security Foundation
 
-- [ ] **CHAN-01**: A new bridge message-type family (`ext:request` / `ext:response` / `ext:event`) transports extension→daemon reverse requests over the existing ws://localhost:7225 bridge without changing the byte-shape of any existing `MCPMessageType` value (INV-01 additive proof).
-- [ ] **CHAN-02**: A relay process signals its ability to fulfill spawn requests by advertising `capabilities: ['agent-spawn']` in its `relay:hello`; the hub routes each `ext:request` locally (if itself the daemon) or to the first relay advertising the required capability.
-- [ ] **CHAN-03**: The bridge rejects every incoming `ext:*` frame whose WebSocket upgrade did not carry an `Origin` header matching a durable per-install FSB-extension-id allowlist and whose `Host` header is not exactly `127.0.0.1` (or `localhost`) at the loopback port.
-- [ ] **CHAN-04**: A per-install >=32-byte shared secret is provisioned once between the extension and the daemon, transported only in the `Sec-WebSocket-Protocol` upgrade header (never in URL, never in payloads, never in logs), rotated on daemon restart, and required on every `ext:*` frame.
-- [ ] **CHAN-05**: `redactForLog` and diagnostic ring-buffer writes strip any string matching the shared-secret token pattern; the drift gate fails the build if a raw secret substring appears in any tracked log fixture.
-- [ ] **CHAN-06**: The bridge topology test suite covers hub-exit-mid-delegation and relay-mid-`ext:*`-frame scenarios; existing hub-exit-promotion tests still pass byte-for-byte.
-- [ ] **CHAN-07**: A permanent CI grep gate fails the build if the strings `--dangerously-skip-permissions`, `--yolo`, or `--auto` appear anywhere in `mcp/src/agent-providers/**`, so those flags can never enter the spawn path in any future patch.
+- [x] **CHAN-01**: A new bridge message-type family (`ext:request` / `ext:response` / `ext:event`) transports extension→daemon reverse requests over the existing ws://localhost:7225 bridge without changing the byte-shape of any existing `MCPMessageType` value (INV-01 additive proof).
+- [x] **CHAN-02**: A relay process signals its ability to fulfill spawn requests by advertising `capabilities: ['agent-spawn']` in its `relay:hello`; the hub routes each `ext:request` locally (if itself the daemon) or to the first relay advertising the required capability.
+- [x] **CHAN-03**: The bridge rejects every incoming `ext:*` frame whose WebSocket upgrade did not carry an `Origin` header matching a durable per-install FSB-extension-id allowlist and whose `Host` header is not exactly `127.0.0.1` (or `localhost`) at the loopback port.
+- [x] **CHAN-04**: A per-install >=32-byte shared secret is provisioned once between the extension and the daemon, transported only in the `Sec-WebSocket-Protocol` upgrade header (never in URL, never in payloads, never in logs), rotated on daemon restart, and required on every `ext:*` frame.
+- [x] **CHAN-05**: `redactForLog` and diagnostic ring-buffer writes strip any string matching the shared-secret token pattern; the drift gate fails the build if a raw secret substring appears in any tracked log fixture.
+- [x] **CHAN-06**: The bridge topology test suite covers hub-exit-mid-delegation and relay-mid-`ext:*`-frame scenarios; existing hub-exit-promotion tests still pass byte-for-byte.
+- [x] **CHAN-07**: A permanent CI grep gate fails the build if the strings `--dangerously-skip-permissions`, `--yolo`, or `--auto` appear anywhere in `mcp/src/agent-providers/**`, so those flags can never enter the spawn path in any future patch.
 
 ### ADAPT -- Adapter Contract & Spawn Supervisor
 
@@ -141,13 +141,13 @@ Which phases cover which requirements. Populated during roadmap creation.
 | PROV-04 | Phase 58 | Complete |
 | PROV-05 | Phase 58 | Complete |
 | PROV-06 | Phase 58 | Complete |
-| CHAN-01 | Phase 59 | Pending |
-| CHAN-02 | Phase 59 | Pending |
-| CHAN-03 | Phase 59 | Pending |
-| CHAN-04 | Phase 59 | Pending |
-| CHAN-05 | Phase 59 | Pending |
-| CHAN-06 | Phase 59 | Pending |
-| CHAN-07 | Phase 59 | Pending |
+| CHAN-01 | Phase 59 | Complete |
+| CHAN-02 | Phase 59 | Complete |
+| CHAN-03 | Phase 59 | Complete |
+| CHAN-04 | Phase 59 | Complete |
+| CHAN-05 | Phase 59 | Complete |
+| CHAN-06 | Phase 59 | Complete |
+| CHAN-07 | Phase 59 | Complete |
 | ADAPT-01 | Phase 60 | Pending |
 | ADAPT-02 | Phase 60 | Pending |
 | ADAPT-03 | Phase 60 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-12 after Phase 58 completion (11/51 requirements complete)*
+*Last updated: 2026-07-14 after Phase 59 completion (18/51 requirements complete; four live checks deferred to milestone end)*

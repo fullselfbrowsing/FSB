@@ -32,7 +32,7 @@
 
 - [x] **Phase 57: Agent Identity Capture** - Persist copy-clicks, capture MCP `initialize` `clientInfo`, thread it through `agent:register`, add disk-scan detection, expose a unified `getMcpClients` view — additive on both sides of the wire (INV-01 safe), unblocks everything downstream (completed 2026-07-12)
 - [x] **Phase 58: Providers Panel** - Rename "API Configuration" → "Providers", introduce `api` vs `agent` provider kinds, hide the key input for agent kind, badge exactly one "Recommended" provider via the connected > installed > copy-clicked cascade, keep `universal-provider.js` unaware of agent values (INV-03 BYOK parity) (completed 2026-07-12; live UAT deferred to milestone-end gate)
-- [ ] **Phase 59: Reverse-Request Channel & Security Foundation** - **SECURITY-CRITICAL, load-bearing**. Additive `ext:*` frames on ws://localhost:7225, strict Origin allowlist + Host loopback + per-install rotating shared secret in `Sec-WebSocket-Protocol`, log redaction, hub-exit-mid-delegation topology tests, permanent CI grep gate against `--dangerously-skip-permissions` / `--yolo` / `--auto` — ships BEFORE any spawn code exists
+- [x] **Phase 59: Reverse-Request Channel & Security Foundation** - **SECURITY-CRITICAL, load-bearing**. Additive `ext:*` frames on ws://localhost:7225, strict Origin allowlist + Host loopback + per-install rotating shared secret in `Sec-WebSocket-Protocol`, log redaction, hub-exit-mid-delegation topology tests, permanent CI grep gate against `--dangerously-skip-permissions` / `--yolo` / `--auto` — completed 2026-07-14; automated/source verification passed and four live checks are deferred to the milestone-end UAT gate
 - [ ] **Phase 60: Adapter Contract & Claude Code MVP** - `AgentProviderAdapter` interface, `SpawnSupervisor` in the `serve` daemon with argv-only spawn / scrubbed env / SIGTERM-at-process-group / Windows `taskkill /T /F` / orphan scan on startup, Claude Code adapter with verified 2.1.177 flag set + shipped `fsb` agent definition + recorded stream-json JSONL fixture — the integration payoff
 - [ ] **Phase 61: Delegation UX & SW-Eviction Persistence** - Fifth `EXECUTION_MODES` entry `delegated`, explicit first-use consent card, live per-tool-call streaming feed, default-background-tab + "Take control" affordance, kill switch that reclaims owned tabs, post-run usage summary, `chrome.storage.session` per-event persistence, 20 s WS heartbeat, "agent offline → `doctor`" deep-link, restart-is-clean semantics
 - [ ] **Phase 62: CI Drift-Smoke Gate & Doctor Extensions** - Per-adapter CI drift-smoke against canned fixtures (fail-loud on unknown event types / missing fields / version outside compat matrix), `fsb-mcp-server doctor` per-adapter section (binary path, version, auth, secret rotation age), machine-readable adapter compatibility matrix consumed by the extension
@@ -163,7 +163,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 |-------|-----------------|--------|-----------|
 | 57. Agent Identity Capture | 3/3 | Complete    | 2026-07-12 |
 | 58. Providers Panel | 3/3 | Complete    | 2026-07-12 |
-| 59. Reverse-Request Channel & Security Foundation | 0/0 | Not started | — |
+| 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
 | 60. Adapter Contract & Claude Code MVP | 0/0 | Not started | — |
 | 61. Delegation UX & SW-Eviction Persistence | 0/0 | Not started | — |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 0/0 | Not started | — |
