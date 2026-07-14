@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: planning
-stopped_at: Phase 61 UI-SPEC approved
-last_updated: "2026-07-14T19:59:57.032Z"
-last_activity: 2026-07-14
+status: executing
+stopped_at: Phase 61 planning approved; Wave 1 ready
+last_updated: "2026-07-14T21:31:13.130Z"
+last_activity: 2026-07-14 -- Phase 61 planning complete
 progress:
   total_phases: 18
   completed_phases: 4
-  total_plans: 14
+  total_plans: 22
   completed_plans: 14
-  percent: 100
+  percent: 64
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 61 (Delegation UX & SW-Eviction Persistence) — READY
-Plan: Not yet planned
-Status: Ready for autonomous discussion and planning
-Last activity: 2026-07-14
+Plan: 0 of 8 (Wave 1: 61-01, 61-02, and 61-03 ready)
+Status: Planning approved; ready for autonomous execution
+Last activity: 2026-07-14 -- Phase 61 planning complete
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -46,7 +46,7 @@ Last activity: 2026-07-14
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
-| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Next |
+| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Planned (8 plans; execution ready) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
@@ -104,11 +104,15 @@ v0.9.91-specific decisions so far:
 - [Phase 60]: Use one closed Claude Code 2.1.177 profile with a retained native path, immutable MCP-only argv, a shipped static FSB agent, task text through stdin only, scrubbed provider-key environment, and truthful schema-derived fixture provenance.
 - [Phase 60]: Treat process-tree or runtime cleanup uncertainty as daemon-wide degradation — stop accepting starts, preserve exact evidence, and drive one orderly nonzero shutdown rather than risk overlapping browser authority.
 - [Phase 60]: Bind delegation lifetime to its authenticated reverse route and join setup, stdin, cleanup, and cancellation so every topology/exit/error race settles exactly once without replay.
+- [Phase 61 planning]: Keep provider selection background-authoritative and exact; pure preflight plus challenge-bound trust enable precede all visible mutation, while Providers gets a separate authority-reducing confirmation reset.
+- [Phase 61 planning]: Persist one bounded redacted typed entry per normalized event before fanout; per-correlation bridge tails, closed snapshots/terminal codes, and UI-only exact sequence suppression prevent final-over-write and recovery ambiguity.
+- [Phase 61 planning]: The controller owns id-keyed run records and active-tab eligibility; confirmed hold moves every exact mapped tab into one sealed lease, complete restore precedes resume, and Stop waits tree settlement before exact release/count.
+- [Phase 61 planning]: Active delegation liveness uses one ref-counted 20-second exact-nonce heartbeat with daemon echo and three-miss disconnect; restart loss additionally requires generation plus bounded recovery disposition.
 - [Milestone]: Defer every live/human UAT checklist to one milestone-end sweep; automated/source verification and clean review remain mandatory per phase, and no deferred item is silently marked passed.
 
 ### Pending Todos
 
-None. Phases 57-60 are complete; Phase 61 is ready for autonomous discussion and planning.
+None. Phases 57-60 are complete; Phase 61 has 8 independently checked plans and is ready for autonomous execution.
 
 ### Blockers/Concerns
 
@@ -148,10 +152,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-14T19:59:57.028Z
-Stopped at: Phase 61 UI-SPEC approved
-Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md
+Last session: 2026-07-14T21:31:13.130Z
+Stopped at: Phase 61 planning approved; Wave 1 ready
+Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-01-PLAN.md
 
 ## Next Actions
 
-Discuss and plan Phase 61 autonomously with recommended defaults, then execute it; keep every live CLI/OS/browser UAT pending for the single milestone-end gate.
+Execute Phase 61 Wave 1 (Plans 61-01, 61-02, and 61-03), run focused gates plus the first-change fail-safe full-suite gate, and keep every live CLI/OS/browser UAT pending for the single milestone-end gate.
