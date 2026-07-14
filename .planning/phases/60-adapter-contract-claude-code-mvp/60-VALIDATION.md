@@ -1,8 +1,8 @@
 ---
 phase: 60
 slug: adapter-contract-claude-code-mvp
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-14
 ---
@@ -20,7 +20,7 @@ created: 2026-07-14
 | **Framework** | Dependency-free Node assertions against compiled TypeScript, injected child/process/platform/filesystem fakes, and existing real `ws` bridge harnesses |
 | **Config file** | `package.json`, `mcp/package.json`, `mcp/tsconfig.json` |
 | **Quick run command** | `npm --prefix mcp run build && node tests/mcp-agent-provider-contract.test.js && node tests/mcp-claude-code-adapter.test.js` |
-| **Full suite command** | `npm test` with the temporary Phase 39 compatibility symlink and a cleanup trap |
+| **Full suite command** | `node scripts/run-phase60-full-tests.mjs` (preflight + temporary Phase 39 link + `npm test` + finally cleanup + dirty/staged preservation checks) |
 | **Estimated runtime** | focused slices < 30 seconds; full root suite several minutes |
 
 The workspace contains user-owned deletions of historical Phase 39 artifacts. For full-suite runs only, create an untracked symlink at `.planning/phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md` pointing to `.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md`, install a shell trap that removes the link and empty directory, and never stage or commit it.
@@ -47,11 +47,11 @@ The workspace contains user-owned deletions of historical Phase 39 artifacts. Fo
 | 60-02-01 | 02 | 2 | CLAUDE-03 | T60-04, T60-05 | Known provider events normalize to strict provider-neutral envelopes; raw Claude shapes do not escape | protocol | `npm --prefix mcp run build && node tests/mcp-agent-stream-fixture.test.js` | ❌ W0 | ⬜ pending |
 | 60-02-02 | 02 | 2 | CLAUDE-03 | T60-04, T60-05 | Unknown/malformed/oversize/chunked/final-line cases fail loud or normalize exactly, drain >200 KiB, and never fabricate success | mutation/resource | `node tests/mcp-agent-stream-fixture.test.js` | ❌ W0 | ⬜ pending |
 | 60-03-01 | 03 | 2 | ADAPT-05 | T60-06, T60-07 | Owner-only atomic journal/config reject symlinks and persist no prompt/provider output | filesystem unit | `npm --prefix mcp run build && node tests/mcp-agent-orphan-recovery.test.js` | ❌ W0 | ⬜ pending |
-| 60-03-02 | 03 | 2 | ADAPT-04 | T60-06 | POSIX group and Windows direct taskkill ordering wait for verified tree absence | lifecycle unit | `node tests/mcp-spawn-supervisor.test.js && node tests/mcp-agent-orphan-recovery.test.js` | ❌ W0 | ⬜ pending |
+| 60-03-02 | 03 | 2 | ADAPT-04 | T60-06 | POSIX group and Windows direct taskkill ordering wait for verified tree absence | lifecycle unit | `node tests/mcp-agent-orphan-recovery.test.js` | ❌ W0 | ⬜ pending |
 | 60-03-03 | 03 | 2 | ADAPT-04, ADAPT-05 | T60-06, T60-07 | Recovery kills only confirmed journaled survivors; stale clears; ambiguity withholds spawn; unrelated process survives | recovery matrix | `node tests/mcp-agent-orphan-recovery.test.js` | ❌ W0 | ⬜ pending |
 | 60-04-01 | 04 | 3 | ADAPT-02, ADAPT-03 | T60-01, T60-03, T60-05 | Strict start/cancel payloads, fixed spawn options, stdin-only task, scrubbed env, concurrent drains, and exact-once settlement | supervisor integration | `npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js` | ❌ W0 | ⬜ pending |
 | 60-04-02 | 04 | 3 | ADAPT-02, ADAPT-05 | T60-07, T60-08 | Only `serve` advertises after recovery; delegation id emits early; events flow until one terminal response; cancel cannot forge identity | bridge integration | `node tests/mcp-reverse-channel-contract.test.js && node tests/mcp-bridge-topology.test.js` | ✅ extend | ⬜ pending |
-| 60-04-03 | 04 | 3 | ADAPT-01–05, CLAUDE-01–04 | T60-01–T60-09 | Async shutdown settles every run; exact-five transport errors and frozen legacy bytes remain unchanged; full suite is green | system/regression | `node tests/mcp-version-parity.test.js && node tests/agent-provider-forbidden-flags.test.js && npm test` | ✅ extend/full | ⬜ pending |
+| 60-04-03 | 04 | 3 | ADAPT-01–05, CLAUDE-01–04 | T60-01–T60-09 | Async shutdown settles every run; exact-five transport errors and frozen legacy bytes remain unchanged; trapped full suite is green and preserves dirty/staged state | system/regression | `node tests/mcp-version-parity.test.js && node tests/agent-provider-forbidden-flags.test.js && node scripts/run-phase60-full-tests.mjs` | ✅ extend/❌ W0 harness | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -65,6 +65,7 @@ The workspace contains user-owned deletions of historical Phase 39 artifacts. Fo
 - [ ] `tests/mcp-spawn-supervisor.test.js` — injected child/stream/clock/process races and exact-once terminal settlement.
 - [ ] `tests/mcp-agent-orphan-recovery.test.js` — owner-only journal plus confirmed/stale/ambiguous/unrelated process matrix.
 - [ ] Extend `tests/mcp-reverse-channel-contract.test.js` and `tests/mcp-bridge-topology.test.js` for strict `delegate.*`, early delegation id, serve-only capability, recovery order, and shutdown.
+- [ ] `scripts/run-phase60-full-tests.mjs` — fail-safe preflight/link/trap/root-suite/dirty-and-staged-state preservation harness.
 - [ ] Add the focused test commands once to root `package.json` without dropping/reordering existing commands unnecessarily.
 
 No test framework, AI framework, Python service, LLM judge, or hosted collector is required.
@@ -105,14 +106,13 @@ No Critical/High automated threat evidence may be deferred. Only the real-enviro
 
 ## Validation Sign-Off
 
-- [ ] All tasks have an automated verify command or explicit Wave 0 dependency.
-- [ ] Sampling continuity: no three consecutive tasks without automated verification.
-- [ ] Wave 0 covers every missing focused fixture.
-- [ ] Existing Phase 59 auth/topology/parity and forbidden-flag gates remain green.
-- [ ] Full root suite runs with the temporary historical fixture and removes it afterward.
-- [ ] Manual checks are preserved as milestone-end `human_needed`, never fabricated.
-- [ ] No production extension/side-panel Phase 61 behavior enters the Phase 60 plans.
-- [ ] `nyquist_compliant: true` is set after plan-checker approval.
+- [x] All tasks have an automated verify command or explicit Wave 0 dependency.
+- [x] Sampling continuity: no three consecutive tasks without automated verification.
+- [x] Wave 0 covers every missing focused fixture.
+- [x] Existing Phase 59 auth/topology/parity and forbidden-flag gates remain green.
+- [x] Full root suite runs with the temporary historical fixture and removes it afterward.
+- [x] Manual checks are preserved as milestone-end `human_needed`, never fabricated.
+- [x] No production extension/side-panel Phase 61 behavior enters the Phase 60 plans.
+- [x] `nyquist_compliant: true` is set after plan-checker approval.
 
-**Approval:** pending
-
+**Approval:** approved 2026-07-14
