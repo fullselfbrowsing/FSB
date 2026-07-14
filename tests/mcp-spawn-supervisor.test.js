@@ -84,10 +84,18 @@ function makeChild(options = {}) {
   const stderr = new PassThrough();
   const stdinBytes = [];
   let closed = false;
+  let stdin = null;
 
   const close = (exit = { code: 0, signal: null }) => {
     if (closed) return;
     closed = true;
+    if (stdin && !stdin.destroyed) {
+      if (options.stdinCloseGate) {
+        void options.stdinCloseGate.promise.then(() => stdin.destroy());
+      } else {
+        stdin.destroy();
+      }
+    }
     if (!stdout.readableEnded) stdout.end();
     if (!stderr.readableEnded) stderr.end();
     setImmediate(() => child.emit('close', exit.code, exit.signal));
@@ -102,7 +110,7 @@ function makeChild(options = {}) {
     setImmediate(() => close(exit));
   };
 
-  const stdin = new Writable({
+  stdin = new Writable({
     highWaterMark: options.highWaterMark ?? 8,
     write(chunk, _encoding, callback) {
       stdinBytes.push(Buffer.from(chunk));
@@ -110,6 +118,7 @@ function makeChild(options = {}) {
         callback(new Error('fixture stdin failure'));
         return;
       }
+      if (options.holdStdinWrite) return;
       setImmediate(callback);
     },
     final(callback) {
@@ -119,6 +128,19 @@ function makeChild(options = {}) {
       }
     },
   });
+
+  if (options.stdinEndFailure) {
+    stdin.end = () => {
+      setImmediate(() => {
+        if (options.stdinEndFailure === 'error') {
+          stdin.destroy(new Error('fixture EOF failure'));
+        } else {
+          stdin.destroy();
+        }
+      });
+      return stdin;
+    };
+  }
 
   Object.assign(child, {
     pid: options.pid ?? 41001,
@@ -817,6 +839,71 @@ async function runSetupCancellationRaceTests(supervisorModule) {
   }
 }
 
+async function runStdinLifecycleTests(supervisorModule) {
+  for (const stdinEndFailure of ['close', 'error']) {
+    const harness = makeHarness(supervisorModule, {
+      childOptions: { stdinEndFailure },
+      onStdinEnd: () => {},
+    });
+    const result = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: `${stdinEndFailure} during stdin EOF` }),
+      harness.emit,
+    );
+    assert.equal(result.status, 'failed', `${stdinEndFailure} during EOF is non-success`);
+    assert.equal(result.terminal.code, 'stdin_failed', `${stdinEndFailure} during EOF is classified as stdin_failed`);
+    assert.equal(harness.terminationCalls.length, 1, `${stdinEndFailure} during EOF stops the tree once`);
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      childOptions: { holdStdinWrite: true, highWaterMark: 1 },
+      onStdinEnd: () => {},
+    });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'stdin backpressure never drains' }),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.spawnCalls[0]?.child.stdin.writableNeedDrain === true,
+      'standalone stdin no-drain backpressure',
+    );
+    harness.spawnCalls[0].child.close({ code: 1, signal: null });
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed', 'child close without drain is non-success');
+    assert.equal(terminal.terminal.code, 'stdin_failed', 'child close without drain is classified as stdin_failed');
+    assert.equal(harness.terminationCalls.length, 1, 'child close without drain still verifies tree cleanup once');
+  }
+
+  {
+    const stdinCloseGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      childOptions: { holdStdinWrite: true, highWaterMark: 1, stdinCloseGate },
+      onStdinEnd: () => {},
+    });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'cancel while stdin backpressure never drains' }),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.spawnCalls[0]?.child.stdin.writableNeedDrain === true,
+      'stdin no-drain backpressure',
+    );
+    let closeSettled = false;
+    const closePromise = harness.supervisor.close().then((result) => {
+      closeSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(closeSettled, false, 'close joins the backpressured stdin continuation');
+    stdinCloseGate.resolve();
+    const [closed, terminal] = await Promise.all([closePromise, startPromise]);
+    assert.deepEqual(closed, { cancelled: 1, failed: 0, alreadySettled: 0 });
+    assert.equal(terminal.status, 'cancelled', 'backpressured stdin cancellation settles as cancelled');
+    assert.equal(harness.terminationCalls.length, 1, 'backpressured stdin cancellation stops the tree once');
+    assert.equal(harness.counters.remove, 1, 'backpressured stdin cancellation removes runtime state');
+  }
+}
+
 async function runRecoveryAndRegistryTests(supervisorModule, registryModule) {
   const harness = makeHarness(supervisorModule);
   assert.deepEqual(await harness.supervisor.recover(), {
@@ -862,6 +949,7 @@ async function main() {
   await runFailureBarrierTests(supervisorModule);
   await runCancelAndShutdownTests(supervisorModule);
   await runSetupCancellationRaceTests(supervisorModule);
+  await runStdinLifecycleTests(supervisorModule);
   await runRecoveryAndRegistryTests(supervisorModule, registryModule);
   console.log('mcp-spawn-supervisor.test.js: PASS');
 }

@@ -859,44 +859,76 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   private async writeTask(child: ChildProcessWithoutNullStreams, task: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      let callbackDone = false;
+      let writeCallbackDone = false;
       let drainDone = true;
+      let endStarted = false;
+      let endCallbackDone = false;
+      let finishDone = false;
       let settled = false;
       const cleanup = (keepPendingErrorListener = false): void => {
         if (!keepPendingErrorListener) child.stdin.off('error', onError);
+        child.stdin.off('close', onClose);
         child.stdin.off('drain', onDrain);
+        child.stdin.off('finish', onFinish);
       };
-      const finish = (): void => {
-        if (settled || !callbackDone || !drainDone) return;
+      const fail = (keepPendingErrorListener = false): void => {
+        if (settled) return;
+        settled = true;
+        cleanup(keepPendingErrorListener);
+        reject(new Error('stdin_failed'));
+      };
+      const onError = (): void => {
+        fail();
+      };
+      const complete = (): void => {
+        if (settled || !endCallbackDone || !finishDone) return;
         settled = true;
         cleanup();
         resolve();
       };
-      const onError = (): void => {
-        if (settled) return;
-        settled = true;
-        cleanup(true);
-        reject(new Error('stdin_failed'));
+      const onClose = (): void => {
+        if (!endCallbackDone || !finishDone) fail();
+      };
+      const onFinish = (): void => {
+        finishDone = true;
+        complete();
+      };
+      const end = (): void => {
+        if (settled || endStarted || !writeCallbackDone || !drainDone) return;
+        endStarted = true;
+        try {
+          child.stdin.end(() => {
+            endCallbackDone = true;
+            complete();
+          });
+        } catch {
+          fail();
+        }
       };
       const onDrain = (): void => {
         drainDone = true;
-        finish();
+        end();
       };
       child.stdin.once('error', onError);
-      const accepted = child.stdin.write(task, 'utf8', (error?: Error | null) => {
-        if (error) {
-          onError();
-          return;
+      child.stdin.once('close', onClose);
+      child.stdin.once('finish', onFinish);
+      try {
+        const accepted = child.stdin.write(task, 'utf8', (error?: Error | null) => {
+          if (error) {
+            fail(true);
+            return;
+          }
+          writeCallbackDone = true;
+          end();
+        });
+        if (!accepted) {
+          drainDone = false;
+          child.stdin.once('drain', onDrain);
         }
-        callbackDone = true;
-        finish();
-      });
-      if (!accepted) {
-        drainDone = false;
-        child.stdin.once('drain', onDrain);
+      } catch {
+        fail();
       }
     });
-    child.stdin.end();
   }
 
   private async terminateAndCleanup(run: DelegationRun): Promise<void> {
