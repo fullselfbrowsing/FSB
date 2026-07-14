@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: planning
-stopped_at: Phase 61 context gathered (assumptions mode)
-last_updated: "2026-07-14T19:44:46.842Z"
+stopped_at: Phase 61 UI-SPEC approved
+last_updated: "2026-07-14T19:59:57.032Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 18
@@ -148,9 +148,9 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-14T19:44:46.839Z
-Stopped at: Phase 61 context gathered (assumptions mode)
-Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-CONTEXT.md
+Last session: 2026-07-14T19:59:57.028Z
+Stopped at: Phase 61 UI-SPEC approved
+Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md
 
 ## Next Actions
 
