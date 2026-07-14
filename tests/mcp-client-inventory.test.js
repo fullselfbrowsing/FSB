@@ -268,10 +268,15 @@ async function main() {
       /await runtime\.bridge\.connect\(\);\s*void pushMcpClientInventory\(runtime\.bridge\);/,
       'stdio pushes inventory immediately after bridge connect',
     );
+    assert.match(indexSource, /await startServeDelegation\(\{ host, port \}\);/);
+    const serveLifecycleSource = fs.readFileSync(
+      path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'serve-delegation.ts'),
+      'utf8',
+    );
     assert.match(
-      indexSource,
-      /await bridge\.connect\(\);\s*void pushMcpClientInventory\(bridge\);/,
-      'serve mode pushes inventory immediately after bridge connect',
+      serveLifecycleSource,
+      /await bridge\.connect\(\);\s*await dependencies\.pushInventory\(bridge\);/,
+      'serve mode pushes inventory immediately after its recovery-gated bridge connect',
     );
 
     console.log('mcp-client-inventory.test.js: PASS');
