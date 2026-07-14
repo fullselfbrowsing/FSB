@@ -1,0 +1,322 @@
+'use strict';
+
+/**
+ * Phase 60 Plan 01 -- retained Claude detection and closed spawn profile.
+ *
+ * No live CLI, provider authentication, model call, or browser is used.
+ * Run: npm --prefix mcp run build && node tests/mcp-claude-code-adapter.test.js
+ */
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+const repoRoot = path.resolve(__dirname, '..');
+const detectBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-detect.js');
+const profileBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-profile.js');
+const detectSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'claude-detect.ts');
+const profileSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'claude-profile.ts');
+const agentPath = path.join(repoRoot, 'mcp', 'ai', 'agents', 'fsb.json');
+
+const nativeCandidate = Object.freeze({
+  sourcePath: '/fixture/bin/claude',
+  realPath: '/fixture/opt/claude-2.1.177',
+});
+
+function detectorDependencies(overrides = {}) {
+  const probeCalls = [];
+  let resolveCalls = 0;
+  const dependencies = {
+    platform: 'darwin',
+    pathValue: '/fixture/bin',
+    resolveBinary: async () => {
+      resolveCalls += 1;
+      return nativeCandidate;
+    },
+    resolveRealPath: async (value) => {
+      if (value === nativeCandidate.sourcePath) return nativeCandidate.realPath;
+      return value;
+    },
+    resolveWindowsShim: async () => null,
+    probe: async (file, args, options) => {
+      probeCalls.push({ file, args: [...args], options: { ...options } });
+      return { stdout: 'Claude Code 2.1.177', stderr: '' };
+    },
+    ...overrides,
+  };
+  return {
+    dependencies,
+    probeCalls,
+    getResolveCalls: () => resolveCalls,
+  };
+}
+
+async function main() {
+  assert.ok(fs.existsSync(agentPath), 'shipped FSB agent policy exists before profile tests');
+  const shippedAgent = JSON.parse(fs.readFileSync(agentPath, 'utf8'));
+  assert.equal(shippedAgent.name, 'fsb');
+  assert.deepEqual(shippedAgent.tools, ['mcp__fsb']);
+  assert.equal(shippedAgent.permissionMode, 'dontAsk');
+  assert.equal(shippedAgent.maxTurns, 40);
+
+  const detectModule = await import(pathToFileURL(detectBuildPath).href);
+  const profileModule = await import(pathToFileURL(profileBuildPath).href);
+  const {
+    CLAUDE_MINIMUM_VERSION,
+    CLAUDE_PROBE_OPTIONS,
+    createClaudeCodeDetector,
+  } = detectModule;
+  const {
+    SERIALIZED_FSB_AGENTS,
+    SHIPPED_FSB_AGENT_POLICY,
+    buildClaudeSpawnSpec,
+  } = profileModule;
+
+  assert.equal(CLAUDE_MINIMUM_VERSION, '2.1.177');
+  assert.deepEqual(CLAUDE_PROBE_OPTIONS, {
+    timeout: 3000,
+    windowsHide: true,
+    maxBuffer: 65536,
+    shell: false,
+  });
+  assert.ok(Object.isFrozen(CLAUDE_PROBE_OPTIONS));
+
+  const supported = detectorDependencies();
+  const detection = await createClaudeCodeDetector(supported.dependencies).detect();
+  assert.deepEqual(detection, {
+    installed: true,
+    version: '2.1.177',
+    authState: 'unknown',
+    binary: {
+      command: nativeCandidate.realPath,
+      realPath: nativeCandidate.realPath,
+      argvPrefix: [],
+    },
+    profileVersion: '2.1.177',
+  });
+  assert.ok(Object.isFrozen(detection));
+  assert.ok(Object.isFrozen(detection.binary));
+  assert.ok(Object.isFrozen(detection.binary.argvPrefix));
+  assert.equal(supported.getResolveCalls(), 1, 'PATH candidate is resolved once');
+  assert.deepEqual(supported.probeCalls, [{
+    file: nativeCandidate.realPath,
+    args: ['--version'],
+    options: {
+      timeout: 3000,
+      windowsHide: true,
+      maxBuffer: 65536,
+      shell: false,
+    },
+  }], 'the retained native path is probed with fixed argv/options');
+
+  const old = detectorDependencies({
+    probe: async () => ({ stdout: 'Claude Code 2.1.176', stderr: '' }),
+  });
+  const oldDetection = await createClaudeCodeDetector(old.dependencies).detect();
+  assert.equal(oldDetection.installed, false);
+  assert.equal(oldDetection.version, '2.1.176');
+  assert.equal(oldDetection.binary, null);
+  assert.equal(oldDetection.diagnostic.code, 'version_unsupported');
+
+  const prerelease = detectorDependencies({
+    probe: async () => ({ stdout: '2.1.177-rc.1', stderr: '' }),
+  });
+  assert.equal(
+    (await createClaudeCodeDetector(prerelease.dependencies).detect()).installed,
+    false,
+    'a prerelease of the minimum stable version is rejected',
+  );
+
+  const unparseable = detectorDependencies({
+    probe: async () => ({ stdout: 'Claude development build', stderr: '' }),
+  });
+  const unparseableDetection = await createClaudeCodeDetector(unparseable.dependencies).detect();
+  assert.equal(unparseableDetection.installed, false);
+  assert.equal(unparseableDetection.diagnostic.code, 'version_unparseable');
+  assert.equal(JSON.stringify(unparseableDetection).includes('Claude development build'), false);
+
+  const missing = detectorDependencies({ resolveBinary: async () => null });
+  const missingDetection = await createClaudeCodeDetector(missing.dependencies).detect();
+  assert.equal(missingDetection.installed, false);
+  assert.equal(missingDetection.diagnostic.code, 'binary_missing');
+
+  const probeSecret = 'provider_secret_probe_canary_71b831c9';
+  const failedProbe = detectorDependencies({
+    probe: async () => { throw new Error(probeSecret); },
+  });
+  const failedProbeDetection = await createClaudeCodeDetector(failedProbe.dependencies).detect();
+  assert.equal(failedProbeDetection.installed, false);
+  assert.equal(failedProbeDetection.diagnostic.code, 'adapter_unavailable');
+  assert.equal(JSON.stringify(failedProbeDetection).includes(probeSecret), false);
+
+  let sourceChecks = 0;
+  const changed = detectorDependencies({
+    resolveRealPath: async (value) => {
+      if (value === nativeCandidate.sourcePath) {
+        sourceChecks += 1;
+        return sourceChecks >= 2 ? '/fixture/opt/replaced-claude' : nativeCandidate.realPath;
+      }
+      return value;
+    },
+  });
+  const changedDetection = await createClaudeCodeDetector(changed.dependencies).detect();
+  assert.equal(changedDetection.installed, false);
+  assert.equal(changedDetection.diagnostic.code, 'binary_changed');
+
+  const windowsNativeCandidate = Object.freeze({
+    sourcePath: 'C:\\fixture\\bin\\claude.exe',
+    realPath: 'C:\\fixture\\bin\\claude.exe',
+  });
+  const windowsNative = detectorDependencies({
+    platform: 'win32',
+    resolveBinary: async () => windowsNativeCandidate,
+    resolveRealPath: async (value) => value,
+  });
+  const windowsNativeDetection = await createClaudeCodeDetector(windowsNative.dependencies).detect();
+  assert.equal(windowsNativeDetection.installed, true);
+  assert.equal(windowsNativeDetection.binary.command, windowsNativeCandidate.realPath);
+
+  const windowsShimCandidate = Object.freeze({
+    sourcePath: 'C:\\fixture\\bin\\claude.cmd',
+    realPath: 'C:\\fixture\\bin\\claude.cmd',
+  });
+  const rejectedShim = detectorDependencies({
+    platform: 'win32',
+    resolveBinary: async () => windowsShimCandidate,
+    resolveRealPath: async (value) => value,
+  });
+  const rejectedShimDetection = await createClaudeCodeDetector(rejectedShim.dependencies).detect();
+  assert.equal(rejectedShimDetection.installed, false);
+  assert.equal(rejectedShimDetection.diagnostic.code, 'binary_unsafe');
+  assert.equal(rejectedShim.probeCalls.length, 0, 'unsafe shim is never executed');
+
+  const shimProbeCalls = [];
+  const acceptedShim = detectorDependencies({
+    platform: 'win32',
+    resolveBinary: async () => windowsShimCandidate,
+    resolveRealPath: async (value) => value,
+    resolveWindowsShim: async () => ({
+      verified: true,
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      realPath: 'C:\\Program Files\\nodejs\\node.exe',
+      argvPrefix: ['C:\\fixture\\lib\\claude-cli.js'],
+    }),
+    probe: async (file, args, options) => {
+      shimProbeCalls.push({ file, args: [...args], options: { ...options } });
+      return { stdout: '2.1.177', stderr: '' };
+    },
+  });
+  const acceptedShimDetection = await createClaudeCodeDetector(acceptedShim.dependencies).detect();
+  assert.equal(acceptedShimDetection.installed, true);
+  assert.deepEqual(shimProbeCalls[0], {
+    file: 'C:\\Program Files\\nodejs\\node.exe',
+    args: ['C:\\fixture\\lib\\claude-cli.js', '--version'],
+    options: {
+      timeout: 3000,
+      windowsHide: true,
+      maxBuffer: 65536,
+      shell: false,
+    },
+  });
+
+  const taskCanary = 'TASK_CANARY_71b831c9_$(touch pwned); --flag\nnext';
+  const context = Object.freeze({
+    adapterId: 'claude-code',
+    detection,
+    delegationId: 'delegation_71b831c9',
+    runtimeFingerprint: 'fingerprint_71b831c9_fixed',
+    cwd: '/fixture/workspace',
+    privateMcpConfigPath: '/fixture/runtime/mcp-config.json',
+    runtimeFiles: Object.freeze(['/fixture/runtime/mcp-config.json']),
+  });
+  const spec = buildClaudeSpawnSpec({ text: taskCanary }, context);
+  const exactArgv = [
+    '-p',
+    '--verbose',
+    '--output-format', 'stream-json',
+    '--include-partial-messages',
+    '--setting-sources', '',
+    '--disable-slash-commands',
+    '--no-chrome',
+    '--strict-mcp-config',
+    '--mcp-config', '/fixture/runtime/mcp-config.json',
+    '--agents', SERIALIZED_FSB_AGENTS,
+    '--agent', 'fsb',
+    '--permission-mode', 'dontAsk',
+    '--tools', '',
+    '--allowedTools', 'mcp__fsb',
+    '--disallowedTools', 'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch',
+    '--max-turns', '40',
+    '--no-session-persistence',
+  ];
+  assert.deepEqual(spec.argv, exactArgv, 'profile argv order and literal empty values are fixed');
+  assert.equal(spec.command, nativeCandidate.realPath, 'spawn spec retains the probed command');
+  assert.equal(spec.cwd, context.cwd);
+  assert.deepEqual(spec.privateFiles, [context.privateMcpConfigPath]);
+  assert.deepEqual(spec.fixedEnv, {
+    FSB_AGENT_ADAPTER: 'claude-code',
+    FSB_AGENT_PROFILE: '2.1.177',
+    FSB_DELEGATION_ID: context.delegationId,
+    FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
+  });
+  assert.ok(Object.isFrozen(spec));
+  assert.ok(Object.isFrozen(spec.argv));
+  assert.ok(Object.isFrozen(spec.privateFiles));
+  assert.ok(Object.isFrozen(spec.fixedEnv));
+  assert.equal(JSON.stringify(spec).includes(taskCanary), false, 'task canary is absent from all spawn metadata');
+  for (const providerKey of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY']) {
+    assert.equal(JSON.stringify(spec).includes(providerKey), false, `${providerKey} is absent`);
+  }
+
+  const serializedAgents = JSON.parse(SERIALIZED_FSB_AGENTS);
+  assert.deepEqual(Object.keys(serializedAgents), ['fsb']);
+  assert.deepEqual(serializedAgents.fsb, {
+    description: shippedAgent.description,
+    prompt: shippedAgent.prompt,
+    tools: shippedAgent.tools,
+    disallowedTools: shippedAgent.disallowedTools,
+    permissionMode: shippedAgent.permissionMode,
+    maxTurns: shippedAgent.maxTurns,
+  }, 'serialized agent definition is derived only from the shipped static asset');
+  assert.equal(SHIPPED_FSB_AGENT_POLICY.name, 'fsb');
+  assert.ok(Object.isFrozen(SHIPPED_FSB_AGENT_POLICY));
+
+  const retainedSpec = buildClaudeSpawnSpec({ text: 'Use the retained path.' }, context);
+  assert.equal(retainedSpec.command, nativeCandidate.realPath, 'later PATH changes cannot alter the spec');
+
+  assert.throws(
+    () => buildClaudeSpawnSpec({ text: 'x'.repeat(65537) }, context),
+    /safe byte limit/,
+  );
+  assert.throws(
+    () => buildClaudeSpawnSpec({ text: '\ud800' }, context),
+    /UTF-8 text/,
+  );
+  assert.throws(
+    () => buildClaudeSpawnSpec({ text: 'valid task' }, { ...context, adapterId: 'Claude-Code' }),
+    /canonical adapter id/,
+  );
+
+  const source = `${fs.readFileSync(detectSourcePath, 'utf8')}\n${fs.readFileSync(profileSourcePath, 'utf8')}`;
+  assert.match(source, /shell:\s*false/);
+  for (const forbiddenSource of [
+    'shell: true',
+    'cmd /c',
+    '--bare',
+    '--model',
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+    'GEMINI_API_KEY',
+  ]) {
+    assert.equal(source.includes(forbiddenSource), false, `provider source excludes ${forbiddenSource}`);
+  }
+
+  console.log('mcp-claude-code-adapter.test.js: PASS');
+}
+
+main().catch((error) => {
+  console.error('mcp-claude-code-adapter.test.js: FAIL');
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
+});
