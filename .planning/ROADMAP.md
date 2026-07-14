@@ -164,7 +164,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 57. Agent Identity Capture | 3/3 | Complete    | 2026-07-12 |
 | 58. Providers Panel | 3/3 | Complete    | 2026-07-12 |
 | 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
-| 60. Adapter Contract & Claude Code MVP | 0/0 | Not started | — |
+| 60. Adapter Contract & Claude Code MVP | 2/4 | In Progress|  |
 | 61. Delegation UX & SW-Eviction Persistence | 0/0 | Not started | — |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 0/0 | Not started | — |
 | 63. Native-Messaging Host | 0/0 | Not started | — |
