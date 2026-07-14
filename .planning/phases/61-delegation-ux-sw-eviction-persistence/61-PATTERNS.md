@@ -9,11 +9,11 @@
 side-panel draft
   -> background provider/preflight route (read-only)
   -> offline / unpaired / unsupported disposition, OR one-use consent challenge
-  -> background consumes challenge or provider-local trust
+  -> background consumes the task/provider-bound challenge; provider-local trust only controls whether the consent card is shown
   -> delegation controller calls delegate.start
   -> daemon mints delegationId and spawns CLI
   -> child AgentScope adds FSB_DELEGATION_ID to agent:register
-  -> dispatcher mints agentId and registry stamps delegation mapping
+  -> dispatcher mints agentId, controller verifies the daemon-minted delegation is currently expected, then registry stamps the mapping
   -> normalized ext:event enters async observer tail
   -> projection/redaction -> serialized chrome.storage.session append
   -> only after write: controller state/watchdog + UI fanout
@@ -28,6 +28,7 @@ The side panel never mints/consumes authority or infers terminal state. The cont
 
 | Target file | Role | Closest analog | Pattern to preserve |
 |-------------|------|----------------|---------------------|
+| `extension/utils/delegation-preflight.js` (new) | pure authoritative provider/readiness classification | `extension/ui/providers-panel.js::normalizeProviderSettings`, `extension/ws/mcp-bridge-client.js` connection snapshot | normalize stored API empty-string compatibility only at the background boundary; exact agent id, closed offline/unpaired/unsupported results, no writes/sends/tab queries |
 | `extension/utils/delegation-consent.js` (new) | provider trust and one-use challenge authority | `extension/utils/consent-policy-store.js`, `extension/utils/consent-gate.js` | classic-script IIFE, exact normalization, storage-backed authority, explicit fail-closed result |
 | `extension/utils/delegation-event-store.js` (new) | bounded redacted session ledger and serialized append | `extension/utils/mcp-task-store.js`, `extension/utils/agent-registry.js::_persist/hydrate` | versioned envelope, mutex/promise queue, awaited session writes, exact hydrate validation |
 | `extension/utils/delegation-controller.js` (new) | sole delegation lifecycle state machine | `extension/utils/mcp-visual-session-lifecycle.js`, `extension/utils/trigger-lifecycle.js` | closed global API, idempotent transitions, persisted-before-notify ordering, injected/testable dependencies |
@@ -134,14 +135,15 @@ Extend the type with `delegationId?: string`, populate it only from the validate
 3. Sanitize/stamp client info and installed evidence.
 4. Return the minted id and additive metadata.
 
-Validate the delegation sidecar before mint or fail the registration. Stamp it on the registry record and notify/bind the controller through a closed method after the record is authoritative. Do not reflect a caller value without validation or let it replace the minted agent id.
+Validate the delegation sidecar's shape before mint. After ordinary registration mints the extension agent id, call the controller's closed binding gate; it accepts only a daemon-minted delegation id that is currently expected in `starting`/`running`, performs the registry mapping while that state is authoritative, and consumes the one expected registration. If the gate rejects or races terminal settlement, roll back the new ordinary agent record and map nothing. Do not pre-register a delegation, reflect a caller value without controller authorization, or let it replace the minted agent id.
 
 ### 7. Registry lock, hydrate, and deadline recovery
 
 `AgentRegistry` serializes mutations with `withRegistryLock`, persists versioned Maps to `chrome.storage.session`, and recovers staged connection releases during `hydrate()`. A hold lease should reuse that discipline:
 
-- snapshot exact agent id, delegation id, tab ids, ownership tokens/metadata, and expiry;
-- remove the tab ids from active owner maps inside the same locked turn;
+- the controller queries the active tab and proves it is one of the delegation's exact owned tabs; the registry never queries active-tab UI state;
+- snapshot the complete exact mapped set (agent id, delegation id, every tab id, every ownership token/metadata, and expiry) into one lease;
+- compare the supplied complete snapshot to the registry's current complete mapped set, then remove all mapped tab ids from active owner maps inside the same locked turn;
 - retain a separate held-tab reservation so `bindTab` rejects another claimant;
 - persist before the operation resolves;
 - on hydrate, cancel/expire overdue leases without restoring by guesswork;
@@ -151,7 +153,7 @@ Ordinary `releaseTab` deletes an agent after its final tab. Do not use it to imp
 
 ### 8. Storage envelope validation
 
-Follow task-store/registry conventions: one version field, exact identity, arrays/records validated item by item, corrupt state discarded/fails closed, and all write promises awaited where authority/order depends on persistence. `unlimitedStorage` does not relax `storage.session`'s 10 MB quota.
+Follow `extension/utils/mcp-task-store.js` plus registry conventions: one version field, exact identity, arrays/records validated item by item, corrupt state fails closed, and all write promises awaited where authority/order depends on persistence. A persisted duplicate sequence is corruption even when byte-identical; only the UI may suppress a duplicate delivery of the same already-persisted `(delegationId, sequence)`. `unlimitedStorage` does not relax `storage.session`'s 10 MB quota.
 
 Use a per-delegation append tail:
 
@@ -226,7 +228,7 @@ Before editing a shared extension file, run:
 rg -n "engine-config\.js|background\.js|mcp-bridge-client\.js|mcp-tool-dispatcher\.js|agent-registry\.js|sidepanel\.(js|html|css)|manifest\.json" tests
 ```
 
-Update every paired source-shape tripwire in the same task commit and run the complete root suite from the first extension-touching implementation commit.
+Update every paired source-shape tripwire in the same task commit and run its focused sub-30-second command. Run the complete fail-safe root suite as a separate commit/wave gate from the first extension-touching implementation commit; do not place the several-minute full suite inside a task's `<automated>` command.
 
 ## Same-Wave Conflict Map
 
