@@ -678,6 +678,14 @@ class VerifiedProcessTreeTerminator implements ProcessTreeTerminator {
     if (existing) return existing;
     const operation = this.stopOnce(entry, child, options);
     this.inFlight.set(key, operation);
+    void operation.then(
+      () => {
+        if (this.inFlight.get(key) === operation) this.inFlight.delete(key);
+      },
+      () => {
+        if (this.inFlight.get(key) === operation) this.inFlight.delete(key);
+      },
+    );
     return operation;
   }
 

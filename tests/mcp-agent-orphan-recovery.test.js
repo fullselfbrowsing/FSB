@@ -995,6 +995,40 @@ async function runTerminationTests(processTreeModule) {
     await Promise.all([first, second]);
     assert.deepEqual(signals, [[-41001, 'SIGTERM']]);
     assert.equal(inspector.calls.length, 2);
+
+    const afterSettlement = terminator.stop(active, closedChild(), { grace: 25 });
+    assert.notStrictEqual(
+      afterSettlement,
+      first,
+      'a successful settled stop is evicted before a later inspection',
+    );
+    await afterSettlement;
+    assert.equal(inspector.calls.length, 4, 'the later stop performs fresh inspection');
+  }
+
+  {
+    const inspector = queuedInspector([
+      ambiguousInspection,
+      staleInspection,
+      staleInspection,
+    ]);
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: () => assert.fail('ambiguous or stale evidence must not be signaled'),
+      wait: async () => {},
+    });
+    const failed = terminator.stop(active, closedChild(), { grace: 25 });
+    await expectTreeUnsettled(() => failed);
+
+    const afterRejection = terminator.stop(active, closedChild(), { grace: 25 });
+    assert.notStrictEqual(
+      afterRejection,
+      failed,
+      'a rejected settled stop is evicted before a later inspection',
+    );
+    await afterRejection;
+    assert.equal(inspector.calls.length, 3, 'the later stop re-inspects after rejection');
   }
 
   {
