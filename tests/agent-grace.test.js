@@ -496,6 +496,10 @@ this.__phase241bridge = {
       client._intentionalClose = true;
       if (client._reconnectTimer) { clearTimeout(client._reconnectTimer); client._reconnectTimer = null; }
       if (client._pingTimer) { clearInterval(client._pingTimer); client._pingTimer = null; }
+      if (client._delegationHeartbeatTimer) {
+        clearInterval(client._delegationHeartbeatTimer);
+        client._delegationHeartbeatTimer = null;
+      }
     } catch (_e) { /* best-effort */ }
   }
 
@@ -726,6 +730,44 @@ this.__phase241bridge = {
     }
   }
   console.log('  PASS: bridge passes RECONNECT_GRACE_MS=10000 to stageReleaseByConnectionId');
+
+  console.log('--- Test 14 (bridge): delegation heartbeat remains separate from reconnect grace ---');
+  {
+    const bridgeSource = fs.readFileSync(
+      path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'),
+      'utf8'
+    );
+    assert.ok(
+      bridgeSource.includes('const RECONNECT_GRACE_MS = 10000;'),
+      'legacy agent transport grace remains exactly ten seconds'
+    );
+    assert.ok(
+      bridgeSource.includes('const DELEGATION_HEARTBEAT_INTERVAL_MS = 20000;'),
+      'active delegation acknowledgement interval is independently pinned to twenty seconds'
+    );
+    assert.ok(
+      bridgeSource.includes('const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;'),
+      'active delegation connection classification requires three misses'
+    );
+    assert.ok(
+      bridgeSource.includes('this._delegationHeartbeatOwners = new Set();'),
+      'heartbeat owners use one Set-backed refcount roster'
+    );
+    assert.ok(
+      bridgeSource.includes('retainDelegationHeartbeat(ownerId)')
+        && bridgeSource.includes('releaseDelegationHeartbeat(ownerId)'),
+      'bridge exposes paired retain/release heartbeat APIs'
+    );
+    assert.ok(
+      bridgeSource.includes('stageReleaseByConnectionId(this._connectionId, RECONNECT_GRACE_MS)'),
+      'socket-close agent release still uses only the legacy reconnect grace'
+    );
+    assert.ok(
+      !/stageReleaseByConnectionId\([^\n]*DELEGATION_HEARTBEAT/.test(bridgeSource),
+      'delegation heartbeat timing never replaces or widens agent transport grace'
+    );
+  }
+  console.log('  PASS: 20s/three-miss heartbeat and 10s agent grace are independent contracts');
 
   console.log('PASS grace');
 })().catch(err => {

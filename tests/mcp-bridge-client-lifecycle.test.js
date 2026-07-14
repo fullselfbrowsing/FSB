@@ -236,6 +236,9 @@ this.__phase198 = {
   MCP_BRIDGE_STATE_KEY: typeof MCP_BRIDGE_STATE_KEY !== 'undefined' ? MCP_BRIDGE_STATE_KEY : undefined,
   MCP_RECONNECT_ALARM: typeof MCP_RECONNECT_ALARM !== 'undefined' ? MCP_RECONNECT_ALARM : undefined,
   MCP_RECONNECT_MAX_MS: typeof MCP_RECONNECT_MAX_MS !== 'undefined' ? MCP_RECONNECT_MAX_MS : undefined,
+  MCP_PING_INTERVAL_MS: typeof MCP_PING_INTERVAL_MS !== 'undefined' ? MCP_PING_INTERVAL_MS : undefined,
+  DELEGATION_HEARTBEAT_INTERVAL_MS: typeof DELEGATION_HEARTBEAT_INTERVAL_MS !== 'undefined' ? DELEGATION_HEARTBEAT_INTERVAL_MS : undefined,
+  DELEGATION_HEARTBEAT_MISS_LIMIT: typeof DELEGATION_HEARTBEAT_MISS_LIMIT !== 'undefined' ? DELEGATION_HEARTBEAT_MISS_LIMIT : undefined,
   MCP_BRIDGE_PAIRING_KEY: typeof MCP_BRIDGE_PAIRING_KEY !== 'undefined' ? MCP_BRIDGE_PAIRING_KEY : undefined,
   FSB_EXT_PROTOCOL: typeof FSB_EXT_PROTOCOL !== 'undefined' ? FSB_EXT_PROTOCOL : undefined,
   lifecycleBus: typeof fsbAutomationLifecycleBus !== 'undefined' ? fsbAutomationLifecycleBus : null
@@ -1038,6 +1041,135 @@ function runAsyncObserverSourceShapeCase() {
   assert(!source.includes('event observers do not settle'), 'bridge source has no catch-and-continue observer failure path');
 }
 
+async function runDelegationHeartbeatCases() {
+  console.log('\n--- Phase 61 acknowledged delegation heartbeat ---');
+
+  const activeIntervals = (harness, delay) => harness.timers.intervals
+    .filter((timer) => timer.delay === delay && !timer.cleared);
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+
+    assertEqual(harness.exports.MCP_PING_INTERVAL_MS, 25000, 'ordinary bridge ping remains on its legacy 25-second cadence');
+    assertEqual(harness.exports.DELEGATION_HEARTBEAT_INTERVAL_MS, 20000, 'active delegation heartbeat cadence is exactly 20 seconds');
+    assertEqual(harness.exports.DELEGATION_HEARTBEAT_MISS_LIMIT, 3, 'active delegation disconnect threshold is exactly three misses');
+    assertEqual(activeIntervals(harness, 25000).length, 1, 'no owner starts only the ordinary bridge timer');
+    assertEqual(activeIntervals(harness, 20000).length, 0, 'no active delegation starts no acknowledged heartbeat');
+    assertEqual(client.retainDelegationHeartbeat(''), false, 'empty heartbeat owner is rejected');
+    assertEqual(client.retainDelegationHeartbeat(' owner-a'), false, 'non-canonical heartbeat owner is rejected');
+
+    assertEqual(client.retainDelegationHeartbeat('owner-a'), true, 'first owner retains the acknowledged heartbeat');
+    assertEqual(activeIntervals(harness, 25000).length, 0, 'zero-to-one retain replaces the ordinary timer');
+    assertEqual(activeIntervals(harness, 20000).length, 1, 'zero-to-one retain starts exactly one 20-second interval');
+    assertEqual(client.retainDelegationHeartbeat('owner-a'), false, 'duplicate retain is idempotent');
+    assertEqual(client.retainDelegationHeartbeat('owner-b'), true, 'a second distinct owner increments the refcount');
+    assertEqual(activeIntervals(harness, 20000).length, 1, 'two owners still share one heartbeat interval');
+
+    const heartbeatTimer = activeIntervals(harness, 20000)[0];
+    heartbeatTimer.fn();
+    const firstPing = JSON.parse(socket.sent[socket.sent.length - 1]);
+    assertDeepEqual(Object.keys(firstPing).sort(), ['nonce', 'ts', 'type'], 'active heartbeat uses the exact additive ping shape');
+    assertEqual(firstPing.type, 'mcp:ping', 'active heartbeat emits mcp:ping');
+    assert(Number.isSafeInteger(firstPing.ts) && firstPing.ts >= 0, 'active heartbeat timestamp is a safe non-negative integer');
+    assert(/^[A-Za-z0-9_-]{16,64}$/.test(firstPing.nonce), 'active heartbeat nonce is bounded and opaque');
+
+    socket.receive({ type: 'mcp:pong', ts: -1, nonce: firstPing.nonce });
+    assertEqual(client._delegationHeartbeatNonce, firstPing.nonce, 'invalid pong timestamp cannot acknowledge the outstanding beat');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: firstPing.nonce, extra: true });
+    assertEqual(client._delegationHeartbeatNonce, firstPing.nonce, 'extra pong fields fail closed without acknowledging the beat');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: 'w'.repeat(16) });
+    assertEqual(client._delegationHeartbeatNonce, firstPing.nonce, 'wrong nonce pong cannot acknowledge the outstanding beat');
+    heartbeatTimer.fn();
+    const secondPing = JSON.parse(socket.sent[socket.sent.length - 1]);
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 1, 'an unacknowledged current nonce increments misses once');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: firstPing.nonce });
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 1, 'stale pong cannot reset the miss counter');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: secondPing.nonce });
+    const acknowledged = client.getDelegationConnectionSnapshot();
+    assertEqual(acknowledged.consecutiveMisses, 0, 'exact current nonce pong resets misses');
+    assertEqual(acknowledged.state, 'connected', 'exact current nonce pong publishes connected');
+    assert(Number.isSafeInteger(acknowledged.lastAckAt), 'exact current nonce pong records an acknowledgement timestamp');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: secondPing.nonce });
+    assertEqual(client._delegationHeartbeatNonce, null, 'duplicate pong is ignored after acknowledgement');
+
+    heartbeatTimer.fn();
+    const boundaryPing = JSON.parse(socket.sent[socket.sent.length - 1]);
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: boundaryPing.nonce });
+    heartbeatTimer.fn();
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 0, 'ack at the heartbeat boundary prevents a false miss');
+
+    assertEqual(client.releaseDelegationHeartbeat('owner-a'), true, 'staggered release removes the first owner');
+    assertEqual(activeIntervals(harness, 20000).length, 1, 'one remaining owner keeps the shared heartbeat alive');
+    assertEqual(client.releaseDelegationHeartbeat('owner-a'), false, 'duplicate release is idempotent');
+    assertEqual(client.releaseDelegationHeartbeat('owner-b'), true, 'final owner release reaches zero');
+    assertEqual(activeIntervals(harness, 20000).length, 0, 'one-to-zero release clears the acknowledged heartbeat');
+    assertEqual(activeIntervals(harness, 25000).length, 1, 'one-to-zero release restores ordinary bridge keepalive');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    client.retainDelegationHeartbeat('three-miss-owner');
+    const heartbeatTimer = activeIntervals(harness, 20000)[0];
+
+    heartbeatTimer.fn();
+    heartbeatTimer.fn();
+    assertDeepEqual(toPlainObject(client.getDelegationConnectionSnapshot()), {
+      state: 'connected',
+      consecutiveMisses: 1,
+      lastAckAt: null
+    }, 'one missed acknowledgement remains connected');
+    heartbeatTimer.fn();
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 2, 'exactly two consecutive misses remain below disconnect threshold');
+    assertEqual(client.getDelegationConnectionSnapshot().state, 'connected', 'exactly two consecutive misses remain connected');
+    const staleNonce = JSON.parse(socket.sent[socket.sent.length - 1]).nonce;
+    heartbeatTimer.fn();
+    const currentPing = JSON.parse(socket.sent[socket.sent.length - 1]);
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 3, 'third consecutive unacknowledged beat is counted');
+    assertEqual(client.getDelegationConnectionSnapshot().state, 'disconnected', 'three consecutive missed acknowledgements classify disconnected');
+
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: staleNonce });
+    assertEqual(client.getDelegationConnectionSnapshot().state, 'disconnected', 'stale acknowledgement cannot revive a disconnected classification');
+    socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: currentPing.nonce });
+    assertEqual(client.getDelegationConnectionSnapshot().state, 'connected', 'later exact current acknowledgement may return to connected');
+    assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 0, 'later exact current acknowledgement clears misses without replay');
+    assert(socket.sent.every((raw) => JSON.parse(raw).type === 'mcp:ping'), 'heartbeat recovery sends no restart or work-replay frame');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const firstSocket = harness.sockets[0];
+    firstSocket.open();
+    client.retainDelegationHeartbeat('reconnect-owner');
+    const firstTimer = activeIntervals(harness, 20000)[0];
+    firstTimer.fn();
+    firstSocket.close();
+    assertEqual(activeIntervals(harness, 20000).length, 0, 'socket close clears the acknowledged heartbeat timer');
+    assertEqual(client.getDelegationConnectionSnapshot().state, 'disconnected', 'socket close publishes disconnected heartbeat state');
+
+    const reconnectTimer = harness.timers.timeouts.find((timer) => !timer.cleared && timer.delay >= 2000);
+    reconnectTimer.fn();
+    await flushMicrotasks();
+    const replacement = harness.sockets[1];
+    replacement.open();
+    assertEqual(activeIntervals(harness, 20000).length, 1, 'reconnect with a retained owner starts one replacement heartbeat timer');
+    assertEqual(activeIntervals(harness, 25000).length, 0, 'reconnect with a retained owner does not also start ordinary keepalive');
+    assertEqual(replacement.sent.length, 0, 'reconnect does not replay an outstanding beat or delegated work');
+  }
+}
+
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
@@ -1053,6 +1185,7 @@ async function run() {
   await runExtRequestLifecycleCases();
   await runAsyncExtObserverCases();
   runAsyncObserverSourceShapeCase();
+  await runDelegationHeartbeatCases();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

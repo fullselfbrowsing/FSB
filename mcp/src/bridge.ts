@@ -71,6 +71,10 @@ const BRIDGE_DISCONNECT_MESSAGES = new Set<string>([
   'Lost connection to hub',
 ]);
 
+const HEARTBEAT_NONCE_MIN_LENGTH = 16;
+const HEARTBEAT_NONCE_MAX_LENGTH = 64;
+const HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export function isBridgeDisconnectError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return BRIDGE_DISCONNECT_MESSAGES.has(msg);
@@ -775,10 +779,14 @@ export class WebSocketBridge {
     try {
       parsed = JSON.parse(raw) as Record<string, unknown>;
       if (parsed.type === 'mcp:ping') {
+        const heartbeat = this._parseHeartbeatPing(parsed);
+        if (!heartbeat) return;
         const heartbeatAt = Date.now();
         this.lastExtensionHeartbeatAt = heartbeatAt;
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'mcp:pong', ts: heartbeatAt }));
+          ws.send(JSON.stringify(heartbeat.nonce === undefined
+            ? { type: 'mcp:pong', ts: heartbeatAt }
+            : { type: 'mcp:pong', ts: heartbeatAt, nonce: heartbeat.nonce }));
         }
         this._broadcastRelayState();
         return;
@@ -847,6 +855,36 @@ export class WebSocketBridge {
       }
       this.messageOrigin.delete(resp.id);
     }
+  }
+
+  private _parseHeartbeatPing(
+    value: Record<string, unknown>,
+  ): { nonce?: string } | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const keys = Object.keys(value).sort();
+    const hasNonce = Object.prototype.hasOwnProperty.call(value, 'nonce');
+    if (
+      keys.length !== (hasNonce ? 3 : 2)
+      || keys[0] !== (hasNonce ? 'nonce' : 'ts')
+      || keys[hasNonce ? 1 : 0] !== 'ts'
+      || keys[hasNonce ? 2 : 1] !== 'type'
+      || value.type !== 'mcp:ping'
+      || typeof value.ts !== 'number'
+      || !Number.isSafeInteger(value.ts)
+      || value.ts < 0
+    ) {
+      return null;
+    }
+    if (!hasNonce) return {};
+    if (
+      typeof value.nonce !== 'string'
+      || value.nonce.length < HEARTBEAT_NONCE_MIN_LENGTH
+      || value.nonce.length > HEARTBEAT_NONCE_MAX_LENGTH
+      || !HEARTBEAT_NONCE_PATTERN.test(value.nonce)
+    ) {
+      return null;
+    }
+    return { nonce: value.nonce };
   }
 
   private _isCurrentExtAuthority(ws: WsWebSocket): boolean {

@@ -14,6 +14,8 @@ async function run() {
     makeExtError,
     parseExtFrame,
   } = await import(protocolUrl);
+  const bridgeUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'bridge.js')).href;
+  const { WebSocketBridge } = await import(bridgeUrl);
 
   const validFrames = [
     { id: 'request-1', type: 'ext:request', method: 'bridge.ping', payload: { value: 1 } },
@@ -158,6 +160,56 @@ async function run() {
     ['unknown', 'agent-spawn', 'agent-spawn'].filter((capability) => capability === 'agent-spawn'),
   )];
   assert.deepStrictEqual(normalizedCapabilities, ['agent-spawn'], 'closed capability normalization drops unknown and duplicate values');
+
+  const heartbeatBridge = new WebSocketBridge({ instanceId: 'heartbeat-contract' });
+  const heartbeatSocket = {
+    readyState: 1,
+    sent: [],
+    send(raw) { this.sent.push(raw); },
+  };
+  const sendHeartbeat = (frame) => {
+    heartbeatSocket.sent.length = 0;
+    heartbeatBridge._handleExtensionMessage(heartbeatSocket, JSON.stringify(frame));
+    return heartbeatSocket.sent.map((raw) => JSON.parse(raw));
+  };
+
+  const legacyPongs = sendHeartbeat({ type: 'mcp:ping', ts: 1234567890 });
+  assert.strictEqual(legacyPongs.length, 1, 'legacy nonce-absent ping still receives one pong');
+  assert.deepStrictEqual(Object.keys(legacyPongs[0]).sort(), ['ts', 'type'], 'legacy pong shape remains nonce-free');
+  assert.strictEqual(legacyPongs[0].type, 'mcp:pong');
+  assert.ok(Number.isSafeInteger(legacyPongs[0].ts) && legacyPongs[0].ts >= 0, 'legacy pong uses a safe daemon timestamp');
+
+  for (const nonce of ['a'.repeat(16), 'A0_-'.repeat(16)]) {
+    const pongs = sendHeartbeat({ type: 'mcp:ping', ts: 1234567890, nonce });
+    assert.strictEqual(pongs.length, 1, `bounded nonce length ${nonce.length} receives one pong`);
+    assert.deepStrictEqual(Object.keys(pongs[0]).sort(), ['nonce', 'ts', 'type'], 'nonce pong has the exact three-key shape');
+    assert.strictEqual(pongs[0].type, 'mcp:pong');
+    assert.strictEqual(pongs[0].nonce, nonce, 'daemon echoes the validated heartbeat nonce byte-for-byte');
+  }
+
+  const malformedHeartbeats = [
+    { type: 'mcp:ping' },
+    { type: 'mcp:ping', ts: -1 },
+    { type: 'mcp:ping', ts: 1.5 },
+    { type: 'mcp:ping', ts: Number.MAX_SAFE_INTEGER + 1 },
+    { type: 'mcp:ping', ts: '123' },
+    { type: 'mcp:ping', ts: 123, nonce: 'a'.repeat(15) },
+    { type: 'mcp:ping', ts: 123, nonce: 'a'.repeat(65) },
+    { type: 'mcp:ping', ts: 123, nonce: 'valid_length_but!' },
+    { type: 'mcp:ping', ts: 123, nonce: null },
+    { type: 'mcp:ping', ts: 123, extra: true },
+    { type: 'mcp:ping', ts: 123, nonce: 'a'.repeat(16), extra: true },
+  ];
+  for (const frame of malformedHeartbeats) {
+    assert.deepStrictEqual(sendHeartbeat(frame), [], `closed heartbeat parser drops malformed frame: ${JSON.stringify(frame)}`);
+  }
+
+  const authorityCanary = 'authority_canary_01';
+  const canaryPong = sendHeartbeat({ type: 'mcp:ping', ts: 123, nonce: authorityCanary });
+  assert.strictEqual(canaryPong[0].nonce, authorityCanary, 'nonce is used only as the echoed acknowledgement token');
+  assert.ok(!JSON.stringify(heartbeatBridge).includes(authorityCanary), 'heartbeat nonce is never retained in daemon topology state');
+  assert.strictEqual(heartbeatBridge.pendingRequests.has(authorityCanary), false, 'heartbeat nonce never becomes a request id');
+  assert.strictEqual(heartbeatBridge.messageOrigin.has(authorityCanary), false, 'heartbeat nonce never acquires routing authority');
 
   console.log('mcp-reverse-channel-contract: all assertions passed');
 }

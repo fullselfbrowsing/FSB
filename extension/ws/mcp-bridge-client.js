@@ -23,6 +23,11 @@ const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
 const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
 const MCP_PING_INTERVAL_MS = 25000;
+const DELEGATION_HEARTBEAT_INTERVAL_MS = 20000;
+const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;
+const DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH = 16;
+const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
+const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
 const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
@@ -49,6 +54,13 @@ class MCPBridgeClient {
     this._reconnectDelay = MCP_RECONNECT_BASE_MS;
     this._reconnectTimer = null;
     this._pingTimer = null;
+    this._delegationHeartbeatTimer = null;
+    this._delegationHeartbeatOwners = new Set();
+    this._delegationHeartbeatNonce = null;
+    this._delegationHeartbeatNonceCounter = 0;
+    this._delegationHeartbeatConsecutiveMisses = 0;
+    this._delegationHeartbeatLastAckAt = null;
+    this._delegationConnectionState = 'disconnected';
     this._intentionalClose = false;
     this._connected = false;
     this._status = 'idle';
@@ -97,6 +109,7 @@ class MCPBridgeClient {
       lastConnectedAt: this._lastConnectedAt,
       lastDisconnectedAt: this._lastDisconnectedAt,
       lastDisconnectReason: this._lastDisconnectReason,
+      delegationConnection: this.getDelegationConnectionSnapshot(),
       updatedAt: this._timestamp()
     };
   }
@@ -155,8 +168,15 @@ class MCPBridgeClient {
       this._lastConnectedAt = this._timestamp();
       this._lastDisconnectReason = null;
       this._clearReconnectAlarm();
+      this._delegationHeartbeatNonce = null;
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = 'connected';
       this._persistState();
-      this._startPing();
+      if (this._delegationHeartbeatOwners.size > 0) {
+        this._startDelegationHeartbeat();
+      } else {
+        this._startPing();
+      }
       // Phase 241 D-08 -- mint a fresh connection_id at onopen.
       // crypto.randomUUID is available in MV3 service workers and Node 18+.
       // The defensive fallback ensures the bridge never throws even if the
@@ -249,6 +269,9 @@ class MCPBridgeClient {
       }
       this._persistState();
       this._stopPing();
+      this._stopDelegationHeartbeat();
+      this._delegationConnectionState = 'disconnected';
+      this._persistState();
       this._notifySocketWaiters('close', socket);
       if (!this._intentionalClose && !wasReplacement) {
         this._scheduleReconnect();
@@ -268,6 +291,7 @@ class MCPBridgeClient {
   disconnect() {
     this._intentionalClose = true;
     this._stopPing();
+    this._stopDelegationHeartbeat();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
@@ -282,6 +306,7 @@ class MCPBridgeClient {
     this._status = 'disconnected';
     this._lastDisconnectedAt = this._timestamp();
     this._lastDisconnectReason = 'intentional_close';
+    this._delegationConnectionState = 'disconnected';
     this._nextReconnectAt = null;
     this._persistState();
   }
@@ -761,6 +786,7 @@ class MCPBridgeClient {
 
   _startPing() {
     this._stopPing();
+    if (this._delegationHeartbeatOwners.size > 0) return;
     this._pingTimer = setInterval(() => {
       if (this._ws && this._ws.readyState === WebSocket.OPEN) {
         this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
@@ -773,6 +799,124 @@ class MCPBridgeClient {
       clearInterval(this._pingTimer);
       this._pingTimer = null;
     }
+  }
+
+  _isValidDelegationHeartbeatOwner(ownerId) {
+    return typeof ownerId === 'string'
+      && ownerId.length > 0
+      && ownerId.length <= 200
+      && ownerId.trim() === ownerId;
+  }
+
+  _isValidDelegationHeartbeatNonce(nonce) {
+    return typeof nonce === 'string'
+      && nonce.length >= DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH
+      && nonce.length <= DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH
+      && DELEGATION_HEARTBEAT_NONCE_PATTERN.test(nonce);
+  }
+
+  _mintDelegationHeartbeatNonce() {
+    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID().replace(/-/g, '');
+    }
+    this._delegationHeartbeatNonceCounter += 1;
+    const entropy = Math.random().toString(36).slice(2);
+    return `${Date.now().toString(36)}_${this._delegationHeartbeatNonceCounter.toString(36)}_${entropy}`
+      .padEnd(DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH, '0')
+      .slice(0, DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH);
+  }
+
+  getDelegationConnectionSnapshot() {
+    return {
+      state: this._delegationConnectionState,
+      consecutiveMisses: this._delegationHeartbeatConsecutiveMisses,
+      lastAckAt: this._delegationHeartbeatLastAckAt,
+    };
+  }
+
+  retainDelegationHeartbeat(ownerId) {
+    if (!this._isValidDelegationHeartbeatOwner(ownerId)) return false;
+    if (this._delegationHeartbeatOwners.has(ownerId)) return false;
+    const wasEmpty = this._delegationHeartbeatOwners.size === 0;
+    this._delegationHeartbeatOwners.add(ownerId);
+    if (wasEmpty) {
+      this._stopPing();
+      this._delegationHeartbeatNonce = null;
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = this._connected ? 'connected' : 'disconnected';
+      this._startDelegationHeartbeat();
+      this._persistState();
+    }
+    return true;
+  }
+
+  releaseDelegationHeartbeat(ownerId) {
+    if (!this._isValidDelegationHeartbeatOwner(ownerId)) return false;
+    if (!this._delegationHeartbeatOwners.delete(ownerId)) return false;
+    if (this._delegationHeartbeatOwners.size === 0) {
+      this._stopDelegationHeartbeat();
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = this._connected ? 'connected' : 'disconnected';
+      if (this._connected) this._startPing();
+      this._persistState();
+    }
+    return true;
+  }
+
+  _startDelegationHeartbeat() {
+    if (this._delegationHeartbeatTimer || this._delegationHeartbeatOwners.size === 0) return;
+    this._delegationHeartbeatTimer = setInterval(
+      () => this._delegationHeartbeatTick(),
+      DELEGATION_HEARTBEAT_INTERVAL_MS,
+    );
+  }
+
+  _stopDelegationHeartbeat() {
+    if (this._delegationHeartbeatTimer) {
+      clearInterval(this._delegationHeartbeatTimer);
+      this._delegationHeartbeatTimer = null;
+    }
+    this._delegationHeartbeatNonce = null;
+  }
+
+  _delegationHeartbeatTick() {
+    if (this._delegationHeartbeatOwners.size === 0) {
+      this._stopDelegationHeartbeat();
+      return;
+    }
+    if (this._delegationHeartbeatNonce !== null) {
+      this._delegationHeartbeatConsecutiveMisses += 1;
+      this._delegationHeartbeatNonce = null;
+      if (this._delegationHeartbeatConsecutiveMisses >= DELEGATION_HEARTBEAT_MISS_LIMIT) {
+        this._delegationConnectionState = 'disconnected';
+      }
+      this._persistState();
+    }
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+
+    const nonce = this._mintDelegationHeartbeatNonce();
+    if (!this._isValidDelegationHeartbeatNonce(nonce)) return;
+    this._delegationHeartbeatNonce = nonce;
+    try {
+      this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now(), nonce }));
+    } catch (_error) {
+      // The outstanding nonce is counted as missed on the next heartbeat.
+    }
+  }
+
+  _handleDelegationHeartbeatPong(msg) {
+    if (!this._isPlainRecord(msg)) return;
+    const keys = Object.keys(msg).sort();
+    if (keys.length !== 3 || keys[0] !== 'nonce' || keys[1] !== 'ts' || keys[2] !== 'type') return;
+    if (msg.type !== 'mcp:pong' || !Number.isSafeInteger(msg.ts) || msg.ts < 0) return;
+    if (!this._isValidDelegationHeartbeatNonce(msg.nonce)) return;
+    if (msg.nonce !== this._delegationHeartbeatNonce) return;
+
+    this._delegationHeartbeatNonce = null;
+    this._delegationHeartbeatConsecutiveMisses = 0;
+    this._delegationHeartbeatLastAckAt = Date.now();
+    this._delegationConnectionState = 'connected';
+    this._persistState();
   }
 
   // --------------------------------------------------------------------------
@@ -812,8 +956,10 @@ class MCPBridgeClient {
       return;
     }
 
-    // Ignore pong responses
-    if (msg.type === 'mcp:pong') return;
+    if (msg.type === 'mcp:pong') {
+      this._handleDelegationHeartbeatPong(msg);
+      return;
+    }
 
     const { id, type, payload } = msg;
     if (!id || !type) return;
