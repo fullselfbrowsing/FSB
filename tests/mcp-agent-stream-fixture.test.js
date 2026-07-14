@@ -1,69 +1,48 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 const { pathToFileURL } = require('url');
 
 const repoRoot = path.resolve(__dirname, '..');
 const streamBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-stream.js');
+const fixtureDir = path.join(
+  repoRoot,
+  'tests',
+  'fixtures',
+  'agent-streams',
+  'claude-code-2.1.177',
+);
+const manifestPath = path.join(fixtureDir, 'manifest.json');
+const fixturePath = path.join(fixtureDir, 'contract-stream.jsonl');
 
-const sessionId = 'session_fixture_01';
+const manifestText = fs.readFileSync(manifestPath, 'utf8');
+const fixtureText = fs.readFileSync(fixturePath, 'utf8');
+const manifest = JSON.parse(manifestText);
+const fixtureLines = fixtureText.trimEnd().split(/\r?\n/).map((line) => JSON.parse(line));
+const fixtureBytes = Buffer.from(fixtureText, 'utf8');
+const sessionId = fixtureLines[0].session_id;
 
-function baselineLines() {
-  return [
-    {
-      type: 'system',
-      subtype: 'init',
-      session_id: sessionId,
-      tools: ['mcp__fsb__search_capabilities', 'mcp__fsb__invoke_capability'],
-      mcp_servers: [{ name: 'fsb', status: 'connected' }],
-      plugins: [],
-      hooks: [],
-      model: 'fixture-model',
-    },
-    {
-      type: 'assistant',
-      session_id: sessionId,
-      message: {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'fixture text' },
-          { type: 'tool_use', id: 'tool_01', name: 'mcp__fsb__search_capabilities', input: { query: 'fixture' } },
-        ],
-      },
-    },
-    {
-      type: 'stream_event',
-      session_id: sessionId,
-      event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'delta' } },
-    },
-    {
-      type: 'user',
-      session_id: sessionId,
-      message: {
-        role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: 'tool_01', content: 'fixture result' }],
-      },
-    },
-    {
-      type: 'system',
-      subtype: 'api_retry',
-      session_id: sessionId,
-      attempt: 1,
-      max_retries: 3,
-      retry_delay_ms: 250,
-      error: 'rate_limit',
-    },
-    {
-      type: 'result',
-      subtype: 'success',
-      session_id: sessionId,
-      is_error: false,
-      num_turns: 2,
-      usage: { input_tokens: 10, output_tokens: 20 },
-    },
-  ];
+const MANIFEST_KEYS = [
+  'expectedSequence',
+  'fixture',
+  'liveCapturePending',
+  'milestoneEndTask',
+  'profileVersion',
+  'provenance',
+  'recordedProvenanceRequirement',
+  'recordedProvenanceStatus',
+  'sanitization',
+  'sanitized',
+  'schemaVersion',
+  'sourceDocs',
+  'terminalLabel',
+];
+
+function cloneFixtureLines() {
+  return JSON.parse(JSON.stringify(fixtureLines));
 }
 
 function encode(lines, trailingNewline = true, separator = '\n') {
@@ -77,19 +56,94 @@ async function collect(parseClaudeEvents, chunks) {
   return events;
 }
 
-async function expectDrift(parseClaudeEvents, chunks, reason) {
-  await assert.rejects(
-    () => collect(parseClaudeEvents, chunks),
-    (error) => {
-      assert.strictEqual(error.code, 'agent_protocol_drift');
-      assert.strictEqual(error.reason, reason);
-      assert.doesNotMatch(error.message, /TOP_SECRET_SENTINEL/);
-      return true;
-    },
+async function observeFailure(parseClaudeEvents, chunks) {
+  const events = [];
+  let failure = null;
+  try {
+    for await (const event of parseClaudeEvents(Readable.from(chunks))) events.push(event);
+  } catch (error) {
+    failure = error;
+  }
+  assert(failure, 'negative case must reject');
+  return { events, failure };
+}
+
+async function expectDrift(parseClaudeEvents, chunks, reason, eventIndex) {
+  const { events, failure } = await observeFailure(parseClaudeEvents, chunks);
+  assert.strictEqual(failure.code, 'agent_protocol_drift');
+  assert.strictEqual(failure.reason, reason);
+  if (eventIndex !== undefined) assert.strictEqual(failure.eventIndex, eventIndex);
+  assert.doesNotMatch(failure.message, /TOP_SECRET_SENTINEL/);
+  assert.doesNotMatch(JSON.stringify(failure.issuePaths), /TOP_SECRET_SENTINEL/);
+  assert.strictEqual(
+    events.filter((event) => event.type === 'result').length,
+    0,
+    `negative ${reason} case emitted terminal success`,
   );
+  return { events, failure };
+}
+
+function deletePath(value, dottedPath) {
+  const parts = dottedPath.split('.');
+  const leaf = parts.pop();
+  let cursor = value;
+  for (const part of parts) cursor = cursor[Number.isInteger(Number(part)) ? Number(part) : part];
+  delete cursor[leaf];
+}
+
+function assertManifestAndSanitization() {
+  assert.deepStrictEqual(Object.keys(manifest).sort(), MANIFEST_KEYS);
+  assert.strictEqual(manifest.schemaVersion, 1);
+  assert.strictEqual(manifest.fixture, 'contract-stream.jsonl');
+  assert.strictEqual(manifest.profileVersion, '2.1.177');
+  assert.strictEqual(manifest.provenance, 'schema-derived-contract');
+  assert.strictEqual(manifest.liveCapturePending, true);
+  assert.strictEqual(manifest.recordedProvenanceStatus, 'human_needed');
+  assert.strictEqual(manifest.recordedProvenanceRequirement, 'CLAUDE-03/D-27');
+  assert.strictEqual(manifest.sanitized, true);
+  assert.deepStrictEqual(manifest.sanitization, {
+    syntheticIdentifiers: true,
+    containsRealPrompt: false,
+    containsBrowserContent: false,
+    containsCredentials: false,
+    containsFilesystemPaths: false,
+  });
+  assert.strictEqual(manifest.terminalLabel, 'success');
+  assert.deepStrictEqual(manifest.expectedSequence, [
+    'init',
+    'assistant',
+    'tool_use',
+    'assistant_delta',
+    'user',
+    'tool_result',
+    'retry',
+    'result',
+  ]);
+  assert.deepStrictEqual(manifest.sourceDocs, [
+    'https://code.claude.com/docs/en/headless',
+    'https://code.claude.com/docs/en/cli-usage',
+  ]);
+  assert.match(manifest.milestoneEndTask, /milestone-end UAT gate/);
+  assert.match(manifest.milestoneEndTask, /genuine sanitized Claude Code 2\.1\.177 stream/);
+  assert.match(manifest.milestoneEndTask, /keep liveCapturePending true/);
+  assert.doesNotMatch(manifestText, /live recording|captured output/i);
+
+  const combined = `${manifestText}\n${fixtureText}`;
+  assert.doesNotMatch(combined, /\/(?:Users|home)\//);
+  assert.doesNotMatch(combined, /[A-Za-z]:\\/);
+  assert.doesNotMatch(combined, /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/);
+  assert.doesNotMatch(combined, /[?&](?:access_token|auth|key|secret|token)=/i);
+  assert.doesNotMatch(combined, /\b(?:sk-ant|sk-proj|AKIA)[A-Za-z0-9_-]*/);
+  assert.doesNotMatch(fixtureText, /\b(?:oauth|password|passwd|cvv|cvc|pan)\b/i);
+  assert.doesNotMatch(fixtureText, /\b\d{13,19}\b/);
+  assert.doesNotMatch(fixtureText, /https?:\/\//);
+  assert(fixtureText.endsWith('\n'), 'contract fixture must have one terminal newline');
+  assert.strictEqual(fixtureLines.length, 6);
 }
 
 async function run() {
+  assertManifestAndSanitization();
+
   const {
     CLAUDE_STREAM_LINE_LIMIT_BYTES,
     AgentProtocolDriftError,
@@ -99,116 +153,182 @@ async function run() {
   assert.strictEqual(CLAUDE_STREAM_LINE_LIMIT_BYTES, 256 * 1024);
   assert.strictEqual(new AgentProtocolDriftError('invalid_json', 1).code, 'agent_protocol_drift');
 
-  const baseline = encode(baselineLines());
-  const events = await collect(parseClaudeEvents, [baseline]);
-  assert.deepStrictEqual(
-    events.map((event) => event.type),
-    ['init', 'assistant', 'tool_use', 'assistant_delta', 'user', 'tool_result', 'retry', 'result'],
-  );
+  // EV-01: the checked-in artifact is a schema-derived contract, not recorded provenance.
+  const events = await collect(parseClaudeEvents, [fixtureBytes]);
+  assert.deepStrictEqual(events.map((event) => event.type), manifest.expectedSequence);
+  assert.strictEqual(events.filter((event) => event.type === 'result').length, 1);
+  assert.strictEqual(events.at(-1).payload.subtype, manifest.terminalLabel);
+  assert.strictEqual(events.at(-1).payload.is_error, false);
   for (const event of events) {
     assert.deepStrictEqual(Object.keys(event).sort(), ['payload', 'sessionId', 'type']);
     assert.strictEqual(event.sessionId, sessionId);
     assert(Object.isFrozen(event));
     assert(Object.isFrozen(event.payload));
   }
-  assert.strictEqual(events[0].payload.model, 'fixture-model', 'compatible fields survive in payload');
+  assert.strictEqual(events[0].payload.model, 'synthetic-model');
 
-  const finalWithoutNewline = await collect(parseClaudeEvents, [encode(baselineLines(), false)]);
-  assert.deepStrictEqual(finalWithoutNewline.map((event) => event.type), events.map((event) => event.type));
-
-  const crlf = await collect(parseClaudeEvents, [encode(baselineLines(), true, '\r\n')]);
-  assert.deepStrictEqual(crlf.map((event) => event.type), events.map((event) => event.type));
-
-  const emojiLines = baselineLines();
-  emojiLines[1].message.content[0].text = 'split emoji 🙂 boundary';
-  const emojiBytes = encode(emojiLines);
-  const emojiStart = emojiBytes.indexOf(Buffer.from('🙂'));
-  const splitUtf8 = await collect(parseClaudeEvents, [
-    emojiBytes.subarray(0, emojiStart + 1),
-    emojiBytes.subarray(emojiStart + 1, emojiStart + 3),
-    emojiBytes.subarray(emojiStart + 3),
+  // EV-02: every fixture byte boundary, including the interior of µ, is invariant.
+  for (let split = 1; split < fixtureBytes.length; split += 1) {
+    const splitEvents = await collect(parseClaudeEvents, [
+      fixtureBytes.subarray(0, split),
+      fixtureBytes.subarray(split),
+    ]);
+    assert.deepStrictEqual(splitEvents, events, `byte split ${split} changed normalization`);
+  }
+  const multibyteStart = fixtureBytes.indexOf(Buffer.from('µ'));
+  assert(multibyteStart > 0);
+  const multibyteEvents = await collect(parseClaudeEvents, [
+    fixtureBytes.subarray(0, multibyteStart + 1),
+    fixtureBytes.subarray(multibyteStart + 1),
   ]);
-  assert.deepStrictEqual(splitUtf8.map((event) => event.type), events.map((event) => event.type));
+  assert.deepStrictEqual(multibyteEvents, events);
 
-  for (const split of [1, 7, 31, Math.floor(baseline.length / 2), baseline.length - 1]) {
-    const splitEvents = await collect(parseClaudeEvents, [baseline.subarray(0, split), baseline.subarray(split)]);
-    assert.deepStrictEqual(splitEvents.map((event) => event.type), events.map((event) => event.type));
+  // EV-03: the final result is emitted once even without a terminal newline.
+  const finalWithoutNewline = await collect(parseClaudeEvents, [Buffer.from(fixtureText.trimEnd())]);
+  assert.deepStrictEqual(finalWithoutNewline, events);
+  const crlf = await collect(parseClaudeEvents, [Buffer.from(fixtureText.replaceAll('\n', '\r\n'))]);
+  assert.deepStrictEqual(crlf, events);
+
+  // EV-04: compatible additions survive inside payload while the outer envelope stays closed.
+  const extraLines = cloneFixtureLines();
+  extraLines.forEach((line, index) => { line.compatible_extra = `synthetic-extra-${index}`; });
+  extraLines[1].message.content[1].compatible_extra = 'synthetic-tool-extra';
+  extraLines[3].message.content[0].compatible_extra = 'synthetic-result-extra';
+  const extraEvents = await collect(parseClaudeEvents, [encode(extraLines)]);
+  const primaryTypes = ['init', 'assistant', 'assistant_delta', 'user', 'retry', 'result'];
+  primaryTypes.forEach((type, index) => {
+    assert.strictEqual(
+      extraEvents.find((event) => event.type === type).payload.compatible_extra,
+      `synthetic-extra-${index}`,
+    );
+  });
+  assert.strictEqual(
+    extraEvents.find((event) => event.type === 'tool_use').payload.compatible_extra,
+    'synthetic-tool-extra',
+  );
+  assert.strictEqual(
+    extraEvents.find((event) => event.type === 'tool_result').payload.compatible_extra,
+    'synthetic-result-extra',
+  );
+  for (const event of extraEvents) {
+    assert.deepStrictEqual(Object.keys(event).sort(), ['payload', 'sessionId', 'type']);
   }
 
-  const unknownTop = baselineLines();
+  // EV-05/06: unknown and customization events have exact fail-loud labels.
+  const unknownTop = cloneFixtureLines();
   unknownTop[1] = { type: 'TOP_SECRET_SENTINEL' };
-  await expectDrift(parseClaudeEvents, [encode(unknownTop)], 'unknown_event_type');
+  await expectDrift(parseClaudeEvents, [encode(unknownTop)], 'unknown_event_type', 2);
 
-  const unknownSystem = baselineLines();
-  unknownSystem[1] = { type: 'system', subtype: 'hook_started', detail: 'TOP_SECRET_SENTINEL' };
-  await expectDrift(parseClaudeEvents, [encode(unknownSystem)], 'configuration_surface');
+  const unknownSystem = cloneFixtureLines();
+  unknownSystem[1] = { type: 'system', subtype: 'status', detail: 'TOP_SECRET_SENTINEL' };
+  await expectDrift(parseClaudeEvents, [encode(unknownSystem)], 'unknown_system_subtype', 2);
 
-  const unsupportedSystem = baselineLines();
-  unsupportedSystem[1] = { type: 'system', subtype: 'status', detail: 'TOP_SECRET_SENTINEL' };
-  await expectDrift(parseClaudeEvents, [encode(unsupportedSystem)], 'unknown_system_subtype');
+  const preInitHook = cloneFixtureLines();
+  preInitHook[0] = { type: 'system', subtype: 'hook_started', detail: 'TOP_SECRET_SENTINEL' };
+  await expectDrift(parseClaudeEvents, [encode(preInitHook)], 'configuration_surface', 1);
 
-  const preInitPlugin = baselineLines();
+  const preInitPlugin = cloneFixtureLines();
   preInitPlugin[0] = { type: 'plugin_progress', detail: 'TOP_SECRET_SENTINEL' };
-  await expectDrift(parseClaudeEvents, [encode(preInitPlugin)], 'configuration_surface');
+  await expectDrift(parseClaudeEvents, [encode(preInitPlugin)], 'configuration_surface', 1);
 
-  const badInit = baselineLines();
-  badInit[0].tools = ['Bash'];
-  await expectDrift(parseClaudeEvents, [encode(badInit)], 'configuration_surface');
+  // Init attestation rejects every non-FSB or customization surface before browser-ready state.
+  const initMutations = [
+    ['built-in tool', (lines) => { lines[0].tools = ['Bash']; }],
+    ['empty tools', (lines) => { lines[0].tools = []; }],
+    ['missing FSB server', (lines) => { lines[0].mcp_servers = []; }],
+    ['extra MCP server', (lines) => { lines[0].mcp_servers.push({ name: 'other' }); }],
+    ['loaded plugin', (lines) => { lines[0].plugins = ['synthetic-plugin']; }],
+    ['loaded hook', (lines) => { lines[0].hooks = ['synthetic-hook']; }],
+    ['failed FSB server', (lines) => { lines[0].mcp_servers[0].status = 'failed'; }],
+  ];
+  for (const [label, mutate] of initMutations) {
+    const lines = cloneFixtureLines();
+    mutate(lines);
+    const outcome = await expectDrift(parseClaudeEvents, [encode(lines)], 'configuration_surface', 1);
+    assert.strictEqual(outcome.events.length, 0, `${label} escaped before init attestation`);
+  }
 
-  const emptyTools = baselineLines();
-  emptyTools[0].tools = [];
-  await expectDrift(parseClaudeEvents, [encode(emptyTools)], 'configuration_surface');
+  // EV-07: each recognized shape loses one required field and fails at its exact line.
+  const missingFields = [
+    [0, 'session_id'],
+    [0, 'tools'],
+    [0, 'mcp_servers'],
+    [1, 'session_id'],
+    [1, 'message'],
+    [1, 'message.content'],
+    [1, 'message.content.1.id'],
+    [2, 'session_id'],
+    [2, 'event'],
+    [2, 'event.type'],
+    [3, 'session_id'],
+    [3, 'message'],
+    [3, 'message.content'],
+    [3, 'message.content.0.tool_use_id'],
+    [4, 'attempt'],
+    [4, 'max_retries'],
+    [4, 'retry_delay_ms'],
+    [5, 'session_id'],
+    [5, 'subtype'],
+    [5, 'is_error'],
+  ];
+  for (const [lineIndex, field] of missingFields) {
+    const lines = cloneFixtureLines();
+    deletePath(lines[lineIndex], field);
+    await expectDrift(parseClaudeEvents, [encode(lines)], 'invalid_shape', lineIndex + 1);
+  }
 
-  const missingFsb = baselineLines();
-  missingFsb[0].mcp_servers = [];
-  await expectDrift(parseClaudeEvents, [encode(missingFsb)], 'configuration_surface');
+  const malformedPrefix = fixtureText.slice(0, fixtureText.indexOf('\n') + 1);
+  await expectDrift(
+    parseClaudeEvents,
+    [Buffer.from(`${malformedPrefix}{"type":\n`, 'utf8')],
+    'invalid_json',
+    2,
+  );
+  await expectDrift(parseClaudeEvents, [Buffer.from([0xff, 0x0a])], 'invalid_utf8', 1);
 
-  const extraMcp = baselineLines();
-  extraMcp[0].mcp_servers.push({ name: 'other', status: 'connected' });
-  await expectDrift(parseClaudeEvents, [encode(extraMcp)], 'configuration_surface');
+  const mismatchedSession = cloneFixtureLines();
+  mismatchedSession[2].session_id = 'synthetic-other-session';
+  await expectDrift(parseClaudeEvents, [encode(mismatchedSession)], 'session_mismatch', 3);
 
-  const mismatchedSession = baselineLines();
-  mismatchedSession[2].session_id = 'other_session';
-  await expectDrift(parseClaudeEvents, [encode(mismatchedSession)], 'session_mismatch');
-
-  const beforeInit = baselineLines();
+  const beforeInit = cloneFixtureLines();
   [beforeInit[0], beforeInit[1]] = [beforeInit[1], beforeInit[0]];
-  await expectDrift(parseClaudeEvents, [encode(beforeInit)], 'event_before_init');
+  await expectDrift(parseClaudeEvents, [encode(beforeInit)], 'event_before_init', 1);
 
-  const duplicateResult = baselineLines();
-  duplicateResult.push({ ...duplicateResult[duplicateResult.length - 1] });
-  await expectDrift(parseClaudeEvents, [encode(duplicateResult)], 'duplicate_result');
+  const duplicateResult = cloneFixtureLines();
+  duplicateResult.push({ ...duplicateResult.at(-1) });
+  await expectDrift(parseClaudeEvents, [encode(duplicateResult)], 'duplicate_result', 7);
+  await expectDrift(
+    parseClaudeEvents,
+    [encode(cloneFixtureLines().slice(0, -1))],
+    'missing_result',
+    6,
+  );
 
-  await expectDrift(parseClaudeEvents, [encode(baselineLines().slice(0, -1))], 'missing_result');
-  const missingContent = baselineLines();
-  delete missingContent[1].message.content;
-  await expectDrift(parseClaudeEvents, [encode(missingContent)], 'invalid_shape');
-  await expectDrift(parseClaudeEvents, [Buffer.from('{"type":\n', 'utf8')], 'invalid_json');
-  await expectDrift(parseClaudeEvents, [Buffer.from([0xff, 0x0a])], 'invalid_utf8');
-
-  const exactLimitLines = baselineLines();
+  // EV-08: exact per-line limit succeeds; one byte over fails; total output is unbounded by sum.
+  const exactLimitLines = cloneFixtureLines();
   const exactLimitEvent = { ...exactLimitLines[1], padding: '' };
   const baseSize = Buffer.byteLength(JSON.stringify(exactLimitEvent));
   exactLimitEvent.padding = 'x'.repeat(CLAUDE_STREAM_LINE_LIMIT_BYTES - baseSize);
   assert.strictEqual(Buffer.byteLength(JSON.stringify(exactLimitEvent)), CLAUDE_STREAM_LINE_LIMIT_BYTES);
   exactLimitLines[1] = exactLimitEvent;
   const exactLimitEvents = await collect(parseClaudeEvents, [encode(exactLimitLines)]);
-  assert.strictEqual(exactLimitEvents.at(-1).type, 'result');
+  assert.deepStrictEqual(exactLimitEvents.map((event) => event.type), manifest.expectedSequence);
+  const exactLimitCrlfEvents = await collect(
+    parseClaudeEvents,
+    [encode(exactLimitLines, true, '\r\n')],
+  );
+  assert.deepStrictEqual(exactLimitCrlfEvents.map((event) => event.type), manifest.expectedSequence);
 
-  const oversized = Buffer.concat([
-    Buffer.from('{"type":"assistant","padding":"'),
-    Buffer.alloc(CLAUDE_STREAM_LINE_LIMIT_BYTES, 0x61),
-    Buffer.from('"}\n'),
-  ]);
-  await expectDrift(parseClaudeEvents, [oversized], 'line_too_large');
+  exactLimitEvent.padding += 'x';
+  await expectDrift(parseClaudeEvents, [encode(exactLimitLines)], 'line_too_large', 2);
 
-  const largeLines = baselineLines();
+  const largeLines = cloneFixtureLines();
   const padding = 'x'.repeat(2048);
   for (let index = 0; index < 110; index += 1) {
     largeLines.splice(largeLines.length - 1, 0, {
       type: 'assistant',
       session_id: sessionId,
-      message: { content: [{ type: 'text', text: `${index}:${padding}` }] },
+      message: { content: [{ type: 'text', text: `synthetic-${index}:${padding}` }] },
     });
   }
   const largeBytes = encode(largeLines);
@@ -222,7 +342,13 @@ async function run() {
   assert.strictEqual(largeEvents.at(-1).type, 'result');
   assert(largeEvents.length > 110);
 
+  const stderrEquivalent = Buffer.from('TOP_SECRET_SENTINEL stderr-equivalent {not-json}\n');
+  const separatedEvents = await collect(parseClaudeEvents, [fixtureBytes]);
+  assert.deepStrictEqual(separatedEvents, events);
+  assert(!JSON.stringify(separatedEvents).includes(stderrEquivalent.toString('utf8')));
+
   console.log('mcp-agent-stream-fixture.test.js: PASS');
+  console.log('CLAUDE-03 recorded provenance: human_needed (schema-derived contract only)');
 }
 
 run().catch((error) => {

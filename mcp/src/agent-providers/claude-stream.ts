@@ -192,14 +192,14 @@ function attestInit(init: z.infer<typeof InitSchema>, eventIndex: number): void 
 
 class ClaudeEventNormalizer {
   private sessionId: string | null = null;
-  private terminal = false;
+  private terminalEvent: AgentEvent | null = null;
 
   normalize(value: unknown, eventIndex: number): readonly AgentEvent[] {
     const envelope = record(value);
     if (!envelope || typeof envelope.type !== 'string') {
       throw new AgentProtocolDriftError('invalid_shape', eventIndex);
     }
-    if (this.terminal) {
+    if (this.terminalEvent) {
       throw new AgentProtocolDriftError(
         envelope.type === 'result' ? 'duplicate_result' : 'event_after_result',
         eventIndex,
@@ -225,10 +225,11 @@ class ClaudeEventNormalizer {
     }
   }
 
-  finish(nextEventIndex: number): void {
-    if (!this.terminal) {
+  finish(nextEventIndex: number): AgentEvent {
+    if (!this.terminalEvent) {
       throw new AgentProtocolDriftError('missing_result', nextEventIndex);
     }
+    return this.terminalEvent;
   }
 
   private requireSession(candidate: string | undefined, eventIndex: number): string {
@@ -300,11 +301,11 @@ class ClaudeEventNormalizer {
   }
 
   private normalizeResult(envelope: Record<string, unknown>, eventIndex: number): AgentEvent[] {
-    if (this.terminal) throw new AgentProtocolDriftError('duplicate_result', eventIndex);
+    if (this.terminalEvent) throw new AgentProtocolDriftError('duplicate_result', eventIndex);
     const result = parseShape(ResultSchema, envelope, eventIndex);
     const sessionId = this.requireSession(result.session_id, eventIndex);
-    this.terminal = true;
-    return [freezeEvent('result', sessionId, result)];
+    this.terminalEvent = freezeEvent('result', sessionId, result);
+    return [];
   }
 }
 
@@ -326,7 +327,13 @@ function decodeLine(line: Buffer, eventIndex: number): unknown {
 }
 
 function appendBounded(pending: Buffer, addition: Buffer, eventIndex: number): Buffer {
-  if (pending.length + addition.length > CLAUDE_STREAM_LINE_LIMIT_BYTES) {
+  const combinedLength = pending.length + addition.length;
+  const lastByte = addition.length > 0
+    ? addition[addition.length - 1]
+    : pending[pending.length - 1];
+  const crlfBoundaryOnly = combinedLength === CLAUDE_STREAM_LINE_LIMIT_BYTES + 1
+    && lastByte === 0x0d;
+  if (combinedLength > CLAUDE_STREAM_LINE_LIMIT_BYTES && !crlfBoundaryOnly) {
     throw new AgentProtocolDriftError('line_too_large', eventIndex);
   }
   if (pending.length === 0) return Buffer.from(addition);
@@ -374,5 +381,5 @@ export async function* parseClaudeEvents(stream: NodeJS.ReadableStream): AsyncIt
     eventIndex += 1;
   }
 
-  normalizer.finish(eventIndex);
+  yield normalizer.finish(eventIndex);
 }
