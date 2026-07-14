@@ -14,6 +14,13 @@ const runtimeBuildPath = path.join(
   'agent-providers',
   'runtime-files.js',
 );
+const processTreeBuildPath = path.join(
+  repoRoot,
+  'mcp',
+  'build',
+  'agent-providers',
+  'process-tree.js',
+);
 
 function tempRoot(label) {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), `fsb-agent-${label}-`));
@@ -427,9 +434,669 @@ async function runRuntimeFilesTests(runtimeModule) {
   }
 }
 
+function journalEntry(processTreeModule, state = 'active', overrides = {}) {
+  const binaryRealPath = '/fixture/bin/claude';
+  const argv = ['--output-format', 'stream-json', '--print'];
+  const common = {
+    state,
+    delegationId: 'delegation_fixture_0001',
+    adapterId: 'claude-code',
+    profileVersion: '2.1.177',
+    createdAt: 1000,
+    binaryRealPath,
+    argvSignature: processTreeModule.createArgvSignature(binaryRealPath, argv),
+    envFingerprint: 'env_fingerprint_fixture_0001',
+  };
+  return state === 'active'
+    ? {
+      ...common,
+      pid: 41001,
+      processGroupId: 41001,
+      startedAt: 1100,
+      processStartIdentity: '90001',
+      ...overrides,
+    }
+    : { ...common, ...overrides };
+}
+
+function linuxStat(pid, parentPid, processGroupId, startTicks, name = 'claude worker') {
+  const fields = Array(19).fill('0');
+  fields[0] = String(parentPid);
+  fields[1] = String(processGroupId);
+  fields[18] = String(startTicks);
+  return `${pid} (${name}) S ${fields.join(' ')}\n`;
+}
+
+function nullDelimited(values) {
+  return Buffer.from(`${values.join('\0')}\0`, 'utf8');
+}
+
+function linuxFixture(processes, options = {}) {
+  const processMap = new Map(processes.map((entry) => [String(entry.pid), entry]));
+  const errorPaths = new Set(options.errorPaths ?? []);
+  return {
+    exists(target) {
+      const match = target.match(/^\/proc\/(\d+)$/);
+      return match ? processMap.has(match[1]) : target === '/proc';
+    },
+    readDirectory(target, maximumEntries) {
+      assert.equal(target, '/proc');
+      const names = [...processMap.keys()];
+      return {
+        names: names.slice(0, maximumEntries),
+        truncated: options.truncated === true || names.length > maximumEntries,
+      };
+    },
+    readBoundedFile(target, maximumBytes) {
+      if (errorPaths.has(target)) throw Object.assign(new Error('fixture denied'), { code: 'EACCES' });
+      const match = target.match(/^\/proc\/(\d+)\/(stat|cmdline|environ)$/);
+      if (!match || !processMap.has(match[1])) {
+        throw Object.assign(new Error('fixture missing'), { code: 'ENOENT' });
+      }
+      const record = processMap.get(match[1]);
+      let value;
+      if (match[2] === 'stat') {
+        value = Buffer.from(linuxStat(
+          record.pid,
+          record.parentPid,
+          record.processGroupId,
+          record.startTicks,
+          record.name,
+        ));
+      } else if (match[2] === 'cmdline') {
+        value = nullDelimited(record.argv);
+      } else {
+        value = nullDelimited(record.environment ?? []);
+      }
+      assert(value.length <= maximumBytes, 'fixture obeys the requested production read cap');
+      return value;
+    },
+  };
+}
+
+function linuxRecords(entry, overrides = {}) {
+  const root = {
+    pid: 41001,
+    parentPid: 1,
+    processGroupId: 41001,
+    startTicks: '90001',
+    argv: [entry.binaryRealPath, '--output-format', 'stream-json', '--print'],
+    environment: [`FSB_AGENT_FINGERPRINT=${entry.envFingerprint}`],
+    ...overrides.root,
+  };
+  const child = {
+    pid: 41002,
+    parentPid: 41001,
+    processGroupId: 41001,
+    startTicks: '90002',
+    argv: ['/usr/bin/helper', '--worker'],
+    environment: [],
+    ...overrides.child,
+  };
+  const unrelated = {
+    pid: 42001,
+    parentPid: 1,
+    processGroupId: 42001,
+    startTicks: '91001',
+    argv: [entry.binaryRealPath, '--interactive'],
+    environment: ['FSB_AGENT_FINGERPRINT=unrelated_fingerprint_0001'],
+    ...overrides.unrelated,
+  };
+  return [root, child, unrelated];
+}
+
+async function runConcreteInspectorTests(processTreeModule) {
+  const {
+    DARWIN_PROCESS_TABLE_ARGS,
+    PROCESS_INSPECTION_MAX_OUTPUT_BYTES,
+    PROCESS_NATIVE_EXEC_OPTIONS,
+    WINDOWS_PROCESS_QUERY_ARGS,
+    createProcessInspector,
+    createProcessStartIdentity,
+  } = processTreeModule;
+
+  const active = journalEntry(processTreeModule);
+  const linuxProcesses = linuxRecords(active);
+  const linux = createProcessInspector({
+    platform: 'linux',
+    fs: linuxFixture(linuxProcesses),
+  });
+  const linuxConfirmed = await linux.inspect(active);
+  assert.equal(linuxConfirmed.classification, 'confirmed');
+  assert.equal(linuxConfirmed.process.pid, 41001);
+  assert.equal(linuxConfirmed.process.processGroupId, 41001);
+  assert.deepEqual(linuxConfirmed.process.descendants, [41002]);
+
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(linuxProcesses),
+    }).inspect({ ...active, processStartIdentity: 'reused-start-identity' })).classification,
+    'ambiguous',
+    'PID reuse is not stale or confirmed',
+  );
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(linuxRecords(active, {
+        root: { argv: [active.binaryRealPath, '--different-fixed-argv'] },
+      })),
+    }).inspect(active)).classification,
+    'ambiguous',
+    'argv mismatch fails closed',
+  );
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(linuxRecords(active, {
+        root: { environment: ['FSB_AGENT_FINGERPRINT=different_fingerprint'] },
+      })),
+    }).inspect(active)).classification,
+    'ambiguous',
+    'environment mismatch fails closed',
+  );
+
+  const absentProcesses = linuxProcesses.filter((record) => record.pid !== 41001 && record.pid !== 41002);
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(absentProcesses),
+    }).inspect(active)).classification,
+    'stale',
+    'complete table proves an absent active group stale',
+  );
+  assert.deepEqual(
+    await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(linuxProcesses.filter((record) => record.pid !== 41001)),
+    }).inspect(active),
+    { classification: 'ambiguous', reason: 'group_still_present' },
+    'leader absence is not success while its process group remains',
+  );
+
+  const prepared = journalEntry(processTreeModule, 'prepared');
+  const preparedProcesses = linuxRecords(prepared);
+  const preparedConfirmed = await createProcessInspector({
+    platform: 'linux',
+    fs: linuxFixture(preparedProcesses),
+  }).inspect(prepared);
+  assert.equal(preparedConfirmed.classification, 'confirmed');
+  assert.equal(preparedConfirmed.process.pid, 41001);
+
+  const secondMatch = {
+    ...preparedProcesses[2],
+    argv: [...preparedProcesses[0].argv],
+    environment: [...preparedProcesses[0].environment],
+  };
+  assert.deepEqual(
+    await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture([preparedProcesses[0], preparedProcesses[1], secondMatch]),
+    }).inspect(prepared),
+    { classification: 'ambiguous', reason: 'multiple_matches' },
+  );
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(preparedProcesses.map((record) => (
+        record.pid === 41001
+          ? { ...record, argv: [record.argv[0], '--other'] }
+          : record
+      ))),
+    }).inspect(prepared)).classification,
+    'stale',
+    'a complete fingerprint-specific search can prove no prepared match',
+  );
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(preparedProcesses, {
+        errorPaths: ['/proc/41001/environ'],
+      }),
+    }).inspect(prepared)).classification,
+    'ambiguous',
+    'permission loss cannot prove absence',
+  );
+  assert.equal(
+    (await createProcessInspector({
+      platform: 'linux',
+      fs: linuxFixture(preparedProcesses, { truncated: true }),
+    }).inspect(prepared)).classification,
+    'ambiguous',
+    'truncated process enumeration cannot prove absence',
+  );
+
+  const darwinStart = 'Tue Jul 14 12:00:00 2026';
+  const darwinActive = {
+    ...active,
+    processStartIdentity: createProcessStartIdentity(darwinStart),
+  };
+  const darwinTable = [
+    `41001 1 41001 ${darwinStart} /fixture/bin/claude --output-format stream-json --print`,
+    `41002 41001 41001 ${darwinStart} /usr/bin/helper --worker`,
+    `42001 1 42001 ${darwinStart} /fixture/bin/claude --interactive`,
+    '',
+  ].join('\n');
+  const darwinEvidence = [
+    `41001 1 41001 ${darwinStart} /fixture/bin/claude --output-format stream-json --print`,
+    `FSB_AGENT_ARGV_SIGNATURE=${darwinActive.argvSignature}`,
+    `FSB_AGENT_FINGERPRINT=${darwinActive.envFingerprint}`,
+  ].join(' ');
+  const darwinCalls = [];
+  const darwin = createProcessInspector({
+    platform: 'darwin',
+    exec: async (file, args, options) => {
+      darwinCalls.push({ file, args: [...args], options });
+      return {
+        stdout: args[0] === '-axo' ? darwinTable : `${darwinEvidence}\n`,
+        stderr: '',
+      };
+    },
+  });
+  const darwinConfirmed = await darwin.inspect(darwinActive);
+  assert.equal(darwinConfirmed.classification, 'confirmed');
+  assert.deepEqual(darwinConfirmed.process.descendants, [41002]);
+  assert.deepEqual(darwinCalls[0], {
+    file: '/bin/ps',
+    args: [...DARWIN_PROCESS_TABLE_ARGS],
+    options: PROCESS_NATIVE_EXEC_OPTIONS,
+  });
+  assert.deepEqual(darwinCalls[1], {
+    file: '/bin/ps',
+    args: [
+      '-E',
+      '-ww',
+      '-p',
+      '41001',
+      '-o',
+      'pid=,ppid=,pgid=,lstart=,command=',
+    ],
+    options: PROCESS_NATIVE_EXEC_OPTIONS,
+  });
+  assert.equal(PROCESS_NATIVE_EXEC_OPTIONS.shell, false);
+  assert.equal(PROCESS_NATIVE_EXEC_OPTIONS.maxBuffer, PROCESS_INSPECTION_MAX_OUTPUT_BYTES);
+
+  const darwinPartial = createProcessInspector({
+    platform: 'darwin',
+    exec: async () => ({ stdout: 'not a complete fixed table\n', stderr: '' }),
+  });
+  assert.equal((await darwinPartial.inspect(darwinActive)).classification, 'ambiguous');
+  const darwinUnavailable = createProcessInspector({
+    platform: 'darwin',
+    exec: async () => { throw new Error('native probe unavailable'); },
+  });
+  assert.equal((await darwinUnavailable.inspect(darwinActive)).classification, 'ambiguous');
+
+  const windowsCalls = [];
+  const windowsLstat = [];
+  const windows = createProcessInspector({
+    platform: 'win32',
+    systemRoot: 'C:\\Windows',
+    fs: {
+      lstat: (target) => {
+        windowsLstat.push(target);
+        return { isFile: () => true, isSymbolicLink: () => false };
+      },
+    },
+    exec: async (file, args, options) => {
+      windowsCalls.push({ file, args: [...args], options });
+      return {
+        stdout: [
+          'Node,CommandLine,CreationDate,ParentProcessId,ProcessId',
+          'HOST,"claude --print",20260714120000.000000-300,1,41001',
+          '',
+        ].join('\r\n'),
+        stderr: '',
+      };
+    },
+  });
+  assert.deepEqual(
+    await windows.inspect(active),
+    { classification: 'ambiguous', reason: 'evidence_partial' },
+    'native Windows query remains ambiguous without exact environment evidence',
+  );
+  assert.deepEqual(windowsLstat, ['C:\\Windows\\System32\\wbem\\wmic.exe']);
+  assert.deepEqual(windowsCalls[0], {
+    file: 'C:\\Windows\\System32\\wbem\\wmic.exe',
+    args: [...WINDOWS_PROCESS_QUERY_ARGS],
+    options: PROCESS_NATIVE_EXEC_OPTIONS,
+  });
+
+  let unavailableWindowsExec = 0;
+  const unavailableWindows = createProcessInspector({
+    platform: 'win32',
+    systemRoot: 'C:\\Windows',
+    fs: {
+      lstat: () => { throw new Error('missing'); },
+    },
+    exec: async () => {
+      unavailableWindowsExec += 1;
+      return { stdout: '', stderr: '' };
+    },
+  });
+  assert.equal((await unavailableWindows.inspect(active)).classification, 'ambiguous');
+  assert.equal(unavailableWindowsExec, 0, 'missing native facility sends no query or kill');
+
+  let unsupportedExec = 0;
+  const unsupported = createProcessInspector({
+    platform: 'aix',
+    exec: async () => {
+      unsupportedExec += 1;
+      return { stdout: '', stderr: '' };
+    },
+  });
+  assert.deepEqual(
+    await unsupported.inspect(active),
+    { classification: 'ambiguous', reason: 'platform_unsupported' },
+  );
+  assert.equal(unsupportedExec, 0);
+}
+
+function confirmedInspection(overrides = {}) {
+  return {
+    classification: 'confirmed',
+    process: {
+      pid: 41001,
+      parentPid: 1,
+      processGroupId: 41001,
+      processStartIdentity: '90001',
+      descendants: [],
+      ...overrides,
+    },
+  };
+}
+
+function queuedInspector(values) {
+  let index = 0;
+  const calls = [];
+  return {
+    calls,
+    async inspect(entry) {
+      calls.push(entry.delegationId);
+      const value = values[Math.min(index, values.length - 1)];
+      index += 1;
+      return value;
+    },
+  };
+}
+
+function closedChild(overrides = {}) {
+  return {
+    pid: 41001,
+    processGroupId: 41001,
+    platform: 'linux',
+    closed: Promise.resolve({ code: 0, signal: null }),
+    ...overrides,
+  };
+}
+
+async function expectTreeUnsettled(operation) {
+  await assert.rejects(
+    operation,
+    (error) => {
+      assert.equal(error.code, 'tree_unsettled');
+      return true;
+    },
+  );
+}
+
+async function runTerminationTests(processTreeModule) {
+  const { createProcessTreeTerminator, PROCESS_NATIVE_EXEC_OPTIONS } = processTreeModule;
+  const active = journalEntry(processTreeModule);
+  const staleInspection = { classification: 'stale' };
+  const ambiguousInspection = { classification: 'ambiguous', reason: 'identity_mismatch' };
+
+  {
+    const inspector = queuedInspector([confirmedInspection(), staleInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    await terminator.stop(active, closedChild(), { grace: 25 });
+    assert.deepEqual(signals, [[-41001, 'SIGTERM']]);
+  }
+
+  {
+    const inspector = queuedInspector([
+      confirmedInspection(),
+      confirmedInspection({ descendants: [41002] }),
+      staleInspection,
+    ]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    await terminator.stop(active, closedChild(), { grace: 25 });
+    assert.deepEqual(signals, [
+      [-41001, 'SIGTERM'],
+      [-41001, 'SIGKILL'],
+    ]);
+  }
+
+  {
+    const inspector = queuedInspector([staleInspection, staleInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+    });
+    await terminator.stop(active, closedChild(), { grace: 25 });
+    assert.deepEqual(signals, [], 'already stale sends no signal');
+  }
+
+  {
+    const inspector = queuedInspector([confirmedInspection()]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => {
+        signals.push([group, signal]);
+        throw Object.assign(new Error('denied'), { code: 'EPERM' });
+      },
+      wait: async () => {},
+    });
+    await expectTreeUnsettled(() => terminator.stop(active, closedChild(), { grace: 25 }));
+    assert.deepEqual(signals, [[-41001, 'SIGTERM']]);
+  }
+
+  {
+    const inspector = queuedInspector([
+      confirmedInspection(),
+      staleInspection,
+      staleInspection,
+    ]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => {
+        signals.push([group, signal]);
+        throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+      },
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    await terminator.stop(active, closedChild(), { grace: 25 });
+    assert.deepEqual(signals, [[-41001, 'SIGTERM']]);
+  }
+
+  {
+    const inspector = queuedInspector([confirmedInspection(), ambiguousInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    await expectTreeUnsettled(() => terminator.stop(active, closedChild(), { grace: 25 }));
+    assert.deepEqual(signals, [[-41001, 'SIGTERM']], 'ambiguous reinspection receives no escalation');
+  }
+
+  {
+    const inspector = queuedInspector([
+      confirmedInspection(),
+      confirmedInspection({ descendants: [41002] }),
+      confirmedInspection({ descendants: [41002] }),
+    ]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    await expectTreeUnsettled(() => terminator.stop(active, closedChild(), { grace: 25 }));
+    assert.deepEqual(signals, [
+      [-41001, 'SIGTERM'],
+      [-41001, 'SIGKILL'],
+    ]);
+  }
+
+  {
+    const inspector = queuedInspector([ambiguousInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+    });
+    await expectTreeUnsettled(() => terminator.stop(active, closedChild(), { grace: 25 }));
+    assert.deepEqual(signals, [], 'unrelated or mismatched identity receives no signal');
+  }
+
+  {
+    const inspector = queuedInspector([confirmedInspection(), staleInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: async () => {},
+      monotonicNow: () => 1,
+    });
+    const first = terminator.stop(active, closedChild(), { grace: 25 });
+    const second = terminator.stop(active, closedChild(), { grace: 25 });
+    assert.strictEqual(first, second, 'duplicate stop returns the same in-flight operation');
+    await Promise.all([first, second]);
+    assert.deepEqual(signals, [[-41001, 'SIGTERM']]);
+    assert.equal(inspector.calls.length, 2);
+  }
+
+  {
+    let resolveClose;
+    const child = closedChild({
+      closed: new Promise((resolve) => { resolveClose = resolve; }),
+    });
+    const inspector = queuedInspector([confirmedInspection(), staleInspection]);
+    const signals = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'linux',
+      inspector,
+      signalGroup: (group, signal) => signals.push([group, signal]),
+      wait: () => new Promise(() => {}),
+      monotonicNow: () => 1,
+    });
+    let settled = false;
+    const operation = terminator.stop(active, child, { grace: 25 }).then(() => { settled = true; });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(settled, false, 'stop remains pending while child close is delayed');
+    resolveClose({ code: 0, signal: 'SIGTERM' });
+    await operation;
+    assert.equal(settled, true);
+  }
+
+  {
+    const inspector = queuedInspector([confirmedInspection(), staleInspection]);
+    const calls = [];
+    const terminator = createProcessTreeTerminator({
+      platform: 'win32',
+      inspector,
+      systemRoot: 'C:\\Windows',
+      fs: {
+        lstat: (target) => {
+          calls.push({ type: 'lstat', target });
+          return { isFile: () => true, isSymbolicLink: () => false };
+        },
+      },
+      exec: async (file, args, options) => {
+        calls.push({ type: 'exec', file, args: [...args], options });
+        return { stdout: '', stderr: '' };
+      },
+      wait: async () => {},
+    });
+    await terminator.stop(active, closedChild({ platform: 'win32' }), { grace: 25 });
+    assert.deepEqual(calls, [
+      { type: 'lstat', target: 'C:\\Windows\\System32\\taskkill.exe' },
+      {
+        type: 'exec',
+        file: 'C:\\Windows\\System32\\taskkill.exe',
+        args: ['/pid', '41001', '/T', '/F'],
+        options: PROCESS_NATIVE_EXEC_OPTIONS,
+      },
+    ]);
+    assert.equal(calls[1].options.shell, false);
+    assert.equal(calls[1].options.windowsHide, true);
+  }
+
+  {
+    const inspector = queuedInspector([confirmedInspection()]);
+    let taskkillCalls = 0;
+    const terminator = createProcessTreeTerminator({
+      platform: 'win32',
+      inspector,
+      taskkill: async () => {
+        taskkillCalls += 1;
+        throw new Error('taskkill failed');
+      },
+      wait: async () => {},
+    });
+    await expectTreeUnsettled(() => terminator.stop(
+      active,
+      closedChild({ platform: 'win32' }),
+      { grace: 25 },
+    ));
+    assert.equal(taskkillCalls, 1);
+  }
+
+  {
+    const inspector = queuedInspector([ambiguousInspection]);
+    let taskkillCalls = 0;
+    const terminator = createProcessTreeTerminator({
+      platform: 'win32',
+      inspector,
+      taskkill: async () => { taskkillCalls += 1; },
+      wait: async () => {},
+    });
+    await expectTreeUnsettled(() => terminator.stop(
+      active,
+      closedChild({ platform: 'win32' }),
+      { grace: 25 },
+    ));
+    assert.equal(taskkillCalls, 0, 'partial Windows evidence never reaches taskkill');
+  }
+}
+
 async function main() {
   const runtimeModule = await import(pathToFileURL(runtimeBuildPath).href);
+  const processTreeModule = await import(pathToFileURL(processTreeBuildPath).href);
   await runRuntimeFilesTests(runtimeModule);
+  await runConcreteInspectorTests(processTreeModule);
+  await runTerminationTests(processTreeModule);
   console.log('mcp-agent-orphan-recovery.test.js: PASS');
 }
 
