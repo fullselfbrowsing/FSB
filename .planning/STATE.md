@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: planning
-stopped_at: Phase 60 context gathered; AI integration research next
-last_updated: "2026-07-14T15:10:21.664Z"
-last_activity: 2026-07-14 -- Phase 59 completed with automated/source verification passed
+status: executing
+stopped_at: Phase 60 planned; execution wave 1 next
+last_updated: "2026-07-14T16:29:14.690Z"
+last_activity: 2026-07-14 -- Phase 60 planning complete
 progress:
   total_phases: 18
   completed_phases: 3
-  total_plans: 10
+  total_plans: 14
   completed_plans: 12
-  percent: 100
+  percent: 86
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 60 (Adapter Contract & Claude Code MVP) — READY
-Plan: Not yet planned
-Status: Ready for autonomous Phase 60 discussion and planning
-Last activity: 2026-07-14 -- Phase 59 completed with automated/source verification passed
+Plan: 0 of 4 complete
+Status: Ready to execute
+Last activity: 2026-07-14 -- Phase 60 planning complete
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
