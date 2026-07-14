@@ -156,6 +156,20 @@ Add focused built-output Node tests and place them before the final root regress
 
 Tests should import `mcp/build/**` after `npm --prefix mcp run build`, matching repository convention. Prefer explicit dependency injection hooks over monkeypatching global process functions. Do not add extension/background or side-panel production wiring in this phase.
 
+## Validation Architecture
+
+Use the existing dependency-free Node assertion harness against compiled MCP output. Wave 0 is the focused test/fixture scaffold created alongside the first implementation tasks; no framework installation is required. Every task must include a focused build/test command, every plan wave must run the accumulated Phase 60 slice, and the phase closes only after the complete root `npm test` chain passes with the temporary, never-staged Phase 39 compatibility symlink removed by a shell trap.
+
+Validation layers:
+
+1. **Contract/source gates:** exact interface/registry/capability shapes, strict payload schemas, fixed argv, stdin/env canaries, forbidden-flag scanner, package assets, and Phase 59 byte parity.
+2. **Pure protocol tests:** sanitized fixture plus mutations for every normalized event, drift, chunk/boundary, and resource-limit case.
+3. **Injected lifecycle tests:** fake child streams, clocks, process inspectors, taskkill/group signals, runtime filesystem, and journal records cover all race orderings without real process authority.
+4. **Reverse-channel integration:** existing local/relay bridge harness proves early delegation-id events, continued correlation, terminal response, cancellation, capability placement, startup recovery order, and shutdown.
+5. **Full regression:** root `npm test` remains blocking; live Claude/OS/browser checks remain separately listed as human-needed at milestone end.
+
+Plan-specific focused commands should remain below roughly 30 seconds. Do not use watch mode, flaky retries, snapshots that can be refreshed over a security failure, or LLM judges. Critical cases require 100% pass.
+
 ## Suggested Plan Decomposition
 
 1. **Contract, Claude profile, and stream fixture/parser** — types/registry, retained detection, static agent, runtime validation, normalized parser, fixture/mutations, and package/forbidden-flag tests. Covers ADAPT-01/02 and CLAUDE-01..04 foundations.
@@ -213,4 +227,3 @@ Preserve, but do not execute or claim, these checks until the milestone-end gate
 - daemon-crash orphan detection without collateral process termination;
 - real JSONL capture provenance/schema comparison;
 - live browser ownership, vault boundary, irreversible-action handoff, and eventual Phase 61 UX.
-
