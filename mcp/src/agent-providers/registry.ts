@@ -1,8 +1,12 @@
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  type AdapterDetection,
+  type AgentEvent,
   type AgentProviderAdapter,
   type AgentProviderId,
+  type SupervisedChild,
 } from './adapter.js';
+import { createClaudeCodeAdapter } from './claude-code.js';
 
 export type AdapterRegistryErrorCode =
   | 'invalid_adapter_id'
@@ -28,6 +32,15 @@ export interface AdapterRegistration {
 export interface AgentProviderRegistry {
   require(id: string): AgentProviderAdapter;
   ids(): readonly AgentProviderId[];
+}
+
+export interface ProductionAdapterRegistryDependencies {
+  readonly detect?: () => Promise<AdapterDetection>;
+  readonly parseEvents?: (stream: NodeJS.ReadableStream) => AsyncIterable<AgentEvent>;
+  readonly kill: (
+    child: SupervisedChild,
+    options: { grace: number },
+  ) => Promise<void>;
 }
 
 const CANONICAL_IDS = Object.freeze([CLAUDE_CODE_ADAPTER_ID] as const);
@@ -80,4 +93,13 @@ export function createAdapterRegistry(
       return CANONICAL_IDS;
     },
   });
+}
+
+export function createProductionAdapterRegistry(
+  dependencies: ProductionAdapterRegistryDependencies,
+): AgentProviderRegistry {
+  return createAdapterRegistry([{
+    id: CLAUDE_CODE_ADAPTER_ID,
+    adapter: createClaudeCodeAdapter(dependencies),
+  }]);
 }

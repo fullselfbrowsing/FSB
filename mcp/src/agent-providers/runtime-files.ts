@@ -134,6 +134,11 @@ export interface PreparedRun {
   readonly mcpConfigPath: string;
 }
 
+export interface RuntimeRunPaths {
+  readonly runDirectory: string;
+  readonly mcpConfigPath: string;
+}
+
 export interface AgentRecoveryProfileSummary {
   readonly adapterId: AgentProviderId;
   readonly profileVersion: string;
@@ -440,6 +445,17 @@ export class AgentRuntimeFiles {
     }
   }
 
+  pathsFor(delegationId: string): RuntimeRunPaths {
+    if (!DELEGATION_ID_PATTERN.test(delegationId)) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Delegation id is invalid');
+    }
+    const runDirectory = join(this.rootPath, delegationId);
+    return Object.freeze({
+      runDirectory,
+      mcpConfigPath: join(runDirectory, MCP_CONFIG_FILENAME),
+    });
+  }
+
   prepareRun(input: PrepareRunInput): Promise<PreparedRun> {
     const entry = validatePrepareInput(input);
     const endpoint = validateEndpoint(input.endpoint);
@@ -532,10 +548,7 @@ export class AgentRuntimeFiles {
   }
 
   private ensureRunDirectory(delegationId: string): string {
-    if (!DELEGATION_ID_PATTERN.test(delegationId)) {
-      throw new RuntimeFilesError('invalid_runtime_input', 'Delegation id is invalid');
-    }
-    const directory = join(this.rootPath, delegationId);
+    const directory = this.pathsFor(delegationId).runDirectory;
     this.ensureDirectory(directory);
     return directory;
   }

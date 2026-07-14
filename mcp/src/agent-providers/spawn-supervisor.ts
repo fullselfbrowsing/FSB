@@ -1,0 +1,969 @@
+import { randomBytes } from 'node:crypto';
+import {
+  spawn as nodeSpawn,
+  type ChildProcessWithoutNullStreams,
+  type SpawnOptionsWithoutStdio,
+} from 'node:child_process';
+import { isAbsolute } from 'node:path';
+import { z } from 'zod';
+import type {
+  AdapterDetection,
+  AgentEvent,
+  AgentProviderAdapter,
+  ChildExit,
+  SupervisedChild,
+} from './adapter.js';
+import { CLAUDE_CODE_ADAPTER_ID } from './adapter.js';
+import type { AgentProviderRegistry } from './registry.js';
+import type {
+  ActiveJournalEntry,
+  AgentStartupRecovery,
+  AgentStartupRecoveryResult,
+  JournalEntry,
+  PreparedJournalEntry,
+} from './runtime-files.js';
+import type { AgentRuntimeFiles } from './runtime-files.js';
+import type {
+  ProcessInspection,
+  ProcessInspector,
+  ProcessTreeTerminator,
+} from './process-tree.js';
+import { createArgvSignature, TreeUnsettledError } from './process-tree.js';
+import type { ExtEvent, ExtRequest, ExtRequestHandler } from '../types.js';
+
+const TASK_LIMIT_BYTES = 64 * 1024;
+const EVENT_LIMIT_BYTES = 256 * 1024;
+const STDERR_LIMIT_BYTES = 64 * 1024;
+const PRE_AUTH_EVENT_LIMIT_BYTES = 2 * 1024 * 1024;
+const PRE_AUTH_EVENT_LIMIT_COUNT = 1024;
+const COMPLETED_RUN_LIMIT = 256;
+const DEFAULT_ACTIVATION_ATTEMPTS = 80;
+const DEFAULT_ACTIVATION_POLL_MS = 25;
+
+const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const PROVIDER_KEY_NAMES = Object.freeze([
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+] as const);
+
+const START_REQUEST_KEYS = Object.freeze(['id', 'method', 'payload', 'type']);
+const START_PAYLOAD_KEYS = Object.freeze(['adapterId', 'task']);
+const CANCEL_PAYLOAD_KEYS = Object.freeze(['delegationId']);
+
+const DelegateStartSchema = z.object({
+  adapterId: z.literal(CLAUDE_CODE_ADAPTER_ID),
+  task: z.string().min(1),
+}).strict();
+
+const DelegateCancelSchema = z.object({
+  delegationId: z.string().regex(DELEGATION_ID_PATTERN),
+}).strict();
+
+const AGENT_EVENT_TYPES = new Set([
+  'init',
+  'assistant',
+  'assistant_delta',
+  'user',
+  'tool_use',
+  'tool_result',
+  'retry',
+  'result',
+  'diagnostic',
+]);
+
+export type DelegationRunState =
+  | 'created'
+  | 'spawning'
+  | 'running'
+  | 'stopping'
+  | 'settled';
+
+export type DelegationStatus = 'succeeded' | 'failed' | 'cancelled';
+
+export type DelegationFailureCode =
+  | 'adapter_unavailable'
+  | 'agent_protocol_drift'
+  | 'spawn_failed'
+  | 'activation_failed'
+  | 'stdin_failed'
+  | 'process_exit'
+  | 'tree_unsettled'
+  | 'runtime_cleanup_failed'
+  | 'route_lost'
+  | 'daemon_shutdown';
+
+export interface SpawnInvocationOptions extends SpawnOptionsWithoutStdio {
+  readonly shell: false;
+  readonly detached: true;
+  readonly windowsHide: true;
+  readonly stdio: ['pipe', 'pipe', 'pipe'];
+  readonly cwd: string;
+  readonly env: NodeJS.ProcessEnv;
+}
+
+export type AgentSpawnDependency = (
+  command: string,
+  argv: readonly string[],
+  options: SpawnInvocationOptions,
+) => ChildProcessWithoutNullStreams;
+
+export interface SpawnSupervisorCloseResult {
+  readonly cancelled: number;
+  readonly failed: number;
+  readonly alreadySettled: number;
+}
+
+export interface SpawnSupervisor {
+  readonly handleExtRequest: ExtRequestHandler;
+  recover(): Promise<AgentStartupRecoveryResult>;
+  close(): Promise<SpawnSupervisorCloseResult>;
+  journalEntryForChild(child: SupervisedChild): JournalEntry | null;
+}
+
+export interface SpawnSupervisorDependencies {
+  readonly registry: AgentProviderRegistry;
+  readonly runtimeFiles: Pick<
+    AgentRuntimeFiles,
+    'pathsFor' | 'prepareRun' | 'activateRun' | 'removeRun'
+  >;
+  readonly inspector: ProcessInspector;
+  readonly terminator: ProcessTreeTerminator;
+  readonly startupRecovery: AgentStartupRecovery;
+  readonly endpoint: string;
+  readonly cwd?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly environment?: NodeJS.ProcessEnv;
+  readonly spawn?: AgentSpawnDependency;
+  readonly wallNow?: () => number;
+  readonly monotonicNow?: () => number;
+  readonly wait?: (milliseconds: number) => Promise<void>;
+  readonly mintDelegationId?: () => string;
+  readonly mintFingerprint?: () => string;
+  readonly terminationGrace?: number;
+  readonly activationAttempts?: number;
+  readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
+}
+
+interface RunTerminalResult {
+  readonly delegationId: string;
+  readonly status: DelegationStatus;
+  readonly terminal: Readonly<Record<string, unknown>>;
+}
+
+interface RunStreams {
+  parser: Promise<void>;
+  stderr: Promise<void>;
+  closed: Promise<ChildExit>;
+}
+
+interface DelegationRun {
+  readonly delegationId: string;
+  readonly requestId: string;
+  readonly task: string;
+  readonly emit: (event: ExtEvent) => void;
+  readonly adapter: AgentProviderAdapter;
+  profileVersion: string;
+  readonly terminalPromise: Promise<RunTerminalResult>;
+  readonly resolveTerminal: (result: RunTerminalResult) => void;
+  state: DelegationRunState;
+  settled: boolean;
+  authorityGranted: boolean;
+  stopRequested: boolean;
+  failureCode: DelegationFailureCode | null;
+  entry: JournalEntry | null;
+  child: ChildProcessWithoutNullStreams | null;
+  supervisedChild: SupervisedChild | null;
+  streams: RunStreams | null;
+  bufferedEvents: AgentEvent[];
+  bufferedEventBytes: number;
+  resultEvent: AgentEvent | null;
+  parserError: unknown;
+  terminationPromise: Promise<void> | null;
+  cancelPromise: Promise<RunTerminalResult> | null;
+}
+
+export class InvalidDelegationRequestError extends Error {
+  readonly code = 'invalid_ext_request' as const;
+
+  constructor() {
+    super('Delegation request is invalid');
+    this.name = 'InvalidDelegationRequestError';
+  }
+}
+
+function defaultSpawn(
+  command: string,
+  argv: readonly string[],
+  options: SpawnInvocationOptions,
+): ChildProcessWithoutNullStreams {
+  return nodeSpawn(command, [...argv], options) as ChildProcessWithoutNullStreams;
+}
+
+function defaultWait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Object.keys(value).sort();
+  return keys.length === expected.length
+    && keys.every((key, index) => key === expected[index]);
+}
+
+function isWellFormedText(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function parseStartRequest(request: ExtRequest): { adapterId: 'claude-code'; task: string } {
+  if (
+    !isPlainRecord(request)
+    || !exactKeys(request, START_REQUEST_KEYS)
+    || request.type !== 'ext:request'
+    || request.method !== 'delegate.start'
+    || !isPlainRecord(request.payload)
+    || !exactKeys(request.payload, START_PAYLOAD_KEYS)
+  ) throw new InvalidDelegationRequestError();
+  const parsed = DelegateStartSchema.safeParse(request.payload);
+  if (
+    !parsed.success
+    || !isWellFormedText(parsed.data.task)
+    || Buffer.byteLength(parsed.data.task, 'utf8') > TASK_LIMIT_BYTES
+  ) throw new InvalidDelegationRequestError();
+  return parsed.data;
+}
+
+function parseCancelRequest(request: ExtRequest): { delegationId: string } {
+  if (
+    !isPlainRecord(request)
+    || !exactKeys(request, START_REQUEST_KEYS)
+    || request.type !== 'ext:request'
+    || request.method !== 'delegate.cancel'
+    || !isPlainRecord(request.payload)
+    || !exactKeys(request.payload, CANCEL_PAYLOAD_KEYS)
+  ) throw new InvalidDelegationRequestError();
+  const parsed = DelegateCancelSchema.safeParse(request.payload);
+  if (!parsed.success) throw new InvalidDelegationRequestError();
+  return parsed.data;
+}
+
+function diagnosticTerminal(
+  code: DelegationFailureCode | 'cancelled',
+  profileVersion: string | null,
+): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    type: 'diagnostic',
+    code,
+    ...(profileVersion ? { profileVersion } : {}),
+  });
+}
+
+function eventTerminal(event: AgentEvent): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    type: event.type,
+    sessionId: event.sessionId,
+    payload: event.payload,
+  });
+}
+
+function errorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object' || !('code' in error)) return null;
+  return typeof (error as { code?: unknown }).code === 'string'
+    ? (error as { code: string }).code
+    : null;
+}
+
+function validateDetection(detection: AdapterDetection): asserts detection is AdapterDetection & {
+  binary: NonNullable<AdapterDetection['binary']>;
+  profileVersion: string;
+  version: string;
+} {
+  if (
+    !detection.installed
+    || !detection.binary
+    || !detection.profileVersion
+    || !detection.version
+    || !isAbsolute(detection.binary.command)
+  ) throw new Error('adapter_unavailable');
+}
+
+function observeChild(child: ChildProcessWithoutNullStreams): {
+  ready: Promise<void>;
+  closed: Promise<ChildExit>;
+} {
+  let readySettled = false;
+  const ready = new Promise<void>((resolve, reject) => {
+    child.once('spawn', () => {
+      if (readySettled) return;
+      readySettled = true;
+      resolve();
+    });
+    child.once('error', () => {
+      if (readySettled) return;
+      readySettled = true;
+      reject(new Error('spawn_failed'));
+    });
+  });
+
+  let closeSettled = false;
+  const closed = new Promise<ChildExit>((resolve) => {
+    const settle = (exit: ChildExit): void => {
+      if (closeSettled) return;
+      closeSettled = true;
+      resolve(Object.freeze(exit));
+    };
+    child.once('error', () => settle({ code: null, signal: null }));
+    child.once('close', (code: number | null, signal: NodeJS.Signals | null) => {
+      settle({ code, signal });
+    });
+  });
+  return { ready, closed };
+}
+
+function safeJson(value: unknown): string | null {
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === 'string' ? serialized : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateNormalizedEvent(event: AgentEvent): string {
+  if (
+    !isPlainRecord(event)
+    || !exactKeys(event, ['payload', 'sessionId', 'type'])
+    || typeof event.type !== 'string'
+    || !AGENT_EVENT_TYPES.has(event.type)
+    || typeof event.sessionId !== 'string'
+    || event.sessionId.length === 0
+    || event.sessionId.length > 256
+    || !isPlainRecord(event.payload)
+  ) throw new Error('agent_protocol_drift');
+  const serialized = safeJson(event);
+  if (!serialized || Buffer.byteLength(serialized, 'utf8') > EVENT_LIMIT_BYTES) {
+    throw new Error('agent_protocol_drift');
+  }
+  return serialized;
+}
+
+function containsSensitiveValue(serialized: string, values: readonly string[]): boolean {
+  return values.some((value) => (
+    value.length >= 16 && serialized.includes(value)
+  ));
+}
+
+class ExactOnceSpawnSupervisor implements SpawnSupervisor {
+  readonly handleExtRequest: ExtRequestHandler;
+
+  private readonly activeRuns = new Map<string, DelegationRun>();
+  private readonly completedRuns = new Map<string, RunTerminalResult>();
+  private readonly entriesByPid = new Map<number, JournalEntry>();
+  private readonly spawnChild: AgentSpawnDependency;
+  private readonly cwd: string;
+  private readonly platform: NodeJS.Platform;
+  private readonly environment: NodeJS.ProcessEnv;
+  private readonly wallNow: () => number;
+  private readonly monotonicNow: () => number;
+  private readonly wait: (milliseconds: number) => Promise<void>;
+  private readonly mintDelegationId: () => string;
+  private readonly mintFingerprint: () => string;
+  private readonly terminationGrace: number;
+  private readonly activationAttempts: number;
+  private readonly allowSpawnOnPlatform: (platform: NodeJS.Platform) => boolean;
+  private accepting = true;
+  private closePromise: Promise<SpawnSupervisorCloseResult> | null = null;
+
+  constructor(private readonly dependencies: SpawnSupervisorDependencies) {
+    this.spawnChild = dependencies.spawn ?? defaultSpawn;
+    this.cwd = dependencies.cwd ?? process.cwd();
+    this.platform = dependencies.platform ?? process.platform;
+    this.environment = { ...(dependencies.environment ?? process.env) };
+    this.wallNow = dependencies.wallNow ?? (() => Date.now());
+    this.monotonicNow = dependencies.monotonicNow ?? (() => performance.now());
+    this.wait = dependencies.wait ?? defaultWait;
+    this.mintDelegationId = dependencies.mintDelegationId
+      ?? (() => `delegation_${randomBytes(16).toString('base64url')}`);
+    this.mintFingerprint = dependencies.mintFingerprint
+      ?? (() => randomBytes(32).toString('base64url'));
+    this.terminationGrace = dependencies.terminationGrace ?? 2_000;
+    this.activationAttempts = dependencies.activationAttempts ?? DEFAULT_ACTIVATION_ATTEMPTS;
+    this.allowSpawnOnPlatform = dependencies.allowSpawnOnPlatform
+      ?? ((platform) => platform === 'linux' || platform === 'darwin');
+    if (
+      !isAbsolute(this.cwd)
+      || !Number.isSafeInteger(this.terminationGrace)
+      || this.terminationGrace < 0
+      || this.terminationGrace > 60_000
+      || !Number.isSafeInteger(this.activationAttempts)
+      || this.activationAttempts < 1
+      || this.activationAttempts > 1000
+    ) throw new TypeError('Spawn supervisor configuration is invalid');
+
+    this.handleExtRequest = async (request, emit) => {
+      if (!this.accepting) throw new InvalidDelegationRequestError();
+      if (request.method === 'delegate.start') {
+        const payload = parseStartRequest(request);
+        return this.start(request.id, payload.task, payload.adapterId, emit);
+      }
+      if (request.method === 'delegate.cancel') {
+        const payload = parseCancelRequest(request);
+        return this.cancel(payload.delegationId);
+      }
+      throw new InvalidDelegationRequestError();
+    };
+  }
+
+  recover(): Promise<AgentStartupRecoveryResult> {
+    return this.dependencies.startupRecovery.recover();
+  }
+
+  journalEntryForChild(child: SupervisedChild): JournalEntry | null {
+    return this.entriesByPid.get(child.pid) ?? null;
+  }
+
+  close(): Promise<SpawnSupervisorCloseResult> {
+    if (!this.closePromise) this.closePromise = this.closeOnce();
+    return this.closePromise;
+  }
+
+  private async closeOnce(): Promise<SpawnSupervisorCloseResult> {
+    this.accepting = false;
+    const runs = [...this.activeRuns.values()];
+    const results = await Promise.all(runs.map(async (run) => {
+      if (run.settled) return 'alreadySettled' as const;
+      const result = await this.cancelRun(run, 'daemon_shutdown');
+      return result.status === 'cancelled' ? 'cancelled' as const : 'failed' as const;
+    }));
+    return Object.freeze({
+      cancelled: results.filter((value) => value === 'cancelled').length,
+      failed: results.filter((value) => value === 'failed').length,
+      alreadySettled: results.filter((value) => value === 'alreadySettled').length,
+    });
+  }
+
+  private async start(
+    requestId: string,
+    task: string,
+    adapterId: string,
+    emit: (event: ExtEvent) => void,
+  ): Promise<Record<string, unknown>> {
+    const delegationId = this.uniqueDelegationId();
+    const adapter = this.dependencies.registry.require(adapterId);
+    let resolveTerminal!: (result: RunTerminalResult) => void;
+    const terminalPromise = new Promise<RunTerminalResult>((resolve) => {
+      resolveTerminal = resolve;
+    });
+    const run: DelegationRun = {
+      delegationId,
+      requestId,
+      task,
+      emit,
+      adapter,
+      profileVersion: 'unknown',
+      terminalPromise,
+      resolveTerminal,
+      state: 'created',
+      settled: false,
+      authorityGranted: false,
+      stopRequested: false,
+      failureCode: null,
+      entry: null,
+      child: null,
+      supervisedChild: null,
+      streams: null,
+      bufferedEvents: [],
+      bufferedEventBytes: 0,
+      resultEvent: null,
+      parserError: null,
+      terminationPromise: null,
+      cancelPromise: null,
+    };
+    this.activeRuns.set(delegationId, run);
+    void this.executeRun(run);
+    return await terminalPromise as unknown as Record<string, unknown>;
+  }
+
+  private async executeRun(run: DelegationRun): Promise<void> {
+    let profileVersion: string | null = null;
+    try {
+      if (!this.allowSpawnOnPlatform(this.platform)) throw new Error('adapter_unavailable');
+      run.state = 'spawning';
+      const detection = await run.adapter.detect();
+      validateDetection(detection);
+      profileVersion = detection.profileVersion;
+      run.profileVersion = profileVersion;
+      if (run.stopRequested) throw new Error('daemon_shutdown');
+
+      const runtimeFingerprint = this.uniqueFingerprint();
+      const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
+      const spec = await run.adapter.buildSpawn({ text: run.task }, {
+        adapterId: CLAUDE_CODE_ADAPTER_ID,
+        detection,
+        delegationId: run.delegationId,
+        runtimeFingerprint,
+        cwd: this.cwd,
+        privateMcpConfigPath: paths.mcpConfigPath,
+        runtimeFiles: [paths.mcpConfigPath],
+      });
+      this.validateSpawnSpec(run, detection, spec.command, spec.argv, spec.cwd, spec.fixedEnv);
+      const argvSignature = createArgvSignature(spec.command, spec.argv);
+      const createdAt = this.wallNow();
+      const prepared = await this.dependencies.runtimeFiles.prepareRun({
+        delegationId: run.delegationId,
+        adapterId: CLAUDE_CODE_ADAPTER_ID,
+        profileVersion,
+        createdAt,
+        binaryRealPath: spec.command,
+        argvSignature,
+        envFingerprint: runtimeFingerprint,
+        endpoint: this.dependencies.endpoint,
+      });
+      run.entry = prepared.entry;
+      if (run.stopRequested) throw new Error('daemon_shutdown');
+
+      const environment = this.createEnvironment(spec.fixedEnv, argvSignature);
+      const options: SpawnInvocationOptions = Object.freeze({
+        shell: false,
+        detached: true,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
+        cwd: spec.cwd,
+        env: environment,
+      });
+      const child = this.spawnChild(spec.command, spec.argv, options);
+      run.child = child;
+      if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
+        throw new Error('spawn_failed');
+      }
+      const observed = observeChild(child);
+      const supervisedChild: SupervisedChild = Object.freeze({
+        pid: child.pid!,
+        processGroupId: child.pid!,
+        platform: this.platform,
+        closed: observed.closed,
+      });
+      run.supervisedChild = supervisedChild;
+      this.entriesByPid.set(supervisedChild.pid, prepared.entry);
+      run.streams = {
+        parser: this.consumeEvents(run, child.stdout),
+        stderr: this.drainStderr(child.stderr),
+        closed: observed.closed,
+      };
+      await observed.ready;
+      const identity = await this.resolveActivation(prepared.entry, supervisedChild.pid);
+      const active = await this.dependencies.runtimeFiles.activateRun({
+        delegationId: run.delegationId,
+        pid: supervisedChild.pid,
+        processGroupId: identity.process.processGroupId,
+        startedAt: Math.max(createdAt, this.wallNow()),
+        processStartIdentity: identity.process.processStartIdentity,
+      });
+      run.entry = active;
+      this.entriesByPid.set(supervisedChild.pid, active);
+      if (run.parserError || run.resultEvent || run.stopRequested) {
+        throw new Error(run.stopRequested ? 'daemon_shutdown' : 'agent_protocol_drift');
+      }
+
+      this.emitStarted(run, active);
+      run.authorityGranted = true;
+      this.flushBufferedEvents(run);
+      if (run.parserError || run.stopRequested) {
+        throw new Error(run.stopRequested ? 'daemon_shutdown' : 'agent_protocol_drift');
+      }
+      run.state = 'running';
+      await this.writeTask(child, run.task);
+      await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
+      if (run.stopRequested) {
+        await this.cancelLifecycle(run, run.failureCode ?? 'daemon_shutdown');
+        return;
+      }
+      if (run.parserError) throw new Error('agent_protocol_drift');
+      const resultEvent = this.requireResultEvent(run);
+      const exit = await run.streams.closed;
+      if (resultEvent.payload.is_error === true) {
+        await this.terminateAndCleanup(run);
+        this.settleOnce(run, 'failed', eventTerminal(resultEvent));
+        return;
+      }
+      if (exit.code !== 0 || exit.signal !== null) throw new Error('process_exit');
+      await this.terminateAndCleanup(run);
+      this.settleOnce(run, 'succeeded', eventTerminal(resultEvent));
+    } catch (error) {
+      if (run.settled) return;
+      if (run.stopRequested) {
+        await this.cancelLifecycle(run, run.failureCode ?? 'daemon_shutdown');
+        return;
+      }
+      let code = this.failureCode(error);
+      try {
+        await this.terminateAndCleanup(run);
+      } catch (cleanupError) {
+        code = errorCode(cleanupError) === 'tree_unsettled'
+          ? 'tree_unsettled'
+          : 'runtime_cleanup_failed';
+      }
+      this.settleOnce(run, 'failed', diagnosticTerminal(code, profileVersion));
+    }
+  }
+
+  private uniqueDelegationId(): string {
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const value = this.mintDelegationId();
+      if (
+        DELEGATION_ID_PATTERN.test(value)
+        && !this.activeRuns.has(value)
+        && !this.completedRuns.has(value)
+      ) return value;
+    }
+    throw new Error('Unable to mint delegation identity');
+  }
+
+  private uniqueFingerprint(): string {
+    const value = this.mintFingerprint();
+    if (!/^[A-Za-z0-9_-]{16,256}$/.test(value)) {
+      throw new Error('Unable to mint runtime fingerprint');
+    }
+    return value;
+  }
+
+  private validateSpawnSpec(
+    run: DelegationRun,
+    detection: AdapterDetection & { binary: NonNullable<AdapterDetection['binary']> },
+    command: string,
+    argv: readonly string[],
+    cwd: string,
+    fixedEnv: Readonly<Record<string, string>>,
+  ): void {
+    if (
+      command !== detection.binary.command
+      || cwd !== this.cwd
+      || !Array.isArray(argv)
+      || argv.length === 0
+      || !isPlainRecord(fixedEnv)
+      || Object.keys(fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
+        key as typeof PROVIDER_KEY_NAMES[number],
+      ))
+    ) throw new Error('adapter_unavailable');
+    const serialized = safeJson({ command, argv, cwd, fixedEnv });
+    const sensitive = [run.task, ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? '')];
+    if (!serialized || containsSensitiveValue(serialized, sensitive)) {
+      throw new Error('adapter_unavailable');
+    }
+  }
+
+  private createEnvironment(
+    fixedEnv: Readonly<Record<string, string>>,
+    argvSignature: string,
+  ): NodeJS.ProcessEnv {
+    const environment = { ...this.environment };
+    for (const key of PROVIDER_KEY_NAMES) delete environment[key];
+    for (const [key, value] of Object.entries(fixedEnv)) environment[key] = value;
+    environment.FSB_AGENT_ARGV_SIGNATURE = argvSignature;
+    for (const key of PROVIDER_KEY_NAMES) delete environment[key];
+    return Object.freeze(environment);
+  }
+
+  private async resolveActivation(
+    entry: PreparedJournalEntry,
+    expectedPid: number,
+  ): Promise<Extract<ProcessInspection, { classification: 'confirmed' }>> {
+    const started = this.monotonicNow();
+    for (let attempt = 0; attempt < this.activationAttempts; attempt += 1) {
+      const inspection = await this.dependencies.inspector.inspect(entry);
+      if (inspection.classification === 'confirmed') {
+        if (
+          inspection.process.pid !== expectedPid
+          || (this.platform !== 'win32' && inspection.process.processGroupId !== expectedPid)
+        ) throw new Error('activation_failed');
+        return inspection;
+      }
+      if (
+        inspection.classification === 'ambiguous'
+        && (inspection.reason === 'identity_mismatch' || inspection.reason === 'multiple_matches')
+      ) throw new Error('activation_failed');
+      if (attempt + 1 < this.activationAttempts) {
+        await this.wait(DEFAULT_ACTIVATION_POLL_MS);
+        if (this.monotonicNow() < started) throw new Error('activation_failed');
+      }
+    }
+    throw new Error('activation_failed');
+  }
+
+  private consumeEvents(run: DelegationRun, stream: NodeJS.ReadableStream): Promise<void> {
+    return (async () => {
+      try {
+        for await (const event of run.adapter.parseEvents(stream)) {
+          const serialized = validateNormalizedEvent(event);
+          const sensitive = [
+            run.task,
+            ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? ''),
+          ];
+          if (containsSensitiveValue(serialized, sensitive)) {
+            throw new Error('agent_protocol_drift');
+          }
+          if (event.type === 'result') {
+            if (run.resultEvent) throw new Error('agent_protocol_drift');
+            run.resultEvent = event;
+          } else {
+            this.publishOrBuffer(run, event, serialized);
+          }
+        }
+        if (!run.resultEvent) throw new Error('agent_protocol_drift');
+        this.publishOrBuffer(run, run.resultEvent, validateNormalizedEvent(run.resultEvent));
+      } catch (error) {
+        run.parserError = error;
+        if (run.authorityGranted && run.child && run.entry && !run.terminationPromise) {
+          void this.terminateAndCleanup(run).catch(() => undefined);
+        }
+      }
+    })();
+  }
+
+  private async drainStderr(stream: NodeJS.ReadableStream): Promise<void> {
+    let retainedBytes = 0;
+    for await (const chunk of stream as AsyncIterable<Buffer | string>) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, 'utf8');
+      retainedBytes = Math.min(STDERR_LIMIT_BYTES, retainedBytes + bytes);
+    }
+    void retainedBytes;
+  }
+
+  private publishOrBuffer(run: DelegationRun, event: AgentEvent, serialized: string): void {
+    if (run.authorityGranted) {
+      this.emitNormalizedEvent(run, event);
+      return;
+    }
+    run.bufferedEventBytes += Buffer.byteLength(serialized, 'utf8');
+    if (
+      run.bufferedEvents.length >= PRE_AUTH_EVENT_LIMIT_COUNT
+      || run.bufferedEventBytes > PRE_AUTH_EVENT_LIMIT_BYTES
+    ) throw new Error('agent_protocol_drift');
+    run.bufferedEvents.push(event);
+  }
+
+  private emitStarted(run: DelegationRun, entry: ActiveJournalEntry): void {
+    try {
+      run.emit({
+        id: run.requestId,
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: {
+          delegationId: run.delegationId,
+          adapterId: entry.adapterId,
+          profileVersion: entry.profileVersion,
+        },
+      });
+    } catch {
+      throw new Error('route_lost');
+    }
+  }
+
+  private emitNormalizedEvent(run: DelegationRun, event: AgentEvent): void {
+    if (run.settled) return;
+    try {
+      run.emit({
+        id: run.requestId,
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: { delegationId: run.delegationId, event },
+      });
+    } catch {
+      throw new Error('route_lost');
+    }
+  }
+
+  private flushBufferedEvents(run: DelegationRun): void {
+    const events = run.bufferedEvents;
+    run.bufferedEvents = [];
+    run.bufferedEventBytes = 0;
+    for (const event of events) this.emitNormalizedEvent(run, event);
+  }
+
+  private async writeTask(child: ChildProcessWithoutNullStreams, task: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      let callbackDone = false;
+      let drainDone = true;
+      let settled = false;
+      const cleanup = (keepPendingErrorListener = false): void => {
+        if (!keepPendingErrorListener) child.stdin.off('error', onError);
+        child.stdin.off('drain', onDrain);
+      };
+      const finish = (): void => {
+        if (settled || !callbackDone || !drainDone) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const onError = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup(true);
+        reject(new Error('stdin_failed'));
+      };
+      const onDrain = (): void => {
+        drainDone = true;
+        finish();
+      };
+      child.stdin.once('error', onError);
+      const accepted = child.stdin.write(task, 'utf8', (error?: Error | null) => {
+        if (error) {
+          onError();
+          return;
+        }
+        callbackDone = true;
+        finish();
+      });
+      if (!accepted) {
+        drainDone = false;
+        child.stdin.once('drain', onDrain);
+      }
+    });
+    child.stdin.end();
+  }
+
+  private async terminateAndCleanup(run: DelegationRun): Promise<void> {
+    if (run.terminationPromise) return run.terminationPromise;
+    run.terminationPromise = (async () => {
+      const entry = run.entry;
+      if (!entry) return;
+      if (run.supervisedChild) {
+        await this.dependencies.terminator.stop(
+          entry,
+          run.supervisedChild,
+          { grace: this.terminationGrace },
+        );
+      } else {
+        const inspection = await this.dependencies.inspector.inspect(entry);
+        if (inspection.classification === 'confirmed') {
+          await this.dependencies.terminator.stop(
+            entry,
+            null,
+            { grace: this.terminationGrace },
+          );
+        } else if (inspection.classification !== 'stale') {
+          throw new TreeUnsettledError();
+        }
+      }
+      await this.dependencies.runtimeFiles.removeRun(run.delegationId);
+      if (run.supervisedChild) this.entriesByPid.delete(run.supervisedChild.pid);
+      run.entry = null;
+    })();
+    return run.terminationPromise;
+  }
+
+  private async cancel(delegationId: string): Promise<Record<string, unknown>> {
+    const run = this.activeRuns.get(delegationId);
+    if (!run) {
+      return Object.freeze({
+        delegationId,
+        status: this.completedRuns.has(delegationId) ? 'already_terminal' : 'not_found',
+      });
+    }
+    const result = await this.cancelRun(run, 'daemon_shutdown');
+    return Object.freeze({
+      delegationId,
+      status: result.status === 'cancelled' ? 'cancelled' : 'failed',
+    });
+  }
+
+  private cancelRun(
+    run: DelegationRun,
+    reason: 'daemon_shutdown',
+  ): Promise<RunTerminalResult> {
+    if (run.cancelPromise) return run.cancelPromise;
+    run.stopRequested = true;
+    run.failureCode = reason;
+    run.state = 'stopping';
+    run.cancelPromise = this.cancelLifecycle(run, reason);
+    return run.cancelPromise;
+  }
+
+  private async cancelLifecycle(
+    run: DelegationRun,
+    reason: DelegationFailureCode,
+  ): Promise<RunTerminalResult> {
+    if (run.settled) return run.terminalPromise;
+    try {
+      if (run.entry) await this.terminateAndCleanup(run);
+      if (run.streams) {
+        await Promise.allSettled([run.streams.parser, run.streams.stderr, run.streams.closed]);
+      }
+      this.settleOnce(run, 'cancelled', diagnosticTerminal('cancelled', run.profileVersion));
+    } catch {
+      this.settleOnce(run, 'failed', diagnosticTerminal('tree_unsettled', run.profileVersion));
+    }
+    if (!run.settled) {
+      this.settleOnce(run, 'failed', diagnosticTerminal(reason, run.profileVersion));
+    }
+    return run.terminalPromise;
+  }
+
+  private failureCode(error: unknown): DelegationFailureCode {
+    const code = errorCode(error) ?? (error instanceof Error ? error.message : '');
+    if (code === 'agent_protocol_drift') return 'agent_protocol_drift';
+    if (code === 'adapter_unavailable') return 'adapter_unavailable';
+    if (code === 'activation_failed') return 'activation_failed';
+    if (code === 'stdin_failed') return 'stdin_failed';
+    if (code === 'process_exit') return 'process_exit';
+    if (code === 'tree_unsettled') return 'tree_unsettled';
+    if (code === 'daemon_shutdown') return 'daemon_shutdown';
+    if (code === 'route_lost') return 'route_lost';
+    return 'spawn_failed';
+  }
+
+  private requireResultEvent(run: DelegationRun): AgentEvent {
+    const event = run.resultEvent as AgentEvent | null;
+    if (!event) throw new Error('agent_protocol_drift');
+    return event;
+  }
+
+  private settleOnce(
+    run: DelegationRun,
+    status: DelegationStatus,
+    terminal: Readonly<Record<string, unknown>>,
+  ): boolean {
+    if (run.settled) return false;
+    run.settled = true;
+    run.state = 'settled';
+    const result = Object.freeze({
+      delegationId: run.delegationId,
+      status,
+      terminal,
+    });
+    this.activeRuns.delete(run.delegationId);
+    this.completedRuns.set(run.delegationId, result);
+    while (this.completedRuns.size > COMPLETED_RUN_LIMIT) {
+      const first = this.completedRuns.keys().next().value as string | undefined;
+      if (!first) break;
+      this.completedRuns.delete(first);
+    }
+    run.resolveTerminal(result);
+    return true;
+  }
+}
+
+export function createSpawnSupervisor(
+  dependencies: SpawnSupervisorDependencies,
+): SpawnSupervisor {
+  return new ExactOnceSpawnSupervisor(dependencies);
+}
+
+export const DELEGATION_TASK_LIMIT_BYTES = TASK_LIMIT_BYTES;
+export const DELEGATION_STDERR_LIMIT_BYTES = STDERR_LIMIT_BYTES;
+export const DELEGATION_PROVIDER_KEY_NAMES = PROVIDER_KEY_NAMES;
