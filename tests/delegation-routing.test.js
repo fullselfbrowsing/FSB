@@ -125,6 +125,20 @@ async function main() {
   assert.equal(Object.isFrozen(preflight), true);
   assert.deepEqual(Object.keys(preflight), ['check']);
 
+  const futureConsentUiContract = Object.freeze({
+    allowed: '{CLI} may drive FSB browser tools for this task.',
+    forbidden: 'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
+    trust: 'Trust {CLI} for future runs',
+    trustExplanation: 'This turns off confirmation for future {CLI} runs on this browser. You can restore confirmation in Providers.'
+  });
+  assert.deepEqual(futureConsentUiContract, {
+    allowed: '{CLI} may drive FSB browser tools for this task.',
+    forbidden: 'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
+    trust: 'Trust {CLI} for future runs',
+    trustExplanation: 'This turns off confirmation for future {CLI} runs on this browser. You can restore confirmation in Providers.'
+  }, 'future UI fixture pins the approved safety scope and confirmation restore promise');
+  assert.doesNotMatch(JSON.stringify(futureConsentUiContract), /\b(?:faster|free|unlimited)\b/i);
+
   const apiProviders = ['xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'];
   for (const modelProvider of apiProviders) {
     for (const agentProviderId of ['', 'claude-code', 'codex']) {
@@ -225,7 +239,10 @@ async function main() {
     /\bwindow\b/,
     /sendMessage/,
     /sendExtRequest/,
-    /query\s*\(/
+    /query\s*\(/,
+    /\bchat\b/,
+    /\bcomposer\b/,
+    /\bsession\b/
   ]) {
     assert.doesNotMatch(preflightSource, forbidden,
       `pure preflight excludes ${String(forbidden)}`);

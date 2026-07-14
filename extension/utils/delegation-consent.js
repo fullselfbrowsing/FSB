@@ -2,6 +2,7 @@
   'use strict';
 
   var CHALLENGE_STORAGE_KEY = 'fsbDelegationConsentChallenges';
+  var TRUST_STORAGE_KEY = 'fsbDelegationProviderTrust';
   var PAYLOAD_VERSION = 1;
   var MAX_CHALLENGE_TTL_MS = 5 * 60 * 1000;
   var DEFAULT_CHALLENGE_TTL_MS = MAX_CHALLENGE_TTL_MS;
@@ -70,7 +71,17 @@
       : null;
   }
 
-  function _callStorage(area, method, argument) {
+  function _localArea() {
+    var chromeApi = _getChrome();
+    var area = chromeApi && chromeApi.storage ? chromeApi.storage.local : null;
+    return area
+      && typeof area.get === 'function'
+      && typeof area.set === 'function'
+      ? area
+      : null;
+  }
+
+  function _callStorage(area, method, argument, errorCode) {
     return new Promise(function(resolve, reject) {
       var settled = false;
       function finish(error, value) {
@@ -82,17 +93,17 @@
       function callback(value) {
         var chromeApi = _getChrome();
         var lastError = chromeApi && chromeApi.runtime ? chromeApi.runtime.lastError : null;
-        finish(lastError ? _storageError('challenge_storage_error') : null, value);
+        finish(lastError ? _storageError(errorCode) : null, value);
       }
       try {
         var returned = area[method](argument, callback);
         if (returned && typeof returned.then === 'function') {
           returned.then(function(value) { finish(null, value); }, function() {
-            finish(_storageError('challenge_storage_error'));
+            finish(_storageError(errorCode));
           });
         }
       } catch (_error) {
-        finish(_storageError('challenge_storage_error'));
+        finish(_storageError(errorCode));
       }
     });
   }
@@ -133,7 +144,7 @@
   async function _readEnvelope() {
     var area = _sessionArea();
     if (!area) throw _storageError('challenge_storage_unavailable');
-    var stored = await _callStorage(area, 'get', [CHALLENGE_STORAGE_KEY]);
+    var stored = await _callStorage(area, 'get', [CHALLENGE_STORAGE_KEY], 'challenge_storage_error');
     return _parseEnvelope(stored);
   }
 
@@ -142,7 +153,7 @@
     if (!area) throw _storageError('challenge_storage_unavailable');
     var keys = Object.keys(envelope.challenges);
     if (keys.length === 0 && typeof area.remove === 'function') {
-      await _callStorage(area, 'remove', CHALLENGE_STORAGE_KEY);
+      await _callStorage(area, 'remove', CHALLENGE_STORAGE_KEY, 'challenge_storage_error');
       return;
     }
     var update = {};
@@ -150,7 +161,52 @@
       v: PAYLOAD_VERSION,
       challenges: envelope.challenges
     };
-    await _callStorage(area, 'set', update);
+    await _callStorage(area, 'set', update, 'challenge_storage_error');
+  }
+
+  function _emptyTrustProviders() {
+    return Object.create(null);
+  }
+
+  function _parseTrustEnvelope(stored) {
+    var raw = stored ? stored[TRUST_STORAGE_KEY] : undefined;
+    if (raw === undefined) return { v: PAYLOAD_VERSION, providers: _emptyTrustProviders() };
+    if (!_isPlainRecord(raw)
+        || Object.keys(raw).sort().join(',') !== 'providers,v'
+        || raw.v !== PAYLOAD_VERSION
+        || !_isPlainRecord(raw.providers)) {
+      throw _storageError('trust_storage_corrupt');
+    }
+    var providers = _emptyTrustProviders();
+    Object.keys(raw.providers).forEach(function(providerId) {
+      if (providerId !== CANONICAL_PROVIDER_ID || raw.providers[providerId] !== true) {
+        throw _storageError('trust_storage_corrupt');
+      }
+      providers[providerId] = true;
+    });
+    return { v: PAYLOAD_VERSION, providers: providers };
+  }
+
+  async function _readTrustEnvelope() {
+    var area = _localArea();
+    if (!area) throw _storageError('trust_storage_unavailable');
+    var stored = await _callStorage(area, 'get', [TRUST_STORAGE_KEY], 'trust_storage_error');
+    return _parseTrustEnvelope(stored);
+  }
+
+  async function _writeTrustEnvelope(envelope) {
+    var area = _localArea();
+    if (!area) throw _storageError('trust_storage_unavailable');
+    if (Object.keys(envelope.providers).length === 0 && typeof area.remove === 'function') {
+      await _callStorage(area, 'remove', TRUST_STORAGE_KEY, 'trust_storage_error');
+      return;
+    }
+    var update = {};
+    update[TRUST_STORAGE_KEY] = {
+      v: PAYLOAD_VERSION,
+      providers: envelope.providers
+    };
+    await _callStorage(area, 'set', update, 'trust_storage_error');
   }
 
   var _challengeChain = Promise.resolve();
@@ -280,12 +336,99 @@
     });
   }
 
+  function getTrusted(providerId) {
+    if (providerId !== CANONICAL_PROVIDER_ID) return Promise.resolve(false);
+    return _withChallengeLock(async function() {
+      try {
+        var envelope = await _readTrustEnvelope();
+        return envelope.providers[providerId] === true;
+      } catch (_error) {
+        return false;
+      }
+    });
+  }
+
+  function writeTrustFromChallenge(request) {
+    if (!_isExactRequest(
+      request,
+      ['challengeId', 'providerId', 'trusted'],
+      ['challengeId', 'providerId', 'trusted']
+    )
+        || typeof request.challengeId !== 'string'
+        || !CHALLENGE_ID_PATTERN.test(request.challengeId)
+        || request.providerId !== CANONICAL_PROVIDER_ID
+        || request.trusted !== true) {
+      return Promise.resolve(_resultError('invalid_trust_request'));
+    }
+
+    return _withChallengeLock(async function() {
+      try {
+        var challengeEnvelope = await _readEnvelope();
+        if (!Object.prototype.hasOwnProperty.call(challengeEnvelope.challenges, request.challengeId)) {
+          return _resultError('challenge_not_found');
+        }
+        var record = challengeEnvelope.challenges[request.challengeId];
+        if (!_validateChallengeRecord(record, request.challengeId)) {
+          delete challengeEnvelope.challenges[request.challengeId];
+          await _writeEnvelope(challengeEnvelope);
+          return _resultError('challenge_malformed');
+        }
+        if (Date.now() >= record.expiresAt) {
+          delete challengeEnvelope.challenges[request.challengeId];
+          await _writeEnvelope(challengeEnvelope);
+          return _resultError('challenge_expired');
+        }
+        if (record.providerId !== request.providerId) {
+          record.trustWriteUsed = true;
+          await _writeEnvelope(challengeEnvelope);
+          return _resultError('challenge_provider_mismatch');
+        }
+        if (record.trustWriteUsed === true) {
+          return _resultError('trust_challenge_replayed');
+        }
+
+        record.trustWriteUsed = true;
+        await _writeEnvelope(challengeEnvelope);
+
+        var trustEnvelope = await _readTrustEnvelope();
+        trustEnvelope.providers[request.providerId] = true;
+        await _writeTrustEnvelope(trustEnvelope);
+        return { ok: true, providerId: request.providerId, trusted: true };
+      } catch (error) {
+        return _resultError(error && error.code ? error.code : 'trust_storage_error');
+      }
+    });
+  }
+
+  function clearTrusted(request) {
+    if (!_isExactRequest(request, ['providerId'], ['providerId'])
+        || request.providerId !== CANONICAL_PROVIDER_ID) {
+      return Promise.resolve(_resultError('invalid_trust_request'));
+    }
+    return _withChallengeLock(async function() {
+      try {
+        var envelope = await _readTrustEnvelope();
+        if (envelope.providers[request.providerId] === true) {
+          delete envelope.providers[request.providerId];
+          await _writeTrustEnvelope(envelope);
+        }
+        return { ok: true, providerId: request.providerId, trusted: false };
+      } catch (error) {
+        return _resultError(error && error.code ? error.code : 'trust_storage_error');
+      }
+    });
+  }
+
   var api = Object.freeze({
     CHALLENGE_STORAGE_KEY: CHALLENGE_STORAGE_KEY,
+    TRUST_STORAGE_KEY: TRUST_STORAGE_KEY,
     PAYLOAD_VERSION: PAYLOAD_VERSION,
     MAX_CHALLENGE_TTL_MS: MAX_CHALLENGE_TTL_MS,
     issueChallenge: issueChallenge,
-    consumeChallenge: consumeChallenge
+    consumeChallenge: consumeChallenge,
+    getTrusted: getTrusted,
+    writeTrustFromChallenge: writeTrustFromChallenge,
+    clearTrusted: clearTrusted
   });
 
   global.FsbDelegationConsent = api;
