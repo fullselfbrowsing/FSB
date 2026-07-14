@@ -255,6 +255,16 @@ async function flushMicrotasks() {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function assertNoSecrets(value, msg) {
   const serialized = JSON.stringify(value || {});
   assert(!/password|cardNumber|cvv|apiKey/i.test(serialized), msg);
@@ -891,6 +901,143 @@ async function runExtRequestLifecycleCases() {
   }
 }
 
+async function runAsyncExtObserverCases() {
+  console.log('\n--- Phase 61 per-correlation async event barriers ---');
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+
+    const firstEventGate = deferred();
+    const order = [];
+    const removeFirst = client.addEventObserver(async (event) => {
+      order.push(`${event.payload.owner}:${event.payload.step}:global-1:start`);
+      if (event.payload.owner === 'a' && event.payload.step === 1) {
+        await firstEventGate.promise;
+      }
+      order.push(`${event.payload.owner}:${event.payload.step}:global-1:end`);
+    });
+    client.addEventObserver(async (event) => {
+      order.push(`${event.payload.owner}:${event.payload.step}:global-2`);
+    });
+
+    const requestA = client.sendExtRequest('delegate.start', { task: 'a' }, {
+      onEvent: async (_eventName, payload) => {
+        order.push(`${payload.owner}:${payload.step}:request`);
+      }
+    });
+    const frameA = JSON.parse(socket.sent[0]);
+    const requestB = client.sendExtRequest('delegate.start', { task: 'b' }, {
+      onEvent: async (_eventName, payload) => {
+        order.push(`${payload.owner}:${payload.step}:request`);
+      }
+    });
+    const frameB = JSON.parse(socket.sent[1]);
+
+    socket.receive({ id: frameA.id, type: 'ext:event', event: 'progress', payload: { owner: 'a', step: 1 } });
+    socket.receive({ id: frameA.id, type: 'ext:event', event: 'progress', payload: { owner: 'a', step: 2 } });
+    socket.receive({ id: frameB.id, type: 'ext:event', event: 'progress', payload: { owner: 'b', step: 1 } });
+    socket.receive({ id: frameA.id, type: 'ext:response', payload: { ok: 'a' } });
+    socket.receive({ id: frameB.id, type: 'ext:response', payload: { ok: 'b' } });
+
+    let aSettled = false;
+    requestA.finally(() => { aSettled = true; });
+    const resultB = await requestB;
+    assertDeepEqual(toPlainObject(resultB), { ok: 'b' }, 'a second correlation settles while the first correlation observer is deferred');
+    assertEqual(aSettled, false, 'matching final remains blocked behind its own deferred observer tail');
+    assert(order.includes('b:1:request'), 'the unrelated correlation runs its complete observer roster independently');
+    assert(!order.includes('a:2:global-1:start'), 'event N+1 waits for deferred event N within one correlation');
+
+    firstEventGate.resolve();
+    const resultA = await requestA;
+    assertDeepEqual(toPlainObject(resultA), { ok: 'a' }, 'matching final resolves after every earlier event observer completes');
+    assertDeepEqual(order.filter((entry) => entry.startsWith('a:')), [
+      'a:1:global-1:start',
+      'a:1:global-1:end',
+      'a:1:global-2',
+      'a:1:request',
+      'a:2:global-1:start',
+      'a:2:global-1:end',
+      'a:2:global-2',
+      'a:2:request'
+    ], 'global observers retain registration order and legacy per-request observers run after them for each event');
+    assertEqual(removeFirst(), true, 'observer remover unregisters its observer exactly once');
+    assertEqual(removeFirst(), false, 'observer remover is idempotent');
+  }
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+
+    let failingObserverCalls = 0;
+    client.addEventObserver((event) => {
+      if (event.payload.fail === 'throw') {
+        failingObserverCalls++;
+        throw new Error('synchronous observer detail');
+      }
+      if (event.payload.fail === 'reject') {
+        failingObserverCalls++;
+        return Promise.reject(new Error('asynchronous observer detail'));
+      }
+      return undefined;
+    });
+
+    const throwing = client.sendExtRequest('delegate.start', { task: 'throw' });
+    const throwFrame = JSON.parse(socket.sent[0]);
+    const unrelated = client.sendExtRequest('delegate.start', { task: 'unrelated' });
+    const unrelatedFrame = JSON.parse(socket.sent[1]);
+    socket.receive({ id: throwFrame.id, type: 'ext:event', event: 'progress', payload: { fail: 'throw' } });
+    socket.receive({ id: unrelatedFrame.id, type: 'ext:event', event: 'progress', payload: { ok: true } });
+    socket.receive({ id: throwFrame.id, type: 'ext:response', payload: { nominalSuccess: true } });
+    socket.receive({ id: unrelatedFrame.id, type: 'ext:response', payload: { ok: true } });
+
+    await throwing.then(
+      () => assert(false, 'a synchronous observer failure wins over a nominal success final'),
+      (error) => {
+        assertEqual(error.code, 'ext_event_observer_failed', 'synchronous observer failure becomes the typed bridge failure');
+        assertEqual(error.retryable, false, 'observer failure is non-retryable at the bridge correlation boundary');
+      }
+    );
+    assertDeepEqual(toPlainObject(await unrelated), { ok: true }, 'observer failure does not reject or delay an unrelated request');
+
+    const rejecting = client.sendExtRequest('delegate.start', { task: 'reject' });
+    const rejectFrame = JSON.parse(socket.sent[2]);
+    socket.receive({ id: rejectFrame.id, type: 'ext:event', event: 'progress', payload: { fail: 'reject' } });
+    socket.receive({ id: rejectFrame.id, type: 'ext:response', payload: { nominalSuccess: true } });
+    await rejecting.then(
+      () => assert(false, 'an asynchronous observer rejection wins over a later nominal final'),
+      (error) => assertEqual(error.code, 'ext_event_observer_failed', 'asynchronous observer rejection uses the same typed bridge failure')
+    );
+    assertEqual(failingObserverCalls, 2, 'sync and async observer failures each execute once and are never replayed');
+  }
+}
+
+function runAsyncObserverSourceShapeCase() {
+  console.log('\n--- Phase 61 async observer source-shape pins ---');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
+  for (const snippet of [
+    'eventTail: Promise.resolve()',
+    'observerError: null',
+    'pending.eventTail = pending.eventTail',
+    'await pending.eventTail',
+    'ext_event_observer_failed',
+    'addEventObserver(observer)'
+  ]) {
+    assert(source.includes(snippet), `bridge source includes per-pending observer barrier: ${snippet}`);
+  }
+  assert(!source.includes('_extEventTail'), 'bridge source has no global event promise tail');
+  assert(!/forEach\s*\(\s*async\b/.test(source), 'bridge source has no unawaited async forEach observer path');
+  assert(!source.includes('event observers do not settle'), 'bridge source has no catch-and-continue observer failure path');
+}
+
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
@@ -904,6 +1051,8 @@ async function run() {
   await runPairingConstructionCases();
   await runPairingProbeAndReloadCases();
   await runExtRequestLifecycleCases();
+  await runAsyncExtObserverCases();
+  runAsyncObserverSourceShapeCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

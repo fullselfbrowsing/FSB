@@ -75,6 +75,7 @@ class MCPBridgeClient {
     this._pairingStatus = 'unpaired';
     this._authProbePromise = null;
     this._extPending = new Map();
+    this._extEventObservers = [];
     this._extRequestCounter = 0;
     this._replacementSockets = new Set();
     this._socketWaiters = new Set();
@@ -496,6 +497,79 @@ class MCPBridgeClient {
     return error;
   }
 
+  addEventObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Extension event observer must be a function');
+    }
+    this._extEventObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._extEventObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._extEventObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _makeExtObserverError(error) {
+    const typed = this._makeExtError(
+      'Extension event observer failed',
+      'ext_event_observer_failed',
+      false,
+    );
+    if (error !== undefined) typed.cause = error;
+    return typed;
+  }
+
+  async _runExtEventObservers(pending, id, eventName, payload, observers) {
+    const event = Object.freeze({
+      id,
+      method: pending.method,
+      event: eventName,
+      payload,
+    });
+    for (const observer of observers) {
+      await observer(event);
+    }
+    if (pending.onEvent) {
+      await pending.onEvent(eventName, payload);
+    }
+  }
+
+  _appendExtEvent(pending, id, eventName, payload) {
+    const observers = [...this._extEventObservers];
+    pending.eventTail = pending.eventTail
+      .then(async () => {
+        if (pending.observerError) return;
+        await this._runExtEventObservers(pending, id, eventName, payload, observers);
+      })
+      .catch((error) => {
+        if (!pending.observerError) {
+          pending.observerError = this._makeExtObserverError(error);
+        }
+      });
+  }
+
+  async _settleExtResponseAfterEvents(pending, response) {
+    await pending.eventTail;
+    if (pending.observerError) {
+      pending.reject(pending.observerError);
+      return;
+    }
+    if (response.hasPayload) {
+      pending.resolve(response.payload);
+      return;
+    }
+    if (response.error.code === 'ext_unauthorized') this._setPairingStatus('expired');
+    pending.reject(this._makeExtError(
+      response.error.message,
+      response.error.code,
+      response.error.retryable,
+    ));
+  }
+
   sendExtRequest(method, payload, options = {}) {
     if (typeof method !== 'string' || !EXT_METHOD_PATTERN.test(method)) {
       return Promise.reject(this._makeExtError('Invalid extension request method', 'invalid_ext_request', false));
@@ -528,7 +602,10 @@ class MCPBridgeClient {
         reject,
         timer,
         socket,
+        method,
         onEvent: typeof options.onEvent === 'function' ? options.onEvent : null,
+        eventTail: Promise.resolve(),
+        observerError: null,
       });
 
       try {
@@ -550,9 +627,7 @@ class MCPBridgeClient {
 
     if (msg.type === 'ext:event') {
       if (typeof msg.event !== 'string' || !this._isPlainRecord(msg.payload)) return true;
-      if (pending.onEvent) {
-        try { pending.onEvent(msg.event, msg.payload); } catch (_error) { /* event observers do not settle */ }
-      }
+      this._appendExtEvent(pending, msg.id, msg.event, msg.payload);
       return true;
     }
 
@@ -563,21 +638,19 @@ class MCPBridgeClient {
     if (hasError && !this._isPlainRecord(msg.error)) return true;
     clearTimeout(pending.timer);
     this._extPending.delete(msg.id);
-
-    if (hasPayload) {
-      pending.resolve(msg.payload);
-      return true;
-    }
-    if (hasError) {
-      const code = typeof msg.error.code === 'string' ? msg.error.code : 'invalid_ext_request';
-      const retryable = msg.error.retryable === true;
-      if (code === 'ext_unauthorized') this._setPairingStatus('expired');
-      pending.reject(this._makeExtError(
-        typeof msg.error.message === 'string' ? msg.error.message : 'Extension request failed',
-        code,
-        retryable,
-      ));
-    }
+    const response = hasPayload
+      ? { hasPayload: true, payload: msg.payload }
+      : {
+          hasPayload: false,
+          error: {
+            code: typeof msg.error.code === 'string' ? msg.error.code : 'invalid_ext_request',
+            message: typeof msg.error.message === 'string' ? msg.error.message : 'Extension request failed',
+            retryable: msg.error.retryable === true,
+          },
+        };
+    this._settleExtResponseAfterEvents(pending, response).catch((error) => {
+      pending.reject(this._makeExtObserverError(error));
+    });
     return true;
   }
 
