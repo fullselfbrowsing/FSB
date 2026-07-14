@@ -53,15 +53,15 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### UX -- Delegation UX
 
 - [x] **UX-01**: A fifth entry `delegated` in `EXECUTION_MODES` (`extension/ai/engine-config.js`) defines: `uiFeedbackChannel: 'popup-sidepanel'`, `animatedHighlights: true`, `safetyLimits: { wallClockMs, eventSilenceMs }` (no iteration cap -- the loop runs in the spawned CLI, not `runAgentLoop`), and is selected when the active provider is `agent`-kind.
-- [ ] **UX-02**: The side panel renders a live per-run streaming feed with distinct card types for init (client, model, session id, allowed tools), tool-call (name, args summary, tab id), retry (typed error class), and result (usage summary), driven by the normalized `AgentEvent` stream.
+- [x] **UX-02**: The side panel renders a live per-run streaming feed with distinct card types for init (client, model, session id, allowed tools), tool-call (name, args summary, tab id), retry (typed error class), and result (usage summary), driven by the normalized `AgentEvent` stream.
 - [x] **UX-03**: Before FSB spawns any agent CLI for the first time, the user sees an explicit consent card that names the CLI, what it will be permitted to do (drive the FSB MCP tools on the user's live browser), and what it will not be permitted to do (edit files, run shell, fetch arbitrary URLs). A per-run confirm-to-continue toggle is on by default and can be disabled per provider only via an explicit "trust this agent" setting.
-- [ ] **UX-04**: A prominent Stop button in the side panel triggers `stopDelegatedTask`, which routes to the supervisor's kill and, on confirmed exit, releases every tab that was owned by the spawned agent (per v0.9.60 ownership) and reports "Agent stopped, N tab(s) released" in the feed.
-- [ ] **UX-05**: A delegated run opens by default in a new background tab; when the user activates the tab that the agent is driving, a persistent "Take control" affordance appears; clicking it pauses the agent (v0.9.60 ownership release + supervisor grace hold), lets the user interact, and offers "Resume with agent" to give ownership back.
-- [ ] **UX-06**: A post-run summary card displays tokens (in/out/total), turn count, wall-clock duration, cost bucket (`included in your subscription` for agent kind; real USD for api kind), and a per-tool-call breakdown, expandable to the full tool-call log for the run.
+- [x] **UX-04**: A prominent Stop button in the side panel triggers `stopDelegatedTask`, which routes to the supervisor's kill and, on confirmed exit, releases every tab that was owned by the spawned agent (per v0.9.60 ownership) and reports "Agent stopped, N tab(s) released" in the feed.
+- [x] **UX-05**: A delegated run opens by default in a new background tab; when the user activates the tab that the agent is driving, a persistent "Take control" affordance appears; clicking it pauses the agent (v0.9.60 ownership release + supervisor grace hold), lets the user interact, and offers "Resume with agent" to give ownership back.
+- [x] **UX-06**: A post-run summary card displays tokens (in/out/total), turn count, wall-clock duration, cost bucket (`included in your subscription` for agent kind; real USD for api kind), and a per-tool-call breakdown, expandable to the full tool-call log for the run.
 
 ### LIFE -- Lifecycle & Persistence
 
-- [ ] **LIFE-01**: Every progress event received from the supervisor is written to `chrome.storage.session` under a per-delegation key before it fans out to UI subscribers, so a MV3 service worker eviction mid-run reloads exactly the delivered feed on re-open.
+- [x] **LIFE-01**: Every progress event received from the supervisor is written to `chrome.storage.session` under a per-delegation key before it fans out to UI subscribers, so a MV3 service worker eviction mid-run reloads exactly the delivered feed on re-open.
 - [ ] **LIFE-02**: While a delegation is active, the extension pings the bridge every 20 s over the existing WS heartbeat channel to keep the Chrome 116+ SW-lifetime extension applied; if 3 heartbeats are missed the extension shows a `daemon:disconnected` fallback that offers a doctor-relaunch button but does not attempt an in-extension restart.
 - [x] **LIFE-03**: If `fsb-mcp-server serve` is not running when a delegated send is attempted, the side panel shows an "Agent offline" state with a deep-link to `fsb-mcp-server doctor` output and does not enqueue or optimistically show the message.
 - [ ] **LIFE-04**: On daemon restart while a delegation was mid-flight, the supervisor does not re-adopt any surviving spawned CLI; it kills it (LIFE-04 restart-is-clean) and reports `daemon_restart_lost_run` in the side panel so the user knows the run ended.
@@ -158,12 +158,12 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CLAUDE-03 | Phase 60 | Complete |
 | CLAUDE-04 | Phase 60 | Complete |
 | UX-01 | Phase 61 | Complete |
-| UX-02 | Phase 61 | Pending |
+| UX-02 | Phase 61 | Complete |
 | UX-03 | Phase 61 | Complete |
-| UX-04 | Phase 61 | Pending |
-| UX-05 | Phase 61 | Pending |
-| UX-06 | Phase 61 | Pending |
-| LIFE-01 | Phase 61 | Pending |
+| UX-04 | Phase 61 | Complete |
+| UX-05 | Phase 61 | Complete |
+| UX-06 | Phase 61 | Complete |
+| LIFE-01 | Phase 61 | Complete |
 | LIFE-02 | Phase 61 | Pending |
 | LIFE-03 | Phase 61 | Complete |
 | LIFE-04 | Phase 61 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-14 after Phase 61 Plan 01 completion (30/51 requirements complete; all live checks deferred to milestone end)*
+*Last updated: 2026-07-14 after Phase 61 Plan 02 completion (35/51 requirements complete; all live checks deferred to milestone end)*
