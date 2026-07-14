@@ -46,6 +46,14 @@ function normalizedEvent(type, payload = {}) {
   return { type, sessionId: 'session_fixture_0001', payload };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 async function* parseNormalizedLines(stream) {
   let pending = '';
   for await (const chunk of stream) {
@@ -135,6 +143,7 @@ function makeHarness(supervisorModule, options = {}) {
   const spawnCalls = [];
   const children = new Map();
   const counters = { detect: 0, build: 0, prepare: 0, activate: 0, remove: 0 };
+  const runtimeRuns = new Map();
   let preparedEntry = null;
   let activeEntry = null;
   const command = '/fixture/bin/claude';
@@ -157,7 +166,9 @@ function makeHarness(supervisorModule, options = {}) {
     async buildSpawn(task, context) {
       counters.build += 1;
       order.push('build');
+      if (options.buildGate) await options.buildGate.promise;
       if (options.buildError) throw new Error('fixture build failure');
+      runtimeRuns.set(context.delegationId, 'config');
       return Object.freeze({
         adapterId: 'claude-code',
         profileVersion,
@@ -208,9 +219,11 @@ function makeHarness(supervisorModule, options = {}) {
     async prepareRun(input) {
       counters.prepare += 1;
       order.push('prepare');
+      if (options.prepareGate) await options.prepareGate.promise;
       if (options.prepareError) throw new Error('fixture prepare failure');
       const { endpoint: _endpoint, ...journalInput } = input;
       preparedEntry = Object.freeze({ state: 'prepared', ...journalInput });
+      runtimeRuns.set(input.delegationId, 'prepared');
       return {
         entry: preparedEntry,
         runDirectory: `${runtimeRoot}/${input.delegationId}`,
@@ -220,6 +233,7 @@ function makeHarness(supervisorModule, options = {}) {
     async activateRun(input) {
       counters.activate += 1;
       order.push('activate');
+      if (options.activateGate) await options.activateGate.promise;
       assert.equal(spawnCalls[0]?.child.stdinBytes.length ?? 0, 0, 'task is held before active journal commit');
       assert.equal(emitted.length, 0, 'no event escapes before active journal commit');
       if (options.activateError) throw new Error('fixture activate failure');
@@ -231,12 +245,14 @@ function makeHarness(supervisorModule, options = {}) {
         startedAt: input.startedAt,
         processStartIdentity: input.processStartIdentity,
       });
+      runtimeRuns.set(input.delegationId, 'active');
       return activeEntry;
     },
     async removeRun(delegationId) {
       counters.remove += 1;
       order.push(`remove:${delegationId}`);
       if (options.removeError) throw new Error('fixture remove failure');
+      runtimeRuns.delete(delegationId);
     },
   };
 
@@ -254,6 +270,7 @@ function makeHarness(supervisorModule, options = {}) {
   const inspector = {
     async inspect(entry) {
       order.push(`inspect:${entry.state}`);
+      if (options.resolveActivationGate) await options.resolveActivationGate.promise;
       const value = inspections[Math.min(inspectionOffset, inspections.length - 1)];
       inspectionOffset += 1;
       if (value instanceof Error) throw value;
@@ -358,6 +375,7 @@ function makeHarness(supervisorModule, options = {}) {
     spawnCalls,
     children,
     counters,
+    runtimeRuns,
     terminationCalls,
     degradations,
     runtimeFiles,
@@ -716,6 +734,54 @@ async function runCancelAndShutdownTests(supervisorModule) {
   }
 }
 
+async function runSetupCancellationRaceTests(supervisorModule) {
+  for (const fixture of [
+    { name: 'buildSpawn', gateOption: 'buildGate', marker: 'build', expectedPrepare: 0, expectedSpawn: 0 },
+    { name: 'prepareRun', gateOption: 'prepareGate', marker: 'prepare', expectedPrepare: 1, expectedSpawn: 0 },
+    { name: 'resolveActivation', gateOption: 'resolveActivationGate', marker: 'inspect:prepared', expectedPrepare: 1, expectedSpawn: 1 },
+    { name: 'activateRun', gateOption: 'activateGate', marker: 'activate', expectedPrepare: 1, expectedSpawn: 1 },
+  ]) {
+    const gate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      [fixture.gateOption]: gate,
+      onStdinEnd: () => {},
+    });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: `${fixture.name} cancellation barrier` }),
+      harness.emit,
+    );
+    await waitFor(() => harness.order.includes(fixture.marker), `${fixture.name} held stage`);
+    let closeSettled = false;
+    const closePromise = harness.supervisor.close().then((result) => {
+      closeSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(closeSettled, false, `${fixture.name} close joins the held setup mutation`);
+    gate.resolve();
+    const [closed, terminal] = await Promise.all([closePromise, startPromise]);
+    assert.deepEqual(closed, { cancelled: 1, failed: 0, alreadySettled: 0 }, `${fixture.name} close classifies one cancellation`);
+    assert.equal(terminal.status, 'cancelled', `${fixture.name} start settles only after cancellation cleanup`);
+    assert.equal(harness.counters.prepare, fixture.expectedPrepare, `${fixture.name} does not advance into an extra prepare mutation`);
+    assert.equal(harness.spawnCalls.length, fixture.expectedSpawn, `${fixture.name} does not advance into an extra spawn`);
+    assert.equal(harness.runtimeRuns.size, 0, `${fixture.name} leaves no runtime config or journal entry`);
+    assert.equal(harness.emitted.length, 0, `${fixture.name} grants no task authority`);
+    if (harness.spawnCalls[0]) {
+      assert.equal(Buffer.concat(harness.spawnCalls[0].child.stdinBytes).length, 0, `${fixture.name} writes no task bytes`);
+      assert.equal(
+        harness.supervisor.journalEntryForChild({
+          pid: harness.spawnCalls[0].child.pid,
+          processGroupId: harness.spawnCalls[0].child.pid,
+          platform: 'linux',
+          closed: Promise.resolve({ code: 0, signal: null }),
+        }),
+        null,
+        `${fixture.name} clears the PID journal map before settlement`,
+      );
+    }
+  }
+}
+
 async function runRecoveryAndRegistryTests(supervisorModule, registryModule) {
   const harness = makeHarness(supervisorModule);
   assert.deepEqual(await harness.supervisor.recover(), {
@@ -760,6 +826,7 @@ async function main() {
   await runHappyPathTest(supervisorModule);
   await runFailureBarrierTests(supervisorModule);
   await runCancelAndShutdownTests(supervisorModule);
+  await runSetupCancellationRaceTests(supervisorModule);
   await runRecoveryAndRegistryTests(supervisorModule, registryModule);
   console.log('mcp-spawn-supervisor.test.js: PASS');
 }

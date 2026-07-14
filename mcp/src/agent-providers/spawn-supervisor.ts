@@ -181,11 +181,14 @@ interface DelegationRun {
   profileVersion: string;
   readonly terminalPromise: Promise<RunTerminalResult>;
   readonly resolveTerminal: (result: RunTerminalResult) => void;
+  readonly setupPromise: Promise<void>;
+  readonly resolveSetup: () => void;
   state: DelegationRunState;
   settled: boolean;
   authorityGranted: boolean;
   stopRequested: boolean;
   failureCode: DelegationFailureCode | null;
+  runtimeOwned: boolean;
   entry: JournalEntry | null;
   child: ChildProcessWithoutNullStreams | null;
   supervisedChild: SupervisedChild | null;
@@ -196,6 +199,7 @@ interface DelegationRun {
   parserError: unknown;
   terminationPromise: Promise<void> | null;
   cancelPromise: Promise<RunTerminalResult> | null;
+  executionPromise: Promise<void> | null;
 }
 
 export class InvalidDelegationRequestError extends Error {
@@ -493,6 +497,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     const terminalPromise = new Promise<RunTerminalResult>((resolve) => {
       resolveTerminal = resolve;
     });
+    let resolveSetup!: () => void;
+    const setupPromise = new Promise<void>((resolve) => {
+      resolveSetup = resolve;
+    });
     const run: DelegationRun = {
       delegationId,
       requestId,
@@ -502,11 +510,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       profileVersion: 'unknown',
       terminalPromise,
       resolveTerminal,
+      setupPromise,
+      resolveSetup,
       state: 'created',
       settled: false,
       authorityGranted: false,
       stopRequested: false,
       failureCode: null,
+      runtimeOwned: false,
       entry: null,
       child: null,
       supervisedChild: null,
@@ -517,25 +528,29 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       parserError: null,
       terminationPromise: null,
       cancelPromise: null,
+      executionPromise: null,
     };
     this.activeRuns.set(delegationId, run);
-    void this.executeRun(run);
+    run.executionPromise = this.executeRun(run);
+    void run.executionPromise;
     return await terminalPromise as unknown as Record<string, unknown>;
   }
 
   private async executeRun(run: DelegationRun): Promise<void> {
     let profileVersion: string | null = null;
     try {
+      this.throwIfStopped(run);
       if (!this.allowSpawnOnPlatform(this.platform)) throw new Error('adapter_unavailable');
       run.state = 'spawning';
       const detection = await run.adapter.detect();
       validateDetection(detection);
       profileVersion = detection.profileVersion;
       run.profileVersion = profileVersion;
-      if (run.stopRequested) throw new Error('daemon_shutdown');
+      this.throwIfStopped(run);
 
       const runtimeFingerprint = this.uniqueFingerprint();
       const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
+      run.runtimeOwned = true;
       const spec = await run.adapter.buildSpawn({ text: run.task }, {
         adapterId: CLAUDE_CODE_ADAPTER_ID,
         detection,
@@ -545,6 +560,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         privateMcpConfigPath: paths.mcpConfigPath,
         runtimeFiles: [paths.mcpConfigPath],
       });
+      this.throwIfStopped(run);
       this.validateSpawnSpec(run, detection, spec.command, spec.argv, spec.cwd, spec.fixedEnv);
       const argvSignature = createArgvSignature(spec.command, spec.argv);
       const createdAt = this.wallNow();
@@ -559,7 +575,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         endpoint: this.dependencies.endpoint,
       });
       run.entry = prepared.entry;
-      if (run.stopRequested) throw new Error('daemon_shutdown');
+      this.throwIfStopped(run);
 
       const environment = this.createEnvironment(spec.fixedEnv, argvSignature);
       const options: SpawnInvocationOptions = Object.freeze({
@@ -590,7 +606,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         closed: observed.closed,
       };
       await observed.ready;
+      this.throwIfStopped(run);
       const identity = await this.resolveActivation(prepared.entry, supervisedChild.pid);
+      this.throwIfStopped(run);
       const active = await this.dependencies.runtimeFiles.activateRun({
         delegationId: run.delegationId,
         pid: supervisedChild.pid,
@@ -600,23 +618,26 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       });
       run.entry = active;
       this.entriesByPid.set(supervisedChild.pid, active);
+      this.throwIfStopped(run);
       if (run.parserError || run.resultEvent || run.stopRequested) {
-        throw new Error(run.stopRequested ? 'daemon_shutdown' : 'agent_protocol_drift');
+        throw new Error(run.stopRequested
+          ? (run.failureCode ?? 'daemon_shutdown')
+          : 'agent_protocol_drift');
       }
 
       this.emitStarted(run, active);
       run.authorityGranted = true;
       this.flushBufferedEvents(run);
       if (run.parserError || run.stopRequested) {
-        throw new Error(run.stopRequested ? 'daemon_shutdown' : 'agent_protocol_drift');
+        throw new Error(run.stopRequested
+          ? (run.failureCode ?? 'daemon_shutdown')
+          : 'agent_protocol_drift');
       }
       run.state = 'running';
+      run.resolveSetup();
       await this.writeTask(child, run.task);
       await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
-      if (run.stopRequested) {
-        await this.cancelLifecycle(run, run.failureCode ?? 'daemon_shutdown');
-        return;
-      }
+      if (run.stopRequested) return;
       if (run.parserError) throw new Error('agent_protocol_drift');
       const resultEvent = this.requireResultEvent(run);
       const exit = await run.streams.closed;
@@ -630,10 +651,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.settleOnce(run, 'succeeded', eventTerminal(resultEvent));
     } catch (error) {
       if (run.settled) return;
-      if (run.stopRequested) {
-        await this.cancelLifecycle(run, run.failureCode ?? 'daemon_shutdown');
-        return;
-      }
+      if (run.stopRequested) return;
       let code = this.failureCode(error);
       try {
         await this.terminateAndCleanup(run);
@@ -646,7 +664,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         this.markDegraded(code);
       }
       this.settleOnce(run, 'failed', diagnosticTerminal(code, profileVersion));
+    } finally {
+      run.resolveSetup();
     }
+  }
+
+  private throwIfStopped(run: DelegationRun): void {
+    if (run.stopRequested) throw new Error(run.failureCode ?? 'daemon_shutdown');
   }
 
   private uniqueDelegationId(): string {
@@ -868,7 +892,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (run.terminationPromise) return run.terminationPromise;
     run.terminationPromise = (async () => {
       const entry = run.entry;
-      if (!entry) return;
+      if (!entry) {
+        if (run.runtimeOwned) {
+          await this.dependencies.runtimeFiles.removeRun(run.delegationId);
+          run.runtimeOwned = false;
+        }
+        return;
+      }
       if (run.supervisedChild) {
         await this.dependencies.terminator.stop(
           entry,
@@ -888,6 +918,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         }
       }
       await this.dependencies.runtimeFiles.removeRun(run.delegationId);
+      run.runtimeOwned = false;
       if (run.supervisedChild) this.entriesByPid.delete(run.supervisedChild.pid);
       run.entry = null;
     })();
@@ -927,7 +958,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   ): Promise<RunTerminalResult> {
     if (run.settled) return run.terminalPromise;
     try {
-      if (run.entry) await this.terminateAndCleanup(run);
+      await run.setupPromise;
+      if (run.entry || run.runtimeOwned) await this.terminateAndCleanup(run);
+      if (run.executionPromise) await run.executionPromise;
       if (run.streams) {
         await Promise.allSettled([run.streams.parser, run.streams.stderr, run.streams.closed]);
       }
