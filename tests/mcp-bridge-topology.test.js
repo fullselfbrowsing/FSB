@@ -62,12 +62,32 @@ async function waitFor(predicate, label, timeoutMs = 1000, intervalMs = 10) {
 
 function createExtensionSocket(port) {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+    const socket = new WebSocket(`ws://127.0.0.1:${port}`, {
+      headers: { Origin: 'chrome-extension://legacy-test-extension' }
+    });
     const timeout = setTimeout(() => {
       socket.close();
       reject(new Error(`extension socket did not open on ${port}`));
     }, 500);
 
+    socket.once('open', () => {
+      clearTimeout(timeout);
+      resolve(socket);
+    });
+    socket.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+function createOriginlessSocket(port) {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+    const timeout = setTimeout(() => {
+      socket.close();
+      reject(new Error(`origin-less socket did not open on ${port}`));
+    }, 500);
     socket.once('open', () => {
       clearTimeout(timeout);
       resolve(socket);
@@ -653,6 +673,100 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
   });
 }
 
+async function runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth) {
+  await withTempHome('bridge-incumbent-authority', async (home) => {
+    const port = await getFreePort();
+    const authPath = auth.getBridgeAuthPath(home);
+    let state = auth.rotateBridgeSessionSecret(authPath, 21_500);
+    state = auth.bindAllowedExtensionOrigin('chrome-extension://incumbent-extension', authPath);
+    const hub = new WebSocketBridge({
+      port,
+      host: '127.0.0.1',
+      instanceId: 'incumbent-authority-hub',
+      handshakeTimeoutMs: 40,
+    });
+    let extensionRegistrations = 0;
+    const registerExtension = hub._registerExtensionClient.bind(hub);
+    hub._registerExtensionClient = (socket) => {
+      extensionRegistrations++;
+      return registerExtension(socket);
+    };
+    const resources = { sockets: [], bridges: [hub] };
+
+    try {
+      await hub.connect();
+      const incumbent = await createBrowserSocket(port, {
+        origin: 'chrome-extension://incumbent-extension',
+        pairingCode: auth.formatPairingCode(state),
+      });
+      resources.sockets.push(incumbent);
+      const incumbentMessages = collectSocketMessages(incumbent);
+      await waitFor(() => hub.topology.extensionConnected === true, 'incumbent extension registration');
+      const incumbentServerSocket = hub.extensionClient;
+      assertEqual(extensionRegistrations, 1, 'authorized incumbent is the only registered extension');
+
+      const immediate = await createOriginlessSocket(port);
+      resources.sockets.push(immediate);
+      const immediateMessages = collectSocketMessages(immediate);
+      const immediateClose = waitForSocketClose(immediate);
+      immediate.send('{}');
+      assertEqual((await immediateClose).code, 1008, 'Origin-less immediate non-relay frame closes with policy violation');
+
+      const timeout = await createOriginlessSocket(port);
+      resources.sockets.push(timeout);
+      const timeoutMessages = collectSocketMessages(timeout);
+      assertEqual((await waitForSocketClose(timeout)).code, 1008, 'Origin-less handshake timeout closes with policy violation');
+
+      const absentToken = await createBrowserSocket(port, {
+        origin: 'chrome-extension://incumbent-extension',
+      });
+      resources.sockets.push(absentToken);
+      const absentTokenMessages = collectSocketMessages(absentToken);
+      assertEqual((await waitForSocketClose(absentToken)).code, 1008, 'absent-token browser cannot replace the incumbent');
+
+      const wrongToken = await createBrowserSocket(port, {
+        origin: 'chrome-extension://incumbent-extension',
+        pairingCode: `fsb-auth.${'Z'.repeat(43)}`,
+      });
+      resources.sockets.push(wrongToken);
+      const wrongTokenMessages = collectSocketMessages(wrongToken);
+      assertEqual((await waitForSocketClose(wrongToken)).code, 1008, 'wrong-token browser cannot replace the incumbent');
+
+      assertEqual(extensionRegistrations, 1, 'unprivileged candidates never increment extension registration count');
+      assertEqual(hub.topology.relayCount, 0, 'invalid Origin-less candidates never increment relay registration count');
+      assertEqual(hub.extensionClient, incumbentServerSocket, 'unprivileged candidates cannot change the incumbent server socket');
+      assertEqual(hub.topology.extensionConnected, true, 'unprivileged candidates cannot change incumbent connectivity');
+
+      const resultPromise = hub.sendAndWait({ type: 'mcp:get-tabs', payload: {} }, { timeout: 500 });
+      await waitFor(
+        () => incumbentMessages.some((message) => message.type === 'mcp:get-tabs'),
+        'incumbent legacy MCP request',
+      );
+      const request = incumbentMessages.find((message) => message.type === 'mcp:get-tabs');
+      for (const [messages, label] of [
+        [immediateMessages, 'Origin-less immediate candidate'],
+        [timeoutMessages, 'Origin-less timeout candidate'],
+        [absentTokenMessages, 'absent-token candidate'],
+        [wrongTokenMessages, 'wrong-token candidate'],
+      ]) {
+        assertEqual(messages.length, 0, `${label} receives no legacy MCP request`);
+      }
+      incumbent.send(JSON.stringify({
+        id: request.id,
+        type: 'mcp:result',
+        payload: { success: true, owner: 'incumbent' },
+      }));
+      assertEqual(
+        JSON.stringify(await resultPromise),
+        '{"success":true,"owner":"incumbent"}',
+        'only the incumbent settles the legacy MCP request',
+      );
+    } finally {
+      await cleanup(resources);
+    }
+  });
+}
+
 async function runAuthStatusProbe(WebSocketBridge, auth) {
   await withTempHome('bridge-auth-status', async (home) => {
     const port = await getFreePort();
@@ -953,7 +1067,7 @@ async function runActiveSocketRevocation(WebSocketBridge, auth, reset) {
     const resources = { sockets: [], bridges: [hub] };
     try {
       await hub.connect();
-      const relay = await createExtensionSocket(port);
+      const relay = await createOriginlessSocket(port);
       resources.sockets.push(relay);
       const relayMessages = collectSocketMessages(relay);
       relay.send(JSON.stringify({ type: 'relay:hello', instanceId: `active-${suffix}-relay` }));
@@ -1184,6 +1298,7 @@ async function run() {
   await runCase('rejects untrusted browser relay origin', () => runRejectsUntrustedBrowserOrigin(WebSocketBridge));
   await runCase('pre-handler Host and Origin upgrade gate', () => runPreHandlerUpgradeGate(WebSocketBridge, auth));
   await runCase('pairing authority matrix', () => runPairingAuthorityMatrix(WebSocketBridge, auth));
+  await runCase('unprivileged sockets cannot displace the active extension', () => runUnprivilegedCannotDisplaceExtension(WebSocketBridge, auth));
   await runCase('secret-free bridge auth-status probe', () => runAuthStatusProbe(WebSocketBridge, auth));
   await runCase('local reverse routing precedence and settlement', () => runLocalReverseRouting(WebSocketBridge, auth));
   await runCase('first capable relay routing and settlement', () => runRelayReverseRouting(WebSocketBridge, auth));

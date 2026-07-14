@@ -526,69 +526,84 @@ export class WebSocketBridge {
     }
   }
 
+  private _parseRelayHello(raw: string): RelayHello | null {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      const keys = Object.keys(parsed);
+      if (keys.some((key) => key !== 'type' && key !== 'instanceId' && key !== 'capabilities')) {
+        return null;
+      }
+      if (
+        parsed.type !== 'relay:hello'
+        || typeof parsed.instanceId !== 'string'
+        || parsed.instanceId.length === 0
+        || parsed.instanceId.length > 200
+        || parsed.instanceId.trim() !== parsed.instanceId
+      ) {
+        return null;
+      }
+      if (Object.prototype.hasOwnProperty.call(parsed, 'capabilities')) {
+        if (
+          !Array.isArray(parsed.capabilities)
+          || parsed.capabilities.length > 1
+          || parsed.capabilities.some((capability) => capability !== 'agent-spawn')
+        ) {
+          return null;
+        }
+      }
+      return parsed as unknown as RelayHello;
+    } catch {
+      return null;
+    }
+  }
+
   /**
-   * When a new WebSocket connection arrives, wait for a relay:hello handshake.
-   * If it arrives, this is a relay client. If not within the configured timeout,
-   * treat it as the Chrome extension.
+   * Browser-Origin sockets are extension candidates. Origin-less sockets must
+   * prove that they are an MCP relay with a valid relay:hello before the short
+   * handshake deadline; they never fall through to extension authority.
    */
   private _handleNewConnection(ws: WsWebSocket): void {
-    let identified = false;
+    const metadata = this.acceptedSocketMetadata.get(ws);
+    if (!metadata) {
+      ws.close(1008, 'Socket classification unavailable');
+      return;
+    }
 
-    // Buffer messages until we know what this connection is
-    const buffered: string[] = [];
+    if (metadata.browserOrigin) {
+      if (this.extensionClient && !this._isCurrentExtAuthority(ws)) {
+        console.error(`[FSB Bridge ${this.instanceId}] Unprivileged extension candidate cannot replace active extension`);
+        ws.close(1008, 'Extension authorization required');
+        return;
+      }
+      this._registerExtensionClient(ws);
+      return;
+    }
+
+    let identified = false;
 
     const onMessage = (data: Buffer | string): void => {
       const raw = typeof data === 'string' ? data : data.toString();
-
-      if (!identified) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed.type === 'relay:hello' && parsed.instanceId) {
-            // This is a relay MCP client
-            identified = true;
-            clearTimeout(handshakeTimer);
-            this.handshakeTimers.delete(ws);
-            this._registerRelayClient(ws, parsed as RelayHello);
-            return;
-          }
-        } catch {
-          // Not valid JSON or not a relay hello -- treat as extension
-        }
-
-        // First message was NOT relay:hello -> this is the extension
-        identified = true;
-        clearTimeout(handshakeTimer);
-        this.handshakeTimers.delete(ws);
-        this._registerExtensionClient(ws);
-
-        // Process the buffered message as an extension message
-        this._handleExtensionMessage(ws, raw);
+      if (identified) return;
+      identified = true;
+      clearTimeout(handshakeTimer);
+      this.handshakeTimers.delete(ws);
+      const hello = this._parseRelayHello(raw);
+      if (!hello) {
+        ws.close(1008, 'Relay handshake required');
         return;
       }
-
-      buffered.push(raw);
+      this._registerRelayClient(ws, hello);
     };
 
     ws.on('message', onMessage);
 
-    // If no message arrives within timeout, assume it's the extension
-    // (extension may not send anything until it receives a message)
+    // An Origin-less socket that does not identify itself is never an extension.
     const handshakeTimer = setTimeout(() => {
       if (!identified) {
         identified = true;
         this.handshakeTimers.delete(ws);
-        // If extension is already connected and healthy, don't replace it --
-        // this is likely a slow relay whose hello was delayed past the timeout
-        if (this.extensionClient && this.connected) {
-          console.error(`[FSB Bridge ${this.instanceId}] Unidentified connection while extension active, closing`);
-          ws.close();
-          return;
-        }
-        this._registerExtensionClient(ws);
-        // Process any buffered messages
-        for (const raw of buffered) {
-          this._handleExtensionMessage(ws, raw);
-        }
+        ws.close(1008, 'Relay handshake required');
       }
     }, this.handshakeTimeoutMs);
 
