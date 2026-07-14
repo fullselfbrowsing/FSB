@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 60 planned; execution wave 1 next
-last_updated: "2026-07-14T16:29:14.690Z"
-last_activity: 2026-07-14 -- Phase 60 planning complete
+stopped_at: Phase 60 Plan 01 complete; Wave 2 next
+last_updated: "2026-07-14T16:44:44.903Z"
+last_activity: 2026-07-14 -- Phase 60 execution started
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -33,10 +33,10 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 ## Current Position
 
-Phase: 60 (Adapter Contract & Claude Code MVP) — READY
-Plan: 0 of 4 complete
-Status: Ready to execute
-Last activity: 2026-07-14 -- Phase 60 planning complete
+Phase: 60 (Adapter Contract & Claude Code MVP) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 60
+Last activity: 2026-07-14 -- Phase 60 execution started
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -45,7 +45,7 @@ Last activity: 2026-07-14 -- Phase 60 planning complete
 | 57 | Agent Identity Capture | IDENT-01, IDENT-02, IDENT-03, IDENT-04, IDENT-05 | Complete (2026-07-12) |
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
-| 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Not started |
+| 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | In progress (1/4 plans) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Not started |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
