@@ -37,18 +37,18 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### ADAPT -- Adapter Contract & Spawn Supervisor
 
-- [ ] **ADAPT-01**: An `AgentProviderAdapter` TypeScript interface in `mcp/src/agent-providers/` defines exactly five methods: `detect() -> {installed, version, authState, binary}`, `buildSpawn(task, ctx) -> SpawnSpec`, `parseEvents(stream) -> AsyncIterable<AgentEvent>`, `kill(child, {grace}) -> Promise<void>`, and `caps() -> AdapterCapabilities`.
-- [ ] **ADAPT-02**: A `SpawnSupervisor` module living in the `fsb-mcp-server serve` daemon accepts a validated spawn request, looks up the requested adapter, constructs argv from adapter output plus a daemon-controlled flag allowlist (unknown payload keys rejected), and spawns the child with `{ detached: true, windowsHide: true, stdio: ['pipe','pipe','pipe'] }` and an environment with `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` scrubbed.
-- [ ] **ADAPT-03**: The supervisor never invokes a shell; the user's prompt travels only via `child.stdin` (never argv, never `sh -c`) so shell metacharacters and Windows `.cmd`-shim EINVAL (Node CVE-2024-27980) cannot execute.
-- [ ] **ADAPT-04**: A `stop`/cancel request triggers SIGTERM at the process-group level (POSIX `process.kill(-child.pid, 'SIGTERM')` after `spawn({detached:true})`, Windows `taskkill /pid <pid> /T /F`), escalates to SIGKILL after a grace window, and blocks resolving the delegation until either an exit-signal is observed or the daemon confirms no descendant matches remain.
-- [ ] **ADAPT-05**: On daemon startup, the supervisor scans for orphaned children matching prior adapter fingerprints and kills them before accepting new spawn requests (recovery from crash).
+- [x] **ADAPT-01**: An `AgentProviderAdapter` TypeScript interface in `mcp/src/agent-providers/` defines exactly five methods: `detect() -> {installed, version, authState, binary}`, `buildSpawn(task, ctx) -> SpawnSpec`, `parseEvents(stream) -> AsyncIterable<AgentEvent>`, `kill(child, {grace}) -> Promise<void>`, and `caps() -> AdapterCapabilities`.
+- [x] **ADAPT-02**: A `SpawnSupervisor` module living in the `fsb-mcp-server serve` daemon accepts a validated spawn request, looks up the requested adapter, constructs argv from adapter output plus a daemon-controlled flag allowlist (unknown payload keys rejected), and spawns the child with `{ detached: true, windowsHide: true, stdio: ['pipe','pipe','pipe'] }` and an environment with `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` scrubbed.
+- [x] **ADAPT-03**: The supervisor never invokes a shell; the user's prompt travels only via `child.stdin` (never argv, never `sh -c`) so shell metacharacters and Windows `.cmd`-shim EINVAL (Node CVE-2024-27980) cannot execute.
+- [x] **ADAPT-04**: A `stop`/cancel request triggers SIGTERM at the process-group level (POSIX `process.kill(-child.pid, 'SIGTERM')` after `spawn({detached:true})`, Windows `taskkill /pid <pid> /T /F`), escalates to SIGKILL after a grace window, and blocks resolving the delegation until either an exit-signal is observed or the daemon confirms no descendant matches remain.
+- [x] **ADAPT-05**: On daemon startup, the supervisor scans for orphaned children matching prior adapter fingerprints and kills them before accepting new spawn requests (recovery from crash).
 
 ### CLAUDE -- Claude Code MVP
 
-- [ ] **CLAUDE-01**: The Claude Code adapter spawns `claude -p --verbose --output-format stream-json --include-partial-messages --strict-mcp-config --mcp-config <daemon-generated-file-pointing-at-loopback-mcp-http-endpoint> --agents <shipped-fsb-agent-json> --agent fsb --permission-mode dontAsk --allowedTools "mcp__fsb" --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch" --max-turns 40 --no-session-persistence`, or the version-appropriate equivalent selected by `detect()` output.
-- [ ] **CLAUDE-02**: The user's task prompt is sent to the spawned CLI via stdin only; the adapter constructs no argv fragment containing user-supplied text.
-- [ ] **CLAUDE-03**: The adapter's `parseEvents` translates the CLI's stream-json events (`system/init`, `assistant`, `user`, tool-use events, `system/api_retry`, `result`) into a normalized `AgentEvent` schema (`type`, `sessionId`, `payload`), fails loud on unknown event types (surfaced as `agent_protocol_drift` diagnostic), and is covered by a recorded JSONL fixture under `tests/fixtures/agent-streams/claude-code-2.1.177/` so CI runs without a live CLI.
-- [ ] **CLAUDE-04**: The Claude Code adapter's `detect()` fingerprints the binary via `claude --version`, compares against a minimum supported version, and reports `installed=false` with a doctor-diagnostic message rather than spawning if the version predates the verified stream-json contract.
+- [x] **CLAUDE-01**: The Claude Code adapter spawns `claude -p --verbose --output-format stream-json --include-partial-messages --strict-mcp-config --mcp-config <daemon-generated-file-pointing-at-loopback-mcp-http-endpoint> --agents <shipped-fsb-agent-json> --agent fsb --permission-mode dontAsk --allowedTools "mcp__fsb" --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch" --max-turns 40 --no-session-persistence`, or the version-appropriate equivalent selected by `detect()` output.
+- [x] **CLAUDE-02**: The user's task prompt is sent to the spawned CLI via stdin only; the adapter constructs no argv fragment containing user-supplied text.
+- [x] **CLAUDE-03**: The adapter's `parseEvents` translates the CLI's stream-json events (`system/init`, `assistant`, `user`, tool-use events, `system/api_retry`, `result`) into a normalized `AgentEvent` schema (`type`, `sessionId`, `payload`), fails loud on unknown event types (surfaced as `agent_protocol_drift` diagnostic), and is covered by a recorded JSONL fixture under `tests/fixtures/agent-streams/claude-code-2.1.177/` so CI runs without a live CLI.
+- [x] **CLAUDE-04**: The Claude Code adapter's `detect()` fingerprints the binary via `claude --version`, compares against a minimum supported version, and reports `installed=false` with a doctor-diagnostic message rather than spawning if the version predates the verified stream-json contract.
 
 ### UX -- Delegation UX
 
@@ -148,15 +148,15 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CHAN-05 | Phase 59 | Complete |
 | CHAN-06 | Phase 59 | Complete |
 | CHAN-07 | Phase 59 | Complete |
-| ADAPT-01 | Phase 60 | Pending |
-| ADAPT-02 | Phase 60 | Pending |
-| ADAPT-03 | Phase 60 | Pending |
-| ADAPT-04 | Phase 60 | Pending |
-| ADAPT-05 | Phase 60 | Pending |
-| CLAUDE-01 | Phase 60 | Pending |
-| CLAUDE-02 | Phase 60 | Pending |
-| CLAUDE-03 | Phase 60 | Pending |
-| CLAUDE-04 | Phase 60 | Pending |
+| ADAPT-01 | Phase 60 | Complete |
+| ADAPT-02 | Phase 60 | Complete |
+| ADAPT-03 | Phase 60 | Complete |
+| ADAPT-04 | Phase 60 | Complete |
+| ADAPT-05 | Phase 60 | Complete |
+| CLAUDE-01 | Phase 60 | Complete |
+| CLAUDE-02 | Phase 60 | Complete |
+| CLAUDE-03 | Phase 60 | Complete |
+| CLAUDE-04 | Phase 60 | Complete |
 | UX-01 | Phase 61 | Pending |
 | UX-02 | Phase 61 | Pending |
 | UX-03 | Phase 61 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-14 after Phase 59 completion (18/51 requirements complete; four live checks deferred to milestone end)*
+*Last updated: 2026-07-14 after Phase 60 completion (27/51 requirements complete; Phase 60's seven live checks deferred to milestone end)*
