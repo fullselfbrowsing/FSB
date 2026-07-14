@@ -10,11 +10,15 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Readable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
+const adapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'adapter.js');
+const claudeAdapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-code.js');
 const detectBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-detect.js');
 const profileBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-profile.js');
+const claudeAdapterSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'claude-code.ts');
 const detectSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'claude-detect.ts');
 const profileSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'claude-profile.ts');
 const agentPath = path.join(repoRoot, 'mcp', 'ai', 'agents', 'fsb.json');
@@ -70,6 +74,8 @@ async function main() {
 
   const detectModule = await import(pathToFileURL(detectBuildPath).href);
   const profileModule = await import(pathToFileURL(profileBuildPath).href);
+  const adapterModule = await import(pathToFileURL(adapterBuildPath).href);
+  const claudeAdapterModule = await import(pathToFileURL(claudeAdapterBuildPath).href);
   const {
     CLAUDE_MINIMUM_VERSION,
     CLAUDE_PROBE_OPTIONS,
@@ -80,6 +86,8 @@ async function main() {
     SHIPPED_FSB_AGENT_POLICY,
     buildClaudeSpawnSpec,
   } = profileModule;
+  const { TASK_ONLY_CAPABILITIES } = adapterModule;
+  const { createClaudeCodeAdapter } = claudeAdapterModule;
 
   assert.equal(CLAUDE_MINIMUM_VERSION, '2.1.177');
   assert.deepEqual(CLAUDE_PROBE_OPTIONS, {
@@ -316,7 +324,138 @@ async function main() {
     /canonical adapter id/,
   );
 
-  const source = `${fs.readFileSync(detectSourcePath, 'utf8')}\n${fs.readFileSync(profileSourcePath, 'utf8')}`;
+  const delegateCalls = {
+    detect: 0,
+    parse: [],
+    kill: [],
+  };
+  const delegatedEvent = Object.freeze({
+    type: 'diagnostic',
+    sessionId: 'synthetic-session',
+    payload: Object.freeze({ code: 'synthetic' }),
+  });
+  const delegatedIterable = Object.freeze({
+    async *[Symbol.asyncIterator]() {
+      yield delegatedEvent;
+    },
+  });
+  const adapter = createClaudeCodeAdapter({
+    detect: async () => {
+      delegateCalls.detect += 1;
+      return detection;
+    },
+    parseEvents: (stream) => {
+      delegateCalls.parse.push(stream);
+      return delegatedIterable;
+    },
+    kill: async (child, options) => {
+      delegateCalls.kill.push({ child, options });
+    },
+  });
+
+  assert.ok(Object.isFrozen(adapter));
+  assert.deepEqual(
+    Object.keys(adapter),
+    ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+    'concrete adapter exposes exactly the five contract methods in order',
+  );
+  assert.ok(Object.values(adapter).every((value) => typeof value === 'function'));
+
+  assert.strictEqual(await adapter.detect(), detection);
+  assert.equal(delegateCalls.detect, 1, 'detect delegates exactly once');
+
+  const adapterSpec = await adapter.buildSpawn({ text: taskCanary }, context);
+  assert.deepEqual(adapterSpec, spec, 'buildSpawn delegates to the closed profile builder');
+  assert.equal(delegateCalls.detect, 1, 'buildSpawn does not re-detect or re-resolve PATH');
+  assert.equal(JSON.stringify(adapterSpec).includes(taskCanary), false);
+
+  const fakeStream = Readable.from([]);
+  const parsedIterable = adapter.parseEvents(fakeStream);
+  assert.strictEqual(parsedIterable, delegatedIterable, 'parseEvents returns the injected async iterable');
+  const parsedEvents = [];
+  for await (const event of parsedIterable) parsedEvents.push(event);
+  assert.deepEqual(parsedEvents, [delegatedEvent]);
+  assert.deepEqual(delegateCalls.parse, [fakeStream]);
+
+  const supervisedChild = Object.freeze({
+    pid: 41001,
+    processGroupId: 41001,
+    platform: 'darwin',
+    closed: Promise.resolve({ code: 0, signal: null }),
+  });
+  const killOptions = Object.freeze({ grace: 1250 });
+  await adapter.kill(supervisedChild, killOptions);
+  assert.deepEqual(delegateCalls.kill, [{ child: supervisedChild, options: killOptions }]);
+
+  assert.strictEqual(adapter.caps(), TASK_ONLY_CAPABILITIES);
+  assert.deepEqual(adapter.caps(), {
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: false,
+  });
+
+  await assert.rejects(
+    () => adapter.buildSpawn({ text: 'x'.repeat(65537) }, context),
+    /safe byte limit/,
+  );
+  await assert.rejects(
+    () => adapter.buildSpawn(
+      { text: 'valid task' },
+      { ...context, detection: { ...detection, installed: false } },
+    ),
+    /supported retained detection/,
+  );
+  await assert.rejects(
+    () => adapter.buildSpawn(
+      { text: 'valid task' },
+      { ...context, privateMcpConfigPath: 'relative-config.json' },
+    ),
+    /daemon-owned absolute runtime paths/,
+  );
+  await assert.rejects(
+    () => adapter.buildSpawn({ text: 'valid task' }, { ...context, adapterId: 'Claude-Code' }),
+    /canonical adapter id/,
+  );
+
+  const parserAdapter = createClaudeCodeAdapter({ kill: async () => {} });
+  const driftInput = Readable.from([
+    Buffer.from('{"type":"TOP_SECRET_SENTINEL"}\n', 'utf8'),
+  ]);
+  await assert.rejects(
+    async () => {
+      for await (const _event of parserAdapter.parseEvents(driftInput)) {
+        // A drifted stream must never reach this body or fall back to another parser.
+      }
+    },
+    (error) => {
+      assert.equal(error.code, 'agent_protocol_drift');
+      assert.equal(error.reason, 'unknown_event_type');
+      assert.equal(error.eventIndex, 1);
+      assert.equal(error.message.includes('TOP_SECRET_SENTINEL'), false);
+      return true;
+    },
+  );
+
+  assert.throws(
+    () => createClaudeCodeAdapter({}),
+    /tree-kill dependency/,
+  );
+  assert.throws(
+    () => createClaudeCodeAdapter({ kill: async () => {}, detect: true }),
+    /detection dependency must be callable/,
+  );
+  assert.throws(
+    () => createClaudeCodeAdapter({ kill: async () => {}, parseEvents: true }),
+    /parser dependency must be callable/,
+  );
+
+  const claudeAdapterSource = fs.readFileSync(claudeAdapterSourcePath, 'utf8');
+  assert.doesNotMatch(claudeAdapterSource, /node:child_process/);
+  assert.doesNotMatch(claudeAdapterSource, /\b(?:spawn|exec|execFile|fork)\s*\(/);
+  assert.doesNotMatch(claudeAdapterSource, /shell\s*:/);
+
+  const source = `${fs.readFileSync(detectSourcePath, 'utf8')}\n${fs.readFileSync(profileSourcePath, 'utf8')}\n${claudeAdapterSource}`;
   assert.match(source, /shell:\s*false/);
   for (const forbiddenSource of [
     'shell: true',
