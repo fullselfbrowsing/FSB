@@ -130,9 +130,9 @@ export async function startServeDelegation(
   let degraded = false;
   let requestDegradedShutdown: (() => void) | null = null;
 
-  const handleExtRequest: ExtRequestHandler = (request, emit) => {
+  const handleExtRequest: ExtRequestHandler = (request, emit, context) => {
     if (!supervisor) throw new ServeDelegationStartupError();
-    return supervisor.handleExtRequest(request, emit);
+    return supervisor.handleExtRequest(request, emit, context);
   };
   const bridge = dependencies.createBridge({
     capabilities: ['agent-spawn'],

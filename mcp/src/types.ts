@@ -155,9 +155,14 @@ export interface ExtEvent {
 
 export type ExtMessage = ExtRequest | ExtResponse | ExtEvent;
 
+export interface ExtRequestContext {
+  readonly signal: AbortSignal;
+}
+
 export type ExtRequestHandler = (
   request: ExtRequest,
   emit: (event: ExtEvent) => void,
+  context?: ExtRequestContext,
 ) => Promise<Record<string, unknown>>;
 
 // Tool result wrapper

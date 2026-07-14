@@ -46,6 +46,12 @@ interface ActiveExtRequest {
   target: 'local' | 'relay';
   relayId?: string;
   settled: boolean;
+  abortController: AbortController | null;
+}
+
+interface ActiveRelayedExtRequest {
+  hubSocket: WebSocket;
+  abortController: AbortController;
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -97,7 +103,7 @@ export class WebSocketBridge {
 
   // Relay mode state
   private hubConnection: WebSocket | null = null;
-  private relayActiveExtRequests = new Map<string, WebSocket>();
+  private relayActiveExtRequests = new Map<string, ActiveRelayedExtRequest>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 0;
   private intentionalClose = false;
@@ -175,6 +181,13 @@ export class WebSocketBridge {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+
+    for (const route of [...this.activeExtRequests.values()]) {
+      this._abortExtRoute(route);
+    }
+    for (const [id, route] of [...this.relayActiveExtRequests]) {
+      this._abortRelayedExtRequest(id, route.hubSocket);
     }
 
     if (this.mode === 'hub') {
@@ -622,6 +635,7 @@ export class WebSocketBridge {
     if (this.extensionClient) {
       console.error(`[FSB Bridge ${this.instanceId}] New extension connected, closing previous`);
       this.lastDisconnectReason = 'extension_replaced';
+      this._abortRoutesForOrigin(this.extensionClient);
       this.extensionClient.close();
     }
 
@@ -655,9 +669,7 @@ export class WebSocketBridge {
       }
       this.progressListeners.clear();
 
-      for (const [id, route] of this.activeExtRequests) {
-        if (route.originSocket === ws) this.activeExtRequests.delete(id);
-      }
+      this._abortRoutesForOrigin(ws);
 
       // Notify relay clients about pending requests that can't be fulfilled
       // (they'll get errors when they timeout)
@@ -893,6 +905,7 @@ export class WebSocketBridge {
         originSocket: ws,
         target: 'local',
         settled: false,
+        abortController: new AbortController(),
       };
       this.activeExtRequests.set(request.id, route);
       void this._invokeLocalExtHandler(request, route);
@@ -910,6 +923,7 @@ export class WebSocketBridge {
           target: 'relay',
           relayId,
           settled: false,
+          abortController: null,
         };
         this.activeExtRequests.set(request.id, route);
         relaySocket.send(JSON.stringify(request));
@@ -949,7 +963,9 @@ export class WebSocketBridge {
     };
 
     try {
-      const payload = await handler(request, emit);
+      const payload = await handler(request, emit, {
+        signal: route.abortController!.signal,
+      });
       const response = parseExtFrame({
         id: request.id,
         type: 'ext:response',
@@ -975,6 +991,32 @@ export class WebSocketBridge {
     route.settled = true;
     this.activeExtRequests.delete(route.id);
     this._sendExtResponse(route.originSocket, response);
+  }
+
+  private _abortRoutesForOrigin(originSocket: WsWebSocket): void {
+    for (const route of [...this.activeExtRequests.values()]) {
+      if (route.originSocket === originSocket) this._abortExtRoute(route);
+    }
+  }
+
+  private _abortExtRoute(route: ActiveExtRequest): void {
+    if (route.settled || this.activeExtRequests.get(route.id) !== route) return;
+    route.settled = true;
+    this.activeExtRequests.delete(route.id);
+    if (route.target === 'local') {
+      route.abortController?.abort(new Error('route_lost'));
+      return;
+    }
+    if (!route.relayId) return;
+    const relaySocket = this.relayClients.get(route.relayId);
+    if (relaySocket?.readyState === WebSocket.OPEN) {
+      relaySocket.send(JSON.stringify(makeExtError(
+        route.id,
+        'bridge_topology_changed',
+        'Extension route closed before delegation settled',
+        true,
+      )));
+    }
   }
 
   private _sendExtResponse(socket: WsWebSocket, response: ExtResponse): void {
@@ -1096,6 +1138,7 @@ export class WebSocketBridge {
         settleReject(err instanceof Error ? err : new Error(String(err)));
         return;
       }
+      const hubSocket = this.hubConnection;
 
       handshakeTimer = setTimeout(() => {
         if (!this.hubConnected && this.mode === 'relay') {
@@ -1145,6 +1188,11 @@ export class WebSocketBridge {
           const frame = parseExtFrame(parsed);
           if (frame?.type === 'ext:request') {
             this._handleRelayedExtRequest(frame);
+          } else if (
+            frame?.type === 'ext:response'
+            && frame.error?.code === 'bridge_topology_changed'
+          ) {
+            this._abortRelayedExtRequest(frame.id, hubSocket);
           } else {
             console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid hub extension frame`);
           }
@@ -1160,7 +1208,10 @@ export class WebSocketBridge {
           settleReject(new Error('Relay connection closed before handshake completed'));
         }
 
-        this.hubConnection = null;
+        for (const [id, route] of [...this.relayActiveExtRequests]) {
+          if (route.hubSocket === hubSocket) this._abortRelayedExtRequest(id, hubSocket);
+        }
+        if (this.hubConnection === hubSocket) this.hubConnection = null;
         this.hubConnected = false;
         this.activeHubInstanceId = null;
         this.relayExtensionConnected = false;
@@ -1176,7 +1227,6 @@ export class WebSocketBridge {
           this.pendingRequests.delete(id);
         }
         this.progressListeners.clear();
-        this.relayActiveExtRequests.clear();
 
         if (!this.intentionalClose) {
           // Try to promote to hub or reconnect as relay
@@ -1213,14 +1263,22 @@ export class WebSocketBridge {
       return;
     }
 
-    this.relayActiveExtRequests.set(request.id, hubSocket);
-    void this._invokeRelayedExtHandler(request, hubSocket);
+    const route: ActiveRelayedExtRequest = {
+      hubSocket,
+      abortController: new AbortController(),
+    };
+    this.relayActiveExtRequests.set(request.id, route);
+    void this._invokeRelayedExtHandler(request, route);
   }
 
-  private async _invokeRelayedExtHandler(request: ExtRequest, hubSocket: WebSocket): Promise<void> {
+  private async _invokeRelayedExtHandler(
+    request: ExtRequest,
+    route: ActiveRelayedExtRequest,
+  ): Promise<void> {
     const handler = this.handleExtRequest;
     if (!handler) return;
-    const isActive = (): boolean => this.relayActiveExtRequests.get(request.id) === hubSocket;
+    const { hubSocket } = route;
+    const isActive = (): boolean => this.relayActiveExtRequests.get(request.id) === route;
     const emit = (event: ExtEvent): void => {
       const parsedEvent = parseExtFrame(event);
       if (
@@ -1236,7 +1294,9 @@ export class WebSocketBridge {
 
     let response: ExtResponse;
     try {
-      const payload = await handler(request, emit);
+      const payload = await handler(request, emit, {
+        signal: route.abortController.signal,
+      });
       const parsedResponse = parseExtFrame({
         id: request.id,
         type: 'ext:response',
@@ -1259,6 +1319,13 @@ export class WebSocketBridge {
     if (!isActive()) return;
     this.relayActiveExtRequests.delete(request.id);
     if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(JSON.stringify(response));
+  }
+
+  private _abortRelayedExtRequest(id: string, hubSocket: WebSocket): void {
+    const route = this.relayActiveExtRequests.get(id);
+    if (!route || route.hubSocket !== hubSocket) return;
+    this.relayActiveExtRequests.delete(id);
+    route.abortController.abort(new Error('route_lost'));
   }
 
   /**

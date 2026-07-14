@@ -1084,6 +1084,7 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
     state = auth.bindAllowedExtensionOrigin('chrome-extension://local-route-extension', authPath);
     let localInvocations = 0;
     let relayInvocations = 0;
+    let localRouteAborts = 0;
     let lateEmit = null;
     const localPending = [];
     const delegationId = 'delegation_local_0001';
@@ -1093,7 +1094,7 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
       instanceId: 'local-route-hub',
       handshakeTimeoutMs: 25,
       capabilities: ['agent-spawn'],
-      handleExtRequest: async (request, emit) => {
+      handleExtRequest: async (request, emit, context) => {
         localInvocations++;
         lateEmit = emit;
         if (request.method === 'delegate.cancel') {
@@ -1125,7 +1126,18 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
             terminal: { type: 'diagnostic', code: 'agent_protocol_drift' },
           };
         }
-        return new Promise((resolve) => localPending.push({ request, emit, resolve }));
+        return new Promise((resolve) => {
+          const pending = { request, emit, resolve, signal: context?.signal };
+          context?.signal.addEventListener('abort', () => {
+            localRouteAborts++;
+            resolve({
+              delegationId: 'delegation_local_route_lost',
+              status: 'failed',
+              terminal: { type: 'diagnostic', code: 'route_lost' },
+            });
+          }, { once: true });
+          localPending.push(pending);
+        });
       },
     });
     const relay = new WebSocketBridge({
@@ -1243,6 +1255,27 @@ async function runLocalReverseRouting(WebSocketBridge, auth) {
       assertEqual(messages[9]?.error?.code, 'invalid_ext_request', 'handler throw settles with the typed invalid request error');
       assert(!JSON.stringify(messages[9]).includes('RAW_HANDLER_INPUT'), 'handler failure response omits raw request content');
       assertEqual(hub.activeExtRequests.size, 0, 'handler throw settles and clears route exactly once');
+
+      extension.send(JSON.stringify({
+        id: 'local-route-loss',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'route-lifetime' },
+      }));
+      await waitFor(() => localPending.length === 2, 'pending local route-loss delegation', 1000, 10);
+      localPending[1].emit({
+        id: 'local-route-loss',
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: { delegationId: 'delegation_local_route_lost', adapterId: 'claude-code', profileVersion: '1' },
+      });
+      await waitFor(() => messages.length === 11, 'local route-loss started event', 1000, 10);
+      extension.close();
+      await waitFor(() => localRouteAborts === 1, 'local route abort signal', 1000, 10);
+      assertEqual(localPending[1].signal?.aborted, true, 'local socket loss revokes continuing task authority');
+      assertEqual(hub.activeExtRequests.size, 0, 'local socket loss clears the reverse route');
+      assertEqual(localRouteAborts, 1, 'local socket loss aborts the handler once');
+      assertEqual(relayInvocations, 0, 'local socket loss never replays onto a capable relay');
     } finally {
       await cleanup(resources);
     }
@@ -1258,6 +1291,7 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
     let skippedInvocations = 0;
     let firstInvocations = 0;
     let secondInvocations = 0;
+    let relayRouteAborts = 0;
     const pending = [];
     const delegationId = 'delegation_relay_0001';
     const hub = new WebSocketBridge({
@@ -1282,7 +1316,7 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
       instanceId: 'relay-route-first',
       handshakeTimeoutMs: 25,
       capabilities: ['agent-spawn'],
-      handleExtRequest: (request, emit) => {
+      handleExtRequest: (request, emit, context) => {
         firstInvocations++;
         if (request.method === 'delegate.cancel') {
           return Promise.resolve({
@@ -1291,7 +1325,18 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
             terminal: { type: 'diagnostic', code: 'already_terminal' },
           });
         }
-        return new Promise((resolve) => pending.push({ request, emit, resolve }));
+        return new Promise((resolve) => {
+          const item = { request, emit, resolve, signal: context?.signal };
+          context?.signal.addEventListener('abort', () => {
+            relayRouteAborts++;
+            resolve({
+              delegationId: 'delegation_relay_route_lost',
+              status: 'failed',
+              terminal: { type: 'diagnostic', code: 'route_lost' },
+            });
+          }, { once: true });
+          pending.push(item);
+        });
       },
     });
     const secondRelay = new WebSocketBridge({
@@ -1410,11 +1455,23 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         payload: { adapterId: 'claude-code', task: 'close-route' },
       }));
       await waitFor(() => pending.length === 2, 'extension-close relay invocation', 1000, 10);
+      pending[1].emit({
+        id: 'extension-close-route',
+        type: 'ext:event',
+        event: 'delegation.started',
+        payload: { delegationId: 'delegation_relay_route_lost', adapterId: 'claude-code', profileVersion: '1' },
+      });
+      await waitFor(() => messages.length === 7, 'extension-close relay started event', 1000, 10);
       extension.close();
       await waitFor(() => hub.activeExtRequests.size === 0, 'extension-close route cleanup', 1000, 10);
       assertEqual(hub.activeExtRequests.size, 0, 'extension close clears its active reverse route');
-      pending[1].resolve({ target: 'too-late' });
       await waitFor(() => firstRelay.relayActiveExtRequests.size === 0, 'relay handler cleanup after extension close', 1000, 10);
+      assertEqual(pending[1].signal?.aborted, true, 'relayed socket loss revokes continuing task authority');
+      assertEqual(relayRouteAborts, 1, 'relayed socket loss aborts the selected handler once');
+      pending[1].resolve({ target: 'too-late' });
+      await sleep(20);
+      assertEqual(firstInvocations, 3, 'relayed socket loss does not replay the start request');
+      assertEqual(secondInvocations, 0, 'relayed socket loss does not fail over to another capable relay');
       assertEqual(secondRelay.currentMode, 'relay', 'extension close retains other capable relays');
     } finally {
       await cleanup(resources);
@@ -1491,6 +1548,8 @@ async function runHubExitWithActiveExtRequest(WebSocketBridge, auth) {
     state = auth.bindAllowedExtensionOrigin('chrome-extension://hub-exit-extension', authPath);
     let handlerInvocations = 0;
     let resolveHandler = null;
+    let routeAborts = 0;
+    let routeSignal = null;
     const hub = new WebSocketBridge({
       port,
       host: '127.0.0.1',
@@ -1507,10 +1566,25 @@ async function runHubExitWithActiveExtRequest(WebSocketBridge, auth) {
       promotionJitterMs: 1,
       maxReconnectDelayMs: 100,
       capabilities: ['agent-spawn'],
-      handleExtRequest: async () => {
+      handleExtRequest: async (request, emit, context) => {
         handlerInvocations++;
+        routeSignal = context?.signal ?? null;
+        emit({
+          id: request.id,
+          type: 'ext:event',
+          event: 'delegation.started',
+          payload: { delegationId: 'delegation_hub_route_lost', adapterId: 'claude-code', profileVersion: '1' },
+        });
         return new Promise((resolve) => {
           resolveHandler = resolve;
+          context?.signal.addEventListener('abort', () => {
+            routeAborts++;
+            resolve({
+              delegationId: 'delegation_hub_route_lost',
+              status: 'failed',
+              terminal: { type: 'diagnostic', code: 'route_lost' },
+            });
+          }, { once: true });
         });
       },
     });
@@ -1532,6 +1606,7 @@ async function runHubExitWithActiveExtRequest(WebSocketBridge, auth) {
         payload: {},
       }));
       await waitFor(() => handlerInvocations === 1, 'hub-exit active relay invocation', 1000, 10);
+      await waitFor(() => messages.length === 1, 'hub-exit started event', 1000, 10);
       assertEqual(hub.activeExtRequests.size, 1, 'hub tracks the active ext request before exit');
       assertEqual(relay.relayActiveExtRequests.size, 1, 'selected relay tracks the active ext request before hub exit');
 
@@ -1543,14 +1618,17 @@ async function runHubExitWithActiveExtRequest(WebSocketBridge, auth) {
         1000,
         10,
       );
-      assertEqual(messages.length, 0, 'hub exit is observed as socket loss without a fabricated final response');
+      assertEqual(messages[0]?.event, 'delegation.started', 'hub loss occurs after relayed authority starts');
+      assertEqual(messages.length, 1, 'hub exit is observed as socket loss without a fabricated final response');
       assertEqual(hub.activeExtRequests.size, 0, 'exited hub clears its old reverse route state');
       assertEqual(relay.relayActiveExtRequests.size, 0, 'promoted relay clears its old relayed request state');
+      assertEqual(routeSignal?.aborted, true, 'hub loss revokes the relayed handler authority');
+      assertEqual(routeAborts, 1, 'hub loss aborts the selected relayed handler once');
       assertEqual(handlerInvocations, 1, 'hub exit does not replay the request during promotion');
 
       resolveHandler({ tooLate: true });
       await sleep(20);
-      assertEqual(messages.length, 0, 'late selected-relay completion cannot reach the closed extension socket');
+      assertEqual(messages.length, 1, 'late selected-relay completion cannot reach the closed extension socket');
       assertEqual(handlerInvocations, 1, 'late completion does not create a replay after promotion');
     } finally {
       await cleanup(resources);

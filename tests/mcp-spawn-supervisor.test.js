@@ -365,7 +365,9 @@ function makeHarness(supervisorModule, options = {}) {
   const emit = (event) => {
     order.push(`emit:${event.event}`);
     emitted.push(event);
-    if (options.emitError) throw new Error('fixture route lost');
+    if (options.emitError === true || options.emitError === event.event) {
+      throw new Error('fixture route lost');
+    }
   };
 
   return {
@@ -589,6 +591,18 @@ async function runFailureBarrierTests(supervisorModule) {
   }
 
   {
+    const harness = makeHarness(supervisorModule, { emitError: 'delegation.event' });
+    const result = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'active emitter route loss fixture' }),
+      harness.emit,
+    );
+    assert.equal(result.status, 'failed');
+    assert.equal(result.terminal.code, 'route_lost', 'active emitter errors retain route_lost fidelity');
+    assert.equal(harness.emitted[0].event, 'delegation.started', 'active emitter failure occurs after authority starts');
+    assert.equal(harness.terminationCalls.length, 1, 'active emitter failure stops the tree once');
+  }
+
+  {
     const harness = makeHarness(supervisorModule, {
       onStdinEnd: (controls) => controls.send([
         normalizedEvent('init', { tools: ['mcp__fsb'] }),
@@ -653,6 +667,27 @@ async function runFailureBarrierTests(supervisorModule) {
 }
 
 async function runCancelAndShutdownTests(supervisorModule) {
+  {
+    const route = new AbortController();
+    const harness = makeHarness(supervisorModule, { onStdinEnd: () => {} });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'route lifetime cancellation fixture' }),
+      harness.emit,
+      { signal: route.signal },
+    );
+    await waitFor(
+      () => harness.emitted.some((event) => event.event === 'delegation.started'),
+      'delegation.started before route loss',
+    );
+    route.abort(new Error('fixture route lost'));
+    route.abort(new Error('duplicate route loss'));
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed', 'route loss is a non-success terminal state');
+    assert.equal(terminal.terminal.code, 'route_lost', 'route loss preserves its domain failure code');
+    assert.equal(harness.terminationCalls.length, 1, 'route loss stops the tree exactly once');
+    assert.equal(harness.counters.remove, 1, 'route loss removes the verified runtime journal');
+  }
+
   {
     const harness = makeHarness(supervisorModule, {
       onStdinEnd: () => {},

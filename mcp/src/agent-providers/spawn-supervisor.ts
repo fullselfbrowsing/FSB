@@ -32,7 +32,12 @@ import type {
 } from './process-tree.js';
 import { createArgvSignature, TreeUnsettledError } from './process-tree.js';
 import { createProcessInspector, createProcessTreeTerminator } from './process-tree.js';
-import type { ExtEvent, ExtRequest, ExtRequestHandler } from '../types.js';
+import type {
+  ExtEvent,
+  ExtRequest,
+  ExtRequestContext,
+  ExtRequestHandler,
+} from '../types.js';
 
 const TASK_LIMIT_BYTES = 64 * 1024;
 const EVENT_LIMIT_BYTES = 256 * 1024;
@@ -200,6 +205,8 @@ interface DelegationRun {
   terminationPromise: Promise<void> | null;
   cancelPromise: Promise<RunTerminalResult> | null;
   executionPromise: Promise<void> | null;
+  routeSignal: AbortSignal | null;
+  routeAbortListener: (() => void) | null;
 }
 
 export class InvalidDelegationRequestError extends Error {
@@ -435,11 +442,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || this.activationAttempts > 1000
     ) throw new TypeError('Spawn supervisor configuration is invalid');
 
-    this.handleExtRequest = async (request, emit) => {
+    this.handleExtRequest = async (request, emit, context) => {
       if (!this.accepting) throw new InvalidDelegationRequestError();
       if (request.method === 'delegate.start') {
         const payload = parseStartRequest(request);
-        return this.start(request.id, payload.task, payload.adapterId, emit);
+        return this.start(request.id, payload.task, payload.adapterId, emit, context);
       }
       if (request.method === 'delegate.cancel') {
         const payload = parseCancelRequest(request);
@@ -490,6 +497,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     task: string,
     adapterId: string,
     emit: (event: ExtEvent) => void,
+    context?: ExtRequestContext,
   ): Promise<Record<string, unknown>> {
     const delegationId = this.uniqueDelegationId();
     const adapter = this.dependencies.registry.require(adapterId);
@@ -529,10 +537,19 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       terminationPromise: null,
       cancelPromise: null,
       executionPromise: null,
+      routeSignal: context?.signal ?? null,
+      routeAbortListener: null,
     };
     this.activeRuns.set(delegationId, run);
     run.executionPromise = this.executeRun(run);
     void run.executionPromise;
+    if (run.routeSignal) {
+      run.routeAbortListener = () => {
+        void this.cancelRun(run, 'route_lost');
+      };
+      run.routeSignal.addEventListener('abort', run.routeAbortListener, { once: true });
+      if (run.routeSignal.aborted) run.routeAbortListener();
+    }
     return await terminalPromise as unknown as Record<string, unknown>;
   }
 
@@ -619,26 +636,20 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.entry = active;
       this.entriesByPid.set(supervisedChild.pid, active);
       this.throwIfStopped(run);
-      if (run.parserError || run.resultEvent || run.stopRequested) {
-        throw new Error(run.stopRequested
-          ? (run.failureCode ?? 'daemon_shutdown')
-          : 'agent_protocol_drift');
-      }
+      if (run.parserError) throw run.parserError;
+      if (run.resultEvent) throw new Error('agent_protocol_drift');
 
       this.emitStarted(run, active);
       run.authorityGranted = true;
       this.flushBufferedEvents(run);
-      if (run.parserError || run.stopRequested) {
-        throw new Error(run.stopRequested
-          ? (run.failureCode ?? 'daemon_shutdown')
-          : 'agent_protocol_drift');
-      }
+      this.throwIfStopped(run);
+      if (run.parserError) throw run.parserError;
       run.state = 'running';
       run.resolveSetup();
       await this.writeTask(child, run.task);
       await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
       if (run.stopRequested) return;
-      if (run.parserError) throw new Error('agent_protocol_drift');
+      if (run.parserError) throw run.parserError;
       const resultEvent = this.requireResultEvent(run);
       const exit = await run.streams.closed;
       if (resultEvent.payload.is_error === true) {
@@ -942,7 +953,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   private cancelRun(
     run: DelegationRun,
-    reason: 'daemon_shutdown',
+    reason: 'daemon_shutdown' | 'route_lost',
   ): Promise<RunTerminalResult> {
     if (run.cancelPromise) return run.cancelPromise;
     run.stopRequested = true;
@@ -964,7 +975,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (run.streams) {
         await Promise.allSettled([run.streams.parser, run.streams.stderr, run.streams.closed]);
       }
-      this.settleOnce(run, 'cancelled', diagnosticTerminal('cancelled', run.profileVersion));
+      if (reason === 'route_lost') {
+        this.settleOnce(run, 'failed', diagnosticTerminal('route_lost', run.profileVersion));
+      } else {
+        this.settleOnce(run, 'cancelled', diagnosticTerminal('cancelled', run.profileVersion));
+      }
     } catch (error) {
       const code = errorCode(error) === 'tree_unsettled'
         ? 'tree_unsettled'
@@ -1015,6 +1030,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   ): boolean {
     if (run.settled) return false;
     run.settled = true;
+    if (run.routeSignal && run.routeAbortListener) {
+      run.routeSignal.removeEventListener('abort', run.routeAbortListener);
+      run.routeAbortListener = null;
+    }
     run.state = 'settled';
     const result = Object.freeze({
       delegationId: run.delegationId,
