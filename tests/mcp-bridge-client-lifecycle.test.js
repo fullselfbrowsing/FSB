@@ -168,6 +168,14 @@ function createFakeWebSocketClass(options = {}) {
 
     close() {
       this.closeCount += 1;
+      if (options.deferClose) {
+        this.readyState = FakeWebSocket.CLOSING;
+        return;
+      }
+      this.finishClose();
+    }
+
+    finishClose() {
       this.readyState = FakeWebSocket.CLOSED;
       if (typeof this.onclose === 'function') this.onclose();
     }
@@ -185,6 +193,7 @@ function createFakeWebSocketClass(options = {}) {
 
   FakeWebSocket.CONNECTING = 0;
   FakeWebSocket.OPEN = 1;
+  FakeWebSocket.CLOSING = 2;
   FakeWebSocket.CLOSED = 3;
   FakeWebSocket._sockets = sockets;
   return FakeWebSocket;
@@ -718,6 +727,47 @@ async function runPairingProbeAndReloadCases() {
     });
     const result = await harness.exports.mcpBridgeClient.reloadPairingAndReconnect();
     assertDeepEqual(toPlainObject(result), { pairingStatus: 'configured' }, 'offline reload retains honest configured status');
+  }
+
+  {
+    const harness = buildClientHarness({
+      deferClose: true,
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const first = harness.sockets[0];
+    first.open();
+    const firstProbe = JSON.parse(first.sent[0]);
+    first.receive({ id: firstProbe.id, type: 'ext:response', payload: { authorized: true } });
+    await flushMicrotasks();
+    assertEqual(client.getState().pairingStatus, 'paired', 'incumbent socket is paired before delayed replacement close');
+
+    const reloadPromise = client.reloadPairingAndReconnect();
+    await flushMicrotasks();
+    const pairingCloseTimeout = harness.timers.timeouts.find((timer) => timer.delay === 1000 && !timer.cleared);
+    assert(pairingCloseTimeout, 'pairing reload exposes the bounded old-socket close timeout');
+    pairingCloseTimeout.fn();
+    await flushMicrotasks();
+
+    const replacement = harness.sockets[1];
+    replacement.open();
+    const replacementProbe = JSON.parse(replacement.sent[0]);
+    assertEqual(client._extPending.size, 1, 'replacement auth probe is pending before the old socket closes late');
+
+    first.finishClose();
+    assertEqual(client._ws, replacement, 'late old-socket close preserves the replacement socket');
+    assertEqual(client.isConnected, true, 'late old-socket close preserves replacement connectivity');
+    assertEqual(client.getState().status, 'connected', 'late old-socket close preserves connected status');
+    assertEqual(client.getState().pairingStatus, 'configured', 'late old-socket close does not expire the in-flight replacement probe');
+    assertEqual(client._extPending.size, 1, 'late old-socket close does not reject the replacement auth probe');
+
+    replacement.receive({ id: replacementProbe.id, type: 'ext:response', payload: { authorized: true } });
+    const result = await reloadPromise;
+    assertDeepEqual(toPlainObject(result), { pairingStatus: 'paired' }, 'replacement auth probe settles once after the stale close');
+    assertEqual(client.isConnected, true, 'replacement remains connected after authenticated settlement');
+    assertEqual(client._extPending.size, 0, 'replacement auth probe clears exactly once after settlement');
   }
 }
 

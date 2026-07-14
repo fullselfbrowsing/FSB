@@ -212,7 +212,11 @@ class MCPBridgeClient {
 
     socket.onclose = () => {
       const wasReplacement = this._replacementSockets.delete(socket);
-      if (this._ws === socket) this._ws = null;
+      if (this._ws !== socket) {
+        this._notifySocketWaiters('close', socket);
+        return;
+      }
+      this._ws = null;
       console.log('[FSB MCP Bridge] Disconnected from local MCP bridge');
       this._connected = false;
       this._status = 'disconnected';
@@ -251,6 +255,7 @@ class MCPBridgeClient {
 
     socket.onerror = () => {
       // Errors are followed by onclose, so reconnect happens there
+      if (this._ws !== socket) return;
       this._lastDisconnectReason = 'socket_error';
     };
   }
