@@ -138,6 +138,66 @@ async function expectCode(value, code) {
   return caught;
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushAsync() {
+  for (let index = 0; index < 4; index += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
+
+function createFakeClock(start = 1720000000000) {
+  let current = start;
+  let nextId = 1;
+  const timers = new Map();
+
+  return {
+    now: () => current,
+    setTimeout(callback, delay) {
+      const id = nextId;
+      nextId += 1;
+      timers.set(id, { at: current + delay, callback, id });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
+    async tick(milliseconds) {
+      const target = current + milliseconds;
+      while (true) {
+        const due = [...timers.values()]
+          .filter((timer) => timer.at <= target)
+          .sort((left, right) => left.at - right.at || left.id - right.id)[0];
+        if (!due) break;
+        timers.delete(due.id);
+        current = due.at;
+        due.callback();
+        await flushAsync();
+      }
+      current = target;
+      await flushAsync();
+    },
+    pending() {
+      return timers.size;
+    },
+  };
+}
+
+function terminalState(code) {
+  if (code === 'completed') return 'completed';
+  if (code === 'stopped' || code === 'cancelled') return 'stopped';
+  if (code === 'daemon_restart_lost_run') return 'restart_lost';
+  return 'failed';
+}
+
 (async () => {
   console.log('--- Phase 61 Plan 02: delegation controller ---');
 
@@ -409,6 +469,541 @@ async function expectCode(value, code) {
       assert.strictEqual(entry.sequence, 1);
       assert.strictEqual(goodCalls, 1);
       assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('closed terminal table persists exact mappings and collapses unknown diagnostics', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const harness = makeDeps(store);
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const codes = [
+        'completed', 'stopped', 'cancelled', 'start_rejected',
+        'wall_clock_timeout', 'event_silence_timeout',
+        'delegation_persistence_failed', 'delegation_quota_exceeded',
+        'delegation_ledger_corrupt', 'route_lost', 'agent_offline',
+        'agent_unpaired', 'unsupported_provider', 'hold_expired',
+        'resume_ownership_lost', 'daemon_restart_lost_run',
+        'agent_protocol_drift', 'tree_unsettled', 'agent_failed',
+        'unknown_failure',
+      ];
+      const cases = codes.map((code) => ({ code, input: code })).concat([{
+        code: 'unknown_failure',
+        input: 'provider_private_terminal_diagnostic',
+      }]);
+
+      for (const [index, item] of cases.entries()) {
+        const id = `delegation_terminal_${index}`;
+        await controller.start({ delegationId: id });
+        const entry = await controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+          timestamp: 1720000000100 + index,
+          terminalCode: item.input,
+          treeSettled: true,
+        }));
+        const snapshot = controller.getSnapshot(id);
+        assert.strictEqual(entry.state, terminalState(item.code));
+        assert.strictEqual(snapshot.state, terminalState(item.code));
+        exactKeys(snapshot.terminal, ['code', 'releasedTabCount']);
+        assert.deepStrictEqual(snapshot.terminal, {
+          code: item.code,
+          releasedTabCount: 0,
+        });
+        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(envelope.terminal, true);
+        assert.strictEqual(envelope.terminalCode, item.code);
+        assert.strictEqual(envelope.entries.length, 1);
+      }
+
+      assert.deepStrictEqual(harness.calls.cancel, []);
+      assert.strictEqual(
+        JSON.stringify(storage.data).includes('provider_private_terminal_diagnostic'),
+        false,
+      );
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('start-vs-stop and duplicate stop coalesce to one terminal settlement', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const harness = makeDeps(store);
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_start_stop_race';
+      const firstStart = controller.start({ delegationId: id });
+      const duplicateStart = controller.start({ delegationId: id });
+      assert.strictEqual(firstStart, duplicateStart);
+      const firstStop = controller.stop({ delegationId: id });
+      const duplicateStop = controller.stop({ delegationId: id });
+      assert.strictEqual(firstStop, duplicateStop);
+
+      const [started, stopped] = await Promise.all([firstStart, firstStop]);
+      assert.strictEqual(started.code, 'started');
+      assert.strictEqual(stopped.code, 'stopped');
+      assert.deepStrictEqual(harness.calls.cancel, [{ delegationId: id, code: 'stopped' }]);
+      const snapshot = controller.getSnapshot(id);
+      assert.strictEqual(snapshot.state, 'stopped');
+      assert.deepStrictEqual(snapshot.terminal, { code: 'stopped', releasedTabCount: 0 });
+      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.strictEqual(envelope.terminal, true);
+      assert.strictEqual(envelope.terminalCode, 'stopped');
+      assert.strictEqual(envelope.entries.length, 1);
+      assert.strictEqual(envelope.entries[0].state, 'stopped');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('final-vs-stop ordering chooses exactly one winner in both directions', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const harness = makeDeps(store);
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      const finalFirstId = 'delegation_final_first';
+      await controller.start({ delegationId: finalFirstId });
+      const finalFirst = controller.acceptEvent(eventInput(finalFirstId, fixtures.resultEvent, {
+        timestamp: 1720000000200,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      const lateStop = controller.stop({ delegationId: finalFirstId });
+      const [finalEntry, lateStopResult] = await Promise.all([finalFirst, lateStop]);
+      assert.strictEqual(finalEntry.state, 'completed');
+      assert.strictEqual(lateStopResult.code, 'already_terminal');
+      const finalSnapshot = controller.getSnapshot(finalFirstId);
+      assert.deepStrictEqual(finalSnapshot.terminal, {
+        code: 'completed',
+        releasedTabCount: 0,
+      });
+      exactKeys(finalSnapshot.summary, [
+        'inputTokens', 'outputTokens', 'totalTokens', 'turns', 'durationMs',
+        'billingKind', 'usd', 'toolCalls', 'state',
+      ]);
+      assert.strictEqual(finalSnapshot.summary.billingKind, 'subscription');
+      assert.strictEqual(finalSnapshot.summary.usd, null);
+      assert.strictEqual(finalSnapshot.summary.state, 'completed');
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === finalFirstId).length,
+        0,
+      );
+
+      const stopFirstId = 'delegation_stop_first';
+      await controller.start({ delegationId: stopFirstId });
+      await controller.acceptEvent(eventInput(stopFirstId, fixtures.initEvent, {
+        ...fixtures.baseContext,
+        timestamp: 1720000000300,
+      }));
+      const stopFirst = controller.stop({ delegationId: stopFirstId });
+      const lateFinal = expectCode(
+        controller.acceptEvent(eventInput(stopFirstId, fixtures.resultEvent, {
+          timestamp: 1720000000301,
+          state: 'completed',
+        })),
+        'delegation_already_terminal',
+      );
+      const stopResult = await stopFirst;
+      await lateFinal;
+      assert.strictEqual(stopResult.code, 'stopped');
+      assert.deepStrictEqual(controller.getSnapshot(stopFirstId).terminal, {
+        code: 'stopped',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === stopFirstId).length,
+        1,
+      );
+      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${stopFirstId}`];
+      assert.strictEqual(envelope.terminal, true);
+      assert.strictEqual(envelope.entries.length, 1);
+      assert.strictEqual(envelope.entries[0].kind, 'init');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('event-silence and wall-clock watchdogs race finals exactly once', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const harness = makeDeps(store, { clock });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      const finalId = 'delegation_final_beats_timeout';
+      await controller.start({ delegationId: finalId });
+      await controller.acceptEvent(eventInput(finalId, fixtures.initEvent, {}));
+      await clock.tick(119999);
+      await controller.acceptEvent(eventInput(finalId, fixtures.resultEvent, {
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      await clock.tick(1);
+      assert.deepStrictEqual(controller.getSnapshot(finalId).terminal, {
+        code: 'completed',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === finalId).length,
+        0,
+      );
+
+      const silenceId = 'delegation_silence_timeout';
+      await controller.start({ delegationId: silenceId });
+      await controller.acceptEvent(eventInput(silenceId, fixtures.initEvent, {}));
+      await clock.tick(120000);
+      assert.deepStrictEqual(controller.getSnapshot(silenceId).terminal, {
+        code: 'event_silence_timeout',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === silenceId).length,
+        1,
+      );
+
+      const wallId = 'delegation_wall_timeout';
+      await controller.start({ delegationId: wallId });
+      await controller.acceptEvent(eventInput(wallId, fixtures.initEvent, {}));
+      for (let index = 0; index < 22; index += 1) {
+        await clock.tick(119000);
+        await controller.acceptEvent(eventInput(wallId, fixtures.stateEvent, {
+          state: 'running',
+        }));
+      }
+      await clock.tick(82000);
+      assert.deepStrictEqual(controller.getSnapshot(wallId).terminal, {
+        code: 'wall_clock_timeout',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === wallId).length,
+        1,
+      );
+      for (const id of [finalId, silenceId, wallId]) {
+        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(envelope.terminal, true);
+        assert.strictEqual(
+          harness.calls.cancel.filter((call) => call.delegationId === id).length <= 1,
+          true,
+        );
+      }
+      assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('simultaneous delegations keep interleaved events timers and Stop isolated', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const harness = makeDeps(store, { clock });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const firstId = 'delegation_parallel_first';
+      const secondId = 'delegation_parallel_second';
+      await Promise.all([
+        controller.start({ delegationId: firstId }),
+        controller.start({ delegationId: secondId }),
+      ]);
+      await controller.acceptEvent(eventInput(firstId, fixtures.initEvent, {}));
+      await controller.acceptEvent(eventInput(secondId, fixtures.initEvent, {}));
+      await clock.tick(119000);
+      await controller.acceptEvent(eventInput(firstId, fixtures.toolUseEvent, {
+        state: 'running',
+        toolName: 'mcp__fsb__search_capabilities',
+      }));
+      await clock.tick(2000);
+
+      const firstBeforeStop = controller.getSnapshot(firstId);
+      const secondAfterTimeout = controller.getSnapshot(secondId);
+      assert.strictEqual(firstBeforeStop.state, 'running');
+      assert.strictEqual(firstBeforeStop.terminal, null);
+      assert.deepStrictEqual(firstBeforeStop.entries.map((entry) => entry.sequence), [1, 2]);
+      assert.deepStrictEqual(secondAfterTimeout.terminal, {
+        code: 'event_silence_timeout',
+        releasedTabCount: 0,
+      });
+      assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1]);
+
+      const stopped = await controller.stop({ delegationId: firstId });
+      assert.strictEqual(stopped.code, 'stopped');
+      assert.deepStrictEqual(controller.getSnapshot(firstId).terminal, {
+        code: 'stopped',
+        releasedTabCount: 0,
+      });
+      assert.deepStrictEqual(
+        harness.calls.cancel.map((call) => call.delegationId).sort(),
+        [firstId, secondId].sort(),
+      );
+      assert.strictEqual(
+        storage.data[`${store.STORAGE_KEY_PREFIX}${firstId}`].terminalCode,
+        'stopped',
+      );
+      assert.strictEqual(
+        storage.data[`${store.STORAGE_KEY_PREFIX}${secondId}`].terminalCode,
+        'event_silence_timeout',
+      );
+      assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('take-control seals every owned tab and resume restores the full lease before daemon resume', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const order = [];
+      const registry = {
+        async bindDelegation(input) {
+          order.push(`bind:${input.agentId}`);
+          return { ok: true };
+        },
+        async getDelegationOwnedTabs() {
+          order.push('owned-tabs');
+          return [
+            { tabId: 17, token: 'sealed-token-17' },
+            { tabId: 11, token: 'sealed-token-11' },
+          ];
+        },
+        async sealHoldLease(input) {
+          order.push('seal-all-tabs');
+          exactKeys(input, ['activeTabId', 'agentId', 'delegationId', 'expiresAt', 'ownedTabs']);
+          assert.deepStrictEqual(input.ownedTabs.map((tab) => tab.tabId).sort(), [11, 17]);
+          return { ok: true, expiresAt: clock.now() + 300000 };
+        },
+        async restoreHoldLease(input) {
+          order.push('restore-all-tabs');
+          exactKeys(input, ['agentId', 'delegationId', 'liveTabIds']);
+          assert.deepStrictEqual(input.liveTabIds, [11, 17]);
+          return { ok: true };
+        },
+        async releaseDelegation() {
+          order.push('release-all-tabs');
+          return { ok: true, releasedTabCount: 2 };
+        },
+      };
+      const harness = makeDeps(store, {
+        clock,
+        registry,
+        hold: async () => {
+          order.push('daemon-hold');
+          return { ok: true, status: 'held' };
+        },
+        resume: async () => {
+          order.push('daemon-resume');
+          return { ok: true, status: 'resumed' };
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_hold_resume_success';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      const bound = await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-61-02' });
+      assert.strictEqual(bound.ok, true);
+      await controller.reconcile({
+        delegationId: id,
+        connection: 'connected',
+        activeTab: { tabId: 11, owned: true, canTakeControl: true },
+      });
+
+      const held = await controller.takeControl({ delegationId: id, activeTabId: 11 });
+      assert.strictEqual(held.code, 'held');
+      exactKeys(held.runtimeEvent, ['announceSequence', 'snapshot', 'type']);
+      exactKeys(held.snapshot.activeTab, ['canTakeControl', 'owned', 'tabId']);
+      exactKeys(held.snapshot.hold, ['expiresAt', 'tabIds']);
+      assert.deepStrictEqual(held.snapshot.hold.tabIds, [11, 17]);
+      assert.deepStrictEqual(
+        order.slice(0, 4),
+        ['bind:agent-61-02', 'owned-tabs', 'daemon-hold', 'seal-all-tabs'],
+      );
+
+      const resumed = await controller.resume({ delegationId: id, liveTabIds: [11, 17] });
+      assert.strictEqual(resumed.code, 'resumed');
+      assert.strictEqual(resumed.snapshot.state, 'running');
+      assert.strictEqual(resumed.snapshot.hold, null);
+      assert.deepStrictEqual(resumed.snapshot.activeTab, {
+        tabId: 11,
+        owned: true,
+        canTakeControl: true,
+      });
+      assert(order.indexOf('restore-all-tabs') < order.indexOf('daemon-resume'));
+
+      const stopped = await controller.stop({ delegationId: id });
+      assert.strictEqual(stopped.code, 'stopped');
+      assert.deepStrictEqual(stopped.snapshot.terminal, {
+        code: 'stopped',
+        releasedTabCount: 2,
+      });
+      assert.strictEqual(order.filter((item) => item === 'release-all-tabs').length, 1);
+      assert.strictEqual(harness.calls.cancel.length, 1);
+      assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('hold-stop overlap, hold expiry, and lost resume ownership each settle once', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const holdGate = deferred();
+      const holdStarted = deferred();
+      let holdCalls = 0;
+      const releases = [];
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async getDelegationOwnedTabs() { return [{ tabId: 31, token: 'sealed-token-31' }]; },
+        async sealHoldLease() { return { ok: true, expiresAt: clock.now() + 300000 }; },
+        async restoreHoldLease(input) {
+          if (input.delegationId === 'delegation_resume_lost') {
+            return { ok: false, code: 'resume_ownership_lost' };
+          }
+          return { ok: true };
+        },
+        async releaseDelegation(input) {
+          releases.push(input.delegationId);
+          return { ok: true, releasedTabCount: 1 };
+        },
+      };
+      const harness = makeDeps(store, {
+        clock,
+        registry,
+        hold: async () => {
+          holdCalls += 1;
+          if (holdCalls === 1) {
+            holdStarted.resolve();
+            await holdGate.promise;
+          }
+          return { ok: true, status: 'held' };
+        },
+        resume: async () => ({ ok: true, status: 'resumed' }),
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      async function ready(id) {
+        await controller.start({ delegationId: id });
+        await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+        await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
+        await controller.reconcile({
+          delegationId: id,
+          connection: 'connected',
+          activeTab: { tabId: 31, owned: true, canTakeControl: true },
+        });
+      }
+
+      const overlapId = 'delegation_hold_stop_overlap';
+      await ready(overlapId);
+      const holding = controller.takeControl({ delegationId: overlapId, activeTabId: 31 });
+      await holdStarted.promise;
+      const stopping = controller.stop({ delegationId: overlapId });
+      holdGate.resolve();
+      const [held, stopped] = await Promise.all([holding, stopping]);
+      assert.strictEqual(held.code, 'held');
+      assert.strictEqual(stopped.code, 'stopped');
+      assert.deepStrictEqual(controller.getSnapshot(overlapId).terminal, {
+        code: 'stopped',
+        releasedTabCount: 1,
+      });
+
+      const expiryId = 'delegation_hold_expiry';
+      await ready(expiryId);
+      assert.strictEqual(
+        (await controller.takeControl({ delegationId: expiryId, activeTabId: 31 })).code,
+        'held',
+      );
+      await clock.tick(300000);
+      assert.deepStrictEqual(controller.getSnapshot(expiryId).terminal, {
+        code: 'hold_expired',
+        releasedTabCount: 1,
+      });
+
+      const lostId = 'delegation_resume_lost';
+      await ready(lostId);
+      await controller.takeControl({ delegationId: lostId, activeTabId: 31 });
+      const lost = await controller.resume({ delegationId: lostId, liveTabIds: [31] });
+      assert.strictEqual(lost.code, 'resume_ownership_lost');
+      assert.deepStrictEqual(controller.getSnapshot(lostId).terminal, {
+        code: 'resume_ownership_lost',
+        releasedTabCount: 1,
+      });
+
+      for (const id of [overlapId, expiryId, lostId]) {
+        assert.strictEqual(
+          harness.calls.cancel.filter((call) => call.delegationId === id).length,
+          1,
+        );
+        assert.strictEqual(releases.filter((value) => value === id).length, 1);
+        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(envelope.terminal, true);
+        assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'stopped'
+          || entry.state === 'failed').length <= 1, true);
+      }
+      assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('reconcile keeps disconnect distinct from restart loss and emits only closed shapes', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const harness = makeDeps(store, {
+        status: async (input) => {
+          harness.calls.status.push(clone(input));
+          return { connection: 'disconnected' };
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_reconcile_restart_boundary';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+
+      const disconnectedEvent = await controller.reconcile({ delegationId: id });
+      exactKeys(disconnectedEvent, ['announceSequence', 'snapshot', 'type']);
+      assert.strictEqual(disconnectedEvent.announceSequence, null);
+      assert.strictEqual(disconnectedEvent.snapshot.connection, 'disconnected');
+      assert.strictEqual(disconnectedEvent.snapshot.state, 'running');
+      assert.strictEqual(disconnectedEvent.snapshot.terminal, null);
+      exactKeys(disconnectedEvent.snapshot.provider, ['id', 'label']);
+      assert.strictEqual(harness.calls.status.length, 1);
+      assert.strictEqual(harness.calls.cancel.length, 0);
+
+      const restart = await controller.reconcile({
+        delegationId: id,
+        recoveryDisposition: 'daemon_restart_lost_run',
+      });
+      assert.strictEqual(restart.code, 'daemon_restart_lost_run');
+      exactKeys(restart.snapshot, [
+        'v', 'delegationId', 'provider', 'state', 'connection', 'entries',
+        'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
+      ]);
+      assert.strictEqual(restart.snapshot.state, 'restart_lost');
+      assert.deepStrictEqual(restart.snapshot.terminal, {
+        code: 'daemon_restart_lost_run',
+        releasedTabCount: 0,
+      });
+      assert.deepStrictEqual(harness.calls.cancel, [{
+        delegationId: id,
+        code: 'daemon_restart_lost_run',
+      }]);
     } finally {
       storage.restore();
     }
