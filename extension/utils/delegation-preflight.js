@@ -89,6 +89,10 @@
     var connected = getOwnValue(bridgeState, 'connected') === true
       && getOwnValue(bridgeState, 'status') === 'connected';
     if (!connected) return failure('agent_offline', agentProviderId);
+    var delegationConnection = getOwnValue(bridgeState, 'delegationConnection');
+    if (getOwnValue(delegationConnection, 'state') !== 'connected') {
+      return failure('agent_offline', agentProviderId);
+    }
     if (getOwnValue(bridgeState, 'pairingStatus') !== 'paired') {
       return failure('agent_unpaired', agentProviderId);
     }

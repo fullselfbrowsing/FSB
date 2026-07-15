@@ -123,7 +123,10 @@ async function run() {
         providerKind: 'api',
         agentProviderId: storedAgentId,
         modelProvider,
-        bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
+        bridgeState: {
+          status: 'connected', connected: true, pairingStatus: 'paired',
+          delegationConnection: { state: 'connected' }
+        }
       };
       const apiResult = delegationPreflight.check(apiInput);
       check(apiResult.ok === true
@@ -143,7 +146,10 @@ async function run() {
       providerKind: 'agent',
       agentProviderId: candidate,
       modelProvider: 'xai',
-      bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
+      bridgeState: {
+        status: 'connected', connected: true, pairingStatus: 'paired',
+        delegationConnection: { state: 'connected' }
+      }
     });
     check(result.ok === (candidate === 'claude-code')
         && (candidate === 'claude-code'

@@ -65,6 +65,7 @@ class MCPBridgeClient {
     this._delegationHeartbeatConsecutiveMisses = 0;
     this._delegationHeartbeatLastAckAt = null;
     this._delegationConnectionState = 'disconnected';
+    this._delegationConnectionObservers = [];
     this._intentionalClose = false;
     this._connected = false;
     this._status = 'idle';
@@ -175,6 +176,7 @@ class MCPBridgeClient {
       this._delegationHeartbeatNonce = null;
       this._delegationHeartbeatConsecutiveMisses = 0;
       this._delegationConnectionState = 'connected';
+      this._notifyDelegationConnectionObservers();
       this._persistState();
       if (this._delegationHeartbeatOwners.size > 0) {
         this._startDelegationHeartbeat();
@@ -275,6 +277,7 @@ class MCPBridgeClient {
       this._stopPing();
       this._stopDelegationHeartbeat();
       this._delegationConnectionState = 'disconnected';
+      this._notifyDelegationConnectionObservers();
       this._persistState();
       this._notifySocketWaiters('close', socket);
       if (!this._intentionalClose && !wasReplacement) {
@@ -840,6 +843,32 @@ class MCPBridgeClient {
     };
   }
 
+  addDelegationConnectionObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Delegation connection observer must be a function');
+    }
+    this._delegationConnectionObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._delegationConnectionObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._delegationConnectionObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _notifyDelegationConnectionObservers() {
+    const snapshot = Object.freeze(this.getDelegationConnectionSnapshot());
+    for (const observer of [...this._delegationConnectionObservers]) {
+      try {
+        const pending = observer(snapshot);
+        if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+      } catch (_error) { /* observer isolation */ }
+    }
+  }
+
   retainDelegationHeartbeat(ownerId) {
     if (!this._isValidDelegationHeartbeatOwner(ownerId)) return false;
     if (this._delegationHeartbeatOwners.has(ownerId)) return false;
@@ -894,7 +923,10 @@ class MCPBridgeClient {
       this._delegationHeartbeatConsecutiveMisses += 1;
       this._delegationHeartbeatNonce = null;
       if (this._delegationHeartbeatConsecutiveMisses >= DELEGATION_HEARTBEAT_MISS_LIMIT) {
-        this._delegationConnectionState = 'disconnected';
+        if (this._delegationConnectionState !== 'disconnected') {
+          this._delegationConnectionState = 'disconnected';
+          this._notifyDelegationConnectionObservers();
+        }
       }
       this._persistState();
     }
@@ -921,7 +953,9 @@ class MCPBridgeClient {
     this._delegationHeartbeatNonce = null;
     this._delegationHeartbeatConsecutiveMisses = 0;
     this._delegationHeartbeatLastAckAt = Date.now();
+    const wasDisconnected = this._delegationConnectionState !== 'connected';
     this._delegationConnectionState = 'connected';
+    if (wasDisconnected) this._notifyDelegationConnectionObservers();
     this._persistState();
   }
 

@@ -1153,6 +1153,10 @@ async function runDelegationHeartbeatCases() {
     await flushMicrotasks();
     const socket = harness.sockets[0];
     socket.open();
+    const connectionTransitions = [];
+    const removeConnectionObserver = client.addDelegationConnectionObserver((snapshot) => {
+      connectionTransitions.push(toPlainObject(snapshot));
+    });
     client.retainDelegationHeartbeat('three-miss-owner');
     const heartbeatTimer = activeIntervals(harness, 20000)[0];
 
@@ -1171,12 +1175,21 @@ async function runDelegationHeartbeatCases() {
     const currentPing = JSON.parse(socket.sent[socket.sent.length - 1]);
     assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 3, 'third consecutive unacknowledged beat is counted');
     assertEqual(client.getDelegationConnectionSnapshot().state, 'disconnected', 'three consecutive missed acknowledgements classify disconnected');
+    assertDeepEqual(connectionTransitions, [{
+      state: 'disconnected',
+      consecutiveMisses: 3,
+      lastAckAt: null
+    }], 'third miss publishes one controller-facing delegation disconnect transition');
 
     socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: staleNonce });
     assertEqual(client.getDelegationConnectionSnapshot().state, 'disconnected', 'stale acknowledgement cannot revive a disconnected classification');
     socket.receive({ type: 'mcp:pong', ts: Date.now(), nonce: currentPing.nonce });
     assertEqual(client.getDelegationConnectionSnapshot().state, 'connected', 'later exact current acknowledgement may return to connected');
     assertEqual(client.getDelegationConnectionSnapshot().consecutiveMisses, 0, 'later exact current acknowledgement clears misses without replay');
+    assertEqual(connectionTransitions.length, 2, 'exact recovery publishes one connected transition');
+    assertEqual(connectionTransitions[1].state, 'connected', 'recovery observer receives connected state');
+    assertEqual(removeConnectionObserver(), true, 'delegation connection observer is removable');
+    assertEqual(removeConnectionObserver(), false, 'delegation connection observer removal is idempotent');
     assert(socket.sent.every((raw) => JSON.parse(raw).type === 'mcp:ping'), 'heartbeat recovery sends no restart or work-replay frame');
   }
 

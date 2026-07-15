@@ -458,7 +458,14 @@ function buildDelegationCommandHarness(options = {}) {
     fsbAgentRegistryInstance: null,
     bootstrapAgentRegistry: async () => {},
     mcpBridgeClient: {
-      getState() { return { connected: true, status: 'connected', pairingStatus: 'paired' }; },
+      getState() {
+        return {
+          connected: true,
+          status: 'connected',
+          pairingStatus: 'paired',
+          delegationConnection: { state: 'connected' }
+        };
+      },
       sendExtRequest(method, payload) {
         calls.push(['sendExtRequest', method, toPlainObject(payload)]);
         return Promise.reject(new Error('unexpected transport call'));
@@ -837,6 +844,8 @@ function runSourceContractCase() {
     'delegation modules load once in dependency order');
   assertEqual((backgroundSource.match(/mcpBridgeClient\.addEventObserver\(/g) || []).length, 1,
     'background installs exactly one awaited delegation bridge observer');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addDelegationConnectionObserver\(/g) || []).length, 1,
+    'background installs exactly one delegation connection observer');
   assert(backgroundSource.indexOf('await controller.hydrate()')
       < backgroundSource.indexOf('controller.subscribe((runtimeEvent)'),
     'controller hydration completes before runtime subscription');
@@ -882,6 +891,14 @@ function runSourceContractCase() {
   assert(reconcileSource.includes('for (const snapshot of snapshots)')
       && reconcileSource.includes('delegationId: snapshot.delegationId'),
     'one status response reconciles every hydrated server id independently');
+  const connectionObserverSource = delegationComposition.slice(
+    delegationComposition.indexOf('function fsbObserveDelegationConnection(connection) {'),
+    delegationComposition.indexOf('async function bootstrapDelegationController() {')
+  );
+  assert(connectionObserverSource.includes("connection: 'disconnected'")
+      && connectionObserverSource.includes('for (const snapshot of snapshots)')
+      && connectionObserverSource.includes('fsbDelegationActiveIds'),
+    'heartbeat disconnect reconciles and fans out every active controller record');
   assert(!/(?:delegate\.start|task\s*:|\badopt\b|\breplay\b)/.test(reconcileSource),
     'wake reconciliation cannot start, adopt, or replay delegated work');
   const snapshotCommand = delegationComposition.slice(

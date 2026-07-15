@@ -1178,6 +1178,9 @@ async function bootstrapAgentRegistry() {
 // polite live announcement after an MV3 worker wake.
 let fsbDelegationBootPromise = null;
 let fsbDelegationBridgeObserverInstalled = false;
+let fsbDelegationConnectionObserverInstalled = false;
+let fsbDelegationConnectionTail = Promise.resolve();
+const fsbDelegationActiveIds = new Set();
 const fsbDelegationProfiles = new Map();
 const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
 const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -1287,7 +1290,12 @@ function fsbDelegationBridgeState() {
   if (typeof mcpBridgeClient === 'undefined'
       || !mcpBridgeClient
       || typeof mcpBridgeClient.getState !== 'function') {
-    return { connected: false, status: 'disconnected', pairingStatus: 'unknown' };
+    return {
+      connected: false,
+      status: 'disconnected',
+      pairingStatus: 'unknown',
+      delegationConnection: { state: 'disconnected' }
+    };
   }
   return mcpBridgeClient.getState();
 }
@@ -1743,6 +1751,39 @@ async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
   });
 }
 
+function fsbObserveDelegationConnection(connection) {
+  if (!connection || (connection.state !== 'connected' && connection.state !== 'disconnected')) {
+    return Promise.resolve();
+  }
+  fsbDelegationConnectionTail = fsbDelegationConnectionTail.catch(() => {}).then(async () => {
+    const controller = globalThis.fsbDelegationControllerInstance;
+    if (!controller) return;
+    const snapshots = [];
+    for (const delegationId of Array.from(fsbDelegationActiveIds)) {
+      let snapshot = null;
+      try { snapshot = controller.getSnapshot(delegationId); } catch (_error) { /* stale id */ }
+      if (!snapshot || snapshot.terminal) {
+        fsbDelegationActiveIds.delete(delegationId);
+      } else {
+        snapshots.push(snapshot);
+      }
+    }
+    if (connection.state === 'connected') {
+      await fsbReconcileDelegationSnapshots(controller, snapshots);
+      return;
+    }
+    for (const snapshot of snapshots) {
+      try {
+        await controller.reconcile({
+          delegationId: snapshot.delegationId,
+          connection: 'disconnected'
+        });
+      } catch (_error) { /* one stale record cannot block the remaining fanout */ }
+    }
+  });
+  return fsbDelegationConnectionTail;
+}
+
 async function bootstrapDelegationController() {
   if (fsbDelegationBootPromise) return fsbDelegationBootPromise;
   fsbDelegationBootPromise = (async () => {
@@ -1789,12 +1830,22 @@ async function bootstrapDelegationController() {
     }
     const controller = globalThis.fsbDelegationControllerInstance;
     const hydratedSnapshots = await controller.hydrate();
+    hydratedSnapshots.forEach((snapshot) => fsbDelegationActiveIds.add(snapshot.delegationId));
     controller.subscribe((runtimeEvent) => {
+      if (runtimeEvent.snapshot.terminal) {
+        fsbDelegationActiveIds.delete(runtimeEvent.snapshot.delegationId);
+      } else {
+        fsbDelegationActiveIds.add(runtimeEvent.snapshot.delegationId);
+      }
       Promise.resolve(chrome.runtime.sendMessage(runtimeEvent)).catch(() => {});
     });
     if (!fsbDelegationBridgeObserverInstalled) {
       mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent);
       fsbDelegationBridgeObserverInstalled = true;
+    }
+    if (!fsbDelegationConnectionObserverInstalled) {
+      mcpBridgeClient.addDelegationConnectionObserver(fsbObserveDelegationConnection);
+      fsbDelegationConnectionObserverInstalled = true;
     }
     await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots);
     return {

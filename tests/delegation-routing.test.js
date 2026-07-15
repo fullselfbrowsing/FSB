@@ -20,6 +20,7 @@ function bridgeState(overrides = {}) {
     status: 'connected',
     connected: true,
     pairingStatus: 'paired',
+    delegationConnection: { state: 'connected' },
     ...overrides
   };
 }
@@ -174,6 +175,15 @@ async function main() {
   assert.deepEqual(clone(preflight.check({
     ...readyInput,
     bridgeState: bridgeState({ connected: false, status: 'disconnected' })
+  })), {
+    ok: false,
+    code: 'agent_offline',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  });
+  assert.deepEqual(clone(preflight.check({
+    ...readyInput,
+    bridgeState: bridgeState({ delegationConnection: { state: 'disconnected' } })
   })), {
     ok: false,
     code: 'agent_offline',
