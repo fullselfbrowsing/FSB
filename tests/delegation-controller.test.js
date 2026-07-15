@@ -1247,6 +1247,50 @@ function terminalState(code) {
     }
   });
 
+  await test('transport route loss never releases ownership before exact cancellation settlement', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      let releaseCalls = 0;
+      const harness = makeDeps(store, {
+        cancel: async () => { throw Object.assign(new Error('route unavailable'), {
+          code: 'bridge_topology_changed',
+        }); },
+        registry: {
+          async bindDelegation() { return { ok: true }; },
+          async releaseDelegation() {
+            releaseCalls += 1;
+            return { ok: true, releasedTabCount: 1 };
+          },
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_route_loss_cleanup';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-route-loss' });
+
+      await controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+        terminalCode: 'route_lost',
+        treeSettled: false,
+      }));
+
+      assert.deepStrictEqual(controller.getSnapshot(id).terminal, {
+        code: 'tree_unsettled',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(releaseCalls, 0,
+        'topology failure retains exact tab ownership while cancellation is unconfirmed');
+      assert.strictEqual(
+        storage.data[`${store.STORAGE_KEY_PREFIX}${id}`].terminalCode,
+        'tree_unsettled',
+      );
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('hold-stop overlap, hold expiry, and lost resume ownership each settle once', async () => {
     const storage = installSessionStorage();
     try {

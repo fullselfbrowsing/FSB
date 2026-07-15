@@ -1433,6 +1433,10 @@ async function fsbDelegationClearTrustCommand(request) {
 }
 
 function fsbDelegationTerminalCode(value) {
+  if (value === 'ext_request_timeout' || value === 'bridge_topology_changed') {
+    return 'route_lost';
+  }
+  if (value === 'runtime_cleanup_failed') return 'tree_unsettled';
   const allowed = new Set([
     'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
     'hold_expired', 'daemon_restart_lost_run', 'agent_failed'
@@ -1467,7 +1471,7 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
       context: {
         timestamp: Date.now(),
         terminalCode: code,
-        treeSettled: code !== 'tree_unsettled',
+        treeSettled: !transportError && code !== 'tree_unsettled',
         client: { id: 'claude-code', label: 'Claude Code' },
         profileVersion: fsbDelegationProfiles.get(delegationId) || null,
         billingKind: 'unknown'

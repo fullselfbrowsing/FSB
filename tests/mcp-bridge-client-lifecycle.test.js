@@ -239,6 +239,7 @@ this.__phase198 = {
   MCP_PING_INTERVAL_MS: typeof MCP_PING_INTERVAL_MS !== 'undefined' ? MCP_PING_INTERVAL_MS : undefined,
   DELEGATION_HEARTBEAT_INTERVAL_MS: typeof DELEGATION_HEARTBEAT_INTERVAL_MS !== 'undefined' ? DELEGATION_HEARTBEAT_INTERVAL_MS : undefined,
   DELEGATION_HEARTBEAT_MISS_LIMIT: typeof DELEGATION_HEARTBEAT_MISS_LIMIT !== 'undefined' ? DELEGATION_HEARTBEAT_MISS_LIMIT : undefined,
+  DELEGATION_START_REQUEST_TIMEOUT_MS: typeof DELEGATION_START_REQUEST_TIMEOUT_MS !== 'undefined' ? DELEGATION_START_REQUEST_TIMEOUT_MS : undefined,
   MCP_BRIDGE_PAIRING_KEY: typeof MCP_BRIDGE_PAIRING_KEY !== 'undefined' ? MCP_BRIDGE_PAIRING_KEY : undefined,
   FSB_EXT_PROTOCOL: typeof FSB_EXT_PROTOCOL !== 'undefined' ? FSB_EXT_PROTOCOL : undefined,
   lifecycleBus: typeof fsbAutomationLifecycleBus !== 'undefined' ? fsbAutomationLifecycleBus : null
@@ -801,6 +802,40 @@ async function runPairingProbeAndReloadCases() {
 
 async function runExtRequestLifecycleCases() {
   console.log('\n--- Phase 59 reverse request lifecycle ---');
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const pending = client.sendExtRequest('delegate.start', {
+      adapterId: 'claude-code',
+      task: 'a valid run that exceeds short RPC budgets'
+    }, { timeout: 1000 });
+    const request = JSON.parse(socket.sent[0]);
+    const lifecycleTimer = harness.timers.timeouts.find((timer) => (
+      timer.delay === harness.exports.DELEGATION_START_REQUEST_TIMEOUT_MS
+      && !timer.cleared
+    ));
+    assertEqual(harness.exports.DELEGATION_START_REQUEST_TIMEOUT_MS, 2820000,
+      'delegate.start owns a 45-minute run plus bounded cleanup transport budget');
+    assert(!!lifecycleTimer, 'delegate.start ignores generic 30/120-second RPC timeout selection');
+    assertEqual(client._extPending.size, 1,
+      'delegate.start remains pending after both generic short-RPC ceilings');
+    socket.receive({
+      id: request.id,
+      type: 'ext:response',
+      payload: { delegationId: 'delegation_long_lived', status: 'succeeded' }
+    });
+    const result = await pending;
+    assertDeepEqual(toPlainObject(result), {
+      delegationId: 'delegation_long_lived',
+      status: 'succeeded'
+    }, 'long-lived delegate.start still settles only on its final response');
+    assertEqual(lifecycleTimer.cleared, true, 'delegate.start clears its lifecycle timer after final settlement');
+  }
 
   {
     const harness = buildClientHarness();

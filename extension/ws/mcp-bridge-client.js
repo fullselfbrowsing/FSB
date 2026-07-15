@@ -17,6 +17,10 @@ const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
 const DEFAULT_EXT_REQUEST_TIMEOUT_MS = 30000;
 const MIN_EXT_REQUEST_TIMEOUT_MS = 1000;
 const MAX_EXT_REQUEST_TIMEOUT_MS = 120000;
+// delegate.start is a run-lifecycle request, not a short RPC. The controller's
+// 45-minute watchdog is authoritative; this transport ceiling leaves a bounded
+// two-minute cleanup window for the exact-id cancellation/final response.
+const DELEGATION_START_REQUEST_TIMEOUT_MS = (45 * 60 * 1000) + (2 * 60 * 1000);
 const AUTH_STATUS_TIMEOUT_MS = 5000;
 const EXT_METHOD_PATTERN = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
@@ -612,7 +616,9 @@ class MCPBridgeClient {
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2, 10));
     const id = `ext_${connectionPart}_${++this._extRequestCounter}_${Date.now()}`;
-    const timeoutMs = this._boundedExtTimeout(options.timeout);
+    const timeoutMs = method === 'delegate.start'
+      ? DELEGATION_START_REQUEST_TIMEOUT_MS
+      : this._boundedExtTimeout(options.timeout);
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

@@ -939,6 +939,10 @@ function runSourceContractCase() {
   assert(delegatedStart.indexOf('resolveAccepted(payload.delegationId)')
       < delegatedStart.indexOf('controller.getSnapshot(delegationId)'),
     'server-minted delegation id acceptance precedes returned controller state');
+  assert(delegationComposition.includes("value === 'ext_request_timeout' || value === 'bridge_topology_changed'")
+      && delegationComposition.includes("return 'route_lost'")
+      && delegationComposition.includes("treeSettled: !transportError && code !== 'tree_unsettled'"),
+    'transport timeout/topology loss requires exact cancellation before ownership release');
 
   const clearTrust = backgroundSource.slice(
     backgroundSource.indexOf('async function fsbDelegationClearTrustCommand(request) {'),
