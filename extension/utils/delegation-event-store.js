@@ -31,7 +31,11 @@
     'delegationId', 'detail', 'init', 'kind', 'metrics', 'retry', 'sequence',
     'state', 'timestamp', 'title', 'tool', 'v'
   ];
-  var ENVELOPE_KEYS = ['delegationId', 'entries', 'terminal', 'terminalCode', 'v'];
+  var LEGACY_ENVELOPE_KEYS = ['delegationId', 'entries', 'terminal', 'terminalCode', 'v'];
+  var ENVELOPE_KEYS = [
+    'cleanupPending', 'delegationId', 'entries', 'terminal', 'terminalCode', 'v'
+  ];
+  var CLEANUP_PENDING_KEYS = ['agentId', 'cancellationConfirmed', 'code'];
   var INIT_KEYS = ['allowedTools', 'client', 'model', 'profileVersion', 'sessionId'];
   var CLIENT_KEYS = ['id', 'label'];
   var TOOL_KEYS = ['argsSummary', 'callId', 'durationMs', 'name', 'status', 'tabId'];
@@ -567,7 +571,10 @@
   }
 
   function _assertValidEnvelope(envelope, delegationId) {
-    if (!_hasExactKeys(envelope, ENVELOPE_KEYS)) _corrupt('ledger envelope shape is invalid');
+    var legacy = _hasExactKeys(envelope, LEGACY_ENVELOPE_KEYS);
+    if (!legacy && !_hasExactKeys(envelope, ENVELOPE_KEYS)) {
+      _corrupt('ledger envelope shape is invalid');
+    }
     if (envelope.v !== PAYLOAD_VERSION || envelope.delegationId !== delegationId) {
       _corrupt('ledger identity is invalid');
     }
@@ -577,6 +584,20 @@
       _corrupt('ledger terminal code is invalid');
     }
     if (envelope.terminal !== (envelope.terminalCode !== null)) _corrupt('ledger terminal fields disagree');
+    var cleanupPending = legacy ? null : envelope.cleanupPending;
+    if (cleanupPending !== null) {
+      if (!_hasExactKeys(cleanupPending, CLEANUP_PENDING_KEYS)
+        || typeof cleanupPending.cancellationConfirmed !== 'boolean'
+        || typeof cleanupPending.code !== 'string'
+        || !VALID_TERMINAL_CODES[cleanupPending.code]
+        || (cleanupPending.agentId !== null
+          && (typeof cleanupPending.agentId !== 'string'
+            || !cleanupPending.agentId
+            || _characterLength(cleanupPending.agentId) > MAX_ID_CHARS))
+        || envelope.terminal) {
+        _corrupt('ledger cleanup marker is invalid');
+      }
+    }
     if (!Array.isArray(envelope.entries) || envelope.entries.length > MAX_ENTRIES_PER_DELEGATION) {
       _corrupt('ledger entries are invalid');
     }
@@ -624,6 +645,7 @@
       delegationId: delegationId,
       terminal: false,
       terminalCode: null,
+      cleanupPending: null,
       entries: []
     };
   }
@@ -657,6 +679,7 @@
       var current = stored[key] === undefined ? _emptyEnvelope(delegationId) : stored[key];
       _assertValidEnvelope(current, delegationId);
       if (current.terminal) _persistence('cannot append to a terminal ledger');
+      if (current.cleanupPending) _persistence('cannot append while cleanup is pending');
       if (current.entries.length >= MAX_ENTRIES_PER_DELEGATION) {
         _quota('delegation entry count limit reached');
       }
@@ -673,6 +696,7 @@
         delegationId: delegationId,
         terminal: false,
         terminalCode: null,
+        cleanupPending: null,
         entries: current.entries.concat([entry])
       };
       _assertValidEnvelope(next, delegationId);
@@ -707,6 +731,73 @@
     });
   }
 
+  /**
+   * Commit the durable no-replay boundary before any registry authority is
+   * released. A worker wake may hydrate this row, but must treat it only as
+   * an exact cleanup retry, never as an ordinary live delegation.
+   */
+  async function markCleanupPending(delegationId, cleanup) {
+    delegationId = _boundedId(delegationId, 'delegationId', false);
+    return _withStorageLock(async function() {
+      var key = _key(delegationId);
+      var all = await _read(null);
+      var current = all[key] === undefined
+        ? _emptyEnvelope(delegationId)
+        : _assertValidEnvelope(all[key], delegationId);
+      if (current.terminal) _persistence('cannot quarantine a terminal ledger');
+      var marker = {
+        code: _normalizeTerminalCode(cleanup && cleanup.code),
+        cancellationConfirmed: !!(cleanup && cleanup.cancellationConfirmed === true),
+        agentId: cleanup && cleanup.agentId !== null && cleanup.agentId !== undefined
+          ? _boundedId(cleanup.agentId, 'cleanupPending.agentId', false)
+          : null
+      };
+      if (current.cleanupPending) {
+        if (current.cleanupPending.code !== marker.code
+          || current.cleanupPending.agentId !== marker.agentId
+          || (current.cleanupPending.cancellationConfirmed === true
+            && marker.cancellationConfirmed !== true)) {
+          _corrupt('cleanup marker conflicts with persisted ledger');
+        }
+        if (current.cleanupPending.cancellationConfirmed === marker.cancellationConfirmed) {
+          return _deepFreeze(_clone(current));
+        }
+        var promoted = {
+          v: PAYLOAD_VERSION,
+          delegationId: delegationId,
+          terminal: false,
+          terminalCode: null,
+          cleanupPending: marker,
+          entries: current.entries.slice()
+        };
+        _assertValidEnvelope(promoted, delegationId);
+        if (_ledgerBytesFromStorage(all, key, promoted) > MAX_AGGREGATE_BYTES) {
+          _quota('aggregate delegation ledger limit reached');
+        }
+        var promotionUpdate = {};
+        promotionUpdate[key] = promoted;
+        await _write(promotionUpdate);
+        return _deepFreeze(_clone(promoted));
+      }
+      var next = {
+        v: PAYLOAD_VERSION,
+        delegationId: delegationId,
+        terminal: false,
+        terminalCode: null,
+        cleanupPending: marker,
+        entries: current.entries.slice()
+      };
+      _assertValidEnvelope(next, delegationId);
+      if (_ledgerBytesFromStorage(all, key, next) > MAX_AGGREGATE_BYTES) {
+        _quota('aggregate delegation ledger limit reached');
+      }
+      var update = {};
+      update[key] = next;
+      await _write(update);
+      return _deepFreeze(_clone(next));
+    });
+  }
+
   async function markTerminal(delegationId, terminal) {
     delegationId = _boundedId(delegationId, 'delegationId', false);
     return _withStorageLock(async function() {
@@ -723,12 +814,35 @@
         if (current.terminalCode !== code) _corrupt('terminal code conflicts with persisted ledger');
         return _deepFreeze(_clone(current));
       }
+      if (current.cleanupPending && current.cleanupPending.code !== code) {
+        _corrupt('terminal code conflicts with cleanup marker');
+      }
+      if (current.cleanupPending
+        && current.cleanupPending.cancellationConfirmed !== true) {
+        _persistence('cannot mark terminal before cancellation confirmation');
+      }
+      var entries = current.entries.slice();
+      if (terminal && _isPlainRecord(terminal.event)
+        && entries.length < MAX_ENTRIES_PER_DELEGATION) {
+        var terminalContext = _isPlainRecord(terminal.context)
+          ? Object.assign({}, terminal.context)
+          : {};
+        terminalContext.delegationId = delegationId;
+        terminalContext.sequence = entries.length + 1;
+        terminalContext.terminalCode = code;
+        terminalContext.timestamp = Number.isSafeInteger(terminalContext.timestamp)
+          && terminalContext.timestamp >= 0
+          ? terminalContext.timestamp
+          : Date.now();
+        entries.push(project(terminal.event, terminalContext));
+      }
       var next = {
         v: PAYLOAD_VERSION,
         delegationId: delegationId,
         terminal: true,
         terminalCode: code,
-        entries: current.entries.slice()
+        cleanupPending: null,
+        entries: entries
       };
       _assertValidEnvelope(next, delegationId);
       if (_ledgerBytesFromStorage(all, key, next) > MAX_AGGREGATE_BYTES) {
@@ -757,6 +871,7 @@
     project: project,
     appendBeforeFanout: appendBeforeFanout,
     hydrateNonterminal: hydrateNonterminal,
+    markCleanupPending: markCleanupPending,
     markTerminal: markTerminal,
     normalizeTerminalCode: _normalizeTerminalCode,
     serializedBytes: _serializedBytes

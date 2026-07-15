@@ -146,6 +146,25 @@
     return 'failed';
   }
 
+  function _normalizeCleanupPending(value, eventStore) {
+    if (value === null || value === undefined) return null;
+    if (!_hasExactKeys(value, ['agentId', 'cancellationConfirmed', 'code'])
+      || typeof value.cancellationConfirmed !== 'boolean'
+      || (value.agentId !== null
+        && (typeof value.agentId !== 'string'
+          || !value.agentId
+          || value.agentId.length > 128))) {
+      return null;
+    }
+    var code = _normalizeTerminalCode(value.code, eventStore);
+    if (code !== value.code) return null;
+    return {
+      code: code,
+      cancellationConfirmed: value.cancellationConfirmed,
+      agentId: value.agentId
+    };
+  }
+
   function _summaryFromEntry(entry) {
     if (!entry || !entry.metrics) return null;
     return {
@@ -294,8 +313,9 @@
       hold: null,
       holdOwnedTabs: null,
       terminal: null,
+      cleanupPending: options.cleanupPending || null,
       hydrated: options.hydrated === true,
-      agentId: null,
+      agentId: typeof options.agentId === 'string' ? options.agentId : null,
       daemonGeneration: null,
       heartbeatRetained: false,
       heartbeatRetainPromise: null,
@@ -340,6 +360,7 @@
     if (!eventStore
       || typeof eventStore.appendBeforeFanout !== 'function'
       || typeof eventStore.hydrateNonterminal !== 'function'
+      || typeof eventStore.markCleanupPending !== 'function'
       || typeof eventStore.markTerminal !== 'function') {
       throw _error('delegation_controller_invalid_dependency', 'eventStore is required');
     }
@@ -588,9 +609,20 @@
 
     function _cancelOnce(record, code) {
       if (!record.cancelPromise) {
-        record.cancelPromise = Promise.resolve().then(function() {
+        var attempt = Promise.resolve().then(function() {
           return cancel({ delegationId: record.delegationId, code: code });
+        }).then(function(result) {
+          if ((!result
+            || (result.status !== 'cancelled' && result.status !== 'already_terminal'))
+            && record.cancelPromise === attempt) {
+            record.cancelPromise = null;
+          }
+          return result;
+        }, function(error) {
+          if (record.cancelPromise === attempt) record.cancelPromise = null;
+          throw error;
         });
+        record.cancelPromise = attempt;
       }
       return record.cancelPromise;
     }
@@ -641,35 +673,8 @@
       if (!record.persistenceFailure) {
         var code = _persistenceCode(error);
         _clearTimers(record);
-        record.persistenceFailure = Promise.resolve().then(async function() {
-          var settledCode = code;
-          var cancellationConfirmed = false;
-          try {
-            var cancelResult = await _cancelOnce(record, code);
-            cancellationConfirmed = !!cancelResult
-              && (cancelResult.status === 'cancelled'
-                || cancelResult.status === 'already_terminal');
-          } catch (_cancelError) { /* quarantine remains fail closed */ }
-          if (!cancellationConfirmed) settledCode = 'tree_unsettled';
-
-          // This compact marker is the durable quarantine boundary. Until it
-          // commits, retain every heartbeat/generation/registry authority and
-          // publish no terminal UI state that a worker wake could contradict.
-          await eventStore.markTerminal(record.delegationId, { code: settledCode });
-
-          var release = { ok: true, releasedTabCount: 0 };
-          if (cancellationConfirmed) release = await _releaseOnce(record);
-          record.state = _terminalState(settledCode);
-          record.terminal = {
-            code: settledCode,
-            releasedTabCount: release.ok === true ? release.releasedTabCount || 0 : 0
-          };
-          if (release.ok === true || !cancellationConfirmed) {
-            await _releaseHeartbeatOnce(record);
-            await _forgetGeneration(record);
-          }
-          _emit(record, null);
-          return settledCode;
+        record.persistenceFailure = Promise.resolve().then(function() {
+          return _settle(record, code, { cancel: true });
         }).catch(function(markerError) {
           record.persistenceFailure = null;
           record.state = 'stopping';
@@ -683,45 +688,144 @@
       );
     }
 
+    async function _commitCleanupBoundary(record, code, cancellationConfirmed) {
+      var envelope = await eventStore.markCleanupPending(record.delegationId, {
+        code: code,
+        cancellationConfirmed: cancellationConfirmed === true,
+        agentId: record.agentId || null
+      });
+      var marker = envelope && _normalizeCleanupPending(envelope.cleanupPending, eventStore);
+      if (!marker
+        || marker.code !== code
+        || marker.cancellationConfirmed !== (cancellationConfirmed === true)
+        || marker.agentId !== (record.agentId || null)
+        || envelope.terminal !== false) {
+        throw _error('delegation_ledger_corrupt', 'cleanup marker did not commit exactly');
+      }
+      record.cleanupPending = marker;
+      record.state = 'stopping';
+      return marker;
+    }
+
+    async function _commitTerminal(record, code, release, options) {
+      options = options || {};
+      if (!record.cleanupPending
+        || record.cleanupPending.code !== code
+        || record.cleanupPending.cancellationConfirmed !== true) {
+        throw _error('delegation_ledger_corrupt', 'terminal cleanup boundary is not confirmed');
+      }
+      var beforeLength = record.entries.length;
+      var envelope = await eventStore.markTerminal(record.delegationId, {
+        code: code,
+        event: { type: 'terminal', sessionId: null, payload: {} },
+        context: {
+          timestamp: Number.isSafeInteger(options.timestamp) ? options.timestamp : now(),
+          title: 'Delegation ended',
+          detail: null
+        }
+      });
+      if (!envelope
+        || envelope.terminal !== true
+        || envelope.terminalCode !== code
+        || envelope.cleanupPending !== null
+        || !Array.isArray(envelope.entries)
+        || (envelope.entries.length !== beforeLength
+          && envelope.entries.length !== beforeLength + 1)) {
+        throw _error('delegation_ledger_corrupt', 'terminal transition did not commit exactly');
+      }
+      var terminalEntry = envelope.entries.length === beforeLength + 1
+        ? envelope.entries[envelope.entries.length - 1]
+        : null;
+      if (terminalEntry) {
+        _applyEntry(record, terminalEntry, {
+          notify: false,
+          deferTerminalState: true,
+          refreshSilence: false
+        });
+      }
+      record.cleanupPending = null;
+      record.state = _terminalState(code);
+      if (record.summary) record.summary.state = _summaryState(record.state);
+      record.terminal = {
+        code: code,
+        releasedTabCount: release.releasedTabCount || 0
+      };
+      if (record.agentId
+        && registry
+        && typeof registry.acknowledgeDelegationRelease === 'function') {
+        try {
+          await registry.acknowledgeDelegationRelease({
+            delegationId: record.delegationId,
+            agentId: record.agentId
+          });
+        } catch (_receiptAckError) { /* bounded stale receipt remains safe */ }
+      }
+      await _releaseHeartbeatOnce(record);
+      await _forgetGeneration(record);
+      var runtimeEvent = _emit(record, terminalEntry ? terminalEntry.sequence : null);
+      return _deepFreeze({
+        ok: true,
+        code: code,
+        entry: terminalEntry,
+        releasedTabCount: record.terminal.releasedTabCount,
+        runtimeEvent: runtimeEvent,
+        snapshot: _snapshot(record)
+      });
+    }
+
     function _settle(record, requestedCode, options) {
       if (record.terminalPromise) return record.terminalPromise;
       options = options || {};
-      var code = _normalizeTerminalCode(requestedCode, eventStore);
+      var code = record.cleanupPending
+        ? record.cleanupPending.code
+        : _normalizeTerminalCode(requestedCode, eventStore);
       _clearTimers(record);
-      record.terminalPromise = Promise.resolve().then(async function() {
-        var settledCode = code;
-        var terminalEntry = options.entry || null;
-        if (options.cancel !== false) {
+      var settlement = Promise.resolve().then(async function() {
+        var cancellationConfirmed = record.cleanupPending
+          ? record.cleanupPending.cancellationConfirmed === true
+          : options.cancel === false;
+        if (!cancellationConfirmed
+          && (record.cleanupPending || options.cancel !== false)) {
           try {
-            var cancelResult = await _cancelOnce(record, settledCode);
-            if (!cancelResult
-              || (cancelResult.status !== 'cancelled'
-                && cancelResult.status !== 'already_terminal')) {
-              settledCode = 'tree_unsettled';
-            }
+            var cancelResult = await _cancelOnce(record, code);
+            cancellationConfirmed = !!cancelResult
+              && (cancelResult.status === 'cancelled'
+                || cancelResult.status === 'already_terminal');
           } catch (_cancelError) {
-            settledCode = 'tree_unsettled';
+            cancellationConfirmed = false;
           }
         }
 
+        if (!record.cleanupPending
+          || record.cleanupPending.cancellationConfirmed !== cancellationConfirmed) {
+          await _commitCleanupBoundary(record, code, cancellationConfirmed);
+        }
+
+        if (!cancellationConfirmed) {
+          record.state = 'stopping';
+          record.terminal = null;
+          var cancellationRuntimeEvent = _emit(record, null);
+          return _deepFreeze({
+            ok: false,
+            code: 'tree_unsettled',
+            entry: null,
+            releasedTabCount: 0,
+            runtimeEvent: cancellationRuntimeEvent,
+            snapshot: _snapshot(record)
+          });
+        }
+
         var release = { ok: true, code: 'nothing_to_release', releasedTabCount: 0 };
-        if (settledCode !== 'tree_unsettled') {
+        if (record.cleanupPending.cancellationConfirmed) {
           release = await _releaseOnce(record);
           if (release.ok !== true) {
-            var cleanupEntry = await _appendStateEntry(
-              record,
-              'stopping',
-              'Delegation cleanup blocked',
-              release.code
-            );
-            _applyEntry(record, cleanupEntry, { notify: false, refreshSilence: false });
             record.state = 'stopping';
-            record.terminalPromise = null;
-            var cleanupRuntimeEvent = _emit(record, cleanupEntry.sequence);
+            record.terminal = null;
+            var cleanupRuntimeEvent = _emit(record, null);
             return _deepFreeze({
               ok: false,
               code: release.code,
-              entry: cleanupEntry,
+              entry: null,
               releasedTabCount: 0,
               runtimeEvent: cleanupRuntimeEvent,
               snapshot: _snapshot(record)
@@ -729,64 +833,19 @@
           }
         }
 
-        try {
-          if (!terminalEntry) {
-            terminalEntry = await eventStore.appendBeforeFanout(
-              record.delegationId,
-              { type: 'terminal', sessionId: null, payload: {} },
-              {
-                timestamp: now(),
-                terminalCode: settledCode,
-                title: 'Delegation ended',
-                detail: null
-              }
-            );
-            if (!terminalEntry
-              || terminalEntry.delegationId !== record.delegationId
-              || terminalEntry.sequence !== record.entries.length + 1) {
-              throw _error('delegation_ledger_corrupt', 'canonical entry sequence or identity is invalid');
-            }
-          }
-          await eventStore.markTerminal(record.delegationId, { code: settledCode });
-        } catch (storageError) {
-          var persistenceCode = _persistenceCode(storageError);
-          try { await _cancelOnce(record, persistenceCode); } catch (_cancelError) { /* preserve storage error */ }
-          record.state = 'failed';
-          record.terminal = {
-            code: persistenceCode,
-            releasedTabCount: release.releasedTabCount || 0
-          };
-          await _releaseHeartbeatOnce(record);
-          await _forgetGeneration(record);
-          throw storageError;
-        }
-
-        if (terminalEntry) {
-          _applyEntry(record, terminalEntry, {
-            notify: false,
-            deferTerminalState: true,
-            refreshSilence: false
-          });
-        }
-        record.state = _terminalState(settledCode);
-        if (record.summary) record.summary.state = _summaryState(record.state);
-        record.terminal = {
-          code: settledCode,
-          releasedTabCount: release.releasedTabCount || 0
-        };
-        await _releaseHeartbeatOnce(record);
-        await _forgetGeneration(record);
-        var runtimeEvent = _emit(record, terminalEntry ? terminalEntry.sequence : null);
-        return _deepFreeze({
-          ok: true,
-          code: settledCode,
-          entry: terminalEntry,
-          releasedTabCount: record.terminal.releasedTabCount,
-          runtimeEvent: runtimeEvent,
-          snapshot: _snapshot(record)
-        });
+        return _commitTerminal(record, code, release, options);
       });
-      return record.terminalPromise;
+      record.terminalPromise = settlement;
+      settlement.then(function(result) {
+        if (result && result.ok !== true && record.terminalPromise === settlement) {
+          record.terminalPromise = null;
+        }
+      }, function() {
+        if (record.terminalPromise === settlement) record.terminalPromise = null;
+        record.state = 'stopping';
+        record.terminal = null;
+      });
+      return settlement;
     }
 
     function hydrate() {
@@ -803,7 +862,15 @@
             throw _error('delegation_ledger_corrupt', 'hydrated ledger identity is invalid');
           }
           var entries = Array.isArray(ledger.entries) ? ledger.entries.slice() : [];
-          var state = entries.length > 0 ? entries[entries.length - 1].state : 'idle';
+          var cleanupPending = _normalizeCleanupPending(ledger.cleanupPending, eventStore);
+          if (ledger.cleanupPending !== undefined
+            && ledger.cleanupPending !== null
+            && !cleanupPending) {
+            throw _error('delegation_ledger_corrupt', 'hydrated cleanup marker is invalid');
+          }
+          var state = cleanupPending
+            ? 'stopping'
+            : (entries.length > 0 ? entries[entries.length - 1].state : 'idle');
           var record = _newRecord(ledger.delegationId, {
             provider: _providerFromEntries(entries),
             state: state,
@@ -812,6 +879,8 @@
             summary: _latestSummary(entries),
             startedAt: _firstEntryTimestamp(entries),
             lastEventAt: _lastEntryTimestamp(entries),
+            cleanupPending: cleanupPending,
+            agentId: cleanupPending && cleanupPending.agentId,
             hydrated: true
           });
           if (registry && typeof registry.getAgentForDelegation === 'function') {
@@ -837,8 +906,10 @@
             }
           } catch (_generationReadError) { /* missing metadata means classification-pending */ }
           await _retainHeartbeatOnce(record);
-          _armWallClock(record);
-          if (record.state !== 'held') _armSilence(record);
+          if (!record.cleanupPending) {
+            _armWallClock(record);
+            if (record.state !== 'held') _armSilence(record);
+          }
         }));
         hydrated = true;
         return _deepFreeze(Array.from(records.values()).map(_snapshot));
@@ -949,11 +1020,14 @@
         if (record.terminal || record.terminalPromise) {
           throw _error('delegation_already_terminal', 'delegation is already terminal');
         }
+        if (record.cleanupPending) {
+          throw _error('delegation_cleanup_pending', 'delegation cleanup remains incomplete');
+        }
         if (input.event.type === 'terminal') {
           var terminalResult = await _settle(
             record,
             context.terminalCode || 'unknown_failure',
-            { cancel: context.treeSettled !== true }
+            { cancel: context.treeSettled !== true, timestamp: context.timestamp }
           );
           if (terminalResult.ok !== true) {
             throw _error(terminalResult.code, 'delegation cleanup remains incomplete');
@@ -994,6 +1068,10 @@
       if (!record) return null;
       return _enqueue(record, async function() {
         if (record.terminal) return _snapshot(record);
+        if (record.cleanupPending) {
+          var cleanupResult = await _settle(record, record.cleanupPending.code, { cancel: false });
+          return cleanupResult.snapshot;
+        }
         var connection = VALID_CONNECTIONS[input.connection] ? input.connection : null;
         if (!connection) {
           try {

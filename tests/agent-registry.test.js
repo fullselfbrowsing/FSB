@@ -1742,7 +1742,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   console.log('--- Phase 61 / Task 3: exact release isolates agents and counts active+held union ---');
   {
     const now = 170_000;
-    setupChromeMock({
+    const mock = setupChromeMock({
       tabs: [
         { id: 521, incognito: false, windowId: 5 },
         { id: 522, incognito: false, windowId: 5 },
@@ -1826,10 +1826,33 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(registry.hasAgent(agentA), false);
       assert.strictEqual(registry.getAgentForDelegation(delegationB), agentB);
       assert.strictEqual(registry.isOwnedBy(524, agentB), true, 'other delegation ownership survives exact cleanup');
+      const receiptPayload = mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY];
+      assert.deepStrictEqual(receiptPayload.delegationReleaseReceipts[delegationA], {
+        v: 1,
+        delegationId: delegationA,
+        agentId: agentA,
+        releasedTabCount: 3,
+        releasedAt: now,
+        acknowledged: false,
+      }, 'exact release proof is persisted before terminal acknowledgement');
       assert.deepStrictEqual(
         await registry.releaseDelegation({ delegationId: delegationA, agentId: agentA }),
+        { ok: true, code: 'delegation_already_released', releasedTabCount: 3 },
+        'repeated cleanup returns the original truthful count',
+      );
+      assert.deepStrictEqual(
+        await registry.releaseDelegation({ delegationId: delegationA, agentId: agentB }),
         { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 },
-        'repeated cleanup is a typed zero-count no-op',
+        'receipt replay fails closed for a different agent',
+      );
+
+      const reloadedModule = freshRequireRegistry();
+      const reloadedRegistry = new reloadedModule.AgentRegistry({ now: () => now + 1 });
+      await reloadedRegistry.hydrate();
+      assert.deepStrictEqual(
+        await reloadedRegistry.releaseDelegation({ delegationId: delegationA, agentId: agentA }),
+        { ok: true, code: 'delegation_already_released', releasedTabCount: 3 },
+        'fresh worker returns the durable exact release count',
       );
       assert.ok(await registry.bindTab(agentB, 521), 'released held tab becomes claimable only after exact cleanup');
 
@@ -1847,6 +1870,176 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     }
   }
   console.log('  PASS: exact cleanup counts once, repeats safely, and never touches another delegation');
+
+  console.log('--- Phase 61 / CR2-02: release receipts stay bounded without dropping outstanding proof ---');
+  {
+    const mock = setupChromeMock({
+      tabs: [{ id: 625, incognito: false, windowId: 6 }],
+    });
+    try {
+      let fresh = freshRequireRegistry();
+      let registry = new fresh.AgentRegistry({ now: () => 200_000 });
+      const registered = await registry.registerAgent();
+      const binding = await registry.bindTab(registered.agentId, 625);
+      const delegationId = 'Delegation_receipt_capacity_active';
+      await registry.bindDelegation({ delegationId, agentId: registered.agentId });
+
+      const key = fresh.FSB_AGENT_REGISTRY_STORAGE_KEY;
+      const payload = JSON.parse(JSON.stringify(mock.session._dump()[key]));
+      payload.delegationReleaseReceipts = {};
+      for (let index = 0; index < 128; index += 1) {
+        const receiptId = `Delegation_receipt_capacity_${String(index).padStart(3, '0')}`;
+        payload.delegationReleaseReceipts[receiptId] = {
+          v: 1,
+          delegationId: receiptId,
+          agentId: `agent_receipt_capacity_${String(index).padStart(3, '0')}`,
+          releasedTabCount: index % 4,
+          releasedAt: index,
+          acknowledged: false,
+        };
+      }
+      await mock.session.set({ [key]: payload });
+
+      fresh = freshRequireRegistry();
+      registry = new fresh.AgentRegistry({ now: () => 200_001 });
+      await registry.hydrate();
+      assert.deepStrictEqual(
+        await registry.releaseDelegation({
+          delegationId,
+          agentId: registered.agentId,
+        }),
+        {
+          ok: false,
+          code: 'delegation_release_persistence_failed',
+          releasedTabCount: 0,
+        },
+        'full outstanding receipt capacity refuses a new physical release',
+      );
+      assert.strictEqual(registry.getAgentForDelegation(delegationId), registered.agentId);
+      assert.strictEqual(registry.isOwnedBy(625, registered.agentId, binding.ownershipToken), true);
+      assert.strictEqual(
+        Object.keys(mock.session._dump()[key].delegationReleaseReceipts).length,
+        128,
+      );
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: full unacknowledged capacity fails before release and preserves authority');
+
+  console.log('--- Phase 61 / CR2-02: corrupt terminal evidence cannot acknowledge a receipt ---');
+  {
+    const delegationId = 'Delegation_receipt_corrupt_ledger';
+    const agentId = 'agent_receipt_corrupt_ledger';
+    const registryEnvelope = {
+      v: 1,
+      records: {},
+      delegationReleaseReceipts: {
+        [delegationId]: {
+          v: 1,
+          delegationId,
+          agentId,
+          releasedTabCount: 2,
+          releasedAt: 123,
+          acknowledged: true,
+        },
+      },
+    };
+    const ledgerKey = `fsbDelegationLedger:v1:${delegationId}`;
+    const mock = setupChromeMock({
+      session: {
+        fsbAgentRegistry: registryEnvelope,
+        [ledgerKey]: {
+          v: 1,
+          delegationId,
+          terminal: true,
+          terminalCode: 'provider_private_code',
+          cleanupPending: null,
+          entries: [],
+        },
+      },
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      await registry.hydrate();
+      assert.strictEqual(
+        mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY]
+          .delegationReleaseReceipts[delegationId].acknowledged,
+        false,
+        'hydrate downgrades forged acknowledgement without canonical terminal evidence',
+      );
+      assert.strictEqual(
+        await registry.acknowledgeDelegationRelease({ delegationId, agentId }),
+        false,
+        'acknowledgement re-reads and refuses corrupt terminal evidence',
+      );
+      await mock.session.set({
+        [ledgerKey]: {
+          v: 1,
+          delegationId,
+          terminal: false,
+          terminalCode: null,
+          cleanupPending: {
+            code: 'completed',
+            cancellationConfirmed: true,
+            agentId,
+          },
+          entries: [],
+        },
+      });
+      assert.strictEqual(
+        await registry.acknowledgeDelegationRelease({ delegationId, agentId }),
+        false,
+        'nonterminal cleanup evidence cannot acknowledge a receipt',
+      );
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: only canonical durable terminal evidence can acknowledge release proof');
+
+  console.log('--- Phase 61 / CR2-02: over-cap persisted outstanding receipts fail hydrate closed ---');
+  {
+    const receipts = {};
+    for (let index = 0; index < 129; index += 1) {
+      const delegationId = `Delegation_receipt_overcap_${String(index).padStart(3, '0')}`;
+      receipts[delegationId] = {
+        v: 1,
+        delegationId,
+        agentId: `agent_receipt_overcap_${String(index).padStart(3, '0')}`,
+        releasedTabCount: 1,
+        releasedAt: index,
+        acknowledged: false,
+      };
+    }
+    const mock = setupChromeMock({
+      session: {
+        fsbAgentRegistry: {
+          v: 1,
+          records: {},
+          delegationReleaseReceipts: receipts,
+        },
+      },
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      await assert.rejects(
+        registry.hydrate(),
+        /release receipt capacity exceeded/,
+      );
+      assert.strictEqual(
+        Object.keys(mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY]
+          .delegationReleaseReceipts).length,
+        129,
+        'fail-closed hydrate never truncates an outstanding proof',
+      );
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: malformed over-cap state is rejected without dropping unacknowledged proof');
 
   console.log('\nAll assertions passed.');
 })().catch((err) => {

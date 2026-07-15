@@ -6,6 +6,7 @@ const fixtures = require('./fixtures/delegation-events');
 
 const STORE_PATH = path.join(__dirname, '..', 'extension', 'utils', 'delegation-event-store.js');
 const CONTROLLER_PATH = path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js');
+const REGISTRY_PATH = path.join(__dirname, '..', 'extension', 'utils', 'agent-registry.js');
 
 let passed = 0;
 let failed = 0;
@@ -38,11 +39,17 @@ function freshModules() {
   };
 }
 
+function freshRegistryModule() {
+  delete require.cache[require.resolve(REGISTRY_PATH)];
+  return require(REGISTRY_PATH);
+}
+
 function installSessionStorage(initial = {}) {
   const previous = globalThis.chrome;
   const data = clone(initial);
   let writeError = null;
   let rejectedWritesRemaining = 0;
+  const rejectedWriteCalls = new Set();
   let gate = null;
   let startedResolve = null;
   let setCalls = 0;
@@ -61,6 +68,9 @@ function installSessionStorage(initial = {}) {
           setCalls += 1;
           if (startedResolve) startedResolve();
           if (gate) await gate.promise;
+          if (rejectedWriteCalls.delete(setCalls)) {
+            throw new Error(`write ${setCalls} rejected`);
+          }
           if (rejectedWritesRemaining > 0) {
             rejectedWritesRemaining -= 1;
             throw new Error('one-shot write rejected');
@@ -72,6 +82,18 @@ function installSessionStorage(initial = {}) {
           for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key];
         },
       },
+      local: {
+        async get() { return {}; },
+        async set() {},
+        async remove() {},
+      },
+    },
+    tabs: {
+      async query() { return [{ id: 71, incognito: false, windowId: 7 }]; },
+      async get(tabId) {
+        if (tabId !== 71) throw new Error(`No tab with id: ${tabId}`);
+        return { id: 71, incognito: false, windowId: 7 };
+      },
     },
   };
 
@@ -80,6 +102,7 @@ function installSessionStorage(initial = {}) {
     get setCalls() { return setCalls; },
     rejectWrites(error = new Error('write rejected')) { writeError = error; },
     rejectNextWrites(count = 1) { rejectedWritesRemaining = count; },
+    rejectWriteAt(callNumber) { rejectedWriteCalls.add(callNumber); },
     clear() { for (const key of Object.keys(data)) delete data[key]; },
     deferWrites() {
       let resolve;
@@ -432,7 +455,7 @@ function terminalState(code) {
     }
   });
 
-  await test('later append failure commits a tombstone before fanout and cannot resurrect on wake', async () => {
+  await test('later append failure commits cleanup and terminal atomically without resurrection', async () => {
     const storage = installSessionStorage();
     try {
       let modules = freshModules();
@@ -456,8 +479,9 @@ function terminalState(code) {
       const key = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
       assert.strictEqual(storage.data[key].terminal, true);
       assert.strictEqual(storage.data[key].terminalCode, 'delegation_persistence_failed');
-      assert.strictEqual(storage.data[key].entries.length, 2,
-        'failed event is never fabricated into the quarantined ledger');
+      assert.strictEqual(storage.data[key].entries.length, 3,
+        'failed provider event is absent and one canonical terminal row is committed');
+      assert.strictEqual(storage.data[key].entries[2].state, 'failed');
       assert.strictEqual(delivered.length, 1,
         'typed failure fans out only after the tombstone write succeeds');
       assert.deepStrictEqual(delivered[0].snapshot.terminal, {
@@ -476,20 +500,251 @@ function terminalState(code) {
     }
   });
 
+  await test('persistence quarantine survives release failure and reloads into exact retry', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const id = 'delegation_persistence_release_retry';
+      let releaseAttempts = 0;
+      let cancelAttempts = 0;
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async releaseDelegation() {
+          releaseAttempts += 1;
+          if (releaseAttempts === 1) {
+            return {
+              ok: false,
+              code: 'delegation_release_persistence_failed',
+              releasedTabCount: 0,
+            };
+          }
+          return { ok: true, code: 'delegation_released', releasedTabCount: 2 };
+        },
+      };
+      const cancel = async (input) => {
+        cancelAttempts += 1;
+        return { delegationId: input.delegationId, status: 'cancelled' };
+      };
+      let harness = makeDeps(modules.store, { registry, cancel });
+      let controller = modules.controllerModule.create(harness.deps);
+      await controller.hydrate();
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-persistence-retry' });
+
+      storage.rejectNextWrites(1);
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.toolUseEvent, {
+          ...fixtures.baseContext,
+          timestamp: fixtures.baseContext.timestamp + 1,
+        })),
+        'delegation_persistence_failed',
+      );
+      const key = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
+      assert.strictEqual(storage.data[key].terminal, false);
+      assert.deepStrictEqual(storage.data[key].cleanupPending, {
+        code: 'delegation_persistence_failed',
+        cancellationConfirmed: true,
+        agentId: 'agent-persistence-retry',
+      });
+      assert.strictEqual(releaseAttempts, 1);
+      assert.strictEqual(cancelAttempts, 1);
+
+      modules = freshModules();
+      harness = makeDeps(modules.store, { registry, cancel });
+      controller = modules.controllerModule.create(harness.deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1);
+      assert.strictEqual(restored[0].state, 'stopping');
+      const retried = await controller.stop({ delegationId: id });
+      assert.strictEqual(retried.ok, true);
+      assert.strictEqual(retried.code, 'delegation_persistence_failed');
+      assert.deepStrictEqual(retried.snapshot.terminal, {
+        code: 'delegation_persistence_failed',
+        releasedTabCount: 2,
+      });
+      assert.strictEqual(releaseAttempts, 2);
+      assert.strictEqual(cancelAttempts, 1);
+      assert.strictEqual(storage.data[key].terminal, true);
+      assert.strictEqual(storage.data[key].cleanupPending, null);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('release receipt survives terminal-write failure and reload with exact count', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      let registryModule = freshRegistryModule();
+      let registry = new registryModule.AgentRegistry({ now: () => 1720000000000 });
+      const registered = await registry.registerAgent();
+      const binding = await registry.bindTab(registered.agentId, 71);
+      assert(binding && binding.ownershipToken);
+
+      const id = 'delegation_receipt_reload';
+      const ackObservations = [];
+      let originalAcknowledge = registry.acknowledgeDelegationRelease.bind(registry);
+      registry.acknowledgeDelegationRelease = async (input) => {
+        ackObservations.push(clone(storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`]));
+        return originalAcknowledge(input);
+      };
+      let harness = makeDeps(modules.store, {
+        registry,
+        cancel: async () => {
+          throw new Error('tree is already settled; cancellation must not run');
+        },
+      });
+      let controller = modules.controllerModule.create(harness.deps);
+      await controller.hydrate();
+      await controller.start({ delegationId: id });
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: registered.agentId });
+      await controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
+        timestamp: 1720000000100,
+        billingKind: 'subscription',
+      }));
+
+      const terminalWriteCall = storage.setCalls + 3;
+      storage.rejectWriteAt(terminalWriteCall);
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+          timestamp: 1720000000101,
+          terminalCode: 'completed',
+          treeSettled: true,
+        })),
+        'delegation_persistence_failed',
+      );
+      assert.strictEqual(storage.setCalls, terminalWriteCall);
+      assert.deepStrictEqual(ackObservations, [],
+        'receipt acknowledgement never precedes durable terminal evidence');
+
+      const ledgerKey = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
+      const registryKey = registryModule.FSB_AGENT_REGISTRY_STORAGE_KEY;
+      assert.strictEqual(storage.data[ledgerKey].terminal, false);
+      assert.deepStrictEqual(storage.data[ledgerKey].cleanupPending, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: registered.agentId,
+      });
+      const firstReceipt = storage.data[registryKey].delegationReleaseReceipts[id];
+      assert.strictEqual(firstReceipt.releasedTabCount, 1);
+      assert.strictEqual(firstReceipt.acknowledged, false);
+      assert.strictEqual(storage.data[registryKey].delegations, undefined);
+
+      modules = freshModules();
+      registryModule = freshRegistryModule();
+      registry = new registryModule.AgentRegistry({ now: () => 1720000000200 });
+      await registry.hydrate();
+      assert.deepStrictEqual(
+        await registry.releaseDelegation({ delegationId: id, agentId: registered.agentId }),
+        { ok: true, code: 'delegation_already_released', releasedTabCount: 1 },
+      );
+      originalAcknowledge = registry.acknowledgeDelegationRelease.bind(registry);
+      registry.acknowledgeDelegationRelease = async (input) => {
+        ackObservations.push(clone(storage.data[ledgerKey]));
+        return originalAcknowledge(input);
+      };
+      harness = makeDeps(modules.store, {
+        registry,
+        cancel: async () => {
+          throw new Error('confirmed cleanup must not cancel twice');
+        },
+      });
+      controller = modules.controllerModule.create(harness.deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1);
+      assert.strictEqual(restored[0].state, 'stopping');
+
+      const retried = await controller.stop({ delegationId: id });
+      assert.strictEqual(retried.ok, true);
+      assert.strictEqual(retried.code, 'completed');
+      assert.deepStrictEqual(retried.snapshot.terminal, {
+        code: 'completed',
+        releasedTabCount: 1,
+      });
+      assert.strictEqual(ackObservations.length, 1);
+      assert.strictEqual(ackObservations[0].terminal, true);
+      assert.strictEqual(ackObservations[0].terminalCode, 'completed');
+      assert.strictEqual(ackObservations[0].cleanupPending, null);
+      assert.strictEqual(
+        storage.data[registryKey].delegationReleaseReceipts[id].acknowledged,
+        true,
+      );
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('2,000-row recovered run terminalizes without row 2,001 or replay', async () => {
+    const bootstrap = freshModules();
+    const id = 'delegation_controller_terminal_boundary';
+    const template = bootstrap.store.project(fixtures.stateEvent, {
+      delegationId: id,
+      sequence: 1,
+      timestamp: 1720000000000,
+      state: 'running',
+      title: 'bounded state',
+    });
+    const entries = Array.from(
+      { length: bootstrap.store.MAX_ENTRIES_PER_DELEGATION },
+      (_, index) => ({ ...clone(template), sequence: index + 1 }),
+    );
+    const key = `${bootstrap.store.STORAGE_KEY_PREFIX}${id}`;
+    const storage = installSessionStorage({
+      [key]: fixtures.makePersistedEnvelope(entries, { delegationId: id }),
+    });
+    try {
+      const { store, controllerModule } = freshModules();
+      const harness = makeDeps(store, {
+        cancel: async () => {
+          throw new Error('settled final must not cancel');
+        },
+      });
+      let controller = controllerModule.create(harness.deps);
+      const hydrated = await controller.hydrate();
+      assert.strictEqual(hydrated.length, 1);
+      assert.strictEqual(hydrated[0].entries.length, store.MAX_ENTRIES_PER_DELEGATION);
+      const terminalEntry = await controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+        timestamp: 1720000000100,
+        terminalCode: 'completed',
+        treeSettled: true,
+      }));
+      assert.strictEqual(terminalEntry, null);
+      assert.deepStrictEqual(controller.getSnapshot(id).terminal, {
+        code: 'completed',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(storage.data[key].terminal, true);
+      assert.strictEqual(storage.data[key].terminalCode, 'completed');
+      assert.strictEqual(storage.data[key].cleanupPending, null);
+      assert.strictEqual(storage.data[key].entries.length, store.MAX_ENTRIES_PER_DELEGATION);
+      assert.strictEqual(storage.data[key].entries.at(-1).sequence, store.MAX_ENTRIES_PER_DELEGATION);
+
+      const reloaded = freshModules();
+      controller = reloaded.controllerModule.create(makeDeps(reloaded.store).deps);
+      assert.deepStrictEqual(await controller.hydrate(), []);
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('quota and corrupt canonical entries fan out only after a terminal marker', async () => {
     for (const code of ['delegation_quota_exceeded', 'delegation_ledger_corrupt']) {
       const { store, controllerModule } = freshModules();
       let appendCalls = 0;
+      const persistedEntries = [];
       const fakeStore = {
         async hydrateNonterminal() { return []; },
         async appendBeforeFanout(id, event, context) {
           appendCalls += 1;
           if (appendCalls === 1) {
-            return store.project(event, {
+            const entry = store.project(event, {
               ...context,
               delegationId: id,
               sequence: 1,
             });
+            persistedEntries.push(entry);
+            return entry;
           }
           if (code === 'delegation_ledger_corrupt') {
             return {
@@ -501,7 +756,33 @@ function terminalState(code) {
           error.code = code;
           throw error;
         },
-        async markTerminal() {},
+        async markCleanupPending(id, cleanup) {
+          return {
+            v: 1,
+            delegationId: id,
+            terminal: false,
+            terminalCode: null,
+            cleanupPending: clone(cleanup),
+            entries: clone(persistedEntries),
+          };
+        },
+        async markTerminal(id, terminal) {
+          const entry = store.project(terminal.event, {
+            ...terminal.context,
+            delegationId: id,
+            sequence: persistedEntries.length + 1,
+            terminalCode: terminal.code,
+          });
+          persistedEntries.push(entry);
+          return {
+            v: 1,
+            delegationId: id,
+            terminal: true,
+            terminalCode: terminal.code,
+            cleanupPending: null,
+            entries: clone(persistedEntries),
+          };
+        },
       };
       const { deps, calls } = makeDeps(fakeStore);
       const controller = controllerModule.create(deps);
@@ -517,7 +798,8 @@ function terminalState(code) {
       assert.strictEqual(delivered, 1);
       assert.strictEqual(controller.getSnapshot(id).terminal.code, code);
       assert.deepStrictEqual(calls.cancel, [{ delegationId: id, code }]);
-      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 2);
+      assert.strictEqual(controller.getSnapshot(id).entries[1].state, 'failed');
     }
   });
 
@@ -831,7 +1113,10 @@ function terminalState(code) {
         registry,
         cancel: async (input) => {
           cancelled.push(clone(input));
-          return { delegationId: input.delegationId, status: 'already_terminal' };
+          return {
+            delegationId: input.delegationId,
+            status: input.delegationId === failedId ? 'failed' : 'already_terminal',
+          };
         },
       });
       const controller = controllerModule.create(harness.deps);
@@ -865,18 +1150,26 @@ function terminalState(code) {
         timestamp: 1720000000700,
         billingKind: 'subscription',
       }));
-      await controller.acceptEvent(eventInput(failedId, fixtures.terminalEvent, {
-        timestamp: 1720000000701,
-        terminalCode: 'tree_unsettled',
-        treeSettled: false,
-      }));
-      assert.deepStrictEqual(controller.getSnapshot(failedId).terminal, {
-        code: 'tree_unsettled',
-        releasedTabCount: 0,
-      });
+      await expectCode(
+        controller.acceptEvent(eventInput(failedId, fixtures.terminalEvent, {
+          timestamp: 1720000000701,
+          terminalCode: 'tree_unsettled',
+          treeSettled: false,
+        })),
+        'tree_unsettled',
+      );
+      assert.strictEqual(controller.getSnapshot(failedId).terminal, null);
       assert.deepStrictEqual(released, [delayedId],
         'cleanup failure retains ownership even after a streamed result');
       assert.deepStrictEqual(cancelled, [{ delegationId: failedId, code: 'tree_unsettled' }]);
+      assert.deepStrictEqual(
+        storage.data[`${store.STORAGE_KEY_PREFIX}${failedId}`].cleanupPending,
+        {
+          code: 'tree_unsettled',
+          cancellationConfirmed: false,
+          agentId: 'agent-cleanup-failed',
+        },
+      );
     } finally {
       storage.restore();
     }
@@ -1455,26 +1748,31 @@ function terminalState(code) {
     }
   });
 
-  await test('Stop retains ownership and persists one tree-unsettled row when cancellation is unconfirmed', async () => {
+  await test('Stop persists unconfirmed cleanup and retries cancellation after worker reload', async () => {
     const storage = installSessionStorage();
     try {
-      const { store, controllerModule } = freshModules();
+      let { store, controllerModule } = freshModules();
       let cancelCalls = 0;
       let releaseCalls = 0;
-      const harness = makeDeps(store, {
-        cancel: async (input) => {
-          cancelCalls += 1;
-          return { delegationId: input.delegationId, status: 'failed' };
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async releaseDelegation() {
+          releaseCalls += 1;
+          return { ok: true, releasedTabCount: 1 };
         },
-        registry: {
-          async bindDelegation() { return { ok: true }; },
-          async releaseDelegation() {
-            releaseCalls += 1;
-            return { ok: true, releasedTabCount: 1 };
-          },
-        },
+      };
+      const cancel = async (input) => {
+        cancelCalls += 1;
+        return {
+          delegationId: input.delegationId,
+          status: cancelCalls === 1 ? 'failed' : 'cancelled',
+        };
+      };
+      let harness = makeDeps(store, {
+        cancel,
+        registry,
       });
-      const controller = controllerModule.create(harness.deps);
+      let controller = controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_tree_unsettled_stop';
       await controller.start({ delegationId: id });
@@ -1486,15 +1784,44 @@ function terminalState(code) {
       assert.strictEqual(first, duplicate);
       const result = await first;
       assert.strictEqual(result.code, 'tree_unsettled');
-      assert.deepStrictEqual(result.snapshot.terminal, {
-        code: 'tree_unsettled',
-        releasedTabCount: 0,
-      });
+      assert.strictEqual(result.snapshot.terminal, null);
+      assert.strictEqual(result.snapshot.state, 'stopping');
       assert.strictEqual(cancelCalls, 1);
       assert.strictEqual(releaseCalls, 0);
-      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
-      assert.strictEqual(envelope.terminalCode, 'tree_unsettled');
-      assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'failed').length, 1);
+      const key = `${store.STORAGE_KEY_PREFIX}${id}`;
+      assert.strictEqual(storage.data[key].terminal, false);
+      assert.strictEqual(storage.data[key].terminalCode, null);
+      assert.deepStrictEqual(storage.data[key].cleanupPending, {
+        code: 'stopped',
+        cancellationConfirmed: false,
+        agentId: 'agent-tree-unsettled',
+      });
+      assert.strictEqual(storage.data[key].entries.length, 2);
+
+      ({ store, controllerModule } = freshModules());
+      harness = makeDeps(store, {
+        cancel,
+        registry,
+      });
+      controller = controllerModule.create(harness.deps);
+      const hydrated = await controller.hydrate();
+      assert.strictEqual(hydrated.length, 1);
+      assert.strictEqual(hydrated[0].state, 'stopping');
+      assert.strictEqual(hydrated[0].terminal, null);
+
+      const retried = await controller.stop({ delegationId: id });
+      assert.strictEqual(retried.ok, true);
+      assert.strictEqual(retried.code, 'stopped');
+      assert.deepStrictEqual(retried.snapshot.terminal, {
+        code: 'stopped',
+        releasedTabCount: 1,
+      });
+      assert.strictEqual(cancelCalls, 2);
+      assert.strictEqual(releaseCalls, 1);
+      assert.strictEqual(storage.data[key].terminal, true);
+      assert.strictEqual(storage.data[key].terminalCode, 'stopped');
+      assert.strictEqual(storage.data[key].cleanupPending, null);
+      assert.strictEqual(storage.data[key].entries.length, 3);
     } finally {
       storage.restore();
     }
@@ -1524,21 +1851,26 @@ function terminalState(code) {
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-route-loss' });
 
-      await controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
-        terminalCode: 'route_lost',
-        treeSettled: false,
-      }));
-
-      assert.deepStrictEqual(controller.getSnapshot(id).terminal, {
-        code: 'tree_unsettled',
-        releasedTabCount: 0,
-      });
-      assert.strictEqual(releaseCalls, 0,
-        'topology failure retains exact tab ownership while cancellation is unconfirmed');
-      assert.strictEqual(
-        storage.data[`${store.STORAGE_KEY_PREFIX}${id}`].terminalCode,
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+          terminalCode: 'route_lost',
+          treeSettled: false,
+        })),
         'tree_unsettled',
       );
+
+      assert.strictEqual(controller.getSnapshot(id).terminal, null);
+      assert.strictEqual(controller.getSnapshot(id).state, 'stopping');
+      assert.strictEqual(releaseCalls, 0,
+        'topology failure retains exact tab ownership while cancellation is unconfirmed');
+      const ledger = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.strictEqual(ledger.terminal, false);
+      assert.strictEqual(ledger.terminalCode, null);
+      assert.deepStrictEqual(ledger.cleanupPending, {
+        code: 'route_lost',
+        cancellationConfirmed: false,
+        agentId: 'agent-route-loss',
+      });
     } finally {
       storage.restore();
     }
@@ -1602,19 +1934,24 @@ function terminalState(code) {
         assert.strictEqual(blockedSnapshot.state, 'stopping');
         const ledger = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
         assert.strictEqual(ledger.terminal, false);
-        assert.strictEqual(ledger.entries[ledger.entries.length - 1].detail, item.code,
-          `${item.name} persists a typed cleanup diagnostic`);
+        assert.deepStrictEqual(ledger.cleanupPending, {
+          code: item.finalPath ? 'completed' : 'stopped',
+          cancellationConfirmed: true,
+          agentId: `agent-${id}`,
+        }, `${item.name} persists an exact cleanup retry marker`);
         assert.strictEqual(releaseAttempts, 1);
 
         const retried = await controller.stop({ delegationId: id });
         assert.strictEqual(retried.ok, true, `${item.name} allows exact cleanup retry`);
-        assert.strictEqual(retried.code, 'stopped');
+        const expectedCode = item.finalPath ? 'completed' : 'stopped';
+        assert.strictEqual(retried.code, expectedCode);
         assert.deepStrictEqual(retried.snapshot.terminal, {
-          code: 'stopped',
+          code: expectedCode,
           releasedTabCount: 2,
         });
         assert.strictEqual(releaseAttempts, 2);
-        assert.strictEqual(cancelAttempts, 1, 'confirmed cancellation is not repeated during release retry');
+        assert.strictEqual(cancelAttempts, item.finalPath ? 0 : 1,
+          'confirmed cancellation is not repeated during release retry');
       } finally {
         storage.restore();
       }

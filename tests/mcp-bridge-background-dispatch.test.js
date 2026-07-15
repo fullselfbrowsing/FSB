@@ -1024,14 +1024,14 @@ function runSourceContractCase() {
       && controllerReconcile.indexOf('registry.getDelegationHoldLease({')
         < controllerReconcile.indexOf("_settle(record, 'resume_ownership_lost', { cancel: true })"),
     'held wake requires the exact sealed lease before continued observation');
-  const settleSource = controllerSource.slice(
-    controllerSource.indexOf('function _settle(record, requestedCode, options) {'),
-    controllerSource.indexOf('function hydrate() {')
+  const terminalCommitSource = controllerSource.slice(
+    controllerSource.indexOf('async function _commitTerminal(record, code, release, options) {'),
+    controllerSource.indexOf('function _settle(record, requestedCode, options) {')
   );
-  assert(settleSource.indexOf('await eventStore.markTerminal(record.delegationId')
-      < settleSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
-      && settleSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
-        < settleSource.lastIndexOf('var runtimeEvent = _emit(record'),
+  assert(terminalCommitSource.indexOf('await eventStore.markTerminal(record.delegationId')
+      < terminalCommitSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+      && terminalCommitSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+        < terminalCommitSource.lastIndexOf('var runtimeEvent = _emit(record'),
     'terminal ledger commit precedes one heartbeat release and live fanout');
   assert(!/chrome\.tabs\.query\s*\(\s*\{[^}]*\bactive\s*:/s.test(registrySource),
     'registry never queries current active-tab state');

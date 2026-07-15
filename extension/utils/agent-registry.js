@@ -46,6 +46,31 @@
   var FSB_HOLD_LEASE_VERSION = 2;
   var FSB_HOLD_LEASE_LEGACY_VERSION = 1;
   var FSB_HOLD_LEASE_MS = 5 * 60 * 1000;
+  var FSB_DELEGATION_RELEASE_RECEIPT_VERSION = 1;
+  var FSB_DELEGATION_RELEASE_RECEIPT_LIMIT = 128;
+  var FSB_DELEGATION_LEDGER_STORAGE_PREFIX = 'fsbDelegationLedger:v1:';
+  var FSB_DELEGATION_TERMINAL_CODES = Object.freeze({
+    completed: true,
+    stopped: true,
+    cancelled: true,
+    start_rejected: true,
+    wall_clock_timeout: true,
+    event_silence_timeout: true,
+    delegation_persistence_failed: true,
+    delegation_quota_exceeded: true,
+    delegation_ledger_corrupt: true,
+    route_lost: true,
+    agent_offline: true,
+    agent_unpaired: true,
+    unsupported_provider: true,
+    hold_expired: true,
+    resume_ownership_lost: true,
+    daemon_restart_lost_run: true,
+    agent_protocol_drift: true,
+    tree_unsettled: true,
+    agent_failed: true,
+    unknown_failure: true
+  });
 
   // Phase 241 plan 01: cap + grace constants ---------------------------------
   // D-05: cap is persisted in chrome.storage.local under fsbAgentCap so it
@@ -126,6 +151,38 @@
     } catch (_e) {
       return null;
     }
+  }
+
+  async function readDurablyTerminalDelegations(delegationIds) {
+    var out = new Set();
+    var c = _getChrome();
+    if (!c || !c.storage || !c.storage.session || typeof c.storage.session.get !== 'function') {
+      return out;
+    }
+    var keys = delegationIds.map(function(delegationId) {
+      return FSB_DELEGATION_LEDGER_STORAGE_PREFIX + delegationId;
+    });
+    if (keys.length === 0) return out;
+    try {
+      var stored = await c.storage.session.get(keys);
+      delegationIds.forEach(function(delegationId) {
+        var ledger = stored && stored[FSB_DELEGATION_LEDGER_STORAGE_PREFIX + delegationId];
+        if (hasExactKeys(ledger, [
+          'v', 'delegationId', 'terminal', 'terminalCode', 'cleanupPending', 'entries'
+        ])
+          && ledger.v === 1
+          && ledger.delegationId === delegationId
+          && ledger.terminal === true
+          && typeof ledger.terminalCode === 'string'
+          && FSB_DELEGATION_TERMINAL_CODES[ledger.terminalCode] === true
+          && ledger.cleanupPending === null
+          && Array.isArray(ledger.entries)
+          && ledger.entries.length <= 2000) {
+          out.add(delegationId);
+        }
+      });
+    } catch (_error) { /* inability to prove terminal keeps receipts unacknowledged */ }
+    return out;
   }
 
   async function writePersistedAgentRegistry(records, extras, strict) {
@@ -321,6 +378,9 @@
     this._holdLeases = new Map();
     this._heldTabDelegations = new Map();
     this._heldTabTokens = new Map();
+    // Exact idempotency proof for the narrow window between registry release
+    // and delegation-ledger terminal commit. Bounded and secret-free.
+    this._delegationReleaseReceipts = new Map();
     this._now = typeof options.now === 'function' ? options.now : Date.now;
     this._hydrated = false;
     // Phase 241 plan 01: cap + grace state.
@@ -457,6 +517,9 @@
       // repair it implicitly because choosing either side would broaden
       // authority.
       if (mappedAgent || mappedDelegation) {
+        return { ok: false, code: 'delegation_binding_conflict' };
+      }
+      if (self._delegationReleaseReceipts.has(input.delegationId)) {
         return { ok: false, code: 'delegation_binding_conflict' };
       }
       var shadow = self._cloneAuthorityState();
@@ -611,6 +674,10 @@
     });
     shadow._heldTabDelegations = new Map(this._heldTabDelegations);
     shadow._heldTabTokens = new Map(this._heldTabTokens);
+    shadow._delegationReleaseReceipts = new Map();
+    this._delegationReleaseReceipts.forEach(function(receipt, delegationId) {
+      shadow._delegationReleaseReceipts.set(delegationId, cloneRecord(receipt));
+    });
     shadow._stagedReleases = new Map();
     this._stagedReleases.forEach(function(entry, connectionId) {
       shadow._stagedReleases.set(connectionId, {
@@ -632,6 +699,7 @@
     this._holdLeases = shadow._holdLeases;
     this._heldTabDelegations = shadow._heldTabDelegations;
     this._heldTabTokens = shadow._heldTabTokens;
+    this._delegationReleaseReceipts = shadow._delegationReleaseReceipts;
   };
 
   function canonicalOwnedTabs(value) {
@@ -949,6 +1017,48 @@
     } catch (_error) { /* diagnostics never broaden release authority */ }
   }
 
+  function canonicalDelegationReleaseReceipt(value, delegationId) {
+    if (!hasExactKeys(value, [
+      'v', 'delegationId', 'agentId', 'releasedTabCount', 'releasedAt', 'acknowledged'
+    ])
+      || value.v !== FSB_DELEGATION_RELEASE_RECEIPT_VERSION
+      || value.delegationId !== delegationId
+      || !isDelegationId(value.delegationId)
+      || typeof value.agentId !== 'string'
+      || value.agentId.length === 0
+      || !Number.isSafeInteger(value.releasedTabCount)
+      || value.releasedTabCount < 0
+      || !Number.isSafeInteger(value.releasedAt)
+      || value.releasedAt < 0
+      || typeof value.acknowledged !== 'boolean') {
+      return null;
+    }
+    return {
+      v: FSB_DELEGATION_RELEASE_RECEIPT_VERSION,
+      delegationId: value.delegationId,
+      agentId: value.agentId,
+      releasedTabCount: value.releasedTabCount,
+      releasedAt: value.releasedAt,
+      acknowledged: value.acknowledged
+    };
+  }
+
+  function pruneDelegationReleaseReceipts(receipts, targetSize) {
+    targetSize = Number.isSafeInteger(targetSize)
+      ? targetSize
+      : FSB_DELEGATION_RELEASE_RECEIPT_LIMIT;
+    if (receipts.size <= targetSize) return;
+    var ordered = Array.from(receipts.entries()).filter(function(entry) {
+      return entry[1].acknowledged === true;
+    }).sort(function(left, right) {
+      var timeDifference = left[1].releasedAt - right[1].releasedAt;
+      return timeDifference || left[0].localeCompare(right[0]);
+    });
+    while (receipts.size > targetSize && ordered.length > 0) {
+      receipts.delete(ordered.shift()[0]);
+    }
+  }
+
   /**
    * Release only one exact delegation/agent mapping. Active and held tabs
    * are validated first, then removed as one distinct union under the lock.
@@ -958,10 +1068,36 @@
     return withRegistryLock(async function() {
       if (!hasExactKeys(input, ['delegationId', 'agentId'])
         || !isDelegationId(input.delegationId)
-        || typeof input.agentId !== 'string'
-        || self.getAgentForDelegation(input.delegationId) !== input.agentId) {
+        || typeof input.agentId !== 'string') {
         emitDelegationReleaseMismatch(input, 'mapping_mismatch');
         return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
+      }
+      var priorReceipt = self._delegationReleaseReceipts.get(input.delegationId);
+      if (priorReceipt) {
+        if (priorReceipt.agentId !== input.agentId) {
+          emitDelegationReleaseMismatch(input, 'receipt_agent_mismatch');
+          return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
+        }
+        return {
+          ok: true,
+          code: 'delegation_already_released',
+          releasedTabCount: priorReceipt.releasedTabCount
+        };
+      }
+      if (self.getAgentForDelegation(input.delegationId) !== input.agentId) {
+        emitDelegationReleaseMismatch(input, 'mapping_mismatch');
+        return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
+      }
+      pruneDelegationReleaseReceipts(
+        self._delegationReleaseReceipts,
+        FSB_DELEGATION_RELEASE_RECEIPT_LIMIT - 1
+      );
+      if (self._delegationReleaseReceipts.size >= FSB_DELEGATION_RELEASE_RECEIPT_LIMIT) {
+        return {
+          ok: false,
+          code: 'delegation_release_persistence_failed',
+          releasedTabCount: 0
+        };
       }
       var activeTabs = self._tabsByAgent.get(input.agentId) || new Set();
       var activeExact = true;
@@ -1011,6 +1147,14 @@
       if (lease) {
         lease.ownedTabs.forEach(function(tab) { releasedTabIds.add(tab.tabId); });
       }
+      var releasedAt = self._now();
+      if (!Number.isSafeInteger(releasedAt) || releasedAt < 0) {
+        return {
+          ok: false,
+          code: 'delegation_release_persistence_failed',
+          releasedTabCount: 0
+        };
+      }
       var shadow = self._cloneAuthorityState();
       activeTabs.forEach(function(tabId) {
         shadow._tabOwners.delete(tabId);
@@ -1027,6 +1171,15 @@
       shadow._agents.delete(input.agentId);
       shadow._delegations.delete(input.delegationId);
       shadow._delegationByAgent.delete(input.agentId);
+      shadow._delegationReleaseReceipts.set(input.delegationId, {
+        v: FSB_DELEGATION_RELEASE_RECEIPT_VERSION,
+        delegationId: input.delegationId,
+        agentId: input.agentId,
+        releasedTabCount: releasedTabIds.size,
+        releasedAt: releasedAt,
+        acknowledged: false
+      });
+      pruneDelegationReleaseReceipts(shadow._delegationReleaseReceipts);
       try {
         await shadow._persist(true);
       } catch (_error) {
@@ -1039,6 +1192,35 @@
         code: 'delegation_released',
         releasedTabCount: releasedTabIds.size
       };
+    });
+  };
+
+  /** Mark an exact release proof stale only after the ledger is terminal. */
+  AgentRegistry.prototype.acknowledgeDelegationRelease = function(input) {
+    var self = this;
+    return withRegistryLock(async function() {
+      if (!hasExactKeys(input, ['delegationId', 'agentId'])
+        || !isDelegationId(input.delegationId)
+        || typeof input.agentId !== 'string') {
+        return false;
+      }
+      var receipt = self._delegationReleaseReceipts.get(input.delegationId);
+      if (!receipt || receipt.agentId !== input.agentId) return false;
+      if (receipt.acknowledged === true) return true;
+      var terminalDelegations = await readDurablyTerminalDelegations([input.delegationId]);
+      if (!terminalDelegations.has(input.delegationId)) return false;
+      var shadow = self._cloneAuthorityState();
+      var shadowReceipt = shadow._delegationReleaseReceipts.get(input.delegationId);
+      shadowReceipt.acknowledged = true;
+      pruneDelegationReleaseReceipts(shadow._delegationReleaseReceipts);
+      try {
+        await shadow._persist(true);
+      } catch (_error) {
+        try { await self._persist(); } catch (_ignored) { /* best-effort */ }
+        return false;
+      }
+      self._adoptAuthorityState(shadow);
+      return true;
     });
   };
 
@@ -1933,6 +2115,44 @@
         self._delegationByAgent.set(agentId, delegationId);
       });
 
+      var releaseReceiptStateChanged = false;
+      var persistedReleaseReceipts = (payload && isPlainObject(payload.delegationReleaseReceipts))
+        ? payload.delegationReleaseReceipts : {};
+      if (payload && payload.delegationReleaseReceipts !== undefined
+        && !isPlainObject(payload.delegationReleaseReceipts)) {
+        releaseReceiptStateChanged = true;
+      }
+      Object.keys(persistedReleaseReceipts).forEach(function(delegationId) {
+        var receipt = canonicalDelegationReleaseReceipt(
+          persistedReleaseReceipts[delegationId],
+          delegationId
+        );
+        if (!receipt
+          || self._delegations.has(delegationId)
+          || self._delegationByAgent.has(receipt.agentId)) {
+          releaseReceiptStateChanged = true;
+          return;
+        }
+        self._delegationReleaseReceipts.set(delegationId, receipt);
+      });
+      var durablyTerminalDelegations = await readDurablyTerminalDelegations(
+        Array.from(self._delegationReleaseReceipts.keys())
+      );
+      self._delegationReleaseReceipts.forEach(function(receipt, delegationId) {
+        var durablyAcknowledged = durablyTerminalDelegations.has(delegationId);
+        if (receipt.acknowledged !== durablyAcknowledged) {
+          receipt.acknowledged = durablyAcknowledged;
+          releaseReceiptStateChanged = true;
+        }
+      });
+      if (self._delegationReleaseReceipts.size > FSB_DELEGATION_RELEASE_RECEIPT_LIMIT) {
+        pruneDelegationReleaseReceipts(self._delegationReleaseReceipts);
+        releaseReceiptStateChanged = true;
+      }
+      if (self._delegationReleaseReceipts.size > FSB_DELEGATION_RELEASE_RECEIPT_LIMIT) {
+        throw new Error('Agent registry release receipt capacity exceeded');
+      }
+
       // Phase 240 D-04: rebuild _tabMetadata from the envelope's tabMetadata
       // block (sibling to records). Phase 240 Pitfall 6: stale Phase 237
       // envelopes have no tabMetadata; those tabs fail isOwnedBy on next
@@ -2093,7 +2313,10 @@
       });
 
       // Step 5: write reconciled snapshot back if anything changed.
-      if (reapedThisWake.length > 0 || delegationStateChanged || holdLeaseStateChanged) {
+      if (reapedThisWake.length > 0
+        || delegationStateChanged
+        || holdLeaseStateChanged
+        || releaseReceiptStateChanged) {
         await self._persist();
       }
 
@@ -2251,6 +2474,17 @@
       hasDelegations = true;
     });
 
+    var delegationReleaseReceipts = {};
+    var hasDelegationReleaseReceipts = false;
+    this._delegationReleaseReceipts.forEach(function(raw, delegationId) {
+      var receipt = canonicalDelegationReleaseReceipt(raw, delegationId);
+      if (!receipt
+        || self._delegations.has(delegationId)
+        || self._delegationByAgent.has(receipt.agentId)) return;
+      delegationReleaseReceipts[delegationId] = receipt;
+      hasDelegationReleaseReceipts = true;
+    });
+
     var holdLeases = {};
     var hasHoldLeases = false;
     this._holdLeases.forEach(function(lease, delegationId) {
@@ -2281,11 +2515,18 @@
     });
 
     var extras = null;
-    if (hasTabMetadata || hasStagedReleases || hasDelegations || hasHoldLeases) {
+    if (hasTabMetadata
+      || hasStagedReleases
+      || hasDelegations
+      || hasDelegationReleaseReceipts
+      || hasHoldLeases) {
       extras = {};
       if (hasTabMetadata) extras.tabMetadata = tabMetadata;
       if (hasStagedReleases) extras.stagedReleases = stagedReleases;
       if (hasDelegations) extras.delegations = delegations;
+      if (hasDelegationReleaseReceipts) {
+        extras.delegationReleaseReceipts = delegationReleaseReceipts;
+      }
       if (hasHoldLeases) extras.holdLeases = holdLeases;
     }
     await writePersistedAgentRegistry(records, extras, strict === true);
@@ -2309,6 +2550,7 @@
     this._holdLeases.clear();
     this._heldTabDelegations.clear();
     this._heldTabTokens.clear();
+    this._delegationReleaseReceipts.clear();
     // Phase 241: clear staged releases and any pending grace timers.
     if (this._stagedReleases) {
       this._stagedReleases.forEach(function(entry) {

@@ -144,6 +144,7 @@ function project(store, event, overrides = {}) {
       'STORAGE_KEY_PREFIX',
       'appendBeforeFanout',
       'hydrateNonterminal',
+      'markCleanupPending',
       'markTerminal',
       'normalizeTerminalCode',
       'project',
@@ -485,7 +486,10 @@ function project(store, event, overrides = {}) {
         Array.from({ length: 24 }, (_, index) => index + 1));
       assert.strictEqual(mock.setCalls, 24);
       const persisted = mock.data[storageKey(store)];
-      exactKeys(persisted, ['v', 'delegationId', 'terminal', 'terminalCode', 'entries']);
+      exactKeys(persisted, [
+        'v', 'delegationId', 'terminal', 'terminalCode', 'cleanupPending', 'entries',
+      ]);
+      assert.strictEqual(persisted.cleanupPending, null);
       assert.deepStrictEqual(persisted.entries.map((entry) => entry.sequence),
         Array.from({ length: 24 }, (_, index) => index + 1));
       assert.deepStrictEqual(persisted.entries.map((entry) => entry.title),
@@ -716,6 +720,172 @@ function project(store, event, overrides = {}) {
         store.markTerminal(delegationId, 'stopped'),
         'delegation_ledger_corrupt',
       );
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('cleanup marker is durable, blocks replay, and only promotes cancellation evidence', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const delegationId = fixtures.baseContext.delegationId;
+      await store.appendBeforeFanout(delegationId, fixtures.initEvent, context());
+      const pending = await store.markCleanupPending(delegationId, {
+        code: 'stopped',
+        cancellationConfirmed: false,
+        agentId: 'agent-cleanup-01',
+      });
+      exactKeys(pending, [
+        'v', 'delegationId', 'terminal', 'terminalCode', 'cleanupPending', 'entries',
+      ]);
+      assert.deepStrictEqual(pending.cleanupPending, {
+        code: 'stopped',
+        cancellationConfirmed: false,
+        agentId: 'agent-cleanup-01',
+      });
+      assert.strictEqual(pending.terminal, false);
+      await expectCode(
+        store.appendBeforeFanout(delegationId, fixtures.stateEvent, context()),
+        'delegation_persistence_failed',
+      );
+      await expectCode(
+        store.markTerminal(delegationId, { code: 'stopped' }),
+        'delegation_persistence_failed',
+      );
+
+      store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated.length, 1);
+      assert.deepStrictEqual(hydrated[0].cleanupPending, pending.cleanupPending);
+
+      const promoted = await store.markCleanupPending(delegationId, {
+        code: 'stopped',
+        cancellationConfirmed: true,
+        agentId: 'agent-cleanup-01',
+      });
+      assert.deepStrictEqual(promoted.cleanupPending, {
+        code: 'stopped',
+        cancellationConfirmed: true,
+        agentId: 'agent-cleanup-01',
+      });
+      await expectCode(
+        store.markCleanupPending(delegationId, {
+          code: 'stopped',
+          cancellationConfirmed: false,
+          agentId: 'agent-cleanup-01',
+        }),
+        'delegation_ledger_corrupt',
+      );
+      await expectCode(
+        store.markCleanupPending(delegationId, {
+          code: 'completed',
+          cancellationConfirmed: true,
+          agentId: 'agent-cleanup-01',
+        }),
+        'delegation_ledger_corrupt',
+      );
+      await expectCode(
+        store.markCleanupPending(delegationId, {
+          code: 'stopped',
+          cancellationConfirmed: true,
+          agentId: 'agent-cleanup-other',
+        }),
+        'delegation_ledger_corrupt',
+      );
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('terminal row and terminal flag commit atomically after cleanup', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const delegationId = fixtures.baseContext.delegationId;
+      await store.appendBeforeFanout(delegationId, fixtures.initEvent, context());
+      await store.markCleanupPending(delegationId, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: 'agent-cleanup-atomic',
+      });
+      const before = jsonClone(mock.data[storageKey(store)]);
+      mock.rejectNextWrite();
+      await expectCode(
+        store.markTerminal(delegationId, {
+          code: 'completed',
+          event: { type: 'terminal', sessionId: null, payload: {} },
+          context: { timestamp: fixtures.baseContext.timestamp + 10 },
+        }),
+        'delegation_persistence_failed',
+      );
+      assert.deepStrictEqual(mock.data[storageKey(store)], before);
+      assert.strictEqual(mock.data[storageKey(store)].terminal, false);
+      assert.strictEqual(mock.data[storageKey(store)].entries.length, 1);
+      assert.strictEqual(mock.data[storageKey(store)].cleanupPending.code, 'completed');
+    } finally {
+      mock.restore();
+    }
+
+    const successMock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const delegationId = fixtures.baseContext.delegationId;
+      await store.appendBeforeFanout(delegationId, fixtures.initEvent, context());
+      await store.markCleanupPending(delegationId, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: 'agent-cleanup-atomic',
+      });
+      const terminal = await store.markTerminal(delegationId, {
+        code: 'completed',
+        event: { type: 'terminal', sessionId: null, payload: {} },
+        context: { timestamp: fixtures.baseContext.timestamp + 10 },
+      });
+      assert.strictEqual(terminal.terminal, true);
+      assert.strictEqual(terminal.terminalCode, 'completed');
+      assert.strictEqual(terminal.cleanupPending, null);
+      assert.strictEqual(terminal.entries.length, 2);
+      assert.strictEqual(terminal.entries[1].kind, 'state');
+      assert.strictEqual(terminal.entries[1].state, 'completed');
+      assert.strictEqual(terminal.entries[1].sequence, 2);
+      assert.deepStrictEqual(successMock.data[storageKey(store)], terminal);
+    } finally {
+      successMock.restore();
+    }
+  });
+
+  await test('full ledger terminalization marks terminal without fabricating entry 2,001', async () => {
+    const bootstrap = freshStore();
+    const delegationId = 'delegation_terminal_boundary';
+    const template = bootstrap.project(fixtures.stateEvent, context({
+      delegationId,
+      sequence: 1,
+      title: 'bounded state',
+    }));
+    const entries = Array.from({ length: bootstrap.MAX_ENTRIES_PER_DELEGATION }, (_, index) => ({
+      ...jsonClone(template),
+      sequence: index + 1,
+    }));
+    const envelope = fixtures.makePersistedEnvelope(entries, { delegationId });
+    const mock = installSessionStorage({ [storageKey(bootstrap, delegationId)]: envelope });
+    try {
+      const store = freshStore();
+      await store.markCleanupPending(delegationId, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: 'agent-cleanup-boundary',
+      });
+      const terminal = await store.markTerminal(delegationId, {
+        code: 'completed',
+        event: { type: 'terminal', sessionId: null, payload: {} },
+        context: { timestamp: fixtures.baseContext.timestamp + 10 },
+      });
+      assert.strictEqual(terminal.terminal, true);
+      assert.strictEqual(terminal.cleanupPending, null);
+      assert.strictEqual(terminal.entries.length, store.MAX_ENTRIES_PER_DELEGATION);
+      assert.strictEqual(terminal.entries.at(-1).sequence, store.MAX_ENTRIES_PER_DELEGATION);
+      assert.strictEqual((await store.hydrateNonterminal()).length, 0);
     } finally {
       mock.restore();
     }
