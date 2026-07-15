@@ -319,6 +319,7 @@
     // transition them.
     this._holdLeases = new Map();
     this._heldTabDelegations = new Map();
+    this._heldTabTokens = new Map();
     this._now = typeof options.now === 'function' ? options.now : Date.now;
     this._hydrated = false;
     // Phase 241 plan 01: cap + grace state.
@@ -399,10 +400,9 @@
         return false;
       }
       var delegationId = self._delegationByAgent.get(agentId);
-      if (delegationId && self._holdLeases.has(delegationId)) {
-        // A generic connection/grace release cannot dissolve a confirmed
-        // human-control lease. The controller must call releaseDelegation
-        // with both exact identities.
+      if (delegationId) {
+        // Generic bridge/grace release cannot dissolve a controller-owned
+        // delegated agent, active or held. Exact cleanup requires both ids.
         return false;
       }
       var ownedTabs = self._tabsByAgent.get(agentId);
@@ -532,6 +532,7 @@
       shadow._holdLeases.set(delegationId, cloneRecord(lease));
     });
     shadow._heldTabDelegations = new Map(this._heldTabDelegations);
+    shadow._heldTabTokens = new Map(this._heldTabTokens);
     shadow._stagedReleases = new Map();
     this._stagedReleases.forEach(function(entry, connectionId) {
       shadow._stagedReleases.set(connectionId, {
@@ -552,6 +553,7 @@
     this._delegationByAgent = shadow._delegationByAgent;
     this._holdLeases = shadow._holdLeases;
     this._heldTabDelegations = shadow._heldTabDelegations;
+    this._heldTabTokens = shadow._heldTabTokens;
   };
 
   function canonicalOwnedTabs(value) {
@@ -643,6 +645,7 @@
         shadow._tabOwners.delete(tab.tabId);
         shadow._tabMetadata.delete(tab.tabId);
         shadow._heldTabDelegations.set(tab.tabId, input.delegationId);
+        shadow._heldTabTokens.set(tab.tabId, tab.ownershipToken);
       });
       shadow._tabsByAgent.set(input.agentId, new Set());
       var record = shadow._agents.get(input.agentId);
@@ -665,6 +668,175 @@
         ok: true,
         code: 'hold_lease_sealed',
         expiresAt: fixedExpiresAt
+      };
+    });
+  };
+
+  function canonicalLiveTabIds(value) {
+    if (!Array.isArray(value) || value.length === 0) return null;
+    var seen = new Set();
+    var out = [];
+    for (var index = 0; index < value.length; index += 1) {
+      if (!isPositiveInteger(value[index]) || seen.has(value[index])) return null;
+      seen.add(value[index]);
+      out.push(value[index]);
+    }
+    return out.sort(function(a, b) { return a - b; });
+  }
+
+  /** Restore every exact held tab/token pair, or restore none. */
+  AgentRegistry.prototype.restoreHoldLease = function(input) {
+    var self = this;
+    return withRegistryLock(async function() {
+      if (!hasExactKeys(input, ['delegationId', 'agentId', 'liveTabIds'])
+        || !isDelegationId(input.delegationId)
+        || typeof input.agentId !== 'string') {
+        return { ok: false, code: 'resume_ownership_lost' };
+      }
+      var lease = self._holdLeases.get(input.delegationId);
+      if (!lease
+        || self.getAgentForDelegation(input.delegationId) !== input.agentId
+        || lease.agentId !== input.agentId
+        || lease.delegationId !== input.delegationId) {
+        return { ok: false, code: 'resume_ownership_lost' };
+      }
+      if (self._now() >= lease.expiresAt) {
+        return { ok: false, code: 'hold_expired', disposition: 'cancel_required' };
+      }
+      var liveTabIds = canonicalLiveTabIds(input.liveTabIds);
+      var heldTabIds = lease.ownedTabs.map(function(tab) { return tab.tabId; })
+        .sort(function(a, b) { return a - b; });
+      if (!liveTabIds
+        || liveTabIds.length !== heldTabIds.length
+        || liveTabIds.some(function(tabId, index) { return tabId !== heldTabIds[index]; })) {
+        return { ok: false, code: 'resume_ownership_lost' };
+      }
+      var exact = lease.ownedTabs.every(function(tab) {
+        return self._heldTabDelegations.get(tab.tabId) === input.delegationId
+          && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
+          && !self._tabOwners.has(tab.tabId)
+          && !self._tabMetadata.has(tab.tabId);
+      });
+      if (!exact) return { ok: false, code: 'resume_ownership_lost' };
+
+      var shadow = self._cloneAuthorityState();
+      var activeTabs = shadow._tabsByAgent.get(input.agentId) || new Set();
+      var record = shadow._agents.get(input.agentId);
+      if (!record) return { ok: false, code: 'resume_ownership_lost' };
+      lease.ownedTabs.forEach(function(tab) {
+        activeTabs.add(tab.tabId);
+        shadow._tabOwners.set(tab.tabId, input.agentId);
+        shadow._tabMetadata.set(tab.tabId, {
+          ownershipToken: tab.ownershipToken,
+          incognito: false,
+          windowId: Number.isFinite(record.windowId) ? record.windowId : null,
+          boundAt: lease.issuedAt,
+          forced: false
+        });
+        shadow._heldTabDelegations.delete(tab.tabId);
+        shadow._heldTabTokens.delete(tab.tabId);
+      });
+      shadow._tabsByAgent.set(input.agentId, activeTabs);
+      record.tabIds = Array.from(activeTabs);
+      record.selectedTabId = lease.activeTabId;
+      shadow._holdLeases.delete(input.delegationId);
+      try {
+        await shadow._persist(true);
+      } catch (_error) {
+        try { await self._persist(); } catch (_ignored) { /* best-effort */ }
+        return { ok: false, code: 'resume_ownership_lost' };
+      }
+      self._adoptAuthorityState(shadow);
+      return { ok: true, code: 'hold_lease_restored' };
+    });
+  };
+
+  function emitDelegationReleaseMismatch(input, reason) {
+    try {
+      if (typeof globalThis !== 'undefined' && typeof globalThis.rateLimitedWarn === 'function') {
+        globalThis.rateLimitedWarn(
+          FSB_AGENT_LOG_PREFIX,
+          'delegation-release-mismatch',
+          'delegation release rejected',
+          {
+            delegationId: input && typeof input.delegationId === 'string' ? input.delegationId : null,
+            agentIdShort: input ? formatAgentIdForDisplay(input.agentId) : '',
+            reason: reason
+          }
+        );
+      }
+    } catch (_error) { /* diagnostics never broaden release authority */ }
+  }
+
+  /**
+   * Release only one exact delegation/agent mapping. Active and held tabs
+   * are validated first, then removed as one distinct union under the lock.
+   */
+  AgentRegistry.prototype.releaseDelegation = function(input) {
+    var self = this;
+    return withRegistryLock(async function() {
+      if (!hasExactKeys(input, ['delegationId', 'agentId'])
+        || !isDelegationId(input.delegationId)
+        || typeof input.agentId !== 'string'
+        || self.getAgentForDelegation(input.delegationId) !== input.agentId) {
+        emitDelegationReleaseMismatch(input, 'mapping_mismatch');
+        return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
+      }
+      var activeTabs = self._tabsByAgent.get(input.agentId) || new Set();
+      var activeExact = true;
+      activeTabs.forEach(function(tabId) {
+        var meta = self._tabMetadata.get(tabId);
+        if (self._tabOwners.get(tabId) !== input.agentId
+          || !meta
+          || typeof meta.ownershipToken !== 'string'
+          || meta.ownershipToken.length === 0) {
+          activeExact = false;
+        }
+      });
+      var lease = self._holdLeases.get(input.delegationId) || null;
+      var heldExact = !lease || (lease.agentId === input.agentId
+        && lease.delegationId === input.delegationId
+        && lease.ownedTabs.every(function(tab) {
+          return self._heldTabDelegations.get(tab.tabId) === input.delegationId
+            && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
+            && !self._tabOwners.has(tab.tabId);
+        }));
+      if (!activeExact || !heldExact) {
+        emitDelegationReleaseMismatch(input, 'ownership_mismatch');
+        return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
+      }
+
+      var releasedTabIds = new Set(activeTabs);
+      if (lease) {
+        lease.ownedTabs.forEach(function(tab) { releasedTabIds.add(tab.tabId); });
+      }
+      var shadow = self._cloneAuthorityState();
+      activeTabs.forEach(function(tabId) {
+        shadow._tabOwners.delete(tabId);
+        shadow._tabMetadata.delete(tabId);
+      });
+      if (lease) {
+        lease.ownedTabs.forEach(function(tab) {
+          shadow._heldTabDelegations.delete(tab.tabId);
+          shadow._heldTabTokens.delete(tab.tabId);
+        });
+        shadow._holdLeases.delete(input.delegationId);
+      }
+      shadow._tabsByAgent.delete(input.agentId);
+      shadow._agents.delete(input.agentId);
+      shadow._delegations.delete(input.delegationId);
+      shadow._delegationByAgent.delete(input.agentId);
+      try {
+        await shadow._persist(true);
+      } catch (_error) {
+        try { await self._persist(); } catch (_ignored) { /* best-effort */ }
+        return { ok: false, code: 'delegation_release_persistence_failed', releasedTabCount: 0 };
+      }
+      self._adoptAuthorityState(shadow);
+      return {
+        ok: true,
+        code: 'delegation_released',
+        releasedTabCount: releasedTabIds.size
       };
     });
   };
@@ -878,9 +1050,19 @@
         // the mutex -- would re-enter the promise chain and deadlock per
         // RESEARCH Pattern 4 anti-pattern).
         if (ownedTabs.size === 0) {
-          self._tabsByAgent.delete(agentId);
-          self._agents.delete(agentId);
-          self._removeDelegationForAgent(agentId);
+          var mappedDelegation = self._delegationByAgent.get(agentId);
+          if (mappedDelegation && self._delegations.get(mappedDelegation) === agentId) {
+            // Preserve controller correlation after ownership loss. Exact
+            // releaseDelegation will remove the empty agent record/mapping.
+            var mappedRecord = self._agents.get(agentId);
+            if (mappedRecord) {
+              mappedRecord.tabIds = [];
+              delete mappedRecord.selectedTabId;
+            }
+          } else {
+            self._tabsByAgent.delete(agentId);
+            self._agents.delete(agentId);
+          }
         }
       }
       await self._persist();
@@ -1100,7 +1282,7 @@
         if (!record) return;
         if (record.connectionId !== connectionId) return;
         var mappedDelegation = self._delegationByAgent.get(agentId);
-        if (mappedDelegation && self._holdLeases.has(mappedDelegation)) return;
+        if (mappedDelegation) return;
         var ownedTabs = self._tabsByAgent.get(agentId);
         var poolSize = ownedTabs ? ownedTabs.size : 0;
         if (ownedTabs) {
@@ -1616,6 +1798,7 @@
         self._holdLeases.set(delegationId, lease);
         tabs.forEach(function(tab) {
           self._heldTabDelegations.set(tab.tabId, delegationId);
+          self._heldTabTokens.set(tab.tabId, tab.ownershipToken);
         });
       });
 
@@ -1664,9 +1847,17 @@
             // here on hydrate specifically, an agent with all-ghost tabs IS
             // itself a ghost.
             if (setRef.size === 0) {
-              self._tabsByAgent.delete(agentId);
-              self._agents.delete(agentId);
-              if (self._removeDelegationForAgent(agentId)) delegationStateChanged = true;
+              var mappedDelegation = self._delegationByAgent.get(agentId);
+              if (mappedDelegation && self._delegations.get(mappedDelegation) === agentId) {
+                var mappedRecord = self._agents.get(agentId);
+                if (mappedRecord) {
+                  mappedRecord.tabIds = [];
+                  delete mappedRecord.selectedTabId;
+                }
+              } else {
+                self._tabsByAgent.delete(agentId);
+                self._agents.delete(agentId);
+              }
             } else {
               var rec = self._agents.get(agentId);
               if (rec) {
@@ -1892,6 +2083,7 @@
     this._delegationByAgent.clear();
     this._holdLeases.clear();
     this._heldTabDelegations.clear();
+    this._heldTabTokens.clear();
     // Phase 241: clear staged releases and any pending grace timers.
     if (this._stagedReleases) {
       this._stagedReleases.forEach(function(entry) {
