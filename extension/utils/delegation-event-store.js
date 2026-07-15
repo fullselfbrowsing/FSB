@@ -16,6 +16,9 @@
   var MAX_ENTRIES_PER_DELEGATION = 2000;
   var MAX_ENTRY_BYTES = 4 * 1024;
   var MAX_AGGREGATE_BYTES = 6 * 1024 * 1024;
+  // Appends stop below the public aggregate ceiling so a compact terminal
+  // tombstone can always quarantine a ledger after a quota-triggered failure.
+  var TERMINAL_MARKER_HEADROOM_BYTES = 32 * 1024;
   var MAX_PRESENTATION_CHARS = 256;
   var MAX_ID_CHARS = 128;
   var MAX_TOOL_NAME_CHARS = 128;
@@ -673,7 +676,8 @@
         entries: current.entries.concat([entry])
       };
       _assertValidEnvelope(next, delegationId);
-      if (_ledgerBytesFromStorage(stored, key, next) > MAX_AGGREGATE_BYTES) {
+      if (_ledgerBytesFromStorage(stored, key, next)
+          > MAX_AGGREGATE_BYTES - TERMINAL_MARKER_HEADROOM_BYTES) {
         _quota('aggregate delegation ledger limit reached');
       }
       var update = {};
@@ -708,8 +712,9 @@
     return _withStorageLock(async function() {
       var key = _key(delegationId);
       var all = await _read(null);
-      if (all[key] === undefined) _persistence('delegation ledger does not exist');
-      var current = _assertValidEnvelope(all[key], delegationId);
+      var current = all[key] === undefined
+        ? _emptyEnvelope(delegationId)
+        : _assertValidEnvelope(all[key], delegationId);
       var candidate = typeof terminal === 'string'
         ? terminal
         : terminal && terminal.code;

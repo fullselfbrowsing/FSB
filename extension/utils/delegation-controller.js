@@ -617,23 +617,46 @@
       if (!record.persistenceFailure) {
         var code = _persistenceCode(error);
         _clearTimers(record);
-        record.persistenceFailure = _cancelOnce(record, code).catch(function() {
-          // The persistence error remains authoritative even when cancellation
-          // transport is unavailable. No subscriber is notified in either case.
-        }).then(function() { return _releaseOnce(record); }).catch(function() {
-          return { releasedTabCount: 0 };
-        }).then(async function(release) {
-          record.state = 'failed';
+        record.persistenceFailure = Promise.resolve().then(async function() {
+          var settledCode = code;
+          var cancellationConfirmed = false;
+          try {
+            var cancelResult = await _cancelOnce(record, code);
+            cancellationConfirmed = !!cancelResult
+              && (cancelResult.status === 'cancelled'
+                || cancelResult.status === 'already_terminal');
+          } catch (_cancelError) { /* quarantine remains fail closed */ }
+          if (!cancellationConfirmed) settledCode = 'tree_unsettled';
+
+          // This compact marker is the durable quarantine boundary. Until it
+          // commits, retain every heartbeat/generation/registry authority and
+          // publish no terminal UI state that a worker wake could contradict.
+          await eventStore.markTerminal(record.delegationId, { code: settledCode });
+
+          var release = { ok: true, releasedTabCount: 0 };
+          if (cancellationConfirmed) release = await _releaseOnce(record);
+          record.state = _terminalState(settledCode);
           record.terminal = {
-            code: code,
-            releasedTabCount: release.releasedTabCount || 0
+            code: settledCode,
+            releasedTabCount: release.ok === true ? release.releasedTabCount || 0 : 0
           };
-          await _releaseHeartbeatOnce(record);
-          await _forgetGeneration(record);
-          return code;
+          if (release.ok === true || !cancellationConfirmed) {
+            await _releaseHeartbeatOnce(record);
+            await _forgetGeneration(record);
+          }
+          _emit(record, null);
+          return settledCode;
+        }).catch(function(markerError) {
+          record.persistenceFailure = null;
+          record.state = 'stopping';
+          record.terminal = null;
+          throw markerError;
         });
       }
-      return record.persistenceFailure.then(function() { throw error; });
+      return record.persistenceFailure.then(
+        function() { throw error; },
+        function() { throw error; }
+      );
     }
 
     function _settle(record, requestedCode, options) {

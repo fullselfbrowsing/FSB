@@ -42,6 +42,7 @@ function installSessionStorage(initial = {}) {
   const previous = globalThis.chrome;
   const data = clone(initial);
   let writeError = null;
+  let rejectedWritesRemaining = 0;
   let gate = null;
   let startedResolve = null;
   let setCalls = 0;
@@ -60,6 +61,10 @@ function installSessionStorage(initial = {}) {
           setCalls += 1;
           if (startedResolve) startedResolve();
           if (gate) await gate.promise;
+          if (rejectedWritesRemaining > 0) {
+            rejectedWritesRemaining -= 1;
+            throw new Error('one-shot write rejected');
+          }
           if (writeError) throw writeError;
           Object.assign(data, clone(update));
         },
@@ -74,6 +79,7 @@ function installSessionStorage(initial = {}) {
     data,
     get setCalls() { return setCalls; },
     rejectWrites(error = new Error('write rejected')) { writeError = error; },
+    rejectNextWrites(count = 1) { rejectedWritesRemaining = count; },
     clear() { for (const key of Object.keys(data)) delete data[key]; },
     deferWrites() {
       let resolve;
@@ -359,7 +365,7 @@ function terminalState(code) {
     }
   });
 
-  await test('write rejection cancels first, fails closed, and never fans out', async () => {
+  await test('unavailable storage cancels first and retains authority without false terminal fanout', async () => {
     const storage = installSessionStorage();
     try {
       const { store, controllerModule } = freshModules();
@@ -389,17 +395,59 @@ function terminalState(code) {
       assert.strictEqual(listenerCalls, 0);
       const snapshot = controller.getSnapshot(id);
       assert.strictEqual(snapshot.entries.length, 0);
-      assert.strictEqual(snapshot.state, 'failed');
-      assert.deepStrictEqual(snapshot.terminal, {
-        code: 'delegation_persistence_failed',
-        releasedTabCount: 0,
-      });
+      assert.strictEqual(snapshot.state, 'stopping');
+      assert.strictEqual(snapshot.terminal, null,
+        'without a durable tombstone the controller cannot claim terminal settlement');
     } finally {
       storage.restore();
     }
   });
 
-  await test('quota and corrupt canonical entries use typed cancellation with no fanout', async () => {
+  await test('later append failure commits a tombstone before fanout and cannot resurrect on wake', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const harness = makeRecoveryDeps(modules.store);
+      let controller = modules.controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_late_persistence_failure';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
+      const delivered = [];
+      controller.subscribe((event) => delivered.push(event));
+
+      storage.rejectNextWrites(1);
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.toolUseEvent, {
+          ...fixtures.baseContext,
+          timestamp: fixtures.baseContext.timestamp + 1,
+        })),
+        'delegation_persistence_failed',
+      );
+      const key = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
+      assert.strictEqual(storage.data[key].terminal, true);
+      assert.strictEqual(storage.data[key].terminalCode, 'delegation_persistence_failed');
+      assert.strictEqual(storage.data[key].entries.length, 1,
+        'failed event is never fabricated into the quarantined ledger');
+      assert.strictEqual(delivered.length, 1,
+        'typed failure fans out only after the tombstone write succeeds');
+      assert.deepStrictEqual(delivered[0].snapshot.terminal, {
+        code: 'delegation_persistence_failed',
+        releasedTabCount: 0,
+      });
+
+      modules = freshModules();
+      const reloaded = makeRecoveryDeps(modules.store);
+      controller = modules.controllerModule.create(reloaded.deps);
+      assert.deepStrictEqual(await controller.hydrate(), [],
+        'terminal tombstone excludes the failed run from wake hydration');
+      assert.deepStrictEqual(reloaded.recoveryCalls.retainHeartbeat, []);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('quota and corrupt canonical entries fan out only after a terminal marker', async () => {
     for (const code of ['delegation_quota_exceeded', 'delegation_ledger_corrupt']) {
       const fakeStore = {
         async hydrateNonterminal() { return []; },
@@ -428,7 +476,8 @@ function terminalState(code) {
         controller.acceptEvent(eventInput(id, fixtures.stateEvent)),
         code,
       );
-      assert.strictEqual(delivered, 0);
+      assert.strictEqual(delivered, 1);
+      assert.strictEqual(controller.getSnapshot(id).terminal.code, code);
       assert.deepStrictEqual(calls.cancel, [{ delegationId: id, code }]);
       assert.strictEqual(controller.getSnapshot(id).entries.length, 0);
     }
