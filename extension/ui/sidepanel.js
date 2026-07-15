@@ -538,6 +538,7 @@ var _delegationConversationEnvelope = { v: 1, byConversation: {}, lru: [] };
 var _delegationBindingWriteChain = Promise.resolve();
 var _delegationHydrationGeneration = 0;
 var _delegationRunStopControls = [];
+var _delegationElapsedInterval = null;
 
 // Phase 61 delegated-run presentation state. This object tracks only which
 // canonical background snapshot belongs to the selected conversation and
@@ -565,6 +566,7 @@ var _delegationUiState = {
   lastRenderedSequence: null,
   lastAlertKey: null,
   announced: Object.create(null),
+  announcedTransitions: Object.create(null),
   subscribed: false
 };
 
@@ -858,6 +860,68 @@ function _delegationSemanticHeading(tagName, className, textValue, tone) {
   return heading;
 }
 
+function _clearDelegationElapsedTimer() {
+  if (_delegationElapsedInterval !== null) {
+    clearInterval(_delegationElapsedInterval);
+    _delegationElapsedInterval = null;
+  }
+}
+
+function _delegationPersistedStartAt(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.entries) || snapshot.entries.length === 0) {
+    return null;
+  }
+  var startedAt = null;
+  for (var index = 0; index < snapshot.entries.length; index++) {
+    var timestamp = snapshot.entries[index] && snapshot.entries[index].timestamp;
+    if (!Number.isSafeInteger(timestamp) || timestamp < 0) continue;
+    if (startedAt === null || timestamp < startedAt) startedAt = timestamp;
+  }
+  return startedAt;
+}
+
+function _formatDelegationElapsed(startedAt, nowValue) {
+  if (!Number.isSafeInteger(startedAt)
+      || startedAt < 0
+      || !Number.isFinite(nowValue)) return 'Not reported';
+  var elapsedSeconds = Math.floor(Math.max(0, nowValue - startedAt) / 1000);
+  var hours = Math.floor(elapsedSeconds / 3600);
+  var minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  var seconds = elapsedSeconds % 60;
+  if (hours > 0) {
+    return hours + 'h ' + String(minutes).padStart(2, '0') + 'm';
+  }
+  if (minutes > 0) {
+    return minutes + 'm ' + String(seconds).padStart(2, '0') + 's';
+  }
+  return seconds + 's';
+}
+
+function _updateDelegationElapsed(node, startedAt) {
+  if (!node) return;
+  node.textContent = _formatDelegationElapsed(startedAt, Date.now());
+}
+
+function _syncDelegationElapsedTimer(snapshot, node) {
+  _clearDelegationElapsedTimer();
+  var startedAt = _delegationPersistedStartAt(snapshot);
+  _updateDelegationElapsed(node, startedAt);
+  if (startedAt === null
+      || !_delegationIsActiveSnapshot(snapshot)
+      || snapshot.connection !== 'connected') return;
+  var delegationId = snapshot.delegationId;
+  _delegationElapsedInterval = setInterval(function() {
+    var current = _delegationUiState.snapshot;
+    if (!current
+        || current.delegationId !== delegationId
+        || !_delegationIsActiveSnapshot(current)) {
+      _clearDelegationElapsedTimer();
+      return;
+    }
+    _updateDelegationElapsed(node, startedAt);
+  }, 1000);
+}
+
 function _applyDelegationSnapshotTone(container, snapshot) {
   if (!container || !snapshot) return;
   var tone = _delegationToneForSnapshot(snapshot);
@@ -927,6 +991,7 @@ function _sendDelegationCommand(message) {
 }
 
 function _hideDelegationPresentation() {
+  _clearDelegationElapsedTimer();
   var mount = _ensureDelegationMount();
   if (mount.run) mount.run.classList.add('hidden');
   if (mount.control) {
@@ -938,6 +1003,7 @@ function _hideDelegationPresentation() {
 }
 
 function _renderDelegationReadyState() {
+  _clearDelegationElapsedTimer();
   var mount = _ensureDelegationMount();
   if (!mount.run || !mount.state || !mount.feed) return;
   _delegationUiState.mode = 'ready';
@@ -989,7 +1055,9 @@ function _resetDelegationSelection(selectedConversationId) {
   _delegationUiState.lastRenderedSequence = null;
   _delegationUiState.lastAlertKey = null;
   _delegationUiState.announced = Object.create(null);
+  _delegationUiState.announcedTransitions = Object.create(null);
   _delegationUiState.subscribed = false;
+  _clearDelegationElapsedTimer();
 }
 
 async function _hydrateDelegationForSelectedConversation() {
@@ -1074,6 +1142,7 @@ function _backToDelegationMessage() {
 
 function _renderDelegationConsent(options) {
   options = options || {};
+  _clearDelegationElapsedTimer();
   var mount = _ensureDelegationMount();
   if (!mount.run || !mount.state || !mount.feed) return;
   _delegationUiState.mode = 'consent';
@@ -1168,6 +1237,7 @@ async function _copyDelegationDoctorCommand() {
 
 function _renderDelegationPreflightFailure(result) {
   result = result || {};
+  _clearDelegationElapsedTimer();
   var code = typeof result.code === 'string' ? result.code : 'agent_offline';
   var providerLabel = result.providerId === 'claude-code'
     ? 'Claude Code'
@@ -1474,7 +1544,41 @@ function _appendDelegationTechnicalCode(container, code) {
   container.appendChild(details);
 }
 
+function _appendDelegationRunDefinition(list, label, value, valueClass) {
+  list.appendChild(_delegationElement('dt', 'delegation-definition-label', label));
+  list.appendChild(_delegationElement(
+    'dd',
+    'delegation-definition-value' + (valueClass ? ' ' + valueClass : ''),
+    value
+  ));
+}
+
+function _appendDelegationRunMetadata(container, snapshot) {
+  if (!_delegationIsActiveSnapshot(snapshot)) return;
+  var list = _delegationElement(
+    'dl',
+    'delegation-definition-list delegation-run-metadata'
+  );
+  _appendDelegationRunDefinition(
+    list,
+    'Provider',
+    snapshot.provider ? snapshot.provider.label : 'Not reported'
+  );
+  _appendDelegationRunDefinition(list, 'State', _delegationStateLabel(snapshot));
+  var elapsedLabel = _delegationElement('dt', 'delegation-definition-label', 'Elapsed');
+  var elapsedValue = _delegationElement(
+    'dd',
+    'delegation-definition-value delegation-run-elapsed',
+    'Not reported'
+  );
+  list.appendChild(elapsedLabel);
+  list.appendChild(elapsedValue);
+  container.appendChild(list);
+  _syncDelegationElapsedTimer(snapshot, elapsedValue);
+}
+
 function _renderDelegationRunHeader(container, snapshot) {
+  _clearDelegationElapsedTimer();
   _clearDelegationNode(container);
   _delegationRunStopControls = [];
   _applyDelegationSnapshotTone(container, snapshot);
@@ -1518,6 +1622,7 @@ function _renderDelegationRunHeader(container, snapshot) {
   );
   heading.id = 'delegationRunHeading';
   container.appendChild(heading);
+  _appendDelegationRunMetadata(container, snapshot);
   if (restartLost) {
     container.appendChild(_delegationElement(
       'p',
@@ -1642,6 +1747,61 @@ function _delegationAnnouncement(entry) {
   return 'Agent state: ' + entry.state;
 }
 
+function _delegationOneShotTransition(key, textValue, silent) {
+  if (!key || !textValue) return '';
+  if (!_delegationUiState.announcedTransitions) {
+    _delegationUiState.announcedTransitions = Object.create(null);
+  }
+  if (_delegationUiState.announcedTransitions[key]) return '';
+  _delegationUiState.announcedTransitions[key] = true;
+  return silent === true ? '' : textValue;
+}
+
+function _delegationLifecycleAnnouncement(snapshot, previousSnapshot, hydrated) {
+  if (!snapshot || typeof snapshot.delegationId !== 'string') return '';
+  var suffix = null;
+  var textValue = null;
+  if (snapshot.state === 'starting') {
+    suffix = 'starting';
+    textValue = 'Starting agent';
+  } else if (snapshot.state === 'stopping') {
+    suffix = 'stopping';
+    textValue = 'Stopping agent';
+  } else if (snapshot.state === 'held') {
+    suffix = 'held';
+    textValue = 'You have control of this tab. Resume with agent available';
+  } else if (snapshot.state === 'resuming') {
+    suffix = 'resuming';
+    textValue = 'Resuming with agent';
+  } else if (snapshot.state === 'holding') {
+    suffix = 'holding';
+    textValue = 'Pausing agent for human control';
+  } else if (snapshot.state === 'running'
+      && previousSnapshot
+      && (previousSnapshot.state === 'held' || previousSnapshot.state === 'resuming')) {
+    suffix = 'resumed';
+    textValue = (snapshot.provider ? snapshot.provider.label : 'Agent') + ' resumed control';
+  } else if (_delegationCanTakeControl(snapshot)) {
+    suffix = 'take-control:' + snapshot.activeTab.tabId;
+    textValue = 'Take control available';
+  }
+  if (!suffix) return '';
+  return _delegationOneShotTransition(
+    snapshot.delegationId + ':lifecycle:' + suffix,
+    textValue,
+    hydrated === true
+  );
+}
+
+function _announceDelegationLifecycleKey(key, textValue) {
+  var announcement = _delegationOneShotTransition(key, textValue, false);
+  if (!announcement) return false;
+  var mount = _ensureDelegationMount();
+  if (!mount.announcer) return false;
+  mount.announcer.textContent = announcement;
+  return true;
+}
+
 function _renderDelegationSnapshot(snapshot, options) {
   options = options || {};
   if (typeof FsbDelegationFeed === 'undefined'
@@ -1655,6 +1815,7 @@ function _renderDelegationSnapshot(snapshot, options) {
 
   var mount = _ensureDelegationMount();
   if (!mount.run || !mount.state || !mount.feed) return false;
+  var previousSnapshot = _delegationUiState.snapshot;
   var previousLastSequence = Number.isSafeInteger(_delegationUiState.lastRenderedSequence)
     ? _delegationUiState.lastRenderedSequence
     : 0;
@@ -1693,6 +1854,13 @@ function _renderDelegationSnapshot(snapshot, options) {
   if (!rendered || rendered.ok !== true) return false;
   _delegationUiState.lastRenderedSequence = rendered.lastSequence;
 
+  var announcementParts = [];
+  var lifecycleAnnouncement = _delegationLifecycleAnnouncement(
+    snapshot,
+    previousSnapshot,
+    options.hydrated === true && options.announceLifecycle !== true
+  );
+  if (lifecycleAnnouncement) announcementParts.push(lifecycleAnnouncement);
   var announceSequence = options.announceSequence;
   if (options.hydrated !== true
       && Number.isSafeInteger(announceSequence)
@@ -1704,9 +1872,12 @@ function _renderDelegationSnapshot(snapshot, options) {
       var entry = snapshot.entries[announceSequence - 1];
       if (entry && entry.sequence === announceSequence) {
         _delegationUiState.announced[deliveryKey] = true;
-        mount.announcer.textContent = _delegationAnnouncement(entry);
+        announcementParts.push(_delegationAnnouncement(entry));
       }
     }
+  }
+  if (announcementParts.length && mount.announcer) {
+    mount.announcer.textContent = announcementParts.join('. ');
   }
   _renderDelegationControlBar(snapshot, options);
   _setDelegationHeaderStatus(
@@ -1846,7 +2017,7 @@ async function _beginDelegationStart(challengeId) {
   chatInput.textContent = '';
   updateSendButtonState();
   _renderDelegationSnapshot(response.snapshot, { hydrated: false, announceSequence: null });
-  await _refreshSelectedDelegationSnapshot();
+  await _refreshSelectedDelegationSnapshot({ hydrated: true, announceLifecycle: true });
   if (acceptedConversationId === _delegationUiState.conversationId
       && response.snapshot.delegationId === _delegationUiState.delegationId
       && _delegationIsSelectedConversation()) {
@@ -1961,6 +2132,10 @@ async function _stopDelegation(event) {
     if (typeof control.focus === 'function') control.focus();
   }
   _syncDelegationStopControls(snapshot);
+  _announceDelegationLifecycleKey(
+    snapshot.delegationId + ':lifecycle:stopping',
+    'Stopping agent'
+  );
   var response = await _sendDelegationCommand({
     type: 'FSB_DELEGATION_STOP',
     delegationId: snapshot.delegationId
@@ -1978,7 +2153,8 @@ async function _stopDelegation(event) {
   _renderDelegationSnapshot(snapshot, { hydrated: false, announceSequence: null });
 }
 
-async function _refreshSelectedDelegationSnapshot() {
+async function _refreshSelectedDelegationSnapshot(options) {
+  options = options || {};
   if (!_delegationIsSelectedConversation()) {
     _hideDelegationPresentation();
     return false;
@@ -1998,7 +2174,11 @@ async function _refreshSelectedDelegationSnapshot() {
       || response.snapshot.delegationId !== selectedId
       || !FsbDelegationFeed.validateSnapshot(response.snapshot)
       || !_delegationIsSelectedConversation()) return false;
-  return _renderDelegationSnapshot(response.snapshot, { hydrated: true, announceSequence: null });
+  return _renderDelegationSnapshot(response.snapshot, {
+    hydrated: options.hydrated === true,
+    announceLifecycle: options.announceLifecycle === true,
+    announceSequence: null
+  });
 }
 
 try {

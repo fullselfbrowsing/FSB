@@ -1908,6 +1908,14 @@ body[data-sidepanel-view="history"] .author-footer {
   margin: 0;
 }
 
+.delegation-run-metadata {
+  margin-bottom: var(--fsb-space-4);
+}
+
+.delegation-run-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
 .delegation-result-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fsb-space-2) var(--fsb-space-4);

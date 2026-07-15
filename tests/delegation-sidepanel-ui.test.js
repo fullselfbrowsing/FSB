@@ -502,15 +502,19 @@ assert(startSource.includes('bindingCommitted = await _writeDelegationConversati
       < startSource.indexOf('_renderDelegationSnapshot(response.snapshot'),
   'conversation binding is part of start commit and exact Stop precedes any unbound run render');
 assert(startSource.indexOf('_renderDelegationSnapshot(response.snapshot')
-      < startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
-    && startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
+      < startSource.indexOf('await _refreshSelectedDelegationSnapshot({ hydrated: true, announceLifecycle: true })')
+    && startSource.indexOf('await _refreshSelectedDelegationSnapshot({ hydrated: true, announceLifecycle: true })')
       < startSource.lastIndexOf('_delegationUiState.subscribed = true'),
-  'accepted start catches up silently before opening its live subscription gate');
+  'accepted start catches up persisted rows silently while retaining live lifecycle feedback');
 assert(panelSource.includes("mount.state.setAttribute('role', 'alert')")
     && panelSource.includes("mount.state.setAttribute('aria-live', 'off')"),
   'connectivity cards retain alert semantics while hydrated/unchanged alerts stay silent');
 assert(panelSource.includes("announceSequence > previousLastSequence"),
   'only a strictly newer matching sequence reaches the polite announcer');
+assert(panelSource.includes('announcedTransitions: Object.create(null)')
+    && panelSource.includes("snapshot.delegationId + ':lifecycle:' + suffix")
+    && panelSource.includes('announcementParts.join(\'. \')'),
+  'lifecycle/control one-shots use a separate dedupe map and the one existing announcer');
 assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
     && panelSource.includes("count === 1 ? 'tab' : 'tabs'"),
   'stopped copy uses only the canonical release count with singular grammar');
@@ -1023,7 +1027,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       _setDelegationComposerLocked() {},
       _delegationStateLabel: () => 'status',
       _delegationSnapshotLocksComposer: () => true,
-      _delegationAnnouncement: () => 'new persisted row'
+      _delegationAnnouncement: () => 'new persisted row',
+      _delegationLifecycleAnnouncement: () => ''
     };
     vm.createContext(context);
     vm.runInContext(extractNamedFunction(panelSource, '_delegationSnapshotAlertKey'), context);
@@ -1062,6 +1067,180 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert.equal(stateNode.getAttribute('aria-live'), null, 'new disconnect transition alerts once');
     context._renderDelegationSnapshot(disconnectedLive, { hydrated: false, announceSequence: null });
     assert.equal(stateNode.getAttribute('aria-live'), 'off', 'unchanged disconnect avoids an alert storm');
+  }
+
+  {
+    const run = new TestNode('section');
+    const stateNode = new TestNode('div');
+    const feed = new TestNode('div');
+    const announcer = new TestNode('div');
+    announcer.textContent = 'hydration sentinel';
+    const uiState = {
+      delegationId: DELEGATION_ID,
+      snapshot: null,
+      pendingTake: false,
+      pendingResume: false,
+      pendingStop: false,
+      lastRenderedSequence: null,
+      lastAlertKey: null,
+      announced: Object.create(null),
+      announcedTransitions: Object.create(null)
+    };
+    const context = {
+      _activeTabIdSnapshot: 42,
+      _delegationUiState: uiState,
+      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer, control: null }),
+      FsbDelegationFeed: {
+        validateSnapshot: () => true,
+        render(_feed, next, options) {
+          return {
+            ok: true,
+            lastSequence: next.entries.length ? next.entries.length : null,
+            hydrated: options.hydrated
+          };
+        }
+      },
+      _renderDelegationRunHeader() {},
+      _renderDelegationControlBar() {},
+      _setDelegationHeaderStatus() {},
+      _setDelegationComposerLocked() {},
+      _delegationStateLabel: () => 'status',
+      _delegationSnapshotLocksComposer: () => true,
+      _delegationAnnouncement: () => 'persisted row'
+    };
+    vm.createContext(context);
+    [
+      '_delegationCanTakeControl',
+      '_delegationOneShotTransition',
+      '_delegationLifecycleAnnouncement',
+      '_delegationSnapshotAlertKey',
+      '_renderDelegationSnapshot'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+    const base = {
+      delegationId: DELEGATION_ID,
+      provider: { id: 'claude-code', label: 'Claude Code' },
+      connection: 'connected',
+      terminal: null,
+      entries: [],
+      activeTab: null,
+      hold: null
+    };
+    const starting = { ...base, state: 'starting' };
+    context._renderDelegationSnapshot(starting, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent, 'Starting agent');
+    announcer.textContent = 'starting dedupe sentinel';
+    context._renderDelegationSnapshot(starting, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent, 'starting dedupe sentinel',
+      'live Starting announces once');
+
+    uiState.snapshot = null;
+    uiState.lastRenderedSequence = null;
+    uiState.announced = Object.create(null);
+    uiState.announcedTransitions = Object.create(null);
+    announcer.textContent = 'hydration sentinel';
+    context._renderDelegationSnapshot(starting, { hydrated: true, announceSequence: null });
+    assert.equal(announcer.textContent, 'hydration sentinel',
+      'initial hydration establishes the lifecycle baseline silently');
+    announcer.textContent = 'unchanged sentinel';
+    context._renderDelegationSnapshot(starting, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent, 'unchanged sentinel',
+      'an unchanged post-hydration snapshot never reannounces Starting');
+
+    const running = {
+      ...base,
+      state: 'running',
+      activeTab: { tabId: 42, owned: true, canTakeControl: true }
+    };
+    context._renderDelegationSnapshot(running, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent, 'Take control available');
+    announcer.textContent = 'control dedupe sentinel';
+    context._renderDelegationSnapshot(running, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent, 'control dedupe sentinel',
+      'unchanged control eligibility announces only once');
+
+    const held = {
+      ...base,
+      state: 'held',
+      activeTab: { tabId: 42, owned: false, canTakeControl: false },
+      hold: { expiresAt: 10000, tabIds: [42] }
+    };
+    context._renderDelegationSnapshot(held, { hydrated: false, announceSequence: null });
+    assert.equal(announcer.textContent,
+      'You have control of this tab. Resume with agent available');
+    context._renderDelegationSnapshot({ ...base, state: 'stopping' }, {
+      hydrated: false,
+      announceSequence: null
+    });
+    assert.equal(announcer.textContent, 'Stopping agent');
+    assert.notEqual(uiState.announced, uiState.announcedTransitions,
+      'persisted sequence and lifecycle/control identities remain separate');
+  }
+
+  {
+    let now = 61000;
+    let nextIntervalId = 1;
+    const intervals = new Map();
+    const cleared = [];
+    const elapsedNode = new TestNode('dd');
+    const active = {
+      delegationId: DELEGATION_ID,
+      state: 'running',
+      connection: 'connected',
+      entries: [
+        { timestamp: 1000 },
+        { timestamp: 2500 }
+      ]
+    };
+    const state = { snapshot: active };
+    const context = {
+      Date: { now: () => now },
+      _delegationElapsedInterval: null,
+      _delegationUiState: state,
+      setInterval(fn, delay) {
+        const id = nextIntervalId++;
+        intervals.set(id, { fn, delay });
+        return id;
+      },
+      clearInterval(id) {
+        cleared.push(id);
+        intervals.delete(id);
+      }
+    };
+    vm.createContext(context);
+    [
+      '_delegationIsActiveSnapshot',
+      '_clearDelegationElapsedTimer',
+      '_delegationPersistedStartAt',
+      '_formatDelegationElapsed',
+      '_updateDelegationElapsed',
+      '_syncDelegationElapsedTimer'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+    assert.equal(context._delegationPersistedStartAt(active), 1000,
+      'elapsed presentation uses only the earliest persisted ledger timestamp');
+    context._syncDelegationElapsedTimer(active, elapsedNode);
+    assert.equal(elapsedNode.textContent, '1m 00s');
+    assert.equal(intervals.size, 1);
+    assert.equal(Array.from(intervals.values())[0].delay, 1000);
+    now = 126000;
+    Array.from(intervals.values())[0].fn();
+    assert.equal(elapsedNode.textContent, '2m 05s',
+      'fake presentation clock advances elapsed text without mutating lifecycle state');
+    const terminal = { ...active, state: 'completed' };
+    state.snapshot = terminal;
+    context._syncDelegationElapsedTimer(terminal, elapsedNode);
+    assert.equal(intervals.size, 0, 'terminal render safely clears the elapsed interval');
+    assert.equal(cleared.length, 1);
+    assert.equal(context._formatDelegationElapsed(null, now), 'Not reported');
+
+    const elapsedSource = [
+      extractNamedFunction(panelSource, '_delegationPersistedStartAt'),
+      extractNamedFunction(panelSource, '_formatDelegationElapsed'),
+      extractNamedFunction(panelSource, '_updateDelegationElapsed'),
+      extractNamedFunction(panelSource, '_syncDelegationElapsedTimer')
+    ].join('\n');
+    assert(elapsedSource.includes('snapshot.entries') && elapsedSource.includes('Date.now()'));
+    assert(!/chrome\.|storage|sendMessage|FSB_DELEGATION/.test(elapsedSource),
+      'elapsed presentation has no persistence, command, or lifecycle-authority side effect');
   }
 
   {
@@ -1158,6 +1337,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       _syncDelegationStopControls(next) {
         stopSyncs.push({ next, pending: state.pendingStop });
       },
+      _announceDelegationLifecycleKey() {},
       _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
     };
     vm.createContext(context);
@@ -1194,6 +1374,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       isRunning: false,
       _chatLockedByOwnerChip: false,
       _delegationRunStopControls: [],
+      _delegationElapsedInterval: null,
+      clearInterval() {},
       _delegationUiState: {
         errorCode: null,
         pendingStop: false
@@ -1218,6 +1400,11 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       '_delegationStoppedHeading',
       '_delegationStateLabel',
       '_delegationIsActiveSnapshot',
+      '_clearDelegationElapsedTimer',
+      '_delegationPersistedStartAt',
+      '_formatDelegationElapsed',
+      '_updateDelegationElapsed',
+      '_syncDelegationElapsedTimer',
       '_delegationUsesFixedStop',
       '_restoreLegacyStopControl',
       '_syncDelegationStopControls',
@@ -1225,6 +1412,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       '_appendDelegationActionRow',
       '_appendDelegationDoctorRecovery',
       '_appendDelegationTechnicalCode',
+      '_appendDelegationRunDefinition',
+      '_appendDelegationRunMetadata',
       '_renderDelegationRunHeader'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
     const base = {
@@ -1246,6 +1435,10 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert(card.textContent.includes('fsb-mcp-server doctor'));
     assert(card.textContent.includes('Copy doctor command'));
     assert(card.textContent.includes('Open provider setup'));
+    assert(card.textContent.includes('ProviderClaude Code')
+      && card.textContent.includes('StateAgent connection lost')
+      && card.textContent.includes('ElapsedNot reported'),
+      'active run metadata exposes canonical provider, state, and elapsed fallback');
     assert(!card.textContent.includes('daemon restart'), 'ordinary disconnect never receives restart copy');
 
     context._renderDelegationRunHeader(card, {
