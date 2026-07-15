@@ -3,8 +3,8 @@
 // Fails when any EN messages.xlf <source> text (keyed by trans-unit id) differs
 // from the mirrored <source> in a target locale XLIFF. Ignores context-group /
 // linenumber churn. Target locale list is derived from locale-constants.ts
-// (never hardcoded). Orphan ids (in locale file but absent from EN) are
-// WARNING-only so pre-existing 54-per-locale debt does not red the gate on day one.
+// (never hardcoded). This focused gate still reports orphan ids as warnings;
+// verify-translation-quality.mjs hard-fails them in CI.
 //
 // Usage (from showcase/angular/, matching verify-hreflang.mjs):
 //   node scripts/verify-translation-drift.mjs

@@ -1,0 +1,844 @@
+{
+  "allLocales": [
+    {
+      "id": "shell.nav.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.nav.desktop.github",
+      "sourceSha256": "54b9c02a49c37b18ea4a2d2d6bc1a312424d14f4dc13640e50afb2ee3f23c8f1",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.nav.mobile.github",
+      "sourceSha256": "54b9c02a49c37b18ea4a2d2d6bc1a312424d14f4dc13640e50afb2ee3f23c8f1",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.footer.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.footer.project.github",
+      "sourceSha256": "f911e414cf6bdfc595532ab166b5ba0f63d73c021452fcdacbda363dda6ad8fb",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.footer.research.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.footer.research.phantomStream",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "shell.footer.research.prometheus",
+      "sourceSha256": "bfa97cfb590b2093ee41d9e44a906fbe19c3f809130727a37895afe9bad12756",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "prometheus.github",
+      "sourceSha256": "f83114ddba555e4209c99d0b417261c0026f6b8b7838f146f76d1c5e9648d0cb",
+      "reason": "brand link with protected product copy"
+    },
+    {
+      "id": "prometheus.title",
+      "sourceSha256": "74eb85fcf4d6928e0ef2dd6231b1530b962f04cd73b2f37a00f6b119d4e30241",
+      "reason": "protected product name"
+    },
+    {
+      "id": "shell.footer.community.discord",
+      "sourceSha256": "053bc65874ad6098e58c41c57b378a2f36b0220e5e0b46722245e6c2f796818c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "about.videos.demo2.tag",
+      "sourceSha256": "53f13ae99ed53bd346eb8e1c8cefb7ef8260683b50401caf101360967ea052aa",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "about.videos.demo3.tag",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "about.videos.demo4.tag",
+      "sourceSha256": "0615570f9ea136946c5dc08a250010320707646f57f72cedab1dfb73d95eade6",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "about.actions.tag.navigate",
+      "sourceSha256": "d0cda6559bb347db706f6fa92a5b2491658e0c1e5bda98bb14e3c8a711b8fa33",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.searchGoogle",
+      "sourceSha256": "6190c12a43b97e95fe03d50120b006b962780071238383e7dfab489d28291126",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.refresh",
+      "sourceSha256": "d6cc0a088c07683c65cd266860cab8d94b3a1937b17420d9da30ca299c09fb77",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.goBack",
+      "sourceSha256": "a58964ca4d88f3c2eacde1638ef3a81f09794eff9e89c15de091e53ef3d872d3",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.goForward",
+      "sourceSha256": "f6686725c4b1726e7dba0107304e7194d5f7d74edc3a668e466858d5357aa49b",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.spaNavigation",
+      "sourceSha256": "d33d14bd567e84be2a394ca8a6e2238a6ff43c48060558afc5a6a2c5149e1065",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.click",
+      "sourceSha256": "e5c7ffac26fed654fe62045898f55b551a0dc120badf3d116bcd364418f3ec16",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.rightClick",
+      "sourceSha256": "d6b59e0a78613fad74894c75c62ecc6659f1cfcd7b8703efa9c70c72527fefca",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.doubleClick",
+      "sourceSha256": "a8e931cf8c64e1101e52273286b5a391f7278d46b3de9cfe1d881543a0eb787c",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.hover",
+      "sourceSha256": "7c8b29e7dc08862f3ec49e7cd5182153f345b327c60a042228d68845b870fa04",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.focus",
+      "sourceSha256": "c51faa148557a08cbf790156578b7a82b41f22dd01227f7dde057e34c18a365f",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.blur",
+      "sourceSha256": "e42932b7a79c40e45f6b945b9656eeca6a9a9b19fcb3011558e27e1e3f52720b",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.type",
+      "sourceSha256": "1303c06b0b014d0ce7b988ab173a13f31227d417058ff4bbe6f8c222b4ad913c",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.clearInput",
+      "sourceSha256": "80872a9836cbda03ee288c05e964c84c8afb21f62e44edd723795791a534dd73",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.selectText",
+      "sourceSha256": "2bb8fa55efa222b0e607616d59513f0841f4fc4bc704606e40ff97c9651fe784",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.pressEnter",
+      "sourceSha256": "ab07f5ded6666eaef9e4d547e06d27da7ad19ff33b936c4d55aec7bae05dee15",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.keyPress",
+      "sourceSha256": "0fc5c216ae9831482831a83c124a5788e32b26df95bc4af4b8885c6c55d5c6e4",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.typeInto",
+      "sourceSha256": "02a35e47f0c355254b7399f67cea7dc00e439971fa95bf92d52190b60291b89d",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.clearAndType",
+      "sourceSha256": "331045c66d3f82d009398f242c278f214ebd653c9e619e134a8f6f2bd7ed3ae9",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.pasteText",
+      "sourceSha256": "d26aec0cff33f8df714a98c0a76031adf2099265ca5a642998100461814230c3",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.selectOption",
+      "sourceSha256": "39b6663881c8afd64533baf753cbe58bfa754f47d514b15d127444b23a42c590",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.toggleCheckbox",
+      "sourceSha256": "29f495a5331db6b37a3de639de84543c8e50e405170730a9e4dcfcbc3191b0dc",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.getText",
+      "sourceSha256": "93861f46c8718c91274ce8d7db14097e2f0ead2bbcd243378f1b11387a446ea6",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.getAttribute",
+      "sourceSha256": "93b0a3b23461e2d762fdf16f9572fad9a9155f103fc82bf3c798ea355a35679f",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.setAttribute",
+      "sourceSha256": "f79ccfdc51cd247165f4d4296b0e48ccb1951684605288be3cb02ab0350012f6",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.readPage",
+      "sourceSha256": "2f63f5a46dfeb201c6b7069ae1e3132a31fafc320d14846e18011abf06c02455",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.getPageSnapshot",
+      "sourceSha256": "920bc58a16c68d5f48ca97472d3c593306683637d415fccc123ccefd74fd03b7",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.scroll",
+      "sourceSha256": "e16a9d4d1cf9ead81f53e096a680d278908d60574a8d036eda70baede61287b4",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.scrollToElement",
+      "sourceSha256": "ad01c8d3b1c1685873a2da06139f773ab58a7d1327d2bc3ce30a716ffa96d0cd",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.scrollToTop",
+      "sourceSha256": "f20222c204072c77a406c0dd4d5b2d41f15d53224c1367823d5c9e3323b3555f",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.scrollToBottom",
+      "sourceSha256": "5064c0943e074624aa7c8782f182d8a3e546b2e4b68c40d32cb50ac912b7b707",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.openTab",
+      "sourceSha256": "24a37f70283dc304b523e2f9fac24fadeda5f5dbed88e79d2298110f7578d723",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.closeTab",
+      "sourceSha256": "77894d87c08c80aa486cd722bd95074cc0e4a9e389e47be5ff1010b3b271131d",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.switchTab",
+      "sourceSha256": "7f12ee0dc82468b463fac6a8e02327ad0c20d6a6c1409ece661597f3282f3eee",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.listTabs",
+      "sourceSha256": "66c66b11c855414c872f5cce2d09804ee5aa08453d24f66df110cbf26b1e9e89",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.duplicateTab",
+      "sourceSha256": "72687315523377b4ba6e4af152cfefe760f1927e5af9e7296cad1cd18ae5d688",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.moveTab",
+      "sourceSha256": "6e51b053b5fc9eb3e61835d655cdf5a12ae1728314d789ed739569e8dc991893",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.waitForElement",
+      "sourceSha256": "1f8cff6524a5a280242f40bf3d844377471b497f565d6e193987fd3fceb1cc97",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.waitForDOMStable",
+      "sourceSha256": "9f064b31f5d1d077e9b8788f657e6428271f35d459ec2bfc67dc8eec54930b2b",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.detectLoadingState",
+      "sourceSha256": "dc6ba3f3fdef3c8676d8f981cd42e4bead0b730e7152bcd780cb393306574932",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.sleep",
+      "sourceSha256": "0afa5bb5d5f1787945e555e91474675beb6f34dd9a490423c4d0460e4d454885",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.execute_js",
+      "sourceSha256": "8a267a3fd3570eda5b1f6992fd164a33a29686b7c07605ed55b3b9110225ab00",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.insertText",
+      "sourceSha256": "8ed40ba303e8a1da4581bca7ebdd4afbac432330425915e8ab21d01a4bfc8952",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.dblClickAt",
+      "sourceSha256": "77692ac7947f13a7c6dfbbf6aea513015224a131225120c2a660c44734c8c270",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.drawShape",
+      "sourceSha256": "c8d8aafb67361a253fa694b3365437d459ad29caab38ab66409f99a762f430b8",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.monacoEditorInsert",
+      "sourceSha256": "4bc477df444e479e26d802b6977e6d69bed23d74658cff1bd2c9726213768a24",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.cdpMouseClick",
+      "sourceSha256": "ef60c1f1ee6d9260c0e962508ba2a655e1c1388181ed6158c622af2ef2556fd6",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.cdpMouseDrag",
+      "sourceSha256": "b039a2500ca4ae560bd9bed5e92952b8d453fbb3d7f382185bbc5e9822fea81f",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.cdpMouseWheel",
+      "sourceSha256": "b9cf3b7e09f32a7800fe7493dd857169da43fb929e380dbfe64a922945591faa",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.cdpClickAndHold",
+      "sourceSha256": "6372add7cd00690484e22fdb7b4df749ed4572b02b4280423f659f849f7586c7",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.dragDrop",
+      "sourceSha256": "02e4656f4498793c2db9f5a6c28ac8907ec566ac2b53bcfd133f374b9c441e67",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.dropFile",
+      "sourceSha256": "5cc5d4eeaa0cb61e16925c60f8ac5843b2a225f5d9ae033f236ba521fd15b22c",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.selectTextRange",
+      "sourceSha256": "6589575ddfe99c2a0e032c93ea28e2a1da4564ae93e3d3655932e8a138fd634c",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.searchCapabilities",
+      "sourceSha256": "765ef9ddbaee64c5651acae22d56fc9c2ae27a5e794ebaa06d65b11ceb1da702",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.invokeCapability",
+      "sourceSha256": "9b8d5afb395bbe3e42cc3914a300ab9fb57e30396ebd9587b9d0434581cf4b35",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.trigger",
+      "sourceSha256": "683259feabbf5eb39895d7a5d3f4872d6989d5fa7a3eca713251d996d99a1630",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.stopTrigger",
+      "sourceSha256": "982f207dc2d0ddc0ab3b9ffef246c81e380392ba0366bed6418292c8d004e684",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.getTriggerStatus",
+      "sourceSha256": "70164cfd022cd5089d2599473dec2919515b1ee3ad195cd4691c6aa9d6d4bbfb",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.listTriggers",
+      "sourceSha256": "4ca44d74471b8bd3b62162a2d000d01291b75b0598f4566e5f42d04888a40e77",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "about.actions.tag.uploadFile",
+      "sourceSha256": "f053e9c0eb06126609716ef18c14a49ef6bec417782633171cb1be877617d454",
+      "reason": "API/action identifier"
+    },
+    {
+      "id": "site.name",
+      "sourceSha256": "3cebbdeff75ea832fd152ff96b2d5c23934df58a62429b8f34d4965274f4b80a",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "agents.schema.software.name",
+      "sourceSha256": "cb1bfc6fb39952c8a48639a9db30492bd42e9b4e35c72e18520f875c5963af82",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "dashboard.template.022.placeholder",
+      "sourceSha256": "100680ad546ce6a577f42f52df33b4cfdca756859e664b8d7de329b150d09ce9",
+      "reason": "example URL"
+    },
+    {
+      "id": "home.comparison.competitor.mariner.logo.alt",
+      "sourceSha256": "ce770667e5f9b0d8f55367bb79419689d90c48451bb33f079f3a9a72ae132de8",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.mariner",
+      "sourceSha256": "6d15325646c454b1eefe788788e0f04195fa29019a2e436f05c3463037ed105b",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.computerUse.logo.alt",
+      "sourceSha256": "744205e43529c1fc39bc4ed37dbcd1e91facc78d2a2d136bc893b023ac3c75f5",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.computerUse",
+      "sourceSha256": "5702cfb270361888fa4eb43daa95dac3ddcf33eee89e1ad750316e4423e4fd44",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.operator",
+      "sourceSha256": "291101a07fe980e93b900ae85c9eb824f9e7e93d0d754be7440b9386b615cad7",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.openclaw.logo.alt",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.competitor.openclaw",
+      "sourceSha256": "a7b90ee8facf0aed66654381629a6ae2983257dfe5daad4ae455dbf49fc6d39b",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.comparison.fsb.name",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "product or technical identifier"
+    },
+    {
+      "id": "home.comparison.stat.perStep.value",
+      "sourceSha256": "f794aa016296b8faf157ac385853feec7be9eca4fcd8cc135793ad6a226d0178",
+      "reason": "numeric performance value"
+    },
+    {
+      "id": "home.install.baseCommand",
+      "sourceSha256": "94452aa0f0141687ce5d8da494c30d2cef2ef711d7735c19fdbeb3973be3b8f0",
+      "reason": "literal install command"
+    },
+    {
+      "id": "home.capabilities.credit.opentabs",
+      "sourceSha256": "bb7f3b6bb53814dd4e9ca6665ecd77ee3147447e0f1170086c857fe67005089f",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "home.providers.xai.logo.alt",
+      "sourceSha256": "daeed48c26239eefa88416ecb43801d6479a0919015fadd6e33f9956739ec716",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.xai.name",
+      "sourceSha256": "6e84114ba8be4411d3ca7b9cc2b820cb4096c3475061a6e9b6acb7d56d3a6709",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.xai.models",
+      "sourceSha256": "f147f82f52fdbaecff62eceeae8ea2be4a1d58973600cb6ba99eaf1f303bc512",
+      "reason": "model names"
+    },
+    {
+      "id": "home.providers.openai.name",
+      "sourceSha256": "8b7d1a3187ab355dc31bc683aaa71ab5ed217940c12196a9cd5f4ca984babfa4",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.openai.models",
+      "sourceSha256": "f557d6250da3f1db58a8f126f7753c464a2769fcbd9c60efb39f474949cc4a60",
+      "reason": "model names"
+    },
+    {
+      "id": "home.providers.anthropic.logo.alt",
+      "sourceSha256": "744205e43529c1fc39bc4ed37dbcd1e91facc78d2a2d136bc893b023ac3c75f5",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.anthropic.name",
+      "sourceSha256": "744205e43529c1fc39bc4ed37dbcd1e91facc78d2a2d136bc893b023ac3c75f5",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.anthropic.models",
+      "sourceSha256": "ad2cb2df1c52a39880d221f6e37d4fdc62c8b1d06aba9fb53c8b779fce99bcab",
+      "reason": "model names"
+    },
+    {
+      "id": "home.providers.gemini.logo.alt",
+      "sourceSha256": "063b7348027464769cf962f54c93cb5170a16c3763d000bf64c0e1198330e697",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.gemini.name",
+      "sourceSha256": "063b7348027464769cf962f54c93cb5170a16c3763d000bf64c0e1198330e697",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.openrouter.logo.alt",
+      "sourceSha256": "eb70c3bc14fa7ae14285b750955958e63b64b8f19546c30fc2223ad9057a959c",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.openrouter.name",
+      "sourceSha256": "eb70c3bc14fa7ae14285b750955958e63b64b8f19546c30fc2223ad9057a959c",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "home.providers.lmstudio.name",
+      "sourceSha256": "6b9727908e373676862e2de697aea360927c3ae8f98d85ebcd16eccfc32ce91e",
+      "reason": "product, provider, or model name"
+    },
+    {
+      "id": "lattice.screen.label",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.hero.title",
+      "sourceSha256": "d1f8e6138460765edf8e6a9cf388ab6aa4e90975e088f78d6d76ae4fbbb7e65c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.chip.node",
+      "sourceSha256": "c6657b1c24082285873f8d940975ec8448f4a9ed5fa7b754a5779a71b799a3f1",
+      "reason": "runtime requirement"
+    },
+    {
+      "id": "lattice.chip.license",
+      "sourceSha256": "e5dcffe836b6ec8a58e492419b550e65fb8cbdc308503979e5dacb33ac7ea3b7",
+      "reason": "license identifier"
+    },
+    {
+      "id": "lattice.subnav.cli",
+      "sourceSha256": "e759793341ff3757eaa76e814db0170ec13b6b0a988a742d9a81240c505f48ec",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.install.tab.pnpm",
+      "sourceSha256": "2e5aa0361aaffd9121d965204bff293f4a12be1e71208fea0cb44739a4356999",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.install.tab.npm",
+      "sourceSha256": "d79677188687e7b32b43de9d2365a1ff8ae6f1a9e3d494719be542394d99f7dd",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.install.cli",
+      "sourceSha256": "2d9e21c5338246fc6a7c0498375baafe86efa953b8837a20b0ab9aecff1ee40a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.quickstart.filename",
+      "sourceSha256": "ca5249104585f2d5b6f45ea38147e733d43b8799f5b1c320ec866079b62e1529",
+      "reason": "filename or CLI identifier"
+    },
+    {
+      "id": "lattice.cli.eyebrow",
+      "sourceSha256": "0d570e6299b2d8c2d20e455443e57908a4f1996e47adfee0de2a4ae6e1c066a2",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.cli.filename",
+      "sourceSha256": "ee1a81435d823d3bcc38a7ffac16525d611d9ea18b211141a28b0d55767da506",
+      "reason": "filename or CLI identifier"
+    },
+    {
+      "id": "lattice.footer.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.footer.project.github",
+      "sourceSha256": "f911e414cf6bdfc595532ab166b5ba0f63d73c021452fcdacbda363dda6ad8fb",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.footer.research.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.footer.research.phantomStream",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.footer.research.prometheus",
+      "sourceSha256": "bfa97cfb590b2093ee41d9e44a906fbe19c3f809130727a37895afe9bad12756",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "lattice.footer.community.discord",
+      "sourceSha256": "053bc65874ad6098e58c41c57b378a2f36b0220e5e0b46722245e6c2f796818c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.screen.label",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.nav.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.nav.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.nav.github",
+      "sourceSha256": "279cbb2b5f3a267259fcc23b953486f34ef3feec8441f1f8ac6ee2470b95ad43",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.mobile.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.mobile.github",
+      "sourceSha256": "279cbb2b5f3a267259fcc23b953486f34ef3feec8441f1f8ac6ee2470b95ad43",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.hero.title",
+      "sourceSha256": "d415480ab78155e3a1503b96e3cb9f19476fc2ea7f64ec235910f292f1baaf37",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.chip.node",
+      "sourceSha256": "38a3f80a7341fe9428e2eb2d66215a081aea80d78095a2f6a7ab0226d4d11139",
+      "reason": "runtime requirement"
+    },
+    {
+      "id": "phantomStream.chip.license",
+      "sourceSha256": "cfaf5ebb53e9bf045d9d58082babd2c722f2968b7fee406845415a020f012fed",
+      "reason": "license identifier"
+    },
+    {
+      "id": "phantomStream.compare.phantom",
+      "sourceSha256": "53cea6568e12f1ad00beeea2e501bd8bc4a31e9526497e36e8f00c8a7cbc1181",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.brand.aria",
+      "sourceSha256": "83139e1a42a4c7033286d67f1c732d7067ea620fd6dbf5c5fb0df845d8b33e4a",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.project.github",
+      "sourceSha256": "f911e414cf6bdfc595532ab166b5ba0f63d73c021452fcdacbda363dda6ad8fb",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.research.lattice",
+      "sourceSha256": "4864e5af58e7bc8a61c79ea22e20bf6b9bbab4f7f3e92baf158c8674265a05de",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.research.phantom",
+      "sourceSha256": "766575aab91a68ee42174ed84cca4ccca21632578d7becf95149ce9d1a06dae5",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.research.prometheus",
+      "sourceSha256": "bfa97cfb590b2093ee41d9e44a906fbe19c3f809130727a37895afe9bad12756",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.footer.community.discord",
+      "sourceSha256": "053bc65874ad6098e58c41c57b378a2f36b0220e5e0b46722245e6c2f796818c",
+      "reason": "brand, package, or CLI name"
+    },
+    {
+      "id": "phantomStream.chip.esm",
+      "sourceSha256": "3a062e9fa8f60d893cc0365df3e47754b73fa73cf27851bd44ebd7f8192216d9",
+      "reason": "entire chip is protected JavaScript packaging terminology"
+    },
+    {
+      "id": "PRIVACY_TELEMETRY_ERASE_CURL|GDPR Article 17 erasure curl command. Copy this command literally; do not translate.",
+      "sourceSha256": "37dde52ba4a6ce2e738f280f4ca93c3b91308a44bd28c042ab3215e48008f324",
+      "reason": "literal GDPR curl command"
+    }
+  ],
+  "byLocale": {
+    "es": [
+      {
+        "id": "dashboard.template.002",
+        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
+        "reason": "natural Spanish technical term or product name"
+      },
+      {
+        "id": "dashboard.runtime.preview.errorLabel",
+        "sourceSha256": "ca00fccfb408989eddc401062c4d1219a6aceb6b9b55412357f1790862e8f178",
+        "reason": "natural Spanish technical term or product name"
+      },
+      {
+        "id": "home.install.manualFlag",
+        "sourceSha256": "36bde66f289a35683683b041c6d8f418a5f36607b547da25d00ad55891e80b88",
+        "reason": "natural Spanish technical term or product name"
+      },
+      {
+        "id": "SHOWCASE_STATS_FSB_VIEW_TOKENS",
+        "sourceSha256": "a039dfb9628b53ddaebcfe8ef0793e3fdf19867601295f00d192acef59050869",
+        "reason": "natural Spanish technical term or product name"
+      }
+    ],
+    "de": [
+      {
+        "id": "about.videos.demo1.tag",
+        "sourceSha256": "0c62cfcf5c72673be0759f650d1bc0881071d1e9ad181b9a0e1ef4a925d8b5cb",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "about.memory.category.design",
+        "sourceSha256": "5ed5105680207b4de7fda499d5a5c202b21424b4ee0465603ba99218a6c22891",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "about.schema.demo.openClaw.alternateName",
+        "sourceSha256": "7b5cdef476949136a3492208c6802635f603ddc4036377ef5a5665cd055b51e6",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "dashboard.template.001",
+        "sourceSha256": "67b696468610b879ed7f224dbf6b0861f27e39d20454cb9d7af1ec52d3e5eeaa",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "dashboard.template.002",
+        "sourceSha256": "703390318bd55aef50b7823d2b90a846debff99e6e3d401a24a921b733912a6d",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "dashboard.template.012",
+        "sourceSha256": "8e2c7ac508139a02af859de64a4743c1f3946837279332c35ec8f5ddf20654ae",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "dashboard.template.062",
+        "sourceSha256": "a1794783aab72d205dc532b1170d1be63ebdce8816b57c21acb451c15dab969a",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "dashboard.runtime.status.offline",
+        "sourceSha256": "a1794783aab72d205dc532b1170d1be63ebdce8816b57c21acb451c15dab969a",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "home.features.card.autopilot.title",
+        "sourceSha256": "0c62cfcf5c72673be0759f650d1bc0881071d1e9ad181b9a0e1ef4a925d8b5cb",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "home.meta.title",
+        "sourceSha256": "3cebbdeff75ea832fd152ff96b2d5c23934df58a62429b8f34d4965274f4b80a",
+        "reason": "natural German loanword or product name"
+      },
+      {
+        "id": "phantomStream.schema.runtimePlatform",
+        "sourceSha256": "048b6128f69e4de61fbfdf5386cb32f955d365823a9f03d37b3b1643f5248055",
+        "reason": "natural German loanword or product name"
+      }
+    ],
+    "ja": [],
+    "zh-CN": [
+      {
+        "id": "about.schema.demo.openClaw.alternateName",
+        "sourceSha256": "7b5cdef476949136a3492208c6802635f603ddc4036377ef5a5665cd055b51e6",
+        "reason": "product name or locale-standard invariant"
+      }
+    ],
+    "zh-TW": []
+  },
+  "equivalentByLocale": {
+    "de": [
+      {
+        "id": "about.memory.site.nike3dViewer",
+        "sourceSha256": "2346faedd82ad289372c5cfef6fb734e7095e229505b996efd199227ea1fa43a",
+        "targetSha256": "7cd63cda62b9fd2c3cf600932a33bf8690cc9d09301fcc0a365c0680b518f75d",
+        "reason": "natural German compound spelling with an invariant product name"
+      },
+      {
+        "id": "about.memory.site.onlinePdfEditor",
+        "sourceSha256": "438fd7f8450c732344370009d7687af6b6682a93a988a2d3e9f67d305298772f",
+        "targetSha256": "43a2d18f3e8fd1fcee7ed10b9af2933c87bd3382f3d207c169e3b08d02810d45",
+        "reason": "natural German compound spelling for a technical product label"
+      },
+      {
+        "id": "about.memory.site.supportChatbot",
+        "sourceSha256": "76fdefeb182deaf6f854e1de1612f48a88358af73b63752aff9a2ec2b06f7912",
+        "targetSha256": "1ebe8cf4f395b169e5c6c60a5cf9214472f807b5600bbbd89e1f26cac52a6a8e",
+        "reason": "natural German compound spelling for a technical product label"
+      },
+      {
+        "id": "about.schema.demo.ecommerce.alternateName",
+        "sourceSha256": "26e9773fe7f9b47d89f85ab5d9b59815b7893f983d58b27bd218061356d51ad4",
+        "targetSha256": "39877a237f88a8abc9fd1bddbef62e790e6b704e3ba45e790b1991837981bdeb",
+        "reason": "German compound punctuation around the invariant FSB test name"
+      },
+      {
+        "id": "agents.og.imageAlt",
+        "sourceSha256": "fae06cb91f85ae21bb15cfab481224254e7ea76c818bb1a0348f9335c3ca5b97",
+        "targetSha256": "424452a1b8dd293646049f919bffd03b89986a19a27b2d8595134f7724b06b0b",
+        "reason": "German compound punctuation around the invariant FSB brand name"
+      },
+      {
+        "id": "dashboard.template.010",
+        "sourceSha256": "0a878454544f2e300b6936a35fea1c4872b4c218636aa53634414e2c23287b6f",
+        "targetSha256": "39054c349f52971fb276e575ca697f36cd0c51bdceabc4e94be05f88135f7ce1",
+        "reason": "natural German compound spelling with the invariant FSB brand name"
+      },
+      {
+        "id": "dashboard.meta.title",
+        "sourceSha256": "0a878454544f2e300b6936a35fea1c4872b4c218636aa53634414e2c23287b6f",
+        "targetSha256": "39054c349f52971fb276e575ca697f36cd0c51bdceabc4e94be05f88135f7ce1",
+        "reason": "natural German compound spelling with the invariant FSB brand name"
+      },
+      {
+        "id": "home.features.card.mcpIntegration.title",
+        "sourceSha256": "e6ee8349823e491ddeb344e43d96d29563e5ad4a8459da55ff83ee41b5d9ba47",
+        "targetSha256": "0dfc9b67b3dc2e84f90b14ce856f62c5165da0a71e3527ecd36116f365e37012",
+        "reason": "natural German compound spelling with the invariant MCP acronym"
+      },
+      {
+        "id": "home.features.card.remoteDashboard.title",
+        "sourceSha256": "8534dfa4bca7a53e11a55245e1b9366aa043f33e3d167ad99890e56b757d2589",
+        "targetSha256": "e3c770c330833a4e1b6e0f9f42cb97abcd3cad7d396739cc98450bf51efa4325",
+        "reason": "natural German compound spelling for a technical feature label"
+      },
+      {
+        "id": "phantomStream.feature.playwright.title",
+        "sourceSha256": "2d5d932c138cb4edd4bb75c3ad2d17ea19e99a3ed73066080520bb4f395abdd2",
+        "targetSha256": "559c6d2d647db9aa3e9be6854fd3d7c0e05be52d943c0cc333c1205bc81e4b03",
+        "reason": "natural German compound spelling with the invariant Playwright name"
+      },
+      {
+        "id": "support.og.imageAlt",
+        "sourceSha256": "fae06cb91f85ae21bb15cfab481224254e7ea76c818bb1a0348f9335c3ca5b97",
+        "targetSha256": "424452a1b8dd293646049f919bffd03b89986a19a27b2d8595134f7724b06b0b",
+        "reason": "German compound punctuation around the invariant FSB brand name"
+      }
+    ]
+  }
+}

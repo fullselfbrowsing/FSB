@@ -1,9 +1,14 @@
 #!/usr/bin/env node
-// Phase 52 / AUDIT-01 + AUDIT-02 -- Full-page translation completeness audit.
+// Phase 52 / AUDIT-01 + AUDIT-02 -- historical source-coverage diagnostic.
 // Cross-references the showcase's 12-route table against messages.xlf (EN source)
 // and the 5 translated XLIFF files, producing a per-route x per-locale coverage
-// (marked + target exists) and currency (target matches current EN source) verdict,
+// (marked + target exists) and source currency (mirrored <source> matches current EN)
+// verdict,
 // an orphaned-ids report, and a stats-274 JSON->XLIFF merge trace.
+//
+// IMPORTANT: this script does not determine whether <target> is translated. Never
+// use its PASS result as evidence of translation quality or completeness. Run
+// `npm run verify:translation-quality` for the authoritative target-content gate.
 //
 // This is a DIAGNOSTIC script, not a CI gate: it exits 0 whenever the report is
 // successfully generated, regardless of what it finds (drift/missing/orphans are
@@ -43,8 +48,8 @@ const DATA_OUT = join(PHASE_DIR, '52-audit-data.json');
 // route-name list (see SUMMARY.md for why: a hardcoded "6 non-shellless routes"
 // list would have silently missed `sitemaps` and `legal`, which also lack the
 // flag and therefore also render the shared shell nav/footer).
-// `dashboard` carries an explicit outOfScope annotation (CI-05) rather than being
-// omitted -- it is an authenticated app surface, not marketing content.
+// Dashboard is in scope: authenticated routes must not fall back to English inside
+// an otherwise localized application shell.
 // Deliberately excludes the unrouted 13th subdirectory under src/app/pages/ (a
 // dead scaffold dir with its own placeholder.* markers, zero matches in either
 // routes file) -- since marker extraction below is scoped per-route to each
@@ -58,7 +63,7 @@ const ROUTE_TABLE = [
     path: 'dashboard',
     componentDir: 'pages/dashboard',
     shellless: false,
-    outOfScope: 'authenticated app surface, not marketing content -- see CI-05',
+    outOfScope: null,
   },
   { path: 'agents', componentDir: 'pages/agents', shellless: false, outOfScope: null },
   { path: 'privacy', componentDir: 'pages/privacy', shellless: false, outOfScope: null },
@@ -385,12 +390,9 @@ function buildRouteLocaleStats(verdictEntries) {
 // Groups failing entries by id (not by route) so a shared shell/picker id that
 // fails shows up ONCE with every affected route listed, rather than as N
 // separate "failures" for what is a single underlying fact (Pitfall 4).
-// `dashboard` is excluded here -- it is out of scope for translation and gets
-// its own explicit excluded row in the summary table instead.
 function buildFailureIndex(verdictEntries) {
   const index = new Map();
   for (const e of verdictEntries) {
-    if (e.route === 'dashboard') continue;
     const isFailure = e.coverage === 'FAIL' || e.currency === 'FAIL';
     if (!isFailure) continue;
     if (!index.has(e.id)) index.set(e.id, { routes: new Set(), locales: new Map() });
@@ -478,8 +480,7 @@ function buildReport(ctx) {
   lines.push('');
   lines.push(
     'One entry per failing trans-unit id (coverage FAIL or currency FAIL in at least ' +
-    'one locale) -- not a full enumeration of every passing id. `dashboard` is excluded ' +
-    '(out of scope for translation, see summary table above). Shared shell/picker ids ' +
+    'one locale) -- not a full enumeration of every passing id. Shared shell/picker ids ' +
     'that fail are listed once here even though they render on multiple routes; the ' +
     '`Routes` line names every affected route so this is not mistaken for N separate bugs.'
   );
@@ -644,6 +645,8 @@ function readXliffOrExit(path, label) {
 
 function main() {
   console.log('Phase 52 / AUDIT-01 + AUDIT-02 -- audit-translation-completeness.mjs starting...');
+  console.warn('WARNING: this historical diagnostic verifies source coverage/currency only; it does not prove targets are translated.');
+  console.warn('Use `npm run verify:translation-quality` for target-content validation.');
   console.log('');
 
   requireFile(LOCALE_CONSTANTS_PATH, 'locale-constants.ts');
