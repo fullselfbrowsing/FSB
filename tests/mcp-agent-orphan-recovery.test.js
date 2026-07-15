@@ -40,6 +40,7 @@ function preparedInput(overrides = {}) {
     binaryRealPath: '/fixture/bin/claude',
     argvSignature: 'argv_signature_fixture_0001',
     envFingerprint: 'env_fingerprint_fixture_0001',
+    generation: 'generation_fixture_previous',
     endpoint: 'http://127.0.0.1:7226/mcp',
     ...overrides,
   };
@@ -88,6 +89,8 @@ async function expectRuntimeError(operation, code) {
 
 async function runRuntimeFilesTests(runtimeModule) {
   const {
+    AGENT_RECOVERY_DISPOSITION_LIMIT,
+    AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES,
     AGENT_ORPHAN_JOURNAL_LIMIT_BYTES,
     AGENT_RUNTIME_DIRECTORY_MODE,
     AGENT_RUNTIME_FILE_MODE,
@@ -97,6 +100,8 @@ async function runRuntimeFilesTests(runtimeModule) {
   assert.equal(AGENT_RUNTIME_DIRECTORY_MODE, 0o700);
   assert.equal(AGENT_RUNTIME_FILE_MODE, 0o600);
   assert.equal(AGENT_ORPHAN_JOURNAL_LIMIT_BYTES, 256 * 1024);
+  assert.equal(AGENT_RECOVERY_DISPOSITION_LIMIT, 128);
+  assert.equal(AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES, 64 * 1024);
 
   const state = tempRoot('runtime-state');
   try {
@@ -113,6 +118,7 @@ async function runRuntimeFilesTests(runtimeModule) {
       'createdAt',
       'delegationId',
       'envFingerprint',
+      'generation',
       'profileVersion',
       'state',
     ]);
@@ -145,6 +151,7 @@ async function runRuntimeFilesTests(runtimeModule) {
       'createdAt',
       'delegationId',
       'envFingerprint',
+      'generation',
       'pid',
       'processGroupId',
       'processStartIdentity',
@@ -159,6 +166,155 @@ async function runRuntimeFilesTests(runtimeModule) {
     assert.equal(fs.existsSync(prepared.runDirectory), false);
   } finally {
     state.cleanup();
+  }
+
+  const recoveryState = tempRoot('runtime-recovery-state');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: recoveryState.root, platform: 'linux' });
+    assert.deepEqual(runtime.readRecoveryDispositions(), {
+      status: 'ok',
+      journal: { version: 1, dispositions: [] },
+    });
+    const prepared = await runtime.prepareRun(preparedInput());
+    const active = await runtime.activateRun(activeInput());
+    const disposition = {
+      delegationId: active.delegationId,
+      code: 'daemon_restart_lost_run',
+      recoveredAt: 1700000000000,
+    };
+    assert.equal(active.generation, 'generation_fixture_previous');
+    assert.deepEqual(
+      await runtime.recordRestartLossAndRemoveRun(active, disposition),
+      [disposition],
+    );
+    assert.equal(fs.statSync(runtime.recoveryPath).mode & 0o777, 0o600);
+    assert.deepEqual(readJson(runtime.recoveryPath), {
+      version: 1,
+      dispositions: [disposition],
+    });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 1, entries: [] });
+    assert.equal(fs.existsSync(prepared.runDirectory), false);
+    const persisted = runtime.readRecoveryDispositions();
+    assert.deepEqual(persisted, {
+      status: 'ok',
+      journal: { version: 1, dispositions: [disposition] },
+    });
+    assert(Object.isFrozen(persisted.journal));
+    assert(Object.isFrozen(persisted.journal.dispositions));
+    assert(Object.isFrozen(persisted.journal.dispositions[0]));
+    assert.deepEqual(
+      await runtime.recordRestartLossAndRemoveRun(active, {
+        ...disposition,
+        recoveredAt: disposition.recoveredAt + 1,
+      }),
+      [disposition],
+      'retry after journal removal preserves the first durable disposition',
+    );
+    await expectRuntimeError(
+      () => runtime.recordRestartLossAndRemoveRun(
+        { ...active, delegationId: 'delegation_fixture_missing' },
+        { ...disposition, delegationId: 'delegation_fixture_missing' },
+      ),
+      'journal_conflict',
+    );
+  } finally {
+    recoveryState.cleanup();
+  }
+
+  const recoveryRetry = tempRoot('runtime-recovery-retry');
+  try {
+    const setup = createAgentRuntimeFiles({ rootPath: recoveryRetry.root, platform: 'linux' });
+    await setup.prepareRun(preparedInput());
+    const active = await setup.activateRun(activeInput());
+    const disposition = {
+      delegationId: active.delegationId,
+      code: 'daemon_restart_lost_run',
+      recoveredAt: 1700000000000,
+    };
+    let rejectJournalReplace = true;
+    const interrupted = createAgentRuntimeFiles({
+      rootPath: recoveryRetry.root,
+      platform: 'linux',
+      fs: {
+        renameSync(from, to) {
+          if (rejectJournalReplace && to === setup.journalPath) {
+            rejectJournalReplace = false;
+            throw new Error('injected journal replace interruption');
+          }
+          return fs.renameSync(from, to);
+        },
+      },
+    });
+    await expectRuntimeError(
+      () => interrupted.recordRestartLossAndRemoveRun(active, disposition),
+      'runtime_target_unavailable',
+    );
+    assert.deepEqual(
+      interrupted.readRecoveryDispositions().journal.dispositions,
+      [disposition],
+      'crash window retains the durable disposition before journal removal',
+    );
+    assert.deepEqual(
+      interrupted.readJournal().journal.entries,
+      [active],
+      'crash window retains the source journal entry for a retry',
+    );
+    const retried = createAgentRuntimeFiles({ rootPath: recoveryRetry.root, platform: 'linux' });
+    assert.deepEqual(
+      await retried.recordRestartLossAndRemoveRun(active, {
+        ...disposition,
+        recoveredAt: disposition.recoveredAt + 1,
+      }),
+      [disposition],
+    );
+    assert.deepEqual(retried.readJournal().journal.entries, []);
+    assert.deepEqual(retried.readRecoveryDispositions().journal.dispositions, [disposition]);
+  } finally {
+    recoveryRetry.cleanup();
+  }
+
+  const recoveryBound = tempRoot('runtime-recovery-bound');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: recoveryBound.root, platform: 'linux' });
+    const prepared = await runtime.prepareRun(preparedInput({
+      delegationId: 'delegation_fixture_latest',
+      argvSignature: 'argv_signature_fixture_latest',
+      envFingerprint: 'env_fingerprint_fixture_latest',
+    }));
+    const active = await runtime.activateRun(activeInput({
+      delegationId: prepared.entry.delegationId,
+    }));
+    const existing = Array.from({ length: 128 }, (_, index) => ({
+      delegationId: `delegation_retained_${String(index).padStart(4, '0')}`,
+      code: 'daemon_restart_lost_run',
+      recoveredAt: 1600000000000 + index,
+    }));
+    fs.writeFileSync(
+      runtime.recoveryPath,
+      `${JSON.stringify({ version: 1, dispositions: existing })}\n`,
+      { mode: 0o600 },
+    );
+    fs.chmodSync(runtime.recoveryPath, 0o600);
+    await runtime.recordRestartLossAndRemoveRun(active, {
+      delegationId: active.delegationId,
+      code: 'daemon_restart_lost_run',
+      recoveredAt: 1700000000000,
+    });
+    const retained = runtime.readRecoveryDispositions().journal.dispositions;
+    assert.equal(retained.length, runtimeModule.AGENT_RECOVERY_DISPOSITION_LIMIT);
+    assert.equal(
+      retained.some((entry) => entry.delegationId === existing[0].delegationId),
+      false,
+      'bounded append prunes the oldest persisted disposition',
+    );
+    assert.equal(retained.at(-1).delegationId, active.delegationId);
+    assert(
+      fs.statSync(runtime.recoveryPath).size
+        <= runtimeModule.AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES,
+      'bounded disposition file remains below its declared byte cap',
+    );
+  } finally {
+    recoveryBound.cleanup();
   }
 
   const ipv6 = tempRoot('runtime-ipv6');
@@ -388,6 +544,19 @@ async function runRuntimeFilesTests(runtimeModule) {
     ['invalid-json', '{'],
     ['wrong-version', JSON.stringify({ version: 2, entries: [] })],
     ['unknown-top-key', JSON.stringify({ version: 1, entries: [], extra: true })],
+    ['missing-generation', JSON.stringify({
+      version: 1,
+      entries: [{
+        state: 'prepared',
+        delegationId: 'delegation_fixture_0001',
+        adapterId: 'claude-code',
+        profileVersion: '2.1.177',
+        createdAt: 1000,
+        binaryRealPath: '/fixture/bin/claude',
+        argvSignature: 'argv_signature_fixture_0001',
+        envFingerprint: 'env_fingerprint_fixture_0001',
+      }],
+    })],
     ['unknown-entry-key', JSON.stringify({
       version: 1,
       entries: [{
@@ -415,6 +584,34 @@ async function runRuntimeFilesTests(runtimeModule) {
     } finally {
       corrupt.cleanup();
     }
+  }
+
+  const corruptRecovery = tempRoot('runtime-corrupt-recovery');
+  try {
+    fs.mkdirSync(corruptRecovery.root, { recursive: true, mode: 0o700 });
+    fs.chmodSync(corruptRecovery.root, 0o700);
+    const runtime = createAgentRuntimeFiles({ rootPath: corruptRecovery.root, platform: 'linux' });
+    fs.writeFileSync(runtime.recoveryPath, JSON.stringify({
+      version: 1,
+      dispositions: [{
+        delegationId: 'delegation_fixture_0001',
+        code: 'daemon_restart_lost_run',
+        recoveredAt: 1700000000000,
+        task: 'forbidden',
+      }],
+    }), { mode: 0o600 });
+    fs.chmodSync(runtime.recoveryPath, 0o644);
+    assert.deepEqual(
+      runtime.readRecoveryDispositions(),
+      { status: 'unavailable', reason: 'insecure' },
+    );
+    fs.chmodSync(runtime.recoveryPath, 0o600);
+    assert.deepEqual(
+      runtime.readRecoveryDispositions(),
+      { status: 'unavailable', reason: 'corrupt' },
+    );
+  } finally {
+    corruptRecovery.cleanup();
   }
 
   const oversize = tempRoot('runtime-oversize');
@@ -446,6 +643,7 @@ function journalEntry(processTreeModule, state = 'active', overrides = {}) {
     binaryRealPath,
     argvSignature: processTreeModule.createArgvSignature(binaryRealPath, argv),
     envFingerprint: 'env_fingerprint_fixture_0001',
+    generation: 'generation_fixture_previous',
   };
   return state === 'active'
     ? {
@@ -1127,12 +1325,16 @@ async function runTerminationTests(processTreeModule) {
 
 function recoveryRuntime(entries, options = {}) {
   let remaining = [...entries];
+  let dispositions = [...(options.dispositions ?? [])];
   const events = options.events ?? [];
   const removed = [];
+  const recorded = [];
   return {
     events,
     removed,
+    recorded,
     remaining: () => [...remaining],
+    dispositions: () => [...dispositions],
     readJournal() {
       events.push('journal:read');
       if (options.unavailable) {
@@ -1140,11 +1342,23 @@ function recoveryRuntime(entries, options = {}) {
       }
       return { status: 'ok', journal: { version: 1, entries: [...remaining] } };
     },
-    async removeRun(delegationId) {
-      events.push(`remove:${delegationId}`);
-      if (options.failRemove?.has(delegationId)) throw new Error('injected remove failure');
-      removed.push(delegationId);
-      remaining = remaining.filter((entry) => entry.delegationId !== delegationId);
+    readRecoveryDispositions() {
+      events.push('recovery:read');
+      if (options.unavailableRecovery) {
+        return { status: 'unavailable', reason: options.unavailableRecovery };
+      }
+      return { status: 'ok', journal: { version: 1, dispositions: [...dispositions] } };
+    },
+    async recordRestartLossAndRemoveRun(entry, disposition) {
+      events.push(`record:${entry.delegationId}`);
+      if (options.failRemove?.has(entry.delegationId)) throw new Error('injected remove failure');
+      if (!dispositions.some((candidate) => candidate.delegationId === entry.delegationId)) {
+        dispositions = [...dispositions, disposition].slice(-128);
+        recorded.push(disposition);
+      }
+      removed.push(entry.delegationId);
+      remaining = remaining.filter((candidate) => candidate.delegationId !== entry.delegationId);
+      return [...dispositions];
     },
   };
 }
@@ -1184,7 +1398,12 @@ function recoveryTerminator(options = {}) {
 }
 
 async function runRecoveryTests(runtimeModule, processTreeModule) {
-  const { createAgentRuntimeFiles, createAgentStartupRecovery } = runtimeModule;
+  const { createAgentRuntimeFiles } = runtimeModule;
+  const createAgentStartupRecovery = (dependencies) => runtimeModule.createAgentStartupRecovery({
+    generation: 'generation_fixture_current',
+    now: () => 1700000000000,
+    ...dependencies,
+  });
   const { createProcessInspector } = processTreeModule;
   const staleInspection = { classification: 'stale' };
   const ambiguousIdentity = { classification: 'ambiguous', reason: 'identity_mismatch' };
@@ -1214,11 +1433,64 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
       ambiguousFailClosed: 0,
       spawnAvailable: true,
       profiles: [],
+      restartLosses: [],
     });
-    assert.deepEqual(events, ['journal:read', 'advertise']);
+    assert.deepEqual(events, ['recovery:read', 'journal:read', 'advertise']);
     assert(Object.isFrozen(result));
     assert(Object.isFrozen(result.profiles));
     assert.strictEqual(recovery.recover(), recovery.recover(), 'recovery itself is idempotent');
+  }
+
+  {
+    const entry = journalEntry(processTreeModule, 'active', {
+      generation: 'generation_fixture_current',
+    });
+    const events = [];
+    const runtime = recoveryRuntime([entry], { events });
+    const inspector = plannedRecoveryInspector(new Map(), events);
+    const terminator = recoveryTerminator({ events });
+    let advertised = false;
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recoverBeforeAdvertise(() => { advertised = true; });
+    assert.equal(result.confirmedKilled, 0);
+    assert.equal(result.staleCleared, 0);
+    assert.equal(result.ambiguousFailClosed, 1);
+    assert.equal(result.spawnAvailable, false);
+    assert.deepEqual(result.restartLosses, []);
+    assert.equal(advertised, false);
+    assert.deepEqual(inspector.calls, [], 'same-generation disk state is never adopted or inspected');
+    assert.equal(terminator.calls.length, 0, 'same-generation disk state is never killed');
+    assert.deepEqual(runtime.remaining(), [entry]);
+    assert.deepEqual(runtime.recorded, []);
+    assert.deepEqual(events, ['recovery:read', 'journal:read']);
+  }
+
+  {
+    const entry = journalEntry(processTreeModule);
+    const events = [];
+    const runtime = recoveryRuntime([entry], {
+      events,
+      unavailableRecovery: 'corrupt',
+    });
+    const inspector = plannedRecoveryInspector(new Map(), events);
+    const terminator = recoveryTerminator({ events });
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.equal(result.ambiguousFailClosed, 1);
+    assert.equal(result.spawnAvailable, false);
+    assert.deepEqual(result.restartLosses, []);
+    assert.deepEqual(events, ['recovery:read']);
+    assert.deepEqual(inspector.calls, [], 'corrupt disposition state blocks process mutation');
+    assert.equal(terminator.calls.length, 0);
+    assert.deepEqual(runtime.remaining(), [entry]);
   }
 
   {
@@ -1248,20 +1520,31 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
         staleCleared: 0,
         ambiguousFailClosed: 0,
       }],
+      restartLosses: [{
+        delegationId: entry.delegationId,
+        code: 'daemon_restart_lost_run',
+        recoveredAt: 1700000000000,
+      }],
     });
     assert.deepEqual(events, [
+      'recovery:read',
       'journal:read',
       `inspect:${entry.delegationId}`,
       `stop:${entry.delegationId}`,
       `inspect:${entry.delegationId}`,
-      `remove:${entry.delegationId}`,
+      `record:${entry.delegationId}`,
     ]);
     assert.equal(terminator.calls.length, 1);
     assert.strictEqual(terminator.calls[0].entry, entry);
     assert.equal(terminator.calls[0].child, null);
     assert.deepEqual(terminator.calls[0].options, { grace: 250 });
     assert.deepEqual(runtime.remaining(), []);
+    assert.equal(runtime.recorded.length, 1);
     assert(Object.isFrozen(result.profiles[0]));
+    assert(Object.isFrozen(result.restartLosses));
+    assert(Object.isFrozen(result.restartLosses[0]));
+    assert.strictEqual(recovery.recover(), recovery.recover(), 'repeated startup recovery is non-destructive');
+    assert.equal(runtime.recorded.length, 1, 'repeated recovery persists no duplicate disposition');
   }
 
   {
@@ -1310,15 +1593,21 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
         staleCleared: 1,
         ambiguousFailClosed: 1,
       }],
+      restartLosses: [prepared, staleActive].map((entry) => ({
+        delegationId: entry.delegationId,
+        code: 'daemon_restart_lost_run',
+        recoveredAt: 1700000000000,
+      })),
     });
     assert.deepEqual(events, [
+      'recovery:read',
       'journal:read',
       `inspect:${prepared.delegationId}`,
       `stop:${prepared.delegationId}`,
       `inspect:${prepared.delegationId}`,
-      `remove:${prepared.delegationId}`,
+      `record:${prepared.delegationId}`,
       `inspect:${staleActive.delegationId}`,
-      `remove:${staleActive.delegationId}`,
+      `record:${staleActive.delegationId}`,
       `inspect:${ambiguousPrepared.delegationId}`,
     ], 'journal entries recover serially in journal order');
     assert.deepEqual(
@@ -1415,6 +1704,7 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
     assert.equal(result.ambiguousFailClosed, 4);
     assert.equal(result.spawnAvailable, false);
     assert.deepEqual(runtime.remaining(), entries, 'every failure preserves its journal record');
+    assert.deepEqual(runtime.recorded, [], 'failed cleanup emits no restart-loss disposition');
   }
 
   {
@@ -1447,6 +1737,7 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
         ambiguousFailClosed: 1,
         spawnAvailable: false,
         profiles: [],
+        restartLosses: [],
       });
       assert.equal(inspectCalls, 0, 'corrupt journal supplies no inspection anchor');
       assert.equal(stopCalls, 0);

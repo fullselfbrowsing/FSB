@@ -22,6 +22,7 @@ import type {
   ActiveJournalEntry,
   AgentStartupRecovery,
   AgentStartupRecoveryResult,
+  AgentRestartLossDisposition,
   JournalEntry,
   PreparedJournalEntry,
 } from './runtime-files.js';
@@ -105,11 +106,7 @@ export const DELEGATION_HOLD_EXPIRY_MS = HOLD_EXPIRY_MS;
 
 export type DelegationTerminalStatus = 'succeeded' | 'failed' | 'cancelled';
 
-export interface DelegationRestartLoss {
-  readonly delegationId: string;
-  readonly code: 'daemon_restart_lost_run';
-  readonly recoveredAt: number;
-}
+export type DelegationRestartLoss = AgentRestartLossDisposition;
 
 export interface DelegationStatus {
   readonly [key: string]: unknown;
@@ -405,6 +402,40 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[]):
     && keys.every((key, index) => key === expected[index]);
 }
 
+function sanitizeRestartLosses(value: unknown): readonly DelegationRestartLoss[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  const byDelegation = new Map<string, DelegationRestartLoss>();
+  for (const candidate of value) {
+    if (
+      !isPlainRecord(candidate)
+      || !exactKeys(candidate, ['code', 'delegationId', 'recoveredAt'])
+      || typeof candidate.delegationId !== 'string'
+      || !DELEGATION_ID_PATTERN.test(candidate.delegationId)
+      || candidate.code !== 'daemon_restart_lost_run'
+      || typeof candidate.recoveredAt !== 'number'
+      || !Number.isSafeInteger(candidate.recoveredAt)
+      || candidate.recoveredAt < 0
+    ) continue;
+    const disposition = Object.freeze({
+      delegationId: candidate.delegationId,
+      code: candidate.code,
+      recoveredAt: candidate.recoveredAt,
+    });
+    const previous = byDelegation.get(disposition.delegationId);
+    if (!previous || previous.recoveredAt < disposition.recoveredAt) {
+      byDelegation.set(disposition.delegationId, disposition);
+    }
+  }
+  return Object.freeze(
+    [...byDelegation.values()]
+      .sort((left, right) => (
+        left.recoveredAt - right.recoveredAt
+        || left.delegationId.localeCompare(right.delegationId)
+      ))
+      .slice(-RECOVERY_STATUS_LIMIT),
+  );
+}
+
 function isWellFormedText(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
@@ -677,6 +708,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   async recover(): Promise<AgentStartupRecoveryResult> {
     const result = await this.dependencies.startupRecovery.recover();
+    this.restartLosses = sanitizeRestartLosses(result.restartLosses);
     if (this.allowSpawnOnPlatform(this.platform)) return result;
     return Object.freeze({
       confirmedKilled: result.confirmedKilled,
@@ -684,6 +716,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ambiguousFailClosed: result.ambiguousFailClosed + 1,
       spawnAvailable: false,
       profiles: result.profiles,
+      restartLosses: this.restartLosses,
     });
   }
 
@@ -811,6 +844,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         binaryRealPath: spec.command,
         argvSignature,
         envFingerprint: runtimeFingerprint,
+        generation: this.generation,
         endpoint: this.dependencies.endpoint,
       });
       run.entry = prepared.entry;
@@ -1505,11 +1539,14 @@ export function createProductionSpawnSupervisor(
   const inspector = createProcessInspector({ platform });
   const inspectProcessGroupStatus = createProcessGroupStatusInspector(platform);
   const terminator = createProcessTreeTerminator({ platform, inspector });
+  const generation = randomUUID();
   const startupRecovery = createAgentStartupRecovery({
     runtimeFiles,
     inspector,
     terminator,
     terminationGrace: options.terminationGrace ?? 2_000,
+    generation,
+    now: () => Date.now(),
   });
 
   let supervisor: SpawnSupervisor | null = null;
@@ -1526,6 +1563,7 @@ export function createProductionSpawnSupervisor(
     inspector,
     terminator,
     startupRecovery,
+    mintGeneration: () => generation,
     inspectProcessGroupStatus,
     endpoint: options.endpoint,
     ...(options.cwd ? { cwd: options.cwd } : {}),

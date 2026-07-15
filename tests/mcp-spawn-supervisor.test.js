@@ -351,6 +351,7 @@ function makeHarness(supervisorModule, options = {}) {
     ambiguousFailClosed: 0,
     spawnAvailable: true,
     profiles: Object.freeze([]),
+    restartLosses: Object.freeze([]),
   });
   const startupRecovery = {
     async recover() {
@@ -1094,6 +1095,8 @@ async function runHappyPathTest(supervisorModule) {
   assert.equal(harness.emitted.filter((event) => event.event === 'delegation.started').length, 1);
   assert.equal(harness.terminationCalls.length, 1, 'normal close is still tree-verified once');
   assert.equal(harness.counters.remove, 1);
+  assert.equal(harness.preparedEntry.generation, 'generation_fixture_0001');
+  assert.equal(harness.activeEntry.generation, 'generation_fixture_0001');
 
   const serialized = JSON.stringify({
     prepared: harness.preparedEntry,
@@ -1348,6 +1351,11 @@ async function runCancelAndShutdownTests(supervisorModule) {
     assert.equal(terminal.terminal.code, 'route_lost', 'route loss preserves its domain failure code');
     assert.equal(harness.terminationCalls.length, 1, 'route loss stops the tree exactly once');
     assert.equal(harness.counters.remove, 1, 'route loss removes the verified runtime journal');
+    assert.deepEqual(
+      (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).restartLosses,
+      [],
+      'transport disconnect alone never becomes daemon-restart loss',
+    );
   }
 
   {
@@ -1552,6 +1560,7 @@ async function runRecoveryAndRegistryTests(supervisorModule, registryModule) {
     ambiguousFailClosed: 0,
     spawnAvailable: true,
     profiles: [],
+    restartLosses: [],
   });
   assert.equal(harness.order.at(-1), 'recover');
 
@@ -1579,6 +1588,74 @@ async function runRecoveryAndRegistryTests(supervisorModule, registryModule) {
   assert.equal(killCalls, 1, 'production registry binds the concrete adapter kill dependency');
 }
 
+async function runRecoveryStatusTests(supervisorModule) {
+  const restartLosses = Array.from({ length: 130 }, (_, index) => ({
+    delegationId: `delegation_restart_${String(index).padStart(4, '0')}`,
+    code: 'daemon_restart_lost_run',
+    recoveredAt: 1700000000000 + index,
+  }));
+  restartLosses.push({
+    delegationId: 'delegation_restart_0050',
+    code: 'daemon_restart_lost_run',
+    recoveredAt: 1800000000000,
+  });
+  restartLosses.push({
+    delegationId: 'delegation_restart_secret',
+    code: 'daemon_restart_lost_run',
+    recoveredAt: 1800000000001,
+    task: 'STATUS_SECRET_CANARY_MUST_NOT_LEAK',
+  });
+  const harness = makeHarness(supervisorModule, {
+    recoveryResult: Object.freeze({
+      confirmedKilled: 1,
+      staleCleared: 1,
+      ambiguousFailClosed: 0,
+      spawnAvailable: true,
+      profiles: Object.freeze([]),
+      restartLosses: Object.freeze(restartLosses),
+    }),
+  });
+  assert.deepEqual(
+    (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).restartLosses,
+    [],
+    'status does not invent restart loss before startup recovery',
+  );
+  await harness.supervisor.recover();
+  const first = await harness.supervisor.handleExtRequest(statusRequest(), harness.emit);
+  const second = await harness.supervisor.handleExtRequest(statusRequest(), harness.emit);
+  assert.deepEqual(second, first, 'repeated status is non-destructive and idempotent');
+  assert.equal(first.restartLosses.length, supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT);
+  assert.equal(
+    new Set(first.restartLosses.map((entry) => entry.delegationId)).size,
+    first.restartLosses.length,
+    'recovery status de-duplicates delegation ids',
+  );
+  assert.deepEqual(
+    first.restartLosses,
+    [...first.restartLosses].sort((left, right) => (
+      left.recoveredAt - right.recoveredAt
+      || left.delegationId.localeCompare(right.delegationId)
+    )),
+    'recovery status order is deterministic',
+  );
+  assert(Object.isFrozen(first.restartLosses));
+  assert(first.restartLosses.every((entry) => (
+    Object.isFrozen(entry)
+    && Object.keys(entry).sort().join(',') === 'code,delegationId,recoveredAt'
+  )));
+  const serialized = JSON.stringify(first);
+  for (const forbidden of [
+    'STATUS_SECRET_CANARY_MUST_NOT_LEAK',
+    'pid',
+    'argv',
+    'env',
+    'cwd',
+    'task',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, `${forbidden} is absent from recovery status`);
+  }
+}
+
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
@@ -1597,6 +1674,7 @@ async function main() {
   await runSetupCancellationRaceTests(supervisorModule);
   await runStdinLifecycleTests(supervisorModule);
   await runRecoveryAndRegistryTests(supervisorModule, registryModule);
+  await runRecoveryStatusTests(supervisorModule);
   console.log('mcp-spawn-supervisor.test.js: PASS');
 }
 

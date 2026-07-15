@@ -9,14 +9,19 @@ const DIRECTORY_MODE = 0o700;
 const FILE_MODE = 0o600;
 const JOURNAL_VERSION = 1 as const;
 const JOURNAL_FILENAME = 'agent-orphans.json';
+const RECOVERY_VERSION = 1 as const;
+const RECOVERY_FILENAME = 'agent-recovery.json';
 const MCP_CONFIG_FILENAME = 'mcp-config.json';
 const JOURNAL_LIMIT_BYTES = 256 * 1024;
+const RECOVERY_LIMIT_BYTES = 64 * 1024;
 const MAX_JOURNAL_ENTRIES = 256;
+const MAX_RECOVERY_DISPOSITIONS = 128;
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const PROFILE_VERSION_PATTERN = /^[0-9A-Za-z.+-]{1,64}$/;
 const FINGERPRINT_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
 const PROCESS_IDENTITY_PATTERN = /^[A-Za-z0-9_.:+-]{1,256}$/;
+const GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
 const PREPARED_KEYS = Object.freeze([
   'adapterId',
@@ -25,6 +30,7 @@ const PREPARED_KEYS = Object.freeze([
   'createdAt',
   'delegationId',
   'envFingerprint',
+  'generation',
   'profileVersion',
   'state',
 ]);
@@ -36,6 +42,8 @@ const ACTIVE_KEYS = Object.freeze([
   'startedAt',
 ].sort());
 const JOURNAL_KEYS = Object.freeze(['entries', 'version']);
+const RECOVERY_KEYS = Object.freeze(['dispositions', 'version']);
+const RECOVERY_DISPOSITION_KEYS = Object.freeze(['code', 'delegationId', 'recoveredAt']);
 const PREPARE_INPUT_KEYS = Object.freeze([
   'adapterId',
   'argvSignature',
@@ -44,6 +52,7 @@ const PREPARE_INPUT_KEYS = Object.freeze([
   'delegationId',
   'endpoint',
   'envFingerprint',
+  'generation',
   'profileVersion',
 ]);
 const ACTIVATE_INPUT_KEYS = Object.freeze([
@@ -79,6 +88,7 @@ export interface PreparedJournalEntry {
   readonly binaryRealPath: string;
   readonly argvSignature: string;
   readonly envFingerprint: string;
+  readonly generation: string;
 }
 
 export interface ActiveJournalEntry {
@@ -90,6 +100,7 @@ export interface ActiveJournalEntry {
   readonly binaryRealPath: string;
   readonly argvSignature: string;
   readonly envFingerprint: string;
+  readonly generation: string;
   readonly pid: number;
   readonly processGroupId: number;
   readonly startedAt: number;
@@ -103,10 +114,25 @@ export interface AgentOrphanJournal {
   readonly entries: readonly JournalEntry[];
 }
 
+export interface AgentRestartLossDisposition {
+  readonly delegationId: string;
+  readonly code: 'daemon_restart_lost_run';
+  readonly recoveredAt: number;
+}
+
+export interface AgentRecoveryDispositionJournal {
+  readonly version: typeof RECOVERY_VERSION;
+  readonly dispositions: readonly AgentRestartLossDisposition[];
+}
+
 export type JournalUnavailableReason = 'corrupt' | 'insecure' | 'io' | 'oversize';
 
 export type JournalReadResult =
   | { readonly status: 'ok'; readonly journal: AgentOrphanJournal }
+  | { readonly status: 'unavailable'; readonly reason: JournalUnavailableReason };
+
+export type RecoveryDispositionReadResult =
+  | { readonly status: 'ok'; readonly journal: AgentRecoveryDispositionJournal }
   | { readonly status: 'unavailable'; readonly reason: JournalUnavailableReason };
 
 export interface PrepareRunInput {
@@ -117,6 +143,7 @@ export interface PrepareRunInput {
   readonly binaryRealPath: string;
   readonly argvSignature: string;
   readonly envFingerprint: string;
+  readonly generation: string;
   readonly endpoint: string;
 }
 
@@ -153,13 +180,19 @@ export interface AgentStartupRecoveryResult {
   readonly ambiguousFailClosed: number;
   readonly spawnAvailable: boolean;
   readonly profiles: readonly AgentRecoveryProfileSummary[];
+  readonly restartLosses: readonly AgentRestartLossDisposition[];
 }
 
 export interface AgentStartupRecoveryDependencies {
-  readonly runtimeFiles: Pick<AgentRuntimeFiles, 'readJournal' | 'removeRun'>;
+  readonly runtimeFiles: Pick<
+    AgentRuntimeFiles,
+    'readJournal' | 'readRecoveryDispositions' | 'recordRestartLossAndRemoveRun'
+  >;
   readonly inspector: ProcessInspector;
   readonly terminator: ProcessTreeTerminator;
   readonly terminationGrace: number;
+  readonly generation: string;
+  readonly now: () => number;
 }
 
 export interface AgentStartupRecovery {
@@ -241,7 +274,9 @@ function isPreparedEntry(value: unknown): value is PreparedJournalEntry {
     && typeof entry.argvSignature === 'string'
     && FINGERPRINT_PATTERN.test(entry.argvSignature)
     && typeof entry.envFingerprint === 'string'
-    && FINGERPRINT_PATTERN.test(entry.envFingerprint);
+    && FINGERPRINT_PATTERN.test(entry.envFingerprint)
+    && typeof entry.generation === 'string'
+    && GENERATION_PATTERN.test(entry.generation);
 }
 
 function isActiveEntry(value: unknown): value is ActiveJournalEntry {
@@ -257,6 +292,7 @@ function isActiveEntry(value: unknown): value is ActiveJournalEntry {
     binaryRealPath: entry.binaryRealPath,
     argvSignature: entry.argvSignature,
     envFingerprint: entry.envFingerprint,
+    generation: entry.generation,
   };
   return isPreparedEntry(preparedShape)
     && entry.state === 'active'
@@ -277,6 +313,52 @@ function freezeJournal(entries: readonly JournalEntry[]): AgentOrphanJournal {
     version: JOURNAL_VERSION,
     entries: Object.freeze(entries.map(freezeEntry)),
   });
+}
+
+function isRecoveryDisposition(value: unknown): value is AgentRestartLossDisposition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const disposition = value as Record<string, unknown>;
+  return exactKeys(disposition, RECOVERY_DISPOSITION_KEYS)
+    && typeof disposition.delegationId === 'string'
+    && DELEGATION_ID_PATTERN.test(disposition.delegationId)
+    && disposition.code === 'daemon_restart_lost_run'
+    && isSafeInteger(disposition.recoveredAt);
+}
+
+function freezeRecoveryDispositions(
+  dispositions: readonly AgentRestartLossDisposition[],
+): AgentRecoveryDispositionJournal {
+  return Object.freeze({
+    version: RECOVERY_VERSION,
+    dispositions: Object.freeze(dispositions.map((entry) => Object.freeze({ ...entry }))),
+  });
+}
+
+function parseRecoveryDispositions(value: unknown): AgentRecoveryDispositionJournal | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const journal = value as Record<string, unknown>;
+  if (!exactKeys(journal, RECOVERY_KEYS) || journal.version !== RECOVERY_VERSION) return null;
+  if (
+    !Array.isArray(journal.dispositions)
+    || journal.dispositions.length > MAX_RECOVERY_DISPOSITIONS
+  ) return null;
+  const delegationIds = new Set<string>();
+  const dispositions: AgentRestartLossDisposition[] = [];
+  for (const candidate of journal.dispositions) {
+    if (!isRecoveryDisposition(candidate) || delegationIds.has(candidate.delegationId)) return null;
+    delegationIds.add(candidate.delegationId);
+    dispositions.push(candidate);
+  }
+  return freezeRecoveryDispositions(dispositions);
+}
+
+function sameJournalEntry(left: JournalEntry, right: JournalEntry): boolean {
+  if (left.state !== right.state) return false;
+  const keys = left.state === 'active' ? ACTIVE_KEYS : PREPARED_KEYS;
+  return keys.every((key) => (
+    (left as unknown as Record<string, unknown>)[key]
+    === (right as unknown as Record<string, unknown>)[key]
+  ));
 }
 
 function parseJournal(value: unknown): AgentOrphanJournal | null {
@@ -349,6 +431,7 @@ function validatePrepareInput(input: PrepareRunInput): PreparedJournalEntry {
     binaryRealPath: input.binaryRealPath,
     argvSignature: input.argvSignature,
     envFingerprint: input.envFingerprint,
+    generation: input.generation,
   };
   if (!isPreparedEntry(entry)) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
@@ -384,6 +467,7 @@ export function getAgentRuntimeRoot(homeDir = homedir()): string {
 export class AgentRuntimeFiles {
   readonly rootPath: string;
   readonly journalPath: string;
+  readonly recoveryPath: string;
 
   private readonly platform: NodeJS.Platform;
   private readonly fs: RuntimeFsDependencies;
@@ -396,6 +480,7 @@ export class AgentRuntimeFiles {
       throw new RuntimeFilesError('invalid_runtime_input', 'Runtime root path is invalid');
     }
     this.journalPath = join(this.rootPath, JOURNAL_FILENAME);
+    this.recoveryPath = join(this.rootPath, RECOVERY_FILENAME);
     this.platform = options.platform ?? process.platform;
     this.fs = { ...DEFAULT_FS, ...options.fs };
     this.randomToken = options.randomToken
@@ -434,6 +519,49 @@ export class AgentRuntimeFiles {
         return { status: 'unavailable', reason: 'oversize' };
       }
       const journal = parseJournal(JSON.parse(raw) as unknown);
+      return journal
+        ? { status: 'ok', journal }
+        : { status: 'unavailable', reason: 'corrupt' };
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return { status: 'unavailable', reason: 'corrupt' };
+      }
+      return { status: 'unavailable', reason: 'io' };
+    }
+  }
+
+  readRecoveryDispositions(): RecoveryDispositionReadResult {
+    try {
+      if (!this.fs.existsSync(this.rootPath)) {
+        return { status: 'ok', journal: freezeRecoveryDispositions([]) };
+      }
+      const root = this.fs.lstatSync(this.rootPath);
+      if (
+        root.isSymbolicLink()
+        || !root.isDirectory()
+        || (this.platform !== 'win32' && (root.mode & 0o077) !== 0)
+      ) {
+        return { status: 'unavailable', reason: 'insecure' };
+      }
+      if (!this.fs.existsSync(this.recoveryPath)) {
+        return { status: 'ok', journal: freezeRecoveryDispositions([]) };
+      }
+      const target = this.fs.lstatSync(this.recoveryPath);
+      if (
+        target.isSymbolicLink()
+        || !target.isFile()
+        || (this.platform !== 'win32' && (target.mode & 0o077) !== 0)
+      ) {
+        return { status: 'unavailable', reason: 'insecure' };
+      }
+      if (target.size > RECOVERY_LIMIT_BYTES) {
+        return { status: 'unavailable', reason: 'oversize' };
+      }
+      const raw = this.fs.readFileSync(this.recoveryPath, 'utf8');
+      if (Buffer.byteLength(raw, 'utf8') > RECOVERY_LIMIT_BYTES) {
+        return { status: 'unavailable', reason: 'oversize' };
+      }
+      const journal = parseRecoveryDispositions(JSON.parse(raw) as unknown);
       return journal
         ? { status: 'ok', journal }
         : { status: 'unavailable', reason: 'corrupt' };
@@ -529,6 +657,52 @@ export class AgentRuntimeFiles {
     });
   }
 
+  recordRestartLossAndRemoveRun(
+    entry: JournalEntry,
+    disposition: AgentRestartLossDisposition,
+  ): Promise<readonly AgentRestartLossDisposition[]> {
+    if (
+      (!isPreparedEntry(entry) && !isActiveEntry(entry))
+      || !isRecoveryDisposition(disposition)
+      || disposition.delegationId !== entry.delegationId
+    ) {
+      return Promise.reject(
+        new RuntimeFilesError('invalid_runtime_input', 'Restart recovery state is invalid'),
+      );
+    }
+    return this.serializeMutation(() => {
+      const journal = this.requireJournal();
+      const recovery = this.requireRecoveryDispositions();
+      const stored = journal.entries.find(
+        (candidate) => candidate.delegationId === entry.delegationId,
+      );
+      const existing = recovery.dispositions.find(
+        (candidate) => candidate.delegationId === entry.delegationId,
+      );
+      if (!stored) {
+        if (existing) return recovery.dispositions;
+        throw new RuntimeFilesError('journal_conflict', 'Restart recovery entry is unavailable');
+      }
+      if (!sameJournalEntry(stored, entry)) {
+        throw new RuntimeFilesError('journal_conflict', 'Restart recovery identity conflicts');
+      }
+
+      this.cleanupRunDirectory(entry.delegationId);
+      let dispositions = recovery.dispositions;
+      if (!existing) {
+        dispositions = Object.freeze([
+          ...recovery.dispositions,
+          Object.freeze({ ...disposition }),
+        ].slice(-MAX_RECOVERY_DISPOSITIONS));
+        this.writeRecoveryDispositions(dispositions);
+      }
+      this.writeJournal(journal.entries.filter(
+        (candidate) => candidate.delegationId !== entry.delegationId,
+      ));
+      return dispositions;
+    });
+  }
+
   private serializeMutation<T>(operation: () => T): Promise<T> {
     const result = this.mutationTail.then(operation, operation);
     this.mutationTail = result.then(() => undefined, () => undefined);
@@ -539,6 +713,17 @@ export class AgentRuntimeFiles {
     const result = this.readJournal();
     if (result.status !== 'ok') {
       throw new RuntimeFilesError('journal_unavailable', 'Agent orphan journal is unavailable');
+    }
+    return result.journal;
+  }
+
+  private requireRecoveryDispositions(): AgentRecoveryDispositionJournal {
+    const result = this.readRecoveryDispositions();
+    if (result.status !== 'ok') {
+      throw new RuntimeFilesError(
+        'journal_unavailable',
+        'Agent recovery disposition journal is unavailable',
+      );
     }
     return result.journal;
   }
@@ -631,6 +816,28 @@ export class AgentRuntimeFiles {
     this.atomicWrite(this.journalPath, serialized, true);
   }
 
+  private writeRecoveryDispositions(
+    dispositions: readonly AgentRestartLossDisposition[],
+  ): void {
+    const journal = freezeRecoveryDispositions(dispositions);
+    const reparsed = parseRecoveryDispositions(journal);
+    if (!reparsed) {
+      throw new RuntimeFilesError(
+        'invalid_runtime_input',
+        'Agent recovery disposition journal is invalid',
+      );
+    }
+    const serialized = `${JSON.stringify(journal)}\n`;
+    if (Buffer.byteLength(serialized, 'utf8') > RECOVERY_LIMIT_BYTES) {
+      throw new RuntimeFilesError(
+        'invalid_runtime_input',
+        'Agent recovery disposition journal is oversized',
+      );
+    }
+    this.ensureRoot();
+    this.atomicWrite(this.recoveryPath, serialized, true);
+  }
+
   private cleanupRunDirectory(delegationId: string): void {
     const directory = join(this.rootPath, delegationId);
     if (!this.fs.existsSync(directory)) return;
@@ -694,8 +901,11 @@ class JournalStartupRecovery implements AgentStartupRecovery {
       !Number.isFinite(dependencies.terminationGrace)
       || dependencies.terminationGrace < 0
       || dependencies.terminationGrace > 60_000
+      || typeof dependencies.generation !== 'string'
+      || !GENERATION_PATTERN.test(dependencies.generation)
+      || typeof dependencies.now !== 'function'
     ) {
-      throw new RuntimeFilesError('invalid_runtime_input', 'Recovery grace is invalid');
+      throw new RuntimeFilesError('invalid_runtime_input', 'Recovery configuration is invalid');
     }
   }
 
@@ -723,13 +933,24 @@ class JournalStartupRecovery implements AgentStartupRecovery {
       staleCleared: 0,
       ambiguousFailClosed: 0,
     };
+    const recoveryJournal = this.dependencies.runtimeFiles.readRecoveryDispositions();
+    if (recoveryJournal.status !== 'ok') {
+      totals.ambiguousFailClosed = 1;
+      return this.finish(totals, profiles, []);
+    }
+    let restartLosses = recoveryJournal.journal.dispositions;
     const journal = this.dependencies.runtimeFiles.readJournal();
     if (journal.status !== 'ok') {
       totals.ambiguousFailClosed = 1;
-      return this.finish(totals, profiles);
+      return this.finish(totals, profiles, restartLosses);
     }
 
     for (const entry of journal.journal.entries) {
+      const recoveryRequired = entry.generation !== this.dependencies.generation;
+      if (!recoveryRequired) {
+        this.increment(totals, profiles, entry, 'ambiguousFailClosed');
+        continue;
+      }
       let inspection;
       try {
         inspection = await this.dependencies.inspector.inspect(entry);
@@ -745,7 +966,7 @@ class JournalStartupRecovery implements AgentStartupRecovery {
 
       if (inspection.classification === 'stale') {
         try {
-          await this.dependencies.runtimeFiles.removeRun(entry.delegationId);
+          restartLosses = await this.recordRestartLoss(entry);
           this.increment(totals, profiles, entry, 'staleCleared');
         } catch {
           this.increment(totals, profiles, entry, 'ambiguousFailClosed');
@@ -764,14 +985,30 @@ class JournalStartupRecovery implements AgentStartupRecovery {
           this.increment(totals, profiles, entry, 'ambiguousFailClosed');
           continue;
         }
-        await this.dependencies.runtimeFiles.removeRun(entry.delegationId);
+        restartLosses = await this.recordRestartLoss(entry);
         this.increment(totals, profiles, entry, 'confirmedKilled');
       } catch {
         this.increment(totals, profiles, entry, 'ambiguousFailClosed');
       }
     }
 
-    return this.finish(totals, profiles);
+    return this.finish(totals, profiles, restartLosses);
+  }
+
+  private recordRestartLoss(
+    entry: JournalEntry,
+  ): Promise<readonly AgentRestartLossDisposition[]> {
+    const recoveredAt = this.dependencies.now();
+    if (!isSafeInteger(recoveredAt)) {
+      return Promise.reject(
+        new RuntimeFilesError('invalid_runtime_input', 'Recovery timestamp is invalid'),
+      );
+    }
+    return this.dependencies.runtimeFiles.recordRestartLossAndRemoveRun(entry, Object.freeze({
+      delegationId: entry.delegationId,
+      code: 'daemon_restart_lost_run',
+      recoveredAt,
+    }));
   }
 
   private increment(
@@ -799,6 +1036,7 @@ class JournalStartupRecovery implements AgentStartupRecovery {
   private finish(
     totals: Record<RecoveryCategory, number>,
     profiles: Map<string, MutableRecoveryProfileSummary>,
+    restartLosses: readonly AgentRestartLossDisposition[],
   ): AgentStartupRecoveryResult {
     const frozenProfiles = [...profiles.values()]
       .sort((left, right) => (
@@ -812,6 +1050,15 @@ class JournalStartupRecovery implements AgentStartupRecovery {
       ambiguousFailClosed: totals.ambiguousFailClosed,
       spawnAvailable: totals.ambiguousFailClosed === 0,
       profiles: Object.freeze(frozenProfiles),
+      restartLosses: Object.freeze(
+        [...restartLosses]
+          .sort((left, right) => (
+            left.recoveredAt - right.recoveredAt
+            || left.delegationId.localeCompare(right.delegationId)
+          ))
+          .slice(-MAX_RECOVERY_DISPOSITIONS)
+          .map((entry) => Object.freeze({ ...entry })),
+      ),
     });
   }
 }
@@ -825,3 +1072,5 @@ export function createAgentStartupRecovery(
 export const AGENT_RUNTIME_DIRECTORY_MODE = DIRECTORY_MODE;
 export const AGENT_RUNTIME_FILE_MODE = FILE_MODE;
 export const AGENT_ORPHAN_JOURNAL_LIMIT_BYTES = JOURNAL_LIMIT_BYTES;
+export const AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES = RECOVERY_LIMIT_BYTES;
+export const AGENT_RECOVERY_DISPOSITION_LIMIT = MAX_RECOVERY_DISPOSITIONS;

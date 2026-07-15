@@ -97,6 +97,36 @@ async function run() {
   const indexSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
   assert(indexSource.includes("import { startServeDelegation } from './agent-providers/serve-delegation.js';"));
   assert(indexSource.includes('const lifecycle = await startServeDelegation({ host, port });'));
+  const supervisorSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts'),
+    'utf8',
+  );
+  const runtimeFilesSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'runtime-files.ts'),
+    'utf8',
+  );
+  assert(
+    runtimeFilesSource.includes('const recoveryRequired = entry.generation !== this.dependencies.generation;'),
+    'restart loss requires a prior journal generation',
+  );
+  assert(
+    runtimeFilesSource.includes('recordRestartLossAndRemoveRun'),
+    'restart loss is persisted only through the atomic cleanup disposition mutation',
+  );
+  assert(
+    supervisorSource.includes('mintGeneration: () => generation'),
+    'startup recovery and live supervisor share one daemon-minted generation',
+  );
+  for (const source of [serveDelegationSource, indexSource]) {
+    assert(
+      !source.includes('daemon_restart_lost_run'),
+      'transport and serve topology never infer daemon restart loss',
+    );
+  }
+  for (const forbidden of ['adoptRun(', 'replayRun(']) {
+    assert(!runtimeFilesSource.includes(forbidden), `${forbidden} is absent from runtime recovery`);
+    assert(!supervisorSource.includes(forbidden), `${forbidden} is absent from supervisor recovery`);
+  }
 
   const delegationSequence = validFrames.filter((frame) => frame.id === 'delegate-start-1');
   assert.deepStrictEqual(
