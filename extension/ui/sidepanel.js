@@ -816,6 +816,55 @@ function _delegationElement(tagName, className, textValue) {
   return element;
 }
 
+function _delegationToneForSnapshot(snapshot) {
+  if (!snapshot) return 'neutral';
+  var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
+  if (snapshot.state === 'failed'
+      || snapshot.state === 'restart_lost'
+      || snapshot.state === 'stopping'
+      || snapshot.connection === 'offline'
+      || snapshot.connection === 'disconnected'
+      || terminalCode === 'agent_offline'
+      || terminalCode === 'daemon_restart_lost_run') return 'danger';
+  if (snapshot.state === 'held' || snapshot.state === 'resuming') return 'warning';
+  if (snapshot.state === 'completed') return 'success';
+  if (snapshot.state === 'starting'
+      || snapshot.state === 'running'
+      || snapshot.state === 'holding') return 'active';
+  return 'neutral';
+}
+
+function _delegationSemanticIcon(tone) {
+  var iconClass = tone === 'active' ? 'fa-circle-play'
+    : (tone === 'success' ? 'fa-circle-check'
+      : (tone === 'warning' ? 'fa-hand'
+        : (tone === 'danger' ? 'fa-circle-exclamation' : 'fa-circle-info')));
+  var icon = _delegationElement(
+    'i',
+    'fa ' + iconClass + ' delegation-semantic-icon'
+  );
+  icon.setAttribute('aria-hidden', 'true');
+  return icon;
+}
+
+function _delegationSemanticHeading(tagName, className, textValue, tone) {
+  var heading = _delegationElement(
+    tagName,
+    className + ' delegation-semantic-heading'
+  );
+  heading.appendChild(_delegationSemanticIcon(tone));
+  heading.appendChild(_delegationElement('span', 'delegation-heading-copy', textValue));
+  return heading;
+}
+
+function _applyDelegationSnapshotTone(container, snapshot) {
+  if (!container || !snapshot) return;
+  var tone = _delegationToneForSnapshot(snapshot);
+  container.className = 'delegation-state-card delegation-tone-' + tone;
+  container.setAttribute('data-delegation-state', snapshot.state);
+  container.setAttribute('data-delegation-tone', tone);
+}
+
 function _delegationAction(label, className, handler) {
   var button = _delegationElement(
     'button',
@@ -1368,6 +1417,7 @@ function _appendDelegationTechnicalCode(container, code) {
 
 function _renderDelegationRunHeader(container, snapshot) {
   _clearDelegationNode(container);
+  _applyDelegationSnapshotTone(container, snapshot);
   var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
   var restartLost = snapshot.state === 'restart_lost'
     && terminalCode === 'daemon_restart_lost_run';
@@ -1390,19 +1440,23 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !offline
     && !unpaired
     && !unsupported;
-  var heading = document.createElement('h2');
-  heading.id = 'delegationRunHeading';
-  heading.className = 'delegation-state-heading';
-  if (restartLost) heading.textContent = 'Agent run ended after daemon restart';
-  else if (stopped) heading.textContent = _delegationStoppedHeading(snapshot);
-  else if (offline) heading.textContent = 'Agent offline';
-  else if (disconnected) heading.textContent = 'Agent connection lost';
-  else if (unpaired) heading.textContent = 'Pair this browser before starting Claude Code';
+  var headingText = _delegationStateLabel(snapshot);
+  if (restartLost) headingText = 'Agent run ended after daemon restart';
+  else if (stopped) headingText = _delegationStoppedHeading(snapshot);
+  else if (offline) headingText = 'Agent offline';
+  else if (disconnected) headingText = 'Agent connection lost';
+  else if (unpaired) headingText = 'Pair this browser before starting Claude Code';
   else if (unsupported) {
-    heading.textContent = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
+    headingText = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
       + ' cannot run browser tasks';
-  } else if (resumeOwnershipFailure) heading.textContent = 'Agent could not resume control';
-  else heading.textContent = _delegationStateLabel(snapshot);
+  } else if (resumeOwnershipFailure) headingText = 'Agent could not resume control';
+  var heading = _delegationSemanticHeading(
+    'h2',
+    'delegation-state-heading',
+    headingText,
+    _delegationToneForSnapshot(snapshot)
+  );
+  heading.id = 'delegationRunHeading';
   container.appendChild(heading);
   if (restartLost) {
     container.appendChild(_delegationElement(

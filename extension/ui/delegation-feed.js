@@ -327,18 +327,52 @@
     list.appendChild(detail);
   }
 
-  function _entryHeading(article, text) {
-    article.appendChild(_element('h3', 'delegation-entry-heading', text));
+  function _toneForState(state) {
+    if (state === 'completed') return 'success';
+    if (state === 'failed' || state === 'restart_lost') return 'danger';
+    if (state === 'held' || state === 'resuming') return 'warning';
+    return 'info';
+  }
+
+  function _toneForEntry(entry) {
+    if (entry.kind === 'retry') return 'warning';
+    if (entry.kind === 'result') return _toneForState(entry.state);
+    if (entry.kind === 'tool-call' && entry.tool.status === 'failed') return 'danger';
+    return 'info';
+  }
+
+  function _semanticIcon(tone) {
+    var iconClass = tone === 'success' ? 'fa-circle-check'
+      : (tone === 'warning' ? 'fa-triangle-exclamation'
+        : (tone === 'danger' ? 'fa-circle-exclamation' : 'fa-circle-info'));
+    var icon = _element('i', 'fa ' + iconClass + ' delegation-semantic-icon');
+    icon.setAttribute('aria-hidden', 'true');
+    return icon;
+  }
+
+  function _applyTone(node, state, tone) {
+    node.className += ' delegation-tone-' + tone;
+    node.setAttribute('data-delegation-state', state);
+    node.setAttribute('data-delegation-tone', tone);
+  }
+
+  function _entryHeading(article, text, tone) {
+    var heading = _element('h3', 'delegation-entry-heading delegation-semantic-heading');
+    heading.appendChild(_semanticIcon(tone));
+    heading.appendChild(_element('span', 'delegation-heading-copy', text));
+    article.appendChild(heading);
   }
 
   function renderEntry(entry) {
     if (!validateEntry(entry)) return null;
     var article = _element('article', 'delegation-entry delegation-entry-' + entry.kind);
+    var tone = _toneForEntry(entry);
     article.setAttribute('data-delegation-sequence', String(entry.sequence));
     article.setAttribute('data-delegation-kind', entry.kind);
+    _applyTone(article, entry.state, tone);
 
     if (entry.kind === 'init') {
-      _entryHeading(article, 'Agent initialized');
+      _entryHeading(article, 'Agent initialized', tone);
       var initList = _element('dl', 'delegation-definition-list');
       _definition(initList, 'Client', entry.init.client ? entry.init.client.label : null);
       _definition(initList, 'Profile', entry.init.profileVersion);
@@ -349,7 +383,16 @@
         : null);
       article.appendChild(initList);
     } else if (entry.kind === 'tool-call') {
-      _entryHeading(article, 'Tool call');
+      _entryHeading(article, 'Tool call', tone);
+      var toolDetails = _element('details', 'delegation-tool-call-details');
+      var toolSummary = _element('summary', 'delegation-tool-call-summary');
+      toolSummary.appendChild(_semanticIcon(tone));
+      toolSummary.appendChild(_element(
+        'span',
+        'delegation-tool-call-summary-copy',
+        entry.tool.name + ' — ' + entry.tool.status
+      ));
+      toolDetails.appendChild(toolSummary);
       var toolList = _element('dl', 'delegation-definition-list');
       _definition(toolList, 'Name', entry.tool.name);
       _definition(toolList, 'Call id', entry.tool.callId, 'delegation-machine-value');
@@ -357,9 +400,10 @@
       _definition(toolList, 'Reported tab', entry.tool.tabId);
       _definition(toolList, 'Status', entry.tool.status);
       _definition(toolList, 'Duration', _duration(entry.tool.durationMs));
-      article.appendChild(toolList);
+      toolDetails.appendChild(toolList);
+      article.appendChild(toolDetails);
     } else if (entry.kind === 'retry') {
-      _entryHeading(article, 'Retrying');
+      _entryHeading(article, 'Retrying', tone);
       var retryList = _element('dl', 'delegation-definition-list');
       _definition(retryList, 'Class', entry.retry.class);
       _definition(retryList, 'Attempt', entry.retry.attempt);
@@ -367,7 +411,7 @@
       _definition(retryList, 'Delay', _duration(entry.retry.delayMs));
       article.appendChild(retryList);
     } else if (entry.kind === 'result') {
-      _entryHeading(article, 'Result');
+      _entryHeading(article, 'Result', tone);
       var resultList = _element('dl', 'delegation-definition-list delegation-result-grid');
       _definition(resultList, 'Outcome', entry.state);
       _definition(resultList, 'Input tokens', entry.metrics.inputTokens);
@@ -377,7 +421,7 @@
       _definition(resultList, 'Duration', _duration(entry.metrics.durationMs));
       article.appendChild(resultList);
     } else {
-      _entryHeading(article, entry.title || 'Agent activity');
+      _entryHeading(article, entry.title || 'Agent activity', tone);
       if (entry.detail !== null) article.appendChild(_element('p', 'delegation-entry-detail', entry.detail));
       article.appendChild(_element('p', 'delegation-entry-state', 'State: ' + entry.state));
     }
@@ -394,8 +438,10 @@
 
   function renderSummary(summary) {
     if (!_validSummary(summary) || summary === null) return null;
+    var tone = _toneForState(summary.state);
     var article = _element('article', 'delegation-summary');
-    _entryHeading(article, 'Run summary');
+    _applyTone(article, summary.state, tone);
+    _entryHeading(article, 'Run summary', tone);
     var list = _element('dl', 'delegation-summary-metrics delegation-result-grid');
     _definition(list, 'Input tokens', summary.inputTokens);
     _definition(list, 'Output tokens', summary.outputTokens);

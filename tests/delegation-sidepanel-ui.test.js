@@ -179,6 +179,16 @@ function findAll(root, tagName) {
   return found;
 }
 
+function findByClass(root, className) {
+  const found = [];
+  (function visit(node) {
+    const classes = String(node.className || '').split(/\s+/);
+    if (classes.includes(className)) found.push(node);
+    node.children.forEach(visit);
+  })(root);
+  return found;
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -254,7 +264,21 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert(!text.includes('presentation string that must not be parsed'),
     'typed cards do not parse or substitute presentation title data');
 
-  const details = findAll(container, 'details')[0];
+  const allDetails = findAll(container, 'details');
+  assert.equal(allDetails.length, 2,
+    'each tool call and the aggregate breakdown use native disclosures');
+  const toolDetails = findByClass(container, 'delegation-tool-call-details')[0];
+  const toolDisclosure = findAll(toolDetails, 'summary')[0];
+  assert.equal(toolDetails.open, false, 'tool call starts collapsed for scanability');
+  assert.equal(toolDisclosure.textContent, 'mcp__fsb__read_page — succeeded',
+    'collapsed tool disclosure names the call and canonical status');
+  assert(toolDetails.textContent.includes('call_fixture')
+      && toolDetails.textContent.includes('current tab')
+      && toolDetails.textContent.includes('42')
+      && toolDetails.textContent.includes('150 ms'),
+    'expanded tool body retains call id, arguments, tab, and duration');
+
+  const details = findByClass(container, 'delegation-tool-breakdown')[0];
   const disclosure = findAll(details, 'summary')[0];
   details.open = true;
   details.dispatch('toggle');
@@ -262,6 +286,20 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   details.open = false;
   details.dispatch('toggle');
   assert.equal(disclosure.textContent, 'Show tool-call breakdown');
+
+  findAll(container, 'i').forEach((icon) => {
+    assert.equal(icon.getAttribute('aria-hidden'), 'true',
+      'semantic icons are hidden from assistive technology beside explicit text');
+  });
+
+  const completedSummary = Feed.renderSummary(summary({ state: 'completed' }));
+  const failedSummary = Feed.renderSummary(summary({ state: 'failed' }));
+  const restartSummary = Feed.renderSummary(summary({ state: 'restart_lost' }));
+  assert.equal(completedSummary.getAttribute('data-delegation-tone'), 'success');
+  assert.equal(failedSummary.getAttribute('data-delegation-tone'), 'danger');
+  assert.equal(restartSummary.getAttribute('data-delegation-tone'), 'danger');
+  assert(completedSummary.className.includes('delegation-tone-success'));
+  assert(failedSummary.className.includes('delegation-tone-danger'));
 }
 
 {
@@ -274,7 +312,9 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert.equal(Feed.render(container, hostile, { hydrated: false }).ok, true);
   assert(container.textContent.includes('<img src=x onerror=globalThis.pwned=true>'));
   assert(container.textContent.includes('<svg onload=steal()>https://evil.invalid/?secret=1</svg>'));
-  const allNodes = findAll(container, 'article').concat(findAll(container, 'dd'));
+  const allNodes = findAll(container, 'article')
+    .concat(findAll(container, 'summary'))
+    .concat(findAll(container, 'dd'));
   allNodes.forEach((node) => {
     assert.equal(node.getAttribute('href'), null, 'event data never becomes href');
     assert.equal(node.getAttribute('src'), null, 'event data never becomes src');
@@ -350,6 +390,24 @@ assert(cssSource.includes('[data-theme="dark"] .delegation-state-card')
 assert(cssSource.includes('.delegation-action:focus-visible')
     && cssSource.includes('var(--fsb-focus-ring)'),
   'new actions have a visible token-backed focus ring');
+assert(cssSource.includes('[data-delegation-tone="success"]')
+    && cssSource.includes('[data-delegation-tone="warning"]')
+    && cssSource.includes('[data-delegation-tone="danger"]')
+    && cssSource.includes('border-left: 4px solid var(--fsb-success)')
+    && cssSource.includes('border-left: 4px solid var(--fsb-warning)')
+    && cssSource.includes('border-left: 4px solid var(--fsb-danger)'),
+  'closed state tones map to exact semantic color tokens');
+assert(!/\.delegation-entry-tool-call\s*\{[^}]*var\(--fsb-primary\)/s.test(cssSource),
+  'tool rows no longer spend the primary accent');
+assert(cssSource.includes('color: var(--fsb-text-inverse);'),
+  'primary delegation actions use the theme-aware inverse text token');
+const delegationCss = cssSource.slice(cssSource.indexOf('.delegation-run {'));
+assert(!/(?:gap|margin(?:-\w+)?|padding(?:-\w+)?)\s*:[^;]*(?:12px|18px)/.test(delegationCss),
+  'Phase 61 layout spacing excludes off-scale 12px and 18px values');
+assert(delegationCss.includes('var(--fsb-space-1)')
+    && delegationCss.includes('var(--fsb-space-2)')
+    && delegationCss.includes('var(--fsb-space-4)'),
+  'Phase 61 layout reuses the approved shared spacing tokens');
 assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation: none !important[\s\S]*?transition: none !important/.test(cssSource),
   'reduced-motion removes delegation animation and transition');
 
@@ -1069,6 +1127,10 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     [
       '_clearDelegationNode',
       '_delegationElement',
+      '_delegationToneForSnapshot',
+      '_delegationSemanticIcon',
+      '_delegationSemanticHeading',
+      '_applyDelegationSnapshotTone',
       '_delegationAction',
       '_renderDelegationInlineError',
       '_delegationStoppedHeading',
@@ -1090,6 +1152,10 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     const card = new TestNode('div');
 
     context._renderDelegationRunHeader(card, { ...base, connection: 'disconnected' });
+    assert.equal(card.getAttribute('data-delegation-state'), 'running');
+    assert.equal(card.getAttribute('data-delegation-tone'), 'danger');
+    assert(card.className.includes('delegation-tone-danger'));
+    assert.equal(findAll(card, 'i')[0].getAttribute('aria-hidden'), 'true');
     assert(card.textContent.includes('Agent connection lost'));
     assert(card.textContent.includes('FSB missed three replies from the local agent service. The run cannot continue safely.'));
     assert(card.textContent.includes('fsb-mcp-server doctor'));
@@ -1109,6 +1175,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert(card.textContent.includes('Start a new task'));
     assert(!card.textContent.includes('missed three replies'),
       'explicit restart disposition takes precedence over disconnected transport state');
+    assert.equal(card.getAttribute('data-delegation-tone'), 'danger');
 
     context._renderDelegationRunHeader(card, {
       ...base,
@@ -1117,6 +1184,22 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     });
     assert(card.textContent.includes('Agent stopped, 2 tabs released'));
     assert(card.textContent.includes('Start a new task'));
+    assert.equal(card.getAttribute('data-delegation-tone'), 'neutral');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'completed',
+      terminal: { code: 'completed', releasedTabCount: 0 }
+    });
+    assert.equal(card.getAttribute('data-delegation-tone'), 'success');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'held',
+      activeTab: { tabId: 42, owned: false, canTakeControl: false },
+      hold: { expiresAt: 10000, tabIds: [42] }
+    });
+    assert.equal(card.getAttribute('data-delegation-tone'), 'warning');
   }
 
   {
