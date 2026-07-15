@@ -179,6 +179,17 @@
     return null;
   }
 
+  function _firstEntryTimestamp(entries) {
+    return entries.length > 0 && Number.isSafeInteger(entries[0].timestamp)
+      ? entries[0].timestamp
+      : null;
+  }
+
+  function _lastEntryTimestamp(entries) {
+    var last = entries.length > 0 ? entries[entries.length - 1] : null;
+    return last && Number.isSafeInteger(last.timestamp) ? last.timestamp : null;
+  }
+
   function _normalizeSupervisorStatus(value) {
     if (!_hasExactKeys(value, ['active', 'generation', 'restartLosses'])
       || typeof value.generation !== 'string'
@@ -301,8 +312,8 @@
       wallTimer: null,
       silenceTimer: null,
       holdTimer: null,
-      startedAt: null,
-      lastEventAt: null,
+      startedAt: Number.isSafeInteger(options.startedAt) ? options.startedAt : null,
+      lastEventAt: Number.isSafeInteger(options.lastEventAt) ? options.lastEventAt : null,
       expectedRegistration: true
     };
   }
@@ -443,20 +454,33 @@
 
     function _armWallClock(record) {
       _clearTimer(record, 'wallTimer');
+      if (!Number.isSafeInteger(record.startedAt)) record.startedAt = now();
+      var delay = Math.max(0, record.startedAt + WALL_CLOCK_TIMEOUT_MS - now());
       record.wallTimer = _unrefTimer(schedule(function() {
         record.wallTimer = null;
         _queueTimeout(record, 'wall_clock_timeout');
-      }, WALL_CLOCK_TIMEOUT_MS));
+      }, delay));
     }
 
-    function _refreshSilence(record) {
+    function _armSilence(record) {
       _clearTimer(record, 'silenceTimer');
       if (record.terminalPromise || record.terminal || record.state === 'held') return;
-      record.lastEventAt = now();
+      if (!Number.isSafeInteger(record.lastEventAt)) {
+        record.lastEventAt = Number.isSafeInteger(record.startedAt) ? record.startedAt : now();
+      }
+      var delay = Math.max(0, record.lastEventAt + EVENT_SILENCE_TIMEOUT_MS - now());
       record.silenceTimer = _unrefTimer(schedule(function() {
         record.silenceTimer = null;
         _queueTimeout(record, 'event_silence_timeout');
-      }, EVENT_SILENCE_TIMEOUT_MS));
+      }, delay));
+    }
+
+    function _refreshSilence(record, timestamp) {
+      var observedAt = Number.isSafeInteger(timestamp) ? Math.min(timestamp, now()) : now();
+      if (!Number.isSafeInteger(record.lastEventAt) || observedAt > record.lastEventAt) {
+        record.lastEventAt = observedAt;
+      }
+      _armSilence(record);
     }
 
     function _armHoldExpiry(record, expiresAt) {
@@ -483,7 +507,7 @@
       if (!record.provider && entry.init && entry.init.client) {
         record.provider = _closedProvider(entry.init.client);
       }
-      if (options.refreshSilence !== false) _refreshSilence(record);
+      if (options.refreshSilence !== false) _refreshSilence(record, entry.timestamp);
       if (options.notify === false) return null;
       return _emit(record, entry.sequence);
     }
@@ -786,6 +810,8 @@
             connection: 'disconnected',
             entries: entries,
             summary: _latestSummary(entries),
+            startedAt: _firstEntryTimestamp(entries),
+            lastEventAt: _lastEntryTimestamp(entries),
             hydrated: true
           });
           if (registry && typeof registry.getAgentForDelegation === 'function') {
@@ -811,6 +837,8 @@
             }
           } catch (_generationReadError) { /* missing metadata means classification-pending */ }
           await _retainHeartbeatOnce(record);
+          _armWallClock(record);
+          if (record.state !== 'held') _armSilence(record);
         }));
         hydrated = true;
         return _deepFreeze(Array.from(records.values()).map(_snapshot));
@@ -863,7 +891,7 @@
       record.lastEventAt = record.startedAt;
       records.set(delegationId, record);
       _armWallClock(record);
-      _refreshSilence(record);
+      _refreshSilence(record, record.startedAt);
       provisional = null;
       var runtimeEvent = _emit(record, null);
       record.startPromise = _retainHeartbeatOnce(record).then(function() {
@@ -961,10 +989,6 @@
         var status = _normalizeSupervisorStatus(rawStatus);
         if (!status) {
           record.connection = connection || 'disconnected';
-          if (record.connection !== 'connected') {
-            _clearTimer(record, 'wallTimer');
-            _clearTimer(record, 'silenceTimer');
-          }
           return _emit(record, null);
         }
 
@@ -985,8 +1009,6 @@
 
         var priorGeneration = record.daemonGeneration;
         if (priorGeneration && priorGeneration !== status.generation) {
-          _clearTimer(record, 'wallTimer');
-          _clearTimer(record, 'silenceTimer');
           record.connection = 'disconnected';
           if (restartLoss && !active) {
             return _settle(record, 'daemon_restart_lost_run', { cancel: false });
@@ -995,8 +1017,6 @@
         }
         if (!priorGeneration) {
           if (!active) {
-            _clearTimer(record, 'wallTimer');
-            _clearTimer(record, 'silenceTimer');
             record.connection = 'disconnected';
             return _emit(record, null);
           }
@@ -1004,8 +1024,6 @@
         }
 
         if (!active) {
-          _clearTimer(record, 'wallTimer');
-          _clearTimer(record, 'silenceTimer');
           record.connection = 'disconnected';
           return _emit(record, null);
         }
@@ -1061,7 +1079,7 @@
           record.holdOwnedTabs = null;
           _clearTimer(record, 'holdTimer');
           if (record.wallTimer === null) _armWallClock(record);
-          if (record.silenceTimer === null) _refreshSilence(record);
+          if (record.silenceTimer === null) _armSilence(record);
         } else {
           _clearTimer(record, 'silenceTimer');
           if (record.wallTimer === null) _armWallClock(record);
@@ -1451,7 +1469,7 @@
           : null;
         var runningEntry = await _appendStateEntry(record, 'running', 'Delegation resumed');
         _applyEntry(record, runningEntry, { notify: false, refreshSilence: false });
-        _refreshSilence(record);
+        _refreshSilence(record, runningEntry.timestamp);
         return _closedOperationResult(true, 'resumed', record, _emit(record, runningEntry.sequence));
       });
       record.resumePromise = pendingResume;

@@ -918,6 +918,77 @@ function terminalState(code) {
     }
   });
 
+  await test('eviction and reconnect preserve absolute wall and silence deadlines', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const base = 1720000000000;
+      const wallId = 'delegation_absolute_wall_deadline';
+      await modules.store.appendBeforeFanout(wallId, fixtures.initEvent, {
+        timestamp: base,
+        state: 'running',
+        client: { id: 'claude-code', label: 'Claude Code' },
+      });
+      await modules.store.appendBeforeFanout(
+        wallId,
+        { type: 'state', sessionId: null, payload: {} },
+        { timestamp: base + 1, state: 'held', title: 'Delegation held', detail: null },
+      );
+
+      modules = freshModules();
+      const wakeClock = createFakeClock(base + (20 * 60 * 1000));
+      let harness = makeDeps(modules.store, { clock: wakeClock });
+      let controller = modules.controllerModule.create(harness.deps);
+      const wallRestored = await controller.hydrate();
+      assert.strictEqual(wallRestored[0].state, 'held');
+      await wakeClock.tick((25 * 60 * 1000) - 1);
+      assert.strictEqual(controller.getSnapshot(wallId).terminal, null,
+        'evicted run remains active until its original wall deadline');
+      await wakeClock.tick(1);
+      assert.deepStrictEqual(controller.getSnapshot(wallId).terminal, {
+        code: 'wall_clock_timeout',
+        releasedTabCount: 0,
+      });
+
+      const silenceId = 'delegation_absolute_silence_deadline';
+      await modules.store.appendBeforeFanout(silenceId, fixtures.initEvent, {
+        timestamp: base + 3000000,
+        state: 'running',
+        client: { id: 'claude-code', label: 'Claude Code' },
+      });
+      modules = freshModules();
+      const silenceBase = base + 3000000;
+      const reconnectClock = createFakeClock(silenceBase + 60000);
+      const generation = 'generation_absolute_deadline_61';
+      harness = makeRecoveryDeps(modules.store, {
+        overrides: { clock: reconnectClock },
+      });
+      controller = modules.controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const live = supervisorStatus(generation, [{ delegationId: silenceId, state: 'running' }]);
+      await controller.reconcile({ delegationId: silenceId, connection: 'connected', status: live });
+      await reconnectClock.tick(30000);
+      await controller.reconcile({ delegationId: silenceId, connection: 'disconnected' });
+      await controller.reconcile({ delegationId: silenceId, connection: 'connected', status: live });
+      await reconnectClock.tick(29999);
+      assert.strictEqual(controller.getSnapshot(silenceId).terminal, null,
+        'disconnect and reconnect cannot mint a fresh silence budget');
+      await controller.reconcile({ delegationId: silenceId, connection: 'disconnected' });
+      await controller.reconcile({ delegationId: silenceId, connection: 'connected', status: live });
+      await reconnectClock.tick(1);
+      assert.deepStrictEqual(controller.getSnapshot(silenceId).terminal, {
+        code: 'event_silence_timeout',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        harness.calls.cancel.filter((call) => call.delegationId === silenceId).length,
+        1,
+      );
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('simultaneous delegations keep interleaved events timers and Stop isolated', async () => {
     const storage = installSessionStorage();
     try {
