@@ -50,7 +50,7 @@ test('derives a spreadsheet ID only from the active Google Sheets URL', async ()
   assert.deepEqual(calls, [{ method: 'getSpreadsheet', params: { spreadsheetId: ID } }]);
 
   const wrongOrigin = await handlers['gsheets.get_spreadsheet'].handle({}, context([], `https://evil.example/spreadsheets/d/${ID}/edit`));
-  assert.equal(wrongOrigin.code, 'GOOGLE_SHEETS_SPREADSHEET_REQUIRED');
+  assert.equal(wrongOrigin.code, 'GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED');
 });
 
 test('routes read operations to exactly one narrow client method', async () => {
@@ -86,10 +86,10 @@ test('write and destructive operations are runtime guarded until live UAT activa
   }
 });
 
-test('explicit spreadsheet ID wins and arbitrary transport fields are never forwarded', async () => {
+test('matching explicit spreadsheet ID is accepted and arbitrary transport fields are never forwarded', async () => {
   const calls = [];
   await handlers['gsheets.get_values'].handle({
-    spreadsheetId: 'explicitSpreadsheetId1234567890',
+    spreadsheetId: ID,
     range: 'A1',
     url: 'https://attacker.example',
     method: 'DELETE',
@@ -97,17 +97,23 @@ test('explicit spreadsheet ID wins and arbitrary transport fields are never forw
     token: 'secret'
   }, context(calls));
   assert.deepEqual(calls[0].params, {
-    spreadsheetId: 'explicitSpreadsheetId1234567890',
+    spreadsheetId: ID,
     range: 'A1',
     majorDimension: undefined,
     valueRenderOption: undefined,
     dateTimeRenderOption: undefined
   });
+
+  const mismatch = await handlers['gsheets.get_values'].handle({
+    spreadsheetId: 'explicitSpreadsheetId1234567890',
+    range: 'A1'
+  }, context([]));
+  assert.equal(mismatch.code, 'GOOGLE_SHEETS_TARGET_MISMATCH');
 });
 
-test('fails closed when the API facade or spreadsheet target is unavailable', async () => {
+test('fails closed when the session facade or active spreadsheet target is unavailable', async () => {
   const noClient = await handlers['gsheets.get_values'].handle({ spreadsheetId: ID, range: 'A1' }, {});
   const noTarget = await handlers['gsheets.get_values'].handle({ range: 'A1' }, { googleSheets: { getValues() {} } });
-  assert.equal(noClient.code, 'GOOGLE_SHEETS_API_UNAVAILABLE');
-  assert.equal(noTarget.code, 'GOOGLE_SHEETS_SPREADSHEET_REQUIRED');
+  assert.equal(noClient.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(noTarget.code, 'GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED');
 });

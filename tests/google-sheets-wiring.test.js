@@ -18,26 +18,27 @@ function read(relative) {
   return fs.readFileSync(path.join(ROOT, relative), 'utf8');
 }
 
-test('manifest and background wire fail-closed Sheets OAuth and handler modules', () => {
+test('manifest and background wire the signed-in Sheets session without OAuth surfaces', () => {
   const manifest = JSON.parse(read('extension/manifest.json'));
-  assert.ok(manifest.permissions.includes('identity'));
-  assert.ok(manifest.permissions.includes('identity.email'));
-  assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/spreadsheets']);
-  assert.match(manifest.oauth2.client_id, /^REPLACE_/);
+  assert.equal(manifest.permissions.includes('identity'), false);
+  assert.equal(manifest.permissions.includes('identity.email'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(manifest, 'oauth2'), false);
 
   const background = read('extension/background.js');
-  assert.match(background, /importScripts\('utils\/google-sheets-api\.js'\)/);
+  assert.match(background, /importScripts\('utils\/google-sheets-session\.js'\)/);
   assert.match(background, /importScripts\('catalog\/handlers\/gsheets\.js'\)/);
-  assert.match(background, /case 'google-sheets:connect'/);
-  assert.match(background, /!sender\.tab/);
-  assert.match(background, /getURL\('ui\/control_panel\.html'\)/);
+  assert.doesNotMatch(background, /google-sheets:(?:connect|disconnect|get-status)/);
+  assert.doesNotMatch(read('extension/ui/control_panel.html'), /googleSheetsConnectBtn|googleSheetsDisconnectBtn|googleSheetsConnectionCard/);
+  assert.doesNotMatch(read('extension/ui/options.js'), /connectGoogleSheets|disconnectGoogleSheets|refreshGoogleSheetsStatus/);
 });
 
 test('router exposes only the five-operation Sheets facade to handlers', () => {
   const router = read('extension/utils/capability-router.js');
-  assert.match(router, /googleSheets: _googleSheetsContext\(\)/);
-  const contextBody = router.match(/function _googleSheetsContext\(\) \{([\s\S]*?)\n  \}/);
+  assert.match(router, /googleSheets: _googleSheetsContext\(ctx\)/);
+  const contextBody = router.match(/function _googleSheetsContext\(ctx\) \{([\s\S]*?)\n  \}/);
   assert.ok(contextBody);
+  assert.match(contextBody[1], /FsbGoogleSheetsSession/);
+  assert.match(contextBody[1], /tabId: ctx && ctx\.tabId/);
   for (const method of ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues']) {
     assert.ok(contextBody[1].includes(`'${method}'`));
   }
@@ -75,6 +76,7 @@ test('canonical and packaged handler copies match and catalog seeds every slug',
     const entry = catalog.resolve(slug, 'https://docs.google.com');
     assert.ok(entry);
     assert.equal(entry.tier, 'T1a');
+    assert.equal(entry.handler.rotClassifiable, false);
     assert.equal(typeof entry.handler.handle, 'function');
   }
 });

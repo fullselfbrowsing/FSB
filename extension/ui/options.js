@@ -145,9 +145,6 @@ function initializeDashboard() {
   // Setup event listeners
   setupEventListeners();
 
-  // Check cached Sheets authorization without opening an OAuth prompt.
-  refreshGoogleSheetsStatus();
-
   // Wire up minus/value/plus numeric steppers
   initFsbSteppers();
 
@@ -269,11 +266,6 @@ function cacheElements() {
 
   // API Status Card
   elements.apiStatusCard = document.getElementById('apiStatusCard');
-  elements.googleSheetsStatusCard = document.getElementById('googleSheetsStatusCard');
-  elements.googleSheetsStatus = document.getElementById('googleSheetsStatus');
-  elements.googleSheetsStatusDetail = document.getElementById('googleSheetsStatusDetail');
-  elements.googleSheetsConnectBtn = document.getElementById('googleSheetsConnectBtn');
-  elements.googleSheetsDisconnectBtn = document.getElementById('googleSheetsDisconnectBtn');
   
   // Logs
   elements.logsDisplay = document.getElementById('logsDisplay');
@@ -744,13 +736,6 @@ function setupEventListeners() {
     elements.fullApiTest.addEventListener('click', runFullApiTest);
   }
 
-  if (elements.googleSheetsConnectBtn) {
-    elements.googleSheetsConnectBtn.addEventListener('click', connectGoogleSheets);
-  }
-  if (elements.googleSheetsDisconnectBtn) {
-    elements.googleSheetsDisconnectBtn.addEventListener('click', disconnectGoogleSheets);
-  }
-  
   // Save bar
   if (elements.saveBtn) {
     elements.saveBtn.addEventListener('click', saveSettings);
@@ -1881,77 +1866,6 @@ function updateApiStatusCard(status, title, detail) {
 
     if (titleElement) titleElement.textContent = title;
     if (detailElement) detailElement.textContent = detail;
-  }
-}
-
-function renderGoogleSheetsStatus(result) {
-  const connected = !!(result && result.connected === true);
-  const configured = !!(result && result.configured === true);
-  const cardState = connected ? 'connected' : (configured ? 'disconnected' : 'error');
-  const title = connected
-    ? `Connected${result.email ? ` as ${result.email}` : ''}`
-    : (configured ? 'Not connected' : 'OAuth setup required');
-  const detail = connected
-    ? 'Sheets capabilities use cached authorization without prompting.'
-    : (configured
-      ? 'Click Connect to authorize Google Sheets.'
-      : ((result && result.message) || (result && result.error) || 'A release owner must configure the Chrome OAuth client ID.'));
-
-  if (elements.googleSheetsStatusCard) {
-    elements.googleSheetsStatusCard.className = `api-status-card ${cardState}`;
-    const icon = elements.googleSheetsStatusCard.querySelector('.status-icon i');
-    if (icon) {
-      icon.className = connected ? 'fas fa-check-circle' : (configured ? 'fas fa-circle-minus' : 'fas fa-triangle-exclamation');
-    }
-  }
-  if (elements.googleSheetsStatus) elements.googleSheetsStatus.textContent = title;
-  if (elements.googleSheetsStatusDetail) elements.googleSheetsStatusDetail.textContent = detail;
-  if (elements.googleSheetsConnectBtn) {
-    elements.googleSheetsConnectBtn.hidden = connected;
-    elements.googleSheetsConnectBtn.disabled = !configured;
-  }
-  if (elements.googleSheetsDisconnectBtn) elements.googleSheetsDisconnectBtn.hidden = !connected;
-}
-
-async function refreshGoogleSheetsStatus() {
-  try {
-    const result = await chrome.runtime.sendMessage({ action: 'google-sheets:get-status' });
-    renderGoogleSheetsStatus(result || { configured: false, connected: false });
-  } catch (_error) {
-    renderGoogleSheetsStatus({ configured: false, connected: false, error: 'Google Sheets status is unavailable.' });
-  }
-}
-
-async function connectGoogleSheets() {
-  if (!elements.googleSheetsConnectBtn || elements.googleSheetsConnectBtn.disabled) return;
-  elements.googleSheetsConnectBtn.disabled = true;
-  try {
-    const result = await chrome.runtime.sendMessage({
-      action: 'google-sheets:connect',
-      userInitiated: true
-    });
-    renderGoogleSheetsStatus(result || { configured: true, connected: false });
-    showToast(result && result.connected ? 'Google Sheets connected' : ((result && result.error) || 'Google Sheets authorization failed'), result && result.connected ? 'success' : 'error');
-  } catch (_error) {
-    showToast('Google Sheets authorization failed', 'error');
-    await refreshGoogleSheetsStatus();
-  }
-}
-
-async function disconnectGoogleSheets() {
-  if (!elements.googleSheetsDisconnectBtn) return;
-  elements.googleSheetsDisconnectBtn.disabled = true;
-  try {
-    const result = await chrome.runtime.sendMessage({
-      action: 'google-sheets:disconnect',
-      userInitiated: true
-    });
-    renderGoogleSheetsStatus(result || { configured: true, connected: false });
-    showToast(result && result.success ? 'Google Sheets disconnected' : 'Could not disconnect Google Sheets', result && result.success ? 'success' : 'error');
-  } catch (_error) {
-    showToast('Could not disconnect Google Sheets', 'error');
-  } finally {
-    elements.googleSheetsDisconnectBtn.disabled = false;
   }
 }
 

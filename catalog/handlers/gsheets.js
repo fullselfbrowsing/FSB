@@ -16,7 +16,7 @@
   var ID = {
     type: 'string',
     pattern: ID_PATTERN,
-    description: 'Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab.'
+    description: 'Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab.'
   };
   var RANGE = { type: 'string', minLength: 1, maxLength: 500, description: 'A1 notation range.' };
   var VALUES = {
@@ -62,8 +62,14 @@
   }, ['range', 'values']);
   var CLEAR_VALUES_PARAMS = schema({ spreadsheetId: ID, range: RANGE }, ['range']);
 
-  function typedError(code) {
-    return { success: false, code: code, errorCode: code, error: code };
+  function typedError(code, extra) {
+    var out = { success: false, code: code, errorCode: code, error: code };
+    if (extra) {
+      for (var key in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, key)) { out[key] = extra[key]; }
+      }
+    }
+    return out;
   }
 
   function guarded(slug, sideEffectClass, params) {
@@ -71,6 +77,7 @@
       tier: 'T1a',
       origin: ORIGIN,
       sideEffectClass: sideEffectClass,
+      rotClassifiable: false,
       params: params,
       async handle() {
         return {
@@ -100,30 +107,36 @@
   }
 
   function resolveSpreadsheetId(args, ctx) {
+    var active = spreadsheetIdFromUrl(ctx);
+    if (!active) { return typedError('GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED'); }
     var explicit = args && args.spreadsheetId;
     if (explicit !== undefined && explicit !== null && explicit !== '') {
-      return typeof explicit === 'string' && ID_RE.test(explicit) ? explicit : '';
+      if (typeof explicit !== 'string' || !ID_RE.test(explicit) || explicit !== active) {
+        return typedError('GOOGLE_SHEETS_TARGET_MISMATCH');
+      }
     }
-    return spreadsheetIdFromUrl(ctx);
+    return { success: true, spreadsheetId: active };
   }
 
   async function call(method, args, ctx, buildParams) {
     var client = ctx && ctx.googleSheets;
     if (!client || typeof client[method] !== 'function') {
-      return typedError('GOOGLE_SHEETS_API_UNAVAILABLE');
+      return typedError('GOOGLE_SHEETS_SESSION_UNAVAILABLE');
     }
-    var spreadsheetId = resolveSpreadsheetId(args, ctx);
-    if (!spreadsheetId) { return typedError('GOOGLE_SHEETS_SPREADSHEET_REQUIRED'); }
+    var target = resolveSpreadsheetId(args, ctx);
+    if (!target.success) { return target; }
     try {
-      return await client[method](buildParams(spreadsheetId, args || {}));
+      return await client[method](buildParams(target.spreadsheetId, args || {}));
     } catch (_e) {
-      return typedError('GOOGLE_SHEETS_API_ERROR');
+      return typedError(method === 'getSpreadsheet' || method === 'getValues'
+        ? 'GOOGLE_SHEETS_SESSION_UNAVAILABLE'
+        : 'RECOVERY_AMBIGUOUS');
     }
   }
 
   var handlers = {
     'gsheets.get_spreadsheet': {
-      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'read', params: GET_SPREADSHEET_PARAMS,
+      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'read', rotClassifiable: false, params: GET_SPREADSHEET_PARAMS,
       handle: function (args, ctx) {
         return call('getSpreadsheet', args, ctx, function (spreadsheetId) {
           return { spreadsheetId: spreadsheetId };
@@ -131,7 +144,7 @@
       }
     },
     'gsheets.get_values': {
-      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'read', params: GET_VALUES_PARAMS,
+      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'read', rotClassifiable: false, params: GET_VALUES_PARAMS,
       handle: function (args, ctx) {
         return call('getValues', args, ctx, function (spreadsheetId, input) {
           return {
