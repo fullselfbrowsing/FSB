@@ -227,6 +227,13 @@ function buildClientHarness(options = {}) {
   if (options.installLifecycleBus) {
     context.fsbAutomationLifecycleBus = new EventTarget();
   }
+  if (Array.isArray(options.delegationMappings)) {
+    context.fsbAgentRegistryInstance = {
+      listDelegationMappings() {
+        return options.delegationMappings.map((row) => ({ ...row }));
+      },
+    };
+  }
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   const footer = `
@@ -246,6 +253,11 @@ this.__phase198 = {
 };
 `;
   vm.runInNewContext(`${source}\n${footer}`, context, { filename: 'ws/mcp-bridge-client.js' });
+
+  if (options.inboundAuthorityReady !== false) {
+    context.__phase198.mcpBridgeClient.setInboundAuthorityReady(true);
+    context.__phase198.mcpBridgeClient.setDelegationAuthorityReady(true);
+  }
 
   return {
     chrome,
@@ -318,6 +330,83 @@ async function runServiceWorkerWakeCase() {
   assert(typeof sessionState?.wakeCount === 'number' && sessionState.wakeCount >= 2, 'recordWake updates wakeCount');
   assertEqual(harness.chrome.storage.local._dump().mcpBridgeState, undefined, 'wake state does not write chrome.storage.local._dump().mcpBridgeState');
   assertNoSecrets(sessionState, 'wake state omits password, cardNumber, cvv, and apiKey fields');
+}
+
+async function runInboundAuthorityReadinessCase() {
+  console.log('\n--- cold-boot inbound authority readiness ---');
+
+  let dispatchCalls = 0;
+  const harness = buildClientHarness({
+    inboundAuthorityReady: false,
+    delegationMappings: [{
+      delegationId: 'delegation_cold_boot_authority_6108',
+      agentId: 'agent_persisted_before_wake',
+    }],
+    dispatchMcpMessageRoute: async () => {
+      dispatchCalls += 1;
+      return { accepted: true };
+    },
+  });
+  const client = harness.exports.mcpBridgeClient;
+  assertEqual(client.isInboundAuthorityReady(), false,
+    'production bridge authority starts closed before combined hydration');
+  let rejected = null;
+  try {
+    await client._routeMessage('agent:status', {
+      agentId: 'agent_persisted_before_wake',
+      ownershipToken: 'persisted-token-before-wake',
+    }, 'cold-boot-old-credential');
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'mcp_authority_not_ready',
+    'old persisted credentials receive the bounded cold-boot rejection');
+  assertEqual(dispatchCalls, 0,
+    'closed readiness rejects before the MCP dispatcher can read restored authority');
+
+  assertEqual(client.setInboundAuthorityReady(true), true,
+    'persisted structural hydration explicitly opens ordinary inbound authority');
+  rejected = null;
+  try {
+    await client._routeMessage('agent:status', {
+      agentId: 'agent_persisted_before_wake',
+      ownershipToken: 'persisted-token-before-wake',
+    }, 'mapped-before-status-reconcile');
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'delegation_authority_not_ready',
+    'a registry-mapped agent remains fenced until daemon status reconciliation');
+  rejected = null;
+  try {
+    await client._routeMessage('agent:register', {
+      delegationId: 'delegation_cold_boot_authority_6108',
+      clientInfo: { name: 'Claude Code' },
+    }, 'delegated-registration-before-status-reconcile');
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'delegation_authority_not_ready',
+    'a delegation-sidecar registration remains fenced before status reconciliation');
+  const ordinary = await client._routeMessage('agent:status', {
+    agentId: 'agent_unrelated_after_wake',
+    ownershipToken: 'ordinary-token-after-wake',
+  }, 'ordinary-post-hydration-credential');
+  assertDeepEqual(toPlainObject(ordinary), { accepted: true },
+    'an unrelated agent remains compatible while delegation reconciliation is pending');
+  assertEqual(dispatchCalls, 1,
+    'only the unrelated agent reaches dispatch while the delegation fence is closed');
+
+  assertEqual(client.setDelegationAuthorityReady(true), true,
+    'daemon status reconciliation explicitly opens delegation-scoped authority');
+  const accepted = await client._routeMessage('agent:status', {
+    agentId: 'agent_persisted_before_wake',
+    ownershipToken: 'persisted-token-before-wake',
+  }, 'post-hydration-credential');
+  assertDeepEqual(toPlainObject(accepted), { accepted: true },
+    'the same route reaches dispatch only after readiness opens');
+  assertEqual(dispatchCalls, 2,
+    'delegation readiness adds exactly one mapped-agent dispatcher call');
 }
 
 async function runConnectedTransitionCase() {
@@ -589,6 +678,14 @@ function runBackgroundArmingSourceCase() {
   for (const snippet of requiredSnippets) {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
   }
+
+  const armStart = backgroundSource.indexOf('function armMcpBridge(reason) {');
+  const armEnd = backgroundSource.indexOf("\n\narmMcpBridge('service-worker-evaluated')", armStart);
+  const armSource = backgroundSource.slice(armStart, armEnd);
+  assert(armSource.includes('mcpBridgeClient.connect()'),
+    'cold wake still connects the bridge so daemon status can reconcile');
+  assert(!armSource.includes('isInboundAuthorityReady'),
+    'socket arming is independent from the inbound command authority gate');
 
   const visualSessionSnippets = [
     "const MCP_VISUAL_SESSION_STORAGE_KEY = 'fsbMcpVisualSessions'",
@@ -1221,6 +1318,7 @@ async function runDelegationHeartbeatCases() {
 async function run() {
   await runBrowserFirstReconnectCase();
   await runServiceWorkerWakeCase();
+  await runInboundAuthorityReadinessCase();
   await runConnectedTransitionCase();
   await runAutomationRuntimeEventShapeCase();
   await runAutomationLifecycleBusCase();

@@ -151,9 +151,15 @@ function makeDeps(store, overrides = {}) {
     registry: {
       bindDelegation() { calls.registry.push('bind'); },
       hydrate() { calls.registry.push('hydrate'); },
+      getAgentForDelegation() { return null; },
+      listDelegationMappings() { return []; },
+      getDelegationReleaseReceipt() { return null; },
     },
     ...overrides,
   };
+  if (deps.registry && typeof deps.registry.listDelegationMappings !== 'function') {
+    deps.registry.listDelegationMappings = () => [];
+  }
   return { deps, calls };
 }
 
@@ -392,6 +398,31 @@ function terminalState(code) {
     }
   });
 
+  await test('prototype-named connection inputs remain outside the closed state machine', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const controller = controllerModule.create(makeDeps(store).deps);
+      await controller.hydrate();
+      const id = 'delegation_prototype_connection_6104';
+      const started = await controller.start({
+        delegationId: id,
+        connection: 'constructor',
+      });
+      assert.strictEqual(started.snapshot.connection, 'connected',
+        'prototype property names cannot enter the start connection enum');
+      const reconciled = await controller.reconcile({
+        delegationId: id,
+        connection: '__proto__',
+        status: null,
+      });
+      assert.strictEqual(reconciled.snapshot.connection, 'disconnected',
+        'prototype property names cannot bypass disconnected reconciliation');
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('worker eviction after start commit restores the run before provider activity', async () => {
     const storage = installSessionStorage();
     try {
@@ -507,8 +538,18 @@ function terminalState(code) {
       const id = 'delegation_persistence_release_retry';
       let releaseAttempts = 0;
       let cancelAttempts = 0;
+      let registryMapped = false;
       const registry = {
-        async bindDelegation() { return { ok: true }; },
+        async bindDelegation() { registryMapped = true; return { ok: true }; },
+        getAgentForDelegation(delegationId) {
+          return registryMapped && delegationId === id ? 'agent-persistence-retry' : null;
+        },
+        listDelegationMappings() {
+          return registryMapped
+            ? [{ delegationId: id, agentId: 'agent-persistence-retry' }]
+            : [];
+        },
+        getDelegationReleaseReceipt() { return null; },
         async releaseDelegation() {
           releaseAttempts += 1;
           if (releaseAttempts === 1) {
@@ -807,11 +848,26 @@ function terminalState(code) {
     const storage = installSessionStorage();
     try {
       let modules = freshModules();
-      let harness = makeDeps(modules.store);
+      let mappedAgentId = null;
+      const registry = {
+        async bindDelegation(input) {
+          mappedAgentId = input.agentId;
+          return { ok: true };
+        },
+        getAgentForDelegation() { return mappedAgentId; },
+        listDelegationMappings() {
+          return mappedAgentId
+            ? [{ delegationId: fixtures.baseContext.delegationId, agentId: mappedAgentId }]
+            : [];
+        },
+        getDelegationReleaseReceipt() { return null; },
+      };
+      let harness = makeDeps(modules.store, { registry });
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
       await controller.start({ delegationId: id });
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-reload-proof' });
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       await controller.acceptEvent(eventInput(id, fixtures.toolUseEvent, {
         ...fixtures.baseContext,
@@ -819,7 +875,7 @@ function terminalState(code) {
       }));
 
       modules = freshModules();
-      harness = makeDeps(modules.store);
+      harness = makeDeps(modules.store, { registry });
       controller = modules.controllerModule.create(harness.deps);
       const restored = await controller.hydrate();
       assert.strictEqual(restored.length, 1);
@@ -1270,7 +1326,18 @@ function terminalState(code) {
 
       modules = freshModules();
       const wakeClock = createFakeClock(base + (20 * 60 * 1000));
-      let harness = makeDeps(modules.store, { clock: wakeClock });
+      let harness = makeDeps(modules.store, {
+        clock: wakeClock,
+        registry: {
+          getAgentForDelegation(delegationId) {
+            return delegationId === wallId ? 'agent-wall-deadline' : null;
+          },
+          listDelegationMappings() {
+            return [{ delegationId: wallId, agentId: 'agent-wall-deadline' }];
+          },
+          getDelegationReleaseReceipt() { return null; },
+        },
+      });
       let controller = modules.controllerModule.create(harness.deps);
       const wallRestored = await controller.hydrate();
       assert.strictEqual(wallRestored[0].state, 'held');
@@ -1502,13 +1569,22 @@ function terminalState(code) {
       const { store, controllerModule } = freshModules();
       let activeTabId = 71;
       let mappedAgentId = 'agent-active-tab-authority';
+      let mappedDelegationId = null;
       let ownedTabs = [
         { tabId: 71, ownershipToken: 'token-71' },
         { tabId: 72, ownershipToken: 'token-72' },
       ];
       const registry = {
-        async bindDelegation() { return { ok: true }; },
+        async bindDelegation(input) {
+          mappedDelegationId = input.delegationId;
+          return { ok: true };
+        },
         getAgentForDelegation() { return mappedAgentId; },
+        listDelegationMappings() {
+          return mappedDelegationId && mappedAgentId
+            ? [{ delegationId: mappedDelegationId, agentId: mappedAgentId }]
+            : [];
+        },
         getDelegationOwnedTabs(input) {
           exactKeys(input, ['agentId', 'delegationId']);
           assert.strictEqual(input.agentId, mappedAgentId);
@@ -1754,8 +1830,23 @@ function terminalState(code) {
       let { store, controllerModule } = freshModules();
       let cancelCalls = 0;
       let releaseCalls = 0;
+      let stopRegistryMapped = false;
       const registry = {
-        async bindDelegation() { return { ok: true }; },
+        async bindDelegation() { stopRegistryMapped = true; return { ok: true }; },
+        getAgentForDelegation(delegationId) {
+          return stopRegistryMapped && delegationId === 'delegation_tree_unsettled_stop'
+            ? 'agent-tree-unsettled'
+            : null;
+        },
+        listDelegationMappings() {
+          return stopRegistryMapped
+            ? [{
+              delegationId: 'delegation_tree_unsettled_stop',
+              agentId: 'agent-tree-unsettled',
+            }]
+            : [];
+        },
+        getDelegationReleaseReceipt() { return null; },
         async releaseDelegation() {
           releaseCalls += 1;
           return { ok: true, releasedTabCount: 1 };
@@ -2442,6 +2533,9 @@ function terminalState(code) {
       ];
       const registry = {
         getAgentForDelegation(delegationId) { return agentIds.get(delegationId) || null; },
+        listDelegationMappings() {
+          return Array.from(agentIds, ([delegationId, agentId]) => ({ delegationId, agentId }));
+        },
         getDelegationHoldLease({ delegationId }) {
           if (delegationId !== exactId) {
             return { ok: false, code: 'resume_ownership_lost' };
@@ -2511,6 +2605,151 @@ function terminalState(code) {
 
       await acceptSuccessfulFinal(controller, exactId, 1720000001000);
       assert.deepStrictEqual(released, [mismatchId, exactId]);
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('wake rejects persisted tab activity without exact registry authority', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const id = 'delegation_wake_missing_registry_authority';
+      await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+        timestamp: 1720000000000,
+        state: 'running',
+        client: { id: 'claude-code', label: 'Claude Code' },
+      });
+      await modules.store.appendBeforeFanout(id, fixtures.toolUseEvent, {
+        timestamp: 1720000000001,
+        state: 'running',
+        toolName: 'mcp__fsb__navigate',
+        tabId: 71,
+      });
+
+      modules = freshModules();
+      const registry = {
+        getAgentForDelegation() { return null; },
+        listDelegationMappings() { return []; },
+        getDelegationReleaseReceipt() { return null; },
+      };
+      const harness = makeRecoveryDeps(modules.store, {
+        overrides: { registry },
+      });
+      const controller = modules.controllerModule.create(harness.deps);
+      await assert.rejects(
+        controller.hydrate(),
+        (error) => error && error.code === 'delegation_binding_rejected',
+        'tab-bearing ledger cannot hydrate after its exact registry mapping disappears',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [],
+        'rejected authority evidence never retains a heartbeat or starts reconciliation');
+
+      const missingHarness = makeRecoveryDeps(modules.store);
+      missingHarness.deps.registry = {};
+      const missingController = modules.controllerModule.create(missingHarness.deps);
+      await assert.rejects(
+        missingController.hydrate(),
+        (error) => error && error.code === 'delegation_binding_rejected',
+        'nonterminal hydration rejects when the registry read authority is unavailable',
+      );
+      assert.deepStrictEqual(missingHarness.recoveryCalls.retainHeartbeat, [],
+        'missing registry authority installs no recovered heartbeat owner');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('every active registry mapping requires one addressable nonterminal ledger', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const missingId = 'delegation_missing_ledger_6104';
+      let registry = {
+        listDelegationMappings() {
+          return [{ delegationId: missingId, agentId: 'agent-missing-ledger' }];
+        },
+        getDelegationReleaseReceipt() { return null; },
+      };
+      let harness = makeRecoveryDeps(modules.store, { overrides: { registry } });
+      let controller = modules.controllerModule.create(harness.deps);
+      await assert.rejects(
+        controller.hydrate(),
+        (error) => error && error.code === 'delegation_binding_rejected',
+        'a registry mapping cannot survive without a nonterminal ledger',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, []);
+
+      const terminalId = 'delegation_terminal_mapping_6104';
+      const seed = await seedRunningLedger(modules.store, modules.controllerModule, terminalId);
+      await acceptSuccessfulFinal(seed, terminalId, 1720000001000);
+      modules = freshModules();
+      registry = {
+        listDelegationMappings() {
+          return [{ delegationId: terminalId, agentId: 'agent-terminal-mapping' }];
+        },
+        getDelegationReleaseReceipt() { return null; },
+      };
+      harness = makeRecoveryDeps(modules.store, { overrides: { registry } });
+      controller = modules.controllerModule.create(harness.deps);
+      await assert.rejects(
+        controller.hydrate(),
+        (error) => error && error.code === 'delegation_binding_rejected',
+        'a terminal ledger cannot conceal a still-active registry mapping',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, []);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('hydrate rejects persisted ledger ids outside the live server-id grammar', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      await modules.store.appendBeforeFanout('bad.id', fixtures.initEvent, {
+        timestamp: 1720000000000,
+        state: 'running',
+        client: { id: 'claude-code', label: 'Claude Code' },
+      });
+      modules = freshModules();
+      const harness = makeRecoveryDeps(modules.store);
+      const controller = modules.controllerModule.create(harness.deps);
+      await assert.rejects(
+        controller.hydrate(),
+        (error) => error && error.code === 'delegation_ledger_corrupt',
+        'unaddressable persisted identity fails before timers or heartbeats',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, []);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('hydrate rejects more persisted active ledgers than the runtime can own', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      for (let index = 0; index < 65; index += 1) {
+        const id = `delegation_hydration_cap_${String(index).padStart(2, '0')}`;
+        await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+          timestamp: 1720000000000 + index,
+          state: 'running',
+          client: { id: 'claude-code', label: 'Claude Code' },
+        });
+      }
+
+      modules = freshModules();
+      const harness = makeRecoveryDeps(modules.store);
+      const controller = modules.controllerModule.create(harness.deps);
+      await assert.rejects(
+        controller.hydrate(),
+        (error) => error && error.code === 'delegation_ledger_corrupt',
+        'a persisted 65-ledger set fails before allocating active controller state',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [],
+        'over-limit hydration retains no heartbeat owners');
       assert.strictEqual(harness.heartbeatOwners.size, 0);
     } finally {
       storage.restore();

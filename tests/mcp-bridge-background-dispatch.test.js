@@ -62,6 +62,20 @@ function assertNoSecrets(value, msg) {
   assert(!/password|cardNumber|cvv|apiKey/i.test(serialized), msg);
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks() {
+  for (let index = 0; index < 20; index += 1) await Promise.resolve();
+}
+
 function createStorageArea(initial = {}) {
   const store = { ...initial };
   return {
@@ -246,6 +260,10 @@ this.__dispatchTest = {
 };
 `;
   vm.runInNewContext(`${source}\n${footer}`, context, { filename: 'ws/mcp-bridge-client.js' });
+  if (options.inboundAuthorityReady !== false) {
+    context.__dispatchTest.mcpBridgeClient.setInboundAuthorityReady(true);
+    context.__dispatchTest.mcpBridgeClient.setDelegationAuthorityReady(true);
+  }
 
   return {
     chrome,
@@ -423,6 +441,8 @@ function buildDelegationCommandHarness(options = {}) {
   const source = extractDelegationCompositionSource(backgroundSource);
   const preflight = require(path.join(__dirname, '..', 'extension', 'utils', 'delegation-preflight.js'));
   const calls = [];
+  let inboundAuthorityReady = true;
+  let delegationAuthorityReady = true;
   const providerConfig = {
     providerKind: 'agent',
     agentProviderId: 'claude-code',
@@ -464,6 +484,18 @@ function buildDelegationCommandHarness(options = {}) {
     fsbAgentRegistryInstance: null,
     bootstrapAgentRegistry: async () => {},
     mcpBridgeClient: {
+      setInboundAuthorityReady(value) {
+        inboundAuthorityReady = value === true;
+        calls.push(['setInboundAuthorityReady', inboundAuthorityReady]);
+        return inboundAuthorityReady;
+      },
+      isInboundAuthorityReady() { return inboundAuthorityReady; },
+      setDelegationAuthorityReady(value) {
+        delegationAuthorityReady = value === true;
+        calls.push(['setDelegationAuthorityReady', delegationAuthorityReady]);
+        return delegationAuthorityReady;
+      },
+      isDelegationAuthorityReady() { return delegationAuthorityReady; },
       getState() {
         return {
           connected: true,
@@ -659,6 +691,442 @@ async function runAgentRegistryBootstrapFailureCase() {
   assertEqual(rejected && rejected.message, 'corrupt registry proof',
     'registry hydration rejection propagates to dependent boot');
   assertEqual(warnings.length, 1, 'registry hydration rejection is logged once');
+
+  const missingSandbox = {};
+  missingSandbox.globalThis = missingSandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapAgentRegistry = bootstrapAgentRegistry;`,
+    missingSandbox,
+  );
+  rejected = null;
+  try {
+    await missingSandbox.__bootstrapAgentRegistry();
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'agent registry dependency is unavailable',
+    'a missing registry module rejects instead of silently booting empty');
+}
+
+async function runDelegationBootQuarantineCase() {
+  console.log('\n--- B3: registry authority quarantines on ledger/mapping disagreement ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const cases = [
+    ['delegation_binding_rejected', 'persisted tab authority has no registry mapping'],
+    ['delegation_ledger_corrupt', 'persisted delegation ledger is corrupt'],
+  ];
+  for (const [code, message] of cases) {
+    const calls = [];
+    let inboundAuthorityReady = true;
+    let delegationAuthorityReady = true;
+    const hydrateError = new Error(message);
+    hydrateError.code = code;
+    const controller = {
+      async hydrate() { throw hydrateError; },
+      subscribe() { calls.push('subscribe'); },
+    };
+    const registry = {
+      getAgentForDelegation() { return null; },
+      listDelegationMappings() { return []; },
+      getDelegationReleaseReceipt() { return null; },
+      quarantineAuthority() { calls.push('quarantine'); },
+    };
+    const sandbox = {
+      bootstrapAgentRegistry: async () => {},
+      FsbDelegationController: { create() { calls.push('create'); return controller; } },
+      FsbDelegationEventStore: {},
+      fsbAgentRegistryInstance: registry,
+      mcpBridgeClient: {
+        setInboundAuthorityReady(value) {
+          const next = value === true;
+          if (next !== inboundAuthorityReady) calls.push(`authority:${next}`);
+          inboundAuthorityReady = next;
+          return inboundAuthorityReady;
+        },
+        isInboundAuthorityReady() { return inboundAuthorityReady; },
+        setDelegationAuthorityReady(value) {
+          const next = value === true;
+          if (next !== delegationAuthorityReady) calls.push(`delegation-authority:${next}`);
+          delegationAuthorityReady = next;
+          return delegationAuthorityReady;
+        },
+        isDelegationAuthorityReady() { return delegationAuthorityReady; },
+        sendExtRequest() { throw new Error('transport must not run'); },
+        addEventObserver() { calls.push('event-observer'); },
+        addDelegationConnectionObserver() { calls.push('connection-observer'); },
+        retainDelegationHeartbeat() {},
+        releaseDelegationHeartbeat() {},
+        getDelegationConnectionSnapshot() { return { state: 'disconnected' }; },
+      },
+      chrome: {
+        runtime: { async sendMessage() {} },
+        storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+        tabs: { async query() { return []; }, async get() { return null; } },
+      },
+      Map,
+      Set,
+      Promise,
+      Date,
+      Number,
+      Object,
+      Array,
+      Error,
+      JSON,
+      console,
+    };
+    sandbox.globalThis = sandbox;
+    vm.runInNewContext(
+      `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+      sandbox,
+    );
+
+    let rejected = null;
+    try {
+      await sandbox.__bootstrapDelegationController();
+    } catch (error) {
+      rejected = error;
+    }
+    assertEqual(rejected && rejected.code, code,
+      `${code} rejects controller boot without rewriting the evidence class`);
+    assertEqual(calls.filter((call) => call === 'create').length, 1,
+      `${code} reaches controller hydration before quarantine`);
+    assertEqual(calls.filter((call) => call === 'quarantine').length, 1,
+      `${code} clears registry maps and staged timers once`);
+    assertEqual(inboundAuthorityReady, false,
+      `${code} closes inbound authority before returning the boot failure`);
+    assertEqual(calls.filter((call) => call === 'authority:false').length, 1,
+      `${code} closes inbound authority exactly once`);
+    assertEqual(delegationAuthorityReady, false,
+      `${code} closes delegation-scoped authority before returning the boot failure`);
+    assertEqual(calls.filter((call) => call === 'delegation-authority:false').length, 1,
+      `${code} closes delegation-scoped authority exactly once`);
+    assert(!calls.includes('subscribe') && !calls.includes('event-observer')
+        && !calls.includes('connection-observer'),
+      `${code} installs no subscriber or bridge observer`);
+  }
+}
+
+async function runDelegationBootReadinessCase() {
+  console.log('\n--- B4: structural and delegated authority open at their exact boundaries ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const hydrateGate = deferred();
+  const statusGate = deferred();
+  const calls = [];
+  let inboundAuthorityReady = false;
+  let delegationAuthorityReady = false;
+  const snapshot = { delegationId: 'delegation_boot_readiness_6108', terminal: null };
+  const controller = {
+    hydrate() { calls.push('hydrate'); return hydrateGate.promise; },
+    subscribe() { calls.push('subscribe'); },
+    async reconcile(input) { calls.push(['reconcile', toPlainObject(input)]); },
+    getSnapshot(delegationId) {
+      return delegationId === snapshot.delegationId ? snapshot : null;
+    },
+  };
+  const registry = {
+    getAgentForDelegation() { return null; },
+    listDelegationMappings() { return []; },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() { calls.push('quarantine'); },
+  };
+  const sandbox = {
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge(reason) { calls.push(['arm', reason]); },
+    FsbDelegationController: { create() { calls.push('create'); return controller; } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    mcpBridgeClient: {
+      isConnected: true,
+      setInboundAuthorityReady(value) {
+        inboundAuthorityReady = value === true;
+        calls.push(['authority', inboundAuthorityReady]);
+        return inboundAuthorityReady;
+      },
+      isInboundAuthorityReady() { return inboundAuthorityReady; },
+      setDelegationAuthorityReady(value) {
+        delegationAuthorityReady = value === true;
+        calls.push(['delegation-authority', delegationAuthorityReady]);
+        return delegationAuthorityReady;
+      },
+      isDelegationAuthorityReady() { return delegationAuthorityReady; },
+      sendExtRequest(method, payload) {
+        calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+        return statusGate.promise;
+      },
+      addEventObserver() { calls.push('event-observer'); },
+      addDelegationConnectionObserver() { calls.push('connection-observer'); },
+      retainDelegationHeartbeat() {},
+      releaseDelegationHeartbeat() {},
+      getDelegationConnectionSnapshot() { return { state: 'connected' }; },
+    },
+    chrome: {
+      runtime: { async sendMessage() {} },
+      storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+      tabs: { async query() { return []; }, async get() { return null; } },
+    },
+    setTimeout,
+    clearTimeout,
+    Map,
+    Set,
+    Promise,
+    Date,
+    Number,
+    Object,
+    Array,
+    Error,
+    JSON,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+    sandbox,
+  );
+
+  const boot = sandbox.__bootstrapDelegationController();
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, false,
+    'inbound authority stays closed while controller hydration is pending');
+  assertEqual(delegationAuthorityReady, false,
+    'delegation-scoped authority stays closed while controller hydration is pending');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 0,
+    'daemon status is not requested before persisted controller hydration');
+
+  hydrateGate.resolve([snapshot]);
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'persisted hydration opens ordinary inbound traffic before daemon status settles');
+  assertEqual(delegationAuthorityReady, false,
+    'delegation-scoped authority stays closed while daemon status reconciliation is pending');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 1,
+    'one shared daemon status request follows successful hydration');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'reconcile').length, 0,
+    'controller reconcile waits for the authoritative status response');
+
+  statusGate.resolve({ generation: 'generation_boot_readiness_6108', active: [], restartLosses: [], routeLosses: [] });
+  await boot;
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'reconcile').length, 1,
+    'hydrated snapshot reconciles exactly once against daemon status');
+  assertEqual(inboundAuthorityReady, true,
+    'ordinary inbound authority remains open after daemon state agrees');
+  assertEqual(delegationAuthorityReady, true,
+    'delegation-scoped authority opens only after persisted and daemon state agree');
+  assertEqual(calls.filter((call) => Array.isArray(call)
+      && call[0] === 'arm' && call[1] === 'delegation-authority-ready').length, 1,
+    'successful boot records one authority-ready wake');
+  assert(!calls.includes('quarantine'), 'successful combined hydration keeps registry authority live');
+}
+
+async function runIndependentDelegationWakeBootstrapCase() {
+  console.log('\n--- B5: delegation wake boot is independent from legacy session recovery ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractNamedFunctionSource(
+    backgroundSource,
+    'function restoreServiceWorkerStateOnWake() {',
+  );
+  const calls = [];
+  let inboundAuthorityReady = false;
+  const sandbox = {
+    async restoreSessionsFromStorage() {
+      calls.push('sessions');
+      throw new Error('malformed legacy session');
+    },
+    async bootstrapDelegationController() {
+      calls.push('delegation');
+      inboundAuthorityReady = true;
+      return { controller: {} };
+    },
+    Promise,
+    console: { warn(message) { calls.push(['warn', message]); } },
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__restoreServiceWorkerStateOnWake = restoreServiceWorkerStateOnWake;`,
+    sandbox,
+  );
+
+  await sandbox.__restoreServiceWorkerStateOnWake();
+  assertEqual(calls.filter((call) => call === 'sessions').length, 1,
+    'legacy session recovery is attempted once');
+  assertEqual(calls.filter((call) => call === 'delegation').length, 1,
+    'delegation hydration is attempted even when legacy session recovery rejects');
+  assertEqual(inboundAuthorityReady, true,
+    'successful independent delegation boot can open inbound authority after a session failure');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'warn').length, 1,
+    'the unrelated session failure remains contained to its own wake chain');
+}
+
+async function runDelegationLateConnectFenceCase() {
+  console.log('\n--- B6: active delegation stays fenced across offline boot and reconnect ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const calls = [];
+  const snapshot = { delegationId: 'delegation_late_connect_6108', terminal: null };
+  let statusGate = deferred();
+  let connectionState = 'disconnected';
+  let connectionObserver = null;
+  let inboundAuthorityReady = false;
+  let delegationAuthorityReady = false;
+  const controller = {
+    async hydrate() { calls.push('hydrate'); return [snapshot]; },
+    subscribe() { calls.push('subscribe'); },
+    async reconcile(input) {
+      calls.push(['reconcile', toPlainObject(input)]);
+      return snapshot;
+    },
+    getSnapshot(delegationId) {
+      return delegationId === snapshot.delegationId ? snapshot : null;
+    },
+  };
+  const registry = {
+    getAgentForDelegation() { return 'agent_late_connect_6108'; },
+    listDelegationMappings() {
+      return [{ delegationId: snapshot.delegationId, agentId: 'agent_late_connect_6108' }];
+    },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() { calls.push('quarantine'); },
+  };
+  const mcpBridgeClient = {
+    isConnected: false,
+    setInboundAuthorityReady(value) {
+      inboundAuthorityReady = value === true;
+      calls.push(['inbound-authority', inboundAuthorityReady]);
+      return inboundAuthorityReady;
+    },
+    isInboundAuthorityReady() { return inboundAuthorityReady; },
+    setDelegationAuthorityReady(value) {
+      delegationAuthorityReady = value === true;
+      calls.push(['delegation-authority', delegationAuthorityReady]);
+      return delegationAuthorityReady;
+    },
+    isDelegationAuthorityReady() { return delegationAuthorityReady; },
+    sendExtRequest(method, payload) {
+      calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+      return statusGate.promise;
+    },
+    addEventObserver() { calls.push('event-observer'); },
+    addDelegationConnectionObserver(observer) {
+      connectionObserver = observer;
+      calls.push('connection-observer');
+    },
+    retainDelegationHeartbeat() {},
+    releaseDelegationHeartbeat() {},
+    getDelegationConnectionSnapshot() { return { state: connectionState }; },
+  };
+  const sandbox = {
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge(reason) { calls.push(['arm', reason]); },
+    FsbDelegationController: { create() { calls.push('create'); return controller; } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    mcpBridgeClient,
+    chrome: {
+      runtime: { async sendMessage() {} },
+      storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+      tabs: { async query() { return []; }, async get() { return null; } },
+    },
+    setTimeout(callback) { callback(); return 1; },
+    clearTimeout() {},
+    Map,
+    Set,
+    Promise,
+    Date,
+    Number,
+    Object,
+    Array,
+    Error,
+    JSON,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+    sandbox,
+  );
+
+  await sandbox.__bootstrapDelegationController();
+  assertEqual(inboundAuthorityReady, true,
+    'offline boot opens ordinary inbound traffic after persisted hydration');
+  assertEqual(delegationAuthorityReady, false,
+    'offline boot with an active delegation keeps delegated sends fenced');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 0,
+    'offline boot cannot fabricate an authoritative daemon status response');
+  assertEqual(typeof connectionObserver, 'function',
+    'successful persisted hydration installs the reconnect observer');
+
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const firstReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'late connect preserves ordinary inbound traffic while status is pending');
+  assertEqual(delegationAuthorityReady, false,
+    'late connect keeps delegated sends fenced while status is pending');
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+  });
+  await firstReconnect;
+  assertEqual(inboundAuthorityReady, true,
+    'canonical late-connect status opens structural inbound authority');
+  assertEqual(delegationAuthorityReady, true,
+    'canonical late-connect status opens delegated sends');
+
+  connectionState = 'disconnected';
+  mcpBridgeClient.isConnected = false;
+  await connectionObserver({ state: 'disconnected' });
+  assertEqual(inboundAuthorityReady, true,
+    'runtime delegation disconnect preserves unrelated MCP compatibility');
+  assertEqual(delegationAuthorityReady, false,
+    'runtime delegation disconnect synchronously fences mapped agents');
+
+  statusGate = deferred();
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const secondReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'runtime reconnect leaves ordinary inbound traffic available');
+  assertEqual(delegationAuthorityReady, false,
+    'runtime reconnect keeps mapped agents fenced until fresh status arrives');
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+  });
+  await secondReconnect;
+  assertEqual(delegationAuthorityReady, true,
+    'fresh canonical reconnect status reopens mapped-agent dispatch');
+
+  connectionState = 'disconnected';
+  mcpBridgeClient.isConnected = false;
+  await connectionObserver({ state: 'disconnected' });
+  statusGate = deferred();
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const malformedReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+    providerDiagnostic: 'must-not-authorize',
+  });
+  await malformedReconnect;
+  assertEqual(inboundAuthorityReady, true,
+    'malformed daemon status cannot disrupt unrelated MCP compatibility');
+  assertEqual(delegationAuthorityReady, false,
+    'malformed daemon status cannot reopen mapped-agent dispatch');
 }
 
 function buildPairingRuntimeHarness(reloadImpl) {
@@ -1103,6 +1571,10 @@ async function run() {
   await runAgentActionDeprecationCase();
   await runWrapperBehaviorCases();
   await runAgentRegistryBootstrapFailureCase();
+  await runDelegationBootQuarantineCase();
+  await runDelegationBootReadinessCase();
+  await runIndependentDelegationWakeBootstrapCase();
+  await runDelegationLateConnectFenceCase();
   await runPairingRuntimeActionCases();
   await runDelegationAuthorityCases();
   runSourceContractCase();

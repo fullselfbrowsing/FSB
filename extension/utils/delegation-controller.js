@@ -104,6 +104,10 @@
     return true;
   }
 
+  function _hasOwn(table, key) {
+    return typeof key === 'string' && Object.prototype.hasOwnProperty.call(table, key);
+  }
+
   function _clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -135,7 +139,7 @@
     if (eventStore && typeof eventStore.normalizeTerminalCode === 'function') {
       return eventStore.normalizeTerminalCode(value);
     }
-    return typeof value === 'string' && VALID_TERMINAL_CODES[value]
+    return typeof value === 'string' && _hasOwn(VALID_TERMINAL_CODES, value)
       ? value
       : 'unknown_failure';
   }
@@ -331,8 +335,8 @@
     return {
       delegationId: delegationId,
       provider: _closedProvider(options.provider),
-      state: VALID_STATES[options.state] ? options.state : 'starting',
-      connection: VALID_CONNECTIONS[options.connection] ? options.connection : 'connected',
+      state: _hasOwn(VALID_STATES, options.state) ? options.state : 'starting',
+      connection: _hasOwn(VALID_CONNECTIONS, options.connection) ? options.connection : 'connected',
       entries: Array.isArray(options.entries) ? options.entries.slice() : [],
       summary: options.summary || null,
       activeTab: null,
@@ -560,7 +564,7 @@
     }
 
     function _persistenceCode(error) {
-      return error && PERSISTENCE_CODES[error.code]
+      return error && _hasOwn(PERSISTENCE_CODES, error.code)
         ? error.code
         : 'delegation_persistence_failed';
     }
@@ -665,7 +669,7 @@
           });
         }).then(function(result) {
           if (!result || result.ok !== true) {
-            var failureCode = result && CLEANUP_BLOCKED_CODES[result.code]
+            var failureCode = result && _hasOwn(CLEANUP_BLOCKED_CODES, result.code)
               ? result.code
               : 'delegation_release_persistence_failed';
             return {
@@ -879,12 +883,46 @@
       hydratePromise = Promise.resolve().then(function() {
         return eventStore.hydrateNonterminal();
       }).then(async function(ledgers) {
-        if (!Array.isArray(ledgers)) {
-          throw _error('delegation_ledger_corrupt', 'hydration result must be an array');
+        if (!Array.isArray(ledgers) || ledgers.length > STATUS_ACTIVE_LIMIT) {
+          throw _error('delegation_ledger_corrupt', 'hydration result exceeds the active delegation limit');
         }
+        if (!registry || typeof registry.listDelegationMappings !== 'function') {
+          throw _error('delegation_binding_rejected', 'registry mapping authority is unavailable');
+        }
+        var mappingRows;
+        try {
+          mappingRows = registry.listDelegationMappings();
+        } catch (_mappingSnapshotError) {
+          throw _error('delegation_binding_rejected', 'registry mapping snapshot failed');
+        }
+        if (mappingRows && typeof mappingRows.then === 'function') {
+          throw _error('delegation_binding_rejected', 'registry mapping snapshots must be synchronous');
+        }
+        if (!Array.isArray(mappingRows) || mappingRows.length > STATUS_ACTIVE_LIMIT) {
+          throw _error('delegation_binding_rejected', 'registry mapping snapshot is invalid');
+        }
+        var mappingByDelegation = new Map();
+        var mappedAgents = new Set();
+        mappingRows.forEach(function(row) {
+          if (!_hasExactKeys(row, ['delegationId', 'agentId'])
+            || typeof row.delegationId !== 'string'
+            || !SERVER_ID_PATTERN.test(row.delegationId)
+            || typeof row.agentId !== 'string'
+            || row.agentId.length === 0
+            || row.agentId.length > 128
+            || mappingByDelegation.has(row.delegationId)
+            || mappedAgents.has(row.agentId)) {
+            throw _error('delegation_binding_rejected', 'registry mapping snapshot is invalid');
+          }
+          mappingByDelegation.set(row.delegationId, row.agentId);
+          mappedAgents.add(row.agentId);
+        });
         var restored = new Map();
         ledgers.forEach(function(ledger) {
-          if (!ledger || typeof ledger.delegationId !== 'string' || restored.has(ledger.delegationId)) {
+          if (!ledger
+            || typeof ledger.delegationId !== 'string'
+            || !SERVER_ID_PATTERN.test(ledger.delegationId)
+            || restored.has(ledger.delegationId)) {
             throw _error('delegation_ledger_corrupt', 'hydrated ledger identity is invalid');
           }
           var entries = Array.isArray(ledger.entries) ? ledger.entries.slice() : [];
@@ -909,19 +947,52 @@
             agentId: cleanupPending && cleanupPending.agentId,
             hydrated: true
           });
-          if (registry && typeof registry.getAgentForDelegation === 'function') {
-            try {
-              var restoredAgentId = registry.getAgentForDelegation(ledger.delegationId);
-              if (restoredAgentId && typeof restoredAgentId.then === 'function') {
-                throw _error('delegation_binding_rejected', 'registry mapping reads must be synchronous');
+          var hasTabAuthorityEvidence = entries.some(function(entry) {
+            return entry
+              && entry.tool
+              && Number.isSafeInteger(entry.tool.tabId)
+              && entry.tool.tabId > 0;
+          });
+          if (registry && typeof registry.listDelegationMappings === 'function') {
+            var restoredAgentId = mappingByDelegation.get(ledger.delegationId) || null;
+            if (typeof restoredAgentId === 'string' && restoredAgentId.length > 0) {
+              if (cleanupPending
+                && cleanupPending.agentId
+                && cleanupPending.agentId !== restoredAgentId) {
+                throw _error('delegation_binding_rejected', 'cleanup and registry mapping disagree');
               }
-              if (typeof restoredAgentId === 'string' && restoredAgentId.length > 0) {
-                record.agentId = restoredAgentId;
-                record.expectedRegistration = false;
+              record.agentId = restoredAgentId;
+              record.expectedRegistration = false;
+            } else if (cleanupPending && cleanupPending.agentId) {
+              var releaseReceipt = null;
+              if (typeof registry.getDelegationReleaseReceipt === 'function') {
+                try {
+                  releaseReceipt = registry.getDelegationReleaseReceipt({
+                    delegationId: ledger.delegationId,
+                    agentId: cleanupPending.agentId
+                  });
+                } catch (_receiptReadError) {
+                  throw _error('delegation_binding_rejected', 'registry receipt read failed');
+                }
               }
-            } catch (_mappingReadError) { /* status reconciliation remains fail closed */ }
+              if (releaseReceipt && typeof releaseReceipt.then === 'function') {
+                throw _error('delegation_binding_rejected', 'registry receipt reads must be synchronous');
+              }
+              if (!releaseReceipt || releaseReceipt.agentId !== cleanupPending.agentId) {
+                throw _error('delegation_binding_rejected', 'cleanup authority proof is missing');
+              }
+              record.agentId = cleanupPending.agentId;
+              record.expectedRegistration = false;
+            } else if (hasTabAuthorityEvidence || state === 'held') {
+              throw _error('delegation_binding_rejected', 'persisted tab authority has no registry mapping');
+            }
           }
           restored.set(ledger.delegationId, record);
+        });
+        mappingByDelegation.forEach(function(_agentId, delegationId) {
+          if (!restored.has(delegationId)) {
+            throw _error('delegation_binding_rejected', 'registry mapping has no nonterminal ledger');
+          }
         });
         records = restored;
         await Promise.all(Array.from(records.values()).map(async function(record) {
@@ -981,7 +1052,7 @@
       var record = _newRecord(delegationId, {
         provider: input.provider || { id: PROVIDER_ID, label: PROVIDER_LABEL },
         state: 'starting',
-        connection: VALID_CONNECTIONS[input.connection] ? input.connection : 'connected',
+        connection: _hasOwn(VALID_CONNECTIONS, input.connection) ? input.connection : 'connected',
         hydrated: true
       });
       record.startedAt = now();
@@ -1098,11 +1169,11 @@
           var cleanupResult = await _settle(record, record.cleanupPending.code, { cancel: false });
           return cleanupResult.snapshot;
         }
-        var connection = VALID_CONNECTIONS[input.connection] ? input.connection : null;
+        var connection = _hasOwn(VALID_CONNECTIONS, input.connection) ? input.connection : null;
         if (!connection) {
           try {
             var connectionSnapshot = await getConnectionSnapshot();
-            if (connectionSnapshot && VALID_CONNECTIONS[connectionSnapshot.state]) {
+            if (connectionSnapshot && _hasOwn(VALID_CONNECTIONS, connectionSnapshot.state)) {
               connection = connectionSnapshot.state;
             }
           } catch (_connectionError) { /* a missing bridge is disconnected, not restart evidence */ }
@@ -1116,7 +1187,7 @@
             connection = 'disconnected';
           }
         }
-        if (!connection && rawStatus && VALID_CONNECTIONS[rawStatus.connection]) {
+        if (!connection && rawStatus && _hasOwn(VALID_CONNECTIONS, rawStatus.connection)) {
           connection = rawStatus.connection;
         }
         var status = _normalizeSupervisorStatus(rawStatus);

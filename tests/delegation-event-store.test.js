@@ -333,6 +333,23 @@ function project(store, event, overrides = {}) {
     assert(!JSON.stringify(entry).includes(fixtures.secretCanary));
   });
 
+  await test('prototype-named enum inputs stay outside every closed vocabulary', () => {
+    const store = freshStore();
+    assert.strictEqual(store.normalizeTerminalCode('constructor'), 'unknown_failure');
+    assert.strictEqual(project(store, fixtures.stateEvent, {
+      state: '__proto__',
+    }).state, 'idle');
+    assert.strictEqual(project(store, fixtures.toolUseEvent, {
+      toolStatus: 'toString',
+    }).tool.status, 'running');
+    assert.strictEqual(project(store, fixtures.unknownRetryEvent, {
+      retryClass: 'constructor',
+    }).retry.class, 'unknown');
+    assert.strictEqual(project(store, fixtures.resultEvent, {
+      billingKind: '__proto__',
+    }).metrics.billingKind, 'unknown');
+  });
+
   await test('string and collection limits accept boundary and reject boundary plus one', async () => {
     const store = freshStore();
     const boundary = fixtures.boundary;
@@ -922,6 +939,9 @@ function project(store, event, overrides = {}) {
     const delegationId = fixtures.baseContext.delegationId;
     const first = project(bootstrap, fixtures.initEvent);
     const second = project(bootstrap, fixtures.stateEvent, { sequence: 2 });
+    const tool = project(bootstrap, fixtures.toolUseEvent, { sequence: 1 });
+    const retry = project(bootstrap, fixtures.retryEvent, { sequence: 1 });
+    const result = project(bootstrap, fixtures.resultEvent, { sequence: 1 });
     const key = storageKey(bootstrap);
     const cases = [
       ['byte-identical duplicate sequence', fixtures.makePersistedEnvelope(
@@ -948,6 +968,32 @@ function project(store, event, overrides = {}) {
         status: 'unknown',
         durationMs: null,
       } }])],
+      ['prototype-named entry kind', fixtures.makePersistedEnvelope([
+        { ...first, kind: 'constructor' },
+      ])],
+      ['prototype-named entry state', fixtures.makePersistedEnvelope([
+        { ...first, state: '__proto__' },
+      ])],
+      ['prototype-named tool status', fixtures.makePersistedEnvelope([
+        { ...tool, tool: { ...tool.tool, status: 'toString' } },
+      ])],
+      ['prototype-named retry class', fixtures.makePersistedEnvelope([
+        { ...retry, retry: { ...retry.retry, class: 'constructor' } },
+      ])],
+      ['prototype-named billing kind', fixtures.makePersistedEnvelope([
+        { ...result, metrics: { ...result.metrics, billingKind: '__proto__' } },
+      ])],
+      ['prototype-named terminal code', fixtures.makePersistedEnvelope([first], {
+        terminal: true,
+        terminalCode: 'constructor',
+      })],
+      ['prototype-named cleanup code', fixtures.makePersistedEnvelope([first], {
+        cleanupPending: {
+          agentId: 'agent_enum_fixture',
+          cancellationConfirmed: true,
+          code: 'toString',
+        },
+      })],
       ['invalid version', { ...fixtures.makePersistedEnvelope([first]), v: 99 }],
       ['terminal disagreement', {
         ...fixtures.makePersistedEnvelope([first]),

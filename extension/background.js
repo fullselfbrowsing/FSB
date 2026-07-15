@@ -1155,9 +1155,15 @@ async function restorePersistedMcpVisualSessions() {
 // Failure mode: log via rateLimitedWarn and propagate so dependent lifecycle
 // authorities cannot start against an empty or quarantined registry.
 async function bootstrapAgentRegistry() {
-  if (!globalThis.FsbAgentRegistry || !globalThis.FsbAgentRegistry.AgentRegistry) return;
+  if (!globalThis.FsbAgentRegistry
+      || typeof globalThis.FsbAgentRegistry.AgentRegistry !== 'function') {
+    throw new Error('agent registry dependency is unavailable');
+  }
   if (!globalThis.fsbAgentRegistryInstance) {
     globalThis.fsbAgentRegistryInstance = new globalThis.FsbAgentRegistry.AgentRegistry();
+  }
+  if (typeof globalThis.fsbAgentRegistryInstance.hydrate !== 'function') {
+    throw new Error('agent registry hydration authority is unavailable');
   }
   try {
     await globalThis.fsbAgentRegistryInstance.hydrate();
@@ -1182,11 +1188,14 @@ let fsbDelegationBootPromise = null;
 let fsbDelegationBridgeObserverInstalled = false;
 let fsbDelegationConnectionObserverInstalled = false;
 let fsbDelegationConnectionTail = Promise.resolve();
+let fsbDelegationConnectionEpoch = 0;
 const fsbDelegationActiveIds = new Set();
 const fsbDelegationProfiles = new Map();
 const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
 const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
+const FSB_DELEGATION_STATUS_ACTIVE_LIMIT = 64;
+const FSB_DELEGATION_STATUS_LOSS_LIMIT = 128;
 
 function fsbDelegationHasExactKeys(value, expected) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -1194,6 +1203,59 @@ function fsbDelegationHasExactKeys(value, expected) {
   const sortedExpected = expected.slice().sort();
   return actual.length === sortedExpected.length
     && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function fsbDelegationStatusIsCanonical(value) {
+  if (!fsbDelegationHasExactKeys(value, ['active', 'generation', 'restartLosses', 'routeLosses'])
+      || typeof value.generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(value.generation)
+      || !Array.isArray(value.active)
+      || value.active.length > FSB_DELEGATION_STATUS_ACTIVE_LIMIT
+      || !Array.isArray(value.restartLosses)
+      || value.restartLosses.length > FSB_DELEGATION_STATUS_LOSS_LIMIT
+      || !Array.isArray(value.routeLosses)
+      || value.routeLosses.length > FSB_DELEGATION_STATUS_LOSS_LIMIT) {
+    return false;
+  }
+  const activeIds = new Set();
+  for (const row of value.active) {
+    if (!fsbDelegationHasExactKeys(row, ['delegationId', 'state'])
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || (row.state !== 'running' && row.state !== 'held' && row.state !== 'stopping')
+        || activeIds.has(row.delegationId)) {
+      return false;
+    }
+    activeIds.add(row.delegationId);
+  }
+  const dispositionIds = new Set();
+  for (const row of value.restartLosses) {
+    if (!fsbDelegationHasExactKeys(row, ['code', 'delegationId', 'recoveredAt'])
+        || row.code !== 'daemon_restart_lost_run'
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || !Number.isSafeInteger(row.recoveredAt)
+        || row.recoveredAt < 0
+        || activeIds.has(row.delegationId)
+        || dispositionIds.has(row.delegationId)) {
+      return false;
+    }
+    dispositionIds.add(row.delegationId);
+  }
+  for (const row of value.routeLosses) {
+    if (!fsbDelegationHasExactKeys(row, ['code', 'delegationId', 'lostAt'])
+        || row.code !== 'route_lost'
+        || typeof row.delegationId !== 'string'
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(row.delegationId)
+        || !Number.isSafeInteger(row.lostAt)
+        || row.lostAt < 0
+        || activeIds.has(row.delegationId)
+        || dispositionIds.has(row.delegationId)) {
+      return false;
+    }
+    dispositionIds.add(row.delegationId);
+  }
+  return true;
 }
 
 function fsbDelegationGenerationKey(delegationId) {
@@ -1238,22 +1300,28 @@ async function fsbWaitForDelegationBridge() {
   return mcpBridgeClient.isConnected === true;
 }
 
-function fsbReadDelegationStatus() {
-  return mcpBridgeClient.sendExtRequest(
+async function fsbReadDelegationStatus() {
+  const status = await mcpBridgeClient.sendExtRequest(
     'delegate.status',
     {},
     { timeout: FSB_DELEGATION_STATUS_TIMEOUT_MS }
   );
+  if (!fsbDelegationStatusIsCanonical(status)) {
+    throw new Error('delegation status response is invalid');
+  }
+  return status;
 }
 
 async function fsbReconcileDelegationSnapshots(controller, snapshots) {
-  if (!Array.isArray(snapshots) || snapshots.length === 0) return;
+  if (!Array.isArray(snapshots) || snapshots.length === 0) return true;
   let connection = mcpBridgeClient.getDelegationConnectionSnapshot();
   let status;
+  let statusVerified = false;
   if ((connection && connection.state === 'connected')
       || await fsbWaitForDelegationBridge()) {
     try {
       status = await fsbReadDelegationStatus();
+      statusVerified = true;
       connection = { state: 'connected' };
     } catch (_error) {
       status = undefined;
@@ -1263,6 +1331,7 @@ async function fsbReconcileDelegationSnapshots(controller, snapshots) {
   const connectionState = connection && connection.state === 'connected'
     ? 'connected'
     : 'disconnected';
+  let allReconciled = true;
   for (const snapshot of snapshots) {
     if (!snapshot || typeof snapshot.delegationId !== 'string') continue;
     try {
@@ -1273,8 +1342,10 @@ async function fsbReconcileDelegationSnapshots(controller, snapshots) {
       });
     } catch (_error) {
       // A corrupt or concurrently-terminal record cannot poison other ids.
+      allReconciled = false;
     }
   }
+  return statusVerified && allReconciled;
 }
 
 async function fsbReadAuthoritativeProviderConfig() {
@@ -1765,6 +1836,12 @@ function fsbObserveDelegationConnection(connection) {
   if (!connection || (connection.state !== 'connected' && connection.state !== 'disconnected')) {
     return Promise.resolve();
   }
+  const connectionEpoch = ++fsbDelegationConnectionEpoch;
+  if (fsbDelegationActiveIds.size > 0) {
+    mcpBridgeClient.setDelegationAuthorityReady(false);
+  } else if (connection.state === 'connected') {
+    mcpBridgeClient.setDelegationAuthorityReady(true);
+  }
   fsbDelegationConnectionTail = fsbDelegationConnectionTail.catch(() => {}).then(async () => {
     const controller = globalThis.fsbDelegationControllerInstance;
     if (!controller) return;
@@ -1778,8 +1855,21 @@ function fsbObserveDelegationConnection(connection) {
         snapshots.push(snapshot);
       }
     }
+    if (snapshots.length === 0) {
+      if (connectionEpoch === fsbDelegationConnectionEpoch) {
+        mcpBridgeClient.setDelegationAuthorityReady(true);
+      }
+      return;
+    }
     if (connection.state === 'connected') {
-      await fsbReconcileDelegationSnapshots(controller, snapshots);
+      const reconciled = await fsbReconcileDelegationSnapshots(controller, snapshots);
+      const latestConnection = mcpBridgeClient.getDelegationConnectionSnapshot();
+      if (connectionEpoch === fsbDelegationConnectionEpoch) {
+        const ready = reconciled === true
+          && latestConnection
+          && latestConnection.state === 'connected';
+        mcpBridgeClient.setDelegationAuthorityReady(ready);
+      }
       return;
     }
     for (const snapshot of snapshots) {
@@ -1790,6 +1880,10 @@ function fsbObserveDelegationConnection(connection) {
         });
       } catch (_error) { /* one stale record cannot block the remaining fanout */ }
     }
+    if (connectionEpoch === fsbDelegationConnectionEpoch
+        && fsbDelegationActiveIds.size === 0) {
+      mcpBridgeClient.setDelegationAuthorityReady(true);
+    }
   });
   return fsbDelegationConnectionTail;
 }
@@ -1798,16 +1892,32 @@ async function bootstrapDelegationController() {
   if (fsbDelegationBootPromise) return fsbDelegationBootPromise;
   fsbDelegationBootPromise = (async () => {
     await bootstrapAgentRegistry();
+    const registry = globalThis.fsbAgentRegistryInstance;
     if (!globalThis.FsbDelegationController
         || !globalThis.FsbDelegationEventStore
         || typeof mcpBridgeClient === 'undefined'
-        || !mcpBridgeClient) {
+        || !mcpBridgeClient
+        || typeof mcpBridgeClient.setInboundAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.isInboundAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.setDelegationAuthorityReady !== 'function'
+        || typeof mcpBridgeClient.isDelegationAuthorityReady !== 'function') {
       throw new Error('delegation dependencies are unavailable');
     }
+    if (!registry
+        || typeof registry.getAgentForDelegation !== 'function'
+        || typeof registry.listDelegationMappings !== 'function'
+        || typeof registry.getDelegationReleaseReceipt !== 'function'
+        || typeof registry.quarantineAuthority !== 'function') {
+      const error = new Error('delegation registry authority is unavailable');
+      error.code = 'delegation_binding_rejected';
+      throw error;
+    }
+    mcpBridgeClient.setInboundAuthorityReady(false);
+    mcpBridgeClient.setDelegationAuthorityReady(false);
     if (!globalThis.fsbDelegationControllerInstance) {
       globalThis.fsbDelegationControllerInstance = globalThis.FsbDelegationController.create({
         eventStore: globalThis.FsbDelegationEventStore,
-        registry: globalThis.fsbAgentRegistryInstance || null,
+        registry,
         cancel: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.cancel', { delegationId }),
         hold: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.hold', { delegationId }),
         resume: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.resume', { delegationId }),
@@ -1857,7 +1967,19 @@ async function bootstrapDelegationController() {
       mcpBridgeClient.addDelegationConnectionObserver(fsbObserveDelegationConnection);
       fsbDelegationConnectionObserverInstalled = true;
     }
-    await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots);
+    mcpBridgeClient.setInboundAuthorityReady(true);
+    const reconciliationEpoch = fsbDelegationConnectionEpoch;
+    const statusReconciled = await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots);
+    const latestConnection = mcpBridgeClient.getDelegationConnectionSnapshot();
+    const authorityReady = fsbDelegationActiveIds.size === 0
+      || (statusReconciled === true
+        && reconciliationEpoch === fsbDelegationConnectionEpoch
+        && latestConnection
+        && latestConnection.state === 'connected');
+    if (authorityReady) {
+      mcpBridgeClient.setDelegationAuthorityReady(true);
+      armMcpBridge('delegation-authority-ready');
+    }
     return {
       controller,
       hydratedSnapshots: hydratedSnapshots.map((snapshot) => (
@@ -1865,6 +1987,18 @@ async function bootstrapDelegationController() {
       )).filter(Boolean)
     };
   })().catch((error) => {
+    if (typeof mcpBridgeClient !== 'undefined'
+        && mcpBridgeClient
+        && typeof mcpBridgeClient.setInboundAuthorityReady === 'function') {
+      mcpBridgeClient.setInboundAuthorityReady(false);
+      if (typeof mcpBridgeClient.setDelegationAuthorityReady === 'function') {
+        mcpBridgeClient.setDelegationAuthorityReady(false);
+      }
+    }
+    if (globalThis.fsbAgentRegistryInstance
+        && typeof globalThis.fsbAgentRegistryInstance.quarantineAuthority === 'function') {
+      globalThis.fsbAgentRegistryInstance.quarantineAuthority();
+    }
     fsbDelegationBootPromise = null;
     throw error;
   });
@@ -3512,15 +3646,6 @@ async function restoreSessionsFromStorage() {
 
     // Restore conversation session mappings after sessions are restored
     await restoreConversationSessions();
-    // Phase 237 -- hydrate the agent registry adjacent to the visual-session
-    // restore site so registry ownership is reconciled before any message
-    // handler can read getOwner(tabId). A failure remains isolated from
-    // unrelated startup work here, while bootstrapDelegationController awaits
-    // the same failing hydration and therefore cannot create an authority.
-    await bootstrapAgentRegistry().catch(() => {});
-    await bootstrapDelegationController().catch((error) => {
-      console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
-    });
     await restorePersistedMcpVisualSessions();
 
     // Phase 256 Plan 03 -- restore implicit visual-session lifecycles after
@@ -3569,11 +3694,26 @@ async function restoreSessionsFromStorage() {
   }
 }
 
-// Immediately restore sessions when service worker wakes up
-// This handles both service worker restarts and browser startups
-restoreSessionsFromStorage().catch(err => {
-  console.warn('FSB: Failed to restore sessions on wake:', err);
-});
+// Start unrelated session recovery and delegation authority recovery as
+// independent wake chains. A malformed legacy session must not prevent the
+// registry/controller pair from hydrating and opening the inbound bridge gate.
+function restoreServiceWorkerStateOnWake() {
+  const sessions = Promise.resolve()
+    .then(() => restoreSessionsFromStorage())
+    .catch((error) => {
+      console.warn('FSB: Failed to restore sessions on wake:', error);
+    });
+  const delegation = Promise.resolve()
+    .then(() => bootstrapDelegationController())
+    .catch((error) => {
+      console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
+    });
+  return Promise.all([sessions, delegation]);
+}
+
+// Immediately restore service-worker state on both worker restarts and browser
+// startups. Each chain catches its own failure before the aggregate settles.
+restoreServiceWorkerStateOnWake();
 
 // Eagerly rehydrate vault session key on service worker startup (Phase 191 - VAULT-03)
 // chrome.storage.session survives SW restarts but the in-memory SecureConfig fields reset to null.

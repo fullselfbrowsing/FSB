@@ -150,6 +150,10 @@
     return true;
   }
 
+  function _hasOwn(table, key) {
+    return typeof key === 'string' && Object.prototype.hasOwnProperty.call(table, key);
+  }
+
   function _characterLength(value) {
     return Array.from(value).length;
   }
@@ -281,7 +285,7 @@
   }
 
   function _normalizeTerminalCode(value) {
-    return typeof value === 'string' && VALID_TERMINAL_CODES[value]
+    return typeof value === 'string' && _hasOwn(VALID_TERMINAL_CODES, value)
       ? value
       : 'unknown_failure';
   }
@@ -308,7 +312,7 @@
       if (terminal === 'daemon_restart_lost_run') return 'restart_lost';
       return 'failed';
     }
-    if (context && typeof context.state === 'string' && VALID_STATES[context.state]) {
+    if (context && typeof context.state === 'string' && _hasOwn(VALID_STATES, context.state)) {
       return context.state;
     }
     return type === 'state' ? 'idle' : 'running';
@@ -346,7 +350,7 @@
     var callId = _value(context, payload, 'callId', type === 'tool_result' ? 'tool_use_id' : 'id');
     var name = _value(context, payload, 'toolName', 'name');
     var status = _value(context, payload, 'toolStatus', 'status');
-    if (!VALID_TOOL_STATUSES[status]) {
+    if (!_hasOwn(VALID_TOOL_STATUSES, status)) {
       if (type === 'tool_use') status = 'running';
       else if (payload && payload.is_error === true) status = 'failed';
       else if (type === 'tool_result') status = 'succeeded';
@@ -364,7 +368,7 @@
 
   function _projectRetry(payload, context) {
     var retryClass = _value(context, payload, 'retryClass', 'class');
-    if (!VALID_RETRY_CLASSES[retryClass]) {
+    if (!_hasOwn(VALID_RETRY_CLASSES, retryClass)) {
       retryClass = payload && payload.subtype === 'api_retry' ? 'api_retry' : 'unknown';
     }
     return {
@@ -385,7 +389,7 @@
       totalTokens = Number.isSafeInteger(sum) ? sum : null;
     }
     var billingKind = _value(context, payload, 'billingKind', 'billing_kind');
-    if (!VALID_BILLING_KINDS[billingKind]) billingKind = 'unknown';
+    if (!_hasOwn(VALID_BILLING_KINDS, billingKind)) billingKind = 'unknown';
     var usd = billingKind === 'api'
       ? _nonnegativeNumberOrNull(_value(context, payload, 'usd'))
       : null;
@@ -496,13 +500,13 @@
       && (typeof value.argsSummary !== 'string' || _characterLength(value.argsSummary) > MAX_PRESENTATION_CHARS)) {
       _corrupt('tool argsSummary is invalid');
     }
-    if (!VALID_TOOL_STATUSES[value.status]) _corrupt('tool status is invalid');
+    if (!_hasOwn(VALID_TOOL_STATUSES, value.status)) _corrupt('tool status is invalid');
     _assertNullableBoundedInteger(value.tabId, 'tool tabId');
     _assertNullableBoundedInteger(value.durationMs, 'tool durationMs');
   }
 
   function _assertValidRetry(value) {
-    if (!_hasExactKeys(value, RETRY_KEYS) || !VALID_RETRY_CLASSES[value.class]) {
+    if (!_hasExactKeys(value, RETRY_KEYS) || !_hasOwn(VALID_RETRY_CLASSES, value.class)) {
       _corrupt('retry payload shape is invalid');
     }
     _assertNullableBoundedInteger(value.attempt, 'retry attempt');
@@ -511,7 +515,7 @@
   }
 
   function _assertValidMetrics(value) {
-    if (!_hasExactKeys(value, METRICS_KEYS) || !VALID_BILLING_KINDS[value.billingKind]) {
+    if (!_hasExactKeys(value, METRICS_KEYS) || !_hasOwn(VALID_BILLING_KINDS, value.billingKind)) {
       _corrupt('metrics payload shape is invalid');
     }
     ['inputTokens', 'outputTokens', 'totalTokens', 'turns', 'durationMs'].forEach(function(field) {
@@ -542,8 +546,8 @@
       || entry.sequence !== expectedSequence
       || !Number.isSafeInteger(entry.timestamp)
       || entry.timestamp < 0
-      || !VALID_KINDS[entry.kind]
-      || !VALID_STATES[entry.state]
+      || !_hasOwn(VALID_KINDS, entry.kind)
+      || !_hasOwn(VALID_STATES, entry.state)
       || typeof entry.title !== 'string'
       || _characterLength(entry.title) > MAX_PRESENTATION_CHARS
       || (entry.detail !== null
@@ -580,7 +584,8 @@
     }
     if (typeof envelope.terminal !== 'boolean') _corrupt('ledger terminal flag is invalid');
     if (envelope.terminalCode !== null
-      && (typeof envelope.terminalCode !== 'string' || !VALID_TERMINAL_CODES[envelope.terminalCode])) {
+      && (typeof envelope.terminalCode !== 'string'
+        || !_hasOwn(VALID_TERMINAL_CODES, envelope.terminalCode))) {
       _corrupt('ledger terminal code is invalid');
     }
     if (envelope.terminal !== (envelope.terminalCode !== null)) _corrupt('ledger terminal fields disagree');
@@ -589,7 +594,7 @@
       if (!_hasExactKeys(cleanupPending, CLEANUP_PENDING_KEYS)
         || typeof cleanupPending.cancellationConfirmed !== 'boolean'
         || typeof cleanupPending.code !== 'string'
-        || !VALID_TERMINAL_CODES[cleanupPending.code]
+        || !_hasOwn(VALID_TERMINAL_CODES, cleanupPending.code)
         || (cleanupPending.agentId !== null
           && (typeof cleanupPending.agentId !== 'string'
             || !cleanupPending.agentId

@@ -52,9 +52,15 @@ const {
 
 function createStorageArea(initial) {
   const store = Object.assign({}, initial || {});
+  let nextGetError = null;
   let nextSetError = null;
   return {
     async get(keys) {
+      if (nextGetError) {
+        const error = nextGetError;
+        nextGetError = null;
+        throw error;
+      }
       if (keys == null) return Object.assign({}, store);
       if (Array.isArray(keys)) {
         const out = {};
@@ -91,6 +97,9 @@ function createStorageArea(initial) {
     },
     _dump() {
       return Object.assign({}, store);
+    },
+    _rejectNextGet(error) {
+      nextGetError = error || new Error('storage read rejected');
     },
     _rejectNextSet(error) {
       nextSetError = error || new Error('storage write rejected');
@@ -596,7 +605,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   }
   console.log('  PASS: empty records map removes the storage key');
 
-  console.log('--- Plan 02 / Test 6: version mismatch returns null ---');
+  console.log('--- Plan 02 / Test 6: unsupported envelope version quarantines hydration ---');
   {
     const mock = setupChromeMock({
       session: {
@@ -610,14 +619,22 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     try {
       const fresh = freshRequireRegistry();
       const registry = new fresh.AgentRegistry();
-      await registry.hydrate();
-      assert.strictEqual(registry.listAgents().length, 0, 'version mismatch -> empty in-memory state');
+      await assert.rejects(
+        registry.hydrate(),
+        /version is unsupported/,
+        'unsupported version cannot impersonate an absent registry',
+      );
+      await assert.rejects(
+        registry.registerAgent(),
+        /hydration failed/,
+        'unsupported version quarantines later authority mutations',
+      );
     } finally {
       teardownDiagnosticCapture();
       teardownChromeMock();
     }
   }
-  console.log('  PASS: version mismatch falls through to empty state');
+  console.log('  PASS: unsupported envelope version fails closed');
 
   console.log('--- Plan 02 / Test 7: SW-eviction simulation -- fresh instance repopulates from storage ---');
   {
@@ -646,7 +663,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   }
   console.log('  PASS: hydrate rebuilds Maps from a valid persisted snapshot');
 
-  console.log('--- Plan 02 / Test 8: corrupt envelope falls through gracefully ---');
+  console.log('--- Plan 02 / Test 8: malformed envelope quarantines hydration ---');
   {
     const mock = setupChromeMock({
       session: { fsbAgentRegistry: 'not-an-object' }
@@ -655,20 +672,382 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     try {
       const fresh = freshRequireRegistry();
       const registry = new fresh.AgentRegistry();
-      let threw = false;
-      try {
-        await registry.hydrate();
-      } catch (e) {
-        threw = true;
-      }
-      assert.strictEqual(threw, false, 'hydrate did not throw on corrupt envelope');
-      assert.strictEqual(registry.listAgents().length, 0, 'no records on corrupt envelope');
+      await assert.rejects(
+        registry.hydrate(),
+        /persisted envelope is corrupt/,
+        'malformed envelope cannot impersonate an absent registry',
+      );
+      await assert.rejects(
+        registry.registerAgent(),
+        /hydration failed/,
+        'malformed envelope quarantines later authority mutations',
+      );
     } finally {
       teardownDiagnosticCapture();
       teardownChromeMock();
     }
   }
-  console.log('  PASS: corrupt envelope handled defensively, no throw');
+  console.log('  PASS: malformed envelope fails closed');
+
+  console.log('--- Plan 02 / Test 8a: genuinely absent registry hydrates empty ---');
+  {
+    setupChromeMock();
+    setupDiagnosticCapture();
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      await registry.hydrate();
+      assert.strictEqual(registry.listAgents().length, 0, 'absent key yields empty state');
+      assert.ok((await registry.registerAgent()).agentId,
+        'absent key permits a new authority only after successful hydration');
+    } finally {
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: only true key absence is treated as an empty registry');
+
+  console.log('--- Plan 02 / Test 8b: storage read rejection preserves held authority proof ---');
+  {
+    const now = 25_000;
+    const agentId = 'agent_storage_read_hold_security';
+    const delegationId = 'Delegation_storage_read_hold_6104';
+    const ownershipToken = 'storage-read-held-token';
+    const originalEnvelope = {
+      v: 1,
+      records: {
+        [agentId]: { agentId, createdAt: 1, tabIds: [], windowId: 9 },
+      },
+      delegations: { [delegationId]: agentId },
+      holdLeases: {
+        [delegationId]: {
+          v: 2,
+          delegationId,
+          agentId,
+          activeTabId: 109,
+          ownedTabs: [{ tabId: 109, ownershipToken }],
+          tabSecurity: [{
+            tabId: 109,
+            ownershipToken,
+            incognito: false,
+            windowId: 9,
+            boundAt: 100,
+            forced: false,
+            lastAgentNavigationAt: 150,
+          }],
+          issuedAt: now,
+          expiresAt: now + 300000,
+        },
+      },
+    };
+    const mock = setupChromeMock({
+      session: { fsbAgentRegistry: originalEnvelope },
+      tabs: [{ id: 109, incognito: false, windowId: 9 }],
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const blockedRegistry = new fresh.AgentRegistry({ now: () => now });
+      mock.session._rejectNextGet(new Error('session read denied'));
+      await assert.rejects(
+        blockedRegistry.hydrate(),
+        /storage read failed/,
+        'session read rejection blocks registry hydration',
+      );
+      await assert.rejects(
+        blockedRegistry.registerAgent(),
+        /hydration failed/,
+        'session read rejection quarantines later authority mutations',
+      );
+      assert.deepStrictEqual(mock.session._dump().fsbAgentRegistry, originalEnvelope,
+        'failed read never overwrites the held-authority envelope');
+
+      const recoveredRegistry = new fresh.AgentRegistry({ now: () => now });
+      await recoveredRegistry.hydrate();
+      const otherAgentId = (await recoveredRegistry.registerAgent()).agentId;
+      assert.strictEqual(await recoveredRegistry.bindTab(otherAgentId, 109), false,
+        'a later successful wake restores the held tab as unclaimable');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: unreadable storage cannot erase or bypass held authority');
+
+  console.log('--- Phase 61 / CR4: nested authority corruption quarantines hydration ---');
+  {
+    const agentId = 'agent_nested_authority_security';
+    const cases = [
+      {
+        label: 'malformed records row',
+        pattern: /record is corrupt/,
+        envelope: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: '109' },
+          },
+          delegations: { Delegation_nested_record_6104: agentId },
+        },
+      },
+      {
+        label: 'coerced incognito metadata',
+        pattern: /tab metadata is corrupt/,
+        envelope: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [110], windowId: 10 },
+          },
+          tabMetadata: {
+            '110': {
+              ownershipToken: 'nested-token-110',
+              incognito: 'false',
+              windowId: 10,
+              boundAt: 100,
+              forced: false,
+              lastAgentNavigationAt: null,
+            },
+          },
+        },
+      },
+      {
+        label: 'missing record window pin',
+        pattern: /tab metadata is corrupt/,
+        envelope: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [111] },
+          },
+          tabMetadata: {
+            '111': {
+              ownershipToken: 'nested-token-111',
+              incognito: false,
+              windowId: 10,
+              boundAt: 100,
+              forced: false,
+              lastAgentNavigationAt: null,
+            },
+          },
+        },
+      },
+      {
+        label: 'neutralized staged release',
+        pattern: /staged release is corrupt/,
+        envelope: {
+          v: 1,
+          records: {
+            [agentId]: {
+              agentId,
+              createdAt: 1,
+              tabIds: [],
+              connectionId: 'connection-nested-6104',
+            },
+          },
+          stagedReleases: {
+            'connection-nested-6104': { deadline: Date.now() + 1000, agentIds: [] },
+          },
+        },
+      },
+      {
+        label: 'release receipt overlaps a live agent',
+        pattern: /release receipt is corrupt/,
+        envelope: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [] },
+          },
+          delegationReleaseReceipts: {
+            Delegation_live_receipt_6104: {
+              v: 1,
+              delegationId: 'Delegation_live_receipt_6104',
+              agentId,
+              releasedTabCount: 1,
+              releasedAt: 100,
+              acknowledged: false,
+            },
+          },
+        },
+      },
+      {
+        label: 'duplicate release receipt agent identity',
+        pattern: /release receipt is corrupt/,
+        envelope: {
+          v: 1,
+          records: {},
+          delegationReleaseReceipts: {
+            Delegation_duplicate_receipt_a_6104: {
+              v: 1,
+              delegationId: 'Delegation_duplicate_receipt_a_6104',
+              agentId,
+              releasedTabCount: 1,
+              releasedAt: 100,
+              acknowledged: false,
+            },
+            Delegation_duplicate_receipt_b_6104: {
+              v: 1,
+              delegationId: 'Delegation_duplicate_receipt_b_6104',
+              agentId,
+              releasedTabCount: 1,
+              releasedAt: 101,
+              acknowledged: false,
+            },
+          },
+        },
+      },
+    ];
+    for (const testCase of cases) {
+      const originalEnvelope = JSON.parse(JSON.stringify(testCase.envelope));
+      const mock = setupChromeMock({
+        session: { fsbAgentRegistry: testCase.envelope },
+        tabs: [{ id: 109 }, { id: 110 }, { id: 111 }],
+      });
+      try {
+        const fresh = freshRequireRegistry();
+        const registry = new fresh.AgentRegistry();
+        await assert.rejects(
+          registry.hydrate(),
+          testCase.pattern,
+          `${testCase.label} rejects hydration`,
+        );
+        await assert.rejects(
+          registry.registerAgent(),
+          /hydration failed/,
+          `${testCase.label} quarantines later authority mutations`,
+        );
+        assert.deepStrictEqual(
+          mock.session._dump().fsbAgentRegistry,
+          originalEnvelope,
+          `${testCase.label} is never rewritten`,
+        );
+      } finally {
+        teardownChromeMock();
+      }
+    }
+  }
+  console.log('  PASS: records, tab security, window pins, and staged cleanup fail closed');
+
+  console.log('--- Phase 61 / CR4: admission bounds prevent post-mutation poison ---');
+  {
+    const mock = setupChromeMock({
+      tabs: [{ id: 112 }, { id: 113 }, { id: 114, windowId: 1.5 }],
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      const agentId = (await registry.registerAgent()).agentId;
+      for (const inheritedSurface of ['__proto__', 'constructor', 'toString']) {
+        const rejected = await registry.getOrRegisterLegacyAgent(inheritedSurface);
+        assert.strictEqual(rejected.error, 'unknown_legacy_surface',
+          `prototype-named legacy surface ${inheritedSurface} is rejected`);
+      }
+      assert.strictEqual(registry.listAgents().length, 1,
+        'prototype-named legacy surfaces cannot create partial records');
+      const legacyReceiptId = 'Delegation_legacy_receipt_conflict_6104';
+      registry._delegationReleaseReceipts.set(legacyReceiptId, {
+        v: 1,
+        delegationId: legacyReceiptId,
+        agentId: 'legacy:popup',
+        releasedTabCount: 1,
+        releasedAt: 100,
+        acknowledged: false,
+      });
+      assert.strictEqual(
+        (await registry.getOrRegisterLegacyAgent('popup')).error,
+        'agent_release_receipt_conflict',
+        'stable legacy identity cannot be recreated while exact release proof remains',
+      );
+      assert.strictEqual(
+        registry.listAgents().some((record) => record.agentId === 'legacy:popup'),
+        false,
+        'release-receipt conflict rejects before legacy record mutation');
+      registry._delegationReleaseReceipts.delete(legacyReceiptId);
+
+      const liveReceiptId = 'Delegation_live_persist_conflict_6104';
+      registry._delegationReleaseReceipts.set(liveReceiptId, {
+        v: 1,
+        delegationId: liveReceiptId,
+        agentId,
+        releasedTabCount: 1,
+        releasedAt: 100,
+        acknowledged: false,
+      });
+      await assert.rejects(registry._persist(true), /release receipt is corrupt/,
+        'persistence rejects receipt proof that overlaps any live agent record');
+      registry._delegationReleaseReceipts.delete(liveReceiptId);
+      assert.strictEqual(registry.stampConnectionId(agentId, 'x'.repeat(129)), false,
+        'oversized connection identity is rejected before mutation');
+      assert.strictEqual(registry.stampClientInfo(agentId, { name: 'x'.repeat(257) }), false,
+        'oversized client identity is rejected before mutation');
+      assert.strictEqual(await registry.stageReleaseByConnectionId('x'.repeat(129), 100), false,
+        'oversized staged-release identity is rejected before timer creation');
+
+      const fullSet = registry._tabsByAgent.get(agentId);
+      for (let tabId = 1; tabId <= 4096; tabId += 1) fullSet.add(tabId);
+      assert.strictEqual(await registry.bindTab(agentId, 5000), false,
+        'tab capacity is rejected before owner or metadata mutation');
+      assert.strictEqual(registry.getOwner(5000), null,
+        'capacity rejection leaves the candidate tab unowned');
+      assert.strictEqual(registry.getTabMetadata(5000), null,
+        'capacity rejection never mints partial security metadata');
+      fullSet.clear();
+
+      assert.strictEqual(await registry.bindTab(agentId, Number.MAX_SAFE_INTEGER + 1), false,
+        'unsafe tab ids are rejected before owner mutation');
+      const safeWindowFallback = await registry.bindTab(agentId, 114);
+      assert.ok(safeWindowFallback, 'a tab with malformed window metadata still binds safely');
+      assert.strictEqual(registry.getTabMetadata(114).windowId, null,
+        'non-integer browser window metadata is never admitted to durable authority');
+      assert.strictEqual(await registry.releaseTab(114), true,
+        'the safely normalized binding remains releasable');
+
+      const legacyEnvelope = {
+        v: 1,
+        records: {
+          legacy_agent: { agentId: 'legacy_agent', createdAt: 1, tabIds: [112] },
+        },
+      };
+      await mock.session.set({ fsbAgentRegistry: legacyEnvelope });
+      const legacyRegistry = new fresh.AgentRegistry();
+      await legacyRegistry.hydrate();
+      assert.strictEqual(await legacyRegistry.bindTab('legacy_agent', 113), false,
+        'token-less legacy ownership cannot become a partial modern metadata block');
+      assert.strictEqual(legacyRegistry.getOwner(113), null,
+        'legacy admission rejection leaves the new tab unowned');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: public mutators enforce canonical bounds before changing authority');
+
+  console.log('--- Phase 61 / CR4: prototype-named authority keys remain durable ---');
+  {
+    const deadline = Date.now() + 5000;
+    const envelope = JSON.parse(JSON.stringify({
+      v: 1,
+      records: JSON.parse('{"__proto__":{"agentId":"__proto__","createdAt":1,"tabIds":[],"connectionId":"prototype"}}'),
+      delegations: JSON.parse('{"constructor":"__proto__"}'),
+      stagedReleases: JSON.parse(`{"prototype":{"deadline":${deadline},"agentIds":["__proto__"]}}`),
+    }));
+    const mock = setupChromeMock({ session: { fsbAgentRegistry: envelope } });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      await registry.hydrate();
+      assert.strictEqual(registry.getAgentForDelegation('constructor'), '__proto__',
+        'prototype-named delegation remains mapped');
+      assert.ok(registry._stagedReleases.has('prototype'),
+        'prototype-named connection retains staged cleanup');
+      await registry._persist(true);
+      const persisted = mock.session._dump().fsbAgentRegistry;
+      assert.ok(Object.prototype.hasOwnProperty.call(persisted.records, '__proto__'),
+        'prototype-named record persists as an own key');
+      assert.ok(Object.prototype.hasOwnProperty.call(persisted.delegations, 'constructor'),
+        'constructor-named delegation persists as an own key');
+      assert.ok(Object.prototype.hasOwnProperty.call(persisted.stagedReleases, 'prototype'),
+        'prototype-named staged release persists as an own key');
+      await registry.cancelStagedRelease('prototype');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: canonical dictionaries cannot drop keys through prototype setters');
 
   // === Plan 02: ghost-record reconciliation + diagnostic emission =============
 
@@ -1056,6 +1435,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
               incognito: false,
               windowId: 10,
               boundAt: 999,
+              forced: false,
               lastAgentNavigationAt: 777
             }
           }
@@ -1108,6 +1488,10 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(boundA.ok, true);
       assert.strictEqual(boundB.ok, true);
       assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA);
+      assert.deepStrictEqual(registry.listDelegationMappings(), [
+        { delegationId: delegationA, agentId: agentA },
+        { delegationId: delegationB, agentId: agentB },
+      ], 'wake reconciliation reads one bounded exact mapping snapshot');
       assert.deepStrictEqual(
         registry.getDelegationOwnedTabs({ delegationId: delegationA, agentId: agentA }),
         [{ tabId: 101, ownershipToken: tabA.ownershipToken }],
@@ -1162,7 +1546,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   }
   console.log('  PASS: exact one-to-one mapping rejects conflicts and removes only itself');
 
-  console.log('--- Phase 61 / Task 1: delegation map hydrate validates ghosts and conflicts ---');
+  console.log('--- Phase 61 / Task 1: delegation map corruption quarantines hydration ---');
   {
     const agentA = 'agent_550e8400-e29b-41d4-a716-446655440001';
     const agentB = 'agent_550e8400-e29b-41d4-a716-446655440002';
@@ -1197,20 +1581,32 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     try {
       const fresh = freshRequireRegistry();
       const registry = new fresh.AgentRegistry();
-      await registry.hydrate();
-      assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA);
-      assert.strictEqual(registry.getAgentForDelegation(delegationGhost), null);
-      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_B1_6104'), null);
-      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_B2_6104'), null);
-      assert.strictEqual(registry.getAgentForDelegation('malformed.id'), null);
-      const persisted = mock.session._dump().fsbAgentRegistry;
-      assert.deepStrictEqual(persisted.delegations, { [delegationA]: agentA },
-        'hydrate writes back only the valid one-to-one row');
+      await assert.rejects(
+        registry.hydrate(),
+        /delegation mapping is corrupt/,
+        'unknown, duplicate, or malformed mapping blocks hydration',
+      );
+      await assert.rejects(
+        registry.registerAgent(),
+        /hydration failed/,
+        'mapping corruption quarantines later authority mutations',
+      );
+      assert.deepStrictEqual(
+        mock.session._dump().fsbAgentRegistry.delegations,
+        {
+          [delegationA]: agentA,
+          [delegationGhost]: 'agent_missing',
+          'Delegation_duplicate_B1_6104': agentB,
+          'Delegation_duplicate_B2_6104': agentB,
+          'malformed.id': agentB,
+        },
+        'failed hydration never rewrites or erases mapping proof',
+      );
     } finally {
       teardownChromeMock();
     }
   }
-  console.log('  PASS: hydrate retains only valid non-ghost one-to-one rows');
+  console.log('  PASS: malformed delegation proof cannot be omitted or rewritten');
 
   console.log('--- Phase 61 / Task 2: complete owned set seals into one held lease ---');
   {

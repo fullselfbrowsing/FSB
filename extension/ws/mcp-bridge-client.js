@@ -32,6 +32,7 @@ const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;
 const DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH = 16;
 const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
 const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
+const MCP_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
 const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
@@ -53,7 +54,7 @@ function isPlainMcpClientInventory(value) {
 }
 
 class MCPBridgeClient {
-  constructor() {
+  constructor(options = {}) {
     this._ws = null;
     this._reconnectDelay = MCP_RECONNECT_BASE_MS;
     this._reconnectTimer = null;
@@ -93,6 +94,8 @@ class MCPBridgeClient {
     this._authProbePromise = null;
     this._extPending = new Map();
     this._extEventObservers = [];
+    this._inboundAuthorityReady = !!(options && options.inboundAuthorityReady === true);
+    this._delegationAuthorityReady = !!(options && options.delegationAuthorityReady === true);
     this._extRequestCounter = 0;
     this._replacementSockets = new Set();
     this._socketWaiters = new Set();
@@ -963,6 +966,73 @@ class MCPBridgeClient {
   // Message handling
   // --------------------------------------------------------------------------
 
+  setInboundAuthorityReady(ready) {
+    this._inboundAuthorityReady = ready === true;
+    return this._inboundAuthorityReady;
+  }
+
+  isInboundAuthorityReady() {
+    return this._inboundAuthorityReady === true;
+  }
+
+  setDelegationAuthorityReady(ready) {
+    this._delegationAuthorityReady = ready === true;
+    return this._delegationAuthorityReady;
+  }
+
+  isDelegationAuthorityReady() {
+    return this._delegationAuthorityReady === true;
+  }
+
+  _isDelegationScopedInbound(type, payload) {
+    if (type === 'agent:register'
+        && payload
+        && typeof payload === 'object'
+        && Object.prototype.hasOwnProperty.call(payload, 'delegationId')) {
+      return true;
+    }
+    const agentId = payload
+      && typeof payload === 'object'
+      && Object.prototype.hasOwnProperty.call(payload, 'agentId')
+      && typeof payload.agentId === 'string'
+      ? payload.agentId
+      : null;
+    if (!agentId) return false;
+    const registry = globalThis.fsbAgentRegistryInstance;
+    if (!registry || typeof registry.listDelegationMappings !== 'function') return true;
+    let mappings;
+    try {
+      mappings = registry.listDelegationMappings();
+    } catch (_error) {
+      return true;
+    }
+    if (!Array.isArray(mappings) || mappings.length > 64) return true;
+    const delegationIds = new Set();
+    const agentIds = new Set();
+    let mapped = false;
+    for (const row of mappings) {
+      if (!row
+          || typeof row !== 'object'
+          || Array.isArray(row)
+          || Object.keys(row).length !== 2
+          || !Object.prototype.hasOwnProperty.call(row, 'delegationId')
+          || !Object.prototype.hasOwnProperty.call(row, 'agentId')
+          || typeof row.delegationId !== 'string'
+          || !MCP_DELEGATION_ID_PATTERN.test(row.delegationId)
+          || typeof row.agentId !== 'string'
+          || row.agentId.length === 0
+          || row.agentId.length > 128
+          || delegationIds.has(row.delegationId)
+          || agentIds.has(row.agentId)) {
+        return true;
+      }
+      delegationIds.add(row.delegationId);
+      agentIds.add(row.agentId);
+      if (row.agentId === agentId) mapped = true;
+    }
+    return mapped;
+  }
+
   _send(data) {
     if (this._ws && this._ws.readyState === WebSocket.OPEN) {
       this._ws.send(typeof data === 'string' ? data : JSON.stringify(data));
@@ -1017,6 +1087,13 @@ class MCPBridgeClient {
    * Returns the result payload.
    */
   async _routeMessage(type, payload, id) {
+    if (type !== 'system:client-inventory' && this._inboundAuthorityReady !== true) {
+      throw new Error('mcp_authority_not_ready');
+    }
+    if (this._delegationAuthorityReady !== true
+        && this._isDelegationScopedInbound(type, payload)) {
+      throw new Error('delegation_authority_not_ready');
+    }
     switch (type) {
       case 'system:client-inventory': {
         if (!isPlainMcpClientInventory(payload && payload.platforms)) {
@@ -2565,4 +2642,7 @@ class MCPBridgeClient {
 }
 
 // Global instance
-const mcpBridgeClient = new MCPBridgeClient();
+const mcpBridgeClient = new MCPBridgeClient({
+  inboundAuthorityReady: false,
+  delegationAuthorityReady: false,
+});

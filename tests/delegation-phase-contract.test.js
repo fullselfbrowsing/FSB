@@ -472,9 +472,9 @@ check(/_hasExactKeys\(value, INIT_KEYS\)/.test(auditedEventStoreSource)
   && /\['profileVersion', 'model', 'sessionId'\]/.test(auditedEventStoreSource)
   && /allowedTools\.length > MAX_ALLOWED_TOOLS/.test(auditedEventStoreSource),
 'init client/profile/model/session/allowed-tools fields receive dedicated closed validation');
-check(/_hasExactKeys\(value, TOOL_KEYS\)[\s\S]*VALID_TOOL_STATUSES\[value\.status\]/.test(auditedEventStoreSource),
+check(/_hasExactKeys\(value, TOOL_KEYS\)[\s\S]*_hasOwn\(VALID_TOOL_STATUSES, value\.status\)/.test(auditedEventStoreSource),
   'tool-call payload and status receive dedicated closed validation');
-check(/_hasExactKeys\(value, RETRY_KEYS\)[\s\S]*VALID_RETRY_CLASSES\[value\.class\]/.test(auditedEventStoreSource),
+check(/_hasExactKeys\(value, RETRY_KEYS\)[\s\S]*_hasOwn\(VALID_RETRY_CLASSES, value\.class\)/.test(auditedEventStoreSource),
   'retry payload and class receive dedicated closed validation');
 
 const architectureLinks = Object.freeze({
