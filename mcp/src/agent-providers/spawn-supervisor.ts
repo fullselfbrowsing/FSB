@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import {
   spawn as nodeSpawn,
   type ChildProcessWithoutNullStreams,
@@ -45,6 +45,8 @@ const STDERR_LIMIT_BYTES = 64 * 1024;
 const PRE_AUTH_EVENT_LIMIT_BYTES = 2 * 1024 * 1024;
 const PRE_AUTH_EVENT_LIMIT_COUNT = 1024;
 const COMPLETED_RUN_LIMIT = 256;
+const ACTIVE_STATUS_LIMIT = 64;
+const RECOVERY_STATUS_LIMIT = 128;
 const DEFAULT_ACTIVATION_ATTEMPTS = 80;
 const DEFAULT_ACTIVATION_POLL_MS = 25;
 
@@ -58,6 +60,7 @@ const PROVIDER_KEY_NAMES = Object.freeze([
 const START_REQUEST_KEYS = Object.freeze(['id', 'method', 'payload', 'type']);
 const START_PAYLOAD_KEYS = Object.freeze(['adapterId', 'task']);
 const CANCEL_PAYLOAD_KEYS = Object.freeze(['delegationId']);
+const STATUS_PAYLOAD_KEYS = Object.freeze([]);
 
 const DelegateStartSchema = z.object({
   adapterId: z.literal(CLAUDE_CODE_ADAPTER_ID),
@@ -65,6 +68,10 @@ const DelegateStartSchema = z.object({
 }).strict();
 
 const DelegateCancelSchema = z.object({
+  delegationId: z.string().regex(DELEGATION_ID_PATTERN),
+}).strict();
+
+const DelegateLifecycleSchema = z.object({
   delegationId: z.string().regex(DELEGATION_ID_PATTERN),
 }).strict();
 
@@ -84,10 +91,29 @@ export type DelegationRunState =
   | 'created'
   | 'spawning'
   | 'running'
+  | 'holding'
+  | 'held'
+  | 'resuming'
   | 'stopping'
   | 'settled';
 
-export type DelegationStatus = 'succeeded' | 'failed' | 'cancelled';
+export type DelegationTerminalStatus = 'succeeded' | 'failed' | 'cancelled';
+
+export interface DelegationRestartLoss {
+  readonly delegationId: string;
+  readonly code: 'daemon_restart_lost_run';
+  readonly recoveredAt: number;
+}
+
+export interface DelegationStatus {
+  readonly [key: string]: unknown;
+  readonly generation: string;
+  readonly active: readonly Readonly<{
+    delegationId: string;
+    state: 'running' | 'held' | 'stopping';
+  }>[];
+  readonly restartLosses: readonly DelegationRestartLoss[];
+}
 
 export type DelegationFailureCode =
   | 'adapter_unavailable'
@@ -148,6 +174,11 @@ export interface SpawnSupervisorDependencies {
   readonly wait?: (milliseconds: number) => Promise<void>;
   readonly mintDelegationId?: () => string;
   readonly mintFingerprint?: () => string;
+  readonly mintGeneration?: () => string;
+  readonly processControl?: {
+    hold(entry: ActiveJournalEntry, child: SupervisedChild): Promise<void>;
+    resume(entry: ActiveJournalEntry, child: SupervisedChild): Promise<void>;
+  };
   readonly terminationGrace?: number;
   readonly activationAttempts?: number;
   readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
@@ -167,7 +198,7 @@ export interface ProductionSpawnSupervisorOptions {
 
 interface RunTerminalResult {
   readonly delegationId: string;
-  readonly status: DelegationStatus;
+  readonly status: DelegationTerminalStatus;
   readonly terminal: Readonly<Record<string, unknown>>;
 }
 
@@ -204,6 +235,8 @@ interface DelegationRun {
   parserError: unknown;
   terminationPromise: Promise<void> | null;
   cancelPromise: Promise<RunTerminalResult> | null;
+  holdPromise: Promise<Readonly<Record<string, unknown>>> | null;
+  resumePromise: Promise<Readonly<Record<string, unknown>>> | null;
   executionPromise: Promise<void> | null;
   routeSignal: AbortSignal | null;
   routeAbortListener: (() => void) | null;
@@ -286,6 +319,34 @@ function parseCancelRequest(request: ExtRequest): { delegationId: string } {
   const parsed = DelegateCancelSchema.safeParse(request.payload);
   if (!parsed.success) throw new InvalidDelegationRequestError();
   return parsed.data;
+}
+
+function parseLifecycleRequest(
+  request: ExtRequest,
+  method: 'delegate.hold' | 'delegate.resume',
+): { delegationId: string } {
+  if (
+    !isPlainRecord(request)
+    || !exactKeys(request, START_REQUEST_KEYS)
+    || request.type !== 'ext:request'
+    || request.method !== method
+    || !isPlainRecord(request.payload)
+    || !exactKeys(request.payload, CANCEL_PAYLOAD_KEYS)
+  ) throw new InvalidDelegationRequestError();
+  const parsed = DelegateLifecycleSchema.safeParse(request.payload);
+  if (!parsed.success) throw new InvalidDelegationRequestError();
+  return parsed.data;
+}
+
+function parseStatusRequest(request: ExtRequest): void {
+  if (
+    !isPlainRecord(request)
+    || !exactKeys(request, START_REQUEST_KEYS)
+    || request.type !== 'ext:request'
+    || request.method !== 'delegate.status'
+    || !isPlainRecord(request.payload)
+    || !exactKeys(request.payload, STATUS_PAYLOAD_KEYS)
+  ) throw new InvalidDelegationRequestError();
 }
 
 function diagnosticTerminal(
@@ -409,6 +470,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly wait: (milliseconds: number) => Promise<void>;
   private readonly mintDelegationId: () => string;
   private readonly mintFingerprint: () => string;
+  private readonly generation: string;
+  private readonly processControl: NonNullable<SpawnSupervisorDependencies['processControl']>;
+  private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
   private readonly terminationGrace: number;
   private readonly activationAttempts: number;
   private readonly allowSpawnOnPlatform: (platform: NodeJS.Platform) => boolean;
@@ -428,6 +492,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ?? (() => `delegation_${randomBytes(16).toString('base64url')}`);
     this.mintFingerprint = dependencies.mintFingerprint
       ?? (() => randomBytes(32).toString('base64url'));
+    this.generation = (dependencies.mintGeneration ?? randomUUID)();
+    this.processControl = dependencies.processControl ?? Object.freeze({
+      hold: async () => { throw new TreeUnsettledError(); },
+      resume: async () => { throw new TreeUnsettledError(); },
+    });
     this.terminationGrace = dependencies.terminationGrace ?? 2_000;
     this.activationAttempts = dependencies.activationAttempts ?? DEFAULT_ACTIVATION_ATTEMPTS;
     this.allowSpawnOnPlatform = dependencies.allowSpawnOnPlatform
@@ -440,6 +509,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || !Number.isSafeInteger(this.activationAttempts)
       || this.activationAttempts < 1
       || this.activationAttempts > 1000
+      || !DELEGATION_ID_PATTERN.test(this.generation)
     ) throw new TypeError('Spawn supervisor configuration is invalid');
 
     this.handleExtRequest = async (request, emit, context) => {
@@ -451,6 +521,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (request.method === 'delegate.cancel') {
         const payload = parseCancelRequest(request);
         return this.cancel(payload.delegationId);
+      }
+      if (request.method === 'delegate.hold') {
+        const payload = parseLifecycleRequest(request, 'delegate.hold');
+        return this.hold(payload.delegationId);
+      }
+      if (request.method === 'delegate.resume') {
+        const payload = parseLifecycleRequest(request, 'delegate.resume');
+        return this.resume(payload.delegationId);
+      }
+      if (request.method === 'delegate.status') {
+        parseStatusRequest(request);
+        return this.status();
       }
       throw new InvalidDelegationRequestError();
     };
@@ -536,6 +618,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       parserError: null,
       terminationPromise: null,
       cancelPromise: null,
+      holdPromise: null,
+      resumePromise: null,
       executionPromise: null,
       routeSignal: context?.signal ?? null,
       routeAbortListener: null,
@@ -986,6 +1070,107 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     });
   }
 
+  private status(): DelegationStatus {
+    const active = [...this.activeRuns.values()]
+      .filter((run) => !run.settled && (
+        run.state === 'running'
+        || run.state === 'held'
+        || run.state === 'stopping'
+        || run.state === 'holding'
+        || run.state === 'resuming'
+      ))
+      .sort((left, right) => left.delegationId.localeCompare(right.delegationId))
+      .slice(0, ACTIVE_STATUS_LIMIT)
+      .map((run) => Object.freeze({
+        delegationId: run.delegationId,
+        state: run.state === 'held'
+          ? 'held' as const
+          : (run.state === 'stopping' ? 'stopping' as const : 'running' as const),
+      }));
+    const restartLosses = [...this.restartLosses]
+      .sort((left, right) => (
+        left.recoveredAt - right.recoveredAt
+        || left.delegationId.localeCompare(right.delegationId)
+      ))
+      .slice(-RECOVERY_STATUS_LIMIT)
+      .map((entry) => Object.freeze({ ...entry }));
+    return Object.freeze({
+      generation: this.generation,
+      active: Object.freeze(active),
+      restartLosses: Object.freeze(restartLosses),
+    });
+  }
+
+  private hold(delegationId: string): Promise<Readonly<Record<string, unknown>>> {
+    const run = this.activeRuns.get(delegationId);
+    if (!run) return Promise.resolve(Object.freeze({
+      delegationId,
+      status: this.completedRuns.has(delegationId) ? 'already_terminal' : 'not_found',
+    }));
+    if (run.holdPromise) return run.holdPromise;
+    if (run.state === 'held') {
+      return Promise.resolve(Object.freeze({ delegationId, status: 'held' }));
+    }
+    if (run.state !== 'running' || !run.entry || run.entry.state !== 'active' || !run.supervisedChild) {
+      return Promise.resolve(Object.freeze({ delegationId, status: 'invalid_state' }));
+    }
+    const operation = (async () => {
+      run.state = 'holding';
+      try {
+        await this.processControl.hold(run.entry as ActiveJournalEntry, run.supervisedChild!);
+        if (run.settled || run.stopRequested) return Object.freeze({
+          delegationId,
+          status: 'already_terminal',
+        });
+        run.state = 'held';
+        return Object.freeze({ delegationId, status: 'held' });
+      } catch {
+        if (!run.settled && !run.stopRequested) run.state = 'running';
+        return Object.freeze({ delegationId, status: 'hold_failed' });
+      }
+    })();
+    run.holdPromise = operation;
+    void operation.finally(() => {
+      if (run.holdPromise === operation) run.holdPromise = null;
+    });
+    return operation;
+  }
+
+  private resume(delegationId: string): Promise<Readonly<Record<string, unknown>>> {
+    const run = this.activeRuns.get(delegationId);
+    if (!run) return Promise.resolve(Object.freeze({
+      delegationId,
+      status: this.completedRuns.has(delegationId) ? 'already_terminal' : 'not_found',
+    }));
+    if (run.resumePromise) return run.resumePromise;
+    if (run.state === 'running') {
+      return Promise.resolve(Object.freeze({ delegationId, status: 'running' }));
+    }
+    if (run.state !== 'held' || !run.entry || run.entry.state !== 'active' || !run.supervisedChild) {
+      return Promise.resolve(Object.freeze({ delegationId, status: 'invalid_state' }));
+    }
+    const operation = (async () => {
+      run.state = 'resuming';
+      try {
+        await this.processControl.resume(run.entry as ActiveJournalEntry, run.supervisedChild!);
+        if (run.settled || run.stopRequested) return Object.freeze({
+          delegationId,
+          status: 'already_terminal',
+        });
+        run.state = 'running';
+        return Object.freeze({ delegationId, status: 'running' });
+      } catch {
+        if (!run.settled && !run.stopRequested) run.state = 'held';
+        return Object.freeze({ delegationId, status: 'resume_failed' });
+      }
+    })();
+    run.resumePromise = operation;
+    void operation.finally(() => {
+      if (run.resumePromise === operation) run.resumePromise = null;
+    });
+    return operation;
+  }
+
   private cancelRun(
     run: DelegationRun,
     reason: 'daemon_shutdown' | 'route_lost',
@@ -1060,7 +1245,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   private settleOnce(
     run: DelegationRun,
-    status: DelegationStatus,
+    status: DelegationTerminalStatus,
     terminal: Readonly<Record<string, unknown>>,
   ): boolean {
     if (run.settled) return false;
@@ -1134,3 +1319,5 @@ export function createProductionSpawnSupervisor(
 export const DELEGATION_TASK_LIMIT_BYTES = TASK_LIMIT_BYTES;
 export const DELEGATION_STDERR_LIMIT_BYTES = STDERR_LIMIT_BYTES;
 export const DELEGATION_PROVIDER_KEY_NAMES = PROVIDER_KEY_NAMES;
+export const DELEGATION_ACTIVE_STATUS_LIMIT = ACTIVE_STATUS_LIMIT;
+export const DELEGATION_RECOVERY_STATUS_LIMIT = RECOVERY_STATUS_LIMIT;

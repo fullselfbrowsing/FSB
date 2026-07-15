@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -21,6 +22,9 @@ async function run() {
     { id: 'request-1', type: 'ext:request', method: 'bridge.ping', payload: { value: 1 } },
     { id: 'delegate-start-1', type: 'ext:request', method: 'delegate.start', payload: { adapterId: 'claude-code', task: 'safe task' } },
     { id: 'delegate-cancel-1', type: 'ext:request', method: 'delegate.cancel', payload: { delegationId: 'delegation_server_0001' } },
+    { id: 'delegate-hold-1', type: 'ext:request', method: 'delegate.hold', payload: { delegationId: 'delegation_server_0001' } },
+    { id: 'delegate-resume-1', type: 'ext:request', method: 'delegate.resume', payload: { delegationId: 'delegation_server_0001' } },
+    { id: 'delegate-status-1', type: 'ext:request', method: 'delegate.status', payload: {} },
     { id: 'response-1', type: 'ext:response', payload: { authorized: true } },
     {
       id: 'delegate-start-1',
@@ -65,6 +69,34 @@ async function run() {
   );
   assert.strictEqual(domainDriftResponse.error, undefined, 'agent protocol drift is not a transport error');
   assert(!EXT_ERROR_CODES.includes('agent_protocol_drift'), 'domain drift does not expand the exact-five transport union');
+
+  const adapterSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'adapter.ts'),
+    'utf8',
+  );
+  const adapterInterface = adapterSource.match(/export interface AgentProviderAdapter \{([\s\S]*?)\n\}/);
+  assert(adapterInterface, 'five-method adapter interface remains source-visible');
+  const adapterMethods = [...adapterInterface[1].matchAll(/^\s{2}([A-Za-z]+)\(/gm)]
+    .map((match) => match[1]);
+  assert.deepStrictEqual(
+    adapterMethods,
+    ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+    'supervisor lifecycle methods never expand the five-method adapter',
+  );
+  for (const lifecycleMethod of ['hold', 'resume', 'status']) {
+    assert(!adapterMethods.includes(lifecycleMethod), `${lifecycleMethod} remains supervisor-only`);
+  }
+  const serveDelegationSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'serve-delegation.ts'),
+    'utf8',
+  );
+  assert(
+    serveDelegationSource.includes('return supervisor.handleExtRequest(request, emit, context);'),
+    'all five closed delegate methods route through the one serve-owned supervisor instance',
+  );
+  const indexSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
+  assert(indexSource.includes("import { startServeDelegation } from './agent-providers/serve-delegation.js';"));
+  assert(indexSource.includes('const lifecycle = await startServeDelegation({ host, port });'));
 
   const delegationSequence = validFrames.filter((frame) => frame.id === 'delegate-start-1');
   assert.deepStrictEqual(
