@@ -15,6 +15,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
 type PhantomSection = 'overview' | 'problem' | 'whydom' | 'architecture' | 'features' | 'security' | 'quickstart' | 'docs';
 type QuickstartTab = 'capture' | 'viewer' | 'relay';
@@ -132,7 +133,7 @@ server.<span class="tk-f">listen</span>(<span class="tk-n">8787</span>);
 @Component({
   selector: 'app-phantom-stream-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LanguagePickerComponent],
   templateUrl: './phantom-stream-page.component.html',
   styleUrl: './phantom-stream-page.component.scss',
 })

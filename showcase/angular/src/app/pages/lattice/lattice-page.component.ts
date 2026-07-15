@@ -15,6 +15,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
 type PackageManager = 'pnpm' | 'npm';
 type CopyTarget = 'resolve' | 'cli';
@@ -75,7 +76,7 @@ const CLI_CODE_HTML = `<span class="pr">$</span> lattice --help
 @Component({
   selector: 'app-lattice-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LanguagePickerComponent],
   templateUrl: './lattice-page.component.html',
   styleUrl: './lattice-page.component.scss',
 })
