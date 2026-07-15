@@ -4475,6 +4475,52 @@ function readGlamaPageStateRuntimeBase(app, runtimeBaseUrl) {
     : null;
 }
 
+function hasForbiddenSheetsNetworkPrimitive(source) {
+  const text = String(source || '');
+  return /\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource|Worker|SharedWorker|importScripts|axios|superagent)\b/i.test(text);
+}
+
+// The Sheets content action is a reviewed UI-only boundary. Keep this stricter than
+// the session helper: the latter owns the one fixed page-gapi request, while content
+// code may only inspect the pinned Sheets DOM and issue trusted keyboard gestures.
+// Reject the primitive names themselves so aliases and bracket access cannot turn a
+// harmless-looking operation argument into a generic authenticated network proxy.
+function hasForbiddenSheetsContentNetworkSource(source) {
+  const text = String(source || '');
+  const dynamicOrProxyCall =
+    /\b(?:globalThis|window|self|document|navigator|tools|chrome(?:Api)?|browser)\s*\[/i.test(text)
+    || /\]\s*\(/.test(text)
+    || /\.\s*request\s*\(/i.test(text)
+    || /\b(?:gapi|postMessage|MessageChannel|BroadcastChannel)\b/i.test(text)
+    || /\b(?:chrome(?:Api)?|browser)\s*\.\s*(?:runtime|tabs|scripting|webRequest|cookies|identity)\b/i.test(text)
+    || /\bReflect\s*\.\s*(?:get|set|apply|construct)\s*\(/i.test(text);
+
+  const urlLiteralOrBuilder =
+    /['"`]\s*(?:https?|wss?|ftp|data|blob)\s*:/i.test(text)
+    || /['"`]\s*\/\/(?![/*])/i.test(text)
+    || /\b(?:url|uri|endpoint|baseUrl)\b/i.test(text)
+    || /\b(?:encodeURI|decodeURI)(?:Component)?\s*\(/i.test(text)
+    || /\b(?:params|args|request|payload|input)\s*(?:\.\s*(?:url|uri|href|src|endpoint|origin|host|path)\b|\[\s*['"`](?:url|uri|href|src|endpoint|origin|host|path)['"`]\s*\])/i.test(text);
+
+  const domNetworkSink =
+    /\b(?:new\s+)?(?:Image|Audio)\s*\(/i.test(text)
+    || /\bdocument\s*\.\s*createElement(?:NS)?\s*\([\s\S]*?['"`](?:a|audio|embed|form|iframe|image|img|link|meta|object|script|source|track|video)\b/i.test(text)
+    || /(?:\.\s*(?:src|srcdoc|srcset|href|action|formAction|poster|data)\b|\[\s*['"`](?:src|srcdoc|srcset|href|action|formAction|poster|data)['"`]\s*\])\s*=/i.test(text)
+    || /\[[^\]\r\n]+\]\s*=/.test(text)
+    || /\.\s*setAttribute(?:NS)?\s*\(/i.test(text)
+    || /\bObject\s*\.\s*(?:assign|defineProperty|defineProperties)\s*\(/i.test(text)
+    || /\.\s*(?:innerHTML|outerHTML|cssText|background|backgroundImage|borderImage|content|cursor|listStyle|listStyleImage|mask|maskImage)\s*=/i.test(text)
+    || /\.\s*(?:createContextualFragment|insertAdjacentHTML|submit|requestSubmit|setProperty)\s*\(/i.test(text)
+    || /\b(?:window|globalThis|self)\s*\.\s*open\s*\(/i.test(text)
+    || /\b(?:window\s*\.\s*)?(?:document\s*\.\s*)?location\s*(?:\.\s*href\s*)?=/i.test(text)
+    || /\blocation\s*\.\s*(?:assign|replace|reload)\s*\(/i.test(text);
+
+  return hasForbiddenSheetsNetworkPrimitive(text)
+    || dynamicOrProxyCall
+    || urlLiteralOrBuilder
+    || domNetworkSink;
+}
+
 export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
   const overrides = sourceOverrides || {};
   const expectedBase = 'https://sheets.googleapis.com/v4';
@@ -4573,7 +4619,8 @@ export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
     || /\bdocument\.cookie\b|chrome(?:Api)?\.cookies\b|\bcookies?\.(?:get|set|remove)\s*\(/i.test(forbiddenSheetsSource)
     || /\b(?:localStorage|sessionStorage|chrome(?:Api)?\.storage)\b/i.test(forbiddenSheetsSource)
     || /\bAuthorization\b|\bBearer\b/i.test(forbiddenSheetsSource)
-    || /\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\s*\(|\bWebSocket\s*\(|\bEventSource\s*\(/i.test(forbiddenSheetsSource);
+    || hasForbiddenSheetsNetworkPrimitive(forbiddenSheetsSource)
+    || hasForbiddenSheetsContentNetworkSource(sheetsContentText);
   if (hasForbiddenCredentialOrNetworkSource) { failures.push('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'); }
 
   const contentActionOk = !!sheetsContentText

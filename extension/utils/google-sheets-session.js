@@ -222,6 +222,7 @@
     var chromeApi = deps.chrome || global.chrome;
     var timeoutMs = deps.requestTimeoutMs || REQUEST_TIMEOUT_MS;
     var mutationChains = new Map();
+    var uiChains = new Map();
 
     async function resolveTarget(params, context) {
       params = params || {};
@@ -296,7 +297,7 @@
       return result;
     }
 
-    async function runUi(target, operation, args) {
+    async function dispatchUi(target, operation, args) {
       if (!chromeApi || !chromeApi.tabs || typeof chromeApi.tabs.sendMessage !== 'function') {
         return typedError('GOOGLE_SHEETS_SESSION_UNAVAILABLE');
       }
@@ -325,6 +326,21 @@
       return result;
     }
 
+    function queued(chains, key, task) {
+      var prior = chains.get(key) || Promise.resolve();
+      var current = prior.catch(function() {}).then(task);
+      chains.set(key, current);
+      return current.finally(function() {
+        if (chains.get(key) === current) { chains.delete(key); }
+      });
+    }
+
+    function runUi(target, operation, args) {
+      return queued(uiChains, target.tabId, function() {
+        return dispatchUi(target, operation, args);
+      });
+    }
+
     async function executeTransport(target, operation, args) {
       var pageResult = await runPageClient(target, operation, args);
       if (pageResult && pageResult.success === true) { return pageResult; }
@@ -335,24 +351,13 @@
       return runUi(target, operation, args);
     }
 
-    function queued(tabId, task) {
-      var prior = mutationChains.get(tabId) || Promise.resolve();
-      var current = prior.catch(function() {}).then(task);
-      mutationChains.set(tabId, current);
-      return current.finally(function() {
-        if (mutationChains.get(tabId) === current) { mutationChains.delete(tabId); }
-      });
-    }
-
     async function execute(operation, params, context) {
       var target = await resolveTarget(params, context);
       if (!target.success) { return target; }
       var args = safeArgs(operation, params);
       if (MUTATIONS[operation]) {
-        return queued(target.tabId, function() { return executeTransport(target, operation, args); });
+        return queued(mutationChains, target.tabId, function() { return executeTransport(target, operation, args); });
       }
-      var activeMutation = mutationChains.get(target.tabId);
-      if (activeMutation) { await activeMutation.catch(function() {}); }
       return executeTransport(target, operation, args);
     }
 

@@ -1553,6 +1553,41 @@ function sheetsNameBox() {
   return document.querySelector('#t-name-box');
 }
 
+let sheetsUiOperationChain = Promise.resolve();
+
+function sheetsWithUiLock(operation) {
+  const run = sheetsUiOperationChain.catch(() => undefined).then(operation);
+  sheetsUiOperationChain = run.catch(() => undefined);
+  return run;
+}
+
+function sheetsWorksheetFromReference(reference) {
+  const parsed = sheetsUi?.parseA1Range(reference);
+  if (!parsed?.sheetPrefix) return '';
+  const raw = parsed.sheetPrefix.slice(0, -1);
+  const unquoted = raw.startsWith("'") && raw.endsWith("'")
+    ? raw.slice(1, -1).replace(/''/g, "'")
+    : raw;
+  return unquoted.normalize('NFC');
+}
+
+function sheetsActiveWorksheetName() {
+  const selectors = [
+    '.docs-sheet-tab.docs-sheet-active-tab .docs-sheet-tab-name',
+    '.docs-sheet-tab[aria-selected="true"] .docs-sheet-tab-name',
+    '[role="tab"][aria-selected="true"] .docs-sheet-tab-name',
+    '.docs-sheet-tab.docs-sheet-active-tab',
+    '.docs-sheet-tab[aria-selected="true"]',
+    '[role="tab"][aria-selected="true"]'
+  ];
+  for (const selector of selectors) {
+    const node = document.querySelector(selector);
+    const title = String(node?.textContent || '').trim();
+    if (title) return title.normalize('NFC');
+  }
+  return '';
+}
+
 function sheetsComparableReference(reference) {
   const text = String(reference || '').trim();
   const delimiter = text.lastIndexOf('!');
@@ -1588,6 +1623,10 @@ async function sheetsNavigate(reference, settleMs = 80) {
     await sheetsDelay(settleMs);
     if (sheetsComparableReference(sheetsActiveAddress()) !== sheetsComparableReference(reference)) {
       return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-navigation-not-confirmed');
+    }
+    const requestedWorksheet = sheetsWorksheetFromReference(reference);
+    if (requestedWorksheet && sheetsActiveWorksheetName() !== requestedWorksheet) {
+      return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'worksheet-navigation-not-confirmed');
     }
     return { success: true, address: sheetsActiveAddress() };
   } catch (_error) {
@@ -1759,6 +1798,9 @@ async function sheetsAppendValues(range, values, valueInputOption, insertDataOpt
   if (dataOption !== 'OVERWRITE' && dataOption !== 'INSERT_ROWS') {
     return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-insert-data-option');
   }
+  if (dataOption === 'INSERT_ROWS') {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-insert-rows-unverified');
+  }
   const encoded = sheetsUi.encodeValues(values, inputOption);
   if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
   if (encoded.rows > sheetsUi.limits.maxAppendRows || encoded.columns > parsed.columns) {
@@ -1766,26 +1808,7 @@ async function sheetsAppendValues(range, values, valueInputOption, insertDataOpt
   }
   const boundary = await sheetsFindAppendRow(parsed, encoded.rows, dataOption);
   if (!boundary.success) return boundary;
-  let mutationStarted = false;
-  if (dataOption === 'INSERT_ROWS') {
-    const lastRow = boundary.row + encoded.rows - 1;
-    const selected = await sheetsNavigate(`${parsed.sheetPrefix}${boundary.row}:${lastRow}`, 60);
-    if (!selected.success) return selected;
-    mutationStarted = true;
-    try {
-      const inserted = await tools.keyPress({ key: '=', ctrlKey: true, altKey: true, useDebuggerAPI: true });
-      if (!inserted || inserted.success !== true || inserted.method !== 'debuggerAPI') {
-        return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
-      }
-      await sheetsDelay(150);
-    } catch (_error) {
-      return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
-    }
-  }
   const pasted = await sheetsPasteEncoded(parsed, encoded, boundary.row);
-  if (!pasted.success && mutationStarted && !pasted.mutationStarted) {
-    return sheetsError('RECOVERY_AMBIGUOUS', 'ui-append-partially-completed', true);
-  }
   if (pasted.success) pasted.appendedRows = encoded.rows;
   return pasted;
 }
@@ -5087,14 +5110,16 @@ const tools = {
     }
     const operation = String(params.operation || '');
     const args = params.args && typeof params.args === 'object' ? params.args : {};
-    if (operation === 'getSpreadsheet') return sheetsSpreadsheetMetadata();
-    if (operation === 'getValues') return sheetsReadValues(args.range, args.majorDimension);
-    if (operation === 'updateValues') return sheetsUpdateValues(args.range, args.values, args.valueInputOption);
-    if (operation === 'appendValues') {
-      return sheetsAppendValues(args.range, args.values, args.valueInputOption, args.insertDataOption);
-    }
-    if (operation === 'clearValues') return sheetsClearValues(args.range);
-    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-sheets-ui-operation');
+    return sheetsWithUiLock(async () => {
+      if (operation === 'getSpreadsheet') return sheetsSpreadsheetMetadata();
+      if (operation === 'getValues') return sheetsReadValues(args.range, args.majorDimension);
+      if (operation === 'updateValues') return sheetsUpdateValues(args.range, args.values, args.valueInputOption);
+      if (operation === 'appendValues') {
+        return sheetsAppendValues(args.range, args.values, args.valueInputOption, args.insertDataOption);
+      }
+      if (operation === 'clearValues') return sheetsClearValues(args.range);
+      return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-sheets-ui-operation');
+    });
   },
 
   // =========================================================================
@@ -5115,10 +5140,9 @@ const tools = {
       return { success: false, error: 'fillsheet only works on Google Sheets (canvas-based editor not detected)' };
     }
 
-    // The shared signed-in-tab path uses bounded clipboard chunks. Keep the
-    // historical cell-by-cell implementation below as a compatibility fallback
-    // for partial/older content-script injection sets where the helper is absent.
-    if (sheetsUi) {
+    // Legacy callers use the same bounded signed-in-tab adapter as typed Sheets calls.
+    if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+    return sheetsWithUiLock(async () => {
       const sharedRows = sheetsUi.csvToValues(data);
       if (!sharedRows.length) return { success: false, error: 'No data rows parsed from CSV' };
       await sheetsRenameSpreadsheet(sheetName);
@@ -5135,214 +5159,7 @@ const tools = {
         transport: 'ui',
         hadEffect: true
       };
-    }
-
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-    // Parse CSV with basic quoting support
-    function parseCSV(csvText) {
-      const rows = [];
-      let current = '';
-      let inQuotes = false;
-      const chars = csvText.split('');
-      let row = [];
-
-      for (let i = 0; i < chars.length; i++) {
-        const ch = chars[i];
-        if (ch === '"' && (i === 0 || chars[i - 1] !== '\\')) {
-          inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-          row.push(current.trim());
-          current = '';
-        } else if (ch === '\n' && !inQuotes) {
-          row.push(current.trim());
-          if (row.length > 0 && row.some(c => c !== '')) rows.push(row);
-          row = [];
-          current = '';
-        } else if (ch === '\\' && i + 1 < chars.length && chars[i + 1] === 'n' && !inQuotes) {
-          // Handle literal \n in unquoted context as newline
-          row.push(current.trim());
-          if (row.length > 0 && row.some(c => c !== '')) rows.push(row);
-          row = [];
-          current = '';
-          i++; // skip 'n'
-        } else {
-          current += ch;
-        }
-      }
-      // Last cell
-      row.push(current.trim());
-      if (row.length > 0 && row.some(c => c !== '')) rows.push(row);
-      return rows;
-    }
-
-    const rows = parseCSV(data);
-    if (rows.length === 0) {
-      return { success: false, error: 'No data rows parsed from CSV' };
-    }
-
-    const totalCells = rows.reduce((sum, r) => sum + r.length, 0);
-    console.info(`[fillsheet] Starting: ${rows.length} rows, ${rows[0]?.length || 0} cols, ${totalCells} cells from ${startCell}`);
-
-    try {
-      // Step 1: Exit any edit mode
-      await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
-      await delay(100);
-
-      // Step 2: Navigate to start cell via Name Box
-      const nameBox = document.querySelector('#t-name-box');
-      if (!nameBox) {
-        return { success: false, error: 'Name Box (#t-name-box) not found — not on a Google Sheets page?' };
-      }
-
-      // Click Name Box
-      nameBox.focus();
-      nameBox.click();
-      await delay(100);
-
-      // Select all text in Name Box and type the cell reference
-      await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-      await delay(50);
-      await tools.typeWithKeys({ text: startCell, clearFirst: false, delay: 20 });
-      await delay(50);
-
-      // Press Enter to navigate
-      await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-      await delay(200);
-
-      // Step 2b: Rename spreadsheet if sheetName provided
-      if (sheetName) {
-        try {
-          const titleEl = document.querySelector('.docs-title-input, #docs-title-input, input[aria-label*="Rename" i], .docs-title-widget input');
-          if (titleEl) {
-            // Focus then click to enter edit mode (both needed for Sheets title input)
-            titleEl.focus();
-            await delay(100);
-            titleEl.click();
-            await delay(300);
-            // Use native .select() for input elements — more reliable than Ctrl+A via Debugger API
-            if (typeof titleEl.select === 'function') {
-              titleEl.select();
-            } else {
-              await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-            }
-            await delay(100);
-            await tools.typeWithKeys({ text: sheetName, clearFirst: false, delay: 20 });
-            await delay(100);
-            await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-            await delay(500);
-            // Re-navigate to start cell after rename (focus may have shifted)
-            nameBox.focus();
-            nameBox.click();
-            await delay(100);
-            await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-            await delay(50);
-            await tools.typeWithKeys({ text: startCell, clearFirst: false, delay: 20 });
-            await delay(50);
-            await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-            await delay(200);
-          }
-        } catch (nameErr) {
-          console.warn('[fillsheet] Sheet rename failed (non-fatal):', nameErr.message);
-        }
-      }
-
-      // Step 3: Type data cell by cell
-      let cellsFilled = 0;
-      let errors = [];
-
-      for (let r = 0; r < rows.length; r++) {
-        const row = rows[r];
-        for (let c = 0; c < row.length; c++) {
-          const value = row[c];
-          if (value !== '') {
-            // Sanitize: prefix with space if starts with = + - @ to prevent formula injection
-            const safeValue = /^[=+\-@]/.test(value) ? ' ' + value : value;
-            const typeResult = await tools.typeWithKeys({ text: safeValue, clearFirst: false, delay: 15 });
-            if (!typeResult.success) {
-              errors.push({ row: r, col: c, value, error: typeResult.error });
-            }
-          }
-          cellsFilled++;
-
-          // Move to next cell
-          if (c < row.length - 1) {
-            // Tab = next column
-            await tools.keyPress({ key: 'Tab', useDebuggerAPI: true });
-            await delay(30);
-          }
-        }
-        // Enter = next row (Sheets moves to column A of next row after Enter from last Tab position)
-        // First press Enter to confirm current cell, then position for next row
-        if (r < rows.length - 1) {
-          await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-          await delay(50);
-
-          // Navigate to the start column of the next row via Name Box
-          // Calculate the next row's start cell
-          const colLetter = startCell.replace(/[0-9]/g, '');
-          const startRow = parseInt(startCell.replace(/[A-Za-z]/g, ''), 10);
-          const nextCell = colLetter + (startRow + r + 1);
-          nameBox.focus();
-          nameBox.click();
-          await delay(80);
-          await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-          await delay(30);
-          await tools.typeWithKeys({ text: nextCell, clearFirst: false, delay: 20 });
-          await delay(30);
-          await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-          await delay(150);
-        }
-      }
-
-      // Final Enter to confirm last cell
-      await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-      await delay(100);
-
-      console.info(`[fillsheet] Complete: ${cellsFilled} cells filled, ${errors.length} errors`);
-
-      // Step 4: Auto-format header row (bold) if there are headers + data rows
-      if (rows.length > 1) {
-        try {
-          // Navigate back to start cell
-          nameBox.focus();
-          nameBox.click();
-          await delay(80);
-          await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-          await delay(30);
-          await tools.typeWithKeys({ text: startCell, clearFirst: false, delay: 20 });
-          await delay(30);
-          await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-          await delay(150);
-
-          // Select header row (Shift+Ctrl+Right to select to last data column)
-          await tools.keyPress({ key: 'ArrowRight', shiftKey: true, ctrlKey: true, useDebuggerAPI: true });
-          await delay(50);
-
-          // Bold the selection
-          await tools.keyPress({ key: 'b', ctrlKey: true, useDebuggerAPI: true });
-          await delay(50);
-
-          // Press Escape to deselect
-          await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
-        } catch (fmtErr) {
-          console.warn('[fillsheet] Header formatting failed (non-fatal):', fmtErr.message);
-        }
-      }
-
-      return {
-        success: errors.length === 0,
-        action: 'fillsheet',
-        startCell,
-        rows: rows.length,
-        cols: rows[0]?.length || 0,
-        cellsFilled,
-        errors: errors.length > 0 ? errors : undefined,
-        hadEffect: true
-      };
-    } catch (error) {
-      return { success: false, error: error.message, action: 'fillsheet' };
-    }
+    });
   },
 
   // =========================================================================
@@ -5359,7 +5176,8 @@ const tools = {
       return { success: false, error: 'readsheet only works on Google Sheets' };
     }
 
-    if (sheetsUi) {
+    if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+    return sheetsWithUiLock(async () => {
       const sharedResult = await sheetsReadValues(range, 'ROWS');
       if (!sharedResult.success) return { ...sharedResult, action: 'readsheet' };
       return {
@@ -5373,123 +5191,7 @@ const tools = {
         renderSemantics: 'formula-bar',
         hadEffect: false
       };
-    }
-
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-    // Parse range like "A1:C5" into start/end
-    const rangeMatch = range.match(/^([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$/);
-    if (!rangeMatch) {
-      return { success: false, error: 'Invalid range format. Use "A1:C5" style.' };
-    }
-
-    function colToNum(col) {
-      let num = 0;
-      for (let i = 0; i < col.length; i++) {
-        num = num * 26 + (col.toUpperCase().charCodeAt(i) - 64);
-      }
-      return num;
-    }
-
-    function numToCol(num) {
-      let col = '';
-      while (num > 0) {
-        const rem = (num - 1) % 26;
-        col = String.fromCharCode(65 + rem) + col;
-        num = Math.floor((num - 1) / 26);
-      }
-      return col;
-    }
-
-    const startCol = colToNum(rangeMatch[1]);
-    const startRow = parseInt(rangeMatch[2], 10);
-    const endCol = colToNum(rangeMatch[3]);
-    const endRow = parseInt(rangeMatch[4], 10);
-
-    if (endRow - startRow > 50 || endCol - startCol > 26) {
-      return { success: false, error: 'Range too large. Max 50 rows x 26 columns.' };
-    }
-
-    const nameBox = document.querySelector('#t-name-box');
-    if (!nameBox) {
-      return { success: false, error: 'Name Box not found' };
-    }
-
-    // Find formula bar element for reading values
-    const formulaBarSelectors = ['#t-formula-bar-input', '.cell-input', '[aria-label="Formula bar"]'];
-
-    function getFormulaBarContent() {
-      for (const sel of formulaBarSelectors) {
-        const el = document.querySelector(sel);
-        if (el) {
-          // Try multiple reading strategies
-          const editable = el.querySelector('[contenteditable="true"]');
-          if (editable) {
-            const text = (editable.innerText || editable.textContent || '').trim();
-            if (text) return text;
-          }
-          const direct = (el.innerText || el.textContent || '').trim();
-          if (direct) return direct;
-          // Check parent for display siblings
-          const parent = el.parentElement;
-          if (parent) {
-            const display = parent.querySelector('.cell-input, [aria-label*="formula"]');
-            if (display && display !== el) {
-              return (display.innerText || display.textContent || '').trim();
-            }
-          }
-        }
-      }
-      return '';
-    }
-
-    try {
-      // Exit edit mode first
-      await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
-      await delay(100);
-
-      const csvRows = [];
-      const totalCells = (endRow - startRow + 1) * (endCol - startCol + 1);
-      console.info(`[readsheet] Reading ${range}: ${endRow - startRow + 1} rows x ${endCol - startCol + 1} cols = ${totalCells} cells`);
-
-      for (let r = startRow; r <= endRow; r++) {
-        const rowValues = [];
-        for (let c = startCol; c <= endCol; c++) {
-          const cellRef = numToCol(c) + r;
-
-          // Navigate to cell via Name Box
-          nameBox.focus();
-          nameBox.click();
-          await delay(60);
-          await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-          await delay(30);
-          await tools.typeWithKeys({ text: cellRef, clearFirst: false, delay: 15 });
-          await delay(30);
-          await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
-          await delay(150);
-
-          // Read formula bar content
-          const value = getFormulaBarContent();
-          rowValues.push(value);
-        }
-        csvRows.push(rowValues.join(','));
-      }
-
-      const csvResult = csvRows.join('\n');
-      console.info(`[readsheet] Complete: read ${totalCells} cells`);
-
-      return {
-        success: true,
-        action: 'readsheet',
-        range,
-        rows: endRow - startRow + 1,
-        cols: endCol - startCol + 1,
-        data: csvResult,
-        hadEffect: false
-      };
-    } catch (error) {
-      return { success: false, error: error.message, action: 'readsheet' };
-    }
+    });
   },
 
   // =========================================================================

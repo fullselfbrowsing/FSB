@@ -187,6 +187,124 @@ test('serializes mutations per tab before dispatching page or UI work', async ()
   assert.equal(maxConcurrent, 1);
 });
 
+test('serializes concurrent UI reads per tab without serializing their page-client attempts', async () => {
+  let pageCalls = 0;
+  let uiCalls = 0;
+  let concurrentUi = 0;
+  let maxConcurrentUi = 0;
+  let releaseFirstUi;
+  let signalFirstUi;
+  let signalSecondUi;
+  const firstUiStarted = new Promise(resolve => { signalFirstUi = resolve; });
+  const secondUiStarted = new Promise(resolve => { signalSecondUi = resolve; });
+  const firstUiGate = new Promise(resolve => { releaseFirstUi = resolve; });
+  const chrome = {
+    tabs: {
+      async get(tabId) { return { id: tabId, url: URL }; },
+      async sendMessage() {
+        uiCalls++;
+        concurrentUi++;
+        maxConcurrentUi = Math.max(maxConcurrentUi, concurrentUi);
+        if (uiCalls === 1) {
+          signalFirstUi();
+          await firstUiGate;
+        } else {
+          signalSecondUi();
+        }
+        concurrentUi--;
+        return { success: true, transport: 'ui', data: { values: [['ok']] } };
+      }
+    },
+    scripting: {
+      async executeScript() {
+        pageCalls++;
+        return [{ result: {
+          success: false,
+          code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+          safeToFallback: true,
+          requestSent: false
+        } }];
+      }
+    }
+  };
+  const client = sessionModule.createSession({ chrome });
+  const first = client.getValues({ range: 'A1' }, CONTEXT);
+  const second = client.getValues({ range: 'B1' }, CONTEXT);
+
+  await firstUiStarted;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pageCalls, 2);
+  assert.equal(uiCalls, 1);
+  assert.equal(maxConcurrentUi, 1);
+
+  releaseFirstUi();
+  await secondUiStarted;
+  const results = await Promise.all([first, second]);
+  assert.equal(results[0].success, true);
+  assert.equal(results[1].success, true);
+  assert.equal(uiCalls, 2);
+  assert.equal(maxConcurrentUi, 1);
+});
+
+test('serializes a UI read behind a UI mutation while allowing its page-client attempt', async () => {
+  let pageCalls = 0;
+  let uiCalls = 0;
+  let concurrentUi = 0;
+  let maxConcurrentUi = 0;
+  let releaseMutationUi;
+  let signalMutationUi;
+  let signalReadUi;
+  const mutationUiStarted = new Promise(resolve => { signalMutationUi = resolve; });
+  const readUiStarted = new Promise(resolve => { signalReadUi = resolve; });
+  const mutationUiGate = new Promise(resolve => { releaseMutationUi = resolve; });
+  const chrome = {
+    tabs: {
+      async get(tabId) { return { id: tabId, url: URL }; },
+      async sendMessage(_tabId, message) {
+        uiCalls++;
+        concurrentUi++;
+        maxConcurrentUi = Math.max(maxConcurrentUi, concurrentUi);
+        if (message.params.operation === 'updateValues') {
+          signalMutationUi();
+          await mutationUiGate;
+        } else {
+          signalReadUi();
+        }
+        concurrentUi--;
+        return { success: true, transport: 'ui', data: { values: [['ok']] } };
+      }
+    },
+    scripting: {
+      async executeScript() {
+        pageCalls++;
+        return [{ result: {
+          success: false,
+          code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+          safeToFallback: true,
+          requestSent: false
+        } }];
+      }
+    }
+  };
+  const client = sessionModule.createSession({ chrome });
+  const mutation = client.updateValues({ range: 'A1', values: [['x']] }, CONTEXT);
+  await mutationUiStarted;
+
+  const read = client.getValues({ range: 'B1' }, CONTEXT);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pageCalls, 2);
+  assert.equal(uiCalls, 1);
+  assert.equal(maxConcurrentUi, 1);
+
+  releaseMutationUi();
+  await readUiStarted;
+  const results = await Promise.all([mutation, read]);
+  assert.equal(results[0].success, true);
+  assert.equal(results[1].success, true);
+  assert.equal(uiCalls, 2);
+  assert.equal(maxConcurrentUi, 1);
+});
+
 test('classifies mutation timeouts, network failures, and 5xx responses as ambiguous', async () => {
   const previous = globalThis.gapi;
   const restoreLocation = installPageLocation();

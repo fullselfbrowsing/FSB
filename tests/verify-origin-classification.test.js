@@ -419,15 +419,70 @@ function check(cond, msg) {
     path.join(ROOT, 'extension', 'content', 'actions.js'),
     'utf8'
   );
-  const broadenedContentSources = gate.verifyPageGapiUiSheetsSessionSources({
+  const verifyInjectedSheetsContent = (injectedSource) => gate.verifyPageGapiUiSheetsSessionSources({
     contentActionsText: sheetsContentSource.replace(
       'sheetsSession: async (params = {}) => {',
-      'sheetsSession: async (params = {}) => { fetch(params.url);'
+      'sheetsSession: async (params = {}) => { ' + injectedSource
     )
   });
+  const broadenedContentSources = verifyInjectedSheetsContent('fetch(params.url);');
   check(broadenedContentSources && broadenedContentSources.ok === false
     && broadenedContentSources.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
     '(b) negative control: a caller-selected content-action fetch fails the fixed Sheets UI source contract');
+
+  const bracketFetchContent = verifyInjectedSheetsContent("globalThis['fetch']('/relative');");
+  check(bracketFetchContent && bracketFetchContent.ok === false
+    && bracketFetchContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: bracket-property fetch in the content action fails the UI-only source contract');
+
+  const dynamicFetchContent = verifyInjectedSheetsContent(
+    "const networkKey = ['fet', 'ch'].join(''); globalThis[networkKey]('/relative');"
+  );
+  check(dynamicFetchContent && dynamicFetchContent.ok === false
+    && dynamicFetchContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: dynamically-named global network calls fail even without a contiguous fetch token');
+
+  const gapiContent = verifyInjectedSheetsContent(
+    "globalThis.gapi.client.request({ path: '/v4/spreadsheets/probe' });"
+  );
+  check(gapiContent && gapiContent.ok === false
+    && gapiContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: every gapi.client.request in the content action fails; only the pinned MAIN-world session may request');
+
+  const urlLiteralContent = verifyInjectedSheetsContent(
+    "const forbiddenRemote = 'https://evil.example.invalid/session';"
+  );
+  check(urlLiteralContent && urlLiteralContent.ok === false
+    && urlLiteralContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: an absolute URL literal in the content action fails even when no direct fetch call is present');
+
+  const dynamicUrlContent = verifyInjectedSheetsContent(
+    "const target = new URL('/session', window.location.origin);"
+  );
+  check(dynamicUrlContent && dynamicUrlContent.ok === false
+    && dynamicUrlContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: dynamic URL construction in the content action fails the fixed UI-only contract');
+
+  const imageSinkContent = verifyInjectedSheetsContent(
+    "const pixel = new Image(); pixel.src = '/session';"
+  );
+  check(imageSinkContent && imageSinkContent.ok === false
+    && imageSinkContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: Image/src DOM network sinks fail the fixed UI-only contract');
+
+  const dynamicDomSinkContent = verifyInjectedSheetsContent(
+    "const pixel = document.querySelector('img'); const sink = 'src'; pixel[sink] = '/session';"
+  );
+  check(dynamicDomSinkContent && dynamicDomSinkContent.ok === false
+    && dynamicDomSinkContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: computed DOM property assignment cannot hide a network-loading sink');
+
+  const runtimeProxyContent = verifyInjectedSheetsContent(
+    "chrome.runtime.sendMessage({ type: 'SESSION_ACTION', path: '/session' });"
+  );
+  check(runtimeProxyContent && runtimeProxyContent.ok === false
+    && runtimeProxyContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: a content-action runtime message cannot become a generic authenticated network proxy');
 
   // (b) REAL end-to-end: checkOriginClassification() over the LIVE catalog + vendored
   // slack-api.ts -- proves the real heads all pass and slack rides the dynamic

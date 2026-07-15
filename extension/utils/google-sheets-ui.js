@@ -220,18 +220,20 @@
           return { success: false, reason: 'ui-append-boundary-ambiguous' };
         }
         boundaryIndex = index;
-        if (mode === 'INSERT_ROWS') {
-          return { success: true, row: (parsed.startRow || 1) + boundaryIndex };
-        }
       }
-      if (index < boundaryIndex + requiredRows && !empty) {
-        return { success: false, reason: 'ui-append-target-not-empty' };
-      }
-      if (index === boundaryIndex + requiredRows - 1) {
-        return { success: true, row: (parsed.startRow || 1) + boundaryIndex };
+      if (boundaryIndex !== -1 && !empty) {
+        return {
+          success: false,
+          reason: index < boundaryIndex + requiredRows
+            ? 'ui-append-target-not-empty'
+            : 'ui-append-boundary-ambiguous'
+        };
       }
     }
-    return { success: false, reason: 'ui-append-boundary-ambiguous' };
+    if (boundaryIndex === -1 || boundaryIndex + requiredRows > values.length) {
+      return { success: false, reason: 'ui-append-boundary-ambiguous' };
+    }
+    return { success: true, row: (parsed.startRow || 1) + boundaryIndex };
   }
 
   function valuesAreEmpty(values) {
