@@ -1,0 +1,22 @@
+{
+  "slug": "gsheets.get_values",
+  "service": "docs.google.com",
+  "intentSynonyms": ["read google sheet cells", "get spreadsheet values", "read a range in sheets"],
+  "description": "Read values from an explicit A1 notation range.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "spreadsheetId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{10,200}$", "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab." },
+      "range": { "type": "string", "minLength": 1, "maxLength": 500, "description": "A1 notation range." },
+      "majorDimension": { "type": "string", "enum": ["ROWS", "COLUMNS"] },
+      "valueRenderOption": { "type": "string", "enum": ["FORMATTED_VALUE", "UNFORMATTED_VALUE", "FORMULA"] },
+      "dateTimeRenderOption": { "type": "string", "enum": ["SERIAL_NUMBER", "FORMATTED_STRING"] }
+    },
+    "required": ["range"],
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": { "source": "fsb", "sourcePath": "catalog/handlers/gsheets.js", "license": "Apache-2.0", "signals": { "transportHelper": "chrome-identity-sheets-v4", "httpMethod": "GET", "opNameVerb": "get" } }
+}

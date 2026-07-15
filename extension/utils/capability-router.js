@@ -143,6 +143,22 @@
   function _fetchPrimitive() {
     return (typeof FsbCapabilityFetch !== 'undefined' && FsbCapabilityFetch) ? FsbCapabilityFetch : null;
   }
+  function _googleSheetsContext() {
+    var api = (typeof FsbGoogleSheetsApi !== 'undefined' && FsbGoogleSheetsApi)
+      ? FsbGoogleSheetsApi
+      : ((typeof globalThis !== 'undefined' && globalThis.FsbGoogleSheetsApi) ? globalThis.FsbGoogleSheetsApi : null);
+    if (!api) { return null; }
+    var methods = ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'];
+    var narrow = {};
+    for (var i = 0; i < methods.length; i++) {
+      (function (method) {
+        if (typeof api[method] === 'function') {
+          narrow[method] = function (params) { return api[method](params); };
+        }
+      })(methods[i]);
+    }
+    return Object.freeze(narrow);
+  }
 
   // ---- Phase 32 (HEAL-01/HEAL-03/HEAL-04) self-healing collaborator accessors --
   //      The post-executeBoundSpec rot classifier, the learned-recipe quarantine
@@ -705,7 +721,8 @@
       url: ctx && ctx.url,
       executeBoundSpec: primitive ? primitive.executeBoundSpec : undefined,
       executeBoundPageRead: primitive ? primitive.executeBoundPageRead : undefined,
-      interpretRecipe: interp ? interp.interpretRecipe : undefined
+      interpretRecipe: interp ? interp.interpretRecipe : undefined,
+      googleSheets: _googleSheetsContext()
     };
     var out = await handler.handle(args || {}, handlerCtx);
 

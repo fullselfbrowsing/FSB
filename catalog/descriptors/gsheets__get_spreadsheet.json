@@ -1,0 +1,17 @@
+{
+  "slug": "gsheets.get_spreadsheet",
+  "service": "docs.google.com",
+  "intentSynonyms": ["get spreadsheet metadata", "inspect a google sheet", "list sheets in a spreadsheet"],
+  "description": "Get spreadsheet properties and sheet metadata without loading cell grids.",
+  "actionVerb": "get",
+  "sideEffectClass": "read",
+  "params": {
+    "type": "object",
+    "properties": {
+      "spreadsheetId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{10,200}$", "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab." }
+    },
+    "additionalProperties": false
+  },
+  "backing": "handler",
+  "provenance": { "source": "fsb", "sourcePath": "catalog/handlers/gsheets.js", "license": "Apache-2.0", "signals": { "transportHelper": "chrome-identity-sheets-v4", "httpMethod": "GET", "opNameVerb": "get" } }
+}

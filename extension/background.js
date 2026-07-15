@@ -299,6 +299,7 @@ try { importScripts('catalog/handlers/ganalytics.js'); } catch (e) { console.err
 try { importScripts('catalog/handlers/figma.js'); } catch (e) { console.error('[FSB] Failed to load handlers/figma.js:', e.message); }
 try { importScripts('catalog/handlers/gdrive.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdrive.js:', e.message); }
 try { importScripts('catalog/handlers/gdocs.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdocs.js:', e.message); }
+try { importScripts('catalog/handlers/gsheets.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gsheets.js:', e.message); }
 try { importScripts('catalog/handlers/powerpoint.js'); } catch (e) { console.error('[FSB] Failed to load handlers/powerpoint.js:', e.message); }
 try { importScripts('catalog/handlers/outlook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/outlook.js:', e.message); }
 try { importScripts('catalog/handlers/teams.js'); } catch (e) { console.error('[FSB] Failed to load handlers/teams.js:', e.message); }
