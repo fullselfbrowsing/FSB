@@ -156,6 +156,13 @@
             knownNoEffect: true
           });
         }
+        if (mutating && status >= 500 && status <= 599) {
+          return error('RECOVERY_AMBIGUOUS', {
+            reason: 'page-gapi-server-failure',
+            status: status,
+            requestSent: true
+          });
+        }
         if (mutating && !status) {
           return error('RECOVERY_AMBIGUOUS', { reason: 'page-gapi-unknown-failure', requestSent: true });
         }
@@ -176,6 +183,13 @@
             safeToFallback: true,
             requestSent: true,
             knownNoEffect: true
+          });
+        }
+        if (mutating && responseStatus >= 500 && responseStatus <= 599) {
+          return error('RECOVERY_AMBIGUOUS', {
+            reason: 'page-gapi-server-failure',
+            status: responseStatus,
+            requestSent: true
           });
         }
         return error('RECIPE_DOM_FALLBACK_PENDING', {

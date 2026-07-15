@@ -1520,6 +1520,295 @@ function detectSiteSearchInput() {
   return null;
 }
 
+// Google Sheets signed-in-tab UI transport. Pure range/value shaping lives in
+// FsbGoogleSheetsUi; these helpers own only the fixed, trusted page gestures.
+const sheetsUi = globalThis.FsbGoogleSheetsUi || null;
+
+function sheetsError(code, reason, mutationStarted = false) {
+  return {
+    success: false,
+    code,
+    errorCode: code,
+    error: code,
+    reason,
+    mutationStarted: mutationStarted === true
+  };
+}
+
+function isGoogleSheetsPage() {
+  return window.location.hostname === 'docs.google.com' &&
+    /^\/spreadsheets\/d\/[A-Za-z0-9_-]{10,200}(?:\/|$)/.test(window.location.pathname);
+}
+
+function sheetsSpreadsheetId() {
+  const match = window.location.pathname.match(/^\/spreadsheets\/d\/([A-Za-z0-9_-]{10,200})(?:\/|$)/);
+  return match ? match[1] : '';
+}
+
+function sheetsDelay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function sheetsNameBox() {
+  return document.querySelector('#t-name-box');
+}
+
+async function sheetsNavigate(reference, settleMs = 80) {
+  const nameBox = sheetsNameBox();
+  if (!nameBox) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-unavailable');
+  try {
+    nameBox.focus();
+    nameBox.click();
+    await sheetsDelay(25);
+    await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
+    await tools.typeWithKeys({ text: String(reference), clearFirst: false, delay: 5 });
+    await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
+    await sheetsDelay(settleMs);
+    return { success: true };
+  } catch (_error) {
+    return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-navigation-failed');
+  }
+}
+
+function sheetsFormulaBarValue() {
+  const selectors = ['#t-formula-bar-input', '.cell-input', '[aria-label="Formula bar"]'];
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const editable = element.querySelector?.('[contenteditable="true"]');
+    const candidate = editable || element;
+    const value = candidate.value !== undefined ? candidate.value : (candidate.innerText ?? candidate.textContent ?? '');
+    if (value !== undefined && value !== null) return String(value).replace(/\u200B/g, '');
+  }
+  return '';
+}
+
+function sheetsActiveAddress() {
+  const box = sheetsNameBox();
+  return box ? String(box.value || box.textContent || '').trim() : '';
+}
+
+async function sheetsReadValues(range, majorDimension) {
+  if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+  const parsed = sheetsUi.parseA1Range(range);
+  if (!parsed || parsed.columnOnly) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-read-requires-bounded-a1-range');
+  if (parsed.rows > sheetsUi.limits.maxReadRows || parsed.columns > sheetsUi.limits.maxReadColumns) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-read-range-limit-exceeded');
+  }
+  try {
+    await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
+    const values = [];
+    for (let row = parsed.startRow; row <= parsed.endRow; row++) {
+      const outputRow = [];
+      for (let column = parsed.startColumn; column <= parsed.endColumn; column++) {
+        const navigation = await sheetsNavigate(sheetsUi.cellReference(parsed, column, row), 55);
+        if (!navigation.success) return navigation;
+        outputRow.push(sheetsFormulaBarValue());
+      }
+      values.push(outputRow);
+    }
+    const dimension = majorDimension === 'COLUMNS' ? 'COLUMNS' : 'ROWS';
+    return {
+      success: true,
+      status: 200,
+      transport: 'ui',
+      renderSemantics: 'formula-bar',
+      data: {
+        range,
+        majorDimension: dimension,
+        values: dimension === 'COLUMNS' ? sheetsUi.transpose(values) : values
+      }
+    };
+  } catch (_error) {
+    return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'ui-read-failed');
+  }
+}
+
+async function sheetsWriteClipboard(text) {
+  try {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'clipboard-write-unavailable');
+    }
+    await navigator.clipboard.writeText(text);
+    return { success: true };
+  } catch (_error) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'clipboard-write-failed');
+  }
+}
+
+async function sheetsPasteEncoded(parsed, encoded, startRow) {
+  let completedChunks = 0;
+  let mutationStarted = false;
+  for (const chunk of encoded.chunks) {
+    const clipboard = await sheetsWriteClipboard(chunk.text);
+    if (!clipboard.success) {
+      return completedChunks > 0
+        ? sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-partially-completed', true)
+        : clipboard;
+    }
+    const target = sheetsUi.cellReference(parsed, parsed.startColumn, startRow + chunk.rowOffset);
+    const navigation = await sheetsNavigate(target, 60);
+    if (!navigation.success) {
+      return completedChunks > 0
+        ? sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-target-lost', true)
+        : navigation;
+    }
+    mutationStarted = true;
+    try {
+      const pasted = await tools.keyPress({ key: 'v', ctrlKey: true, useDebuggerAPI: true });
+      if (!pasted || pasted.success !== true) {
+        return sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-outcome-unknown', mutationStarted);
+      }
+      await sheetsDelay(180);
+      completedChunks++;
+    } catch (_error) {
+      return sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-outcome-unknown', mutationStarted);
+    }
+  }
+  return {
+    success: true,
+    status: 200,
+    transport: 'ui',
+    updatedRows: encoded.rows,
+    updatedColumns: encoded.columns,
+    updatedCells: encoded.cells,
+    chunks: completedChunks,
+    mutationStarted
+  };
+}
+
+async function sheetsUpdateValues(range, values, valueInputOption) {
+  if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+  const parsed = sheetsUi.parseA1Range(range);
+  if (!parsed || parsed.columnOnly) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-update-requires-a1-start-cell');
+  const encoded = sheetsUi.encodeValues(values, valueInputOption || 'RAW');
+  if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
+  return sheetsPasteEncoded(parsed, encoded, parsed.startRow);
+}
+
+async function sheetsFindAppendRow(parsed) {
+  const firstCell = sheetsUi.cellReference(parsed, parsed.startColumn, parsed.startRow || 1);
+  const navigation = await sheetsNavigate(firstCell, 70);
+  if (!navigation.success) return navigation;
+  const startValue = sheetsFormulaBarValue();
+  if (startValue === '') return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-boundary-ambiguous');
+  try {
+    await tools.keyPress({ key: 'ArrowDown', ctrlKey: true, useDebuggerAPI: true });
+    await sheetsDelay(90);
+  } catch (_error) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-boundary-navigation-failed');
+  }
+  const boundary = sheetsUi.appendRowFromBoundary(
+    parsed,
+    startValue,
+    sheetsActiveAddress(),
+    sheetsFormulaBarValue()
+  );
+  return boundary.success
+    ? boundary
+    : sheetsError('RECIPE_DOM_FALLBACK_PENDING', boundary.reason);
+}
+
+async function sheetsAppendValues(range, values, valueInputOption, insertDataOption) {
+  if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+  const parsed = sheetsUi.parseA1Range(range);
+  if (!parsed) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-requires-a1-range');
+  const encoded = sheetsUi.encodeValues(values, valueInputOption || 'RAW');
+  if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
+  const boundary = await sheetsFindAppendRow(parsed);
+  if (!boundary.success) return boundary;
+  let mutationStarted = false;
+  if ((insertDataOption || 'OVERWRITE') === 'INSERT_ROWS') {
+    const lastRow = boundary.row + encoded.rows - 1;
+    const selected = await sheetsNavigate(`${parsed.sheetPrefix}${boundary.row}:${lastRow}`, 60);
+    if (!selected.success) return selected;
+    mutationStarted = true;
+    try {
+      const inserted = await tools.keyPress({ key: '=', ctrlKey: true, altKey: true, useDebuggerAPI: true });
+      if (!inserted || inserted.success !== true) return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
+      await sheetsDelay(150);
+    } catch (_error) {
+      return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
+    }
+  }
+  const pasted = await sheetsPasteEncoded(parsed, encoded, boundary.row);
+  if (!pasted.success && mutationStarted && !pasted.mutationStarted) {
+    return sheetsError('RECOVERY_AMBIGUOUS', 'ui-append-partially-completed', true);
+  }
+  if (pasted.success) pasted.appendedRows = encoded.rows;
+  return pasted;
+}
+
+async function sheetsClearValues(range) {
+  if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+  const parsed = sheetsUi.parseA1Range(range);
+  if (!parsed || parsed.columnOnly) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-clear-requires-bounded-a1-range');
+  const cells = parsed.rows * parsed.columns;
+  if (cells > sheetsUi.limits.maxClearCells) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-clear-verification-limit-exceeded');
+  const selected = await sheetsNavigate(range, 70);
+  if (!selected.success) return selected;
+  try {
+    const deleted = await tools.keyPress({ key: 'Delete', useDebuggerAPI: true });
+    if (!deleted || deleted.success !== true) return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-outcome-unknown', true);
+    await sheetsDelay(160);
+  } catch (_error) {
+    return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-outcome-unknown', true);
+  }
+  const verification = await sheetsReadValues(range, 'ROWS');
+  if (!verification.success) return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-verification-failed', true);
+  if (!sheetsUi.valuesAreEmpty(verification.data.values)) {
+    return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-verification-mismatch', true);
+  }
+  return {
+    success: true,
+    status: 200,
+    transport: 'ui',
+    clearedCells: cells,
+    mutationStarted: true,
+    verified: true
+  };
+}
+
+function sheetsSpreadsheetMetadata() {
+  const titleInput = document.querySelector('.docs-title-input, #docs-title-input, .docs-title-widget input');
+  const title = String(titleInput?.value || document.title || '').replace(/\s+-\s+Google Sheets\s*$/i, '');
+  const tabNodes = Array.from(document.querySelectorAll('.docs-sheet-tab-name, .docs-sheet-tab [role="tab"], [role="tab"][aria-label]'));
+  const seen = new Set();
+  const sheets = [];
+  for (const node of tabNodes) {
+    const sheetTitle = String(node.textContent || node.getAttribute?.('aria-label') || '').trim();
+    if (!sheetTitle || seen.has(sheetTitle)) continue;
+    seen.add(sheetTitle);
+    sheets.push({ properties: { title: sheetTitle, index: sheets.length } });
+  }
+  return {
+    success: true,
+    status: 200,
+    transport: 'ui',
+    data: {
+      spreadsheetId: sheetsSpreadsheetId(),
+      properties: { title },
+      sheets
+    }
+  };
+}
+
+async function sheetsRenameSpreadsheet(title) {
+  if (!title) return;
+  const titleInput = document.querySelector('.docs-title-input, #docs-title-input, input[aria-label*="Rename" i], .docs-title-widget input');
+  if (!titleInput) return;
+  try {
+    titleInput.focus();
+    titleInput.click();
+    await sheetsDelay(80);
+    if (typeof titleInput.select === 'function') titleInput.select();
+    else await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
+    await tools.typeWithKeys({ text: String(title), clearFirst: false, delay: 8 });
+    await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
+    await sheetsDelay(180);
+  } catch (_error) { /* legacy rename remains best-effort */ }
+}
+
 // Tool functions for browser automation
 const tools = {
   // Scroll the page - supports direction ("up"/"down") or raw amount
@@ -4732,6 +5021,26 @@ const tools = {
   arrowLeft: async (params = {}) => { return await tools.keyPress({ key: 'ArrowLeft', useDebuggerAPI: true, ...params }); },
   arrowRight: async (params = {}) => { return await tools.keyPress({ key: 'ArrowRight', useDebuggerAPI: true, ...params }); },
 
+  // Fixed Google Sheets signed-in-tab operation surface used by the capability
+  // session adapter. It intentionally accepts operation keys, never requests.
+  sheetsSession: async (params = {}) => {
+    if (!isGoogleSheetsPage()) return sheetsError('GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED', 'active-sheets-tab-required');
+    const activeId = sheetsSpreadsheetId();
+    if (params.spreadsheetId && params.spreadsheetId !== activeId) {
+      return sheetsError('GOOGLE_SHEETS_TARGET_MISMATCH', 'active-spreadsheet-id-mismatch');
+    }
+    const operation = String(params.operation || '');
+    const args = params.args && typeof params.args === 'object' ? params.args : {};
+    if (operation === 'getSpreadsheet') return sheetsSpreadsheetMetadata();
+    if (operation === 'getValues') return sheetsReadValues(args.range, args.majorDimension);
+    if (operation === 'updateValues') return sheetsUpdateValues(args.range, args.values, args.valueInputOption);
+    if (operation === 'appendValues') {
+      return sheetsAppendValues(args.range, args.values, args.valueInputOption, args.insertDataOption);
+    }
+    if (operation === 'clearValues') return sheetsClearValues(args.range);
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-sheets-ui-operation');
+  },
+
   // =========================================================================
   // GOOGLE SHEETS: fillsheet — mechanical CSV data entry
   // AI generates data, this tool handles the cell-by-cell typing deterministically
@@ -4748,6 +5057,28 @@ const tools = {
     // Verify we're on Google Sheets
     if (!FSB.isCanvasBasedEditor || !FSB.isCanvasBasedEditor()) {
       return { success: false, error: 'fillsheet only works on Google Sheets (canvas-based editor not detected)' };
+    }
+
+    // The shared signed-in-tab path uses bounded clipboard chunks. Keep the
+    // historical cell-by-cell implementation below as a compatibility fallback
+    // for partial/older content-script injection sets where the helper is absent.
+    if (sheetsUi) {
+      const sharedRows = sheetsUi.csvToValues(data);
+      if (!sharedRows.length) return { success: false, error: 'No data rows parsed from CSV' };
+      await sheetsRenameSpreadsheet(sheetName);
+      const sharedResult = await sheetsUpdateValues(startCell, sharedRows, 'RAW');
+      if (!sharedResult.success) return { ...sharedResult, action: 'fillsheet' };
+      return {
+        success: true,
+        action: 'fillsheet',
+        startCell,
+        rows: sharedRows.length,
+        cols: sharedRows[0].length,
+        cellsFilled: sharedResult.updatedCells,
+        chunks: sharedResult.chunks,
+        transport: 'ui',
+        hadEffect: true
+      };
     }
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -4970,6 +5301,22 @@ const tools = {
 
     if (!FSB.isCanvasBasedEditor || !FSB.isCanvasBasedEditor()) {
       return { success: false, error: 'readsheet only works on Google Sheets' };
+    }
+
+    if (sheetsUi) {
+      const sharedResult = await sheetsReadValues(range, 'ROWS');
+      if (!sharedResult.success) return { ...sharedResult, action: 'readsheet' };
+      return {
+        success: true,
+        action: 'readsheet',
+        range,
+        rows: sharedResult.data.values.length,
+        cols: sharedResult.data.values[0]?.length || 0,
+        data: sheetsUi.valuesToCsv(sharedResult.data.values),
+        transport: 'ui',
+        renderSemantics: 'formula-bar',
+        hadEffect: false
+      };
     }
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));

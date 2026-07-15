@@ -590,6 +590,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/dom-stream.js',
   'content/trigger-observe.js',
   'content/accessibility.js',
+  'utils/google-sheets-ui.js',
   'content/actions.js',
   'content/dom-analysis.js',
   'content/messaging.js',

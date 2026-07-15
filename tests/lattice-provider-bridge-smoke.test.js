@@ -617,8 +617,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
   // Quick 260707-7id: 310 mentions (+1 new line for utils/mcp-session-recorder.js
   // -- MCP session recorder; comment lines deliberately token-free).
+  // Google Sheets support adds 3 mentions (+1 each for utils/spreadsheet-record-redaction.js,
+  // utils/google-sheets-session.js, and catalog/handlers/gsheets.js) -> 313.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 310, 'background.js importScripts count = 310 (current head set + the Quick 260707-7id mcp-session-recorder load)');
+  passAssertEqual(importScriptsCount, 313, 'background.js importScripts count = 313 (current head set + 3 Google Sheets support loads)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -652,8 +654,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
   // Quick 260707-7id adds 1 call site (utils/mcp-session-recorder.js) -> 306.
+  // Google Sheets support adds 3 call sites (utils/spreadsheet-record-redaction.js,
+  // utils/google-sheets-session.js, and catalog/handlers/gsheets.js) -> 309.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 306, 'background.js importScripts() call sites = 306 (current head set + the Quick 260707-7id mcp-session-recorder load)');
+  passAssertEqual(importScriptsCallSites, 309, 'background.js importScripts() call sites = 309 (current head set + 3 Google Sheets support loads)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

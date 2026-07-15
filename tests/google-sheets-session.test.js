@@ -105,6 +105,65 @@ test('never retries or falls back after an ambiguous mutation outcome', async ()
   assert.equal(stub.uiCalls.length, 0);
 });
 
+test('classifies mutation timeouts, network failures, and 5xx responses as ambiguous', async () => {
+  const previous = globalThis.gapi;
+  try {
+    globalThis.gapi = { client: { request: () => Promise.reject({ status: 503 }) } };
+    const rejected = await sessionModule.pageClientOperation({
+      operation: 'updateValues', spreadsheetId: ID, timeoutMs: 100,
+      args: { range: 'A1', values: [['x']], valueInputOption: 'RAW' }
+    });
+    assert.equal(rejected.code, 'RECOVERY_AMBIGUOUS');
+    assert.equal(rejected.status, 503);
+
+    globalThis.gapi = { client: { request: () => Promise.reject(new Error('network down')) } };
+    const network = await sessionModule.pageClientOperation({
+      operation: 'updateValues', spreadsheetId: ID, timeoutMs: 100,
+      args: { range: 'A1', values: [['x']], valueInputOption: 'RAW' }
+    });
+    assert.equal(network.code, 'RECOVERY_AMBIGUOUS');
+
+    globalThis.gapi = { client: { request: () => Promise.resolve({ status: 502, result: {} }) } };
+    const response = await sessionModule.pageClientOperation({
+      operation: 'clearValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A1' }
+    });
+    assert.equal(response.code, 'RECOVERY_AMBIGUOUS');
+    assert.equal(response.status, 502);
+
+    globalThis.gapi = { client: { request: () => new Promise(() => {}) } };
+    const timedOut = await sessionModule.pageClientOperation({
+      operation: 'appendValues', spreadsheetId: ID, timeoutMs: 5,
+      args: { range: 'A:C', values: [['x']] }
+    });
+    assert.equal(timedOut.code, 'RECOVERY_AMBIGUOUS');
+  } finally {
+    globalThis.gapi = previous;
+  }
+});
+
+test('surfaces a logged-out UI state as session unavailable', async () => {
+  const stub = chromeStub({
+    pageResult: {
+      success: false,
+      code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      safeToFallback: true,
+      knownNoEffect: true
+    },
+    uiResult: {
+      success: false,
+      code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      errorCode: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      error: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      reason: 'name-box-unavailable'
+    }
+  });
+  const client = sessionModule.createSession({ chrome: stub.chrome });
+  const out = await client.getSpreadsheet({}, CONTEXT);
+  assert.equal(out.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(stub.pageCalls.length, 1);
+  assert.equal(stub.uiCalls.length, 1);
+});
+
 test('MAIN-world bridge builds only fixed Sheets requests and uses no supplied transport fields', async () => {
   const previous = globalThis.gapi;
   const calls = [];

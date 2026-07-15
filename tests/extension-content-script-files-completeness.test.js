@@ -40,6 +40,7 @@ const required = [
   'content/badge-combine.js',
   'content/visual-feedback.js',
   'content/accessibility.js',
+  'utils/google-sheets-ui.js',
   'content/actions.js',
   'content/dom-analysis.js',
   'content/dom-stream.js',

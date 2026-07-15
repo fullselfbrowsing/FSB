@@ -61,6 +61,8 @@ function check(cond, msg) {
     'checkOriginClassification is a named export of the real gate');
   check(typeof gate.parseHeadModules === 'function',
     'parseHeadModules is a named export of the real gate (driven directly, IN-01 coverage)');
+  check(typeof gate.verifyPageGapiUiSheetsSessionSources === 'function',
+    'verifyPageGapiUiSheetsSessionSources is a named export of the real gate');
 
   // ===== (a) parseHeadModules on the REAL catalog source =====================
   const CATALOG_PATH = path.join(ROOT, 'extension', 'utils', 'capability-catalog.js');
@@ -364,6 +366,56 @@ function check(cond, msg) {
     && twitchPageBearer.reason.indexOf('SAME_REGISTRABLE_DOMAIN_PAGE_BEARER_READ') === 0,
     '(b) www.twitch.tv vs gql.twitch.tv page-bearer GraphQL -> sameOrigin:true through the explicit page-bearer read accommodation');
 
+  const sheetsSession = gate.classifyOriginPattern(
+    'https://docs.google.com',
+    'https://sheets.googleapis.com/v4',
+    { pageGapiUiSheetsSession: true }
+  );
+  check(sheetsSession.sameOrigin === true && sheetsSession.separate === false
+    && typeof sheetsSession.reason === 'string'
+    && sheetsSession.reason.indexOf('PAGE_GAPI_UI_SHEETS_SESSION') === 0,
+    '(b) docs.google.com -> exact sheets.googleapis.com/v4 passes only through the explicit page-gapi/UI Sheets session accommodation');
+  const sheetsWrongHead = gate.classifyOriginPattern(
+    'https://drive.google.com',
+    'https://sheets.googleapis.com/v4',
+    { pageGapiUiSheetsSession: true }
+  );
+  check(sheetsWrongHead.sameOrigin === false && sheetsWrongHead.separate === true
+    && String(sheetsWrongHead.reason || '').indexOf('CORS_SEPARATE_ORIGIN') === 0,
+    '(b) the page-gapi/UI Sheets accommodation rejects a non-docs.google.com head origin');
+  const sheetsWrongApi = gate.classifyOriginPattern(
+    'https://docs.google.com',
+    'https://content.googleapis.com/v4',
+    { pageGapiUiSheetsSession: true }
+  );
+  check(sheetsWrongApi.sameOrigin === false && sheetsWrongApi.separate === true
+    && String(sheetsWrongApi.reason || '').indexOf('CORS_SEPARATE_ORIGIN') === 0,
+    '(b) the page-gapi/UI Sheets accommodation rejects a non-sheets.googleapis.com API origin');
+  const sheetsBroaderPath = gate.classifyOriginPattern(
+    'https://docs.google.com',
+    'https://sheets.googleapis.com/v5',
+    { pageGapiUiSheetsSession: true }
+  );
+  check(sheetsBroaderPath.sameOrigin === false && sheetsBroaderPath.separate === true
+    && String(sheetsBroaderPath.reason || '').indexOf('CORS_SEPARATE_ORIGIN') === 0,
+    '(b) the page-gapi/UI Sheets accommodation rejects a broader path on the otherwise-correct API origin');
+
+  const liveSheetsSources = gate.verifyPageGapiUiSheetsSessionSources();
+  check(liveSheetsSources && liveSheetsSources.ok === true
+    && Array.isArray(liveSheetsSources.failures) && liveSheetsSources.failures.length === 0,
+    '(b) the live Sheets manifest/session/action/handler/descriptors satisfy the exact source-verified no-auth session contract');
+  const sheetsSessionSource = fs.readFileSync(
+    path.join(ROOT, 'extension', 'utils', 'google-sheets-session.js'),
+    'utf8'
+  );
+  const broadenedSheetsSources = gate.verifyPageGapiUiSheetsSessionSources({
+    sessionText: sheetsSessionSource + '\nfetch(request.url);'
+  });
+  check(broadenedSheetsSources && broadenedSheetsSources.ok === false
+    && broadenedSheetsSources.failures.includes('SHEETS_GAPI_REQUEST_NOT_FIXED')
+    && broadenedSheetsSources.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: adding caller-selected fetch(request.url) fails both the fixed-gapi and forbidden-network source checks');
+
   // (b) REAL end-to-end: checkOriginClassification() over the LIVE catalog + vendored
   // slack-api.ts -- proves the real heads all pass and slack rides the dynamic
   // accommodation against the genuinely-extracted vendored dynamic form (not a stub).
@@ -610,8 +662,8 @@ function check(cond, msg) {
   const realGsheets = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerGsheets') : null;
   check(realGsheets && realGsheets.apiBaseUrl === 'https://sheets.googleapis.com/v4' &&
       realGsheets.classification && realGsheets.classification.sameOrigin === true &&
-      String(realGsheets.classification.reason || '').startsWith('CHROME_IDENTITY_SHEETS_API'),
-    '(b) the REAL Google Sheets head uses the exact source-verified Chrome Identity API accommodation');
+      String(realGsheets.classification.reason || '').startsWith('PAGE_GAPI_UI_SHEETS_SESSION'),
+    '(b) the REAL Google Sheets head uses the exact source-verified signed-in page-gapi/UI session accommodation');
   const realPowerpoint = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerPowerpoint') : null;
   check(!!realPowerpoint && realPowerpoint.apiBaseUrl === 'https://graph.microsoft.com/v1.0'
     && realPowerpoint.classification && realPowerpoint.classification.sameOrigin === true

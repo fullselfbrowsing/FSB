@@ -178,7 +178,7 @@
           "spreadsheetId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{10,200}$",
-            "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab."
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
           },
           "range": {
             "type": "string",
@@ -239,7 +239,7 @@
         "sourcePath": "catalog/handlers/gsheets.js",
         "license": "Apache-2.0",
         "signals": {
-          "transportHelper": "chrome-identity-sheets-v4",
+          "transportHelper": "page-gapi-ui-sheets-session",
           "httpMethod": "POST",
           "opNameVerb": "append"
         }
@@ -262,7 +262,7 @@
           "spreadsheetId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{10,200}$",
-            "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab."
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
           },
           "range": {
             "type": "string",
@@ -282,7 +282,7 @@
         "sourcePath": "catalog/handlers/gsheets.js",
         "license": "Apache-2.0",
         "signals": {
-          "transportHelper": "chrome-identity-sheets-v4",
+          "transportHelper": "page-gapi-ui-sheets-session",
           "httpMethod": "POST",
           "opNameVerb": "clear"
         }
@@ -305,7 +305,7 @@
           "spreadsheetId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{10,200}$",
-            "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab."
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
           }
         },
         "additionalProperties": false
@@ -316,7 +316,7 @@
         "sourcePath": "catalog/handlers/gsheets.js",
         "license": "Apache-2.0",
         "signals": {
-          "transportHelper": "chrome-identity-sheets-v4",
+          "transportHelper": "page-gapi-ui-sheets-session",
           "httpMethod": "GET",
           "opNameVerb": "get"
         }
@@ -339,7 +339,7 @@
           "spreadsheetId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{10,200}$",
-            "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab."
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
           },
           "range": {
             "type": "string",
@@ -381,7 +381,7 @@
         "sourcePath": "catalog/handlers/gsheets.js",
         "license": "Apache-2.0",
         "signals": {
-          "transportHelper": "chrome-identity-sheets-v4",
+          "transportHelper": "page-gapi-ui-sheets-session",
           "httpMethod": "GET",
           "opNameVerb": "get"
         }
@@ -404,7 +404,7 @@
           "spreadsheetId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{10,200}$",
-            "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab."
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
           },
           "range": {
             "type": "string",
@@ -458,7 +458,7 @@
         "sourcePath": "catalog/handlers/gsheets.js",
         "license": "Apache-2.0",
         "signals": {
-          "transportHelper": "chrome-identity-sheets-v4",
+          "transportHelper": "page-gapi-ui-sheets-session",
           "httpMethod": "PUT",
           "opNameVerb": "update"
         }

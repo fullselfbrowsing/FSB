@@ -8,10 +8,10 @@
   "params": {
     "type": "object",
     "properties": {
-      "spreadsheetId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{10,200}$", "description": "Spreadsheet ID. Defaults to the spreadsheet open in the active Google Sheets tab." }
+      "spreadsheetId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{10,200}$", "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab." }
     },
     "additionalProperties": false
   },
   "backing": "handler",
-  "provenance": { "source": "fsb", "sourcePath": "catalog/handlers/gsheets.js", "license": "Apache-2.0", "signals": { "transportHelper": "chrome-identity-sheets-v4", "httpMethod": "GET", "opNameVerb": "get" } }
+  "provenance": { "source": "fsb", "sourcePath": "catalog/handlers/gsheets.js", "license": "Apache-2.0", "signals": { "transportHelper": "page-gapi-ui-sheets-session", "httpMethod": "GET", "opNameVerb": "get" } }
 }
