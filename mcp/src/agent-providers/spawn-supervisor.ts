@@ -53,6 +53,8 @@ const RECOVERY_STATUS_LIMIT = 128;
 const DEFAULT_ACTIVATION_ATTEMPTS = 80;
 const DEFAULT_ACTIVATION_POLL_MS = 25;
 const HOLD_EXPIRY_MS = 5 * 60 * 1000;
+const PROCESS_TRANSITION_GRACE_MS = 500;
+const PROCESS_TRANSITION_POLL_MS = 25;
 const PROCESS_STATUS_LIMIT_BYTES = 2 * 1024 * 1024;
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -103,6 +105,8 @@ export type DelegationRunState =
   | 'settled';
 
 export const DELEGATION_HOLD_EXPIRY_MS = HOLD_EXPIRY_MS;
+export const DELEGATION_PROCESS_TRANSITION_GRACE_MS = PROCESS_TRANSITION_GRACE_MS;
+export const DELEGATION_PROCESS_TRANSITION_POLL_MS = PROCESS_TRANSITION_POLL_MS;
 
 export type DelegationTerminalStatus = 'succeeded' | 'failed' | 'cancelled';
 
@@ -1304,26 +1308,87 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private async confirmProcessState(
     run: DelegationRun,
     expected: 'running' | 'stopped',
+    transitionGraceMs = 0,
   ): Promise<void> {
     const entry = run.entry;
     const child = run.supervisedChild;
     if (!entry || entry.state !== 'active' || !child || run.settled || run.stopRequested) {
       throw new TreeUnsettledError();
     }
-    const inspection = await this.dependencies.inspector.inspect(entry);
-    if (
-      inspection.classification !== 'confirmed'
-      || inspection.process.pid !== entry.pid
-      || inspection.process.processGroupId !== entry.processGroupId
-      || child.pid !== entry.pid
-      || child.processGroupId !== entry.processGroupId
-      || run.settled
-      || run.stopRequested
-    ) throw new TreeUnsettledError();
-    const status = await this.inspectProcessGroupStatus(entry, inspection.process);
-    if (status.classification !== expected || run.settled || run.stopRequested) {
-      throw new TreeUnsettledError();
+
+    const started = this.monotonicNow();
+    if (!Number.isFinite(started)) throw new TreeUnsettledError();
+    const deadline = started + transitionGraceMs;
+    const maximumAttempts = transitionGraceMs > 0
+      ? Math.ceil(transitionGraceMs / PROCESS_TRANSITION_POLL_MS) + 1
+      : 1;
+
+    for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+      if (
+        run.entry !== entry
+        || run.supervisedChild !== child
+        || entry.state !== 'active'
+        || child.pid !== entry.pid
+        || child.processGroupId !== entry.processGroupId
+        || run.settled
+        || run.stopRequested
+      ) throw new TreeUnsettledError();
+
+      let inspection: ProcessInspection;
+      try {
+        inspection = await this.dependencies.inspector.inspect(entry);
+      } catch {
+        if (transitionGraceMs <= 0) throw new TreeUnsettledError();
+        inspection = { classification: 'ambiguous', reason: 'evidence_unavailable' };
+      }
+
+      if (inspection.classification === 'stale') throw new TreeUnsettledError();
+      if (
+        inspection.classification === 'ambiguous'
+        && (inspection.reason === 'identity_mismatch' || inspection.reason === 'multiple_matches')
+      ) throw new TreeUnsettledError();
+
+      if (inspection.classification === 'confirmed') {
+        if (
+          inspection.process.pid !== entry.pid
+          || inspection.process.processGroupId !== entry.processGroupId
+          || inspection.process.processStartIdentity !== entry.processStartIdentity
+          || run.entry !== entry
+          || run.supervisedChild !== child
+          || run.settled
+          || run.stopRequested
+        ) throw new TreeUnsettledError();
+
+        let status: ProcessGroupStatusInspection;
+        try {
+          status = await this.inspectProcessGroupStatus(entry, inspection.process);
+        } catch {
+          if (transitionGraceMs <= 0) throw new TreeUnsettledError();
+          status = { classification: 'ambiguous' };
+        }
+        if (
+          run.entry !== entry
+          || run.supervisedChild !== child
+          || run.settled
+          || run.stopRequested
+          || status.classification === 'stale'
+        ) throw new TreeUnsettledError();
+        if (status.classification === expected) return;
+      } else if (transitionGraceMs <= 0) {
+        throw new TreeUnsettledError();
+      }
+
+      const observed = this.monotonicNow();
+      if (
+        !Number.isFinite(observed)
+        || observed < started
+        || observed >= deadline
+        || attempt + 1 >= maximumAttempts
+      ) throw new TreeUnsettledError();
+      const remaining = deadline - observed;
+      await this.wait(Math.min(PROCESS_TRANSITION_POLL_MS, remaining));
     }
+    throw new TreeUnsettledError();
   }
 
   private async signalAndConfirm(
@@ -1344,7 +1409,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     } catch {
       throw new TreeUnsettledError();
     }
-    await this.confirmProcessState(run, after);
+    await this.confirmProcessState(run, after, PROCESS_TRANSITION_GRACE_MS);
   }
 
   private hold(delegationId: string): Promise<Readonly<Record<string, unknown>>> {

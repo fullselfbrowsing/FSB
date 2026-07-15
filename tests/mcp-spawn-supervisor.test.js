@@ -370,6 +370,8 @@ function makeHarness(supervisorModule, options = {}) {
   const processGroupStatuses = options.processGroupStatuses ?? null;
   const scheduledTimers = [];
   let fakeClock = 0;
+  let monotonicClock = 0;
+  const waitCalls = [];
 
   const schedule = (callback, milliseconds) => {
     const timer = {
@@ -435,8 +437,11 @@ function makeHarness(supervisorModule, options = {}) {
       let now = 1000;
       return () => now += 1;
     })(),
-    monotonicNow: () => 1,
-    wait: async () => {},
+    monotonicNow: () => monotonicClock,
+    wait: async (milliseconds) => {
+      waitCalls.push(milliseconds);
+      monotonicClock += milliseconds;
+    },
     mintDelegationId: () => `delegation_fixture_${String(++delegationCounter).padStart(4, '0')}`,
     mintFingerprint: () => 'runtime_fingerprint_fixture_0001',
     mintGeneration: () => 'generation_fixture_0001',
@@ -496,6 +501,7 @@ function makeHarness(supervisorModule, options = {}) {
     runtimeRuns,
     terminationCalls,
     lifecycleCalls,
+    waitCalls,
     scheduledTimers,
     advanceClock,
     degradations,
@@ -753,6 +759,118 @@ async function runPosixLifecycleRaceTests(supervisorModule) {
     assert.equal(harness.scheduledTimers[0].cleared, true, 'resume clears the hold expiry');
     await harness.supervisor.handleExtRequest(cancelRequest(delegationId), harness.emit);
     assert.equal((await startPromise).status, 'cancelled');
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processGroupStatuses: [
+        { classification: 'running' },
+        { classification: 'running' },
+        { classification: 'running' },
+        { classification: 'stopped' },
+      ],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'delayed SIGSTOP observation fixture',
+      'ext-delayed-hold-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'held' },
+    );
+    assert.deepEqual(harness.waitCalls, [
+      supervisorModule.DELEGATION_PROCESS_TRANSITION_POLL_MS,
+      supervisorModule.DELEGATION_PROCESS_TRANSITION_POLL_MS,
+    ], 'hold polls while SIGSTOP visibility lags');
+    assert.equal(
+      harness.order.filter((entry) => entry === 'inspect:active').length,
+      4,
+      'hold revalidates the exact pid/group identity on every state observation',
+    );
+    await harness.supervisor.handleExtRequest(cancelRequest(delegationId), harness.emit);
+    assert.equal((await startPromise).status, 'cancelled');
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processGroupStatuses: [
+        { classification: 'running' },
+        { classification: 'stopped' },
+        { classification: 'stopped' },
+        { classification: 'stopped' },
+        { classification: 'stopped' },
+        { classification: 'running' },
+      ],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'delayed SIGCONT observation fixture',
+      'ext-delayed-resume-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'held' },
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.resume', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'running' },
+    );
+    assert.deepEqual(harness.waitCalls, [
+      supervisorModule.DELEGATION_PROCESS_TRANSITION_POLL_MS,
+      supervisorModule.DELEGATION_PROCESS_TRANSITION_POLL_MS,
+    ], 'resume polls while SIGCONT visibility lags');
+    assert.equal(
+      harness.order.filter((entry) => entry === 'inspect:active').length,
+      6,
+      'resume revalidates the exact pid/group identity on every state observation',
+    );
+    await harness.supervisor.handleExtRequest(cancelRequest(delegationId), harness.emit);
+    assert.equal((await startPromise).status, 'cancelled');
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processGroupStatuses: [{ classification: 'running' }],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'never observed SIGSTOP transition fixture',
+      'ext-never-transition-hold-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'hold_failed' },
+    );
+    assert.equal(
+      harness.waitCalls.reduce((total, milliseconds) => total + milliseconds, 0),
+      supervisorModule.DELEGATION_PROCESS_TRANSITION_GRACE_MS,
+      'never-transition confirmation stops at the bounded monotonic deadline',
+    );
+    assert.equal(
+      harness.order.filter((entry) => entry === 'inspect:active').length,
+      harness.lifecycleCalls.filter((call) => call.operation === 'inspect-status').length,
+      'timeout polling revalidates identity before every group-state read',
+    );
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'hold_failed');
+    assert.equal(harness.terminationCalls.length, 1);
   }
 
   {
@@ -1664,6 +1782,8 @@ async function main() {
   assert.equal(supervisorModule.DELEGATION_ACTIVE_STATUS_LIMIT, 64);
   assert.equal(supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT, 128);
   assert.equal(supervisorModule.DELEGATION_HOLD_EXPIRY_MS, 5 * 60 * 1000);
+  assert.equal(supervisorModule.DELEGATION_PROCESS_TRANSITION_GRACE_MS, 500);
+  assert.equal(supervisorModule.DELEGATION_PROCESS_TRANSITION_POLL_MS, 25);
   await runStrictPayloadTests(supervisorModule);
   await runLifecycleProtocolTests(supervisorModule);
   await runPosixLifecycleRaceTests(supervisorModule);
