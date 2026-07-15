@@ -1056,9 +1056,9 @@ function _syncDelegationElapsedTimer(snapshot, node) {
   }, 1000);
 }
 
-function _applyDelegationSnapshotTone(container, snapshot) {
+function _applyDelegationSnapshotTone(container, snapshot, toneOverride) {
   if (!container || !snapshot) return;
-  var tone = _delegationToneForSnapshot(snapshot);
+  var tone = toneOverride || _delegationToneForSnapshot(snapshot);
   container.className = 'delegation-state-card delegation-tone-' + tone;
   container.setAttribute('data-delegation-state', snapshot.state);
   container.setAttribute('data-delegation-tone', tone);
@@ -1277,7 +1277,13 @@ async function _hydrateDelegationForSelectedConversation() {
 function _renderDelegationInlineError(container, textValue) {
   if (!container || !textValue) return;
   var error = _delegationElement('p', 'delegation-inline-error', textValue);
-  error.setAttribute('role', 'alert');
+  // The state card owns assertive semantics for lifecycle alerts. Avoid a
+  // nested alert that would re-announce unchanged cleanup copy when the
+  // parent is deliberately aria-live="off" on a repeated render.
+  if (typeof container.getAttribute !== 'function'
+    || container.getAttribute('role') !== 'alert') {
+    error.setAttribute('role', 'alert');
+  }
   container.appendChild(error);
 }
 
@@ -1771,10 +1777,13 @@ function _renderDelegationRunHeader(container, snapshot) {
   _clearDelegationElapsedTimer();
   _clearDelegationNode(container);
   _delegationRunStopControls = [];
-  _applyDelegationSnapshotTone(container, snapshot);
-  var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
   var bindingCleanupPending = _delegationUiState.bindingCleanupPending === true
     && snapshot.delegationId === _delegationUiState.delegationId;
+  var presentationTone = bindingCleanupPending
+    ? 'danger'
+    : _delegationToneForSnapshot(snapshot);
+  _applyDelegationSnapshotTone(container, snapshot, presentationTone);
+  var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
   var restartLost = snapshot.state === 'restart_lost'
     && terminalCode === 'daemon_restart_lost_run';
   var stopped = snapshot.state === 'stopped' && snapshot.terminal !== null;
@@ -1811,7 +1820,7 @@ function _renderDelegationRunHeader(container, snapshot) {
     'h2',
     'delegation-state-heading',
     headingText,
-    _delegationToneForSnapshot(snapshot)
+    presentationTone
   );
   heading.id = 'delegationRunHeading';
   container.appendChild(heading);

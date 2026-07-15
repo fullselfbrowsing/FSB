@@ -453,6 +453,13 @@ assert(delegationCss.includes('var(--fsb-space-1)')
   'Phase 61 layout reuses the approved shared spacing tokens');
 assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation: none !important[\s\S]*?transition: none !important/.test(cssSource),
   'reduced-motion removes delegation animation and transition');
+const reducedMotionCss = cssSource.slice(cssSource.indexOf('@media (prefers-reduced-motion: reduce)'));
+assert(reducedMotionCss.includes('.chat-messages')
+    && reducedMotionCss.includes('scroll-behavior: auto !important'),
+  'reduced-motion disables smooth chat scrolling on the actual scroll container');
+assert(reducedMotionCss.includes('.status-dot.running')
+    && reducedMotionCss.includes('.stop-btn[data-delegation-action="stop"]'),
+  'reduced-motion disables the delegated status pulse and fixed Stop motion');
 
 console.log('\n--- Phase 61 consent and human-control contract ---');
 
@@ -1888,6 +1895,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     context._delegationUiState.bindingCleanupPending = true;
     context._delegationUiState.delegationId = DELEGATION_ID;
     context._delegationUiState.errorCode = 'delegation_binding_cleanup_unsettled';
+    card.setAttribute('role', 'alert');
     context._renderDelegationRunHeader(card, {
       ...base,
       state: 'failed',
@@ -1900,10 +1908,17 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       'tree-unsettled binding cleanup retains a delegated Stop control');
     assert.equal(findByClass(card, 'delegation-action-danger')[0].disabled, false,
       'canonical stopping/failed snapshots cannot disable the unbound cleanup retry');
+    assert.equal(card.getAttribute('data-delegation-tone'), 'danger',
+      'cleanup-required presentation overrides a stale active snapshot tone');
+    assert(findAll(card, 'i')[0].className.includes('fa-circle-exclamation'),
+      'cleanup-required heading uses the danger semantic icon');
+    assert.equal(findByClass(card, 'delegation-inline-error')[0].getAttribute('role'), null,
+      'parent lifecycle alert owns assertive semantics without a nested re-announcing alert');
     assert(!/stopped/i.test(card.textContent),
       'unsettled cleanup copy never claims the exact run stopped');
     context._delegationUiState.bindingCleanupPending = false;
     context._delegationUiState.errorCode = null;
+    card.removeAttribute('role');
 
     context._renderDelegationRunHeader(card, {
       ...base,

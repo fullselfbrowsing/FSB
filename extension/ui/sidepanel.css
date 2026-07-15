@@ -2124,6 +2124,18 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .chat-messages {
+    scroll-behavior: auto !important;
+  }
+
+  .status-dot.running,
+  .stop-btn[data-delegation-action="stop"],
+  .stop-btn[data-delegation-action="stop"] i {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
   .delegation-entry-new,
   .delegation-action,
   .delegation-run,
