@@ -2,6 +2,10 @@
 
 Policy for Angular templates covered by `npm run lint:i18n`.
 
+> **Current-policy note (2026-07-15):** This document supersedes the completed
+> v1.2.0 CI-05 decision that excluded the dashboard from localization. The
+> v1.2.0 planning artifacts retain that original scope as historical record.
+
 ## In scope (must pass `lint:i18n`)
 
 All showcase HTML under `src/app/**`, including:
@@ -46,4 +50,5 @@ dashboard/extension protocol payload.
 
 - `DO-NOT-TRANSLATE.md` — brand/term rules for XLIFF targets
 - `same-source-allowlist.json` — hash-bound invariant and punctuation-equivalent exceptions
-- `.planning/REQUIREMENTS.md` — CI-01, CI-05
+- `.planning/REQUIREMENTS.md` — historical v1.2.0 requirements; CI-05 is
+  superseded for the current dashboard policy

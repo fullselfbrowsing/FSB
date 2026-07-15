@@ -1,5 +1,10 @@
 # Requirements: FSB (Full Self-Browsing)
 
+> **Historical-scope note (2026-07-15):** CI-05 and the dashboard entry under
+> Out of Scope record the completed v1.2.0 milestone decision. A later showcase
+> localization follow-up localized the dashboard and removed its lint exclusion;
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md` is the current policy.
+
 **Defined:** 2026-07-07
 **Core Value:** Reliable single-attempt execution -- the AI decides correctly, the mechanics execute precisely.
 **Milestone:** v1.2.0 Showcase i18n Completeness

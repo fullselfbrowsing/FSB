@@ -1235,7 +1235,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">26</context>
+          <context context-type="linenumber">27</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
@@ -1243,7 +1243,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">26</context>
+          <context context-type="linenumber">27</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
@@ -6179,7 +6179,7 @@
         <target state="translated">Lattice ケイパビリティメッシュ</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">25</context>
+          <context context-type="linenumber">26</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.resolveTask" datatype="html">
@@ -6187,7 +6187,7 @@
         <target state="translated">このサポート案件を解決する</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">39</context>
+          <context context-type="linenumber">40</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.verifyComment" datatype="html">
@@ -6195,7 +6195,7 @@
         <target state="translated">レシートの署名を確認</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">40</context>
+          <context context-type="linenumber">41</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.replayComment" datatype="html">
@@ -6203,7 +6203,7 @@
         <target state="translated">実行をオフラインでリプレイ</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">41</context>
+          <context context-type="linenumber">42</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.evalComment" datatype="html">
@@ -6211,7 +6211,7 @@
         <target state="translated">回帰ゲート</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">42</context>
+          <context context-type="linenumber">43</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.receiptComment" datatype="html">
@@ -6219,7 +6219,7 @@
         <target state="translated">レシートを確認</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">43</context>
+          <context context-type="linenumber">44</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.copy" datatype="html">
@@ -6227,7 +6227,7 @@
         <target state="translated">コピー</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">93</context>
+          <context context-type="linenumber">94</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.copied" datatype="html">
@@ -6235,7 +6235,7 @@
         <target state="translated">コピーしました</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">94</context>
+          <context context-type="linenumber">95</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.meta.title" datatype="html">
@@ -6243,7 +6243,7 @@
         <target state="translated">Lattice - ケイパビリティ・ランタイム SDK</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">128</context>
+          <context context-type="linenumber">129</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.meta.description" datatype="html">
@@ -6251,7 +6251,7 @@
         <target state="translated">Lattice はマルチモーダル AI アプリケーション向けのケイパビリティ・ランタイム SDK です。型付き出力、確認可能な計画、プロバイダールーティング、アーティファクト、ツール、監査レシート、リプレイしやすい記録を提供します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">129</context>
+          <context context-type="linenumber">130</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.schema.subcategory" datatype="html">
@@ -6259,7 +6259,7 @@
         <target state="translated">マルチモーダル AI アプリケーション向けケイパビリティランタイム SDK</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">210</context>
+          <context context-type="linenumber">211</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.schema.description" datatype="html">
@@ -6267,7 +6267,7 @@
         <target state="translated">Lattice はマルチモーダル AI アプリケーション向けのケイパビリティランタイム SDK です。型付き出力、検査可能な計画、プロバイダーのルーティング、アーティファクト、ツール、監査レシート、再生しやすい記録を提供します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">213</context>
+          <context context-type="linenumber">214</context>
         </context-group>
       </trans-unit>
       <trans-unit id="legal.header.kicker" datatype="html">
@@ -8163,7 +8163,7 @@
         <target state="translated">FSB Full Self-Browsing のロゴ</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">25</context>
+          <context context-type="linenumber">26</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.excludeOwnUi" datatype="html">
@@ -8171,7 +8171,7 @@
         <target state="translated">自身のUIを除外</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">44</context>
+          <context context-type="linenumber">45</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.streamDiffs" datatype="html">
@@ -8179,7 +8179,7 @@
         <target state="translated">最初にスナップショットを取得し、その後は差分をストリーミング</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">45</context>
+          <context context-type="linenumber">46</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.viewerIs" datatype="html">
@@ -8187,7 +8187,7 @@
         <target state="translated">ビューアーは</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">46</context>
+          <context context-type="linenumber">47</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.relayLimit" datatype="html">
@@ -8195,7 +8195,7 @@
         <target state="translated">メッセージごとの上限は1 MiB、バックプレッシャー時はドロップ</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">47</context>
+          <context context-type="linenumber">48</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.clientsJoin" datatype="html">
@@ -8203,7 +8203,7 @@
         <target state="translated">クライアントは次を使って参加</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">48</context>
+          <context context-type="linenumber">49</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.copy" datatype="html">
@@ -8211,7 +8211,7 @@
         <target state="translated">コピー</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">150</context>
+          <context context-type="linenumber">151</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.copied" datatype="html">
@@ -8219,7 +8219,7 @@
         <target state="translated">コピーしました</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">151</context>
+          <context context-type="linenumber">152</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.meta.title" datatype="html">
@@ -8227,7 +8227,7 @@
         <target state="translated">PhantomStream - DOM ネイティブのブラウザミラーリング</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">194</context>
+          <context context-type="linenumber">195</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.meta.description" datatype="html">
@@ -8235,7 +8235,7 @@
         <target state="translated">PhantomStream は DOM ネイティブのライブブラウザミラーリングです。スタイルをインライン化したスナップショットを 1 度送り、その後はピクセルではなく MutationObserver の差分を送信します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">195</context>
+          <context context-type="linenumber">196</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.schema.description" datatype="html">
@@ -8243,7 +8243,7 @@
         <target state="translated">PhantomStream は DOM ネイティブのライブブラウザミラーリングです。スタイルをインライン化したスナップショットを一度送り、その後はピクセルではなく MutationObserver の差分を送ります。@full-self-browsing/phantom-stream として、キャプチャ、レンダラー、リレー、トランスポートの各モジュールを提供します。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">302</context>
+          <context context-type="linenumber">303</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.schema.runtimePlatform" datatype="html">
@@ -8251,7 +8251,7 @@
         <target state="translated">ブラウザー、Node.js 18+</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">304</context>
+          <context context-type="linenumber">305</context>
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.archive.march.summary" datatype="html">

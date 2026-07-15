@@ -18,6 +18,12 @@ progress:
 
 # Project State
 
+> **Post-milestone supersession (2026-07-15):** This file preserves the
+> completed v1.2.0 state. The later showcase localization follow-up localized
+> the dashboard and removed its lint exclusion, so the dashboard hard invariant
+> below is historical rather than current. See
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md` for current policy.
+
 ## Project Reference
 
 See: .planning/PROJECT.md (v1.2.0 Showcase i18n Completeness framing)

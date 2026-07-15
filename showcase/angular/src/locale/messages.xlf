@@ -1082,7 +1082,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">26</context>
+          <context context-type="linenumber">27</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/legal/legal-page.component.ts</context>
@@ -1090,7 +1090,7 @@
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">26</context>
+          <context context-type="linenumber">27</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/privacy/privacy-page.component.ts</context>
@@ -5413,84 +5413,84 @@
         <source>Lattice capability mesh</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">25</context>
+          <context context-type="linenumber">26</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.resolveTask" datatype="html">
         <source>Resolve this support case</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">39</context>
+          <context context-type="linenumber">40</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.verifyComment" datatype="html">
         <source>check receipt signatures</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">40</context>
+          <context context-type="linenumber">41</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.replayComment" datatype="html">
         <source>offline replay of a run</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">41</context>
+          <context context-type="linenumber">42</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.evalComment" datatype="html">
         <source>regression gates</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">42</context>
+          <context context-type="linenumber">43</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.code.receiptComment" datatype="html">
         <source>inspect a receipt</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">43</context>
+          <context context-type="linenumber">44</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.copy" datatype="html">
         <source>Copy</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">93</context>
+          <context context-type="linenumber">94</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.copied" datatype="html">
         <source>Copied</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">94</context>
+          <context context-type="linenumber">95</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.meta.title" datatype="html">
         <source>Lattice - Capability Runtime SDK</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">128</context>
+          <context context-type="linenumber">129</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.meta.description" datatype="html">
         <source>Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">129</context>
+          <context context-type="linenumber">130</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.schema.subcategory" datatype="html">
         <source>Capability runtime SDK for multimodal AI applications</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">210</context>
+          <context context-type="linenumber">211</context>
         </context-group>
       </trans-unit>
       <trans-unit id="lattice.schema.description" datatype="html">
         <source>Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/lattice/lattice-page.component.ts</context>
-          <context context-type="linenumber">213</context>
+          <context context-type="linenumber">214</context>
         </context-group>
       </trans-unit>
       <trans-unit id="legal.header.kicker" datatype="html">
@@ -7149,84 +7149,84 @@
         <source>FSB Full Self-Browsing logo</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">25</context>
+          <context context-type="linenumber">26</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.excludeOwnUi" datatype="html">
         <source>exclude your own UI</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">44</context>
+          <context context-type="linenumber">45</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.streamDiffs" datatype="html">
         <source>snapshot once, then stream diffs</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">45</context>
+          <context context-type="linenumber">46</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.viewerIs" datatype="html">
         <source>viewer is</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">46</context>
+          <context context-type="linenumber">47</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.relayLimit" datatype="html">
         <source>1 MiB per-message cap, backpressure drop</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">47</context>
+          <context context-type="linenumber">48</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.code.clientsJoin" datatype="html">
         <source>clients join with</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">48</context>
+          <context context-type="linenumber">49</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.copy" datatype="html">
         <source>Copy</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">150</context>
+          <context context-type="linenumber">151</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.copied" datatype="html">
         <source>Copied</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">151</context>
+          <context context-type="linenumber">152</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.meta.title" datatype="html">
         <source>PhantomStream - DOM-Native Browser Mirroring</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">194</context>
+          <context context-type="linenumber">195</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.meta.description" datatype="html">
         <source>PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">195</context>
+          <context context-type="linenumber">196</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.schema.description" datatype="html">
         <source>PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels. Ships capture, renderer, relay, and transport modules as @full-self-browsing/phantom-stream.</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">302</context>
+          <context context-type="linenumber">303</context>
         </context-group>
       </trans-unit>
       <trans-unit id="phantomStream.schema.runtimePlatform" datatype="html">
         <source>Browser, Node.js 18+</source>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/phantom-stream/phantom-stream-page.component.ts</context>
-          <context context-type="linenumber">304</context>
+          <context context-type="linenumber">305</context>
         </context-group>
       </trans-unit>
       <trans-unit id="privacy.archive.march.summary" datatype="html">

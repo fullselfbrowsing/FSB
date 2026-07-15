@@ -1,5 +1,11 @@
 # Roadmap: FSB (Full Self-Browsing)
 
+> **Historical-scope note (2026-07-15):** The Phase 54 dashboard-exclusion
+> entries below preserve the completed v1.2.0 roadmap. A later showcase
+> localization follow-up superseded that policy by localizing the dashboard and
+> removing its lint exclusion. Current policy lives in
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
+
 ## Milestones
 
 - ✅ **v1.2.0 Showcase i18n Completeness** — Phases 52-56, shipped 2026-07-09. Archive: `.planning/milestones/v1.2.0-ROADMAP.md`. Closes the translation gap that reopened after v0.9.63 shipped: a full-page audit establishes the true drift/missing scope, resync + stats-page translation + transcreation review close it, a CI drift-detection gate lands on the clean baseline, and the long-deferred WARNING-02 locale-cookie redirect bug is fixed.
