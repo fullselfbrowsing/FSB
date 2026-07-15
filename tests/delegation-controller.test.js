@@ -315,7 +315,7 @@ function terminalState(code) {
     }
   });
 
-  await test('deferred persistence is the commit point for state and subscriber fanout', async () => {
+  await test('durable start commit gates subscriber fanout and start acceptance', async () => {
     const storage = installSessionStorage();
     try {
       const { store, controllerModule } = freshModules();
@@ -323,17 +323,16 @@ function terminalState(code) {
       const controller = controllerModule.create(deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      controller.start({ delegationId: id });
       const delivered = [];
       controller.subscribe((event) => delivered.push(event));
       const deferred = storage.deferWrites();
       let settled = false;
-      const accepting = controller.acceptEvent(eventInput(id, fixtures.initEvent, {
-        ...fixtures.baseContext,
-        timestamp: 1720000000001,
-      })).then((entry) => {
+      const accepting = controller.start({
+        delegationId: id,
+        profileVersion: 'profile-v61-start',
+      }).then((result) => {
         settled = true;
-        return entry;
+        return result;
       });
       await deferred.started;
       await Promise.resolve();
@@ -343,8 +342,13 @@ function terminalState(code) {
       assert.strictEqual(before.state, 'starting');
       assert.strictEqual(before.entries.length, 0);
       deferred.resolve();
-      const entry = await accepting;
+      const started = await accepting;
+      const entry = started.snapshot.entries[0];
+      assert.strictEqual(started.code, 'started');
       assert.strictEqual(entry.sequence, 1);
+      assert.strictEqual(entry.kind, 'init');
+      assert.strictEqual(entry.state, 'starting');
+      assert.strictEqual(entry.init.profileVersion, 'profile-v61-start');
       assert.strictEqual(delivered.length, 1);
       const runtimeEvent = delivered[0];
       exactKeys(runtimeEvent, ['announceSequence', 'snapshot', 'type']);
@@ -356,10 +360,36 @@ function terminalState(code) {
       ]);
       assert.strictEqual(runtimeEvent.snapshot.entries.length, 1);
       assert.deepStrictEqual(runtimeEvent.snapshot.entries[0], entry);
-      assert.strictEqual(runtimeEvent.snapshot.state, 'running');
+      assert.strictEqual(runtimeEvent.snapshot.state, 'starting');
       assert.strictEqual(storage.setCalls, 1);
       assert(Object.isFrozen(runtimeEvent));
       assert(Object.isFrozen(runtimeEvent.snapshot.entries));
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('worker eviction after start commit restores the run before provider activity', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      let harness = makeRecoveryDeps(modules.store);
+      let controller = modules.controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_start_eviction_gap';
+      await controller.start({ delegationId: id, profileVersion: 'profile-v61-eviction' });
+
+      modules = freshModules();
+      harness = makeRecoveryDeps(modules.store);
+      controller = modules.controllerModule.create(harness.deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1);
+      assert.strictEqual(restored[0].delegationId, id);
+      assert.strictEqual(restored[0].state, 'starting');
+      assert.strictEqual(restored[0].entries.length, 1);
+      assert.strictEqual(restored[0].entries[0].kind, 'init');
+      assert.strictEqual(restored[0].entries[0].init.profileVersion, 'profile-v61-eviction');
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [id]);
     } finally {
       storage.restore();
     }
@@ -379,12 +409,11 @@ function terminalState(code) {
       const controller = controllerModule.create(deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      controller.start({ delegationId: id });
       let listenerCalls = 0;
       controller.subscribe(() => { listenerCalls += 1; order.push('listener'); });
       storage.rejectWrites();
       await expectCode(
-        controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext)),
+        controller.start({ delegationId: id, profileVersion: 'profile-v61-unavailable' }),
         'delegation_persistence_failed',
       );
       assert.deepStrictEqual(order, ['cancel']);
@@ -427,7 +456,7 @@ function terminalState(code) {
       const key = `${modules.store.STORAGE_KEY_PREFIX}${id}`;
       assert.strictEqual(storage.data[key].terminal, true);
       assert.strictEqual(storage.data[key].terminalCode, 'delegation_persistence_failed');
-      assert.strictEqual(storage.data[key].entries.length, 1,
+      assert.strictEqual(storage.data[key].entries.length, 2,
         'failed event is never fabricated into the quarantined ledger');
       assert.strictEqual(delivered.length, 1,
         'typed failure fans out only after the tombstone write succeeds');
@@ -449,13 +478,23 @@ function terminalState(code) {
 
   await test('quota and corrupt canonical entries fan out only after a terminal marker', async () => {
     for (const code of ['delegation_quota_exceeded', 'delegation_ledger_corrupt']) {
+      const { store, controllerModule } = freshModules();
+      let appendCalls = 0;
       const fakeStore = {
         async hydrateNonterminal() { return []; },
-        async appendBeforeFanout(id) {
+        async appendBeforeFanout(id, event, context) {
+          appendCalls += 1;
+          if (appendCalls === 1) {
+            return store.project(event, {
+              ...context,
+              delegationId: id,
+              sequence: 1,
+            });
+          }
           if (code === 'delegation_ledger_corrupt') {
             return {
               delegationId: id,
-              sequence: 2,
+              sequence: 3,
             };
           }
           const error = new Error(code);
@@ -464,12 +503,11 @@ function terminalState(code) {
         },
         async markTerminal() {},
       };
-      const { controllerModule } = freshModules();
       const { deps, calls } = makeDeps(fakeStore);
       const controller = controllerModule.create(deps);
       await controller.hydrate();
       const id = `delegation_${code}`;
-      controller.start({ delegationId: id });
+      await controller.start({ delegationId: id });
       let delivered = 0;
       controller.subscribe(() => { delivered += 1; });
       await expectCode(
@@ -479,7 +517,7 @@ function terminalState(code) {
       assert.strictEqual(delivered, 1);
       assert.strictEqual(controller.getSnapshot(id).terminal.code, code);
       assert.deepStrictEqual(calls.cancel, [{ delegationId: id, code }]);
-      assert.strictEqual(controller.getSnapshot(id).entries.length, 0);
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
     }
   });
 
@@ -491,7 +529,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      controller.start({ delegationId: id });
+      await controller.start({ delegationId: id });
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       await controller.acceptEvent(eventInput(id, fixtures.toolUseEvent, {
         ...fixtures.baseContext,
@@ -510,8 +548,8 @@ function terminalState(code) {
       assert.strictEqual(restored[0].delegationId, id);
       assert.strictEqual(restored[0].hydrated, true);
       assert.strictEqual(restored[0].connection, 'disconnected');
-      assert.deepStrictEqual(restored[0].entries.map((entry) => entry.sequence), [1, 2]);
-      assert.deepStrictEqual(restored[0].entries.map((entry) => entry.kind), ['init', 'tool-call']);
+      assert.deepStrictEqual(restored[0].entries.map((entry) => entry.sequence), [1, 2, 3]);
+      assert.deepStrictEqual(restored[0].entries.map((entry) => entry.kind), ['init', 'init', 'tool-call']);
       assert.deepStrictEqual(restored[0].provider, { id: 'claude-code', label: 'Claude Code' });
       assert.deepStrictEqual(harness.calls, {
         cancel: [], status: [], hold: [], resume: [], activeTabs: [], liveTabs: [], registry: [],
@@ -531,7 +569,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      controller.start({ delegationId: id });
+      await controller.start({ delegationId: id });
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       storage.clear();
 
@@ -593,7 +631,7 @@ function terminalState(code) {
       const controller = controllerModule.create(makeDeps(store).deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      controller.start({ delegationId: id });
+      await controller.start({ delegationId: id });
       let goodCalls = 0;
       controller.subscribe(() => { throw new Error('bad subscriber'); });
       controller.subscribe(() => { goodCalls += 1; });
@@ -601,9 +639,9 @@ function terminalState(code) {
         ...fixtures.baseContext,
         state: 'running',
       }));
-      assert.strictEqual(entry.sequence, 1);
+      assert.strictEqual(entry.sequence, 2);
       assert.strictEqual(goodCalls, 1);
-      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 2);
     } finally {
       storage.restore();
     }
@@ -650,7 +688,7 @@ function terminalState(code) {
         const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
         assert.strictEqual(envelope.terminal, true);
         assert.strictEqual(envelope.terminalCode, item.code);
-        assert.strictEqual(envelope.entries.length, 1);
+        assert.strictEqual(envelope.entries.length, 2);
       }
 
       assert.deepStrictEqual(harness.calls.cancel, []);
@@ -688,8 +726,9 @@ function terminalState(code) {
       const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
       assert.strictEqual(envelope.terminal, true);
       assert.strictEqual(envelope.terminalCode, 'stopped');
-      assert.strictEqual(envelope.entries.length, 1);
-      assert.strictEqual(envelope.entries[0].state, 'stopped');
+      assert.strictEqual(envelope.entries.length, 2);
+      assert.strictEqual(envelope.entries[0].state, 'starting');
+      assert.strictEqual(envelope.entries[1].state, 'stopped');
     } finally {
       storage.restore();
     }
@@ -766,9 +805,10 @@ function terminalState(code) {
       );
       const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${stopFirstId}`];
       assert.strictEqual(envelope.terminal, true);
-      assert.strictEqual(envelope.entries.length, 2);
+      assert.strictEqual(envelope.entries.length, 3);
       assert.strictEqual(envelope.entries[0].kind, 'init');
-      assert.strictEqual(envelope.entries[1].state, 'stopped');
+      assert.strictEqual(envelope.entries[1].kind, 'init');
+      assert.strictEqual(envelope.entries[2].state, 'stopped');
     } finally {
       storage.restore();
     }
@@ -1016,13 +1056,13 @@ function terminalState(code) {
       const secondAfterTimeout = controller.getSnapshot(secondId);
       assert.strictEqual(firstBeforeStop.state, 'running');
       assert.strictEqual(firstBeforeStop.terminal, null);
-      assert.deepStrictEqual(firstBeforeStop.entries.map((entry) => entry.sequence), [1, 2]);
+      assert.deepStrictEqual(firstBeforeStop.entries.map((entry) => entry.sequence), [1, 2, 3]);
       assert.deepStrictEqual(secondAfterTimeout.terminal, {
         code: 'event_silence_timeout',
         releasedTabCount: 0,
       });
-      assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1, 2]);
-      assert.strictEqual(secondAfterTimeout.entries[1].state, 'failed');
+      assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1, 2, 3]);
+      assert.strictEqual(secondAfterTimeout.entries[2].state, 'failed');
 
       const stopped = await controller.stop({ delegationId: firstId });
       assert.strictEqual(stopped.code, 'stopped');
@@ -1128,7 +1168,7 @@ function terminalState(code) {
         ['bind:agent-61-02', 'active-tab', 'owned-tabs', 'daemon-hold', 'seal-all-tabs'],
       );
       let envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
-      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['running', 'held']);
+      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['starting', 'running', 'held']);
 
       const resumed = await controller.resume({ delegationId: id });
       assert.strictEqual(resumed.code, 'resumed');
@@ -1142,7 +1182,7 @@ function terminalState(code) {
       assert(order.indexOf('live-tabs') < order.indexOf('restore-all-tabs'));
       assert(order.indexOf('restore-all-tabs') < order.indexOf('daemon-resume'));
       envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
-      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['running', 'held', 'running']);
+      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['starting', 'running', 'held', 'running']);
 
       const stopped = await controller.stop({ delegationId: id });
       assert.strictEqual(stopped.code, 'stopped');
@@ -1155,7 +1195,7 @@ function terminalState(code) {
       envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
       assert.deepStrictEqual(
         envelope.entries.map((entry) => entry.state),
-        ['running', 'held', 'running', 'stopped'],
+        ['starting', 'running', 'held', 'running', 'stopped'],
       );
       assert.strictEqual(clock.pending(), 0);
     } finally {
@@ -1738,7 +1778,7 @@ function terminalState(code) {
       await controller.reconcile({ delegationId: id, connection: 'connected' });
       assert.strictEqual(statusReads.length, 2, 'duplicate status observes without replaying work');
       assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [id]);
-      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 2);
 
       const disconnected = await controller.reconcile({
         delegationId: id,
@@ -1751,8 +1791,8 @@ function terminalState(code) {
       assert.deepStrictEqual(harness.calls.cancel, []);
 
       const terminalEntry = await acceptSuccessfulFinal(controller, id, 1720000001000);
-      assert.strictEqual(terminalEntry.sequence, 3);
-      assert.strictEqual(delivered[delivered.length - 1].announceSequence, 3);
+      assert.strictEqual(terminalEntry.sequence, 4);
+      assert.strictEqual(delivered[delivered.length - 1].announceSequence, 4);
       assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
       assert.deepStrictEqual(harness.recoveryCalls.clearGeneration, [id]);
       assert.strictEqual(harness.heartbeatOwners.size, 0);

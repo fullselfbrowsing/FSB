@@ -945,6 +945,10 @@ function runSourceContractCase() {
     assert(authorityBranch < legacyStart.indexOf(mutation),
       `agent provider branch precedes ${mutation}`);
   }
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js'),
+    'utf8'
+  );
   const delegatedStart = backgroundSource.slice(
     backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'),
     backgroundSource.indexOf('function fsbDelegationMapLifecycleFailure', backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'))
@@ -956,6 +960,20 @@ function runSourceContractCase() {
   assert(delegatedStart.indexOf('resolveAccepted(payload.delegationId)')
       < delegatedStart.indexOf('controller.getSnapshot(delegationId)'),
     'server-minted delegation id acceptance precedes returned controller state');
+  const startedObserver = delegationComposition.slice(
+    delegationComposition.indexOf("if (bridgeEvent.event === 'delegation.started') {"),
+    delegationComposition.indexOf("if (bridgeEvent.event !== 'delegation.event') return;")
+  );
+  assert(startedObserver.includes('await controller.start({')
+      && startedObserver.includes('profileVersion: payload.profileVersion'),
+    'started observer durably commits the canonical profile row before request acceptance');
+  const controllerStart = controllerSource.slice(
+    controllerSource.indexOf('function start(input) {'),
+    controllerSource.indexOf('function acceptEvent(input) {')
+  );
+  assert(controllerStart.indexOf('await eventStore.appendBeforeFanout(')
+      < controllerStart.indexOf('var runtimeEvent = _emit(record, canonicalEntry.sequence)'),
+    'controller start write completes before live fanout');
   assert(delegationComposition.includes("value === 'ext_request_timeout' || value === 'bridge_topology_changed'")
       && delegationComposition.includes("return 'route_lost'")
       && delegationComposition.includes("treeSettled: !transportError && code !== 'tree_unsettled'"),
@@ -970,10 +988,6 @@ function runSourceContractCase() {
   assert(!/(?:issueChallenge|consumeChallenge|controller|delegate\.start)/.test(clearTrust),
     'clear trust cannot consume consent, touch a controller, or start a run');
 
-  const controllerSource = fs.readFileSync(
-    path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js'),
-    'utf8'
-  );
   const registrySource = fs.readFileSync(
     path.join(__dirname, '..', 'extension', 'utils', 'agent-registry.js'),
     'utf8'

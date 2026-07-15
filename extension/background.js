@@ -1729,11 +1729,19 @@ async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
       throw new Error('delegation.started payload is invalid');
     }
     fsbDelegationProfiles.set(payload.delegationId, payload.profileVersion);
-    await controller.start({
-      delegationId: payload.delegationId,
-      provider: { id: 'claude-code', label: 'Claude Code' },
-      connection: 'connected'
-    });
+    try {
+      await controller.start({
+        delegationId: payload.delegationId,
+        provider: { id: 'claude-code', label: 'Claude Code' },
+        profileVersion: payload.profileVersion,
+        connection: 'connected'
+      });
+    } catch (error) {
+      if (fsbDelegationProfiles.get(payload.delegationId) === payload.profileVersion) {
+        fsbDelegationProfiles.delete(payload.delegationId);
+      }
+      throw error;
+    }
     return;
   }
 

@@ -890,11 +890,39 @@
       record.startedAt = now();
       record.lastEventAt = record.startedAt;
       records.set(delegationId, record);
-      _armWallClock(record);
-      _refreshSilence(record, record.startedAt);
-      provisional = null;
-      var runtimeEvent = _emit(record, null);
-      record.startPromise = _retainHeartbeatOnce(record).then(function() {
+      record.startPromise = _enqueue(record, async function() {
+        var canonicalEntry;
+        try {
+          canonicalEntry = await eventStore.appendBeforeFanout(
+            delegationId,
+            { type: 'delegation.started', sessionId: null, payload: {} },
+            {
+              timestamp: record.startedAt,
+              state: 'starting',
+              client: { id: PROVIDER_ID, label: PROVIDER_LABEL },
+              profileVersion: input.profileVersion === undefined ? null : input.profileVersion,
+              model: null,
+              allowedTools: []
+            }
+          );
+        } catch (error) {
+          return _failPersistence(record, error);
+        }
+        if (!canonicalEntry
+          || canonicalEntry.delegationId !== record.delegationId
+          || canonicalEntry.sequence !== 1) {
+          return _failPersistence(
+            record,
+            _error('delegation_ledger_corrupt', 'canonical start entry sequence or identity is invalid')
+          );
+        }
+
+        record.startedAt = canonicalEntry.timestamp;
+        record.lastEventAt = canonicalEntry.timestamp;
+        _armWallClock(record);
+        _applyEntry(record, canonicalEntry, { notify: false });
+        await _retainHeartbeatOnce(record);
+        var runtimeEvent = _emit(record, canonicalEntry.sequence);
         return _deepFreeze({
           ok: true,
           code: 'started',
@@ -902,6 +930,7 @@
           snapshot: _snapshot(record)
         });
       });
+      provisional = null;
       return record.startPromise;
     }
 
