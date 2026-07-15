@@ -170,6 +170,109 @@ async function test2b_registerUsesClientConnectionIdFallback() {
   }
 }
 
+async function test2c_delegationRegistrationGateAndRollback() {
+  console.log('--- Test 2c: delegation registration requires one exact controller gate ---');
+  const delegationId = 'Delegation_expected_live_6104';
+
+  // Missing gate fails closed and removes the otherwise ordinary agent row.
+  {
+    const mock = new MockAgentRegistry({ mintId: 'agent_missing-gate' });
+    installMockRegistry(mock);
+    try {
+      const response = await handleAgentRegisterRoute({ payload: { delegationId } });
+      check(response.success === false, 'missing delegation controller gate rejects registration');
+      check(response.errorCode === 'delegation_binding_rejected', 'missing gate returns typed rejection');
+      check(mock.calls.releaseAgent.length === 1, 'missing gate rolls back ordinary agent record');
+      check(mock.calls.releaseAgent[0][0] === 'agent_missing-gate', 'rollback targets freshly minted id');
+    } finally {
+      uninstallRegistry();
+    }
+  }
+
+  // A malformed sidecar never reaches the gate, but still rolls back mint.
+  {
+    const mock = new MockAgentRegistry({ mintId: 'agent_malformed-sidecar' });
+    installMockRegistry(mock);
+    let calls = 0;
+    try {
+      const response = await handleAgentRegisterRoute({
+        payload: { delegationId: 'case.varied.invalid' },
+        bindRegisteredAgent: async () => { calls += 1; return { ok: true }; },
+      });
+      check(response.success === false, 'malformed delegation id rejects registration');
+      check(calls === 0, 'malformed delegation id never reaches controller authorization');
+      check(mock.calls.releaseAgent.length === 1, 'malformed sidecar rolls back ordinary record');
+    } finally {
+      uninstallRegistry();
+    }
+  }
+
+  // The exact expected active id is passed with the fresh agent id. The gate
+  // consumes it once; a replay/case variation is denied and rolled back.
+  {
+    const mock = new MockAgentRegistry({ mintId: 'agent_expected-live' });
+    installMockRegistry(mock);
+    let expected = delegationId;
+    const calls = [];
+    const gate = async (input) => {
+      calls.push(input);
+      if (input.delegationId !== expected) {
+        return { ok: false, code: 'delegation_binding_rejected' };
+      }
+      expected = null;
+      return { ok: true };
+    };
+    try {
+      const accepted = await handleAgentRegisterRoute({
+        payload: { delegationId, agentId: 'attacker-agent-id' },
+        bindRegisteredAgent: gate,
+      });
+      check(accepted.success === true, 'single expected live delegation is accepted');
+      check(calls.length === 1, 'controller gate called exactly once');
+      check(calls[0].delegationId === delegationId, 'gate receives exact sidecar bytes');
+      check(calls[0].agentId === 'agent_expected-live', 'gate receives fresh extension-minted id');
+
+      const replay = await handleAgentRegisterRoute({
+        payload: { delegationId },
+        bindRegisteredAgent: gate,
+      });
+      check(replay.success === false, 'consumed expected registration rejects replay');
+      check(mock.calls.releaseAgent.length === 1, 'denied replay rolls back its ordinary record');
+
+      const caseVaried = await handleAgentRegisterRoute({
+        payload: { delegationId: delegationId.toLowerCase() },
+        bindRegisteredAgent: gate,
+      });
+      check(caseVaried.success === false, 'case-varied delegation id is not equivalent');
+      check(mock.calls.releaseAgent.length === 2, 'case-varied denial also rolls back');
+    } finally {
+      uninstallRegistry();
+    }
+  }
+
+  for (const code of [
+    'unknown_delegation',
+    'delegation_not_active',
+    'delegation_stale',
+    'delegation_terminal',
+    'delegation_binding_conflict',
+  ]) {
+    const mock = new MockAgentRegistry({ mintId: 'agent_denied-' + code });
+    installMockRegistry(mock);
+    try {
+      const response = await handleAgentRegisterRoute({
+        payload: { delegationId },
+        authorizeDelegation: async () => ({ ok: false, code }),
+      });
+      check(response.success === false && response.errorCode === code,
+        code + ' controller denial is preserved');
+      check(mock.calls.releaseAgent.length === 1, code + ' denial rolls back the mint');
+    } finally {
+      uninstallRegistry();
+    }
+  }
+}
+
 // =========================================================================
 // Test 3 (D-09): release handler happy path
 // =========================================================================
@@ -276,6 +379,7 @@ async function test6_statusMissingAgentId() {
     await test1_registerIgnoresCallerSuppliedId();
     await test2_registerRegistryUnavailable();
     await test2b_registerUsesClientConnectionIdFallback();
+    await test2c_delegationRegistrationGateAndRollback();
     await test3_releaseHappyPath();
     await test4_releaseMissingAgentId();
     await test5_statusCallerSelfOnly();

@@ -42,6 +42,7 @@
   var FSB_AGENT_DISPLAY_HEX_LENGTH = 6;
   var FSB_AGENT_LOG_PREFIX = 'AGT';
   var FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE = 'agent-reaped';
+  var FSB_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
   // Phase 241 plan 01: cap + grace constants ---------------------------------
   // D-05: cap is persisted in chrome.storage.local under fsbAgentCap so it
@@ -229,6 +230,19 @@
     return proto === Object.prototype || proto === null;
   }
 
+  function hasExactKeys(value, expected) {
+    if (!isPlainObject(value)) return false;
+    var actual = Object.keys(value).sort();
+    var wanted = expected.slice().sort();
+    return actual.length === wanted.length && actual.every(function(key, index) {
+      return key === wanted[index];
+    });
+  }
+
+  function isDelegationId(value) {
+    return typeof value === 'string' && FSB_DELEGATION_ID_PATTERN.test(value);
+  }
+
   function cloneRecord(record) {
     if (!record || typeof record !== 'object') return null;
     try {
@@ -283,6 +297,11 @@
     // so getTabMetadata stays a single Map.get(tabId) sync read for the
     // dispatch gate's same-microtask discipline (D-07).
     this._tabMetadata = new Map();
+    // Phase 61: the server delegation id is correlation only. Extension-
+    // minted agent ids remain authoritative for tab ownership. Both indexes
+    // are kept so one-to-one conflicts fail without scanning or ambiguity.
+    this._delegations = new Map();
+    this._delegationByAgent = new Map();
     this._hydrated = false;
     // Phase 241 plan 01: cap + grace state.
     // _cachedCap is the in-memory mirror of chrome.storage.local fsbAgentCap.
@@ -374,9 +393,105 @@
       }
       self._tabsByAgent.delete(agentId);
       self._agents.delete(agentId);
+      self._removeDelegationForAgent(agentId);
       await self._persist();
       return true;
     });
+  };
+
+  /**
+   * Bind one daemon-minted delegation id to one already extension-minted
+   * agent id. Authorization belongs to DelegationController; callers must
+   * reach this method only through bindRegisteredAgent.
+   */
+  AgentRegistry.prototype.bindDelegation = function(input) {
+    var self = this;
+    return withRegistryLock(async function() {
+      if (!hasExactKeys(input, ['delegationId', 'agentId'])
+        || !isDelegationId(input.delegationId)
+        || typeof input.agentId !== 'string'
+        || !self._agents.has(input.agentId)) {
+        return { ok: false, code: 'delegation_binding_rejected' };
+      }
+      var mappedAgent = self._delegations.get(input.delegationId);
+      var mappedDelegation = self._delegationByAgent.get(input.agentId);
+      if ((mappedAgent && mappedAgent !== input.agentId)
+        || (mappedDelegation && mappedDelegation !== input.delegationId)) {
+        return { ok: false, code: 'delegation_binding_conflict' };
+      }
+      if (mappedAgent === input.agentId && mappedDelegation === input.delegationId) {
+        return {
+          ok: true,
+          code: 'delegation_already_bound',
+          delegationId: input.delegationId,
+          agentId: input.agentId
+        };
+      }
+      // A half-index can exist only after memory corruption. Refuse to
+      // repair it implicitly because choosing either side would broaden
+      // authority.
+      if (mappedAgent || mappedDelegation) {
+        return { ok: false, code: 'delegation_binding_conflict' };
+      }
+      self._delegations.set(input.delegationId, input.agentId);
+      self._delegationByAgent.set(input.agentId, input.delegationId);
+      await self._persist();
+      return {
+        ok: true,
+        code: 'delegation_bound',
+        delegationId: input.delegationId,
+        agentId: input.agentId
+      };
+    });
+  };
+
+  /** Exact read of the extension agent mapped to a server delegation. */
+  AgentRegistry.prototype.getAgentForDelegation = function(delegationId) {
+    if (!isDelegationId(delegationId)) return null;
+    var agentId = this._delegations.get(delegationId);
+    if (!agentId || !this._agents.has(agentId)) return null;
+    if (this._delegationByAgent.get(agentId) !== delegationId) return null;
+    return agentId;
+  };
+
+  /**
+   * Return the complete active ownership snapshot for the exact mapping.
+   * Missing token metadata makes the whole lookup fail closed as an empty
+   * set; callers must never seal a partial token mapping.
+   */
+  AgentRegistry.prototype.getDelegationOwnedTabs = function(input) {
+    if (!hasExactKeys(input, ['delegationId', 'agentId'])
+      || !isDelegationId(input.delegationId)
+      || this.getAgentForDelegation(input.delegationId) !== input.agentId) {
+      return [];
+    }
+    var owned = this._tabsByAgent.get(input.agentId);
+    if (!owned) return [];
+    var out = [];
+    var self = this;
+    var valid = true;
+    owned.forEach(function(tabId) {
+      var meta = self._tabMetadata.get(tabId);
+      if (self._tabOwners.get(tabId) !== input.agentId
+        || !meta
+        || typeof meta.ownershipToken !== 'string'
+        || meta.ownershipToken.length === 0) {
+        valid = false;
+        return;
+      }
+      out.push({ tabId: tabId, ownershipToken: meta.ownershipToken });
+    });
+    if (!valid || out.length !== owned.size) return [];
+    return out.sort(function(a, b) { return a.tabId - b.tabId; });
+  };
+
+  AgentRegistry.prototype._removeDelegationForAgent = function(agentId) {
+    var delegationId = this._delegationByAgent.get(agentId);
+    if (!delegationId) return false;
+    if (this._delegations.get(delegationId) !== agentId) return false;
+    this._delegationByAgent.delete(agentId);
+    this._delegations.delete(delegationId);
+    return true;
   };
 
   /**
@@ -578,6 +693,7 @@
         if (ownedTabs.size === 0) {
           self._tabsByAgent.delete(agentId);
           self._agents.delete(agentId);
+          self._removeDelegationForAgent(agentId);
         }
       }
       await self._persist();
@@ -808,6 +924,7 @@
         }
         self._tabsByAgent.delete(agentId);
         self._agents.delete(agentId);
+        self._removeDelegationForAgent(agentId);
         releasedAny = true;
         try {
           if (typeof globalThis !== 'undefined'
@@ -1213,6 +1330,30 @@
         tabIds.forEach(function(tabId) { self._tabOwners.set(tabId, agentId); });
       });
 
+      // Phase 61: restore only internally consistent one-to-one delegation
+      // rows. Unknown agents, malformed ids, duplicate reverse mappings, and
+      // record-key mismatches are omitted rather than guessed or repaired.
+      var delegationStateChanged = false;
+      var persistedDelegations = (payload && isPlainObject(payload.delegations))
+        ? payload.delegations : {};
+      if (payload && payload.delegations !== undefined && !isPlainObject(payload.delegations)) {
+        delegationStateChanged = true;
+      }
+      Object.keys(persistedDelegations).forEach(function(delegationId) {
+        var agentId = persistedDelegations[delegationId];
+        var record = self._agents.get(agentId);
+        if (!isDelegationId(delegationId)
+          || typeof agentId !== 'string'
+          || !record
+          || record.agentId !== agentId
+          || self._delegationByAgent.has(agentId)) {
+          delegationStateChanged = true;
+          return;
+        }
+        self._delegations.set(delegationId, agentId);
+        self._delegationByAgent.set(agentId, delegationId);
+      });
+
       // Phase 240 D-04: rebuild _tabMetadata from the envelope's tabMetadata
       // block (sibling to records). Phase 240 Pitfall 6: stale Phase 237
       // envelopes have no tabMetadata; those tabs fail isOwnedBy on next
@@ -1286,6 +1427,7 @@
             if (setRef.size === 0) {
               self._tabsByAgent.delete(agentId);
               self._agents.delete(agentId);
+              if (self._removeDelegationForAgent(agentId)) delegationStateChanged = true;
             } else {
               var rec = self._agents.get(agentId);
               if (rec) {
@@ -1305,7 +1447,7 @@
       });
 
       // Step 5: write reconciled snapshot back if anything changed.
-      if (reapedThisWake.length > 0) {
+      if (reapedThisWake.length > 0 || delegationStateChanged) {
         await self._persist();
       }
 
@@ -1452,11 +1594,23 @@
       hasStagedReleases = true;
     });
 
+    // Phase 61: additive v1 delegation correlation map. Older readers ignore
+    // the sibling field; newer readers validate both one-to-one indexes on
+    // hydrate before accepting any row.
+    var delegations = {};
+    var hasDelegations = false;
+    this._delegations.forEach(function(agentId, delegationId) {
+      if (self._delegationByAgent.get(agentId) !== delegationId || !self._agents.has(agentId)) return;
+      delegations[delegationId] = agentId;
+      hasDelegations = true;
+    });
+
     var extras = null;
-    if (hasTabMetadata || hasStagedReleases) {
+    if (hasTabMetadata || hasStagedReleases || hasDelegations) {
       extras = {};
       if (hasTabMetadata) extras.tabMetadata = tabMetadata;
       if (hasStagedReleases) extras.stagedReleases = stagedReleases;
+      if (hasDelegations) extras.delegations = delegations;
     }
     await writePersistedAgentRegistry(records, extras);
   };
@@ -1474,6 +1628,8 @@
     this._tabsByAgent.clear();
     // Phase 240: also clear the per-tab metadata cache.
     this._tabMetadata.clear();
+    this._delegations.clear();
+    this._delegationByAgent.clear();
     // Phase 241: clear staged releases and any pending grace timers.
     if (this._stagedReleases) {
       this._stagedReleases.forEach(function(entry) {

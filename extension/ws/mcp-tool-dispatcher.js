@@ -1957,7 +1957,29 @@ function runMcpAgentProviderWrite(method, ...args) {
   } catch (_e) { /* best-effort evidence write */ }
 }
 
-async function handleAgentRegisterRoute({ payload, client } = {}) {
+const FSB_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+function resolveDelegationRegistrationGate(explicitGate) {
+  if (typeof explicitGate === 'function') return explicitGate;
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (controller && typeof controller.bindRegisteredAgent === 'function') {
+    return controller.bindRegisteredAgent.bind(controller);
+  }
+  return null;
+}
+
+async function rollbackDelegatedAgentRegistration(registry, agentId) {
+  if (!registry || typeof registry.releaseAgent !== 'function' || typeof agentId !== 'string') {
+    return false;
+  }
+  try {
+    return (await registry.releaseAgent(agentId, 'delegation-registration-rejected')) === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, authorizeDelegation } = {}) {
   const reg = globalThis.fsbAgentRegistryInstance;
   if (!reg || typeof reg.registerAgent !== 'function') {
     return { success: false, errorCode: 'agent_registry_unavailable', error: 'AgentRegistry not initialized' };
@@ -1982,6 +2004,30 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
     || ((globalThis.FsbAgentRegistry && typeof globalThis.FsbAgentRegistry.formatAgentIdForDisplay === 'function')
       ? globalThis.FsbAgentRegistry.formatAgentIdForDisplay(agentId || '')
       : (typeof agentId === 'string' ? agentId.slice(0, 12) : ''));
+  const hasDelegationSidecar = !!payload
+    && Object.prototype.hasOwnProperty.call(payload, 'delegationId');
+  if (hasDelegationSidecar) {
+    const delegationId = payload.delegationId;
+    const gate = resolveDelegationRegistrationGate(bindRegisteredAgent || authorizeDelegation);
+    let binding = null;
+    if (typeof delegationId === 'string' && FSB_DELEGATION_ID_PATTERN.test(delegationId) && gate) {
+      try {
+        binding = await gate({ delegationId, agentId });
+      } catch (_e) {
+        binding = null;
+      }
+    }
+    if (!binding || binding.ok !== true) {
+      const rolledBack = await rollbackDelegatedAgentRegistration(reg, agentId);
+      return {
+        success: false,
+        errorCode: (binding && typeof binding.code === 'string')
+          ? binding.code
+          : 'delegation_binding_rejected',
+        rolledBack
+      };
+    }
+  }
   // Phase 241 D-08: capture per-bridge connection_id from the caller's payload
   // and stamp it on the agent record so a later bridge onclose can stage all
   // matching agents for grace-window release. The bridge mints the UUID at

@@ -1069,6 +1069,116 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   }
   console.log('  PASS: hydrate restores _tabMetadata block');
 
+  // === Phase 61 delegation correlation ======================================
+
+  console.log('--- Phase 61 / Task 1: exact one-to-one delegation mapping ---');
+  {
+    setupChromeMock({
+      tabs: [
+        { id: 101, incognito: false, windowId: 10 },
+        { id: 202, incognito: false, windowId: 20 }
+      ]
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      const agentA = (await registry.registerAgent()).agentId;
+      const agentB = (await registry.registerAgent()).agentId;
+      const tabA = await registry.bindTab(agentA, 101);
+      await registry.bindTab(agentB, 202);
+      const delegationA = 'Delegation_live_A_6104';
+      const delegationB = 'Delegation_live_B_6104';
+
+      const boundA = await registry.bindDelegation({ delegationId: delegationA, agentId: agentA });
+      const boundB = await registry.bindDelegation({ delegationId: delegationB, agentId: agentB });
+      assert.strictEqual(boundA.ok, true);
+      assert.strictEqual(boundB.ok, true);
+      assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA);
+      assert.deepStrictEqual(
+        registry.getDelegationOwnedTabs({ delegationId: delegationA, agentId: agentA }),
+        [{ tabId: 101, ownershipToken: tabA.ownershipToken }],
+        'lookup returns only the complete exact tab/token set',
+      );
+      assert.deepStrictEqual(
+        registry.getDelegationOwnedTabs({ delegationId: delegationA, agentId: agentB }),
+        [],
+        'mismatched expected agent sees no ownership',
+      );
+
+      const samePair = await registry.bindDelegation({ delegationId: delegationA, agentId: agentA });
+      assert.strictEqual(samePair.code, 'delegation_already_bound');
+      assert.strictEqual(
+        (await registry.bindDelegation({ delegationId: delegationA, agentId: agentB })).code,
+        'delegation_binding_conflict',
+      );
+      assert.strictEqual(
+        (await registry.bindDelegation({ delegationId: delegationB, agentId: agentA })).code,
+        'delegation_binding_conflict',
+      );
+      assert.strictEqual(
+        (await registry.bindDelegation({ delegationId: 'bad.id', agentId: agentA })).ok,
+        false,
+      );
+
+      await registry.releaseAgent(agentA, 'test');
+      assert.strictEqual(registry.getAgentForDelegation(delegationA), null,
+        'ordinary agent removal removes its exact delegation mapping');
+      assert.strictEqual(registry.getAgentForDelegation(delegationB), agentB,
+        'unrelated delegation remains mapped');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: exact one-to-one mapping rejects conflicts and removes only itself');
+
+  console.log('--- Phase 61 / Task 1: delegation map hydrate validates ghosts and conflicts ---');
+  {
+    const agentA = 'agent_550e8400-e29b-41d4-a716-446655440001';
+    const agentB = 'agent_550e8400-e29b-41d4-a716-446655440002';
+    const delegationA = 'Delegation_hydrate_A_6104';
+    const delegationGhost = 'Delegation_hydrate_ghost_6104';
+    const mock = setupChromeMock({
+      session: {
+        fsbAgentRegistry: {
+          v: 1,
+          records: {
+            [agentA]: { agentId: agentA, createdAt: 1, tabIds: [301] },
+            [agentB]: { agentId: agentB, createdAt: 2, tabIds: [302] }
+          },
+          tabMetadata: {
+            '301': { ownershipToken: 'token-a', incognito: false, windowId: 1, boundAt: 1 },
+            '302': { ownershipToken: 'token-b', incognito: false, windowId: 1, boundAt: 1 }
+          },
+          delegations: {
+            [delegationA]: agentA,
+            [delegationGhost]: 'agent_missing',
+            'Delegation_duplicate_A_6104': agentA,
+            'malformed.id': agentB
+          }
+        }
+      },
+      tabs: [
+        { id: 301, incognito: false, windowId: 1 },
+        { id: 302, incognito: false, windowId: 1 }
+      ]
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      await registry.hydrate();
+      assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA);
+      assert.strictEqual(registry.getAgentForDelegation(delegationGhost), null);
+      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_A_6104'), null);
+      assert.strictEqual(registry.getAgentForDelegation('malformed.id'), null);
+      const persisted = mock.session._dump().fsbAgentRegistry;
+      assert.deepStrictEqual(persisted.delegations, { [delegationA]: agentA },
+        'hydrate writes back only the valid one-to-one row');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: hydrate retains only valid non-ghost one-to-one rows');
+
   console.log('\nAll assertions passed.');
 })().catch((err) => {
   console.error('TEST FAILED:', err && err.stack ? err.stack : err);

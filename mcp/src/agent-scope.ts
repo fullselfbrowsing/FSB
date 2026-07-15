@@ -14,6 +14,7 @@ import type { WebSocketBridge } from './bridge.js';
 import type { McpClientInventory } from './client-inventory.js';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
+const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
 export type ClientInfo = {
   name?: string;
@@ -22,6 +23,12 @@ export type ClientInfo = {
 
 export type ClientInfoSupplier = () => ClientInfo | null;
 export type ClientInventorySupplier = () => McpClientInventory | Promise<McpClientInventory>;
+
+export type AgentScopeEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type AgentScopeOptions = {
+  environment?: AgentScopeEnvironment;
+};
 
 export class AgentScope {
   private agentId: string | null = null;
@@ -52,6 +59,14 @@ export class AgentScope {
   // Single-slot model (one bridge per process for v0.9.60) -- mirrors the
   // lastOwnershipToken pattern.
   private connectionId: string | null = null;
+  private readonly environment: AgentScopeEnvironment;
+
+  constructor(options: AgentScopeOptions = {}) {
+    // Capture the process environment once. A delegated child receives the
+    // daemon-minted id at spawn time; later ambient mutations must not change
+    // the identity carried by this process's one registration handshake.
+    this.environment = { ...(options.environment ?? process.env) };
+  }
 
   setClientInfoSupplier(supplier: ClientInfoSupplier): void {
     this.clientInfoSupplier = supplier;
@@ -75,7 +90,20 @@ export class AgentScope {
 
     this.pending = (async () => {
       try {
-        const payload: { clientInfo?: ClientInfo; platforms?: McpClientInventory } = {};
+        const payload: {
+          clientInfo?: ClientInfo;
+          platforms?: McpClientInventory;
+          delegationId?: string;
+        } = {};
+        const delegationId = this.environment.FSB_DELEGATION_ID;
+        if (delegationId !== undefined) {
+          if (!DELEGATION_ID_PATTERN.test(delegationId)) {
+            throw new Error('Invalid FSB_DELEGATION_ID');
+          }
+          // Registration-only correlation sidecar. It is intentionally not
+          // stored as agent identity and never participates in MCP tool args.
+          payload.delegationId = delegationId;
+        }
         const suppliedClientInfo = this.clientInfoSupplier?.();
         if (suppliedClientInfo) {
           const clientInfo: ClientInfo = {};
