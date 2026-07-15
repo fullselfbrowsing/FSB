@@ -51,6 +51,7 @@ const {
 
 function createStorageArea(initial) {
   const store = Object.assign({}, initial || {});
+  let nextSetError = null;
   return {
     async get(keys) {
       if (keys == null) return Object.assign({}, store);
@@ -76,6 +77,11 @@ function createStorageArea(initial) {
       return Object.assign({}, store);
     },
     async set(values) {
+      if (nextSetError) {
+        const error = nextSetError;
+        nextSetError = null;
+        throw error;
+      }
       Object.assign(store, values);
     },
     async remove(keys) {
@@ -84,7 +90,10 @@ function createStorageArea(initial) {
     },
     _dump() {
       return Object.assign({}, store);
-    }
+    },
+    _rejectNextSet(error) {
+      nextSetError = error || new Error('storage write rejected');
+    },
   };
 }
 
@@ -1178,6 +1187,214 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     }
   }
   console.log('  PASS: hydrate retains only valid non-ghost one-to-one rows');
+
+  console.log('--- Phase 61 / Task 2: complete owned set seals into one held lease ---');
+  {
+    const now = 50_000;
+    const mock = setupChromeMock({
+      tabs: [
+        { id: 401, incognito: false, windowId: 4 },
+        { id: 402, incognito: false, windowId: 4 }
+      ]
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      const agentA = (await registry.registerAgent()).agentId;
+      const agentB = (await registry.registerAgent()).agentId;
+      await registry.bindTab(agentA, 401);
+      await registry.bindTab(agentA, 402);
+      const delegationId = 'Delegation_hold_complete_6104';
+      await registry.bindDelegation({ delegationId, agentId: agentA });
+      const ownedTabs = registry.getDelegationOwnedTabs({ delegationId, agentId: agentA });
+      const sealed = await registry.sealHoldLease({
+        delegationId,
+        agentId: agentA,
+        activeTabId: 401,
+        ownedTabs,
+        expiresAt: now + fresh.FSB_HOLD_LEASE_MS,
+      });
+      assert.deepStrictEqual(sealed, {
+        ok: true,
+        code: 'hold_lease_sealed',
+        expiresAt: now + 300000,
+      });
+      assert.deepStrictEqual(registry.getAgentTabs(agentA), [], 'all active ownership leaves automation');
+      assert.strictEqual(registry.getOwner(401), null);
+      assert.strictEqual(registry.getOwner(402), null);
+      assert.strictEqual(registry.getTabMetadata(401), null, 'active token cache leaves the active index');
+      assert.strictEqual(await registry.bindTab(agentB, 401), false, 'second agent cannot claim held active tab');
+      assert.strictEqual(await registry.bindTab(agentB, 402), false, 'second agent cannot claim any held tab');
+      assert.strictEqual(await registry.bindTab(agentA, 401), false, 'mapped agent cannot bypass its own lease');
+      assert.strictEqual(await registry.releaseTab(401), false, 'generic tab release cannot dissolve held state');
+      assert.strictEqual(await registry.releaseAgent(agentA, 'connection-expired'), false,
+        'generic agent release cannot dissolve held state');
+      assert.strictEqual(registry.getAgentForDelegation(delegationId), agentA,
+        'exact delegation mapping remains live while held');
+
+      const envelope = mock.session._dump().fsbAgentRegistry;
+      assert.strictEqual(envelope.v, 1, 'registry envelope version remains additive v1');
+      assert.deepStrictEqual(envelope.holdLeases[delegationId], {
+        v: 1,
+        delegationId,
+        agentId: agentA,
+        activeTabId: 401,
+        ownedTabs,
+        issuedAt: now,
+        expiresAt: now + 300000,
+      });
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: exact complete set becomes one durable unclaimable lease');
+
+  console.log('--- Phase 61 / Task 2: every invalid seal preserves complete active ownership ---');
+  {
+    const now = 70_000;
+    setupChromeMock({
+      tabs: [
+        { id: 411, incognito: false, windowId: 4 },
+        { id: 412, incognito: false, windowId: 4 }
+      ]
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      const agentId = (await registry.registerAgent()).agentId;
+      await registry.bindTab(agentId, 411);
+      await registry.bindTab(agentId, 412);
+      const delegationId = 'Delegation_hold_validation_6104';
+      await registry.bindDelegation({ delegationId, agentId });
+      const exact = registry.getDelegationOwnedTabs({ delegationId, agentId });
+      const expiresAt = now + fresh.FSB_HOLD_LEASE_MS;
+      const cases = [
+        { activeTabId: 999, ownedTabs: exact, expiresAt },
+        { activeTabId: 411, ownedTabs: exact.slice(0, 1), expiresAt },
+        { activeTabId: 411, ownedTabs: exact.concat({ tabId: 999, ownershipToken: 'extra-token' }), expiresAt },
+        { activeTabId: 411, ownedTabs: [exact[0], exact[0], exact[1]], expiresAt },
+        {
+          activeTabId: 411,
+          ownedTabs: [
+            { tabId: exact[0].tabId, ownershipToken: exact[0].ownershipToken + '-changed' },
+            exact[1],
+          ],
+          expiresAt,
+        },
+        { activeTabId: 411, ownedTabs: exact, expiresAt: expiresAt + 1 },
+      ];
+      for (const testCase of cases) {
+        const result = await registry.sealHoldLease({ delegationId, agentId, ...testCase });
+        assert.strictEqual(result.ok, false, 'invalid seal fails');
+        assert.deepStrictEqual(
+          registry.getDelegationOwnedTabs({ delegationId, agentId }),
+          exact,
+          'invalid seal leaves every original tab/token active',
+        );
+        assert.strictEqual(registry.isOwnedBy(411, agentId, exact[0].ownershipToken), true);
+        assert.strictEqual(registry.isOwnedBy(412, agentId, exact[1].ownershipToken), true);
+      }
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: active mismatch, partial/extra/duplicate/token/expiry failures are mutation-free');
+
+  console.log('--- Phase 61 / Task 2: seal serializes against claims/releases and survives reload/expiry ---');
+  {
+    let now = 90_000;
+    setupChromeMock({
+      tabs: [
+        { id: 421, incognito: false, windowId: 4 },
+        { id: 422, incognito: false, windowId: 4 }
+      ]
+    });
+    try {
+      let fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      const agentA = (await registry.registerAgent()).agentId;
+      const agentB = (await registry.registerAgent()).agentId;
+      await registry.bindTab(agentA, 421);
+      await registry.bindTab(agentA, 422);
+      const delegationId = 'Delegation_hold_reload_6104';
+      await registry.bindDelegation({ delegationId, agentId: agentA });
+      const ownedTabs = registry.getDelegationOwnedTabs({ delegationId, agentId: agentA });
+      const results = await Promise.all([
+        registry.sealHoldLease({
+          delegationId,
+          agentId: agentA,
+          activeTabId: 421,
+          ownedTabs,
+          expiresAt: now + fresh.FSB_HOLD_LEASE_MS,
+        }),
+        registry.bindTab(agentB, 421),
+        registry.releaseTab(422),
+      ]);
+      assert.strictEqual(results[0].ok, true, 'seal wins its queued atomic transition');
+      assert.strictEqual(results[1], false, 'concurrent claim observes held reservation');
+      assert.strictEqual(results[2], false, 'concurrent generic release cannot touch held reservation');
+
+      now += fresh.FSB_HOLD_LEASE_MS + 1;
+      fresh = freshRequireRegistry();
+      const restored = new fresh.AgentRegistry({ now: () => now });
+      await restored.hydrate();
+      assert.strictEqual(restored.getAgentForDelegation(delegationId), agentA);
+      assert.deepStrictEqual(restored.getAgentTabs(agentA), [], 'reload retains no active ownership while held');
+      assert.strictEqual(await restored.bindTab(agentB, 421), false,
+        'lease remains unclaimable after exact expiry boundary and module reload');
+      assert.strictEqual(await restored.bindTab(agentB, 422), false,
+        'every expired held tab remains cancellation-required, never silently free');
+
+      const sealSource = fresh.AgentRegistry.prototype.sealHoldLease.toString();
+      assert.strictEqual(sealSource.includes('chrome.tabs.query'), false,
+        'sealHoldLease never queries active-tab UI state');
+      assert.strictEqual(sealSource.includes('activeTabId'), true,
+        'seal consumes only the controller-verified active id');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: lock ordering, reload, expiry, and no-active-query invariants hold');
+
+  console.log('--- Phase 61 / Task 2: storage rejection leaves original ownership intact ---');
+  {
+    const now = 110_000;
+    const mock = setupChromeMock({
+      tabs: [
+        { id: 431, incognito: false, windowId: 4 },
+        { id: 432, incognito: false, windowId: 4 }
+      ]
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      const agentId = (await registry.registerAgent()).agentId;
+      await registry.bindTab(agentId, 431);
+      await registry.bindTab(agentId, 432);
+      const delegationId = 'Delegation_hold_storage_6104';
+      await registry.bindDelegation({ delegationId, agentId });
+      const ownedTabs = registry.getDelegationOwnedTabs({ delegationId, agentId });
+      mock.session._rejectNextSet(new Error('quota rejected'));
+      const result = await registry.sealHoldLease({
+        delegationId,
+        agentId,
+        activeTabId: 431,
+        ownedTabs,
+        expiresAt: now + fresh.FSB_HOLD_LEASE_MS,
+      });
+      assert.deepStrictEqual(result, { ok: false, code: 'hold_lease_persistence_failed' });
+      assert.deepStrictEqual(registry.getDelegationOwnedTabs({ delegationId, agentId }), ownedTabs);
+      for (const tab of ownedTabs) {
+        assert.strictEqual(registry.isOwnedBy(tab.tabId, agentId, tab.ownershipToken), true,
+          'storage failure retains exact tab/token ownership');
+      }
+      const envelope = mock.session._dump().fsbAgentRegistry;
+      assert.strictEqual(envelope.holdLeases, undefined, 'best-effort rollback leaves no durable partial lease');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: durable-write rejection has no active or persisted partial transition');
 
   console.log('\nAll assertions passed.');
 })().catch((err) => {

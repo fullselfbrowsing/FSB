@@ -43,6 +43,8 @@
   var FSB_AGENT_LOG_PREFIX = 'AGT';
   var FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE = 'agent-reaped';
   var FSB_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+  var FSB_HOLD_LEASE_VERSION = 1;
+  var FSB_HOLD_LEASE_MS = 5 * 60 * 1000;
 
   // Phase 241 plan 01: cap + grace constants ---------------------------------
   // D-05: cap is persisted in chrome.storage.local under fsbAgentCap so it
@@ -125,14 +127,20 @@
     }
   }
 
-  async function writePersistedAgentRegistry(records, extras) {
+  async function writePersistedAgentRegistry(records, extras, strict) {
     var c = _getChrome();
-    if (!c || !c.storage || !c.storage.session) return;
+    if (!c || !c.storage || !c.storage.session) {
+      if (strict === true) throw new Error('Agent registry session storage unavailable');
+      return;
+    }
     try {
       var nextRecords = (records && typeof records === 'object') ? records : {};
-      if (Object.keys(nextRecords).length === 0) {
+      var nextExtras = (extras && typeof extras === 'object') ? extras : {};
+      if (Object.keys(nextRecords).length === 0 && Object.keys(nextExtras).length === 0) {
         if (typeof c.storage.session.remove === 'function') {
           await c.storage.session.remove(FSB_AGENT_REGISTRY_STORAGE_KEY);
+        } else if (strict === true) {
+          throw new Error('Agent registry session removal unavailable');
         }
         return;
       }
@@ -143,17 +151,20 @@
       // Phase 240 D-04: additive extras (tabMetadata) carried at the
       // envelope's top level. v: 1 unchanged because older readers ignore
       // unknown fields.
-      if (extras && typeof extras === 'object') {
-        Object.keys(extras).forEach(function(key) {
-          envelope[key] = extras[key];
+      if (nextExtras && typeof nextExtras === 'object') {
+        Object.keys(nextExtras).forEach(function(key) {
+          envelope[key] = nextExtras[key];
         });
       }
       var payload = {};
       payload[FSB_AGENT_REGISTRY_STORAGE_KEY] = envelope;
       if (typeof c.storage.session.set === 'function') {
         await c.storage.session.set(payload);
+      } else if (strict === true) {
+        throw new Error('Agent registry session write unavailable');
       }
-    } catch (_e) {
+    } catch (error) {
+      if (strict === true) throw error;
       // best-effort; do not throw
     }
   }
@@ -288,7 +299,8 @@
   // _hydrated flips true after hydrate() runs (plan 02 enforces "must hydrate
   // before serving requests"; in plan 01 the flag is informational only).
 
-  function AgentRegistry() {
+  function AgentRegistry(options) {
+    options = options || {};
     this._agents = new Map();
     this._tabOwners = new Map();
     this._tabsByAgent = new Map();
@@ -302,6 +314,12 @@
     // are kept so one-to-one conflicts fail without scanning or ambiguity.
     this._delegations = new Map();
     this._delegationByAgent = new Map();
+    // Held tabs leave active automation ownership but remain reserved here.
+    // Lease expiry never deletes these indexes; only exact restore/release may
+    // transition them.
+    this._holdLeases = new Map();
+    this._heldTabDelegations = new Map();
+    this._now = typeof options.now === 'function' ? options.now : Date.now;
     this._hydrated = false;
     // Phase 241 plan 01: cap + grace state.
     // _cachedCap is the in-memory mirror of chrome.storage.local fsbAgentCap.
@@ -378,6 +396,13 @@
     var self = this;
     return withRegistryLock(async function() {
       if (typeof agentId !== 'string' || !self._agents.has(agentId)) {
+        return false;
+      }
+      var delegationId = self._delegationByAgent.get(agentId);
+      if (delegationId && self._holdLeases.has(delegationId)) {
+        // A generic connection/grace release cannot dissolve a confirmed
+        // human-control lease. The controller must call releaseDelegation
+        // with both exact identities.
         return false;
       }
       var ownedTabs = self._tabsByAgent.get(agentId);
@@ -485,6 +510,165 @@
     return out.sort(function(a, b) { return a.tabId - b.tabId; });
   };
 
+  AgentRegistry.prototype._cloneAuthorityState = function() {
+    var shadow = Object.create(AgentRegistry.prototype);
+    shadow._agents = new Map();
+    this._agents.forEach(function(record, agentId) {
+      shadow._agents.set(agentId, cloneRecord(record));
+    });
+    shadow._tabOwners = new Map(this._tabOwners);
+    shadow._tabsByAgent = new Map();
+    this._tabsByAgent.forEach(function(tabIds, agentId) {
+      shadow._tabsByAgent.set(agentId, new Set(tabIds));
+    });
+    shadow._tabMetadata = new Map();
+    this._tabMetadata.forEach(function(meta, tabId) {
+      shadow._tabMetadata.set(tabId, Object.assign({}, meta));
+    });
+    shadow._delegations = new Map(this._delegations);
+    shadow._delegationByAgent = new Map(this._delegationByAgent);
+    shadow._holdLeases = new Map();
+    this._holdLeases.forEach(function(lease, delegationId) {
+      shadow._holdLeases.set(delegationId, cloneRecord(lease));
+    });
+    shadow._heldTabDelegations = new Map(this._heldTabDelegations);
+    shadow._stagedReleases = new Map();
+    this._stagedReleases.forEach(function(entry, connectionId) {
+      shadow._stagedReleases.set(connectionId, {
+        deadline: entry.deadline,
+        timeoutId: entry.timeoutId,
+        agentIds: Array.isArray(entry.agentIds) ? entry.agentIds.slice() : []
+      });
+    });
+    return shadow;
+  };
+
+  AgentRegistry.prototype._adoptAuthorityState = function(shadow) {
+    this._agents = shadow._agents;
+    this._tabOwners = shadow._tabOwners;
+    this._tabsByAgent = shadow._tabsByAgent;
+    this._tabMetadata = shadow._tabMetadata;
+    this._delegations = shadow._delegations;
+    this._delegationByAgent = shadow._delegationByAgent;
+    this._holdLeases = shadow._holdLeases;
+    this._heldTabDelegations = shadow._heldTabDelegations;
+  };
+
+  function canonicalOwnedTabs(value) {
+    if (!Array.isArray(value) || value.length === 0) return null;
+    var seen = new Set();
+    var out = [];
+    for (var index = 0; index < value.length; index += 1) {
+      var tab = value[index];
+      if (!hasExactKeys(tab, ['tabId', 'ownershipToken'])
+        || !isPositiveInteger(tab.tabId)
+        || typeof tab.ownershipToken !== 'string'
+        || tab.ownershipToken.length === 0
+        || seen.has(tab.tabId)) {
+        return null;
+      }
+      seen.add(tab.tabId);
+      out.push({ tabId: tab.tabId, ownershipToken: tab.ownershipToken });
+    }
+    return out.sort(function(a, b) { return a.tabId - b.tabId; });
+  }
+
+  function sameOwnedTabs(left, right) {
+    if (!left || !right || left.length !== right.length) return false;
+    for (var index = 0; index < left.length; index += 1) {
+      if (left[index].tabId !== right[index].tabId
+        || left[index].ownershipToken !== right[index].ownershipToken) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Convert the complete active ownership set into one durable, unclaimable
+   * five-minute hold lease. The controller has already proved active-tab UI
+   * eligibility and confirmed daemon hold; this method performs no browser
+   * active-tab query.
+   */
+  AgentRegistry.prototype.sealHoldLease = function(input) {
+    var self = this;
+    return withRegistryLock(async function() {
+      if (!hasExactKeys(input, ['delegationId', 'agentId', 'activeTabId', 'ownedTabs', 'expiresAt'])
+        || !isDelegationId(input.delegationId)
+        || typeof input.agentId !== 'string'
+        || !isPositiveInteger(input.activeTabId)) {
+        return { ok: false, code: 'hold_lease_invalid' };
+      }
+      if (self.getAgentForDelegation(input.delegationId) !== input.agentId
+        || self._holdLeases.has(input.delegationId)) {
+        return { ok: false, code: 'hold_lease_mapping_changed' };
+      }
+      var supplied = canonicalOwnedTabs(input.ownedTabs);
+      if (!supplied || !supplied.some(function(tab) { return tab.tabId === input.activeTabId; })) {
+        return { ok: false, code: 'hold_lease_invalid' };
+      }
+      var issuedAt = self._now();
+      var fixedExpiresAt = issuedAt + FSB_HOLD_LEASE_MS;
+      if (!Number.isSafeInteger(issuedAt)
+        || !Number.isSafeInteger(input.expiresAt)
+        || input.expiresAt !== fixedExpiresAt) {
+        return { ok: false, code: 'hold_lease_invalid' };
+      }
+      var current = canonicalOwnedTabs(self.getDelegationOwnedTabs({
+        delegationId: input.delegationId,
+        agentId: input.agentId
+      }));
+      if (!sameOwnedTabs(supplied, current)) {
+        return { ok: false, code: 'hold_lease_mapping_changed' };
+      }
+      for (var index = 0; index < supplied.length; index += 1) {
+        if (self._heldTabDelegations.has(supplied[index].tabId)) {
+          return { ok: false, code: 'hold_lease_mapping_changed' };
+        }
+      }
+
+      var shadow = self._cloneAuthorityState();
+      var lease = {
+        v: FSB_HOLD_LEASE_VERSION,
+        delegationId: input.delegationId,
+        agentId: input.agentId,
+        activeTabId: input.activeTabId,
+        ownedTabs: supplied.map(function(tab) {
+          return { tabId: tab.tabId, ownershipToken: tab.ownershipToken };
+        }),
+        issuedAt: issuedAt,
+        expiresAt: fixedExpiresAt
+      };
+      supplied.forEach(function(tab) {
+        shadow._tabOwners.delete(tab.tabId);
+        shadow._tabMetadata.delete(tab.tabId);
+        shadow._heldTabDelegations.set(tab.tabId, input.delegationId);
+      });
+      shadow._tabsByAgent.set(input.agentId, new Set());
+      var record = shadow._agents.get(input.agentId);
+      if (!record) return { ok: false, code: 'hold_lease_mapping_changed' };
+      record.tabIds = [];
+      delete record.selectedTabId;
+      shadow._holdLeases.set(input.delegationId, lease);
+
+      try {
+        await shadow._persist(true);
+      } catch (_error) {
+        // If a storage implementation applied then rejected, best-effort
+        // rewrite of the still-authoritative pre-seal state narrows the
+        // ambiguous failure. In-memory ownership was never changed.
+        try { await self._persist(); } catch (_ignored) { /* best-effort */ }
+        return { ok: false, code: 'hold_lease_persistence_failed' };
+      }
+      self._adoptAuthorityState(shadow);
+      return {
+        ok: true,
+        code: 'hold_lease_sealed',
+        expiresAt: fixedExpiresAt
+      };
+    });
+  };
+
   AgentRegistry.prototype._removeDelegationForAgent = function(agentId) {
     var delegationId = this._delegationByAgent.get(agentId);
     if (!delegationId) return false;
@@ -577,6 +761,9 @@
       if (!isPositiveInteger(tabId)) {
         return false;
       }
+      if (self._heldTabDelegations.has(tabId)) {
+        return false;
+      }
       // If another agent already owns this tab, refuse silently. Phase 240
       // ships the dispatch-gate enforcement that decides displace-vs-reject.
       var currentOwner = self._tabOwners.get(tabId);
@@ -660,7 +847,7 @@
   AgentRegistry.prototype.releaseTab = function(tabId) {
     var self = this;
     return withRegistryLock(async function() {
-      if (!self._tabOwners.has(tabId)) {
+      if (self._heldTabDelegations.has(tabId) || !self._tabOwners.has(tabId)) {
         // No-op path: do NOT persist. Idempotency guarantee.
         return false;
       }
@@ -912,6 +1099,8 @@
         // fired). The current-connection-id filter is the safety net.
         if (!record) return;
         if (record.connectionId !== connectionId) return;
+        var mappedDelegation = self._delegationByAgent.get(agentId);
+        if (mappedDelegation && self._holdLeases.has(mappedDelegation)) return;
         var ownedTabs = self._tabsByAgent.get(agentId);
         var poolSize = ownedTabs ? ownedTabs.size : 0;
         if (ownedTabs) {
@@ -1380,6 +1569,56 @@
         });
       });
 
+      // Phase 61: hydrate sealed leases without consulting active-tab UI
+      // state. Expired leases remain sealed and cancellation-required; time
+      // alone never makes a possibly-human-controlled tab claimable.
+      var holdLeaseStateChanged = false;
+      var persistedHoldLeases = (payload && isPlainObject(payload.holdLeases))
+        ? payload.holdLeases : {};
+      if (payload && payload.holdLeases !== undefined && !isPlainObject(payload.holdLeases)) {
+        holdLeaseStateChanged = true;
+      }
+      Object.keys(persistedHoldLeases).forEach(function(delegationId) {
+        var raw = persistedHoldLeases[delegationId];
+        var tabs = raw && canonicalOwnedTabs(raw.ownedTabs);
+        var valid = hasExactKeys(raw, [
+          'v', 'delegationId', 'agentId', 'activeTabId', 'ownedTabs', 'issuedAt', 'expiresAt'
+        ])
+          && raw.v === FSB_HOLD_LEASE_VERSION
+          && raw.delegationId === delegationId
+          && isDelegationId(delegationId)
+          && typeof raw.agentId === 'string'
+          && self.getAgentForDelegation(delegationId) === raw.agentId
+          && isPositiveInteger(raw.activeTabId)
+          && tabs
+          && tabs.some(function(tab) { return tab.tabId === raw.activeTabId; })
+          && Number.isSafeInteger(raw.issuedAt)
+          && Number.isSafeInteger(raw.expiresAt)
+          && raw.expiresAt === raw.issuedAt + FSB_HOLD_LEASE_MS;
+        if (valid) {
+          valid = tabs.every(function(tab) {
+            return !self._tabOwners.has(tab.tabId) && !self._heldTabDelegations.has(tab.tabId);
+          });
+        }
+        if (!valid) {
+          holdLeaseStateChanged = true;
+          return;
+        }
+        var lease = {
+          v: FSB_HOLD_LEASE_VERSION,
+          delegationId: delegationId,
+          agentId: raw.agentId,
+          activeTabId: raw.activeTabId,
+          ownedTabs: tabs,
+          issuedAt: raw.issuedAt,
+          expiresAt: raw.expiresAt
+        };
+        self._holdLeases.set(delegationId, lease);
+        tabs.forEach(function(tab) {
+          self._heldTabDelegations.set(tab.tabId, delegationId);
+        });
+      });
+
       // Phase 241 Pitfall 1 -- recover staged releases before any early return
       // from the chrome.tabs unavailability paths below. Recovery does not
       // require chrome.tabs.query.
@@ -1447,7 +1686,7 @@
       });
 
       // Step 5: write reconciled snapshot back if anything changed.
-      if (reapedThisWake.length > 0 || delegationStateChanged) {
+      if (reapedThisWake.length > 0 || delegationStateChanged || holdLeaseStateChanged) {
         await self._persist();
       }
 
@@ -1521,7 +1760,7 @@
    * Called from inside withRegistryLock by registerAgent / bindTab /
    * releaseTab / releaseAgent and from hydrate Step 5.
    */
-  AgentRegistry.prototype._persist = async function() {
+  AgentRegistry.prototype._persist = async function(strict) {
     var records = {};
     var self = this;
     this._agents.forEach(function(record, agentId) {
@@ -1605,14 +1844,35 @@
       hasDelegations = true;
     });
 
+    var holdLeases = {};
+    var hasHoldLeases = false;
+    this._holdLeases.forEach(function(lease, delegationId) {
+      if (!lease
+        || self._delegations.get(delegationId) !== lease.agentId
+        || self._delegationByAgent.get(lease.agentId) !== delegationId) return;
+      holdLeases[delegationId] = {
+        v: lease.v,
+        delegationId: lease.delegationId,
+        agentId: lease.agentId,
+        activeTabId: lease.activeTabId,
+        ownedTabs: lease.ownedTabs.map(function(tab) {
+          return { tabId: tab.tabId, ownershipToken: tab.ownershipToken };
+        }),
+        issuedAt: lease.issuedAt,
+        expiresAt: lease.expiresAt
+      };
+      hasHoldLeases = true;
+    });
+
     var extras = null;
-    if (hasTabMetadata || hasStagedReleases || hasDelegations) {
+    if (hasTabMetadata || hasStagedReleases || hasDelegations || hasHoldLeases) {
       extras = {};
       if (hasTabMetadata) extras.tabMetadata = tabMetadata;
       if (hasStagedReleases) extras.stagedReleases = stagedReleases;
       if (hasDelegations) extras.delegations = delegations;
+      if (hasHoldLeases) extras.holdLeases = holdLeases;
     }
-    await writePersistedAgentRegistry(records, extras);
+    await writePersistedAgentRegistry(records, extras, strict === true);
   };
 
   /**
@@ -1630,6 +1890,8 @@
     this._tabMetadata.clear();
     this._delegations.clear();
     this._delegationByAgent.clear();
+    this._holdLeases.clear();
+    this._heldTabDelegations.clear();
     // Phase 241: clear staged releases and any pending grace timers.
     if (this._stagedReleases) {
       this._stagedReleases.forEach(function(entry) {
@@ -1656,6 +1918,7 @@
     FSB_AGENT_ID_PREFIX: FSB_AGENT_ID_PREFIX,
     FSB_AGENT_DISPLAY_HEX_LENGTH: FSB_AGENT_DISPLAY_HEX_LENGTH,
     FSB_AGENT_LOG_PREFIX: FSB_AGENT_LOG_PREFIX,
+    FSB_HOLD_LEASE_MS: FSB_HOLD_LEASE_MS,
     FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE: FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE,
     // _internal: test-only hooks. NOT to be consumed by production callers.
     _internal: {
