@@ -38,11 +38,11 @@
  *   9.  Recorder never throws (throwing storage + throwing logger shims);
  *       each hook site wrapped in its own try/catch -- dispatcher guard
  *       string x1 (message route), bridge guard string x1 (action tap).
- *   10. Source-pin guards: exactly 1 fsbMcpSessionRecorder.recordDispatch
- *       site in mcp-tool-dispatcher.js (message route, inside the
+ *   10. Source-pin guards: exactly 1 shared-redactor recordDispatch ingress
+ *       in mcp-tool-dispatcher.js (message route, inside the
  *       !_mcpMetricsSuppressInner gate, after dispatchMcpMessageRoute -- the
  *       tool route stays session-clean or background actions double-count);
- *       exactly 1 fsbMcpSessionRecorder.recordAction site and exactly 3
+ *       exactly 1 shared-redactor recordAction ingress and exactly 3
  *       this._recordMcpSessionAction( invocations in mcp-bridge-client.js;
  *       the fsbMcpMetricsRecorder pattern still matches exactly 2 sites;
  *       background.js loads the recorder on exactly one line;
@@ -546,11 +546,16 @@ function readDispatch(o) {
     // The tool route must stay session-clean: all of its action traffic
     // originates in _handleExecuteAction (which records at the bridge tap),
     // so a second site here would double-count every background action.
-    const sessionSitePattern = /globalThis\.fsbMcpSessionRecorder\.recordDispatch\(\{[\s\S]*?\}\);/g;
+    const sessionSitePattern = /spreadsheetRedactor\.recordSafely\([\s\S]*?globalThis\.fsbMcpSessionRecorder,[\s\S]*?'recordDispatch',[\s\S]*?sessionRecordEntry[\s\S]*?\);/g;
     const sessionSites = dispatcherSrc.match(sessionSitePattern) || [];
     passAssertEqual(sessionSites.length, 1,
-      'exactly 1 fsbMcpSessionRecorder.recordDispatch site in mcp-tool-dispatcher.js (message route only)');
-    passAssert(sessionSites.length === 1 && sessionSites[0].includes('resolveMcpClientLabel(payload)'),
+      'exactly 1 redacted recordDispatch ingress in mcp-tool-dispatcher.js (message route only)');
+    const sessionEntryStart = dispatcherSrc.indexOf('var sessionRecordEntry = {');
+    const sessionIngressEnd = dispatcherSrc.indexOf("'recordDispatch'", sessionEntryStart);
+    const sessionIngressSpan = sessionEntryStart === -1 || sessionIngressEnd === -1
+      ? ''
+      : dispatcherSrc.slice(sessionEntryStart, sessionIngressEnd);
+    passAssert(sessionIngressSpan.includes('resolveMcpClientLabel(payload)'),
       'the message-route session site calls resolveMcpClientLabel(payload)');
 
     const msgRouteIdx = dispatcherSrc.indexOf('async function dispatchMcpMessageRoute');
@@ -563,7 +568,7 @@ function readDispatch(o) {
     const gateCount = dispatcherSrc.split(gateNeedle).length - 1;
     passAssertEqual(gateCount, 1, 'exactly one !_mcpMetricsSuppressInner gate in the dispatcher');
     const gateIdx = dispatcherSrc.indexOf(gateNeedle);
-    const sessionCallIdx = dispatcherSrc.indexOf('globalThis.fsbMcpSessionRecorder.recordDispatch({');
+    const sessionCallIdx = dispatcherSrc.indexOf('spreadsheetRedactor.recordSafely(');
     passAssert(sessionCallIdx > gateIdx,
       'message-route session site sits INSIDE the !_mcpMetricsSuppressInner gate (alias double-count guard)');
 
@@ -582,10 +587,15 @@ function readDispatch(o) {
     // Bridge tap: exactly ONE recordAction call site, reached from exactly
     // THREE _handleExecuteAction branches (main path + open_tab/switch_tab
     // bootstrap + navigate NO_OWNED_TAB recovery).
-    const recordActionSites = bridgeSrc.match(/globalThis\.fsbMcpSessionRecorder\.recordAction\(\{[\s\S]*?\}\);/g) || [];
+    const recordActionSites = bridgeSrc.match(/spreadsheetRedactor\.recordSafely\([\s\S]*?globalThis\.fsbMcpSessionRecorder,[\s\S]*?'recordAction',[\s\S]*?sessionRecordEntry[\s\S]*?\);/g) || [];
     passAssertEqual(recordActionSites.length, 1,
-      'exactly 1 fsbMcpSessionRecorder.recordAction site in mcp-bridge-client.js');
-    passAssert(recordActionSites.length === 1 && recordActionSites[0].includes('resolveMcpClientLabel(payload)'),
+      'exactly 1 redacted recordAction ingress in mcp-bridge-client.js');
+    const actionEntryStart = bridgeSrc.indexOf('let sessionRecordEntry = {');
+    const actionIngressEnd = bridgeSrc.indexOf("'recordAction'", actionEntryStart);
+    const actionIngressSpan = actionEntryStart === -1 || actionIngressEnd === -1
+      ? ''
+      : bridgeSrc.slice(actionEntryStart, actionIngressEnd);
+    passAssert(actionIngressSpan.includes('resolveMcpClientLabel(payload)'),
       'the bridge tap resolves the canonical client label');
     const tapInvocations = (bridgeSrc.match(/this\._recordMcpSessionAction\(/g) || []).length;
     passAssertEqual(tapInvocations, 3,

@@ -2392,6 +2392,51 @@
       ]
     },
     {
+      "slug": "gsheets.update_values",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-google-sheets-update-values-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
+      "slug": "gsheets.append_values",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-google-sheets-append-values-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
+      "slug": "gsheets.clear_values",
+      "status": "guarded-fail-closed",
+      "failClosedReason": "unverified-google-sheets-clear-values-mutation",
+      "templateRef": ".planning/phases/49-guarded-writes-activation-pipeline/49-LIVE-UAT-TEMPLATE.md",
+      "requiredEvidence": [
+        "method",
+        "path",
+        "bodyShape",
+        "authShape",
+        "consentProof",
+        "auditRedactionProof",
+        "loadedExtensionSmoke"
+      ]
+    },
+    {
       "slug": "gemini.create_conversation",
       "status": "guarded-fail-closed",
       "failClosedReason": "unverified-gemini-create-conversation-mutation",

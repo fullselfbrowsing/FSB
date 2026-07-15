@@ -718,7 +718,7 @@ class MCPBridgeClient {
           typeof globalThis.fsbMcpSessionRecorder.recordAction !== 'function') {
         return;
       }
-      globalThis.fsbMcpSessionRecorder.recordAction({
+      let sessionRecordEntry = {
         client: (typeof globalThis.resolveMcpClientLabel === 'function')
           ? globalThis.resolveMcpClientLabel(payload)
           : null,
@@ -728,7 +728,20 @@ class MCPBridgeClient {
         response: response,
         success: !(response && typeof response === 'object' && response.success === false),
         tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null
-      });
+      };
+      const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
+      const spreadsheetTool = payload && (payload.tool === 'fill_sheet' || payload.tool === 'read_sheet');
+      if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
+        if (!spreadsheetTool) {
+          globalThis.fsbMcpSessionRecorder.recordAction(sessionRecordEntry);
+        }
+      } else {
+        spreadsheetRedactor.recordSafely(
+          globalThis.fsbMcpSessionRecorder,
+          'recordAction',
+          sessionRecordEntry
+        );
+      }
     } catch (_e) { /* never let session recording break the action */ }
   }
 

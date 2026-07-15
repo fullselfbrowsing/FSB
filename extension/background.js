@@ -62,6 +62,7 @@ try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('
 // remain DOM-bound but are not invoked here -- SW reaches them via
 // chrome.scripting.executeScript injection inside wrapWithChangeReport.
 try { importScripts('utils/action-verification.js'); } catch (e) { console.error('[FSB] Failed to load action-verification.js:', e.message); }
+try { importScripts('utils/spreadsheet-record-redaction.js'); } catch (e) { console.error('[FSB] Failed to load spreadsheet-record-redaction.js:', e.message); }
 try { importScripts('ws/mcp-tool-dispatcher.js'); } catch (e) { console.error('[FSB] Failed to load mcp-tool-dispatcher.js:', e.message); }
 // Phase 270 / v0.9.69 -- price resolver. Must load BEFORE mcp-metrics-recorder
 // so the recorder's try/catch can call globalThis.fsbMcpPricing.estimateMcpCost.

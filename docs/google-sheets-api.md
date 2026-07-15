@@ -28,4 +28,6 @@ The API facade permits only these operations:
 
 Requests are restricted to `https://sheets.googleapis.com/v4`, validate spreadsheet IDs and ranges, cap request and response sizes, time out, and retry once only after an HTTP 401. Google Sheets is classified as a sensitive origin, so write and destructive operations remain behind FSB's consent policy.
 
+After OAuth setup, the two read capabilities are executable. The update, append, and clear capabilities are discoverable and fully typed but intentionally return `RECIPE_DOM_FALLBACK_PENDING` without calling Google until the repository's live mutation-UAT activation record is completed. This preserves the project's fail-closed write policy; configuring OAuth alone does not activate spreadsheet mutations.
+
 The existing `fill_sheet` and `read_sheet` browser-automation tools remain available as a fallback. Spreadsheet API and fallback-tool session records are reduced to shape-only diagnostics before recording; spreadsheet IDs, ranges, sheet names, values, formulas, and response bodies are discarded.

@@ -67,8 +67,8 @@ function check(cond, msg) {
   check(fs.existsSync(CATALOG_PATH), '(a) capability-catalog.js exists (the head manifest source)');
   const catalogSrc = fs.existsSync(CATALOG_PATH) ? fs.readFileSync(CATALOG_PATH, 'utf8') : '';
   const realHeads = gate.parseHeadModules(catalogSrc) || [];
-  check(realHeads.length === 123,
-    '(a) parseHeadModules returns exactly 123 heads from the real catalog source; got ' + realHeads.length);
+  check(realHeads.length === 124,
+    '(a) parseHeadModules returns exactly 124 heads from the real catalog source; got ' + realHeads.length);
   const byGlobal = {};
   for (const h of realHeads) { byGlobal[h.global] = h.origin; }
   check(byGlobal.FsbHandlerGithub === 'https://github.com',
@@ -183,6 +183,8 @@ function check(cond, msg) {
     '(a) FsbHandlerClaude origin parsed as https://claude.ai');
   check(byGlobal.FsbHandlerGemini === 'https://gemini.google.com',
     '(a) FsbHandlerGemini origin parsed as https://gemini.google.com');
+  check(byGlobal.FsbHandlerGsheets === 'https://docs.google.com',
+    '(a) FsbHandlerGsheets origin parsed as https://docs.google.com');
   check(byGlobal.FsbHandlerPowerpoint === 'https://powerpoint.cloud.microsoft',
     '(a) FsbHandlerPowerpoint origin parsed as https://powerpoint.cloud.microsoft');
   check(byGlobal.FsbHandlerOutlook === 'https://outlook.cloud.microsoft',
@@ -605,6 +607,11 @@ function check(cond, msg) {
   check(!!realGemini && realGemini.apiBaseUrl === 'https://gemini.google.com'
     && realGemini.classification && realGemini.classification.sameOrigin === true,
     '(b) the REAL Gemini head classifies the reviewed UI/RPC path as same-origin on gemini.google.com');
+  const realGsheets = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerGsheets') : null;
+  check(realGsheets && realGsheets.apiBaseUrl === 'https://sheets.googleapis.com/v4' &&
+      realGsheets.classification && realGsheets.classification.sameOrigin === true &&
+      String(realGsheets.classification.reason || '').startsWith('CHROME_IDENTITY_SHEETS_API'),
+    '(b) the REAL Google Sheets head uses the exact source-verified Chrome Identity API accommodation');
   const realPowerpoint = real && real.results ? real.results.find((r) => r.global === 'FsbHandlerPowerpoint') : null;
   check(!!realPowerpoint && realPowerpoint.apiBaseUrl === 'https://graph.microsoft.com/v1.0'
     && realPowerpoint.classification && realPowerpoint.classification.sameOrigin === true

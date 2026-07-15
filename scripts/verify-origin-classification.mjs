@@ -545,6 +545,11 @@ const HEAD_APP_MAP = {
     fallbackBaseUrl: 'https://docs.google.com',
     relativeRuntimeBaseUrl: '/drive/v3'
   },
+  FsbHandlerGsheets: {
+    app: 'google-sheets',
+    fallbackBaseUrl: 'https://docs.google.com',
+    chromeIdentityApiBaseUrl: 'https://sheets.googleapis.com/v4'
+  },
   FsbHandlerWebflow: {
     app: 'webflow',
     fallbackBaseUrl: 'https://webflow.com',
@@ -723,6 +728,25 @@ export function classifyOriginPattern(handlerOrigin, apiBaseUrl, opts) {
       reason: 'CORS_UNRESOLVABLE_ORIGIN: handler="' + String(handlerOrigin) +
         '" apiBaseUrl="' + String(apiBaseUrl) + '" -- one origin did not parse; ' +
         'a head whose origin cannot be verified must be demoted to T3-DOM'
+    };
+  }
+  // ---- Chrome Identity Google Sheets API accommodation: exact endpoints, ASSERTED ----
+  if (options.chromeIdentitySheetsApi) {
+    const same = hOrigin === 'https://docs.google.com'
+      && aOrigin === 'https://sheets.googleapis.com';
+    return {
+      sameOrigin: same,
+      separate: !same,
+      apiOrigin: aOrigin,
+      handlerOrigin: hOrigin,
+      reason: same
+        ? 'CHROME_IDENTITY_SHEETS_API: head origin https://docs.google.com routes through ' +
+          'the reviewed extension-owned Google Sheets v4 facade at sheets.googleapis.com. ' +
+          'Chrome Identity owns OAuth tokens; the handler receives only five fixed methods, ' +
+          'the facade accepts no arbitrary URL/method/headers, and write/destructive calls ' +
+          'remain subject to the sensitive-origin consent gate.'
+        : 'CORS_SEPARATE_ORIGIN: Chrome Identity Sheets accommodation is limited to ' +
+          'docs.google.com -> sheets.googleapis.com; got head ' + hOrigin + ', API ' + aOrigin
     };
   }
   // ---- Dynamic-workspace accommodation (slack): same-registrable-domain, ASSERTED ----
@@ -4448,6 +4472,67 @@ function readGlamaPageStateRuntimeBase(app, runtimeBaseUrl) {
     : null;
 }
 
+function readChromeIdentitySheetsApiBase(mapping) {
+  const expectedBase = 'https://sheets.googleapis.com/v4';
+  if (!mapping || mapping.app !== 'google-sheets' || mapping.chromeIdentityApiBaseUrl !== expectedBase) {
+    return null;
+  }
+  const apiPath = join(ROOT, 'extension', 'utils', 'google-sheets-api.js');
+  const handlerPath = join(ROOT, 'catalog', 'handlers', 'gsheets.js');
+  const routerPath = join(ROOT, 'extension', 'utils', 'capability-router.js');
+  const manifestPath = join(ROOT, 'extension', 'manifest.json');
+  if (!existsSync(apiPath) || !existsSync(handlerPath) || !existsSync(routerPath) || !existsSync(manifestPath)) {
+    return null;
+  }
+
+  const apiText = readFileSync(apiPath, 'utf8');
+  const handlerText = readFileSync(handlerPath, 'utf8');
+  const routerText = readFileSync(routerPath, 'utf8');
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); } catch (_e) { return null; }
+
+  const scope = 'https://www.googleapis.com/auth/spreadsheets';
+  const manifestOk = Array.isArray(manifest.permissions)
+    && manifest.permissions.includes('identity')
+    && manifest.oauth2 && Array.isArray(manifest.oauth2.scopes)
+    && manifest.oauth2.scopes.length === 1 && manifest.oauth2.scopes[0] === scope;
+  const facadeOk = /SHEETS_BASE_URL\s*=\s*['"]https:\/\/sheets\.googleapis\.com\/v4['"]/.test(apiText)
+    && /SHEETS_SCOPE\s*=\s*['"]https:\/\/www\.googleapis\.com\/auth\/spreadsheets['"]/.test(apiText)
+    && /chromeApi\.identity\.getAuthToken\(\{ interactive: interactive === true \}/.test(apiText)
+    && /fetchFn\(spec\.url,\s*\{/.test(apiText)
+    && /credentials:\s*['"]omit['"]/.test(apiText)
+    && /redirect:\s*['"]error['"]/.test(apiText)
+    && /PLACEHOLDER_CLIENT_ID\.test\(clientId\)/.test(apiText)
+    && !/params\.(?:url|method|headers|token)\b/.test(apiText)
+    && !/(?:localStorage|sessionStorage|chromeApi\.storage)/.test(apiText);
+  const slugs = [
+    'gsheets.get_spreadsheet',
+    'gsheets.get_values',
+    'gsheets.update_values',
+    'gsheets.append_values',
+    'gsheets.clear_values'
+  ];
+  const handlerOk = /var\s+ORIGIN\s*=\s*['"]https:\/\/docs\.google\.com['"]/.test(handlerText)
+    && slugs.every(function(slug) { return handlerText.indexOf("'" + slug + "'") !== -1; })
+    && /ctx\s*&&\s*ctx\.googleSheets/.test(handlerText)
+    && !/\bfetch\s*\(|chrome\.|Authorization|Bearer|getAuthToken/.test(handlerText);
+  const narrowMethods = ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'];
+  const routerOk = /googleSheets:\s*_googleSheetsContext\(\)/.test(routerText)
+    && narrowMethods.every(function(method) { return routerText.indexOf("'" + method + "'") !== -1; });
+  const expectedClasses = ['read', 'read', 'write', 'write', 'destructive'];
+  const descriptorsOk = slugs.every(function(slug, index) {
+    const descriptorPath = join(ROOT, 'catalog', 'descriptors', slug.replace('.', '__') + '.json');
+    if (!existsSync(descriptorPath)) { return false; }
+    try {
+      const descriptor = JSON.parse(readFileSync(descriptorPath, 'utf8'));
+      return descriptor.backing === 'handler' && descriptor.sideEffectClass === expectedClasses[index];
+    } catch (_e) {
+      return false;
+    }
+  });
+  return manifestOk && facadeOk && handlerOk && routerOk && descriptorsOk ? expectedBase : null;
+}
+
 /**
  * checkOriginClassification(headsOverride, opts) -> { results, failures }
  *
@@ -4509,7 +4594,22 @@ export function checkOriginClassification(headsOverride, opts) {
 
     let apiBaseUrl;
     let classifyOpts;
-    if (mapping.graphBearerRuntimeBaseUrl) {
+    if (mapping.chromeIdentityApiBaseUrl) {
+      const sheetsBase = readChromeIdentitySheetsApiBase(mapping);
+      if (!sheetsBase) {
+        const reason = 'CORS_CHROME_IDENTITY_SHEETS_MISMATCH: head ' + head.global +
+          ' requested Google Sheets API base "' + String(mapping.chromeIdentityApiBaseUrl) +
+          '" but the manifest, OAuth facade, narrow router context, handler, or descriptors ' +
+          'did not match the reviewed fixed-endpoint contract -- refusing a Chrome Identity ' +
+          'cross-origin accommodation that is not explicitly pinned';
+        results.push({ global: head.global, handlerOrigin: head.origin, apiBaseUrl: null,
+          classification: { sameOrigin: false, separate: true, reason: reason } });
+        failures.push(reason);
+        continue;
+      }
+      apiBaseUrl = sheetsBase;
+      classifyOpts = { chromeIdentitySheetsApi: true };
+    } else if (mapping.graphBearerRuntimeBaseUrl) {
       let graphBase = null;
       if (mapping.pageBearerGraphApp === 'excel') {
         graphBase = readExcelGraphBearerRuntimeBase(mapping.app, mapping.graphBearerRuntimeBaseUrl);
@@ -4890,6 +4990,8 @@ function runCli() {
       && reason.indexOf('PAGE_BEARER_GRAPH_READ') === 0;
     const isGapiPageBridge = typeof reason === 'string'
       && reason.indexOf('PAGE_GAPI_CLIENT_READ') === 0;
+    const isChromeIdentitySheets = typeof reason === 'string'
+      && reason.indexOf('CHROME_IDENTITY_SHEETS_API') === 0;
     const isGlamaPageStateRuntime = typeof reason === 'string'
       && reason.indexOf('GLAMA_PAGE_STATE_RUNTIME_READ') === 0;
     const verdict = r.classification.sameOrigin
@@ -4909,7 +5011,9 @@ function runCli() {
                     ? 'PAGE-BEARER-GRAPH'
                     : (isGapiPageBridge
                       ? 'PAGE-GAPI-CLIENT'
-                      : (isGlamaPageStateRuntime ? 'PAGE-STATE-RUNTIME' : 'SAME-ORIGIN')))))))))
+                      : (isChromeIdentitySheets
+                        ? 'CHROME-IDENTITY-API'
+                        : (isGlamaPageStateRuntime ? 'PAGE-STATE-RUNTIME' : 'SAME-ORIGIN'))))))))))
       : 'SEPARATE';
     console.log('  ' + verdict + '  ' + r.global + '  head=' + String(r.handlerOrigin) +
       '  api=' + String(r.apiBaseUrl));
@@ -4977,6 +5081,10 @@ function runCli() {
     const reason = r.classification && r.classification.reason;
     return typeof reason === 'string' && reason.indexOf('GLAMA_PAGE_STATE_RUNTIME_READ') === 0;
   }).length;
+  const chromeIdentitySheetsApis = results.filter(function(r) {
+    const reason = r.classification && r.classification.reason;
+    return typeof reason === 'string' && reason.indexOf('CHROME_IDENTITY_SHEETS_API') === 0;
+  }).length;
   console.log(
     'verify-origin-classification: PASS (' + results.length + ' shipped head(s); ' +
     publicCorsReads + ' explicit public no-auth CORS read accommodation(s); ' +
@@ -4987,6 +5095,7 @@ function runCli() {
     guardedOnlyHeads + ' guarded-only no-execution head(s); ' +
     pageBearerGraphReads + ' page-bearer Graph read accommodation(s); ' +
     gapiPageBridgeReads + ' page GAPI client read accommodation(s); ' +
+    chromeIdentitySheetsApis + ' Chrome Identity Sheets API accommodation(s); ' +
     glamaPageStateRuntimeReads + ' Glama page-state runtime read accommodation(s); linear ' +
     'separate-origin negative-control classifies separate; 0 silent cross-origin ports)'
   );

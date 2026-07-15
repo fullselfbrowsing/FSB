@@ -679,14 +679,28 @@ async function dispatchMcpMessageRoute({ type, payload = {}, client = null, mcpM
           globalThis.fsbMcpSessionRecorder &&
           typeof globalThis.fsbMcpSessionRecorder.recordDispatch === 'function'
         ) {
-          globalThis.fsbMcpSessionRecorder.recordDispatch({
+          var sessionRecordEntry = {
             client: resolveMcpClientLabel(payload),
             tool: type,
             requestPayload: payload,
             response,
             success,
             dispatcher_route: 'message'
-          });
+          };
+          var spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
+          var spreadsheetInvoke = type === 'mcp:capabilities-invoke'
+            && payload && typeof payload.slug === 'string' && payload.slug.indexOf('gsheets.') === 0;
+          if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
+            if (!spreadsheetInvoke) {
+              globalThis.fsbMcpSessionRecorder.recordDispatch(sessionRecordEntry);
+            }
+          } else {
+            spreadsheetRedactor.recordSafely(
+              globalThis.fsbMcpSessionRecorder,
+              'recordDispatch',
+              sessionRecordEntry
+            );
+          }
         }
       } catch (_e) { /* defence in depth -- never let session recording break dispatch */ }
     }

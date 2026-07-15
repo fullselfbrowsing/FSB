@@ -53,12 +53,10 @@ test('derives a spreadsheet ID only from the active Google Sheets URL', async ()
   assert.equal(wrongOrigin.code, 'GOOGLE_SHEETS_SPREADSHEET_REQUIRED');
 });
 
-test('routes each operation to exactly one narrow client method', async () => {
+test('routes read operations to exactly one narrow client method', async () => {
   const cases = [
-    ['gsheets.get_values', { range: 'Data!A1:B2', valueRenderOption: 'FORMULA' }, 'getValues'],
-    ['gsheets.update_values', { range: 'A1:B1', values: [['name', 1]], valueInputOption: 'RAW' }, 'updateValues'],
-    ['gsheets.append_values', { range: 'A:B', values: [['x', true]], insertDataOption: 'INSERT_ROWS' }, 'appendValues'],
-    ['gsheets.clear_values', { range: 'Archive!A2:Z' }, 'clearValues']
+    ['gsheets.get_spreadsheet', {}, 'getSpreadsheet'],
+    ['gsheets.get_values', { range: 'Data!A1:B2', valueRenderOption: 'FORMULA' }, 'getValues']
   ];
   for (const [slug, args, expectedMethod] of cases) {
     const calls = [];
@@ -70,12 +68,29 @@ test('routes each operation to exactly one narrow client method', async () => {
   }
 });
 
+test('write and destructive operations are runtime guarded until live UAT activation', async () => {
+  const cases = [
+    ['gsheets.update_values', { range: 'A1:B1', values: [['name', 1]], valueInputOption: 'RAW' }],
+    ['gsheets.append_values', { range: 'A:B', values: [['x', true]], insertDataOption: 'INSERT_ROWS' }],
+    ['gsheets.clear_values', { range: 'Archive!A2:Z' }]
+  ];
+  for (const [slug, args] of cases) {
+    const calls = [];
+    const out = await handlers[slug].handle(args, context(calls));
+    assert.equal(out.success, false);
+    assert.equal(out.code, 'RECIPE_DOM_FALLBACK_PENDING');
+    assert.equal(out.slug, slug);
+    assert.equal(out.reason, 'google-sheets-live-mutation-uat-required');
+    assert.equal(out.fellBackToDom, true);
+    assert.deepEqual(calls, []);
+  }
+});
+
 test('explicit spreadsheet ID wins and arbitrary transport fields are never forwarded', async () => {
   const calls = [];
-  await handlers['gsheets.update_values'].handle({
+  await handlers['gsheets.get_values'].handle({
     spreadsheetId: 'explicitSpreadsheetId1234567890',
     range: 'A1',
-    values: [['safe']],
     url: 'https://attacker.example',
     method: 'DELETE',
     headers: { Authorization: 'secret' },
@@ -84,8 +99,9 @@ test('explicit spreadsheet ID wins and arbitrary transport fields are never forw
   assert.deepEqual(calls[0].params, {
     spreadsheetId: 'explicitSpreadsheetId1234567890',
     range: 'A1',
-    values: [['safe']],
-    valueInputOption: undefined
+    majorDimension: undefined,
+    valueRenderOption: undefined,
+    dateTimeRenderOption: undefined
   });
 });
 

@@ -3,6 +3,7 @@
 
   var ORIGIN = 'https://docs.google.com';
   var SERVICE = 'docs.google.com';
+  var FALLBACK_CODE = 'RECIPE_DOM_FALLBACK_PENDING';
   var ID_PATTERN = '^[A-Za-z0-9_-]{10,200}$';
   var ID_RE = /^[A-Za-z0-9_-]{10,200}$/;
 
@@ -65,6 +66,26 @@
     return { success: false, code: code, errorCode: code, error: code };
   }
 
+  function guarded(slug, sideEffectClass, params) {
+    return {
+      tier: 'T1a',
+      origin: ORIGIN,
+      sideEffectClass: sideEffectClass,
+      params: params,
+      async handle() {
+        return {
+          success: false,
+          code: FALLBACK_CODE,
+          errorCode: FALLBACK_CODE,
+          error: FALLBACK_CODE,
+          slug: slug,
+          reason: 'google-sheets-live-mutation-uat-required',
+          fellBackToDom: true
+        };
+      }
+    };
+  }
+
   function spreadsheetIdFromUrl(ctx) {
     var url = ctx && typeof ctx.url === 'string' ? ctx.url : '';
     if (!url) { return ''; }
@@ -123,41 +144,9 @@
         });
       }
     },
-    'gsheets.update_values': {
-      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'write', params: UPDATE_VALUES_PARAMS,
-      handle: function (args, ctx) {
-        return call('updateValues', args, ctx, function (spreadsheetId, input) {
-          return {
-            spreadsheetId: spreadsheetId,
-            range: input.range,
-            values: input.values,
-            valueInputOption: input.valueInputOption
-          };
-        });
-      }
-    },
-    'gsheets.append_values': {
-      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'write', params: APPEND_VALUES_PARAMS,
-      handle: function (args, ctx) {
-        return call('appendValues', args, ctx, function (spreadsheetId, input) {
-          return {
-            spreadsheetId: spreadsheetId,
-            range: input.range,
-            values: input.values,
-            valueInputOption: input.valueInputOption,
-            insertDataOption: input.insertDataOption
-          };
-        });
-      }
-    },
-    'gsheets.clear_values': {
-      tier: 'T1a', origin: ORIGIN, sideEffectClass: 'destructive', params: CLEAR_VALUES_PARAMS,
-      handle: function (args, ctx) {
-        return call('clearValues', args, ctx, function (spreadsheetId, input) {
-          return { spreadsheetId: spreadsheetId, range: input.range };
-        });
-      }
-    }
+    'gsheets.update_values': guarded('gsheets.update_values', 'write', UPDATE_VALUES_PARAMS),
+    'gsheets.append_values': guarded('gsheets.append_values', 'write', APPEND_VALUES_PARAMS),
+    'gsheets.clear_values': guarded('gsheets.clear_values', 'destructive', CLEAR_VALUES_PARAMS)
   };
 
   if (global.FsbCapabilityCatalog && typeof global.FsbCapabilityCatalog.registerHandler === 'function') {
