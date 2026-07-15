@@ -112,6 +112,7 @@ function runCommand(command) {
 }
 
 async function run() {
+  const rootPackageJson = readJson('package.json');
   const packageJson = readJson('mcp/package.json');
   const serverJson = readJson('mcp/server.json');
   const versionSource = readText('mcp/src/version.ts');
@@ -232,6 +233,18 @@ async function run() {
   console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');
   assertEqual(manifest.manifest_version, 3, 'extension remains on Manifest V3');
   assertEqual(manifest.minimum_chrome_version, '116', 'extension minimum Chrome version is exactly string 116');
+  assertEqual(rootPackageJson.engines.chrome, '>=116.0.0', 'root engine metadata requires Chrome 116');
+  assertEqual(rootPackageJson.config.min_chrome_version, '116.0.0', 'root setup metadata requires Chrome 116');
+  assertEqual(
+    String(Number.parseInt(rootPackageJson.engines.chrome.replace(/^>=/, ''), 10)),
+    manifest.minimum_chrome_version,
+    'engine metadata normalizes to the manifest Chrome floor',
+  );
+  assertEqual(
+    String(Number.parseInt(rootPackageJson.config.min_chrome_version, 10)),
+    manifest.minimum_chrome_version,
+    'setup metadata normalizes to the manifest Chrome floor',
+  );
   assert(
     JSON.stringify(manifest.permissions) === JSON.stringify(prePhase61ExtensionPermissions),
     'Chrome 116 pin leaves the established permission roster byte-for-byte ordered',
