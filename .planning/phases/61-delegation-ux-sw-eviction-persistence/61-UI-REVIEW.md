@@ -1,42 +1,51 @@
 ---
 phase: 61-delegation-ux-sw-eviction-persistence
 reviewed: 2026-07-15
-status: needs-attention
+iteration: 3
+status: source-pass
 baseline: 61-UI-SPEC.md
-overall_score: "16/24"
-screenshots: not-captured
+overall_score: "24/24"
+screenshots: not-captured-source-only
 needs_human_review: true
+audited_head: eeba9220
 ---
 
 # Phase 61 — UI Review
 
-**Audited:** 2026-07-15  
-**Baseline:** approved `61-UI-SPEC.md` design contract  
-**Screenshots:** Not captured. No dev server responded on ports 3000, 5173, or 8080, Playwright-MCP was unavailable, and the user deferred all live browser/visual UAT.  
-**Evidence mode:** Code, DOM-test, and source-contract evidence only. Every visual, focus, screen-reader, contrast, density, and responsive judgment that requires a rendered extension remains `needs_human_review` / pending; this review claims no live visual pass.
+**Audited:** 2026-07-15
+**Baseline:** approved `61-UI-SPEC.md` design contract
+**Final implementation boundary:** `eeba9220` (`fix(61): harden delegation wake authority`)
+**Latest UI-specific fix:** `561c6836` (`fix(61): close final cleanup accessibility gaps`)
+**Screenshots:** Not captured by explicit source-only scope. No browser, local-server, screenshot, or human UAT probes were performed.
+**Evidence mode:** Code, source-contract, and deterministic DOM-test evidence only. Rendered contrast, hierarchy, density, wrapping, focus visibility, screen-reader timing, and extension-panel behavior remain `needs_human_review`; this report claims no live visual or accessibility pass.
+**Boundary check:** `561c6836..eeba9220` changed no `extension/ui/**` file or focused UI test. The later commit hardened canonical delegation producers; controller, event-store, and phase-contract regressions pass, so source-actionable UI findings remain zero.
 
 ---
 
-## Pillar Scores
+## Source-Contract Score
 
 | Pillar | Score | Key Finding |
 |--------|-------|-------------|
-| 1. Copywriting | 4/4 | Exact consent, lifecycle, recovery, summary, and unknown-value copy is implemented and source/DOM tested without forbidden marketing claims. |
-| 2. Visuals | 2/4 | The full-width card/feed hierarchy exists, but the current-run card omits elapsed time and Phase 61 semantic states have no contract-required icon treatment or distinct active-run marker. |
-| 3. Color | 2/4 | Shared light/dark tokens are reused, but every summary receives the success marker—including failed/restart-lost summaries—and the primary accent is permanently assigned to every tool-call row. |
-| 4. Typography | 4/4 | Phase additions stay within the approved 12/14/16px subset and use only the approved 400/600 weights with the existing system and permitted monospace stacks. |
-| 5. Spacing | 2/4 | Core card/grid spacing uses 4/8/16px, but repeated 12px and 18px layout spacing violates the approved scale's explicit “Exceptions: none” rule. |
-| 6. Experience Design | 2/4 | State authority, hydration, errors, focus-after-command, and no-optimism behavior are strong, but the second Stop location, lifecycle/control announcements, and per-tool disclosure contract are missing. |
+| 1. Copywriting | 4/4 | Consent, lifecycle, recovery, failed-binding cleanup, billing, and trust-restoration copy is exact, truthful, and source-tested. |
+| 2. Visuals | 4/4 | Full-width run/feed hierarchy, elapsed metadata, semantic icons, native disclosures, cleanup-danger presentation, and narrow-width structure satisfy the approved source contract. |
+| 3. Color | 4/4 | Closed canonical tones use shared light/dark tokens; stopped is neutral, failures are danger, active runs reserve the accent, and cleanup overrides stale active state with danger. |
+| 4. Typography | 4/4 | Phase additions stay within the approved 12/14/16px subset, 400/600 weights, role-specific line heights, inherited system stack, and limited monospace roles. |
+| 5. Spacing | 4/4 | All Phase 61 margin, padding, and gap declarations use 0 or approved shared spacing tokens, with responsive grids and controls source-pinned. |
+| 6. Experience Design | 4/4 | Canonical rendering, silent hydration, one-shot announcements, dual Stop controls, exact failed-binding retry semantics, reduced motion, focus routing, and responsive fallbacks are implemented and tested. |
 
-**Overall: 16/24**
+**Overall source-contract score: 24/24**
+
+No source-actionable UI fixes remain at the audited boundary.
 
 ---
 
-## Top 3 Priority Fixes
+## Deferred Human Review Priorities
 
-1. **Wire both Stop locations to the same delegated action** — The existing input-cluster Stop remains hidden/legacy-wired during a delegated run, removing the contract's persistent redundant kill switch. Multiplex `stopBtn` to `_stopDelegation` whenever the selected canonical snapshot is active, share pending/disabled state with the run-card button, and restore the legacy handler on terminal/API state.
-2. **Drive terminal tone, icons, and one-shot announcements from canonical state** — A failed or restart-lost summary can look successful, and `Starting`, `Take control available`, held, and stopping transitions do not reach the single announcer when `announceSequence` is `null`. Add closed state/tone attributes and `aria-hidden` icons, then deduplicate lifecycle/control announcements separately from persisted-entry announcements while preserving silent hydration.
-3. **Restore long-run scanability** — The current-run card omits elapsed time and each six-field tool call is always expanded. Derive elapsed presentation from canonical persisted timestamps, and render each tool call as a meaningful native `<details>/<summary>` disclosure with call id, arguments, tab, status, and duration in its expanded body.
+1. **Rendered hierarchy and contrast** — Inspect the run card, chronological feed, icons, alerts, disclosures, and fixed control bar in both themes with dense long-run data.
+2. **Keyboard and assistive technology** — Exercise consent, Take control, Resume, both Stop locations, disclosure focus, alert deduplication, hydration silence, and lifecycle announcements in the real extension.
+3. **Responsive and motion behavior** — Confirm long identifiers and tool arguments at narrow/wide panel sizes, plus real reduced-motion behavior for scrolling, status pulse, Stop hover, and new-entry tint.
+
+These are deferred UAT checks, not known source defects.
 
 ---
 
@@ -44,92 +53,94 @@ needs_human_review: true
 
 ### Pillar 1: Copywriting (4/4)
 
-- Ready-state copy is exact (`extension/ui/sidepanel.js:887-914`); consent, trust, safety, and Back copy is exact (`extension/ui/sidepanel.js:1020-1092`); offline/unpaired/unsupported copy is exact (`extension/ui/sidepanel.js:1112-1186`); and running, held, stopped, failure, disconnect, and restart-loss copy is exact (`extension/ui/sidepanel.js:1215-1223`, `extension/ui/sidepanel.js:1369-1502`).
-- Summary copy is honest and closed: `Included in your subscription`, real API USD only, and `Not reported` for unavailable values (`extension/ui/delegation-feed.js:313-327`, `extension/ui/delegation-feed.js:386-425`).
-- Providers exposes the exact authority-reducing `Restore confirmation for Claude Code` action and explicit pending/success/failure copy (`extension/ui/options.js:379-450`).
-- The exact-copy and forbidden-claim source gate passes (`tests/delegation-sidepanel-ui.test.js:356-425`), including the ban on `faster mode`, `free`, and `unlimited`.
-- Executed evidence: `node tests/delegation-sidepanel-ui.test.js`, `node tests/sidepanel-tab-aware-smoke.test.js`, `node tests/owner-chip.test.js`, and `node tests/providers-panel-logic.test.js` all passed during this audit.
+- Consent uses the approved heading, capability boundary, forbidden-scope statement, trust explanation, primary action, and Back action (`extension/ui/sidepanel.js:1299-1375`).
+- Offline, disconnected, unpaired, unsupported, restart-loss, stop-failure, resume-ownership, retry, and doctor recovery states use explicit recovery language rather than optimistic or generic claims (`extension/ui/sidepanel.js:1776-1935`).
+- Failed conversation binding is truthful in both branches: unsettled cleanup says Stop is not confirmed and keeps the original message; success copy appears only after exact-run terminal proof (`extension/ui/sidepanel.js:1828-1833`, `extension/ui/sidepanel.js:1928-1959`).
+- Billing distinguishes subscription inclusion, real API USD, and unavailable values as `Not reported` (`extension/ui/delegation-feed.js:434-455`). Providers exposes `Restore confirmation for Claude Code` with pending, success, and actionable failure feedback (`extension/ui/options.js:379-450`).
 
-### Pillar 2: Visuals (2/4)
+### Pillar 2: Visuals (4/4)
 
-- The implementation establishes the intended focal hierarchy: the delegation section is first inside the message stream (`extension/ui/sidepanel.html:56-69`), stretches to full width, and places the state card before the chronological feed (`extension/ui/sidepanel.css:1714-1755`). Action controls are visible-text buttons, and narrow/wide layouts stack or split appropriately (`extension/ui/sidepanel.css:1921-1942`, `extension/ui/sidepanel.css:2015-2042`).
-- The approved current-run card requires provider, state, **elapsed time**, and the background-tab statement (`61-UI-SPEC.md:63-76`). `_renderDelegationRunHeader` renders provider/state/background copy and actions but no elapsed value or timer (`extension/ui/sidepanel.js:1369-1502`).
-- The approved color semantics require an icon plus explicit text (`61-UI-SPEC.md:137-153`). The Phase 61 feed and run-card builders create headings, paragraphs, definition lists, details, and buttons, but no semantic icon nodes (`extension/ui/delegation-feed.js:333-425`, `extension/ui/sidepanel.js:1369-1502`). Text prevents color-only meaning, but the explicit icon contract remains unmet.
-- The contract reserves an orange leading marker for the active run (`61-UI-SPEC.md:145-153`), but the state card has no canonical state class/data attribute and no active-run marker. Orange is instead assigned to each tool-call row (`extension/ui/sidepanel.css:1728-1763`).
-- `needs_human_review`: rendered focal strength, card density, control-bar overlap, long-string wrapping, and visual distinction at narrow/wide sizes cannot be judged without loading the extension UI.
+- The delegated run is first in the message stream, with state card before feed and a separate control bar above the composer (`extension/ui/sidepanel.html:56-76`, `extension/ui/sidepanel.html:107-129`).
+- The run card presents provider, state, elapsed time derived from persisted entries, and the background-run statement; the timer is cleared when presentation or authority changes (`extension/ui/sidepanel.js:997-1057`, `extension/ui/sidepanel.js:1743-1774`).
+- Canonical headings combine explicit text with `aria-hidden` icons. Tool calls use native collapsed `details/summary` disclosures with full metadata when expanded (`extension/ui/sidepanel.js:956-995`; `extension/ui/delegation-feed.js:338-431`).
+- Failed-binding cleanup overrides a retained running snapshot with a danger card/icon headed `Agent cleanup needs attention`, closing the active/danger mismatch (`extension/ui/sidepanel.js:1776-1827`).
+- Cards wrap arbitrary values, and the 350px contract collapses actions, controls, results, definitions, summaries, and tool breakdowns to one column (`extension/ui/sidepanel.css:1738-1745`, `extension/ui/sidepanel.css:2097-2117`).
 
-### Pillar 3: Color (2/4)
+### Pillar 3: Color (4/4)
 
-- The Phase 61 block consistently uses shared surface, text, information, warning, success, danger, border, shadow, and focus tokens, including a token-backed dark-theme override (`extension/ui/sidepanel.css:1728-1776`, `extension/ui/sidepanel.css:1821-1834`, `extension/ui/sidepanel.css:1944-1973`, `extension/ui/sidepanel.css:2006-2013`).
-- `_validSummary` permits `completed`, `failed`, `stopped`, and `restart_lost` (`extension/ui/delegation-feed.js:217-235`), but `renderSummary` emits the same unqualified `.delegation-summary` class for all of them (`extension/ui/delegation-feed.js:394-406`). CSS then gives every summary a success-green leading border (`extension/ui/sidepanel.css:1770-1773`). Failed and restart-lost outcomes can therefore present with the completed-result color.
-- The primary accent is contractually limited to consent/start, Resume, active-run marker, and focus (`61-UI-SPEC.md:145-153`), yet `.delegation-entry-tool-call` permanently uses `var(--fsb-primary)` (`extension/ui/sidepanel.css:1761-1763`). This spends the accent repeatedly in long feeds while the required active marker is absent.
-- Primary-button foreground is literal `white` instead of the available theme-aware inverse text token (`extension/ui/sidepanel.css:1944-1948`; token source `extension/shared/fsb-ui-core.css:40`, `extension/shared/fsb-ui-core.css:128`).
-- `needs_human_review`: computed contrast, tinted-surface balance, and the actual 60/30/10 distribution remain pending without rendered light/dark screenshots.
+- Entry and summary states use a closed tone map: completed success, failed/restart-lost danger, held/resuming warning, stopped neutral, and current activity information (`extension/ui/delegation-feed.js:330-375`, `extension/ui/delegation-feed.js:442-447`).
+- Run cards map active/success/warning/danger/neutral, including danger for offline, disconnected, stopping, failure, and restart loss (`extension/ui/sidepanel.js:956-971`).
+- Borders and icons consume shared semantic tokens in both themes. Primary accent is reserved for active state, primary actions, focus, and transient tint rather than every tool row (`extension/ui/sidepanel.css:1728-1840`, `extension/ui/sidepanel.css:2025-2055`, `extension/ui/sidepanel.css:2079-2095`).
+- Cleanup explicitly forces danger even when the accepted unbound run retains an active snapshot, so card, icon, heading, and copy agree (`extension/ui/sidepanel.js:1780-1824`).
 
 ### Pillar 4: Typography (4/4)
 
-- The approved additions allow 11/12/14/16px and only 400/600 weights (`61-UI-SPEC.md:120-133`). The Phase 61 CSS uses 12/14/16px and only 400/600; it introduces no unapproved size or weight (`extension/ui/sidepanel.css:1779-1813`, `extension/ui/sidepanel.css:1821-1829`, `extension/ui/sidepanel.css:1862-1877`, `extension/ui/sidepanel.css:1908-1915`, `extension/ui/sidepanel.css:1929-1942`).
-- Heading, body, label/button, and definition-list line heights match their declared roles. Sentence case is used throughout, and monospace is confined to doctor/machine values (`extension/ui/sidepanel.css:1836-1846`, `extension/ui/sidepanel.css:1881-1884`, `extension/ui/sidepanel.css:1893-1906`).
-- The existing system stack remains inherited; no new font dependency or typography fork was introduced.
-- `needs_human_review`: actual legibility, truncation, zoom behavior, and font rendering remain pending.
+- Headings are 16px/600, body copy 14px/400, and labels, buttons, metadata, disclosures, and errors 12px with only approved 400/600 weights (`extension/ui/sidepanel.css:1801-1808`, `extension/ui/sidepanel.css:1842-1884`, `extension/ui/sidepanel.css:1924-2022`).
+- Line heights follow approved roles; copy stays sentence case. The system stack remains inherited, while monospace is confined to doctor commands and machine/session identifiers (`extension/ui/sidepanel.css:1890-1900`, `extension/ui/sidepanel.css:1943-1946`).
 
-### Pillar 5: Spacing (2/4)
+### Pillar 5: Spacing (4/4)
 
-- The main layout correctly uses the declared scale for 4px metadata gaps, 8px feed/control gaps, and 16px card padding/section spacing (`extension/ui/sidepanel.css:1714-1755`, `extension/ui/sidepanel.css:1804-1813`, `extension/ui/sidepanel.css:1848-1860`, `extension/ui/sidepanel.css:1921-1942`).
-- The approved scale allows only 4/8/16/24/32/48/64px and declares no exceptions (`61-UI-SPEC.md:102-116`). New Phase 61 layout declarations repeatedly introduce 12px spacing in inline errors, doctor blocks, technical details, and control padding (`extension/ui/sidepanel.css:1821-1845`, `extension/ui/sidepanel.css:1893-1900`, `extension/ui/sidepanel.css:1975-1984`).
-- The pinned control bar also uses an off-scale 18px horizontal margin (`extension/ui/sidepanel.css:1975-1984`). These are repeated design-token deviations, not an isolated optical adjustment.
-- Responsive structure itself is present: actions and metric grids stack at 350px, while result/permission grids become two-column at 500px (`extension/ui/sidepanel.css:2015-2042`).
-- `needs_human_review`: card rhythm, bottom clearance above the composer, and narrow-panel density remain pending.
+- Run, feed, cards, metadata, disclosures, actions, and control geometry consistently use shared `--fsb-space-1`, `--fsb-space-2`, and `--fsb-space-4` tokens (`extension/ui/sidepanel.css:1714-1755`, `extension/ui/sidepanel.css:1801-1913`, `extension/ui/sidepanel.css:1948-2065`).
+- The trust checkbox now uses the approved 4px token, closing the final off-scale exception (`extension/ui/sidepanel.css:1858-1873`).
+- The source gate enumerates every Phase 61 `gap`, `margin*`, and `padding*` declaration and rejects values outside 0 or the approved token set (`tests/delegation-sidepanel-ui.test.js:434-453`).
+- Narrow and wide breakpoints preserve one-column/two-column rhythm without off-scale values (`extension/ui/sidepanel.css:2097-2124`).
 
-### Pillar 6: Experience Design (2/4)
+### Pillar 6: Experience Design (4/4)
 
-- Strong source evidence covers the difficult state behavior: hydrate-before-subscribe and silent history (`extension/ui/sidepanel.js:940-1001`), explicit pending/disabled consent (`extension/ui/sidepanel.js:1020-1092`), exact active-tab eligibility (`extension/ui/sidepanel.js:1253-1311`), no optimistic hold/resume rendering (`extension/ui/sidepanel.js:1611-1633`, `extension/ui/sidepanel.js:1747-1809`), idempotent Stop (`extension/ui/sidepanel.js:1811-1836`), and canonical snapshot validation/fanout (`extension/ui/delegation-feed.js:182-293`, `extension/ui/sidepanel.js:1530-1608`).
-- Empty, pending, error, offline, disconnected, restart-lost, stopped, retry, and restored-history states are all represented. Alerts are deduplicated, and only strictly newer persisted entries reach the one polite announcer (`extension/ui/sidepanel.js:1225-1251`, `extension/ui/sidepanel.js:1561-1595`). Interaction tests exercise focus retention, no optimism, trust ordering, hydration silence, interleaved ids, duplicate Stop, and alert dedupe (`tests/delegation-sidepanel-ui.test.js:464-1020`).
-- The contract requires Stop in both the input action cluster and run card, sharing one idempotent action (`61-UI-SPEC.md:47-53`, `61-UI-SPEC.md:209-218`). The run card creates `_stopDelegation` (`extension/ui/sidepanel.js:1324-1335`), but the fixed input button starts hidden (`extension/ui/sidepanel.html:121-123`) and is permanently wired to legacy `stopAutomation` (`extension/ui/sidepanel.js:2794-2797`). Its only show path is the legacy `setRunningState` flow (`extension/ui/sidepanel.js:3172-3203`), which delegated starts do not enter.
-- The single announcer is updated for doctor-copy feedback and newly persisted entry sequences, not for canonical lifecycle/control-only transitions (`extension/ui/sidepanel.js:1099-1109`, `extension/ui/sidepanel.js:1581-1595`). `Starting`, newly available `Take control`, held confirmation, and stopping can arrive with `announceSequence:null`, leaving the UI-SPEC's one-shot announcement requirements unimplemented (`61-UI-SPEC.md:81-98`, `61-UI-SPEC.md:209-218`).
-- The tool-call inventory requires a native disclosure (`61-UI-SPEC.md:70-76`). Each tool row currently renders all six fields in an always-open `<dl>` (`extension/ui/delegation-feed.js:350-359`); the only `<details>` is the aggregate run-summary tool-count breakdown (`extension/ui/delegation-feed.js:408-425`). This makes a long delegated feed substantially denser than the approved interaction model.
-- `needs_human_review`: keyboard traversal, focus visibility, screen-reader announcement timing, reduced motion, clipboard feedback, and genuine extension panel behavior remain pending.
+- Snapshot rendering validates exact authority, ignores non-selected ids and sequence regressions, hydrates silently, and announces only one-shot lifecycle transitions or strictly newer entries through one polite live region (`extension/ui/sidepanel.html:70-76`; `extension/ui/sidepanel.js:1199-1274`, `extension/ui/sidepanel.js:2001-2141`).
+- Alert ownership is singular: state cards own assertive semantics, repeated/hydrated alerts are silenced, and cleanup copy does not create a nested alert that re-announces unchanged text (`extension/ui/sidepanel.js:1277-1288`, `extension/ui/sidepanel.js:1515-1547`, `extension/ui/sidepanel.js:2097-2110`).
+- Run-card and fixed Stop share one delegated handler, pending label, disable state, exact-id command, and owner-lock exemption; the fixed control returns to legacy behavior outside the selected delegation (`extension/ui/sidepanel.js:1608-1709`, `extension/ui/sidepanel.js:2460-2515`).
+- Failed binding is retained only in process memory, scoped to exact tab/conversation origin, capped at eight reservations, and visible with the original task locked. Invalid, mismatched, throwing, or `tree_unsettled` Stop results retain cleanup; only exact non-`tree_unsettled` terminal proof clears it (`extension/ui/sidepanel.js:535`, `extension/ui/sidepanel.js:646-795`, `extension/ui/sidepanel.js:1938-1983`, `extension/ui/sidepanel.js:2460-2515`).
+- Event metadata is constructed only as text, keeping hostile HTML, URLs, styles, and handlers inert (`extension/ui/delegation-feed.js:303-328`; `tests/delegation-sidepanel-ui.test.js:335-355`).
+- Reduced-motion rules disable smooth scrolling on the actual chat container plus the status pulse, fixed Stop motion, entry tint, action transitions, and transforms (`extension/ui/sidepanel.css:2126-2148`).
 
 ---
 
+## Verification
+
+All checks passed at `eeba9220`:
+
+- `node --check extension/ui/delegation-feed.js`
+- `node --check extension/ui/sidepanel.js`
+- `node tests/delegation-sidepanel-ui.test.js`
+- `node tests/sidepanel-tab-aware-smoke.test.js` — 49 pass / 0 fail
+- `node tests/sidepanel-tab-scoping-fix-redo-smoke.test.js` — 24 pass / 0 fail
+- `node tests/owner-chip.test.js` — 54 pass / 0 fail
+- `node tests/providers-panel-logic.test.js`
+- `node tests/delegation-controller.test.js` — 39 pass / 0 fail
+- `node tests/delegation-event-store.test.js` — 28 pass / 0 fail
+- `node tests/delegation-phase-contract.test.js` — 524 pass / 0 fail
+
 ## Audit Outcome
 
-- Contract-level priority fixes: 3
-- Minor recommendations: 3 (normalize spacing tokens, reserve the accent for declared roles, and replace literal primary-button foreground with the inverse text token)
-- Automated UI/source suites executed: 4, all passing
-- Human review required: yes — all live visual/browser/accessibility checks remain pending
+- Source-actionable UI findings: 0
+- Iteration-2 findings verified closed: 3
+- Iteration-3 findings discovered and verified closed before finalization: 3
+- Deterministic source/UI contract checks: 10, all passing
+- Human review required: yes — rendered browser, visual, keyboard, screen-reader, and responsive judgments remain deferred
 - Screenshots: none captured
+- Registry audit: skipped; the approved contract declares no shadcn or third-party registry and no `components.json` exists
 
 ## Files Audited
 
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-01-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-01-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-02-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-02-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-03-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-03-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-04-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-04-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-05-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-05-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-06-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-06-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-07-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-07-SUMMARY.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-08-PLAN.md`
-- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-08-SUMMARY.md`
 - `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-CONTEXT.md`
 - `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md`
+- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-{01..08}-PLAN.md`
+- `.planning/phases/61-delegation-ux-sw-eviction-persistence/61-{01..08}-SUMMARY.md`
 - `extension/ui/delegation-feed.js`
 - `extension/ui/sidepanel.html`
 - `extension/ui/sidepanel.js`
 - `extension/ui/sidepanel.css`
 - `extension/ui/options.js`
+- `extension/ui/owner-chip.js`
 - `extension/shared/fsb-ui-core.css`
-- `extension/background.js`
+- `extension/utils/delegation-event-store.js`
 - `extension/utils/delegation-controller.js`
 - `tests/delegation-sidepanel-ui.test.js`
 - `tests/sidepanel-tab-aware-smoke.test.js`
+- `tests/sidepanel-tab-scoping-fix-redo-smoke.test.js`
 - `tests/owner-chip.test.js`
 - `tests/providers-panel-logic.test.js`
-
+- `tests/delegation-controller.test.js`
+- `tests/delegation-event-store.test.js`
+- `tests/delegation-phase-contract.test.js`

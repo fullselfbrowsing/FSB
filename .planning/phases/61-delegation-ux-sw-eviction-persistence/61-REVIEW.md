@@ -1,181 +1,92 @@
 ---
 phase: 61-delegation-ux-sw-eviction-persistence
-reviewed: 2026-07-15T16:46:09Z
+reviewed: "2026-07-15T20:09:12Z"
 depth: deep
-files_reviewed: 48
+iteration: 3
+boundary: eeba9220
+boundary_parent: 561c683618b5c8b9d98d4d4cad1235d7bf06385a
+files_reviewed: 12
 files_reviewed_list:
-  - extension/ai/engine-config.js
   - extension/background.js
-  - extension/config/config.js
-  - extension/manifest.json
-  - extension/ui/delegation-feed.js
-  - extension/ui/options.js
-  - extension/ui/sidepanel.css
-  - extension/ui/sidepanel.html
-  - extension/ui/sidepanel.js
   - extension/utils/agent-registry.js
-  - extension/utils/delegation-consent.js
   - extension/utils/delegation-controller.js
   - extension/utils/delegation-event-store.js
-  - extension/utils/delegation-preflight.js
   - extension/ws/mcp-bridge-client.js
-  - extension/ws/mcp-tool-dispatcher.js
-  - mcp/src/agent-providers/runtime-files.ts
-  - mcp/src/agent-providers/spawn-supervisor.ts
-  - mcp/src/agent-scope.ts
-  - mcp/src/bridge.ts
-  - package.json
-  - scripts/run-phase60-full-tests.mjs
-  - tests/agent-bridge-routes.test.js
-  - tests/agent-grace.test.js
   - tests/agent-registry.test.js
-  - tests/agent-scope.test.js
-  - tests/delegation-consent.test.js
   - tests/delegation-controller.test.js
   - tests/delegation-event-store.test.js
   - tests/delegation-phase-contract.test.js
-  - tests/delegation-routing.test.js
-  - tests/delegation-sidepanel-ui.test.js
-  - tests/fixtures/delegation-events.js
-  - tests/lattice-provider-bridge-smoke.test.js
-  - tests/mcp-agent-orphan-recovery.test.js
   - tests/mcp-bridge-background-dispatch.test.js
   - tests/mcp-bridge-client-lifecycle.test.js
-  - tests/mcp-client-identity-integration.test.js
-  - tests/mcp-client-merged-view.test.js
-  - tests/mcp-reverse-channel-contract.test.js
-  - tests/mcp-spawn-supervisor.test.js
-  - tests/mcp-version-parity.test.js
-  - tests/open-tab-background-default.test.js
-  - tests/owner-chip.test.js
-  - tests/phase60-full-tests-harness.test.js
-  - tests/provider-parity.test.js
-  - tests/providers-panel-logic.test.js
-  - tests/sidepanel-tab-aware-smoke.test.js
+  - tests/trigger-blocking-reporting.test.js
+context_files_verified: 49
+focused_test_programs: 27
 findings:
-  critical: 2
-  warning: 7
-  info: 1
-  total: 10
-status: issues_found
+  critical: 0
+  warning: 0
+  info: 0
+  total: 0
+status: clean
 ---
 
 # Phase 61: Code Review Report
 
-**Reviewed:** 2026-07-15T16:46:09Z  
-**Depth:** deep  
-**Files Reviewed:** 48  
-**Status:** issues_found
+**Reviewed:** 2026-07-15T20:09:12Z
+
+**Depth:** deep, iteration 3
+
+**Boundary:** `eeba9220` (`fix(61): harden delegation wake authority`)
+
+**Files Reviewed:** 12 exact remediation files, with all 49 Phase 61 implementation/test context files reverified
+
+**Status:** clean
 
 ## Summary
 
-Phase 61 has two critical lifecycle-authority failures: the long-running start request is still governed by a 30-second transport timeout that does not cancel the daemon run, and a streamed result releases browser ownership before the supervisor's final cleanup has confirmed process-tree settlement. Seven additional warnings affect eviction-safe watchdogs, heartbeat enforcement, release failure handling, ledger recovery, start-event persistence, POSIX state confirmation, and side-panel binding durability. One metadata inconsistency leaves the declared Chrome floor split between 116 and 88.
+The final remediation boundary is clean. Deep cross-file review found no actionable correctness, security, or code-quality issue in the 12 committed files. All five iteration-2 findings are fixed at the reviewed tree: hold/resume preserves exact tab security metadata; terminal and quarantine cleanup is failure-atomic and recoverable at the full-ledger boundary; persistence quarantine retains an exact cleanup retry path; a failed compensating Stop remains visible and actionable; and explicit same-generation route-loss evidence terminalizes the matching recovered run without inference, replay, or adoption.
 
-The focused automated tests and TypeScript typecheck pass, but the current tests do not exercise these delayed/failure paths. Live browser, CLI, endurance, process, and restart UAT remains intentionally deferred to the milestone-end gate and is not counted as a review defect.
+The final hardening also closes cold-wake and runtime authority races. Persisted registry and ledger authority must hydrate before ordinary inbound MCP dispatch opens. Active delegation traffic remains independently fenced while offline, after three missed heartbeat acknowledgements, and during reconnect/status reconciliation. Only a canonical bounded `delegate.status` response observed for the current connection epoch can reopen delegated dispatch. Sidecar registrations and mapped delegated agent ids fail closed during that interval, while unrelated non-delegated agents remain compatible.
 
-## Critical Findings
+No live or human UAT was performed. Per instruction, browser/authenticated CLI, real service-worker eviction, real daemon restart, real POSIX process-tree, endurance, visual, and accessibility UAT remains deferred to the single milestone-end gate.
 
-### CR-01 — A normal delegation outlives the client request timeout, then releases ownership without cancelling the still-running daemon process
+## Iteration-2 Finding Closure
 
-**Evidence:** `extension/ws/mcp-bridge-client.js:17-19` sets the generic request default to 30 seconds and caps every override at 120 seconds. `extension/ws/mcp-bridge-client.js:615-623` deletes the local pending request and rejects on timeout, but sends no cancel/abort frame; later events and the response are silently ignored because no pending entry exists (`extension/ws/mcp-bridge-client.js:646-665`). The background starts `delegate.start` without any timeout override (`extension/background.js:1551-1566`). On the daemon side, `delegate.start` awaits the run's terminal promise (`mcp/src/agent-providers/spawn-supervisor.ts:747-808`), and the bridge does not send `ext:response` until that handler resolves (`mcp/src/bridge.ts:1003-1015`). The background then collapses `ext_request_timeout` and `bridge_topology_changed` to `agent_failed` (`extension/background.js:1435-1455`) and asserts `treeSettled: true` for every code except the literal `tree_unsettled` (`extension/background.js:1463-1474`). That terminal path skips cancellation and releases ownership (`extension/utils/delegation-controller.js:612-636`).
+| Prior finding | Iteration-3 result |
+|---|---|
+| CR-01 — Hold/Resume rewrote tab security metadata | Fixed. The sealed lease preserves the complete bounded tab metadata and restore validates/reinstates the exact metadata rather than synthesizing permissive values. Incognito, window, and forced-state regressions are covered. |
+| CR-02 — Registry release preceded a durable terminal boundary | Fixed. Cleanup-pending evidence is persisted before exact release, terminalization is atomic, and a full 2,000-row ledger can become terminal without fabricating row 2,001. Reload/retry paths are covered. |
+| WR-01 — Persistence quarantine could strand registry authority | Fixed. Failed cleanup remains a recoverable cleanup-pending quarantine; Stop/wake retries exact cleanup before terminal completion and releases heartbeat/generation only after success. |
+| WR-02 — Failed compensating Stop hid an accepted run | Fixed. The UI retains the accepted delegation id/snapshot and exposes truthful retryable cleanup state until exact Stop settlement succeeds. Focused side-panel coverage passes. |
+| WR-03 — Worker eviction lost route-loss terminal evidence | Fixed. The daemon retains bounded same-generation route-loss dispositions, and the controller consumes only exact matching evidence to commit one `route_lost` terminal. Absence, disconnect, and mismatched evidence remain non-authoritative. |
 
-**Impact:** Any valid run lasting more than 30 seconds can be shown as failed and have its delegated tabs released while the Claude process and MCP tool authority continue running. This violates the 45-minute run contract and the requirement that release follow confirmed tree settlement.
+## Final Boundary Review
 
-**Required fix:** Give `delegate.start` a dedicated long-lived protocol rather than the generic request timer: either keep the route pending through the 45-minute ceiling plus cleanup, or split acceptance from completion and track completion by delegation id. A timeout/topology loss must issue exact-id cancellation and await a confirmed `cancelled`/`already_terminal` response (or remain `tree_unsettled`) before releasing ownership. Never translate an unconfirmed transport error into `treeSettled: true`. Add a fake-clock integration test that advances beyond 30 and 120 seconds, proves the run remains connected, then proves timeout/route loss cannot release tabs until cancellation settlement is confirmed.
+- Commit scope is exactly the 12 files listed in frontmatter; the working copies match `eeba9220` byte-for-byte.
+- Registry hydration, persisted envelopes, delegation mappings, held leases, cleanup markers, and release receipts are bounded and exact-shape validated. Unsupported, malformed, conflicting, prototype-key, or unavailable storage evidence quarantines authority instead of booting permissively.
+- Controller hydration caps active ledgers, reconciles registry mappings bidirectionally, preserves write-before-fanout, and retains one heartbeat owner per nonterminal record without replaying or adopting daemon work.
+- Background startup isolates legacy session restoration from delegation authority recovery, validates the complete daemon status shape, and uses connection epochs to prevent a stale reconnect response from reopening delegated authority.
+- The bridge starts structurally closed. Its separate delegation gate classifies sidecar registration and registry-mapped agent traffic fail closed without globally disabling unrelated MCP routes.
+- No new public authority surface, native/process capability, provider adapter, caller-supplied delegation identity, or secret-bearing status field was introduced.
 
-### CR-02 — A streamed `result` terminalizes the controller before supervisor cleanup confirms the process tree is gone
+## Automated Verification
 
-**Evidence:** The supervisor publishes the normalized result as soon as parsing finishes (`mcp/src/agent-providers/spawn-supervisor.ts:1041-1049`), while successful execution performs `terminateAndCleanup` and only then resolves the final terminal result (`mcp/src/agent-providers/spawn-supervisor.ts:906-920`). The extension treats any canonical `result` as terminal and explicitly disables cancellation (`extension/utils/delegation-controller.js:839-857`); `_settle` immediately releases the delegation's tabs (`extension/utils/delegation-controller.js:633-636`). When the later final response arrives, the background returns early because the controller is already terminal (`extension/background.js:1447-1450`).
+- 27 focused test programs passed with zero failures.
+- Key exact counts: delegation controller `39/39`; delegation event store `28/28`; Phase 61 contract `524/524`; background dispatch `213/213`; bridge lifecycle `211/211`; trigger blocking/reporting `47/47`; MCP version parity `57/57`; provider parity `67/67`; owner chip `54/54`; side-panel tab-aware smoke `49/49`; tab-scoping redo smoke `24/24`.
+- Agent registry, delegation UI/routing/consent, MCP agent identity/bridge/orphan/supervisor/reverse-channel, provider-panel, open-tab, and Phase 60 harness programs also passed.
+- `./mcp/node_modules/.bin/tsc -p mcp/tsconfig.json --noEmit` passed.
+- All 49 Phase 61 context files were present and byte-read; combined ordered SHA-256 manifest: `c1c77da2306bba8176d7b7c91746ba3287f07374b13155a21dfd632f3ab63d1d`.
+- `node --check` passed for all 41 JavaScript files; both JSON files parsed successfully.
+- `git diff --check origin/main...eeba9220` passed over the exact 49-file Phase 61 context scope, and the 12 committed boundary files show no post-commit drift.
+- No full root suite or build was run. The generated `mcp/build/index.js` and unrelated dirty planning/user files were intentionally untouched.
 
-**Impact:** The ordinary successful-result path can release browser ownership during the interval in which the supervisor still owns or is cleaning the process tree. A cleanup failure arriving afterward cannot restore ownership or change the already-persisted success, so the UI can claim completion while executable authority remains unsettled.
+## Verdict
 
-**Required fix:** Persist and render the result payload as nonterminal summary data, but do not mark the run terminal or release ownership until the final `delegate.start` response proves cleanup completed. Alternatively, withhold the result event until cleanup has settled and publish it together with explicit tree-settled evidence. Add an integration test that delays `terminateAndCleanup` after result emission and asserts the controller remains active and retains ownership until the final response; add the cleanup-failure variant and assert `tree_unsettled` with no release.
-
-## Warning Findings
-
-### WR-01 — Service-worker eviction and reconnect reset the 45-minute and silence watchdog budgets
-
-**Evidence:** Records carry `startedAt` and `lastEventAt` only in memory (`extension/utils/delegation-controller.js:267-300`). Hydration reconstructs entries and state but restores neither timestamp nor either timer (`extension/utils/delegation-controller.js:697-745`). `_armWallClock` and `_refreshSilence` always schedule a full new duration from the current moment (`extension/utils/delegation-controller.js:438-453`). Reconciliation clears both timers on disconnected/missing status (`extension/utils/delegation-controller.js:900-906`, `extension/utils/delegation-controller.js:925-949`) and later arms fresh full durations on reconnection (`extension/utils/delegation-controller.js:990-1006`).
-
-**Impact:** Worker eviction or repeated bridge flapping extends a run beyond the promised wall-clock ceiling and can indefinitely postpone event-silence cancellation.
-
-**Required fix:** Persist absolute `startedAt` and latest-event timestamps (or derive them from a guaranteed persisted start row and latest ledger row), then schedule only the remaining budget after hydration/reconnect. The wall-clock deadline must continue across disconnects; define and persist any intentional silence-pausing policy rather than resetting it. Add fake-clock eviction and repeated reconnect tests that prove the original absolute deadline wins.
-
-### WR-02 — Three missed heartbeat acknowledgements neither transition the controller nor block new delegated starts
-
-**Evidence:** The heartbeat stores its status only in the nested `delegationConnection` snapshot (`extension/ws/mcp-bridge-client.js:96-113`). On the third miss it mutates `_delegationConnectionState` and persists bridge state, but emits no controller callback or runtime update (`extension/ws/mcp-bridge-client.js:882-919`). Delegation preflight checks only top-level `bridgeState.connected` and `bridgeState.status` plus pairing (`extension/utils/delegation-preflight.js:88-94`), ignoring `bridgeState.delegationConnection.state`. The background passes that unmodified state into preflight (`extension/background.js:1286-1303`), while reconciliation is invoked only by explicit boot/start/snapshot flows (`extension/background.js:1244-1273`, `extension/background.js:1586-1589`, `extension/background.js:1660-1665`, `extension/background.js:1787-1795`).
-
-**Impact:** With the WebSocket still open, three missing nonce acknowledgements leave top-level connection state `connected`; the UI can stay live and a new `delegate.start` can pass preflight despite the required delegation channel being disconnected.
-
-**Required fix:** Expose a delegation-connection observer from the bridge client. On the third miss, persist and reconcile every active controller record to `disconnected`, fan out the committed state, and make preflight require `delegationConnection.state === 'connected'` for agent starts. Add a fake-timer test with an open socket and three missing pongs that proves the fourth send is blocked and the active snapshot/UI is disconnected.
-
-### WR-03 — Registry release failures are converted into successful terminal settlement
-
-**Evidence:** `releaseDelegation` returns structured failures for mapping mismatch, ownership mismatch, and persistence failure (`extension/utils/agent-registry.js:865-874`, `extension/utils/agent-registry.js:914-916`, `extension/utils/agent-registry.js:939-949`). `_releaseOnce` ignores `result.ok` and normalizes every such return to a zero-count release (`extension/utils/delegation-controller.js:568-584`). `_settle` catches only thrown errors, persists the requested terminal code, and returns `ok: true` even when release returned `{ok:false}` (`extension/utils/delegation-controller.js:633-691`).
-
-**Impact:** Stop or completion can report success with zero released tabs while the delegation-to-agent mapping and ownership are still live, contradicting both the exact cleanup and typed fail-closed requirements.
-
-**Required fix:** Require `release.result.ok === true` before terminal success. Preserve ownership on any structured failure, persist a distinct typed cleanup diagnostic such as mapping mismatch or release-persistence failure, and retry/reconcile without claiming completion. Add controller tests for all three `{ok:false}` branches and assert no successful Stop/completed response is emitted.
-
-### WR-04 — Persistence-failure cancellation leaves a nonterminal ledger that service-worker wake can resurrect
-
-**Evidence:** `_failPersistence` cancels, releases, and sets only an in-memory terminal object (`extension/utils/delegation-controller.js:589-609`); it never calls `eventStore.markTerminal` and never emits a persisted terminal update. `hydrateNonterminal` restores every stored envelope whose `terminal` flag is still false (`extension/utils/delegation-event-store.js:686-703`). The existing failure test explicitly expects no subscriber delivery and covers a first-write rejection only (`tests/delegation-controller.test.js:349-387`), not failure after a previously persisted row followed by module reload.
-
-**Impact:** If a later append exceeds quota or fails after one or more rows were committed, the daemon is cancelled in memory but the stored ledger remains nonterminal. The next worker wake restores it as an active/disconnected delegation and retains a heartbeat owner for a run that was already cancelled; the live panel also receives no terminal transition before eviction.
-
-**Required fix:** Reserve terminal-marker headroom in the ledger budget. After confirmed cancellation, persist a compact terminal marker (or an explicit quarantined tombstone) before releasing heartbeat/generation state, and fan out the typed failure only after that marker commits. If session storage itself is unavailable, keep cleanup fail-closed and retry/quarantine rather than leaving a ledger eligible for normal hydration. Add a regression with one persisted entry, forced append failure, module reload, and assertions that hydration does not restore the run.
-
-### WR-05 — `delegation.started` is broadcast without a write-before-fanout ledger commit
-
-**Evidence:** The event store explicitly supports mapping `delegation.started` to an `init` row (`extension/utils/delegation-event-store.js:282-287`). The bridge observer handles that event by calling only `controller.start` (`extension/background.js:1711-1725`). `controller.start` creates the record, arms timers, and calls `_emit` without any `appendBeforeFanout` operation (`extension/utils/delegation-controller.js:767-805`).
-
-**Impact:** The first supervisor event violates the one-event/one-row and write-before-fanout invariants. Eviction after the accepted start update but before the first normalized provider event loses the delivered start state entirely, and a run with no later init event has no canonical start row.
-
-**Required fix:** Make start asynchronous and append the canonical `delegation.started`/`init` entry, including profile context, before publishing or acknowledging acceptance. If that commit fails, cancel the server-minted delegation before returning acceptance. Add a deferred-write test proving neither the runtime subscriber nor start response settles before the start row is durable, plus an eviction test in the start-to-first-provider-event gap.
-
-### WR-06 — Hold and resume use a single immediate post-signal process-state read
-
-**Evidence:** `confirmProcessState` performs one inspector read and one process-group status read (`mcp/src/agent-providers/spawn-supervisor.ts:1304-1327`). `signalAndConfirm` sends `SIGSTOP`/`SIGCONT` and immediately invokes that one-shot confirmation (`mcp/src/agent-providers/spawn-supervisor.ts:1329-1348`).
-
-**Impact:** POSIX signal delivery and observable process state are asynchronous. A healthy process group can still appear running immediately after `SIGSTOP` (or stopped immediately after `SIGCONT`), causing false `tree_unsettled`, unnecessary cancellation, and loss of an otherwise valid run.
-
-**Required fix:** Poll with the injected monotonic clock/wait dependency for a short bounded transition grace, revalidating pid/group identity on every attempt, and fail closed only when the deadline expires or identity changes. Add delayed-inspection tests for both hold and resume, plus a never-transitions timeout case.
-
-### WR-07 — The side panel ignores failure to persist the conversation-to-delegation binding
-
-**Evidence:** `_writeDelegationConversationBinding` converts every session-storage error to `false` (`extension/ui/sidepanel.js:716-743`). After the daemon accepts a run, `_beginDelegationStart` awaits but ignores that boolean (`extension/ui/sidepanel.js:1672-1687`) and proceeds to clear the composer and render the run (`extension/ui/sidepanel.js:1696-1707`). Reopen/hydration can locate a delegation only through that stored binding (`extension/ui/sidepanel.js:701-707`, `extension/ui/sidepanel.js:940-949`); a null id deliberately asks the background for no snapshot (`extension/background.js:1651-1661`).
-
-**Impact:** A storage failure can leave a live accepted delegation with no route back from its conversation after panel reload, while the UI has already consumed the user's message and claimed that the run started.
-
-**Required fix:** Treat the binding write as part of start commit. If it returns false or no valid conversation id can be obtained, issue exact-id Stop/cancellation, retain the composer/message, and show a blocking persistence error; render the accepted run only after the binding is durable. Add storage-rejection and reload tests proving there is no hidden active delegation.
-
-## Info Finding
-
-### IN-01 — Chrome minimum-version metadata disagrees with the Phase 61 manifest floor
-
-**Evidence:** The extension manifest now requires Chrome 116 (`extension/manifest.json:1-5`), while package metadata still advertises Chrome 88 in both `engines.chrome` and `config.min_chrome_version` (`package.json:72-75`, `package.json:115-118`).
-
-**Impact:** Tooling or documentation that reads package metadata can claim support for browsers that the installable extension rejects.
-
-**Required fix:** Update both package fields to the Chrome 116 floor and extend the existing version-parity test to assert all three declarations agree.
-
-## Focused Verification
-
-- `./mcp/node_modules/.bin/tsc -p mcp/tsconfig.json --noEmit` — passed.
-- Twenty-five focused Phase 61 Node test files passed, including delegation routing/consent/store/controller/UI, bridge lifecycle/reverse-channel/background dispatch, spawn supervision/orphan recovery, registry/scope/routes/grace, provider/version parity, client identity/merged view, ownership/open-tab, and harness smoke coverage.
-- No live browser, authenticated CLI, 45-minute endurance, real POSIX, daemon-restart, or visual/accessibility UAT was run; those checks remain deferred to the milestone-end UAT gate by instruction.
-
-## Recommended Fix Order
-
-1. Separate long-lived delegation completion from the 30-second transport timeout and make every unconfirmed transport failure retain ownership.
-2. Move terminal/release authority from streamed `result` to the supervisor's post-cleanup final response.
-3. Repair release-result handling and persistence-failure tombstoning before addressing recovery/UI behavior.
-4. Persist absolute watchdog/start state and wire heartbeat miss transitions into controller/preflight.
-5. Make the start row and conversation binding durable commit points, then add bounded hold/resume confirmation polling.
-6. Align Chrome metadata and rerun focused tests, the complete root suite, code review, and the deferred milestone-end UAT group.
+No findings remain. Phase 61 passes deep iteration-3 code review at boundary `eeba9220` and is ready for the deferred milestone-end UAT sweep.
 
 ---
 
-_Reviewed: 2026-07-15T16:46:09Z_  
-_Reviewer: Codex (`gsd-code-reviewer`)_  
-_Depth: deep_
+_Reviewed: 2026-07-15T20:09:12Z_
+
+_Reviewer: Codex (`gsd-code-reviewer` workflow, direct fallback after agent-thread limit)_
+
+_Depth: deep, iteration 3_
