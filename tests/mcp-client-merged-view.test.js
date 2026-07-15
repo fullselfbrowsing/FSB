@@ -93,6 +93,7 @@ function createRuntimeHarness(initial, options = {}) {
     setTimeout,
     clearTimeout,
     armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} }
   };
   context.globalThis = context;

@@ -403,6 +403,93 @@ function extractWrapperSource(backgroundSource) {
   throw new Error('Unbalanced braces while extracting fsbDispatchInternalMessage');
 }
 
+function extractDelegationCompositionSource(backgroundSource) {
+  const startMarker = 'let fsbDelegationBootPromise = null;';
+  const endMarker = '\nfunction findActiveAutomationSessionForTab(tabId) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('delegation composition extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function buildDelegationCommandHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const preflight = require(path.join(__dirname, '..', 'extension', 'utils', 'delegation-preflight.js'));
+  const calls = [];
+  const providerConfig = {
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'xai',
+    ...(options.providerConfig || {})
+  };
+  const consent = {
+    async getTrusted(providerId) {
+      calls.push(['getTrusted', providerId]);
+      return options.trusted === true;
+    },
+    async issueChallenge(input) {
+      calls.push(['issueChallenge', toPlainObject(input)]);
+      return { ok: true, challengeId: 'dch_fixture', expiresAt: 12345 };
+    },
+    async consumeChallenge(input) {
+      calls.push(['consumeChallenge', toPlainObject(input)]);
+      return { ok: true };
+    },
+    async writeTrustFromChallenge(input) {
+      calls.push(['writeTrustFromChallenge', toPlainObject(input)]);
+      return options.writeTrustResult || { ok: true, providerId: 'claude-code', trusted: true };
+    },
+    async clearTrusted(input) {
+      calls.push(['clearTrusted', toPlainObject(input)]);
+      return options.clearTrustResult || { ok: true, providerId: 'claude-code', trusted: false };
+    }
+  };
+  const context = {
+    chrome: {
+      storage: { local: { async get() { return { ...providerConfig }; } } },
+      runtime: { async sendMessage() {} },
+      tabs: { async query() { return []; } }
+    },
+    FsbDelegationPreflight: preflight,
+    FsbDelegationConsent: consent,
+    FsbDelegationController: { create() { throw new Error('controller must not boot in authority-only cases'); } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: null,
+    bootstrapAgentRegistry: async () => {},
+    mcpBridgeClient: {
+      getState() { return { connected: true, status: 'connected', pairingStatus: 'paired' }; },
+      sendExtRequest(method, payload) {
+        calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+        return Promise.reject(new Error('unexpected transport call'));
+      },
+      addEventObserver() { calls.push(['addEventObserver']); }
+    },
+    crypto: require('node:crypto').webcrypto,
+    TextEncoder,
+    Uint8Array,
+    Map,
+    Set,
+    Object,
+    Array,
+    Promise,
+    Date,
+    Number,
+    Error,
+    JSON,
+    console,
+    setTimeout,
+    clearTimeout
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\nthis.__delegationCommand = fsbHandleDelegationCommand;`,
+    context,
+    { filename: 'background.js#delegation-composition' }
+  );
+  return { command: context.__delegationCommand, calls };
+}
+
 function buildWrapperHarness(handlerImpl) {
   const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
   const wrapperSource = extractWrapperSource(backgroundSource);
@@ -534,6 +621,7 @@ function buildPairingRuntimeHarness(reloadImpl) {
   const context = {
     chrome: { runtime: { id: 'pairing-runtime-extension' } },
     armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },
     mcpBridgeClient: {
       reloadPairingAndReconnect() {
@@ -596,6 +684,113 @@ async function runPairingRuntimeActionCases() {
   }
 }
 
+async function runDelegationAuthorityCases() {
+  console.log('\n--- B10: delegated runtime authority is exact and fail closed ---');
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Use the browser tools for this task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      kind: 'agent',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    }, 'preflight returns only the pure closed agent disposition');
+    assertEqual(harness.calls.length, 0, 'preflight performs no consent/controller/transport mutation');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Bound consent task'
+    });
+    assertEqual(result.ok, true, 'untrusted consent mints a background challenge');
+    assertEqual(result.trusted, false, 'untrusted consent remains explicit');
+    assertEqual(typeof result.challengeId, 'string', 'consent returns the background challenge id');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getTrusted', 'issueChallenge'],
+      'consent reads trust then mints exactly one task-bound challenge');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({ trusted: true });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Trusted consent task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    }, 'trusted consent discloses no reusable challenge');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getTrusted'],
+      'trusted consent does not mint a caller-visible challenge');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const first = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    const second = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    assertDeepEqual(first, { ok: true, providerId: 'claude-code', trusted: false },
+      'canonical clear returns the exact authority-reducing result');
+    assertDeepEqual(second, first, 'canonical clear remains idempotent');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['clearTrusted', 'clearTrusted'],
+      'clear invokes only provider-local clear authority');
+  }
+
+  for (const request of [
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'Claude-Code' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'codex' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'claude-code', trusted: false }
+  ]) {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command(request);
+    assertDeepEqual(result, { ok: false, code: 'unsupported_provider' },
+      'unknown, case-variant, and extra-key trust clear requests fail closed');
+    assertEqual(harness.calls.length, 0, 'rejected trust clear touches no authority primitive');
+  }
+
+  for (const request of [
+    { type: 'FSB_DELEGATION_SET_TRUST', challengeId: 'dch_fixture', providerId: 'claude-code', trusted: false },
+    { type: 'FSB_DELEGATION_SET_TRUST', challengeId: 'dch_fixture', providerId: 'claude-code', trusted: true, task: 'extra' },
+    { type: 'FSB_DELEGATION_START', challengeId: null, task: 'forbidden caller boolean', trusted: true },
+    { type: 'FSB_DELEGATION_CONSENT', task: 'extra-key consent', consentGranted: true },
+    { type: 'FSB_DELEGATION_TAKE_CONTROL', delegationId: 'delegation_fixture', activeTabId: 42 },
+    { type: 'FSB_DELEGATION_RESUME', delegationId: 'delegation_fixture', liveTabIds: [42] },
+    { type: 'FSB_DELEGATION_STOP', delegationId: 'delegation_fixture', agentId: 'caller-agent' },
+    { type: 'FSB_DELEGATION_SNAPSHOT', delegationId: null, adopt: true }
+  ]) {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command(request);
+    assertEqual(result.ok, false, `${request.type} rejects caller authority or lifecycle extras`);
+    assertEqual(harness.calls.length, 0, `${request.type} extra-key rejection occurs before side effects`);
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      clearTrustResult: { ok: false, code: 'trust_storage_error' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    assertDeepEqual(result, { ok: false, code: 'trust_storage_failed' },
+      'clear storage failure remains a bounded trust failure');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Part C -- source-contract pins
 // ---------------------------------------------------------------------------
@@ -630,6 +825,67 @@ function runSourceContractCase() {
   assert(backgroundSource.includes('mcpBridgeClient.reloadPairingAndReconnect()'), 'background.js delegates pairing reload directly to the bridge client');
   assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]reloadMcpBridgePairing['"]/.test(backgroundSource),
     'background.js never self-sends the pairing reload action');
+
+  const orderedImports = [
+    "importScripts('utils/delegation-preflight.js')",
+    "importScripts('utils/delegation-consent.js')",
+    "importScripts('utils/delegation-event-store.js')",
+    "importScripts('utils/delegation-controller.js')"
+  ].map((token) => backgroundSource.indexOf(token));
+  assert(orderedImports.every((index) => index >= 0), 'background loads all four delegation modules');
+  assert(orderedImports.every((index, position) => position === 0 || orderedImports[position - 1] < index),
+    'delegation modules load once in dependency order');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addEventObserver\(/g) || []).length, 1,
+    'background installs exactly one awaited delegation bridge observer');
+  assert(backgroundSource.indexOf('await controller.hydrate()')
+      < backgroundSource.indexOf('controller.subscribe((runtimeEvent)'),
+    'controller hydration completes before runtime subscription');
+  assert(backgroundSource.indexOf('controller.subscribe((runtimeEvent)')
+      < backgroundSource.indexOf('mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent)'),
+    'hydrated subscription precedes the one live bridge observer');
+
+  for (const type of [
+    'FSB_DELEGATION_PREFLIGHT', 'FSB_DELEGATION_CONSENT', 'FSB_DELEGATION_SET_TRUST',
+    'FSB_DELEGATION_CLEAR_TRUST', 'FSB_DELEGATION_START', 'FSB_DELEGATION_TAKE_CONTROL',
+    'FSB_DELEGATION_RESUME', 'FSB_DELEGATION_STOP', 'FSB_DELEGATION_SNAPSHOT'
+  ]) {
+    assertEqual((backgroundSource.match(new RegExp(`case '${type}'`, 'g')) || []).length, 1,
+      `${type} has one closed background command route`);
+  }
+
+  const legacyStart = backgroundSource.slice(
+    backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'),
+    backgroundSource.indexOf('async function handleStopAutomation', backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'))
+  );
+  const authorityBranch = legacyStart.indexOf('const authoritativeProvider = await fsbReadAuthoritativeProviderConfig()');
+  assert(authorityBranch >= 0, 'legacy start reloads background-authoritative provider config');
+  for (const mutation of [
+    'chrome.sidePanel.setOptions', 'conversationSessions.has', 'chrome.tabs.get',
+    'activeSessions.set', 'runAgentLoop'
+  ]) {
+    assert(authorityBranch < legacyStart.indexOf(mutation),
+      `agent provider branch precedes ${mutation}`);
+  }
+  const delegatedStart = backgroundSource.slice(
+    backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'),
+    backgroundSource.indexOf('function fsbDelegationMapLifecycleFailure', backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'))
+  );
+  assert(!/request\.(?:trusted|consent|consentGranted|agentId)/.test(delegatedStart),
+    'delegated start never reads caller trust, consent, or agent identity');
+  assert(delegatedStart.indexOf('consumeChallenge') < delegatedStart.indexOf("sendExtRequest(\n      'delegate.start'"),
+    'challenge consumption precedes delegate.start transport');
+  assert(delegatedStart.indexOf('resolveAccepted(payload.delegationId)')
+      < delegatedStart.indexOf('controller.getSnapshot(delegationId)'),
+    'server-minted delegation id acceptance precedes returned controller state');
+
+  const clearTrust = backgroundSource.slice(
+    backgroundSource.indexOf('async function fsbDelegationClearTrustCommand(request) {'),
+    backgroundSource.indexOf('function fsbDelegationTerminalCode', backgroundSource.indexOf('async function fsbDelegationClearTrustCommand(request) {'))
+  );
+  assert(clearTrust.includes('FsbDelegationConsent.clearTrusted'),
+    'clear trust delegates only to the authority-reducing primitive');
+  assert(!/(?:issueChallenge|consumeChallenge|controller|delegate\.start)/.test(clearTrust),
+    'clear trust cannot consume consent, touch a controller, or start a run');
 }
 
 // ---------------------------------------------------------------------------
@@ -641,6 +897,7 @@ async function run() {
   await runAgentActionDeprecationCase();
   await runWrapperBehaviorCases();
   await runPairingRuntimeActionCases();
+  await runDelegationAuthorityCases();
   runSourceContractCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

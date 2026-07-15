@@ -200,6 +200,7 @@ function loadRuntimeQueryHarness(providers, registry) {
     setTimeout,
     clearTimeout,
     armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },
     FsbMcpAgentProviders: providers,
     fsbAgentRegistryInstance: registry

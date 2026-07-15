@@ -145,6 +145,7 @@ const MCP_BRIDGE_PAIRING_COPY = Object.freeze({
 });
 let providerSettingsModelLoadTimer = null;
 let providerSettingsLoadGeneration = 0;
+let delegationTrustClearPending = false;
 
 // Initialize analytics
 let analytics = null;
@@ -268,6 +269,7 @@ function cacheElements() {
   elements.agentBillingCopy = document.getElementById('agentBillingCopy');
   elements.agentBillingLink = document.getElementById('agentBillingLink');
   elements.agentBillingLinkLabel = document.getElementById('agentBillingLinkLabel');
+  ensureDelegationTrustControl();
   elements.otherMcpClientsDisclosure = document.getElementById('otherMcpClientsDisclosure');
   elements.otherMcpClientsSummary = document.getElementById('otherMcpClientsSummary');
   elements.otherMcpClientsList = document.getElementById('otherMcpClientsList');
@@ -372,6 +374,80 @@ function cacheElements() {
   elements.auditLogEmptyRow = document.getElementById('auditLogEmptyRow');
   elements.auditExportBtn = document.getElementById('auditExportBtn');
   elements.auditClearBtn = document.getElementById('auditClearBtn');
+}
+
+function ensureDelegationTrustControl() {
+  if (!elements.agentProviderDetails || elements.delegationTrustSection) return;
+  const section = document.createElement('section');
+  section.className = 'agent-provider-details__section';
+  section.hidden = true;
+  section.setAttribute('aria-labelledby', 'delegationTrustHeading');
+
+  const heading = document.createElement('h4');
+  heading.id = 'delegationTrustHeading';
+  heading.textContent = 'Run confirmation';
+  const copy = document.createElement('p');
+  copy.textContent = 'Require confirmation before Claude Code starts another delegated browser task.';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'form-secondary-btn provider-detail-action';
+  button.textContent = 'Restore confirmation for Claude Code';
+  const status = document.createElement('p');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.setAttribute('aria-atomic', 'true');
+
+  section.appendChild(heading);
+  section.appendChild(copy);
+  section.appendChild(button);
+  section.appendChild(status);
+  elements.agentProviderDetails.appendChild(section);
+  elements.delegationTrustSection = section;
+  elements.delegationTrustClearBtn = button;
+  elements.delegationTrustStatus = status;
+}
+
+function renderDelegationTrustControl() {
+  if (!elements.delegationTrustSection) return;
+  const visible = providerPanelState.providerKind === 'agent'
+    && providerPanelState.agentProviderId === 'claude-code';
+  elements.delegationTrustSection.hidden = !visible;
+  if (!visible) {
+    delegationTrustClearPending = false;
+    if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = false;
+    if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = '';
+  }
+}
+
+async function clearDelegationTrust() {
+  if (delegationTrustClearPending
+      || providerPanelState.providerKind !== 'agent'
+      || providerPanelState.agentProviderId !== 'claude-code') return;
+  delegationTrustClearPending = true;
+  if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = true;
+  if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = 'Restoring confirmation…';
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    if (!result
+        || result.ok !== true
+        || result.providerId !== 'claude-code'
+        || result.trusted !== false) {
+      throw new Error('delegation trust clear was rejected');
+    }
+    if (elements.delegationTrustStatus) {
+      elements.delegationTrustStatus.textContent = 'Confirmation restored for Claude Code';
+    }
+  } catch (_error) {
+    if (elements.delegationTrustStatus) {
+      elements.delegationTrustStatus.textContent = 'Could not restore confirmation. Try again.';
+    }
+  } finally {
+    delegationTrustClearPending = false;
+    if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = false;
+  }
 }
 
 function getProviderPanelHelper() {
@@ -650,6 +726,7 @@ function renderProviderEvidence() {
 
 function renderSelectedAgentDetails() {
   const helper = getProviderPanelHelper();
+  renderDelegationTrustControl();
   if (!helper || providerPanelState.providerKind !== 'agent'
       || !helper.isAgentProvider(providerPanelState.agentProviderId)) return;
   const providerId = providerPanelState.agentProviderId;
@@ -960,6 +1037,7 @@ function renderProviderKind() {
   const showAgentDetails = providerPanelState.providerKind === 'agent';
   if (elements.apiProviderDetails) elements.apiProviderDetails.hidden = showAgentDetails;
   if (elements.agentProviderDetails) elements.agentProviderDetails.hidden = !showAgentDetails;
+  renderDelegationTrustControl();
 }
 
 function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey) {
@@ -1063,6 +1141,9 @@ function setupEventListeners() {
   }
   if (elements.removeMcpBridgePairingBtn) {
     elements.removeMcpBridgePairingBtn.addEventListener('click', removeMcpBridgePairing);
+  }
+  if (elements.delegationTrustClearBtn) {
+    elements.delegationTrustClearBtn.addEventListener('click', clearDelegationTrust);
   }
 
   // Form inputs change detection

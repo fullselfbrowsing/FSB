@@ -617,8 +617,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
   // Phase 57 Plan 02 adds the durable MCP-agent provider helper -> 310.
   // Phase 57 Plan 03 adds the exact MCP client alias helper -> 311.
+  // Phase 61 Plan 06 composes preflight, consent, event-store, and controller
+  // modules in the service worker -> 315.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 311, 'background.js importScripts count = 311 (including both Phase 57 MCP client helpers)');
+  passAssertEqual(importScriptsCount, 315, 'background.js importScripts count = 315 (including the four Phase 61 delegation modules)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -653,8 +655,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (ai/lattice-runtime-adapter.js) -> 305.
   // Phase 57 Plan 02 adds one helper call site -> 306.
   // Phase 57 Plan 03 adds the alias helper call site -> 307.
+  // Phase 61 Plan 06 adds four delegation composition call sites -> 311.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 307, 'background.js importScripts() call sites = 307 (including both Phase 57 MCP client helpers)');
+  passAssertEqual(importScriptsCallSites, 311, 'background.js importScripts() call sites = 311 (including the four Phase 61 delegation modules)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));

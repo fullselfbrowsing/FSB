@@ -30,6 +30,10 @@ importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
+try { importScripts('utils/delegation-preflight.js'); } catch (e) { console.error('[FSB] Failed to load delegation-preflight.js:', e.message); }
+try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
+try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
+try { importScripts('utils/delegation-controller.js'); } catch (e) { console.error('[FSB] Failed to load delegation-controller.js:', e.message); }
 try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
 try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
@@ -1166,6 +1170,504 @@ async function bootstrapAgentRegistry() {
       );
     }
   }
+}
+
+// Phase 61 -- one service-worker-owned delegation lifecycle authority.
+// Hydration intentionally completes before either the runtime subscriber or
+// bridge observer is installed, so persisted history is never replayed as a
+// polite live announcement after an MV3 worker wake.
+let fsbDelegationBootPromise = null;
+let fsbDelegationBridgeObserverInstalled = false;
+const fsbDelegationProfiles = new Map();
+
+function fsbDelegationHasExactKeys(value, expected) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const sortedExpected = expected.slice().sort();
+  return actual.length === sortedExpected.length
+    && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+async function fsbReadAuthoritativeProviderConfig() {
+  const stored = await chrome.storage.local.get([
+    'providerKind', 'agentProviderId', 'modelProvider'
+  ]);
+  return {
+    providerKind: typeof stored.providerKind === 'string' ? stored.providerKind : 'api',
+    agentProviderId: typeof stored.agentProviderId === 'string' ? stored.agentProviderId : '',
+    modelProvider: typeof stored.modelProvider === 'string' ? stored.modelProvider : 'xai'
+  };
+}
+
+function fsbDelegationBridgeState() {
+  if (typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.getState !== 'function') {
+    return { connected: false, status: 'disconnected', pairingStatus: 'unknown' };
+  }
+  return mcpBridgeClient.getState();
+}
+
+async function fsbDelegationPreflightResult() {
+  const config = await fsbReadAuthoritativeProviderConfig();
+  const result = globalThis.FsbDelegationPreflight.check({
+    providerKind: config.providerKind,
+    agentProviderId: config.agentProviderId,
+    modelProvider: config.modelProvider,
+    bridgeState: fsbDelegationBridgeState()
+  });
+  return { config, result };
+}
+
+async function fsbDelegationTaskDigest(task) {
+  if (typeof task !== 'string' || task.trim().length === 0 || task.length > 200000) {
+    throw new Error('invalid delegation task');
+  }
+  if (!globalThis.crypto || !globalThis.crypto.subtle || typeof TextEncoder !== 'function') {
+    throw new Error('delegation digest is unavailable');
+  }
+  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(task));
+  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function fsbDelegationFailure(code, snapshot) {
+  return { ok: false, code, snapshot: snapshot || null };
+}
+
+function fsbDelegationTrustFailure(code) {
+  if (code === 'unsupported_provider') return { ok: false, code: 'unsupported_provider' };
+  if (typeof code === 'string' && code.indexOf('storage') !== -1) {
+    return { ok: false, code: 'trust_storage_failed' };
+  }
+  return { ok: false, code: 'trust_challenge_invalid' };
+}
+
+async function fsbDelegationPreflightCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['task', 'type'])
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  try {
+    return (await fsbDelegationPreflightResult()).result;
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+}
+
+async function fsbDelegationConsentCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['task', 'type'])
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+  if (!authority.result.ok || authority.result.kind !== 'agent') return authority.result;
+  const trusted = await globalThis.FsbDelegationConsent.getTrusted(authority.result.providerId);
+  if (trusted) {
+    return {
+      ok: true,
+      providerId: authority.result.providerId,
+      providerLabel: authority.result.providerLabel,
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    };
+  }
+  let taskDigest;
+  try {
+    taskDigest = await fsbDelegationTaskDigest(request.task);
+  } catch (_error) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  const issued = await globalThis.FsbDelegationConsent.issueChallenge({
+    providerId: authority.result.providerId,
+    taskDigest
+  });
+  if (!issued || issued.ok !== true) {
+    return { ok: false, code: 'consent_required' };
+  }
+  return {
+    ok: true,
+    providerId: authority.result.providerId,
+    providerLabel: authority.result.providerLabel,
+    trusted: false,
+    challengeId: issued.challengeId,
+    expiresAt: issued.expiresAt
+  };
+}
+
+async function fsbDelegationSetTrustCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['challengeId', 'providerId', 'trusted', 'type'])
+      || typeof request.challengeId !== 'string'
+      || request.providerId !== 'claude-code'
+      || request.trusted !== true) {
+    return { ok: false, code: 'trust_challenge_invalid' };
+  }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return { ok: false, code: 'trust_provider_changed' };
+  }
+  if (!authority.result.ok
+      || authority.result.kind !== 'agent'
+      || authority.result.providerId !== request.providerId) {
+    return {
+      ok: false,
+      code: authority.result && authority.result.code === 'unsupported_provider'
+        ? 'unsupported_provider'
+        : 'trust_provider_changed'
+    };
+  }
+  const result = await globalThis.FsbDelegationConsent.writeTrustFromChallenge({
+    challengeId: request.challengeId,
+    providerId: request.providerId,
+    trusted: true
+  });
+  return result && result.ok === true
+    ? { ok: true, providerId: 'claude-code', trusted: true }
+    : fsbDelegationTrustFailure(result && result.code);
+}
+
+async function fsbDelegationClearTrustCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['providerId', 'type'])
+      || request.providerId !== 'claude-code') {
+    return { ok: false, code: 'unsupported_provider' };
+  }
+  const result = await globalThis.FsbDelegationConsent.clearTrusted({
+    providerId: request.providerId
+  });
+  return result && result.ok === true
+    ? { ok: true, providerId: 'claude-code', trusted: false }
+    : fsbDelegationTrustFailure(result && result.code);
+}
+
+function fsbDelegationTerminalCode(value) {
+  const allowed = new Set([
+    'cancelled', 'route_lost', 'agent_protocol_drift', 'tree_unsettled',
+    'hold_expired', 'daemon_restart_lost_run', 'agent_failed'
+  ]);
+  return typeof value === 'string' && allowed.has(value) ? value : 'agent_failed';
+}
+
+async function fsbSettleDelegationFromFinal(delegationId, finalResult, transportError) {
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (!controller) return;
+  let snapshot;
+  try { snapshot = controller.getSnapshot(delegationId); } catch (_error) { return; }
+  if (!snapshot || snapshot.terminal) {
+    fsbDelegationProfiles.delete(delegationId);
+    return;
+  }
+
+  let code = transportError && transportError.code
+    ? fsbDelegationTerminalCode(transportError.code)
+    : null;
+  if (!code && finalResult && finalResult.status === 'succeeded') code = 'completed';
+  if (!code && finalResult && finalResult.status === 'cancelled') code = 'cancelled';
+  if (!code && finalResult && finalResult.terminal && finalResult.terminal.type === 'diagnostic') {
+    code = fsbDelegationTerminalCode(finalResult.terminal.code);
+  }
+  if (!code) code = 'agent_failed';
+
+  try {
+    await controller.acceptEvent({
+      delegationId,
+      event: { type: 'terminal', sessionId: null, payload: {} },
+      context: {
+        timestamp: Date.now(),
+        terminalCode: code,
+        treeSettled: code !== 'tree_unsettled',
+        client: { id: 'claude-code', label: 'Claude Code' },
+        profileVersion: fsbDelegationProfiles.get(delegationId) || null,
+        billingKind: 'unknown'
+      }
+    });
+  } catch (_error) {
+    // A streamed result or concurrent Stop may already have settled the exact
+    // record. The controller remains the only terminal authority either way.
+  } finally {
+    fsbDelegationProfiles.delete(delegationId);
+  }
+}
+
+async function fsbDelegationStartCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['challengeId', 'task', 'type'])
+      || (request.challengeId !== null && typeof request.challengeId !== 'string')
+      || typeof request.task !== 'string'
+      || request.task.trim().length === 0) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return fsbDelegationFailure('preflight_failed', null);
+  }
+  if (!authority.result.ok
+      || authority.result.kind !== 'agent'
+      || authority.result.providerId !== 'claude-code') {
+    return fsbDelegationFailure('preflight_failed', null);
+  }
+
+  let taskDigest;
+  try {
+    taskDigest = await fsbDelegationTaskDigest(request.task);
+  } catch (_error) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  const trusted = await globalThis.FsbDelegationConsent.getTrusted('claude-code');
+  let challengeId = request.challengeId;
+  if (trusted) {
+    if (challengeId !== null) return fsbDelegationFailure('consent_invalid', null);
+    const issued = await globalThis.FsbDelegationConsent.issueChallenge({
+      providerId: 'claude-code',
+      taskDigest
+    });
+    if (!issued || issued.ok !== true) return fsbDelegationFailure('consent_required', null);
+    challengeId = issued.challengeId;
+  } else if (typeof challengeId !== 'string' || challengeId.length === 0) {
+    return fsbDelegationFailure('consent_required', null);
+  }
+
+  const consumed = await globalThis.FsbDelegationConsent.consumeChallenge({
+    challengeId,
+    providerId: 'claude-code',
+    taskDigest
+  });
+  if (!consumed || consumed.ok !== true) {
+    return fsbDelegationFailure(
+      consumed && consumed.code === 'challenge_not_found' ? 'consent_required' : 'consent_invalid',
+      null
+    );
+  }
+
+  let boot;
+  try {
+    boot = await bootstrapDelegationController();
+  } catch (_error) {
+    return fsbDelegationFailure('start_rejected', null);
+  }
+  const controller = boot.controller;
+  let resolveAccepted;
+  let rejectAccepted;
+  const acceptedPromise = new Promise((resolve, reject) => {
+    resolveAccepted = resolve;
+    rejectAccepted = reject;
+  });
+  let finalPromise;
+  try {
+    finalPromise = mcpBridgeClient.sendExtRequest(
+      'delegate.start',
+      { adapterId: 'claude-code', task: request.task },
+      {
+        onEvent(eventName, payload) {
+          if (eventName !== 'delegation.started') return;
+          if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
+              || payload.adapterId !== 'claude-code'
+              || typeof payload.delegationId !== 'string') {
+            rejectAccepted(new Error('missing server delegation id'));
+            return;
+          }
+          resolveAccepted(payload.delegationId);
+        }
+      }
+    );
+  } catch (error) {
+    return fsbDelegationFailure('start_rejected', null);
+  }
+
+  const rejectedBeforeAcceptance = finalPromise.then(
+    () => { throw new Error('delegate.start completed without acceptance'); },
+    (error) => { throw error; }
+  );
+  let delegationId;
+  try {
+    delegationId = await Promise.race([acceptedPromise, rejectedBeforeAcceptance]);
+  } catch (_error) {
+    return fsbDelegationFailure('start_rejected', null);
+  }
+
+  finalPromise.then(
+    (result) => fsbSettleDelegationFromFinal(delegationId, result, null),
+    (error) => fsbSettleDelegationFromFinal(delegationId, null, error)
+  ).catch(() => {});
+  const snapshot = controller.getSnapshot(delegationId);
+  if (!snapshot) return fsbDelegationFailure('start_rejected', null);
+  return { ok: true, snapshot };
+}
+
+function fsbDelegationMapLifecycleFailure(operation, result) {
+  const code = result && result.code;
+  if (code === 'invalid_transition' || code === 'already_terminal') return 'invalid_state';
+  if (code === 'unknown_delegation' || code === 'invalid_delegation_id') return 'delegation_mismatch';
+  if (code === 'delegation_binding_rejected' || code === 'active_tab_not_owned') return 'mapping_unavailable';
+  if (operation === 'take') {
+    return code && code.indexOf('lease') !== -1 ? 'hold_lease_failed' : 'hold_failed';
+  }
+  if (operation === 'resume') {
+    return code === 'resume_ownership_lost' || code === 'hold_expired'
+      ? 'resume_ownership_lost'
+      : 'resume_failed';
+  }
+  return code && code.indexOf('persistence') !== -1 ? 'persistence_failed' : 'stop_failed';
+}
+
+async function fsbDelegationLifecycleCommand(request, operation) {
+  if (!fsbDelegationHasExactKeys(request, ['delegationId', 'type'])
+      || typeof request.delegationId !== 'string'
+      || request.delegationId.length === 0) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  let controller;
+  try { controller = (await bootstrapDelegationController()).controller; } catch (_error) {
+    return fsbDelegationFailure(operation === 'stop' ? 'stop_failed' : operation === 'resume' ? 'resume_failed' : 'hold_failed', null);
+  }
+  const before = controller.getSnapshot(request.delegationId);
+  if (!before) return fsbDelegationFailure('delegation_mismatch', null);
+  let result;
+  try {
+    if (operation === 'take') result = await controller.takeControl({ delegationId: request.delegationId });
+    else if (operation === 'resume') result = await controller.resume({ delegationId: request.delegationId });
+    else result = await controller.stop({ delegationId: request.delegationId });
+  } catch (error) {
+    return fsbDelegationFailure(
+      fsbDelegationMapLifecycleFailure(operation, { code: error && error.code }),
+      controller.getSnapshot(request.delegationId) || before
+    );
+  }
+  if (!result || result.ok !== true) {
+    return fsbDelegationFailure(
+      fsbDelegationMapLifecycleFailure(operation, result),
+      (result && result.snapshot) || controller.getSnapshot(request.delegationId) || before
+    );
+  }
+  return { ok: true, snapshot: result.snapshot };
+}
+
+async function fsbDelegationSnapshotCommand(request) {
+  if (!fsbDelegationHasExactKeys(request, ['delegationId', 'type'])
+      || (request.delegationId !== null && typeof request.delegationId !== 'string')) {
+    return fsbDelegationFailure('invalid_request', null);
+  }
+  let boot;
+  try { boot = await bootstrapDelegationController(); } catch (_error) {
+    return fsbDelegationFailure('persistence_failed', null);
+  }
+  if (request.delegationId === null) return { ok: true, snapshot: null };
+  const snapshot = boot.controller.getSnapshot(request.delegationId);
+  return snapshot
+    ? { ok: true, snapshot }
+    : fsbDelegationFailure('delegation_mismatch', null);
+}
+
+function fsbHandleDelegationCommand(request) {
+  switch (request && request.type) {
+    case 'FSB_DELEGATION_PREFLIGHT': return fsbDelegationPreflightCommand(request);
+    case 'FSB_DELEGATION_CONSENT': return fsbDelegationConsentCommand(request);
+    case 'FSB_DELEGATION_SET_TRUST': return fsbDelegationSetTrustCommand(request);
+    case 'FSB_DELEGATION_CLEAR_TRUST': return fsbDelegationClearTrustCommand(request);
+    case 'FSB_DELEGATION_START': return fsbDelegationStartCommand(request);
+    case 'FSB_DELEGATION_TAKE_CONTROL': return fsbDelegationLifecycleCommand(request, 'take');
+    case 'FSB_DELEGATION_RESUME': return fsbDelegationLifecycleCommand(request, 'resume');
+    case 'FSB_DELEGATION_STOP': return fsbDelegationLifecycleCommand(request, 'stop');
+    case 'FSB_DELEGATION_SNAPSHOT': return fsbDelegationSnapshotCommand(request);
+    default: return null;
+  }
+}
+
+function fsbDelegationEventContext(delegationId, event) {
+  const profileVersion = fsbDelegationProfiles.get(delegationId) || null;
+  const context = {
+    timestamp: Date.now(),
+    client: { id: 'claude-code', label: 'Claude Code' },
+    profileVersion,
+    billingKind: event && event.type === 'result' ? 'subscription' : 'unknown'
+  };
+  return context;
+}
+
+async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
+  if (!fsbDelegationHasExactKeys(bridgeEvent, ['event', 'id', 'method', 'payload'])
+      || bridgeEvent.method !== 'delegate.start') {
+    return;
+  }
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (!controller) throw new Error('delegation controller is unavailable');
+
+  if (bridgeEvent.event === 'delegation.started') {
+    const payload = bridgeEvent.payload;
+    if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
+        || payload.adapterId !== 'claude-code'
+        || typeof payload.delegationId !== 'string'
+        || typeof payload.profileVersion !== 'string') {
+      throw new Error('delegation.started payload is invalid');
+    }
+    fsbDelegationProfiles.set(payload.delegationId, payload.profileVersion);
+    await controller.start({
+      delegationId: payload.delegationId,
+      provider: { id: 'claude-code', label: 'Claude Code' },
+      connection: 'connected'
+    });
+    return;
+  }
+
+  if (bridgeEvent.event !== 'delegation.event') return;
+  const payload = bridgeEvent.payload;
+  if (!fsbDelegationHasExactKeys(payload, ['delegationId', 'event'])
+      || typeof payload.delegationId !== 'string'
+      || !fsbDelegationHasExactKeys(payload.event, ['payload', 'sessionId', 'type'])) {
+    throw new Error('delegation.event payload is invalid');
+  }
+  await controller.acceptEvent({
+    delegationId: payload.delegationId,
+    event: payload.event,
+    context: fsbDelegationEventContext(payload.delegationId, payload.event)
+  });
+}
+
+async function bootstrapDelegationController() {
+  if (fsbDelegationBootPromise) return fsbDelegationBootPromise;
+  fsbDelegationBootPromise = (async () => {
+    await bootstrapAgentRegistry();
+    if (!globalThis.FsbDelegationController
+        || !globalThis.FsbDelegationEventStore
+        || typeof mcpBridgeClient === 'undefined'
+        || !mcpBridgeClient) {
+      throw new Error('delegation dependencies are unavailable');
+    }
+    if (!globalThis.fsbDelegationControllerInstance) {
+      globalThis.fsbDelegationControllerInstance = globalThis.FsbDelegationController.create({
+        eventStore: globalThis.FsbDelegationEventStore,
+        registry: globalThis.fsbAgentRegistryInstance || null,
+        cancel: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.cancel', { delegationId }),
+        hold: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.hold', { delegationId }),
+        resume: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.resume', { delegationId }),
+        status: () => mcpBridgeClient.sendExtRequest('delegate.status', {})
+      });
+    }
+    const controller = globalThis.fsbDelegationControllerInstance;
+    const hydratedSnapshots = await controller.hydrate();
+    controller.subscribe((runtimeEvent) => {
+      Promise.resolve(chrome.runtime.sendMessage(runtimeEvent)).catch(() => {});
+    });
+    if (!fsbDelegationBridgeObserverInstalled) {
+      mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent);
+      fsbDelegationBridgeObserverInstalled = true;
+    }
+    return { controller, hydratedSnapshots };
+  })().catch((error) => {
+    fsbDelegationBootPromise = null;
+    throw error;
+  });
+  return fsbDelegationBootPromise;
 }
 
 function findActiveAutomationSessionForTab(tabId) {
@@ -2815,6 +3317,9 @@ async function restoreSessionsFromStorage() {
     // own errors, but we still chain a defensive .catch in case construction
     // throws so SW boot is never poisoned.
     await bootstrapAgentRegistry().catch(() => {});
+    await bootstrapDelegationController().catch((error) => {
+      console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
+    });
     await restorePersistedMcpVisualSessions();
 
     // Phase 256 Plan 03 -- restore implicit visual-session lifecycles after
@@ -7619,7 +8124,16 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
 
   armMcpBridge('runtime.onMessage');
 
-  automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
+  const delegationCommand = fsbHandleDelegationCommand(request);
+  if (delegationCommand) {
+    Promise.resolve(delegationCommand).then(
+      (result) => sendResponse(result),
+      () => sendResponse(fsbDelegationFailure('invalid_request', null))
+    );
+    return true;
+  }
+
+  automationLogger.logComm(null, 'receive', request.action || request.type || 'unknown', true, { tabId: sender.tab?.id });
 
   switch (request.action) {
     case 'fsbAuditLogClearAndExport': {
@@ -8968,6 +9482,21 @@ async function handleStartAutomation(request, sender, sendResponse) {
   const { task, tabId, conversationId, source } = request;
 
   try {
+    // Delegated providers must leave this chokepoint before side-panel, tab,
+    // conversation, chat, session, or agent-loop mutation. The typed
+    // FSB_DELEGATION_START command is the sole spawn authority; this legacy
+    // action returns only the background-owned consent disposition so older
+    // callers cannot accidentally enter the API loop with an agent provider.
+    const authoritativeProvider = await fsbReadAuthoritativeProviderConfig();
+    if (authoritativeProvider.providerKind === 'agent') {
+      const consent = await fsbDelegationConsentCommand({
+        type: 'FSB_DELEGATION_CONSENT',
+        task
+      });
+      sendResponse(consent);
+      return;
+    }
+
     // Get the target tab ID (may be updated by smart tab management below)
     let targetTabId = tabId || sender.tab?.id;
 

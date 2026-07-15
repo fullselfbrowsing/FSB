@@ -13,9 +13,11 @@ const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const helperPath = path.join(repoRoot, 'extension', 'ui', 'providers-panel.js');
+const optionsPath = path.join(repoRoot, 'extension', 'ui', 'options.js');
 const controlPanelPath = path.join(repoRoot, 'extension', 'ui', 'control_panel.html');
 const packagePath = path.join(repoRoot, 'package.json');
 const helperSource = fs.readFileSync(helperPath, 'utf8');
+const optionsSource = fs.readFileSync(optionsPath, 'utf8');
 const controlPanelSource = fs.readFileSync(controlPanelPath, 'utf8');
 const packageSource = fs.readFileSync(packagePath, 'utf8');
 
@@ -34,6 +36,21 @@ function deepFreeze(value) {
   return value;
 }
 
+function extractFunction(source, signature) {
+  const start = source.indexOf(signature);
+  if (start < 0) throw new Error(`missing function signature: ${signature}`);
+  const brace = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = brace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  throw new Error(`unbalanced function: ${signature}`);
+}
+
 function assertRecommendation(clients, expected, message) {
   const snapshot = clone(clients);
   const result = providers.getRecommendation(clients);
@@ -44,7 +61,7 @@ function assertRecommendation(clients, expected, message) {
   return result;
 }
 
-function main() {
+async function main() {
   assert.equal(fs.existsSync(helperPath), true, 'provider helper exists');
   assert.deepEqual(Object.keys(providers), [
     'API_PROVIDER_IDS',
@@ -458,6 +475,95 @@ function main() {
   assert.doesNotMatch(helperSource, /\.\.\.\s*(?:clients|row|settings)/,
     'untrusted state is never spread');
 
+  const trustControlSource = [
+    extractFunction(optionsSource, 'function renderDelegationTrustControl()'),
+    extractFunction(optionsSource, 'async function clearDelegationTrust()')
+  ].join('\n');
+  assert.match(optionsSource, /Restore confirmation for Claude Code/,
+    'Providers exposes the exact restore-confirmation action');
+  assert.match(optionsSource, /Confirmation restored for Claude Code/,
+    'Providers reports the exact authoritative clear success');
+  assert.match(optionsSource,
+    /chrome\.runtime\.sendMessage\(\{\s*type: 'FSB_DELEGATION_CLEAR_TRUST',\s*providerId: 'claude-code'\s*\}\)/,
+    'Providers sends only the exact authority-reducing clear command');
+  assert.doesNotMatch(trustControlSource, /chrome\.storage|localStorage|markUnsavedChanges|saveSettings/,
+    'restore confirmation never reads trust storage or joins Save Settings');
+  assert.match(trustControlSource,
+    /providerPanelState\.providerKind === 'agent'[\s\S]*providerPanelState\.agentProviderId === 'claude-code'/,
+    'restore confirmation is visible only for the canonical Claude agent pair');
+
+  function makeTrustControlHarness(sendMessage) {
+    const state = { providerKind: 'agent', agentProviderId: 'claude-code' };
+    const elements = {
+      delegationTrustSection: { hidden: true },
+      delegationTrustClearBtn: { disabled: false },
+      delegationTrustStatus: { textContent: '' }
+    };
+    const context = {
+      providerPanelState: state,
+      elements,
+      chrome: { runtime: { sendMessage } },
+      Promise,
+      Error
+    };
+    context.globalThis = context;
+    vm.runInNewContext(
+      `let delegationTrustClearPending = false;\n${trustControlSource}\nthis.render = renderDelegationTrustControl;\nthis.clear = clearDelegationTrust;`,
+      context,
+      { filename: 'options.js#delegation-trust-control' }
+    );
+    return { state, elements, render: context.render, clear: context.clear };
+  }
+
+  {
+    const sent = [];
+    let resolveClear;
+    const pending = new Promise((resolve) => { resolveClear = resolve; });
+    const harness = makeTrustControlHarness((request) => {
+      sent.push(clone(request));
+      return pending;
+    });
+    harness.render();
+    assert.equal(harness.elements.delegationTrustSection.hidden, false,
+      'canonical Claude details show restore confirmation');
+    const first = harness.clear();
+    const duplicate = harness.clear();
+    assert.equal(sent.length, 1, 'pending clicks dedupe to one clear command');
+    assert.equal(harness.elements.delegationTrustClearBtn.disabled, true,
+      'restore confirmation disables while pending');
+    assert.equal(harness.elements.delegationTrustStatus.textContent, 'Restoring confirmation…',
+      'pending state is reported inline');
+    resolveClear({ ok: true, providerId: 'claude-code', trusted: false });
+    await Promise.all([first, duplicate]);
+    assert.deepEqual(sent, [{ type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'claude-code' }],
+      'click sends no task, challenge, trust boolean, or provider-native state');
+    assert.equal(harness.elements.delegationTrustStatus.textContent,
+      'Confirmation restored for Claude Code', 'authoritative success uses exact copy');
+    assert.equal(harness.elements.delegationTrustClearBtn.disabled, false,
+      'control re-enables after authoritative success');
+
+    harness.state.providerKind = 'api';
+    harness.render();
+    assert.equal(harness.elements.delegationTrustSection.hidden, true,
+      'API details do not render the trust control');
+    harness.state.providerKind = 'agent';
+    harness.state.agentProviderId = 'codex';
+    harness.render();
+    assert.equal(harness.elements.delegationTrustSection.hidden, true,
+      'future unsupported agent details do not render the Claude trust control');
+  }
+
+  {
+    const harness = makeTrustControlHarness(async () => ({
+      ok: false, code: 'trust_storage_failed'
+    }));
+    await harness.clear();
+    assert.equal(harness.elements.delegationTrustStatus.textContent,
+      'Could not restore confirmation. Try again.', 'failure remains inline and actionable');
+    assert.equal(harness.elements.delegationTrustClearBtn.disabled, false,
+      'failure retains an enabled restore control');
+  }
+
   const providersScriptToken = '<script src="providers-panel.js"></script>';
   const optionsScriptToken = '<script src="options.js"></script>';
   assert.equal(controlPanelSource.split(providersScriptToken).length - 1, 1,
@@ -535,10 +641,8 @@ function main() {
   console.log('providers-panel-logic.test.js: PASS');
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.error('providers-panel-logic.test.js: FAIL');
   console.error(error && error.stack ? error.stack : error);
   process.exit(1);
-}
+});
