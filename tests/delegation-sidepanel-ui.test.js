@@ -514,8 +514,14 @@ assert(panelSource.includes("announceSequence > previousLastSequence"),
 assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
     && panelSource.includes("count === 1 ? 'tab' : 'tabs'"),
   'stopped copy uses only the canonical release count with singular grammar');
-assert(panelSource.includes("snapshot.state === 'stopping' ? 'Stopping agent…' : 'Stop agent'"),
-  'stopping wording is selected only by the canonical stopping snapshot');
+assert(panelSource.includes("var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop")
+    && panelSource.includes("stopping ? 'Stopping agent…' : 'Stop agent'"),
+  'canonical stopping and the one pending command share exact Stop wording');
+assert(panelSource.includes("stopBtn.addEventListener('click', _handleFixedStop)")
+    && panelSource.includes('_delegationUsesFixedStop(_delegationUiState.snapshot)')
+    && panelSource.includes('return _stopDelegation(event);')
+    && panelSource.includes('return stopAutomation();'),
+  'fixed Stop multiplexes to delegated authority only for the selected active snapshot');
 const doctorSource = extractNamedFunction(panelSource, '_copyDelegationDoctorCommand');
 const setupSource = extractNamedFunction(panelSource, '_openDelegationProviderSetup');
 assert(doctorSource.includes("var command = 'fsb-mcp-server doctor'")
@@ -1059,9 +1065,73 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
   }
 
   {
+    const fixedStop = new TestNode('button');
+    fixedStop.classList.add('hidden');
+    const runStop = new TestNode('button');
+    const run = new TestNode('section');
+    const state = {
+      snapshot: { delegationId: DELEGATION_ID, state: 'running' },
+      pendingStop: false
+    };
+    let delegatedCalls = 0;
+    let legacyCalls = 0;
+    const context = {
+      stopBtn: fixedStop,
+      isRunning: false,
+      _chatLockedByOwnerChip: false,
+      _delegationRunStopControls: [runStop],
+      _delegationUiState: state,
+      _delegationIsSelectedConversation: () => true,
+      _ensureDelegationMount: () => ({ run }),
+      _stopDelegation() { delegatedCalls += 1; return 'delegated'; },
+      stopAutomation() { legacyCalls += 1; return 'legacy'; }
+    };
+    vm.createContext(context);
+    [
+      '_delegationIsActiveSnapshot',
+      '_delegationUsesFixedStop',
+      '_restoreLegacyStopControl',
+      '_syncDelegationStopControls',
+      '_handleFixedStop'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+    assert.equal(context._syncDelegationStopControls(state.snapshot), true);
+    assert.equal(fixedStop.classList.contains('hidden'), false,
+      'fixed input-cluster Stop is visible for selected delegated activity');
+    assert.equal(fixedStop.getAttribute('title'), 'Stop agent');
+    assert.equal(fixedStop.getAttribute('aria-label'), 'Stop agent');
+    assert.equal(fixedStop.getAttribute('data-delegation-action'), 'stop');
+    assert.equal(runStop.textContent, 'Stop agent');
+    assert.equal(context._handleFixedStop({ currentTarget: fixedStop }), 'delegated');
+    assert.equal(delegatedCalls, 1);
+    assert.equal(legacyCalls, 0);
+
+    state.pendingStop = true;
+    context._syncDelegationStopControls(state.snapshot);
+    assert.equal(fixedStop.disabled, true);
+    assert.equal(runStop.disabled, true);
+    assert.equal(fixedStop.getAttribute('aria-label'), 'Stopping agent…');
+    assert.equal(runStop.textContent, 'Stopping agent…');
+    assert.equal(run.getAttribute('aria-busy'), 'true',
+      'both Stop locations share one delegated pending/busy state');
+
+    state.pendingStop = false;
+    state.snapshot = { delegationId: DELEGATION_ID, state: 'completed' };
+    context._syncDelegationStopControls(state.snapshot);
+    assert.equal(fixedStop.classList.contains('hidden'), true,
+      'terminal delegated state restores the inactive legacy Stop surface');
+    assert.equal(fixedStop.getAttribute('title'), 'Stop Automation');
+    assert.equal(fixedStop.getAttribute('aria-label'), null);
+    assert.equal(fixedStop.getAttribute('data-delegation-action'), null);
+    assert.equal(context._handleFixedStop({ currentTarget: fixedStop }), 'legacy');
+    assert.equal(legacyCalls, 1, 'API/terminal state retains the legacy stop handler');
+  }
+
+  {
     let resolveStop;
     const commands = [];
     const renders = [];
+    const stopSyncs = [];
     const running = { delegationId: DELEGATION_ID, state: 'running' };
     const stopped = {
       delegationId: DELEGATION_ID,
@@ -1085,6 +1155,9 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
         return new Promise((resolve) => { resolveStop = resolve; });
       },
       _delegationValidLifecycleResponse: () => true,
+      _syncDelegationStopControls(next) {
+        stopSyncs.push({ next, pending: state.pendingStop });
+      },
       _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
     };
     vm.createContext(context);
@@ -1096,6 +1169,9 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert.equal(state.pendingStop, true);
     assert.equal(button.disabled, true);
     assert.equal(button.focusCount, 1, 'Stop retains focus on its disabled control while pending');
+    assert.equal(stopSyncs.length, 1);
+    assert.equal(stopSyncs[0].pending, true,
+      'deferred Stop response immediately synchronizes both redundant controls');
     assert.equal(renders.length, 0, 'Stop renders no terminal result before authority replies');
     assert.equal(await duplicate, undefined, 'duplicate Stop click has no lifecycle effect');
     resolveStop({ ok: true, snapshot: stopped });
@@ -1114,10 +1190,16 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
   {
     const context = {
       document: globalThis.document,
+      stopBtn: new TestNode('button'),
+      isRunning: false,
+      _chatLockedByOwnerChip: false,
+      _delegationRunStopControls: [],
       _delegationUiState: {
         errorCode: null,
         pendingStop: false
       },
+      _delegationIsSelectedConversation: () => true,
+      _ensureDelegationMount: () => ({ run: new TestNode('section') }),
       _copyDelegationDoctorCommand() {},
       _openDelegationProviderSetup() {},
       _prepareDelegationTask() {},
@@ -1136,6 +1218,9 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       '_delegationStoppedHeading',
       '_delegationStateLabel',
       '_delegationIsActiveSnapshot',
+      '_delegationUsesFixedStop',
+      '_restoreLegacyStopControl',
+      '_syncDelegationStopControls',
       '_renderDelegationRunActions',
       '_appendDelegationActionRow',
       '_appendDelegationDoctorRecovery',

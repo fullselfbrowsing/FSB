@@ -537,6 +537,7 @@ var DELEGATION_CONVERSATION_ID_PATTERN = /^conv_[A-Za-z0-9_-]{1,250}$/;
 var _delegationConversationEnvelope = { v: 1, byConversation: {}, lru: [] };
 var _delegationBindingWriteChain = Promise.resolve();
 var _delegationHydrationGeneration = 0;
+var _delegationRunStopControls = [];
 
 // Phase 61 delegated-run presentation state. This object tracks only which
 // canonical background snapshot belongs to the selected conversation and
@@ -901,6 +902,7 @@ function _applyDelegationComposerLock() {
     else micBtn.removeAttribute('aria-disabled');
   }
   updateSendButtonState();
+  _syncDelegationStopControls(_delegationUiState.snapshot);
 }
 
 function _setDelegationComposerLocked(locked) {
@@ -931,6 +933,8 @@ function _hideDelegationPresentation() {
     _clearDelegationNode(mount.control);
     mount.control.classList.add('hidden');
   }
+  _delegationRunStopControls = [];
+  _restoreLegacyStopControl();
 }
 
 function _renderDelegationReadyState() {
@@ -945,6 +949,8 @@ function _renderDelegationReadyState() {
   mount.state.removeAttribute('role');
   mount.state.removeAttribute('aria-live');
   _delegationUiState.lastAlertKey = null;
+  _delegationRunStopControls = [];
+  _restoreLegacyStopControl();
   var heading = _delegationElement(
     'h2', 'delegation-state-heading', 'Delegate a browser task'
   );
@@ -1078,6 +1084,8 @@ function _renderDelegationConsent(options) {
   );
   _clearDelegationNode(mount.state);
   _clearDelegationNode(mount.feed);
+  _delegationRunStopControls = [];
+  _restoreLegacyStopControl();
   mount.state.removeAttribute('role');
 
   var heading = _delegationElement(
@@ -1202,6 +1210,8 @@ function _renderDelegationPreflightFailure(result) {
   mount.run.setAttribute('aria-busy', 'false');
   _clearDelegationNode(mount.state);
   _clearDelegationNode(mount.feed);
+  _delegationRunStopControls = [];
+  _restoreLegacyStopControl();
   mount.state.removeAttribute('aria-live');
   if (code === 'agent_offline' || code === 'runtime_unavailable') {
     mount.state.setAttribute('role', 'alert');
@@ -1370,16 +1380,65 @@ function _delegationIsActiveSnapshot(snapshot) {
   );
 }
 
+function _delegationUsesFixedStop(snapshot) {
+  return _delegationIsSelectedConversation()
+    && _delegationIsActiveSnapshot(snapshot);
+}
+
+function _restoreLegacyStopControl() {
+  if (!stopBtn) return;
+  stopBtn.removeAttribute('data-delegation-action');
+  stopBtn.removeAttribute('aria-label');
+  stopBtn.setAttribute('title', 'Stop Automation');
+  stopBtn.disabled = _chatLockedByOwnerChip === true;
+  if (typeof isRunning !== 'undefined' && isRunning) stopBtn.classList.remove('hidden');
+  else stopBtn.classList.add('hidden');
+}
+
+function _syncDelegationStopControls(snapshot) {
+  if (!_delegationUsesFixedStop(snapshot)) {
+    _restoreLegacyStopControl();
+    return false;
+  }
+  var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop;
+  var stopLabel = stopping ? 'Stopping agent…' : 'Stop agent';
+  if (stopBtn) {
+    stopBtn.classList.remove('hidden');
+    stopBtn.disabled = stopping || _chatLockedByOwnerChip === true;
+    stopBtn.setAttribute('data-delegation-action', 'stop');
+    stopBtn.setAttribute('title', stopLabel);
+    stopBtn.setAttribute('aria-label', stopLabel);
+  }
+  for (var index = 0; index < _delegationRunStopControls.length; index++) {
+    var control = _delegationRunStopControls[index];
+    if (!control) continue;
+    control.disabled = stopping;
+    control.textContent = stopLabel;
+  }
+  var mount = _ensureDelegationMount();
+  if (mount.run) mount.run.setAttribute('aria-busy', stopping ? 'true' : 'false');
+  return true;
+}
+
+function _handleFixedStop(event) {
+  if (_delegationUsesFixedStop(_delegationUiState.snapshot)) {
+    return _stopDelegation(event);
+  }
+  return stopAutomation();
+}
+
 function _renderDelegationRunActions(container, snapshot) {
   if (!_delegationIsActiveSnapshot(snapshot)) return;
+  var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop;
   var actions = _delegationElement('div', 'delegation-state-actions');
   var stop = _delegationAction(
-    snapshot.state === 'stopping' ? 'Stopping agent…' : 'Stop agent',
+    stopping ? 'Stopping agent…' : 'Stop agent',
     'delegation-action-danger',
     _stopDelegation
   );
   stop.setAttribute('data-delegation-action', 'stop');
-  stop.disabled = snapshot.state === 'stopping' || _delegationUiState.pendingStop;
+  stop.disabled = stopping;
+  _delegationRunStopControls.push(stop);
   actions.appendChild(stop);
   container.appendChild(actions);
 }
@@ -1417,6 +1476,7 @@ function _appendDelegationTechnicalCode(container, code) {
 
 function _renderDelegationRunHeader(container, snapshot) {
   _clearDelegationNode(container);
+  _delegationRunStopControls = [];
   _applyDelegationSnapshotTone(container, snapshot);
   var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
   var restartLost = snapshot.state === 'restart_lost'
@@ -1554,6 +1614,7 @@ function _renderDelegationRunHeader(container, snapshot) {
     );
   }
   _renderDelegationRunActions(container, snapshot);
+  _syncDelegationStopControls(snapshot);
 }
 
 async function _prepareDelegationTask(retrySameMessage) {
@@ -1899,6 +1960,7 @@ async function _stopDelegation(event) {
     control.disabled = true;
     if (typeof control.focus === 'function') control.focus();
   }
+  _syncDelegationStopControls(snapshot);
   var response = await _sendDelegationCommand({
     type: 'FSB_DELEGATION_STOP',
     delegationId: snapshot.delegationId
@@ -2874,7 +2936,7 @@ async function checkEncryptedConfig() {
 
 // Event listeners
 sendBtn.addEventListener('click', handleSendMessage);
-stopBtn.addEventListener('click', stopAutomation);
+stopBtn.addEventListener('click', _handleFixedStop);
 newChatBtn.addEventListener('click', startNewChat);
 settingsBtn.addEventListener('click', openSettings);
 historyBtn.addEventListener('click', toggleHistoryView);
@@ -3278,6 +3340,7 @@ function setRunningState(tabId, sessionId) {
     statusText.textContent = 'Working';
     if (typeof showAutomationRunner === 'function') showAutomationRunner(activeEntry.startedAt, 'Working');
     updateSendButtonState();
+    _syncDelegationStopControls(_delegationUiState.snapshot);
     livenessFailCount = 0;
     if (livenessInterval) clearInterval(livenessInterval);
     livenessInterval = setInterval(checkSessionLiveness, 10000);
@@ -3320,6 +3383,7 @@ function setIdleState(tabId) {
     // Drop the entry so a future swap-IN does not restore a stale loader.
     _clearTabStatusIntent(_activeTabIdSnapshot);
     updateSendButtonState();
+    _syncDelegationStopControls(_delegationUiState.snapshot);
   } else if (typeof targetTabId === 'number') {
     // QT-uof-5 (B-FIX) -- background tab transitioned to idle. Drop its
     // per-tab intent so a future swap-IN does not restore a stale loader
@@ -3354,6 +3418,7 @@ function setErrorState(tabId) {
     statusText.textContent = 'Error';
     if (typeof hideAutomationRunner === 'function') hideAutomationRunner();
     updateSendButtonState();
+    _syncDelegationStopControls(_delegationUiState.snapshot);
   }
 }
 
