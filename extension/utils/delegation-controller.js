@@ -181,6 +181,7 @@
       summary: options.summary || null,
       activeTab: null,
       hold: null,
+      holdOwnedTabs: null,
       terminal: null,
       hydrated: options.hydrated === true,
       agentId: null,
@@ -250,6 +251,12 @@
     var resumeOperation = typeof options.resume === 'function'
       ? options.resume
       : function() { return Promise.resolve({ ok: false, code: 'unsupported_provider' }); };
+    var getActiveTab = typeof options.getActiveTab === 'function'
+      ? options.getActiveTab
+      : function() { return Promise.resolve(null); };
+    var getLiveTabIds = typeof options.getLiveTabIds === 'function'
+      ? options.getLiveTabIds
+      : function() { return Promise.resolve([]); };
     var registry = options.registry || null;
     var records = new Map();
     var listeners = new Set();
@@ -365,6 +372,28 @@
         : 'delegation_persistence_failed';
     }
 
+    async function _appendStateEntry(record, state, title) {
+      var canonicalEntry;
+      try {
+        canonicalEntry = await eventStore.appendBeforeFanout(
+          record.delegationId,
+          { type: 'state', sessionId: null, payload: {} },
+          { timestamp: now(), state: state, title: title, detail: null }
+        );
+      } catch (error) {
+        return _failPersistence(record, error);
+      }
+      if (!canonicalEntry
+        || canonicalEntry.delegationId !== record.delegationId
+        || canonicalEntry.sequence !== record.entries.length + 1) {
+        return _failPersistence(
+          record,
+          _error('delegation_ledger_corrupt', 'canonical entry sequence or identity is invalid')
+        );
+      }
+      return canonicalEntry;
+    }
+
     function _cancelOnce(record, code) {
       if (!record.cancelPromise) {
         record.cancelPromise = Promise.resolve().then(function() {
@@ -427,11 +456,13 @@
         if (options.cancel !== false) {
           try {
             var cancelResult = await _cancelOnce(record, settledCode);
-            if (cancelResult && cancelResult.ok === false && cancelResult.code) {
-              settledCode = _normalizeTerminalCode(cancelResult.code, eventStore);
+            if (!cancelResult
+              || (cancelResult.status !== 'cancelled'
+                && cancelResult.status !== 'already_terminal')) {
+              settledCode = 'tree_unsettled';
             }
-          } catch (cancelError) {
-            settledCode = _normalizeTerminalCode(cancelError && cancelError.code, eventStore);
+          } catch (_cancelError) {
+            settledCode = 'tree_unsettled';
           }
         }
 
@@ -441,27 +472,24 @@
         }
 
         try {
-          try {
-            await eventStore.markTerminal(record.delegationId, { code: settledCode });
-          } catch (missingLedgerError) {
-            var canSeed = record.entries.length === 0
-              && !terminalEntry
-              && missingLedgerError
-              && missingLedgerError.code === 'delegation_persistence_failed'
-              && /does not exist/.test(String(missingLedgerError.message || ''));
-            if (!canSeed) throw missingLedgerError;
+          if (!terminalEntry) {
             terminalEntry = await eventStore.appendBeforeFanout(
               record.delegationId,
-              { type: 'state', sessionId: null, payload: {} },
+              { type: 'terminal', sessionId: null, payload: {} },
               {
                 timestamp: now(),
-                state: _terminalState(settledCode),
+                terminalCode: settledCode,
                 title: 'Delegation ended',
                 detail: null
               }
             );
-            await eventStore.markTerminal(record.delegationId, { code: settledCode });
+            if (!terminalEntry
+              || terminalEntry.delegationId !== record.delegationId
+              || terminalEntry.sequence !== record.entries.length + 1) {
+              throw _error('delegation_ledger_corrupt', 'canonical entry sequence or identity is invalid');
+            }
           }
+          await eventStore.markTerminal(record.delegationId, { code: settledCode });
         } catch (storageError) {
           var persistenceCode = _persistenceCode(storageError);
           try { await _cancelOnce(record, persistenceCode); } catch (_cancelError) { /* preserve storage error */ }
@@ -780,10 +808,28 @@
         record.state = 'holding';
         var holdingEvent = _emit(record, null);
 
+        var activeTab;
+        try {
+          activeTab = await getActiveTab({ delegationId: record.delegationId });
+        } catch (_activeTabError) {
+          activeTab = null;
+        }
+        var activeTabId = activeTab && Number.isSafeInteger(activeTab.tabId)
+          ? activeTab.tabId
+          : (Number.isSafeInteger(activeTab) ? activeTab : null);
+        if (!Number.isSafeInteger(activeTabId)) {
+          record.state = 'running';
+          return _closedOperationResult(false, 'active_tab_not_owned', record, _emit(record, null));
+        }
+
         var agentId = record.agentId;
         if (!agentId && registry && typeof registry.getAgentForDelegation === 'function') {
-          agentId = await registry.getAgentForDelegation(record.delegationId);
-          if (agentId && typeof agentId === 'object') agentId = agentId.agentId;
+          try {
+            agentId = await registry.getAgentForDelegation(record.delegationId);
+            if (agentId && typeof agentId === 'object') agentId = agentId.agentId;
+          } catch (_mappingError) {
+            agentId = null;
+          }
         }
         if (typeof agentId !== 'string' || agentId.length === 0
           || !registry
@@ -794,50 +840,79 @@
         }
         record.agentId = agentId;
 
-        var ownedResult = await registry.getDelegationOwnedTabs({
-          delegationId: record.delegationId,
-          agentId: agentId
-        });
+        var ownedResult;
+        try {
+          ownedResult = await registry.getDelegationOwnedTabs({
+            delegationId: record.delegationId,
+            agentId: agentId
+          });
+        } catch (_ownedTabsError) {
+          record.state = 'running';
+          return _closedOperationResult(false, 'delegation_binding_rejected', record, _emit(record, null));
+        }
         var ownedTabs = Array.isArray(ownedResult)
           ? ownedResult
           : (ownedResult && Array.isArray(ownedResult.ownedTabs) ? ownedResult.ownedTabs : []);
-        var activeTabId = Number.isSafeInteger(input.activeTabId)
-          ? input.activeTabId
-          : (record.activeTab && record.activeTab.tabId);
+        var ownershipTokens = Object.create(null);
+        var completeOwnedSet = ownedTabs.length > 0 && ownedTabs.every(function(tab) {
+          if (!tab
+            || !Number.isSafeInteger(tab.tabId)
+            || tab.tabId < 0
+            || typeof tab.ownershipToken !== 'string'
+            || tab.ownershipToken.length === 0
+            || ownershipTokens[tab.tabId]) {
+            return false;
+          }
+          ownershipTokens[tab.tabId] = true;
+          return true;
+        });
         var activeOwned = ownedTabs.some(function(tab) {
           return tab && tab.tabId === activeTabId;
         });
-        if (!activeOwned) {
+        if (!completeOwnedSet || !activeOwned) {
           record.state = 'running';
           return _closedOperationResult(false, 'active_tab_not_owned', record, _emit(record, null));
         }
 
-        var held = await holdOperation({ delegationId: record.delegationId });
+        var held;
+        try {
+          held = await holdOperation({ delegationId: record.delegationId });
+        } catch (_holdError) {
+          held = null;
+        }
         if (!held || (held.ok !== true && held.status !== 'held')) {
-          record.state = 'running';
-          return _closedOperationResult(false, (held && held.code) || 'hold_rejected', record, _emit(record, null));
+          var holdFailureCode = (held && held.code) || 'agent_failed';
+          await _settle(record, holdFailureCode, { cancel: true });
+          return _closedOperationResult(false, holdFailureCode, record, null);
         }
 
         var expiresAt = now() + HOLD_LEASE_MS;
-        var sealed = await registry.sealHoldLease({
-          delegationId: record.delegationId,
-          agentId: agentId,
-          activeTabId: activeTabId,
-          ownedTabs: ownedTabs,
-          expiresAt: expiresAt
-        });
+        var sealed;
+        try {
+          sealed = await registry.sealHoldLease({
+            delegationId: record.delegationId,
+            agentId: agentId,
+            activeTabId: activeTabId,
+            ownedTabs: ownedTabs,
+            expiresAt: expiresAt
+          });
+        } catch (_sealError) {
+          sealed = null;
+        }
         if (!sealed || sealed.ok === false) {
           await _settle(record, (sealed && sealed.code) || 'resume_ownership_lost', { cancel: true });
           return _closedOperationResult(false, (sealed && sealed.code) || 'resume_ownership_lost', record, null);
         }
         if (Number.isSafeInteger(sealed.expiresAt)) expiresAt = sealed.expiresAt;
         var tabIds = ownedTabs.map(function(tab) { return tab.tabId; }).sort(function(a, b) { return a - b; });
-        record.state = 'held';
         record.hold = { tabIds: tabIds, expiresAt: expiresAt };
+        record.holdOwnedTabs = _clone(ownedTabs);
         record.activeTab = { tabId: activeTabId, owned: false, canTakeControl: false };
         _clearTimer(record, 'silenceTimer');
         _armHoldExpiry(record, expiresAt);
-        return _closedOperationResult(true, 'held', record, _emit(record, null) || holdingEvent);
+        var heldEntry = await _appendStateEntry(record, 'held', 'Delegation held');
+        _applyEntry(record, heldEntry, { notify: false, refreshSilence: false });
+        return _closedOperationResult(true, 'held', record, _emit(record, heldEntry.sequence) || holdingEvent);
       });
       record.holdPromise = pendingHold;
       pendingHold.then(function() {
@@ -872,35 +947,68 @@
         _emit(record, null);
         _clearTimer(record, 'holdTimer');
 
-        var liveTabIds = Array.isArray(input.liveTabIds)
-          ? input.liveTabIds.slice()
-          : record.hold.tabIds.slice();
-        var restored = registry && typeof registry.restoreHoldLease === 'function'
-          ? await registry.restoreHoldLease({
+        var liveTabIds;
+        try {
+          liveTabIds = await getLiveTabIds({
             delegationId: record.delegationId,
-            agentId: record.agentId,
-            liveTabIds: liveTabIds
-          })
-          : { ok: false, code: 'resume_ownership_lost' };
+            tabIds: record.hold.tabIds.slice()
+          });
+        } catch (_liveTabsError) {
+          liveTabIds = [];
+        }
+        if (!Array.isArray(liveTabIds)) liveTabIds = [];
+        var restored = { ok: false, code: 'resume_ownership_lost' };
+        if (registry && typeof registry.restoreHoldLease === 'function') {
+          try {
+            restored = await registry.restoreHoldLease({
+              delegationId: record.delegationId,
+              agentId: record.agentId,
+              liveTabIds: liveTabIds
+            });
+          } catch (_restoreError) { /* the sealed lease remains authoritative */ }
+        }
         if (!restored || restored.ok === false) {
           await _settle(record, (restored && restored.code) || 'resume_ownership_lost', { cancel: true });
           return _closedOperationResult(false, (restored && restored.code) || 'resume_ownership_lost', record, null);
         }
 
-        var resumed = await resumeOperation({ delegationId: record.delegationId });
+        var resumed;
+        try {
+          resumed = await resumeOperation({ delegationId: record.delegationId });
+        } catch (_resumeError) {
+          resumed = null;
+        }
         if (!resumed || (resumed.ok !== true && resumed.status !== 'running' && resumed.status !== 'resumed')) {
-          await _settle(record, (resumed && resumed.code) || 'resume_ownership_lost', { cancel: true });
-          return _closedOperationResult(false, (resumed && resumed.code) || 'resume_ownership_lost', record, null);
+          var resumeFailureCode = (resumed && resumed.code) || 'resume_ownership_lost';
+          if (registry
+            && typeof registry.sealHoldLease === 'function'
+            && Array.isArray(record.holdOwnedTabs)
+            && record.activeTab
+            && Number.isSafeInteger(record.activeTab.tabId)) {
+            try {
+              await registry.sealHoldLease({
+                delegationId: record.delegationId,
+                agentId: record.agentId,
+                activeTabId: record.activeTab.tabId,
+                ownedTabs: _clone(record.holdOwnedTabs),
+                expiresAt: now() + HOLD_LEASE_MS
+              });
+            } catch (_resealError) { /* exact cancellation remains authoritative */ }
+          }
+          await _settle(record, resumeFailureCode, { cancel: true });
+          return _closedOperationResult(false, resumeFailureCode, record, null);
         }
 
         var activeTabId = record.activeTab ? record.activeTab.tabId : record.hold.tabIds[0];
-        record.state = 'running';
         record.hold = null;
+        record.holdOwnedTabs = null;
         record.activeTab = Number.isSafeInteger(activeTabId)
           ? { tabId: activeTabId, owned: true, canTakeControl: true }
           : null;
+        var runningEntry = await _appendStateEntry(record, 'running', 'Delegation resumed');
+        _applyEntry(record, runningEntry, { notify: false, refreshSilence: false });
         _refreshSilence(record);
-        return _closedOperationResult(true, 'resumed', record, _emit(record, null));
+        return _closedOperationResult(true, 'resumed', record, _emit(record, runningEntry.sequence));
       });
       record.resumePromise = pendingResume;
       pendingResume.then(function() {

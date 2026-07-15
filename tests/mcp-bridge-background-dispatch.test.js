@@ -886,6 +886,33 @@ function runSourceContractCase() {
     'clear trust delegates only to the authority-reducing primitive');
   assert(!/(?:issueChallenge|consumeChallenge|controller|delegate\.start)/.test(clearTrust),
     'clear trust cannot consume consent, touch a controller, or start a run');
+
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js'),
+    'utf8'
+  );
+  const registrySource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'agent-registry.js'),
+    'utf8'
+  );
+  assert(!/(?:input|request)\.(?:activeTabId|liveTabIds)/.test(controllerSource),
+    'controller never consumes caller-supplied active or live tab ids');
+  assert(controllerSource.indexOf('await getActiveTab({ delegationId: record.delegationId })')
+      < controllerSource.indexOf('await registry.getDelegationOwnedTabs({'),
+    'controller queries the active tab before the complete ownership snapshot');
+  assert(controllerSource.indexOf('await getLiveTabIds({')
+      < controllerSource.indexOf('await registry.restoreHoldLease({'),
+    'controller queries sealed tab identities before complete lease restoration');
+  assert(!/chrome\.tabs\.query\s*\(\s*\{[^}]*\bactive\s*:/s.test(registrySource),
+    'registry never queries current active-tab state');
+  for (const method of ['sealHoldLease', 'restoreHoldLease', 'releaseDelegation']) {
+    assert(!backgroundSource.includes(`.${method}(`),
+      `background never mutates registry lifecycle directly through ${method}`);
+  }
+  for (const method of ['delegate.cancel', 'delegate.hold', 'delegate.resume']) {
+    assertEqual((backgroundSource.match(new RegExp(`'${method.replace('.', '\\.')}'`, 'g')) || []).length, 1,
+      `${method} transport exists only as an injected controller callback`);
+  }
 }
 
 // ---------------------------------------------------------------------------

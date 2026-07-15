@@ -103,15 +103,22 @@ function makeDeps(store, overrides = {}) {
     status: [],
     hold: [],
     resume: [],
+    activeTabs: [],
+    liveTabs: [],
     registry: [],
   };
   const deps = {
     eventStore: store,
     clock: { now: () => 1720000000000 },
-    cancel: async (input) => { calls.cancel.push(clone(input)); },
+    cancel: async (input) => {
+      calls.cancel.push(clone(input));
+      return { delegationId: input.delegationId, status: 'cancelled' };
+    },
     status: async (input) => { calls.status.push(clone(input)); },
     hold: async (input) => { calls.hold.push(clone(input)); },
     resume: async (input) => { calls.resume.push(clone(input)); },
+    getActiveTab: async (input) => { calls.activeTabs.push(clone(input)); return null; },
+    getLiveTabIds: async (input) => { calls.liveTabs.push(clone(input)); return []; },
     registry: {
       bindDelegation() { calls.registry.push('bind'); },
       hydrate() { calls.registry.push('hydrate'); },
@@ -379,7 +386,7 @@ function terminalState(code) {
       assert.deepStrictEqual(restored[0].entries.map((entry) => entry.kind), ['init', 'tool-call']);
       assert.deepStrictEqual(restored[0].provider, { id: 'claude-code', label: 'Claude Code' });
       assert.deepStrictEqual(harness.calls, {
-        cancel: [], status: [], hold: [], resume: [], registry: [],
+        cancel: [], status: [], hold: [], resume: [], activeTabs: [], liveTabs: [], registry: [],
       });
       let hydratedReplay = 0;
       controller.subscribe(() => { hydratedReplay += 1; });
@@ -406,7 +413,7 @@ function terminalState(code) {
       assert.deepStrictEqual(await controller.hydrate(), []);
       assert.strictEqual(controller.getSnapshot(id), null);
       assert.deepStrictEqual(harness.calls, {
-        cancel: [], status: [], hold: [], resume: [], registry: [],
+        cancel: [], status: [], hold: [], resume: [], activeTabs: [], liveTabs: [], registry: [],
       });
     } finally {
       storage.restore();
@@ -443,7 +450,7 @@ function terminalState(code) {
         await expectCode(controller.hydrate(), 'delegation_ledger_corrupt');
         await expectCode(() => controller.subscribe(() => {}), 'delegation_not_hydrated');
         assert.deepStrictEqual(harness.calls, {
-          cancel: [], status: [], hold: [], resume: [], registry: [],
+          cancel: [], status: [], hold: [], resume: [], activeTabs: [], liveTabs: [], registry: [],
         });
       } finally {
         storage.restore();
@@ -623,8 +630,9 @@ function terminalState(code) {
       );
       const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${stopFirstId}`];
       assert.strictEqual(envelope.terminal, true);
-      assert.strictEqual(envelope.entries.length, 1);
+      assert.strictEqual(envelope.entries.length, 2);
       assert.strictEqual(envelope.entries[0].kind, 'init');
+      assert.strictEqual(envelope.entries[1].state, 'stopped');
     } finally {
       storage.restore();
     }
@@ -734,7 +742,8 @@ function terminalState(code) {
         code: 'event_silence_timeout',
         releasedTabCount: 0,
       });
-      assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1]);
+      assert.deepStrictEqual(secondAfterTimeout.entries.map((entry) => entry.sequence), [1, 2]);
+      assert.strictEqual(secondAfterTimeout.entries[1].state, 'failed');
 
       const stopped = await controller.stop({ delegationId: firstId });
       assert.strictEqual(stopped.code, 'stopped');
@@ -774,8 +783,8 @@ function terminalState(code) {
         async getDelegationOwnedTabs() {
           order.push('owned-tabs');
           return [
-            { tabId: 17, token: 'sealed-token-17' },
-            { tabId: 11, token: 'sealed-token-11' },
+            { tabId: 17, ownershipToken: 'sealed-token-17' },
+            { tabId: 11, ownershipToken: 'sealed-token-11' },
           ];
         },
         async sealHoldLease(input) {
@@ -798,6 +807,15 @@ function terminalState(code) {
       const harness = makeDeps(store, {
         clock,
         registry,
+        getActiveTab: async () => {
+          order.push('active-tab');
+          return { tabId: 11 };
+        },
+        getLiveTabIds: async (input) => {
+          order.push('live-tabs');
+          assert.deepStrictEqual(input.tabIds, [11, 17]);
+          return [11, 17];
+        },
         hold: async () => {
           order.push('daemon-hold');
           return { ok: true, status: 'held' };
@@ -820,18 +838,20 @@ function terminalState(code) {
         activeTab: { tabId: 11, owned: true, canTakeControl: true },
       });
 
-      const held = await controller.takeControl({ delegationId: id, activeTabId: 11 });
+      const held = await controller.takeControl({ delegationId: id });
       assert.strictEqual(held.code, 'held');
       exactKeys(held.runtimeEvent, ['announceSequence', 'snapshot', 'type']);
       exactKeys(held.snapshot.activeTab, ['canTakeControl', 'owned', 'tabId']);
       exactKeys(held.snapshot.hold, ['expiresAt', 'tabIds']);
       assert.deepStrictEqual(held.snapshot.hold.tabIds, [11, 17]);
       assert.deepStrictEqual(
-        order.slice(0, 4),
-        ['bind:agent-61-02', 'owned-tabs', 'daemon-hold', 'seal-all-tabs'],
+        order.slice(0, 5),
+        ['bind:agent-61-02', 'active-tab', 'owned-tabs', 'daemon-hold', 'seal-all-tabs'],
       );
+      let envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['running', 'held']);
 
-      const resumed = await controller.resume({ delegationId: id, liveTabIds: [11, 17] });
+      const resumed = await controller.resume({ delegationId: id });
       assert.strictEqual(resumed.code, 'resumed');
       assert.strictEqual(resumed.snapshot.state, 'running');
       assert.strictEqual(resumed.snapshot.hold, null);
@@ -840,7 +860,10 @@ function terminalState(code) {
         owned: true,
         canTakeControl: true,
       });
+      assert(order.indexOf('live-tabs') < order.indexOf('restore-all-tabs'));
       assert(order.indexOf('restore-all-tabs') < order.indexOf('daemon-resume'));
+      envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.deepStrictEqual(envelope.entries.map((entry) => entry.state), ['running', 'held', 'running']);
 
       const stopped = await controller.stop({ delegationId: id });
       assert.strictEqual(stopped.code, 'stopped');
@@ -850,7 +873,242 @@ function terminalState(code) {
       });
       assert.strictEqual(order.filter((item) => item === 'release-all-tabs').length, 1);
       assert.strictEqual(harness.calls.cancel.length, 1);
+      envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.deepStrictEqual(
+        envelope.entries.map((entry) => entry.state),
+        ['running', 'held', 'running', 'stopped'],
+      );
       assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('take-control derives the active identity and cancels exact runs after confirmed-hold failures', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const order = [];
+      const ownedTabs = [
+        { tabId: 11, ownershipToken: 'ownership-11' },
+        { tabId: 17, ownershipToken: 'ownership-17' },
+      ];
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async getDelegationOwnedTabs(input) {
+          order.push(`owned:${input.delegationId}`);
+          return clone(ownedTabs);
+        },
+        async sealHoldLease(input) {
+          order.push(`seal:${input.delegationId}`);
+          assert.deepStrictEqual(input.ownedTabs, ownedTabs);
+          if (input.delegationId === 'delegation_seal_failure') {
+            return { ok: false, code: 'resume_ownership_lost' };
+          }
+          return { ok: true, expiresAt: clock.now() + 300000 };
+        },
+        async releaseDelegation(input) {
+          order.push(`release:${input.delegationId}`);
+          return { ok: true, releasedTabCount: 2 };
+        },
+      };
+      const harness = makeDeps(store, {
+        clock,
+        registry,
+        getActiveTab: async (input) => {
+          order.push(`active:${input.delegationId}`);
+          return {
+            tabId: input.delegationId === 'delegation_wrong_active' ? 99 : 11,
+          };
+        },
+        hold: async (input) => {
+          order.push(`hold:${input.delegationId}`);
+          if (input.delegationId === 'delegation_hold_failure') {
+            return { delegationId: input.delegationId, status: 'hold_failed' };
+          }
+          return { delegationId: input.delegationId, status: 'held' };
+        },
+        cancel: async (input) => {
+          harness.calls.cancel.push(clone(input));
+          order.push(`cancel:${input.delegationId}`);
+          return { delegationId: input.delegationId, status: 'cancelled' };
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      async function ready(id) {
+        await controller.start({ delegationId: id });
+        await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+        await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
+      }
+
+      const wrongId = 'delegation_wrong_active';
+      await ready(wrongId);
+      const wrong = await controller.takeControl({ delegationId: wrongId, activeTabId: 11 });
+      assert.strictEqual(wrong.code, 'active_tab_not_owned');
+      assert.strictEqual(wrong.snapshot.state, 'running');
+      assert.strictEqual(order.includes(`hold:${wrongId}`), false);
+      assert.strictEqual(harness.calls.cancel.some((call) => call.delegationId === wrongId), false);
+
+      const holdFailureId = 'delegation_hold_failure';
+      await ready(holdFailureId);
+      const holdFailure = await controller.takeControl({ delegationId: holdFailureId });
+      assert.strictEqual(holdFailure.ok, false);
+      assert.strictEqual(holdFailure.code, 'agent_failed');
+      assert.strictEqual(holdFailure.snapshot.terminal.code, 'agent_failed');
+      assert(order.indexOf(`hold:${holdFailureId}`) < order.indexOf(`cancel:${holdFailureId}`));
+      assert.strictEqual(order.includes(`seal:${holdFailureId}`), false);
+
+      const sealFailureId = 'delegation_seal_failure';
+      await ready(sealFailureId);
+      const sealFailure = await controller.takeControl({ delegationId: sealFailureId });
+      assert.strictEqual(sealFailure.ok, false);
+      assert.strictEqual(sealFailure.code, 'resume_ownership_lost');
+      assert(order.indexOf(`hold:${sealFailureId}`) < order.indexOf(`seal:${sealFailureId}`));
+      assert(order.indexOf(`seal:${sealFailureId}`) < order.indexOf(`cancel:${sealFailureId}`));
+      assert(order.indexOf(`cancel:${sealFailureId}`) < order.indexOf(`release:${sealFailureId}`));
+
+      for (const id of [holdFailureId, sealFailureId]) {
+        const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(envelope.terminal, true);
+        assert.strictEqual(envelope.entries.filter((entry) => entry.kind === 'state'
+          && (entry.state === 'failed' || entry.state === 'stopped')).length, 1);
+      }
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('resume rejects partial live identity sets and re-seals before cancel when daemon resume fails', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const clock = createFakeClock();
+      const order = [];
+      const ownedTabs = [
+        { tabId: 11, ownershipToken: 'ownership-11' },
+        { tabId: 17, ownershipToken: 'ownership-17' },
+      ];
+      const sealCounts = new Map();
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async getDelegationOwnedTabs() { return clone(ownedTabs); },
+        async sealHoldLease(input) {
+          const count = (sealCounts.get(input.delegationId) || 0) + 1;
+          sealCounts.set(input.delegationId, count);
+          order.push(`${count === 1 ? 'seal' : 'reseal'}:${input.delegationId}`);
+          assert.deepStrictEqual(input.ownedTabs, ownedTabs);
+          return { ok: true, expiresAt: clock.now() + 300000 };
+        },
+        async restoreHoldLease(input) {
+          order.push(`restore:${input.delegationId}:${input.liveTabIds.join(',')}`);
+          if (input.liveTabIds.length !== 2) {
+            return { ok: false, code: 'resume_ownership_lost' };
+          }
+          return { ok: true };
+        },
+        async releaseDelegation(input) {
+          order.push(`release:${input.delegationId}`);
+          return { ok: true, releasedTabCount: 2 };
+        },
+      };
+      const harness = makeDeps(store, {
+        clock,
+        registry,
+        getActiveTab: async () => ({ tabId: 11 }),
+        getLiveTabIds: async (input) => {
+          order.push(`live:${input.delegationId}`);
+          return input.delegationId === 'delegation_partial_resume' ? [11] : [11, 17];
+        },
+        hold: async (input) => ({ delegationId: input.delegationId, status: 'held' }),
+        resume: async (input) => {
+          order.push(`resume:${input.delegationId}`);
+          return input.delegationId === 'delegation_daemon_resume_failure'
+            ? { delegationId: input.delegationId, status: 'resume_failed' }
+            : { delegationId: input.delegationId, status: 'running' };
+        },
+        cancel: async (input) => {
+          harness.calls.cancel.push(clone(input));
+          order.push(`cancel:${input.delegationId}`);
+          return { delegationId: input.delegationId, status: 'already_terminal' };
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      async function readyAndHold(id) {
+        await controller.start({ delegationId: id });
+        await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+        await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
+        const held = await controller.takeControl({ delegationId: id });
+        assert.strictEqual(held.code, 'held');
+      }
+
+      const partialId = 'delegation_partial_resume';
+      await readyAndHold(partialId);
+      const partial = await controller.resume({ delegationId: partialId, liveTabIds: [11, 17] });
+      assert.strictEqual(partial.code, 'resume_ownership_lost');
+      assert.strictEqual(order.includes(`resume:${partialId}`), false);
+      assert(order.indexOf(`live:${partialId}`) < order.indexOf(`restore:${partialId}:11`));
+      assert(order.indexOf(`restore:${partialId}:11`) < order.indexOf(`cancel:${partialId}`));
+      assert.strictEqual(sealCounts.get(partialId), 1);
+
+      const daemonFailureId = 'delegation_daemon_resume_failure';
+      await readyAndHold(daemonFailureId);
+      const daemonFailure = await controller.resume({ delegationId: daemonFailureId });
+      assert.strictEqual(daemonFailure.code, 'resume_ownership_lost');
+      assert.strictEqual(sealCounts.get(daemonFailureId), 2);
+      assert(order.indexOf(`restore:${daemonFailureId}:11,17`) < order.indexOf(`resume:${daemonFailureId}`));
+      assert(order.indexOf(`resume:${daemonFailureId}`) < order.indexOf(`reseal:${daemonFailureId}`));
+      assert(order.indexOf(`reseal:${daemonFailureId}`) < order.indexOf(`cancel:${daemonFailureId}`));
+      assert(order.indexOf(`cancel:${daemonFailureId}`) < order.indexOf(`release:${daemonFailureId}`));
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('Stop retains ownership and persists one tree-unsettled row when cancellation is unconfirmed', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      let cancelCalls = 0;
+      let releaseCalls = 0;
+      const harness = makeDeps(store, {
+        cancel: async (input) => {
+          cancelCalls += 1;
+          return { delegationId: input.delegationId, status: 'failed' };
+        },
+        registry: {
+          async bindDelegation() { return { ok: true }; },
+          async releaseDelegation() {
+            releaseCalls += 1;
+            return { ok: true, releasedTabCount: 1 };
+          },
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+      const id = 'delegation_tree_unsettled_stop';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-tree-unsettled' });
+
+      const first = controller.stop({ delegationId: id });
+      const duplicate = controller.stop({ delegationId: id });
+      assert.strictEqual(first, duplicate);
+      const result = await first;
+      assert.strictEqual(result.code, 'tree_unsettled');
+      assert.deepStrictEqual(result.snapshot.terminal, {
+        code: 'tree_unsettled',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(cancelCalls, 1);
+      assert.strictEqual(releaseCalls, 0);
+      const envelope = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+      assert.strictEqual(envelope.terminalCode, 'tree_unsettled');
+      assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'failed').length, 1);
     } finally {
       storage.restore();
     }
@@ -867,7 +1125,9 @@ function terminalState(code) {
       const releases = [];
       const registry = {
         async bindDelegation() { return { ok: true }; },
-        async getDelegationOwnedTabs() { return [{ tabId: 31, token: 'sealed-token-31' }]; },
+        async getDelegationOwnedTabs() {
+          return [{ tabId: 31, ownershipToken: 'sealed-token-31' }];
+        },
         async sealHoldLease() { return { ok: true, expiresAt: clock.now() + 300000 }; },
         async restoreHoldLease(input) {
           if (input.delegationId === 'delegation_resume_lost') {
@@ -883,6 +1143,8 @@ function terminalState(code) {
       const harness = makeDeps(store, {
         clock,
         registry,
+        getActiveTab: async () => ({ tabId: 31 }),
+        getLiveTabIds: async () => [31],
         hold: async () => {
           holdCalls += 1;
           if (holdCalls === 1) {
@@ -909,7 +1171,7 @@ function terminalState(code) {
 
       const overlapId = 'delegation_hold_stop_overlap';
       await ready(overlapId);
-      const holding = controller.takeControl({ delegationId: overlapId, activeTabId: 31 });
+      const holding = controller.takeControl({ delegationId: overlapId });
       await holdStarted.promise;
       const stopping = controller.stop({ delegationId: overlapId });
       holdGate.resolve();
@@ -924,7 +1186,7 @@ function terminalState(code) {
       const expiryId = 'delegation_hold_expiry';
       await ready(expiryId);
       assert.strictEqual(
-        (await controller.takeControl({ delegationId: expiryId, activeTabId: 31 })).code,
+        (await controller.takeControl({ delegationId: expiryId })).code,
         'held',
       );
       await clock.tick(300000);
@@ -935,8 +1197,8 @@ function terminalState(code) {
 
       const lostId = 'delegation_resume_lost';
       await ready(lostId);
-      await controller.takeControl({ delegationId: lostId, activeTabId: 31 });
-      const lost = await controller.resume({ delegationId: lostId, liveTabIds: [31] });
+      await controller.takeControl({ delegationId: lostId });
+      const lost = await controller.resume({ delegationId: lostId });
       assert.strictEqual(lost.code, 'resume_ownership_lost');
       assert.deepStrictEqual(controller.getSnapshot(lostId).terminal, {
         code: 'resume_ownership_lost',

@@ -1650,7 +1650,25 @@ async function bootstrapDelegationController() {
         cancel: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.cancel', { delegationId }),
         hold: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.hold', { delegationId }),
         resume: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.resume', { delegationId }),
-        status: () => mcpBridgeClient.sendExtRequest('delegate.status', {})
+        status: () => mcpBridgeClient.sendExtRequest('delegate.status', {}),
+        getActiveTab: async () => {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          const active = Array.isArray(tabs) && tabs.length === 1 ? tabs[0] : null;
+          return active && Number.isSafeInteger(active.id) ? { tabId: active.id } : null;
+        },
+        getLiveTabIds: async ({ tabIds }) => {
+          if (!Array.isArray(tabIds)) return [];
+          const identities = await Promise.all(tabIds.map(async (tabId) => {
+            if (!Number.isSafeInteger(tabId)) return null;
+            try {
+              const tab = await chrome.tabs.get(tabId);
+              return tab && tab.id === tabId ? tabId : null;
+            } catch (_error) {
+              return null;
+            }
+          }));
+          return identities.filter(Number.isSafeInteger);
+        }
       });
     }
     const controller = globalThis.fsbDelegationControllerInstance;
