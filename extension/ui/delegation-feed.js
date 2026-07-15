@@ -229,7 +229,8 @@
         usd: value.usd,
         toolCalls: value.toolCalls
       })
-      && (value.state === 'completed'
+      && (value.state === 'running'
+        || value.state === 'completed'
         || value.state === 'failed'
         || value.state === 'stopped'
         || value.state === 'restart_lost'));

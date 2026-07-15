@@ -197,6 +197,19 @@ function eventInput(delegationId, event, context = {}) {
   return { delegationId, event, context };
 }
 
+async function acceptSuccessfulFinal(controller, delegationId, timestamp) {
+  await controller.acceptEvent(eventInput(delegationId, fixtures.resultEvent, {
+    timestamp,
+    state: 'completed',
+    billingKind: 'subscription',
+  }));
+  return controller.acceptEvent(eventInput(delegationId, fixtures.terminalEvent, {
+    timestamp: timestamp + 1,
+    terminalCode: 'completed',
+    treeSettled: true,
+  }));
+}
+
 async function expectCode(value, code) {
   let caught = null;
   try {
@@ -633,7 +646,7 @@ function terminalState(code) {
     }
   });
 
-  await test('final-vs-stop ordering chooses exactly one winner in both directions', async () => {
+  await test('post-cleanup final-vs-stop ordering chooses exactly one winner in both directions', async () => {
     const storage = installSessionStorage();
     try {
       const { store, controllerModule } = freshModules();
@@ -643,10 +656,18 @@ function terminalState(code) {
 
       const finalFirstId = 'delegation_final_first';
       await controller.start({ delegationId: finalFirstId });
-      const finalFirst = controller.acceptEvent(eventInput(finalFirstId, fixtures.resultEvent, {
+      const streamedResult = await controller.acceptEvent(eventInput(finalFirstId, fixtures.resultEvent, {
         timestamp: 1720000000200,
         state: 'completed',
         billingKind: 'subscription',
+      }));
+      assert.strictEqual(streamedResult.state, 'running');
+      assert.strictEqual(controller.getSnapshot(finalFirstId).terminal, null,
+        'streamed result alone retains lifecycle authority');
+      const finalFirst = controller.acceptEvent(eventInput(finalFirstId, fixtures.terminalEvent, {
+        timestamp: 1720000000201,
+        terminalCode: 'completed',
+        treeSettled: true,
       }));
       const lateStop = controller.stop({ delegationId: finalFirstId });
       const [finalEntry, lateStopResult] = await Promise.all([finalFirst, lateStop]);
@@ -704,6 +725,74 @@ function terminalState(code) {
     }
   });
 
+  await test('streamed result retains ownership through delayed and failed cleanup', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const released = [];
+      const cancelled = [];
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        async releaseDelegation({ delegationId }) {
+          released.push(delegationId);
+          return { ok: true, releasedTabCount: 1 };
+        },
+      };
+      const harness = makeDeps(store, {
+        registry,
+        cancel: async (input) => {
+          cancelled.push(clone(input));
+          return { delegationId: input.delegationId, status: 'already_terminal' };
+        },
+      });
+      const controller = controllerModule.create(harness.deps);
+      await controller.hydrate();
+
+      const delayedId = 'delegation_delayed_cleanup';
+      await controller.start({ delegationId: delayedId });
+      await controller.bindRegisteredAgent({ delegationId: delayedId, agentId: 'agent-delayed' });
+      const streamed = await controller.acceptEvent(eventInput(delayedId, fixtures.resultEvent, {
+        timestamp: 1720000000600,
+        billingKind: 'subscription',
+      }));
+      assert.strictEqual(streamed.state, 'running');
+      assert.strictEqual(controller.getSnapshot(delayedId).terminal, null);
+      assert.strictEqual(controller.getSnapshot(delayedId).summary.state, 'running');
+      assert.deepStrictEqual(released, [], 'result emission cannot release browser authority');
+
+      await controller.acceptEvent(eventInput(delayedId, fixtures.terminalEvent, {
+        timestamp: 1720000000601,
+        terminalCode: 'completed',
+        treeSettled: true,
+      }));
+      assert.deepStrictEqual(released, [delayedId],
+        'post-cleanup final evidence releases exact ownership once');
+      assert.strictEqual(controller.getSnapshot(delayedId).summary.state, 'completed');
+
+      const failedId = 'delegation_cleanup_failure';
+      await controller.start({ delegationId: failedId });
+      await controller.bindRegisteredAgent({ delegationId: failedId, agentId: 'agent-cleanup-failed' });
+      await controller.acceptEvent(eventInput(failedId, fixtures.resultEvent, {
+        timestamp: 1720000000700,
+        billingKind: 'subscription',
+      }));
+      await controller.acceptEvent(eventInput(failedId, fixtures.terminalEvent, {
+        timestamp: 1720000000701,
+        terminalCode: 'tree_unsettled',
+        treeSettled: false,
+      }));
+      assert.deepStrictEqual(controller.getSnapshot(failedId).terminal, {
+        code: 'tree_unsettled',
+        releasedTabCount: 0,
+      });
+      assert.deepStrictEqual(released, [delayedId],
+        'cleanup failure retains ownership even after a streamed result');
+      assert.deepStrictEqual(cancelled, [{ delegationId: failedId, code: 'tree_unsettled' }]);
+    } finally {
+      storage.restore();
+    }
+  });
+
   await test('event-silence and wall-clock watchdogs race finals exactly once', async () => {
     const storage = installSessionStorage();
     try {
@@ -720,6 +809,10 @@ function terminalState(code) {
       await controller.acceptEvent(eventInput(finalId, fixtures.resultEvent, {
         state: 'completed',
         billingKind: 'subscription',
+      }));
+      await controller.acceptEvent(eventInput(finalId, fixtures.terminalEvent, {
+        terminalCode: 'completed',
+        treeSettled: true,
       }));
       await clock.tick(1);
       assert.deepStrictEqual(controller.getSnapshot(finalId).terminal, {
@@ -1460,13 +1553,9 @@ function terminalState(code) {
       assert.strictEqual(statusReads.length, 2, 'disconnected reconciliation sends no status request');
       assert.deepStrictEqual(harness.calls.cancel, []);
 
-      const terminalEntry = await controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
-        timestamp: 1720000001000,
-        state: 'completed',
-        billingKind: 'subscription',
-      }));
-      assert.strictEqual(terminalEntry.sequence, 2);
-      assert.strictEqual(delivered[delivered.length - 1].announceSequence, 2);
+      const terminalEntry = await acceptSuccessfulFinal(controller, id, 1720000001000);
+      assert.strictEqual(terminalEntry.sequence, 3);
+      assert.strictEqual(delivered[delivered.length - 1].announceSequence, 3);
       assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
       assert.deepStrictEqual(harness.recoveryCalls.clearGeneration, [id]);
       assert.strictEqual(harness.heartbeatOwners.size, 0);
@@ -1587,16 +1676,8 @@ function terminalState(code) {
       assert.strictEqual(pendingLoss.code, 'daemon_restart_lost_run');
       assert.strictEqual(pendingLoss.snapshot.state, 'restart_lost');
 
-      await controller.acceptEvent(eventInput(ids.same, fixtures.resultEvent, {
-        timestamp: 1720000000400,
-        state: 'completed',
-        billingKind: 'subscription',
-      }));
-      await controller.acceptEvent(eventInput(ids.malformed, fixtures.resultEvent, {
-        timestamp: 1720000000500,
-        state: 'completed',
-        billingKind: 'subscription',
-      }));
+      await acceptSuccessfulFinal(controller, ids.same, 1720000000400);
+      await acceptSuccessfulFinal(controller, ids.malformed, 1720000000500);
       assert.deepStrictEqual(harness.calls.cancel, [], 'confirmed restart loss never sends cancel');
       assert.strictEqual(harness.heartbeatOwners.size, 0);
       for (const id of Object.values(ids)) {
@@ -1713,11 +1794,7 @@ function terminalState(code) {
       assert.deepStrictEqual(released, [mismatchId]);
       assert.strictEqual(harness.heartbeatOwners.has(mismatchId), false);
 
-      await controller.acceptEvent(eventInput(exactId, fixtures.resultEvent, {
-        timestamp: 1720000001000,
-        state: 'completed',
-        billingKind: 'subscription',
-      }));
+      await acceptSuccessfulFinal(controller, exactId, 1720000001000);
       assert.deepStrictEqual(released, [mismatchId, exactId]);
       assert.strictEqual(harness.heartbeatOwners.size, 0);
     } finally {
@@ -1731,11 +1808,7 @@ function terminalState(code) {
       let modules = freshModules();
       const terminalId = 'delegation_terminal_while_asleep';
       const seed = await seedRunningLedger(modules.store, modules.controllerModule, terminalId);
-      await seed.acceptEvent(eventInput(terminalId, fixtures.resultEvent, {
-        timestamp: 1720000001000,
-        state: 'completed',
-        billingKind: 'subscription',
-      }));
+      await acceptSuccessfulFinal(seed, terminalId, 1720000001000);
 
       modules = freshModules();
       let harness = makeRecoveryDeps(modules.store, {

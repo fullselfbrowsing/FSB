@@ -256,6 +256,8 @@ function project(store, event, overrides = {}) {
       ],
     });
     assert.strictEqual(entry.kind, 'result');
+    assert.strictEqual(entry.state, 'running',
+      'streamed result remains nonterminal until explicit cleanup evidence');
     exactKeys(entry.metrics, [
       'inputTokens', 'outputTokens', 'totalTokens', 'turns', 'durationMs',
       'billingKind', 'usd', 'toolCalls',
@@ -284,7 +286,8 @@ function project(store, event, overrides = {}) {
     });
     assert.strictEqual(api.metrics.usd, 0.0125);
     const failed = project(store, fixtures.failedResultEvent, { sequence: 9 });
-    assert.strictEqual(failed.state, 'failed');
+    assert.strictEqual(failed.state, 'running',
+      'error result also waits for explicit post-cleanup terminal evidence');
     assert.strictEqual(failed.metrics.inputTokens, null);
     assert.strictEqual(failed.metrics.outputTokens, null);
     assert.strictEqual(failed.metrics.totalTokens, null);

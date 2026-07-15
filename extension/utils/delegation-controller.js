@@ -118,6 +118,7 @@
   }
 
   function _summaryState(state) {
+    if (state === 'running') return 'running';
     if (state === 'completed') return 'completed';
     if (state === 'stopped') return 'stopped';
     if (state === 'restart_lost') return 'restart_lost';
@@ -837,8 +838,7 @@
         }
 
         var terminalCode = null;
-        if (canonicalEntry.kind === 'result'
-          || canonicalEntry.state === 'completed'
+        if (canonicalEntry.state === 'completed'
           || canonicalEntry.state === 'failed'
           || canonicalEntry.state === 'stopped'
           || canonicalEntry.state === 'restart_lost') {

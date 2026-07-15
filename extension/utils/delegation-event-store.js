@@ -289,10 +289,10 @@
 
   function _deriveState(type, payload, context) {
     if (type === 'result') {
-      if (context && /^(?:completed|failed|stopped|restart_lost)$/.test(context.state)) {
-        return context.state;
-      }
-      return payload && payload.is_error === true ? 'failed' : 'completed';
+      // A streamed result contains the durable summary, but the supervisor
+      // still owns process-tree cleanup. Only a later explicit terminal row
+      // may transition the ledger out of running.
+      return 'running';
     }
     if (type === 'terminal') {
       var terminal = _normalizeTerminalCode(context && context.terminalCode);
