@@ -13,6 +13,10 @@
 
 After code changes, reload the extension from `chrome://extensions` and refresh any open tabs so content scripts re-inject.
 
+## Google Sheets Development
+
+Google Sheets capabilities reuse an already signed-in, agent-owned spreadsheet tab. They require no Google Cloud client ID, consent prompt, token setup, or Sheets-specific MCP update. Reload the unpacked extension after changes, refresh the open Sheet, and reconnect the existing MCP bridge. See [Google Sheets signed-in session integration](../docs/google-sheets-api.md) for the bounded operation contract and UAT gates.
+
 ## Key Entry Points
 
 | Path | Role |
