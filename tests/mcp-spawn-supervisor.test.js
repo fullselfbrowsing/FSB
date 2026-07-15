@@ -364,19 +364,36 @@ function makeHarness(supervisorModule, options = {}) {
     },
   };
 
-  const processControl = {
-    async hold(entry, child) {
-      order.push('hold');
-      lifecycleCalls.push({ operation: 'hold', entry, child });
-      if (options.holdGate) await options.holdGate.promise;
-      if (options.holdError) throw new Error('fixture hold failure');
-    },
-    async resume(entry, child) {
-      order.push('resume');
-      lifecycleCalls.push({ operation: 'resume', entry, child });
-      if (options.resumeGate) await options.resumeGate.promise;
-      if (options.resumeError) throw new Error('fixture resume failure');
-    },
+  let processGroupState = options.initialProcessGroupState ?? 'running';
+  let processGroupStatusOffset = 0;
+  const processGroupStatuses = options.processGroupStatuses ?? null;
+  const scheduledTimers = [];
+  let fakeClock = 0;
+
+  const schedule = (callback, milliseconds) => {
+    const timer = {
+      callback,
+      dueAt: fakeClock + milliseconds,
+      cleared: false,
+      fired: false,
+      unrefCalled: false,
+      unref() { this.unrefCalled = true; },
+    };
+    scheduledTimers.push(timer);
+    return timer;
+  };
+
+  const advanceClock = async (milliseconds) => {
+    fakeClock += milliseconds;
+    while (true) {
+      const timer = scheduledTimers
+        .filter((entry) => !entry.cleared && !entry.fired && entry.dueAt <= fakeClock)
+        .sort((left, right) => left.dueAt - right.dueAt)[0];
+      if (!timer) break;
+      timer.fired = true;
+      timer.callback();
+      await new Promise((resolve) => setImmediate(resolve));
+    }
   };
 
   let delegationCounter = 0;
@@ -422,7 +439,35 @@ function makeHarness(supervisorModule, options = {}) {
     mintDelegationId: () => `delegation_fixture_${String(++delegationCounter).padStart(4, '0')}`,
     mintFingerprint: () => 'runtime_fingerprint_fixture_0001',
     mintGeneration: () => 'generation_fixture_0001',
-    processControl,
+    signalProcessGroup(group, signal) {
+      order.push(`signal:${signal}`);
+      lifecycleCalls.push({ operation: 'signal', group, signal });
+      if (options.signalError === true || options.signalError === signal) {
+        throw new Error('fixture signal failure');
+      }
+      processGroupState = signal === 'SIGSTOP' ? 'stopped' : 'running';
+    },
+    async inspectProcessGroupStatus(entry, process) {
+      order.push(`group-status:${processGroupState}`);
+      lifecycleCalls.push({ operation: 'inspect-status', entry, process });
+      const callOffset = processGroupStatusOffset;
+      processGroupStatusOffset += 1;
+      const statusGate = options.processStatusGates?.[callOffset] ?? options.processStatusGate;
+      if (statusGate) await statusGate.promise;
+      if (options.processStatusError) throw new Error('fixture status failure');
+      if (processGroupStatuses) {
+        const status = processGroupStatuses[Math.min(
+          callOffset,
+          processGroupStatuses.length - 1,
+        )];
+        return status;
+      }
+      return { classification: processGroupState };
+    },
+    schedule,
+    clearScheduled(timer) {
+      timer.cleared = true;
+    },
     terminationGrace: 25,
     activationAttempts: 3,
     allowSpawnOnPlatform: options.allowSpawnOnPlatform,
@@ -450,6 +495,8 @@ function makeHarness(supervisorModule, options = {}) {
     runtimeRuns,
     terminationCalls,
     lifecycleCalls,
+    scheduledTimers,
+    advanceClock,
     degradations,
     runtimeFiles,
     inspector,
@@ -551,9 +598,14 @@ async function runLifecycleProtocolTests(supervisorModule) {
     ),
     { delegationId, status: 'held' },
   );
-  assert.equal(harness.lifecycleCalls.filter((call) => call.operation === 'hold').length, 1);
-  assert.strictEqual(harness.lifecycleCalls[0].entry, harness.activeEntry);
-  assert.equal(harness.lifecycleCalls[0].child.pid, harness.spawnCalls[0].child.pid);
+  assert.deepEqual(
+    harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => [call.group, call.signal]),
+    [[-harness.spawnCalls[0].child.pid, 'SIGSTOP']],
+  );
+  assert.strictEqual(
+    harness.lifecycleCalls.find((call) => call.operation === 'inspect-status').entry,
+    harness.activeEntry,
+  );
   assert.deepEqual(
     (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).active,
     [{ delegationId, state: 'held' }],
@@ -564,7 +616,13 @@ async function runLifecycleProtocolTests(supervisorModule) {
     harness.emit,
   );
   assert.deepEqual(resumed, { delegationId, status: 'running' });
-  assert.equal(harness.lifecycleCalls.filter((call) => call.operation === 'resume').length, 1);
+  assert.deepEqual(
+    harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => [call.group, call.signal]),
+    [
+      [-harness.spawnCalls[0].child.pid, 'SIGSTOP'],
+      [-harness.spawnCalls[0].child.pid, 'SIGCONT'],
+    ],
+  );
   assert.deepEqual(
     await harness.supervisor.handleExtRequest(
       lifecycleRequest('delegate.hold', 'delegation_unknown_0001'),
@@ -589,6 +647,360 @@ async function runLifecycleProtocolTests(supervisorModule) {
   const serialized = JSON.stringify(finalStatus);
   for (const forbidden of ['pid', 'argv', 'env', 'task', 'lifecycle protocol fixture']) {
     assert.equal(serialized.includes(forbidden), false, `${forbidden} is absent from status`);
+  }
+}
+
+async function startLiveDelegation(harness, task, requestId) {
+  const startPromise = harness.supervisor.handleExtRequest(
+    startRequest(
+      { adapterId: 'claude-code', task },
+      { id: requestId },
+    ),
+    harness.emit,
+  );
+  await waitFor(
+    () => harness.emitted.some((event) => event.event === 'delegation.started'),
+    `${task} delegation.started`,
+  );
+  return {
+    startPromise,
+    delegationId: harness.emitted.find((event) => event.event === 'delegation.started').payload.delegationId,
+  };
+}
+
+async function runPosixLifecycleRaceTests(supervisorModule) {
+  {
+    const holdGate = deferred();
+    const resumeGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processStatusGates: [holdGate, null, resumeGate],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'coalesced POSIX lifecycle fixture',
+      'ext-posix-coalesce-start',
+    );
+    const lifecycleOrderStart = harness.order.length;
+    const firstHold = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.hold', delegationId, { id: 'ext-posix-hold-1' }),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.lifecycleCalls.filter((call) => call.operation === 'inspect-status').length === 1,
+      'held pre-signal status inspection',
+    );
+    const duplicateHold = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.hold', delegationId, { id: 'ext-posix-hold-2' }),
+      harness.emit,
+    );
+    assert.equal(
+      harness.lifecycleCalls.filter((call) => call.operation === 'signal').length,
+      0,
+      'hold does not signal before process status confirmation',
+    );
+    holdGate.resolve();
+    assert.deepEqual(await Promise.all([firstHold, duplicateHold]), [
+      { delegationId, status: 'held' },
+      { delegationId, status: 'held' },
+    ]);
+    assert.deepEqual(
+      harness.order.slice(lifecycleOrderStart).filter((entry) => (
+        entry === 'inspect:active'
+        || entry.startsWith('group-status:')
+        || entry.startsWith('signal:')
+      )),
+      [
+        'inspect:active',
+        'group-status:running',
+        'signal:SIGSTOP',
+        'inspect:active',
+        'group-status:stopped',
+      ],
+      'SIGSTOP is bracketed by exact tree and group-state confirmation',
+    );
+    assert.equal(harness.scheduledTimers.length, 1, 'confirmed hold arms one expiry timer');
+    assert.equal(
+      harness.scheduledTimers[0].dueAt,
+      supervisorModule.DELEGATION_HOLD_EXPIRY_MS,
+      'hold expiry is the fixed five-minute interval',
+    );
+    assert.equal(harness.scheduledTimers[0].unrefCalled, true);
+
+    const firstResume = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.resume', delegationId, { id: 'ext-posix-resume-1' }),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.lifecycleCalls.filter((call) => call.operation === 'inspect-status').length === 3,
+      'resume pre-signal status inspection',
+    );
+    const duplicateResume = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.resume', delegationId, { id: 'ext-posix-resume-2' }),
+      harness.emit,
+    );
+    resumeGate.resolve();
+    assert.deepEqual(await Promise.all([firstResume, duplicateResume]), [
+      { delegationId, status: 'running' },
+      { delegationId, status: 'running' },
+    ]);
+    assert.deepEqual(
+      harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => call.signal),
+      ['SIGSTOP', 'SIGCONT'],
+      'duplicate lifecycle requests coalesce to one signal per transition',
+    );
+    assert.equal(harness.scheduledTimers[0].cleared, true, 'resume clears the hold expiry');
+    await harness.supervisor.handleExtRequest(cancelRequest(delegationId), harness.emit);
+    assert.equal((await startPromise).status, 'cancelled');
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      platform: 'win32',
+      allowSpawnOnPlatform: () => true,
+      onStdinEnd: () => {},
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'unsupported lifecycle platform fixture',
+      'ext-unsupported-hold-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'hold_failed' },
+    );
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'hold_failed');
+    assert.equal(harness.lifecycleCalls.length, 0, 'unsupported platforms never inspect or signal');
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.counters.remove, 1);
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      signalError: 'SIGSTOP',
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'signal failure convergence fixture',
+      'ext-signal-failure-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'hold_failed' },
+    );
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'hold_failed');
+    assert.deepEqual(
+      harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => call.signal),
+      ['SIGSTOP'],
+    );
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.counters.remove, 1);
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processGroupStatuses: [
+        { classification: 'running' },
+        { classification: 'ambiguous' },
+      ],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'post-signal inspection failure fixture',
+      'ext-inspection-failure-start',
+    );
+    const held = await harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.hold', delegationId),
+      harness.emit,
+    );
+    assert.deepEqual(held, { delegationId, status: 'hold_failed' });
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'hold_failed');
+    assert.equal(harness.scheduledTimers.length, 0, 'unconfirmed hold never arms expiry');
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.counters.remove, 1);
+  }
+
+  {
+    const confirmed = {
+      classification: 'confirmed',
+      process: {
+        pid: 41001,
+        parentPid: 1,
+        processGroupId: 41001,
+        processStartIdentity: '131001',
+        descendants: [],
+      },
+    };
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      inspections: [confirmed, { classification: 'stale' }],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'exited child before hold fixture',
+      'ext-stale-hold-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'hold_failed' },
+    );
+    assert.equal((await startPromise).terminal.code, 'hold_failed');
+    assert.equal(
+      harness.lifecycleCalls.filter((call) => call.operation === 'signal').length,
+      0,
+      'an absent exact tree is never signalled',
+    );
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, { onStdinEnd: () => {} });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'fixed hold expiry boundary fixture',
+      'ext-expiry-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'held' },
+    );
+    await harness.advanceClock(supervisorModule.DELEGATION_HOLD_EXPIRY_MS - 1);
+    assert.deepEqual(
+      (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).active,
+      [{ delegationId, state: 'held' }],
+      'hold remains active one millisecond before expiry',
+    );
+    assert.equal(harness.terminationCalls.length, 0);
+    await harness.advanceClock(1);
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'hold_expired');
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.counters.remove, 1);
+    assert.deepEqual(
+      (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).active,
+      [],
+    );
+  }
+
+  {
+    const holdGate = deferred();
+    let controls = null;
+    const harness = makeHarness(supervisorModule, {
+      processStatusGate: holdGate,
+      onStdinEnd(value) { controls = value; },
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'result while hold confirmation is pending',
+      'ext-hold-result-start',
+    );
+    await waitFor(() => controls !== null, 'result-race child controls');
+    const holdPromise = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.hold', delegationId),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.lifecycleCalls.some((call) => call.operation === 'inspect-status'),
+      'result-race hold inspection',
+    );
+    controls.send([
+      normalizedEvent('init', { tools: ['mcp__fsb'] }),
+      normalizedEvent('result', { is_error: false }),
+    ]);
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'succeeded');
+    holdGate.resolve();
+    assert.deepEqual(await holdPromise, { delegationId, status: 'hold_failed' });
+    assert.equal(harness.terminationCalls.length, 1, 'result/hold race stops the tree once');
+    assert.equal(harness.counters.remove, 1, 'result/hold race removes runtime state once');
+    assert.equal(harness.scheduledTimers.length, 0, 'result/hold race cannot arm expiry');
+  }
+
+  {
+    const resumeGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      processStatusGates: [null, null, resumeGate],
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'cancel while resume confirmation is pending',
+      'ext-resume-cancel-start',
+    );
+    await harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.hold', delegationId),
+      harness.emit,
+    );
+    const resumePromise = harness.supervisor.handleExtRequest(
+      lifecycleRequest('delegate.resume', delegationId),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.lifecycleCalls.filter((call) => call.operation === 'inspect-status').length === 3,
+      'resume/cancel pre-signal inspection',
+    );
+    const cancelPromise = harness.supervisor.handleExtRequest(
+      cancelRequest(delegationId, { id: 'ext-resume-cancel' }),
+      harness.emit,
+    );
+    const [cancelled, terminal] = await Promise.all([cancelPromise, startPromise]);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(terminal.status, 'cancelled');
+    resumeGate.resolve();
+    assert.deepEqual(await resumePromise, { delegationId, status: 'resume_failed' });
+    assert.deepEqual(
+      harness.lifecycleCalls.filter((call) => call.operation === 'signal').map((call) => call.signal),
+      ['SIGSTOP'],
+      'cancel wins before SIGCONT',
+    );
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.counters.remove, 1);
+    assert.equal(harness.scheduledTimers[0].cleared, true);
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      signalError: 'SIGSTOP',
+      terminateError: true,
+    });
+    const { startPromise, delegationId } = await startLiveDelegation(
+      harness,
+      'lingering descendant fail-closed fixture',
+      'ext-lingering-descendant-start',
+    );
+    assert.deepEqual(
+      await harness.supervisor.handleExtRequest(
+        lifecycleRequest('delegate.hold', delegationId),
+        harness.emit,
+      ),
+      { delegationId, status: 'hold_failed' },
+    );
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'tree_unsettled');
+    assert.equal(harness.counters.remove, 0, 'unsettled descendants retain recovery evidence');
+    assert.deepEqual(harness.degradations, ['tree_unsettled']);
   }
 }
 
@@ -1174,8 +1586,10 @@ async function main() {
   assert.equal(supervisorModule.DELEGATION_STDERR_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_ACTIVE_STATUS_LIMIT, 64);
   assert.equal(supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT, 128);
+  assert.equal(supervisorModule.DELEGATION_HOLD_EXPIRY_MS, 5 * 60 * 1000);
   await runStrictPayloadTests(supervisorModule);
   await runLifecycleProtocolTests(supervisorModule);
+  await runPosixLifecycleRaceTests(supervisorModule);
   await runStatusBoundsTest(supervisorModule);
   await runHappyPathTest(supervisorModule);
   await runFailureBarrierTests(supervisorModule);

@@ -1,9 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
+  execFile as nodeExecFile,
   spawn as nodeSpawn,
   type ChildProcessWithoutNullStreams,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import type {
@@ -49,6 +51,8 @@ const ACTIVE_STATUS_LIMIT = 64;
 const RECOVERY_STATUS_LIMIT = 128;
 const DEFAULT_ACTIVATION_ATTEMPTS = 80;
 const DEFAULT_ACTIVATION_POLL_MS = 25;
+const HOLD_EXPIRY_MS = 5 * 60 * 1000;
+const PROCESS_STATUS_LIMIT_BYTES = 2 * 1024 * 1024;
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const PROVIDER_KEY_NAMES = Object.freeze([
@@ -97,6 +101,8 @@ export type DelegationRunState =
   | 'stopping'
   | 'settled';
 
+export const DELEGATION_HOLD_EXPIRY_MS = HOLD_EXPIRY_MS;
+
 export type DelegationTerminalStatus = 'succeeded' | 'failed' | 'cancelled';
 
 export interface DelegationRestartLoss {
@@ -125,7 +131,23 @@ export type DelegationFailureCode =
   | 'tree_unsettled'
   | 'runtime_cleanup_failed'
   | 'route_lost'
+  | 'hold_failed'
+  | 'hold_expired'
+  | 'resume_failed'
   | 'daemon_shutdown';
+
+export type DelegationProcessSignal = 'SIGSTOP' | 'SIGCONT';
+
+export type ProcessGroupStatusInspection =
+  | { readonly classification: 'running' }
+  | { readonly classification: 'stopped' }
+  | { readonly classification: 'stale' }
+  | { readonly classification: 'ambiguous' };
+
+export type ProcessGroupStatusInspector = (
+  entry: ActiveJournalEntry,
+  process: Extract<ProcessInspection, { classification: 'confirmed' }>['process'],
+) => Promise<ProcessGroupStatusInspection>;
 
 export interface SpawnInvocationOptions extends SpawnOptionsWithoutStdio {
   readonly shell: false;
@@ -175,10 +197,13 @@ export interface SpawnSupervisorDependencies {
   readonly mintDelegationId?: () => string;
   readonly mintFingerprint?: () => string;
   readonly mintGeneration?: () => string;
-  readonly processControl?: {
-    hold(entry: ActiveJournalEntry, child: SupervisedChild): Promise<void>;
-    resume(entry: ActiveJournalEntry, child: SupervisedChild): Promise<void>;
-  };
+  readonly signalProcessGroup?: (
+    negativeProcessGroupId: number,
+    signal: DelegationProcessSignal,
+  ) => void;
+  readonly inspectProcessGroupStatus?: ProcessGroupStatusInspector;
+  readonly schedule?: (callback: () => void, milliseconds: number) => unknown;
+  readonly clearScheduled?: (timer: unknown) => void;
   readonly terminationGrace?: number;
   readonly activationAttempts?: number;
   readonly allowSpawnOnPlatform?: (platform: NodeJS.Platform) => boolean;
@@ -237,6 +262,7 @@ interface DelegationRun {
   cancelPromise: Promise<RunTerminalResult> | null;
   holdPromise: Promise<Readonly<Record<string, unknown>>> | null;
   resumePromise: Promise<Readonly<Record<string, unknown>>> | null;
+  holdTimer: unknown | null;
   executionPromise: Promise<void> | null;
   routeSignal: AbortSignal | null;
   routeAbortListener: (() => void) | null;
@@ -261,6 +287,110 @@ function defaultSpawn(
 
 function defaultWait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function inspectStateSet(states: readonly string[]): ProcessGroupStatusInspection {
+  if (states.length === 0) return Object.freeze({ classification: 'stale' });
+  const stopped = states.map((state) => state === 'T' || state === 't');
+  if (stopped.every(Boolean)) return Object.freeze({ classification: 'stopped' });
+  if (stopped.every((value) => !value)) return Object.freeze({ classification: 'running' });
+  return Object.freeze({ classification: 'ambiguous' });
+}
+
+function parseLinuxProcessState(raw: string): { state: string; processGroupId: number } | null {
+  if (Buffer.byteLength(raw, 'utf8') > 4096) return null;
+  const closing = raw.lastIndexOf(') ');
+  if (closing < 0) return null;
+  const fields = raw.slice(closing + 2).trim().split(/\s+/);
+  const processGroupId = Number(fields[2]);
+  if (!fields[0] || !Number.isSafeInteger(processGroupId) || processGroupId < 1) return null;
+  return { state: fields[0], processGroupId };
+}
+
+function readLinuxProcessGroupStatus(
+  entry: ActiveJournalEntry,
+  process: Extract<ProcessInspection, { classification: 'confirmed' }>['process'],
+): ProcessGroupStatusInspection {
+  const expectedIds = [process.pid, ...process.descendants]
+    .sort((left, right) => left - right);
+  const states: string[] = [];
+  for (const pid of expectedIds) {
+    let parsed;
+    try {
+      parsed = parseLinuxProcessState(readFileSync(`/proc/${pid}/stat`, 'utf8'));
+    } catch {
+      return Object.freeze({ classification: 'ambiguous' });
+    }
+    if (!parsed || parsed.processGroupId !== entry.processGroupId) {
+      return Object.freeze({ classification: 'ambiguous' });
+    }
+    states.push(parsed.state);
+  }
+  return inspectStateSet(states);
+}
+
+function execDarwinProcessStates(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    nodeExecFile(
+      '/bin/ps',
+      ['-axo', 'pid=,pgid=,state='],
+      {
+        timeout: 5000,
+        windowsHide: true,
+        maxBuffer: PROCESS_STATUS_LIMIT_BYTES,
+        shell: false,
+      },
+      (error, stdout) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(String(stdout));
+      },
+    );
+  });
+}
+
+async function readDarwinProcessGroupStatus(
+  entry: ActiveJournalEntry,
+  process: Extract<ProcessInspection, { classification: 'confirmed' }>['process'],
+): Promise<ProcessGroupStatusInspection> {
+  let output: string;
+  try {
+    output = await execDarwinProcessStates();
+  } catch {
+    return Object.freeze({ classification: 'ambiguous' });
+  }
+  if (Buffer.byteLength(output, 'utf8') > PROCESS_STATUS_LIMIT_BYTES) {
+    return Object.freeze({ classification: 'ambiguous' });
+  }
+  const expectedIds = new Set([process.pid, ...process.descendants]);
+  const seen = new Set<number>();
+  const states: string[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)$/);
+    if (!match) continue;
+    const pid = Number(match[1]);
+    const group = Number(match[2]);
+    if (group !== entry.processGroupId) continue;
+    if (!expectedIds.has(pid) || seen.has(pid)) {
+      return Object.freeze({ classification: 'ambiguous' });
+    }
+    seen.add(pid);
+    states.push(match[3][0]);
+  }
+  if (seen.size !== expectedIds.size) return Object.freeze({ classification: 'ambiguous' });
+  return inspectStateSet(states);
+}
+
+export function createProcessGroupStatusInspector(
+  platform: NodeJS.Platform = process.platform,
+): ProcessGroupStatusInspector {
+  if (platform === 'linux') {
+    return async (entry, process) => readLinuxProcessGroupStatus(entry, process);
+  }
+  if (platform === 'darwin') return readDarwinProcessGroupStatus;
+  return async () => Object.freeze({ classification: 'ambiguous' });
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -471,7 +601,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly mintDelegationId: () => string;
   private readonly mintFingerprint: () => string;
   private readonly generation: string;
-  private readonly processControl: NonNullable<SpawnSupervisorDependencies['processControl']>;
+  private readonly signalProcessGroup: NonNullable<SpawnSupervisorDependencies['signalProcessGroup']>;
+  private readonly inspectProcessGroupStatus: ProcessGroupStatusInspector;
+  private readonly schedule: NonNullable<SpawnSupervisorDependencies['schedule']>;
+  private readonly clearScheduled: NonNullable<SpawnSupervisorDependencies['clearScheduled']>;
   private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
   private readonly terminationGrace: number;
   private readonly activationAttempts: number;
@@ -493,10 +626,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     this.mintFingerprint = dependencies.mintFingerprint
       ?? (() => randomBytes(32).toString('base64url'));
     this.generation = (dependencies.mintGeneration ?? randomUUID)();
-    this.processControl = dependencies.processControl ?? Object.freeze({
-      hold: async () => { throw new TreeUnsettledError(); },
-      resume: async () => { throw new TreeUnsettledError(); },
-    });
+    this.signalProcessGroup = dependencies.signalProcessGroup
+      ?? ((negativeProcessGroupId, signal) => process.kill(negativeProcessGroupId, signal));
+    this.inspectProcessGroupStatus = dependencies.inspectProcessGroupStatus
+      ?? (async () => Object.freeze({ classification: 'ambiguous' }));
+    this.schedule = dependencies.schedule
+      ?? ((callback, milliseconds) => setTimeout(callback, milliseconds));
+    this.clearScheduled = dependencies.clearScheduled
+      ?? ((timer) => clearTimeout(timer as ReturnType<typeof setTimeout>));
     this.terminationGrace = dependencies.terminationGrace ?? 2_000;
     this.activationAttempts = dependencies.activationAttempts ?? DEFAULT_ACTIVATION_ATTEMPTS;
     this.allowSpawnOnPlatform = dependencies.allowSpawnOnPlatform
@@ -620,6 +757,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       cancelPromise: null,
       holdPromise: null,
       resumePromise: null,
+      holdTimer: null,
       executionPromise: null,
       routeSignal: context?.signal ?? null,
       routeAbortListener: null,
@@ -1101,6 +1239,80 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     });
   }
 
+  private clearHoldTimer(run: DelegationRun): void {
+    if (run.holdTimer === null) return;
+    try {
+      this.clearScheduled(run.holdTimer);
+    } finally {
+      run.holdTimer = null;
+    }
+  }
+
+  private armHoldTimer(run: DelegationRun): void {
+    this.clearHoldTimer(run);
+    let timer: unknown = null;
+    timer = this.schedule(() => {
+      if (run.holdTimer !== timer) return;
+      run.holdTimer = null;
+      if (run.settled || run.stopRequested || run.state !== 'held') return;
+      void this.cancelRun(run, 'hold_expired');
+    }, HOLD_EXPIRY_MS);
+    run.holdTimer = timer;
+    if (timer && typeof timer === 'object' && 'unref' in timer) {
+      try {
+        (timer as { unref?: () => void }).unref?.();
+      } catch {
+        // Timer ownership and expiry remain valid when unref is unavailable.
+      }
+    }
+  }
+
+  private async confirmProcessState(
+    run: DelegationRun,
+    expected: 'running' | 'stopped',
+  ): Promise<void> {
+    const entry = run.entry;
+    const child = run.supervisedChild;
+    if (!entry || entry.state !== 'active' || !child || run.settled || run.stopRequested) {
+      throw new TreeUnsettledError();
+    }
+    const inspection = await this.dependencies.inspector.inspect(entry);
+    if (
+      inspection.classification !== 'confirmed'
+      || inspection.process.pid !== entry.pid
+      || inspection.process.processGroupId !== entry.processGroupId
+      || child.pid !== entry.pid
+      || child.processGroupId !== entry.processGroupId
+      || run.settled
+      || run.stopRequested
+    ) throw new TreeUnsettledError();
+    const status = await this.inspectProcessGroupStatus(entry, inspection.process);
+    if (status.classification !== expected || run.settled || run.stopRequested) {
+      throw new TreeUnsettledError();
+    }
+  }
+
+  private async signalAndConfirm(
+    run: DelegationRun,
+    signal: DelegationProcessSignal,
+    before: 'running' | 'stopped',
+    after: 'running' | 'stopped',
+  ): Promise<void> {
+    if (this.platform !== 'linux' && this.platform !== 'darwin') {
+      throw new TreeUnsettledError();
+    }
+    await this.confirmProcessState(run, before);
+    if (run.settled || run.stopRequested || !run.entry || run.entry.state !== 'active') {
+      throw new TreeUnsettledError();
+    }
+    try {
+      this.signalProcessGroup(-run.entry.processGroupId, signal);
+    } catch {
+      throw new TreeUnsettledError();
+    }
+    await this.confirmProcessState(run, after);
+  }
+
   private hold(delegationId: string): Promise<Readonly<Record<string, unknown>>> {
     const run = this.activeRuns.get(delegationId);
     if (!run) return Promise.resolve(Object.freeze({
@@ -1117,15 +1329,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     const operation = (async () => {
       run.state = 'holding';
       try {
-        await this.processControl.hold(run.entry as ActiveJournalEntry, run.supervisedChild!);
+        await this.signalAndConfirm(run, 'SIGSTOP', 'running', 'stopped');
         if (run.settled || run.stopRequested) return Object.freeze({
           delegationId,
           status: 'already_terminal',
         });
         run.state = 'held';
+        this.armHoldTimer(run);
         return Object.freeze({ delegationId, status: 'held' });
       } catch {
-        if (!run.settled && !run.stopRequested) run.state = 'running';
+        if (!run.settled && !run.stopRequested) await this.cancelRun(run, 'hold_failed');
         return Object.freeze({ delegationId, status: 'hold_failed' });
       }
     })();
@@ -1151,8 +1364,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     }
     const operation = (async () => {
       run.state = 'resuming';
+      this.clearHoldTimer(run);
       try {
-        await this.processControl.resume(run.entry as ActiveJournalEntry, run.supervisedChild!);
+        await this.signalAndConfirm(run, 'SIGCONT', 'stopped', 'running');
         if (run.settled || run.stopRequested) return Object.freeze({
           delegationId,
           status: 'already_terminal',
@@ -1160,7 +1374,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         run.state = 'running';
         return Object.freeze({ delegationId, status: 'running' });
       } catch {
-        if (!run.settled && !run.stopRequested) run.state = 'held';
+        if (!run.settled && !run.stopRequested) await this.cancelRun(run, 'resume_failed');
         return Object.freeze({ delegationId, status: 'resume_failed' });
       }
     })();
@@ -1173,9 +1387,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
   private cancelRun(
     run: DelegationRun,
-    reason: 'daemon_shutdown' | 'route_lost',
+    reason: 'daemon_shutdown' | 'route_lost' | 'hold_failed' | 'hold_expired' | 'resume_failed',
   ): Promise<RunTerminalResult> {
     if (run.cancelPromise) return run.cancelPromise;
+    this.clearHoldTimer(run);
     run.stopRequested = true;
     run.failureCode = reason;
     run.state = 'stopping';
@@ -1195,10 +1410,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (run.streams) {
         await Promise.allSettled([run.streams.parser, run.streams.stderr, run.streams.closed]);
       }
-      if (reason === 'route_lost') {
-        this.settleOnce(run, 'failed', diagnosticTerminal('route_lost', run.profileVersion));
-      } else {
+      if (reason === 'daemon_shutdown') {
         this.settleOnce(run, 'cancelled', diagnosticTerminal('cancelled', run.profileVersion));
+      } else {
+        this.settleOnce(run, 'failed', diagnosticTerminal(reason, run.profileVersion));
       }
     } catch (error) {
       const code = errorCode(error) === 'tree_unsettled'
@@ -1223,6 +1438,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     if (code === 'tree_unsettled') return 'tree_unsettled';
     if (code === 'daemon_shutdown') return 'daemon_shutdown';
     if (code === 'route_lost') return 'route_lost';
+    if (code === 'hold_failed') return 'hold_failed';
+    if (code === 'hold_expired') return 'hold_expired';
+    if (code === 'resume_failed') return 'resume_failed';
     return 'spawn_failed';
   }
 
@@ -1249,6 +1467,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     terminal: Readonly<Record<string, unknown>>,
   ): boolean {
     if (run.settled) return false;
+    this.clearHoldTimer(run);
     run.settled = true;
     if (run.routeSignal && run.routeAbortListener) {
       run.routeSignal.removeEventListener('abort', run.routeAbortListener);
@@ -1284,6 +1503,7 @@ export function createProductionSpawnSupervisor(
   const platform = options.platform ?? process.platform;
   const runtimeFiles = createAgentRuntimeFiles({ platform });
   const inspector = createProcessInspector({ platform });
+  const inspectProcessGroupStatus = createProcessGroupStatusInspector(platform);
   const terminator = createProcessTreeTerminator({ platform, inspector });
   const startupRecovery = createAgentStartupRecovery({
     runtimeFiles,
@@ -1306,6 +1526,7 @@ export function createProductionSpawnSupervisor(
     inspector,
     terminator,
     startupRecovery,
+    inspectProcessGroupStatus,
     endpoint: options.endpoint,
     ...(options.cwd ? { cwd: options.cwd } : {}),
     platform,
