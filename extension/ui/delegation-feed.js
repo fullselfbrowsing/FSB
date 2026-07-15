@@ -338,7 +338,8 @@
     if (entry.kind === 'retry') return 'warning';
     if (entry.kind === 'result') return _toneForState(entry.state);
     if (entry.kind === 'tool-call' && entry.tool.status === 'failed') return 'danger';
-    return 'info';
+    if (entry.kind === 'init' || entry.kind === 'state') return 'info';
+    return 'neutral';
   }
 
   function _semanticIcon(tone) {

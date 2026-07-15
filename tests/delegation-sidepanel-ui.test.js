@@ -254,6 +254,11 @@ console.log('\n--- Phase 61 delegation feed contract ---');
     ['1', '2', '3', '4'],
     'persisted entry order is unchanged'
   );
+  assert.deepEqual(
+    articles.map((node) => node.getAttribute('data-delegation-tone')),
+    ['info', 'neutral', 'warning', 'success', 'success'],
+    'init, tool, retry, result, and summary consume only their declared semantic tones'
+  );
   const text = container.textContent;
   [
     'Claude Code', '2.1.177', 'claude-sonnet', 'session_fixture', 'mcp__fsb',
@@ -300,6 +305,12 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert.equal(restartSummary.getAttribute('data-delegation-tone'), 'danger');
   assert(completedSummary.className.includes('delegation-tone-success'));
   assert(failedSummary.className.includes('delegation-tone-danger'));
+
+  const failedTool = clone(snapshot().entries[1]);
+  failedTool.tool.status = 'failed';
+  const failedToolCard = Feed.renderEntry(failedTool);
+  assert.equal(failedToolCard.getAttribute('data-delegation-tone'), 'danger',
+    'canonical failed tool status receives an explicit danger marker');
 }
 
 {
