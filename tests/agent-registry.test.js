@@ -1082,7 +1082,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
   console.log('--- Phase 61 / Task 1: exact one-to-one delegation mapping ---');
   {
-    setupChromeMock({
+    const mock = setupChromeMock({
       tabs: [
         { id: 101, incognito: false, windowId: 10 },
         { id: 202, incognito: false, windowId: 20 }
@@ -1129,6 +1129,16 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         false,
       );
 
+      const agentC = (await registry.registerAgent()).agentId;
+      const delegationC = 'Delegation_storage_C_6104';
+      mock.session._rejectNextSet(new Error('binding write rejected'));
+      assert.deepStrictEqual(
+        await registry.bindDelegation({ delegationId: delegationC, agentId: agentC }),
+        { ok: false, code: 'delegation_binding_persistence_failed' },
+        'durable binding failure leaves no in-memory authority',
+      );
+      assert.strictEqual(registry.getAgentForDelegation(delegationC), null);
+
       assert.strictEqual(await registry.releaseAgent(agentA, 'test'), false,
         'generic release cannot bypass exact delegated cleanup');
       assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA,
@@ -1168,7 +1178,8 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
           delegations: {
             [delegationA]: agentA,
             [delegationGhost]: 'agent_missing',
-            'Delegation_duplicate_A_6104': agentA,
+            'Delegation_duplicate_B1_6104': agentB,
+            'Delegation_duplicate_B2_6104': agentB,
             'malformed.id': agentB
           }
         }
@@ -1184,7 +1195,8 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       await registry.hydrate();
       assert.strictEqual(registry.getAgentForDelegation(delegationA), agentA);
       assert.strictEqual(registry.getAgentForDelegation(delegationGhost), null);
-      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_A_6104'), null);
+      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_B1_6104'), null);
+      assert.strictEqual(registry.getAgentForDelegation('Delegation_duplicate_B2_6104'), null);
       assert.strictEqual(registry.getAgentForDelegation('malformed.id'), null);
       const persisted = mock.session._dump().fsbAgentRegistry;
       assert.deepStrictEqual(persisted.delegations, { [delegationA]: agentA },
@@ -1582,6 +1594,26 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(registry.isOwnedBy(523, agentA, mixedActive.ownershipToken), true);
       registry._delegationByAgent.set(agentA, originalReverse);
 
+      registry._tabOwners.set(599, agentA);
+      const orphanedOwnerIndex = await registry.releaseDelegation({
+        delegationId: delegationA,
+        agentId: agentA,
+      });
+      assert.strictEqual(orphanedOwnerIndex.releasedTabCount, 0,
+        'owner index not represented in the complete reverse set releases zero');
+      registry._tabOwners.delete(599);
+
+      registry._heldTabDelegations.set(598, delegationA);
+      registry._heldTabTokens.set(598, 'orphaned-held-token');
+      const orphanedHeldIndex = await registry.releaseDelegation({
+        delegationId: delegationA,
+        agentId: agentA,
+      });
+      assert.strictEqual(orphanedHeldIndex.releasedTabCount, 0,
+        'held reservation not represented in the sealed lease releases zero');
+      registry._heldTabDelegations.delete(598);
+      registry._heldTabTokens.delete(598);
+
       const released = await registry.releaseDelegation({ delegationId: delegationA, agentId: agentA });
       assert.deepStrictEqual(released, {
         ok: true,
@@ -1598,6 +1630,15 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         'repeated cleanup is a typed zero-count no-op',
       );
       assert.ok(await registry.bindTab(agentB, 521), 'released held tab becomes claimable only after exact cleanup');
+
+      const agentC = (await registry.registerAgent()).agentId;
+      const delegationC = 'Delegation_release_zero_6104';
+      await registry.bindDelegation({ delegationId: delegationC, agentId: agentC });
+      assert.deepStrictEqual(
+        await registry.releaseDelegation({ delegationId: delegationC, agentId: agentC }),
+        { ok: true, code: 'delegation_released', releasedTabCount: 0 },
+        'a valid mapped agent with no tabs cleans up exactly with count zero',
+      );
     } finally {
       teardownDiagnosticCapture();
       teardownChromeMock();

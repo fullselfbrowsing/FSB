@@ -458,9 +458,16 @@
       if (mappedAgent || mappedDelegation) {
         return { ok: false, code: 'delegation_binding_conflict' };
       }
-      self._delegations.set(input.delegationId, input.agentId);
-      self._delegationByAgent.set(input.agentId, input.delegationId);
-      await self._persist();
+      var shadow = self._cloneAuthorityState();
+      shadow._delegations.set(input.delegationId, input.agentId);
+      shadow._delegationByAgent.set(input.agentId, input.delegationId);
+      try {
+        await shadow._persist(true);
+      } catch (_error) {
+        try { await self._persist(); } catch (_ignored) { /* best-effort */ }
+        return { ok: false, code: 'delegation_binding_persistence_failed' };
+      }
+      self._adoptAuthorityState(shadow);
       return {
         ok: true,
         code: 'delegation_bound',
@@ -506,6 +513,17 @@
       }
       out.push({ tabId: tabId, ownershipToken: meta.ownershipToken });
     });
+    this._tabOwners.forEach(function(ownerAgentId, tabId) {
+      if (ownerAgentId === input.agentId && !owned.has(tabId)) valid = false;
+    });
+    var record = this._agents.get(input.agentId);
+    var recordTabIds = record && canonicalRecordTabIds(record.tabIds);
+    var ownedTabIds = Array.from(owned).sort(function(a, b) { return a - b; });
+    if (!recordTabIds
+      || recordTabIds.length !== ownedTabIds.length
+      || recordTabIds.some(function(tabId, index) { return tabId !== ownedTabIds[index]; })) {
+      valid = false;
+    }
     if (!valid || out.length !== owned.size) return [];
     return out.sort(function(a, b) { return a.tabId - b.tabId; });
   };
@@ -609,13 +627,18 @@
       if (!supplied || !supplied.some(function(tab) { return tab.tabId === input.activeTabId; })) {
         return { ok: false, code: 'hold_lease_invalid' };
       }
-      var issuedAt = self._now();
-      var fixedExpiresAt = issuedAt + FSB_HOLD_LEASE_MS;
-      if (!Number.isSafeInteger(issuedAt)
+      var registryNow = self._now();
+      if (!Number.isSafeInteger(registryNow)
         || !Number.isSafeInteger(input.expiresAt)
-        || input.expiresAt !== fixedExpiresAt) {
+        || input.expiresAt < registryNow
+        || input.expiresAt > registryNow + FSB_HOLD_LEASE_MS) {
         return { ok: false, code: 'hold_lease_invalid' };
       }
+      // The controller computes the deadline immediately before this locked
+      // call. Deriving issuedAt from that deadline preserves an exact five-
+      // minute lease without assuming two Date.now() calls share a millisecond.
+      var fixedExpiresAt = input.expiresAt;
+      var issuedAt = fixedExpiresAt - FSB_HOLD_LEASE_MS;
       var current = canonicalOwnedTabs(self.getDelegationOwnedTabs({
         delegationId: input.delegationId,
         agentId: input.agentId
@@ -684,6 +707,12 @@
     return out.sort(function(a, b) { return a - b; });
   }
 
+  function canonicalRecordTabIds(value) {
+    if (!Array.isArray(value)) return null;
+    if (value.length === 0) return [];
+    return canonicalLiveTabIds(value);
+  }
+
   /** Restore every exact held tab/token pair, or restore none. */
   AgentRegistry.prototype.restoreHoldLease = function(input) {
     var self = this;
@@ -716,6 +745,15 @@
           && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
           && !self._tabOwners.has(tab.tabId)
           && !self._tabMetadata.has(tab.tabId);
+      });
+      var leaseTabIds = new Set(lease.ownedTabs.map(function(tab) { return tab.tabId; }));
+      self._heldTabDelegations.forEach(function(delegationId, tabId) {
+        if (delegationId === input.delegationId && !leaseTabIds.has(tabId)) exact = false;
+      });
+      self._holdLeases.forEach(function(candidate, delegationId) {
+        if (candidate && candidate.agentId === input.agentId && delegationId !== input.delegationId) {
+          exact = false;
+        }
       });
       if (!exact) return { ok: false, code: 'resume_ownership_lost' };
 
@@ -793,6 +831,17 @@
           activeExact = false;
         }
       });
+      self._tabOwners.forEach(function(ownerAgentId, tabId) {
+        if (ownerAgentId === input.agentId && !activeTabs.has(tabId)) activeExact = false;
+      });
+      var record = self._agents.get(input.agentId);
+      var recordTabIds = record && canonicalRecordTabIds(record.tabIds);
+      var activeTabIds = Array.from(activeTabs).sort(function(a, b) { return a - b; });
+      if (!recordTabIds
+        || recordTabIds.length !== activeTabIds.length
+        || recordTabIds.some(function(tabId, index) { return tabId !== activeTabIds[index]; })) {
+        activeExact = false;
+      }
       var lease = self._holdLeases.get(input.delegationId) || null;
       var heldExact = !lease || (lease.agentId === input.agentId
         && lease.delegationId === input.delegationId
@@ -801,6 +850,15 @@
             && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
             && !self._tabOwners.has(tab.tabId);
         }));
+      var leaseTabIds = new Set(lease ? lease.ownedTabs.map(function(tab) { return tab.tabId; }) : []);
+      self._heldTabDelegations.forEach(function(delegationId, tabId) {
+        if (delegationId === input.delegationId && !leaseTabIds.has(tabId)) heldExact = false;
+      });
+      self._holdLeases.forEach(function(candidate, delegationId) {
+        if (candidate && candidate.agentId === input.agentId && delegationId !== input.delegationId) {
+          heldExact = false;
+        }
+      });
       if (!activeExact || !heldExact) {
         emitDelegationReleaseMismatch(input, 'ownership_mismatch');
         return { ok: false, code: 'delegation_mapping_mismatch', releasedTabCount: 0 };
@@ -1710,6 +1768,12 @@
       if (payload && payload.delegations !== undefined && !isPlainObject(payload.delegations)) {
         delegationStateChanged = true;
       }
+      var persistedDelegationCounts = Object.create(null);
+      Object.keys(persistedDelegations).forEach(function(delegationId) {
+        var agentId = persistedDelegations[delegationId];
+        if (typeof agentId !== 'string') return;
+        persistedDelegationCounts[agentId] = (persistedDelegationCounts[agentId] || 0) + 1;
+      });
       Object.keys(persistedDelegations).forEach(function(delegationId) {
         var agentId = persistedDelegations[delegationId];
         var record = self._agents.get(agentId);
@@ -1717,6 +1781,7 @@
           || typeof agentId !== 'string'
           || !record
           || record.agentId !== agentId
+          || persistedDelegationCounts[agentId] !== 1
           || self._delegationByAgent.has(agentId)) {
           delegationStateChanged = true;
           return;
