@@ -80,6 +80,16 @@
       var args = request && request.args && typeof request.args === 'object' ? request.args : {};
       var spreadsheetId = String(request && request.spreadsheetId || '');
       var mutating = operation === 'updateValues' || operation === 'appendValues' || operation === 'clearValues';
+      var pageLocation = globalThis.location;
+      var pageMatch = pageLocation && pageLocation.origin === 'https://docs.google.com'
+        ? String(pageLocation.pathname || '').match(/^\/spreadsheets\/d\/([A-Za-z0-9_-]{10,200})(?:\/|$)/)
+        : null;
+      if (!pageMatch || pageMatch[1] !== spreadsheetId) {
+        return error('GOOGLE_SHEETS_TARGET_MISMATCH', {
+          reason: 'page-spreadsheet-changed-before-request',
+          requestSent: false
+        });
+      }
       var gapiClient = globalThis.gapi && globalThis.gapi.client;
       if (!gapiClient || typeof gapiClient.request !== 'function') {
         return error('GOOGLE_SHEETS_SESSION_UNAVAILABLE', {
@@ -156,7 +166,7 @@
             knownNoEffect: true
           });
         }
-        if (mutating && status >= 500 && status <= 599) {
+        if (mutating && (status === 408 || (status >= 500 && status <= 599))) {
           return error('RECOVERY_AMBIGUOUS', {
             reason: 'page-gapi-server-failure',
             status: status,
@@ -185,7 +195,7 @@
             knownNoEffect: true
           });
         }
-        if (mutating && responseStatus >= 500 && responseStatus <= 599) {
+        if (mutating && (responseStatus === 408 || (responseStatus >= 500 && responseStatus <= 599))) {
           return error('RECOVERY_AMBIGUOUS', {
             reason: 'page-gapi-server-failure',
             status: responseStatus,
@@ -211,6 +221,7 @@
     deps = deps || {};
     var chromeApi = deps.chrome || global.chrome;
     var timeoutMs = deps.requestTimeoutMs || REQUEST_TIMEOUT_MS;
+    var mutationChains = new Map();
 
     async function resolveTarget(params, context) {
       params = params || {};
@@ -307,21 +318,42 @@
       }
       if (!result || result.success !== true) {
         if (result && result.code) { return result; }
-        return MUTATIONS[operation] && result && result.mutationStarted
+        return MUTATIONS[operation]
           ? typedError('RECOVERY_AMBIGUOUS', { reason: 'ui-mutation-outcome-unknown' })
           : typedError('RECIPE_DOM_FALLBACK_PENDING', { reason: result && result.reason || 'sheets-ui-operation-unavailable' });
       }
       return result;
     }
 
+    async function executeTransport(target, operation, args) {
+      var pageResult = await runPageClient(target, operation, args);
+      if (pageResult && pageResult.success === true) { return pageResult; }
+      if (!pageResult || pageResult.safeToFallback !== true) { return pageResult; }
+      if (MUTATIONS[operation] && pageResult.requestSent !== false && pageResult.knownNoEffect !== true) {
+        return typedError('RECOVERY_AMBIGUOUS', { reason: 'page-fallback-effect-not-proven' });
+      }
+      return runUi(target, operation, args);
+    }
+
+    function queued(tabId, task) {
+      var prior = mutationChains.get(tabId) || Promise.resolve();
+      var current = prior.catch(function() {}).then(task);
+      mutationChains.set(tabId, current);
+      return current.finally(function() {
+        if (mutationChains.get(tabId) === current) { mutationChains.delete(tabId); }
+      });
+    }
+
     async function execute(operation, params, context) {
       var target = await resolveTarget(params, context);
       if (!target.success) { return target; }
       var args = safeArgs(operation, params);
-      var pageResult = await runPageClient(target, operation, args);
-      if (pageResult && pageResult.success === true) { return pageResult; }
-      if (!pageResult || pageResult.safeToFallback !== true) { return pageResult; }
-      return runUi(target, operation, args);
+      if (MUTATIONS[operation]) {
+        return queued(target.tabId, function() { return executeTransport(target, operation, args); });
+      }
+      var activeMutation = mutationChains.get(target.tabId);
+      if (activeMutation) { await activeMutation.catch(function() {}); }
+      return executeTransport(target, operation, args);
     }
 
     return {

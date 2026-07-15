@@ -730,7 +730,10 @@ class MCPBridgeClient {
         tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null
       };
       const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
-      const spreadsheetTool = payload && (payload.tool === 'fill_sheet' || payload.tool === 'read_sheet');
+      const spreadsheetTool = payload && (
+        payload.tool === 'fill_sheet' || payload.tool === 'read_sheet' ||
+        payload.tool === 'fillsheet' || payload.tool === 'readsheet'
+      );
       if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
         if (!spreadsheetTool) {
           globalThis.fsbMcpSessionRecorder.recordAction(sessionRecordEntry);

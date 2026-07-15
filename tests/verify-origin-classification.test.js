@@ -415,6 +415,19 @@ function check(cond, msg) {
     && broadenedSheetsSources.failures.includes('SHEETS_GAPI_REQUEST_NOT_FIXED')
     && broadenedSheetsSources.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
     '(b) negative control: adding caller-selected fetch(request.url) fails both the fixed-gapi and forbidden-network source checks');
+  const sheetsContentSource = fs.readFileSync(
+    path.join(ROOT, 'extension', 'content', 'actions.js'),
+    'utf8'
+  );
+  const broadenedContentSources = gate.verifyPageGapiUiSheetsSessionSources({
+    contentActionsText: sheetsContentSource.replace(
+      'sheetsSession: async (params = {}) => {',
+      'sheetsSession: async (params = {}) => { fetch(params.url);'
+    )
+  });
+  check(broadenedContentSources && broadenedContentSources.ok === false
+    && broadenedContentSources.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: a caller-selected content-action fetch fails the fixed Sheets UI source contract');
 
   // (b) REAL end-to-end: checkOriginClassification() over the LIVE catalog + vendored
   // slack-api.ts -- proves the real heads all pass and slack rides the dynamic

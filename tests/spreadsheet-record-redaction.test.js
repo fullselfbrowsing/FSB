@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const redaction = require('../extension/utils/spreadsheet-record-redaction.js');
 const ROOT = path.resolve(__dirname, '..');
@@ -17,6 +18,27 @@ function recorder(method) {
     entries,
     target: { [method](entry) { entries.push(entry); } }
   };
+}
+
+function bridgeHarness(spreadsheetRedactor = redaction) {
+  const entries = [];
+  const context = {
+    console,
+    fsbMcpSessionRecorder: {
+      recordAction(entry) { entries.push(entry); }
+    },
+    FsbSpreadsheetRecordRedaction: spreadsheetRedactor,
+    resolveMcpClientLabel() { return 'test-client'; },
+    globalThis: null
+  };
+  context.globalThis = context;
+  const source = fs.readFileSync(path.join(ROOT, 'extension/ws/mcp-bridge-client.js'), 'utf8');
+  vm.runInNewContext(
+    `${source}\nthis.__spreadsheetBridgeClient = mcpBridgeClient;`,
+    context,
+    { filename: 'extension/ws/mcp-bridge-client.js' }
+  );
+  return { client: context.__spreadsheetBridgeClient, entries };
 }
 
 function assertNoContent(entry) {
@@ -134,6 +156,11 @@ test('failure records keep a safe typed code but drop raw errors', () => {
   const second = recorder('recordDispatch');
   redaction.recordSafely(second.target, 'recordDispatch', source);
   assert.equal(second.entries[0].response.errorCode, undefined);
+
+  source.response.errorCode = 'RECOVERY_AMBIGUOUS';
+  const ambiguous = recorder('recordDispatch');
+  redaction.recordSafely(ambiguous.target, 'recordDispatch', source);
+  assert.equal(ambiguous.entries[0].response.errorCode, 'RECOVERY_AMBIGUOUS');
 });
 
 test('recordAction ingress redacts legacy fill_sheet and read_sheet payloads', () => {
@@ -173,6 +200,93 @@ test('recordAction ingress redacts legacy fill_sheet and read_sheet payloads', (
   redaction.recordSafely(readSink.target, 'recordAction', read);
   assert.deepEqual(readSink.entries[0].response.shape, { rowCount: 2, columnCount: 2, valueCount: 3 });
   assertNoContent(readSink.entries[0]);
+});
+
+test('real bridge fillsheet and readsheet payloads are shape-only before recordAction', () => {
+  const fillCsv = `"${SENTINEL}\ninside",2\n3,=${SENTINEL}!A1`;
+  const fillPayload = {
+    tool: 'fillsheet',
+    params: { startCell: 'A1', data: fillCsv, sheetName: SENTINEL, tab_id: 8 },
+    agentId: 'agent:wire',
+    visualSession: { visualReason: `Fill ${SENTINEL}`, client: 'test-client', isFinal: true },
+    ownershipToken: SENTINEL
+  };
+  const fillResponse = {
+    success: true,
+    action: 'fillsheet',
+    startCell: 'A1',
+    rows: 2,
+    cols: 2,
+    cellsFilled: 4,
+    hadEffect: true
+  };
+  const readPayload = {
+    tool: 'readsheet',
+    params: { range: RANGE, tab_id: 8 },
+    agentId: 'agent:wire',
+    ownershipToken: SENTINEL
+  };
+  const readResponse = {
+    success: true,
+    action: 'readsheet',
+    range: RANGE,
+    rows: 2,
+    cols: 2,
+    data: `${SENTINEL},x\n=${SENTINEL}!A1,2`,
+    hadEffect: false
+  };
+
+  const harness = bridgeHarness();
+  harness.client._recordMcpSessionAction(fillPayload, fillResponse, 8);
+  harness.client._recordMcpSessionAction(readPayload, readResponse, 8);
+
+  assert.equal(harness.entries.length, 2);
+  const [fillRecorded, readRecorded] = harness.entries;
+  assert.equal(fillRecorded.tool, 'fillsheet');
+  assert.equal(fillRecorded.payload.tool, 'fillsheet');
+  assert.deepEqual(fillRecorded.params, {
+    operation: 'fillsheet',
+    shape: { rowCount: 2, columnCount: 2, valueCount: 4 }
+  });
+  assert.deepEqual(fillRecorded.payload.params, fillRecorded.params);
+  assert.deepEqual(fillRecorded.payload.visualSession, { isFinal: true });
+  assert.deepEqual(fillRecorded.response, {
+    success: true,
+    shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+  });
+  assertNoContent(fillRecorded);
+
+  assert.equal(readRecorded.tool, 'readsheet');
+  assert.equal(readRecorded.payload.tool, 'readsheet');
+  assert.deepEqual(readRecorded.params, {
+    operation: 'readsheet',
+    shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+  });
+  assert.deepEqual(readRecorded.response, {
+    success: true,
+    shape: { rowCount: 2, columnCount: 2, valueCount: 4 }
+  });
+  assertNoContent(readRecorded);
+});
+
+test('bridge drops every spreadsheet alias when the shared redactor is unavailable', () => {
+  const harness = bridgeHarness(null);
+  for (const tool of ['fill_sheet', 'read_sheet', 'fillsheet', 'readsheet']) {
+    harness.client._recordMcpSessionAction({
+      tool,
+      params: { data: SENTINEL, range: RANGE, sheetName: SENTINEL },
+      agentId: 'agent:wire'
+    }, { success: true, data: SENTINEL }, 8);
+  }
+  assert.equal(harness.entries.length, 0);
+
+  harness.client._recordMcpSessionAction({
+    tool: 'click',
+    params: { selector: '#safe' },
+    agentId: 'agent:wire'
+  }, { success: true }, 8);
+  assert.equal(harness.entries.length, 1);
+  assert.equal(harness.entries[0].tool, 'click');
 });
 
 test('unknown gsheets slugs are recognized and fail closed without retaining the raw slug', () => {

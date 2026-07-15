@@ -1553,6 +1553,17 @@ function sheetsNameBox() {
   return document.querySelector('#t-name-box');
 }
 
+function sheetsComparableReference(reference) {
+  const text = String(reference || '').trim();
+  const delimiter = text.lastIndexOf('!');
+  return (delimiter === -1 ? text : text.slice(delimiter + 1)).replace(/\$/g, '').toUpperCase();
+}
+
+function sheetsTrustedKey(result, reason) {
+  if (result && result.success === true && result.method === 'debuggerAPI') return { success: true };
+  return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', reason || 'trusted-keyboard-unavailable');
+}
+
 async function sheetsNavigate(reference, settleMs = 80) {
   const nameBox = sheetsNameBox();
   if (!nameBox) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-unavailable');
@@ -1560,17 +1571,31 @@ async function sheetsNavigate(reference, settleMs = 80) {
     nameBox.focus();
     nameBox.click();
     await sheetsDelay(25);
-    await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
-    await tools.typeWithKeys({ text: String(reference), clearFirst: false, delay: 5 });
-    await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
+    const selected = sheetsTrustedKey(
+      await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true }),
+      'name-box-select-not-trusted'
+    );
+    if (!selected.success) return selected;
+    const typed = await tools.typeWithKeys({ text: String(reference), clearFirst: false, delay: 5 });
+    if (!typed || typed.success !== true || typed.method !== 'debuggerAPI') {
+      return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-type-not-trusted');
+    }
+    const entered = sheetsTrustedKey(
+      await tools.keyPress({ key: 'Enter', useDebuggerAPI: true }),
+      'name-box-enter-not-trusted'
+    );
+    if (!entered.success) return entered;
     await sheetsDelay(settleMs);
-    return { success: true };
+    if (sheetsComparableReference(sheetsActiveAddress()) !== sheetsComparableReference(reference)) {
+      return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-navigation-not-confirmed');
+    }
+    return { success: true, address: sheetsActiveAddress() };
   } catch (_error) {
     return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-navigation-failed');
   }
 }
 
-function sheetsFormulaBarValue() {
+function sheetsFormulaBarState() {
   const selectors = ['#t-formula-bar-input', '.cell-input', '[aria-label="Formula bar"]'];
   for (const selector of selectors) {
     const element = document.querySelector(selector);
@@ -1578,9 +1603,11 @@ function sheetsFormulaBarValue() {
     const editable = element.querySelector?.('[contenteditable="true"]');
     const candidate = editable || element;
     const value = candidate.value !== undefined ? candidate.value : (candidate.innerText ?? candidate.textContent ?? '');
-    if (value !== undefined && value !== null) return String(value).replace(/\u200B/g, '');
+    if (value !== undefined && value !== null) {
+      return { success: true, value: String(value).replace(/\u200B/g, '') };
+    }
   }
-  return '';
+  return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'formula-bar-unavailable');
 }
 
 function sheetsActiveAddress() {
@@ -1596,14 +1623,20 @@ async function sheetsReadValues(range, majorDimension) {
     return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-read-range-limit-exceeded');
   }
   try {
-    await tools.keyPress({ key: 'Escape', useDebuggerAPI: true });
+    const escaped = sheetsTrustedKey(
+      await tools.keyPress({ key: 'Escape', useDebuggerAPI: true }),
+      'grid-escape-not-trusted'
+    );
+    if (!escaped.success) return escaped;
     const values = [];
     for (let row = parsed.startRow; row <= parsed.endRow; row++) {
       const outputRow = [];
       for (let column = parsed.startColumn; column <= parsed.endColumn; column++) {
         const navigation = await sheetsNavigate(sheetsUi.cellReference(parsed, column, row), 55);
         if (!navigation.success) return navigation;
-        outputRow.push(sheetsFormulaBarValue());
+        const formula = sheetsFormulaBarState();
+        if (!formula.success) return formula;
+        outputRow.push(formula.value);
       }
       values.push(outputRow);
     }
@@ -1656,7 +1689,7 @@ async function sheetsPasteEncoded(parsed, encoded, startRow) {
     mutationStarted = true;
     try {
       const pasted = await tools.keyPress({ key: 'v', ctrlKey: true, useDebuggerAPI: true });
-      if (!pasted || pasted.success !== true) {
+      if (!pasted || pasted.success !== true || pasted.method !== 'debuggerAPI') {
         return sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-outcome-unknown', mutationStarted);
       }
       await sheetsDelay(180);
@@ -1681,28 +1714,33 @@ async function sheetsUpdateValues(range, values, valueInputOption) {
   if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
   const parsed = sheetsUi.parseA1Range(range);
   if (!parsed || parsed.columnOnly) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-update-requires-a1-start-cell');
-  const encoded = sheetsUi.encodeValues(values, valueInputOption || 'RAW');
+  const inputOption = valueInputOption || 'RAW';
+  if (inputOption !== 'RAW' && inputOption !== 'USER_ENTERED') {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-value-input-option');
+  }
+  const encoded = sheetsUi.encodeValues(values, inputOption);
   if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
   return sheetsPasteEncoded(parsed, encoded, parsed.startRow);
 }
 
-async function sheetsFindAppendRow(parsed) {
-  const firstCell = sheetsUi.cellReference(parsed, parsed.startColumn, parsed.startRow || 1);
-  const navigation = await sheetsNavigate(firstCell, 70);
-  if (!navigation.success) return navigation;
-  const startValue = sheetsFormulaBarValue();
-  if (startValue === '') return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-boundary-ambiguous');
-  try {
-    await tools.keyPress({ key: 'ArrowDown', ctrlKey: true, useDebuggerAPI: true });
-    await sheetsDelay(90);
-  } catch (_error) {
-    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-boundary-navigation-failed');
+async function sheetsFindAppendRow(parsed, rowsNeeded, insertDataOption) {
+  if (parsed.columns > sheetsUi.limits.maxAppendColumns) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-column-limit-exceeded');
   }
-  const boundary = sheetsUi.appendRowFromBoundary(
+  const mode = insertDataOption || 'OVERWRITE';
+  const scanRows = sheetsUi.limits.maxAppendTableRows + (mode === 'OVERWRITE' ? rowsNeeded : 1);
+  const startRow = parsed.startRow || 1;
+  const candidateEnd = startRow + scanRows - 1;
+  const endRow = parsed.endRow === null ? candidateEnd : Math.min(parsed.endRow, candidateEnd);
+  const scanRange = `${parsed.sheetPrefix}${sheetsUi.numberToColumn(parsed.startColumn)}${startRow}:` +
+    `${sheetsUi.numberToColumn(parsed.endColumn)}${endRow}`;
+  const scan = await sheetsReadValues(scanRange, 'ROWS');
+  if (!scan.success) return scan;
+  const boundary = sheetsUi.appendRowFromTable(
     parsed,
-    startValue,
-    sheetsActiveAddress(),
-    sheetsFormulaBarValue()
+    scan.data.values,
+    rowsNeeded,
+    mode
   );
   return boundary.success
     ? boundary
@@ -1713,19 +1751,32 @@ async function sheetsAppendValues(range, values, valueInputOption, insertDataOpt
   if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
   const parsed = sheetsUi.parseA1Range(range);
   if (!parsed) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-requires-a1-range');
-  const encoded = sheetsUi.encodeValues(values, valueInputOption || 'RAW');
+  const inputOption = valueInputOption || 'RAW';
+  const dataOption = insertDataOption || 'OVERWRITE';
+  if (inputOption !== 'RAW' && inputOption !== 'USER_ENTERED') {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-value-input-option');
+  }
+  if (dataOption !== 'OVERWRITE' && dataOption !== 'INSERT_ROWS') {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'unsupported-insert-data-option');
+  }
+  const encoded = sheetsUi.encodeValues(values, inputOption);
   if (!encoded.success) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', encoded.reason);
-  const boundary = await sheetsFindAppendRow(parsed);
+  if (encoded.rows > sheetsUi.limits.maxAppendRows || encoded.columns > parsed.columns) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-append-shape-limit-exceeded');
+  }
+  const boundary = await sheetsFindAppendRow(parsed, encoded.rows, dataOption);
   if (!boundary.success) return boundary;
   let mutationStarted = false;
-  if ((insertDataOption || 'OVERWRITE') === 'INSERT_ROWS') {
+  if (dataOption === 'INSERT_ROWS') {
     const lastRow = boundary.row + encoded.rows - 1;
     const selected = await sheetsNavigate(`${parsed.sheetPrefix}${boundary.row}:${lastRow}`, 60);
     if (!selected.success) return selected;
     mutationStarted = true;
     try {
       const inserted = await tools.keyPress({ key: '=', ctrlKey: true, altKey: true, useDebuggerAPI: true });
-      if (!inserted || inserted.success !== true) return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
+      if (!inserted || inserted.success !== true || inserted.method !== 'debuggerAPI') {
+        return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
+      }
       await sheetsDelay(150);
     } catch (_error) {
       return sheetsError('RECOVERY_AMBIGUOUS', 'ui-row-insert-outcome-unknown', true);
@@ -1749,7 +1800,9 @@ async function sheetsClearValues(range) {
   if (!selected.success) return selected;
   try {
     const deleted = await tools.keyPress({ key: 'Delete', useDebuggerAPI: true });
-    if (!deleted || deleted.success !== true) return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-outcome-unknown', true);
+    if (!deleted || deleted.success !== true || deleted.method !== 'debuggerAPI') {
+      return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-outcome-unknown', true);
+    }
     await sheetsDelay(160);
   } catch (_error) {
     return sheetsError('RECOVERY_AMBIGUOUS', 'ui-clear-outcome-unknown', true);
@@ -1770,6 +1823,9 @@ async function sheetsClearValues(range) {
 }
 
 function sheetsSpreadsheetMetadata() {
+  if (!sheetsNameBox()) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-unavailable');
+  const formula = sheetsFormulaBarState();
+  if (!formula.success) return formula;
   const titleInput = document.querySelector('.docs-title-input, #docs-title-input, .docs-title-widget input');
   const title = String(titleInput?.value || document.title || '').replace(/\s+-\s+Google Sheets\s*$/i, '');
   const tabNodes = Array.from(document.querySelectorAll('.docs-sheet-tab-name, .docs-sheet-tab [role="tab"], [role="tab"][aria-label]'));

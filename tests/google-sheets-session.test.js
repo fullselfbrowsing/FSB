@@ -12,6 +12,21 @@ const OTHER_ID = 'zyxwvutsrqponmlkjihgfedcba654321';
 const URL = `https://docs.google.com/spreadsheets/d/${ID}/edit#gid=0`;
 const CONTEXT = { tabId: 17, origin: 'https://docs.google.com', url: URL };
 
+function installPageLocation(spreadsheetId = ID) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: {
+      origin: 'https://docs.google.com',
+      pathname: `/spreadsheets/d/${spreadsheetId}/edit`
+    }
+  });
+  return function restore() {
+    if (previous) Object.defineProperty(globalThis, 'location', previous);
+    else delete globalThis.location;
+  };
+}
+
 function chromeStub(options = {}) {
   const pageCalls = [];
   const uiCalls = [];
@@ -105,8 +120,76 @@ test('never retries or falls back after an ambiguous mutation outcome', async ()
   assert.equal(stub.uiCalls.length, 0);
 });
 
+test('requires independent no-effect proof before a mutation may use UI fallback', async () => {
+  const stub = chromeStub({
+    pageResult: {
+      success: false,
+      code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      safeToFallback: true,
+      requestSent: true
+    }
+  });
+  const client = sessionModule.createSession({ chrome: stub.chrome });
+  const out = await client.updateValues({ range: 'A1', values: [['x']] }, CONTEXT);
+  assert.equal(out.code, 'RECOVERY_AMBIGUOUS');
+  assert.equal(out.reason, 'page-fallback-effect-not-proven');
+  assert.equal(stub.uiCalls.length, 0);
+});
+
+test('treats an untyped UI mutation timeout as ambiguous after dispatch', async () => {
+  const stub = chromeStub({
+    pageResult: {
+      success: false,
+      code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+      safeToFallback: true,
+      requestSent: false
+    },
+    uiResult: { success: false, error: 'Action sheetsSession timed out after 120000ms' }
+  });
+  const client = sessionModule.createSession({ chrome: stub.chrome });
+  const out = await client.clearValues({ range: 'A1' }, CONTEXT);
+  assert.equal(out.code, 'RECOVERY_AMBIGUOUS');
+  assert.equal(stub.uiCalls.length, 1);
+});
+
+test('serializes mutations per tab before dispatching page or UI work', async () => {
+  let concurrent = 0;
+  let maxConcurrent = 0;
+  const chrome = {
+    tabs: {
+      async get(tabId) { return { id: tabId, url: URL }; },
+      async sendMessage() {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        concurrent--;
+        return { success: true, transport: 'ui' };
+      }
+    },
+    scripting: {
+      async executeScript() {
+        return [{ result: {
+          success: false,
+          code: 'GOOGLE_SHEETS_SESSION_UNAVAILABLE',
+          safeToFallback: true,
+          requestSent: false
+        } }];
+      }
+    }
+  };
+  const client = sessionModule.createSession({ chrome });
+  const [updated, cleared] = await Promise.all([
+    client.updateValues({ range: 'A1', values: [['x']] }, CONTEXT),
+    client.clearValues({ range: 'B1' }, CONTEXT)
+  ]);
+  assert.equal(updated.success, true);
+  assert.equal(cleared.success, true);
+  assert.equal(maxConcurrent, 1);
+});
+
 test('classifies mutation timeouts, network failures, and 5xx responses as ambiguous', async () => {
   const previous = globalThis.gapi;
+  const restoreLocation = installPageLocation();
   try {
     globalThis.gapi = { client: { request: () => Promise.reject({ status: 503 }) } };
     const rejected = await sessionModule.pageClientOperation({
@@ -138,6 +221,7 @@ test('classifies mutation timeouts, network failures, and 5xx responses as ambig
     assert.equal(timedOut.code, 'RECOVERY_AMBIGUOUS');
   } finally {
     globalThis.gapi = previous;
+    restoreLocation();
   }
 });
 
@@ -166,6 +250,7 @@ test('surfaces a logged-out UI state as session unavailable', async () => {
 
 test('MAIN-world bridge builds only fixed Sheets requests and uses no supplied transport fields', async () => {
   const previous = globalThis.gapi;
+  const restoreLocation = installPageLocation();
   const calls = [];
   globalThis.gapi = {
     client: {
@@ -197,6 +282,25 @@ test('MAIN-world bridge builds only fixed Sheets requests and uses no supplied t
     assert.equal(JSON.stringify(calls[0]).includes('secret'), false);
   } finally {
     globalThis.gapi = previous;
+    restoreLocation();
+  }
+});
+
+test('MAIN-world bridge re-pins location immediately before the page request', async () => {
+  const previous = globalThis.gapi;
+  const restoreLocation = installPageLocation(OTHER_ID);
+  let calls = 0;
+  globalThis.gapi = { client: { request() { calls++; return Promise.resolve({ status: 200 }); } } };
+  try {
+    const out = await sessionModule.pageClientOperation({
+      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A1' }
+    });
+    assert.equal(out.code, 'GOOGLE_SHEETS_TARGET_MISMATCH');
+    assert.equal(out.requestSent, false);
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.gapi = previous;
+    restoreLocation();
   }
 });
 

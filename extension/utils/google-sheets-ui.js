@@ -8,20 +8,25 @@
   var MAX_CHUNK_CELLS = 5000;
   var MAX_TOTAL_BYTES = 1024 * 1024;
   var MAX_CHUNK_BYTES = 256 * 1024;
+  var MAX_SHEETS_COLUMNS = 18278;
+  var MAX_SHEETS_ROWS = 10000000;
+  var MAX_APPEND_TABLE_ROWS = 25;
+  var MAX_APPEND_COLUMNS = 10;
+  var MAX_APPEND_ROWS = 25;
 
   function columnToNumber(column) {
     var value = String(column || '').toUpperCase();
-    if (!/^[A-Z]+$/.test(value)) { return 0; }
+    if (!/^[A-Z]{1,3}$/.test(value)) { return 0; }
     var number = 0;
     for (var i = 0; i < value.length; i++) {
       number = number * 26 + value.charCodeAt(i) - 64;
     }
-    return number;
+    return number <= MAX_SHEETS_COLUMNS ? number : 0;
   }
 
   function numberToColumn(number) {
     number = Number(number);
-    if (!Number.isInteger(number) || number < 1) { return ''; }
+    if (!Number.isInteger(number) || number < 1 || number > MAX_SHEETS_COLUMNS) { return ''; }
     var out = '';
     while (number > 0) {
       var remainder = (number - 1) % 26;
@@ -57,7 +62,8 @@
       var endColumn = columnToNumber(cellMatch[3] || cellMatch[1]);
       var startRow = Number(cellMatch[2]);
       var endRow = Number(cellMatch[4] || cellMatch[2]);
-      if (!startColumn || !endColumn || startRow < 1 || endRow < startRow || endColumn < startColumn) { return null; }
+      if (!startColumn || !endColumn || !Number.isSafeInteger(startRow) || !Number.isSafeInteger(endRow) ||
+          startRow < 1 || endRow > MAX_SHEETS_ROWS || endRow < startRow || endColumn < startColumn) { return null; }
       return {
         sheetPrefix: parts.sheetPrefix,
         startColumn: startColumn,
@@ -114,6 +120,10 @@
   }
 
   function encodeValues(values, valueInputOption) {
+    var inputOption = valueInputOption || 'RAW';
+    if (inputOption !== 'RAW' && inputOption !== 'USER_ENTERED') {
+      return { success: false, reason: 'unsupported-value-input-option' };
+    }
     if (!Array.isArray(values) || values.length === 0 || !Array.isArray(values[0]) || values[0].length === 0) {
       return { success: false, reason: 'values-must-be-a-non-empty-matrix' };
     }
@@ -128,7 +138,7 @@
       }
       var encodedRow = [];
       for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
-        var normalized = normalizeCell(row[columnIndex], valueInputOption);
+        var normalized = normalizeCell(row[columnIndex], inputOption);
         if (normalized.error) { return { success: false, reason: normalized.error }; }
         encodedRow.push(normalized.value);
       }
@@ -184,17 +194,44 @@
     return output;
   }
 
-  function appendRowFromBoundary(parsed, startValue, activeAddress, activeValue) {
-    if (!parsed || String(startValue || '') === '') {
+  function isEmptyCell(value) {
+    return value === '' || value === null || value === undefined;
+  }
+
+  function appendRowFromTable(parsed, values, rowsNeeded, insertDataOption) {
+    var requiredRows = Number(rowsNeeded);
+    var mode = insertDataOption || 'OVERWRITE';
+    if (!parsed || !Array.isArray(values) || !Number.isInteger(requiredRows) ||
+        requiredRows < 1 || requiredRows > MAX_APPEND_ROWS ||
+        (mode !== 'OVERWRITE' && mode !== 'INSERT_ROWS')) {
       return { success: false, reason: 'ui-append-boundary-ambiguous' };
     }
-    var active = parseA1Range(activeAddress);
-    if (!active || active.columnOnly || active.startColumn !== parsed.startColumn ||
-        active.startRow < (parsed.startRow || 1) || active.startRow > 100000 ||
-        String(activeValue || '') === '') {
-      return { success: false, reason: 'ui-append-boundary-ambiguous' };
+    var boundaryIndex = -1;
+    for (var index = 0; index < values.length; index++) {
+      var row = values[index];
+      if (!Array.isArray(row) || row.length !== parsed.columns) {
+        return { success: false, reason: 'ui-append-boundary-ambiguous' };
+      }
+      var empty = row.every(isEmptyCell);
+      var full = row.every(function(value) { return !isEmptyCell(value); });
+      if (boundaryIndex === -1) {
+        if (full && index < MAX_APPEND_TABLE_ROWS) { continue; }
+        if (!empty || index === 0 || index > MAX_APPEND_TABLE_ROWS) {
+          return { success: false, reason: 'ui-append-boundary-ambiguous' };
+        }
+        boundaryIndex = index;
+        if (mode === 'INSERT_ROWS') {
+          return { success: true, row: (parsed.startRow || 1) + boundaryIndex };
+        }
+      }
+      if (index < boundaryIndex + requiredRows && !empty) {
+        return { success: false, reason: 'ui-append-target-not-empty' };
+      }
+      if (index === boundaryIndex + requiredRows - 1) {
+        return { success: true, row: (parsed.startRow || 1) + boundaryIndex };
+      }
     }
-    return { success: true, row: active.startRow + 1 };
+    return { success: false, reason: 'ui-append-boundary-ambiguous' };
   }
 
   function valuesAreEmpty(values) {
@@ -248,7 +285,7 @@
     cellReference: cellReference,
     encodeValues: encodeValues,
     transpose: transpose,
-    appendRowFromBoundary: appendRowFromBoundary,
+    appendRowFromTable: appendRowFromTable,
     valuesAreEmpty: valuesAreEmpty,
     csvToValues: csvToValues,
     valuesToCsv: valuesToCsv,
@@ -259,7 +296,12 @@
       maxClearCells: MAX_CLEAR_CELLS,
       maxChunkCells: MAX_CHUNK_CELLS,
       maxTotalBytes: MAX_TOTAL_BYTES,
-      maxChunkBytes: MAX_CHUNK_BYTES
+      maxChunkBytes: MAX_CHUNK_BYTES,
+      maxSheetsColumns: MAX_SHEETS_COLUMNS,
+      maxSheetsRows: MAX_SHEETS_ROWS,
+      maxAppendTableRows: MAX_APPEND_TABLE_ROWS,
+      maxAppendColumns: MAX_APPEND_COLUMNS,
+      maxAppendRows: MAX_APPEND_ROWS
     })
   });
   global.FsbGoogleSheetsUi = api;

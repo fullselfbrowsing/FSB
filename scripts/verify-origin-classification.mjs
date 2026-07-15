@@ -4511,6 +4511,17 @@ export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
   if (!handlerText) { failures.push('SHEETS_HANDLER_MISSING'); }
   if (!contentActionsText) { failures.push('SHEETS_CONTENT_ACTIONS_MISSING'); }
 
+  const contentHelpersStart = contentActionsText.indexOf('// Google Sheets signed-in-tab UI transport');
+  const contentHelpersEnd = contentActionsText.indexOf('// Tool functions for browser automation', contentHelpersStart);
+  const contentActionStart = contentActionsText.search(/\bsheetsSession\s*:\s*async\b/);
+  const contentActionEnd = contentActionsText.indexOf('// GOOGLE SHEETS: fillsheet', contentActionStart);
+  const sheetsContentText = contentHelpersStart !== -1 && contentHelpersEnd > contentHelpersStart
+    && contentActionStart !== -1 && contentActionEnd > contentActionStart
+    ? contentActionsText.slice(contentHelpersStart, contentHelpersEnd)
+      + '\n' + contentActionsText.slice(contentActionStart, contentActionEnd)
+    : '';
+  if (!sheetsContentText) { failures.push('SHEETS_CONTENT_ACTION_NOT_FIXED'); }
+
   const fixedMethods = ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'];
   const sessionReturn = sessionText.match(
     /return\s*\{([\s\S]*?)\};\s*\}\s*var\s+session\s*=\s*createSession\s*\(\s*\)/
@@ -4528,6 +4539,8 @@ export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
     && /chromeApi\.tabs\.get\(tabId\)/.test(sessionText)
     && /spreadsheetIdFromUrl\(tab\s*&&\s*tab\.url\)/.test(sessionText)
     && /explicit\s*!==\s*spreadsheetId/.test(sessionText)
+    && /pageLocation\.origin\s*===\s*['"]https:\/\/docs\.google\.com['"]/.test(sessionText)
+    && /pageMatch\[1\]\s*!==\s*spreadsheetId/.test(sessionText)
     && /target:\s*\{\s*tabId:\s*target\.tabId\s*\}/.test(sessionText)
     && /sendMessage\(target\.tabId,\s*\{/.test(sessionText)
     && !/chromeApi\.tabs\.(?:query|create|update)\s*\(/.test(sessionText);
@@ -4552,7 +4565,7 @@ export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
     && !/(?:request|args|params)\.(?:url|path|method|headers|body)\b/.test(sessionText);
   if (!fixedGapiRequestOk) { failures.push('SHEETS_GAPI_REQUEST_NOT_FIXED'); }
 
-  const forbiddenSheetsSource = sessionText + '\n' + handlerText;
+  const forbiddenSheetsSource = sessionText + '\n' + handlerText + '\n' + sheetsContentText;
   const hasForbiddenCredentialOrNetworkSource =
     /chrome(?:Api)?\.identity\b|\bgetAuthToken\b/i.test(forbiddenSheetsSource)
     || /\bgapi(?:Client)?\.(?:auth|load|init)\b|\bgoogle\.accounts\b|\binit(?:Token|Code)Client\b|\brequestAccessToken\b/i.test(forbiddenSheetsSource)
@@ -4563,8 +4576,14 @@ export function verifyPageGapiUiSheetsSessionSources(sourceOverrides) {
     || /\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\s*\(|\bWebSocket\s*\(|\bEventSource\s*\(/i.test(forbiddenSheetsSource);
   if (hasForbiddenCredentialOrNetworkSource) { failures.push('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'); }
 
-  const contentActionOk = /\bsheetsSession\s*:\s*async\b/.test(contentActionsText)
-    || /\btools\.sheetsSession\s*=\s*async\b/.test(contentActionsText);
+  const contentActionOk = !!sheetsContentText
+    && /\bsheetsSession\s*:\s*async\b/.test(sheetsContentText)
+    && /isGoogleSheetsPage\(\)/.test(sheetsContentText)
+    && /params\.spreadsheetId\s*&&\s*params\.spreadsheetId\s*!==\s*activeId/.test(sheetsContentText)
+    && ['getSpreadsheet', 'getValues', 'updateValues', 'appendValues', 'clearValues'].every(function(operation) {
+      return sheetsContentText.indexOf("operation === '" + operation + "'") !== -1;
+    })
+    && !/(?:params|args)\.(?:url|path|method|headers|body)\b/.test(sheetsContentText);
   if (!contentActionOk) { failures.push('SHEETS_SESSION_CONTENT_ACTION_MISSING'); }
 
   const slugs = [

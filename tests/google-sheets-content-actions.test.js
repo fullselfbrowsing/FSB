@@ -4,9 +4,118 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const ui = require('../extension/utils/google-sheets-ui.js');
 const ROOT = path.resolve(__dirname, '..');
+const ACTIONS_SOURCE = fs.readFileSync(path.join(ROOT, 'extension/content/actions.js'), 'utf8');
+
+function sheetsDomHarness(options = {}) {
+  const start = ACTIONS_SOURCE.indexOf('// Google Sheets signed-in-tab UI transport');
+  const end = ACTIONS_SOURCE.indexOf('// Tool functions for browser automation', start);
+  assert.ok(start >= 0 && end > start, 'Sheets content helper source region exists');
+
+  const cells = new Map(Object.entries(options.cells || {}));
+  let selectedAddress = options.initialAddress || 'A1';
+  let pendingAddress = selectedAddress;
+  let pasteCalls = 0;
+  let deleteCalls = 0;
+  const nameBox = options.missingNameBox ? null : {
+    value: selectedAddress,
+    textContent: selectedAddress,
+    focus() {},
+    click() {}
+  };
+  const formulaBar = options.missingFormulaBar ? null : {
+    querySelector() { return null; },
+    get value() { return cells.get(selectedAddress) ?? ''; }
+  };
+  const trusted = { success: true, method: 'debuggerAPI' };
+  const tools = {
+    async keyPress(params) {
+      if (typeof options.keyPress === 'function') {
+        const override = await options.keyPress(params, { selectedAddress, cells });
+        if (override) return override;
+      }
+      if (params.key === 'Enter') {
+        if (options.confirmNavigation !== false) {
+          selectedAddress = pendingAddress.replace(/^.*!/, '').replace(/\$/g, '').toUpperCase();
+        }
+        if (nameBox) nameBox.value = selectedAddress;
+      }
+      if (params.key === 'v' && params.ctrlKey) pasteCalls++;
+      if (params.key === 'Delete') {
+        deleteCalls++;
+        if (options.deleteHasEffect !== false) cells.set(selectedAddress, '');
+      }
+      return trusted;
+    },
+    async typeWithKeys(params) {
+      if (options.typeResult) return options.typeResult;
+      pendingAddress = String(params.text);
+      if (nameBox) nameBox.value = pendingAddress;
+      return { success: true, method: 'debuggerAPI' };
+    }
+  };
+  const document = {
+    title: options.title || 'Disposable - Google Sheets',
+    querySelector(selector) {
+      if (selector === '#t-name-box') return nameBox;
+      if (selector === '#t-formula-bar-input' || selector === '.cell-input' || selector === '[aria-label="Formula bar"]') {
+        return formulaBar;
+      }
+      if (selector.includes('docs-title-input')) {
+        return options.missingTitle ? null : { value: options.title || 'Disposable' };
+      }
+      return null;
+    },
+    querySelectorAll() { return options.tabNodes || []; }
+  };
+  const context = {
+    console,
+    FsbGoogleSheetsUi: ui,
+    __tools: tools,
+    document,
+    navigator: {
+      clipboard: {
+        async writeText(text) {
+          if (options.clipboardError) throw options.clipboardError;
+          context.__clipboard = text;
+        }
+      }
+    },
+    window: {
+      location: {
+        hostname: options.hostname || 'docs.google.com',
+        pathname: options.pathname || '/spreadsheets/d/abcdefghijklmnopqrstuvwxyz123456/edit'
+      }
+    },
+    setTimeout(callback) { callback(); return 1; },
+    clearTimeout() {},
+    globalThis: null
+  };
+  context.globalThis = context;
+  const exports = [
+    'sheetsNavigate',
+    'sheetsReadValues',
+    'sheetsUpdateValues',
+    'sheetsAppendValues',
+    'sheetsClearValues',
+    'sheetsSpreadsheetMetadata'
+  ];
+  vm.runInNewContext(
+    `${ACTIONS_SOURCE.slice(start, end)}\nconst tools = globalThis.__tools;\n` +
+      `globalThis.__sheetsInternals = { ${exports.join(', ')} };`,
+    context,
+    { filename: 'extension/content/actions.sheets-region.js' }
+  );
+  return {
+    api: context.__sheetsInternals,
+    cells,
+    get pasteCalls() { return pasteCalls; },
+    get deleteCalls() { return deleteCalls; }
+  };
+}
 
 test('parses bounded A1, quoted-sheet, single-cell, and column append ranges', () => {
   assert.deepEqual(ui.parseA1Range('A1:B2'), {
@@ -27,6 +136,10 @@ test('parses bounded A1, quoted-sheet, single-cell, and column append ranges', (
   assert.equal(columns.columns, 3);
   assert.equal(ui.parseA1Range('A0:B2'), null);
   assert.equal(ui.parseA1Range('https://attacker.example'), null);
+  assert.equal(ui.parseA1Range(`${'Z'.repeat(400)}1`), null);
+  assert.equal(ui.parseA1Range(`A${'9'.repeat(400)}`), null);
+  assert.equal(ui.parseA1Range('ZZZ10000000').endRow, 10000000);
+  assert.equal(ui.parseA1Range('AAAA1'), null);
 });
 
 test('encodes RAW strings as literal text and preserves USER_ENTERED formulas', () => {
@@ -41,6 +154,7 @@ test('encodes RAW strings as literal text and preserves USER_ENTERED formulas', 
   const entered = ui.encodeValues([['=1+1']], 'USER_ENTERED');
   assert.equal(entered.success, true);
   assert.equal(entered.chunks[0].text, '=1+1');
+  assert.equal(ui.encodeValues([['=1+1']], 'FORMULA').reason, 'unsupported-value-input-option');
 });
 
 test('fails closed for lossy matrices and row-chunks large bounded writes', () => {
@@ -66,22 +180,100 @@ test('legacy CSV conversion and read transpose reuse the shared value helpers', 
 
 test('append boundaries and clear readback fail closed when UI state is ambiguous', () => {
   const parsed = ui.parseA1Range('Data!A:C');
-  assert.deepEqual(ui.appendRowFromBoundary(parsed, '', 'A1', ''), {
+  assert.deepEqual(ui.appendRowFromTable(parsed, [
+    ['', '', ''],
+    ['', '', '']
+  ], 1, 'OVERWRITE'), {
     success: false,
     reason: 'ui-append-boundary-ambiguous'
   });
-  assert.equal(ui.appendRowFromBoundary(parsed, 'header', 'B8', 'value').success, false);
-  assert.deepEqual(ui.appendRowFromBoundary(parsed, 'header', 'A8', 'last row'), {
+  assert.equal(ui.appendRowFromTable(parsed, [
+    ['h1', 'h2', 'h3'],
+    ['a', '', 'c'],
+    ['', '', '']
+  ], 1, 'OVERWRITE').success, false);
+  assert.equal(ui.appendRowFromTable(parsed, [
+    ['h1', 'h2', 'h3'],
+    ['', 'orphan', ''],
+    ['', '', '']
+  ], 1, 'OVERWRITE').success, false);
+  assert.deepEqual(ui.appendRowFromTable(parsed, [
+    ['h1', 'h2', 'h3'],
+    ['a', 'b', 'c'],
+    ['', '', ''],
+    ['', '', '']
+  ], 2, 'OVERWRITE'), {
     success: true,
-    row: 9
+    row: 3
   });
+  assert.equal(ui.appendRowFromTable(parsed, [
+    ['h1', 'h2', 'h3'],
+    ['', '', ''],
+    ['later', 'data', 'row']
+  ], 2, 'OVERWRITE').reason, 'ui-append-target-not-empty');
   assert.equal(ui.valuesAreEmpty([['', ''], ['', '']]), true);
   assert.equal(ui.valuesAreEmpty([[''], ['still present']]), false);
   assert.equal(ui.valuesAreEmpty([[0]]), false);
 });
 
+test('DOM fallback requires trusted keys, confirmed addresses, and a real formula bar', async () => {
+  const untrusted = sheetsDomHarness({
+    keyPress() { return { success: true, method: 'domEvents', trusted: false }; }
+  });
+  const untrustedResult = await untrusted.api.sheetsUpdateValues('A1', [['x']], 'RAW');
+  assert.equal(untrustedResult.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(untrusted.pasteCalls, 0);
+
+  const wrongAddress = sheetsDomHarness({ confirmNavigation: false });
+  const wrongAddressResult = await wrongAddress.api.sheetsNavigate('B2');
+  assert.equal(wrongAddressResult.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(wrongAddressResult.reason, 'name-box-navigation-not-confirmed');
+
+  const noFormula = sheetsDomHarness({ missingFormulaBar: true });
+  const read = await noFormula.api.sheetsReadValues('A1', 'ROWS');
+  assert.equal(read.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(read.reason, 'formula-bar-unavailable');
+  assert.equal(noFormula.api.sheetsSpreadsheetMetadata().code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+});
+
+test('DOM append scans a rectangular table and clear verifies actual readback', async () => {
+  const append = sheetsDomHarness({
+    cells: {
+      A1: 'h1', B1: 'h2', C1: 'h3',
+      A2: '', B2: 'orphan', C2: ''
+    }
+  });
+  const appendResult = await append.api.sheetsAppendValues('A:C', [['x', 'y', 'z']], 'RAW', 'OVERWRITE');
+  assert.equal(appendResult.code, 'RECIPE_DOM_FALLBACK_PENDING');
+  assert.equal(appendResult.reason, 'ui-append-boundary-ambiguous');
+  assert.equal(append.pasteCalls, 0);
+
+  const clearNoEffect = sheetsDomHarness({ cells: { A1: 'still here' }, deleteHasEffect: false });
+  const clearResult = await clearNoEffect.api.sheetsClearValues('A1');
+  assert.equal(clearResult.code, 'RECOVERY_AMBIGUOUS');
+  assert.equal(clearResult.reason, 'ui-clear-verification-mismatch');
+  assert.equal(clearNoEffect.deleteCalls, 1);
+
+  const clearWrongTarget = sheetsDomHarness({ cells: { A1: 'keep' }, confirmNavigation: false });
+  const wrongTargetResult = await clearWrongTarget.api.sheetsClearValues('B2');
+  assert.equal(wrongTargetResult.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+  assert.equal(clearWrongTarget.deleteCalls, 0);
+});
+
+test('fixed DOM actions reject caller-supplied option values outside the typed enums', async () => {
+  const harness = sheetsDomHarness({ cells: { A1: 'header' } });
+  assert.equal(
+    (await harness.api.sheetsUpdateValues('A1', [['=unsafe']], 'FORMULA')).reason,
+    'unsupported-value-input-option'
+  );
+  assert.equal(
+    (await harness.api.sheetsAppendValues('A:C', [['x']], 'RAW', 'SHIFT_DOWN')).reason,
+    'unsupported-insert-data-option'
+  );
+});
+
 test('content action exposes only the fixed Sheets UI operations and protects value-bearing logs', () => {
-  const actions = fs.readFileSync(path.join(ROOT, 'extension/content/actions.js'), 'utf8');
+  const actions = ACTIONS_SOURCE;
   const messaging = fs.readFileSync(path.join(ROOT, 'extension/content/messaging.js'), 'utf8');
   const background = fs.readFileSync(path.join(ROOT, 'extension/background.js'), 'utf8');
   const wsClient = fs.readFileSync(path.join(ROOT, 'extension/ws/ws-client.js'), 'utf8');

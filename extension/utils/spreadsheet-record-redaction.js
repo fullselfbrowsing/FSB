@@ -8,8 +8,14 @@
     'gsheets.append_values': true,
     'gsheets.clear_values': true
   });
-  var LEGACY_TOOLS = Object.freeze({ fill_sheet: true, read_sheet: true });
+  var LEGACY_TOOLS = Object.freeze({
+    fill_sheet: true,
+    read_sheet: true,
+    fillsheet: true,
+    readsheet: true
+  });
   var SAFE_ERROR_CODE = /^(?:GOOGLE_SHEETS|RECIPE)_[A-Z0-9_]{1,64}$/;
+  var SAFE_EXACT_ERROR_CODES = Object.freeze({ RECOVERY_AMBIGUOUS: true });
 
   function object(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -101,6 +107,7 @@
     params = object(params);
     if (Array.isArray(params.values)) { return arrayShape(params.values); }
     if (typeof params.csvData === 'string') { return csvShape(params.csvData); }
+    if (typeof params.data === 'string') { return csvShape(params.data); }
     return { rowCount: 0, columnCount: 0, valueCount: 0 };
   }
 
@@ -117,7 +124,7 @@
       data.values,
       data.rows
     ];
-    var shape = null;
+    var shape = typeof rawData === 'string' ? csvShape(rawData) : null;
     for (var i = 0; i < candidates.length; i++) {
       if (Array.isArray(candidates[i])) { shape = arrayShape(candidates[i]); break; }
     }
@@ -161,7 +168,9 @@
       out.status = Math.floor(value.status);
     }
     var code = typeof value.errorCode === 'string' ? value.errorCode : value.code;
-    if (typeof code === 'string' && SAFE_ERROR_CODE.test(code)) { out.errorCode = code; }
+    if (typeof code === 'string' && (SAFE_ERROR_CODE.test(code) || SAFE_EXACT_ERROR_CODES[code])) {
+      out.errorCode = code;
+    }
     return out;
   }
 
