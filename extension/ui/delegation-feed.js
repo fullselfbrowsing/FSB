@@ -331,6 +331,7 @@
     if (state === 'completed') return 'success';
     if (state === 'failed' || state === 'restart_lost') return 'danger';
     if (state === 'held' || state === 'resuming') return 'warning';
+    if (state === 'stopped') return 'neutral';
     return 'info';
   }
 
@@ -338,7 +339,8 @@
     if (entry.kind === 'retry') return 'warning';
     if (entry.kind === 'result') return _toneForState(entry.state);
     if (entry.kind === 'tool-call' && entry.tool.status === 'failed') return 'danger';
-    if (entry.kind === 'init' || entry.kind === 'state') return 'info';
+    if (entry.kind === 'state') return _toneForState(entry.state);
+    if (entry.kind === 'init') return 'info';
     return 'neutral';
   }
 

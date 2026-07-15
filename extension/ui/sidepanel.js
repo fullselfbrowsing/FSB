@@ -1288,7 +1288,13 @@ function _renderDelegationPreflightFailure(result) {
   } else {
     mount.state.removeAttribute('role');
   }
-  var heading = _delegationElement('h2', 'delegation-state-heading', headingText);
+  var offlinePresentation = code === 'agent_offline' || code === 'runtime_unavailable';
+  var heading = offlinePresentation
+    ? _delegationSemanticHeading(
+      'h2', 'delegation-state-heading delegation-semantic-heading', headingText, 'danger'
+    )
+    : _delegationElement('h2', 'delegation-state-heading', headingText);
+  if (offlinePresentation) heading.setAttribute('data-delegation-tone', 'danger');
   heading.id = 'delegationRunHeading';
   heading.tabIndex = -1;
   mount.state.appendChild(heading);
@@ -1306,7 +1312,6 @@ function _renderDelegationPreflightFailure(result) {
     _clearDelegationNode(mount.control);
     mount.control.classList.add('hidden');
   }
-  var offlinePresentation = code === 'agent_offline' || code === 'runtime_unavailable';
   _setDelegationHeaderStatus(
     offlinePresentation ? 'Agent offline' : 'Ready',
     offlinePresentation ? 'error' : ''
@@ -1460,7 +1465,17 @@ function _restoreLegacyStopControl() {
   stopBtn.removeAttribute('data-delegation-action');
   stopBtn.removeAttribute('aria-label');
   stopBtn.setAttribute('title', 'Stop Automation');
-  stopBtn.disabled = _chatLockedByOwnerChip === true;
+  var ownerLocked = _chatLockedByOwnerChip === true;
+  stopBtn.disabled = ownerLocked;
+  if (ownerLocked) {
+    stopBtn.setAttribute('aria-disabled', 'true');
+    stopBtn.setAttribute('aria-describedby', 'fsb-lockout-aria-description');
+    stopBtn.classList.add('fsb-foreign-owned-disabled');
+  } else {
+    stopBtn.removeAttribute('aria-disabled');
+    stopBtn.removeAttribute('aria-describedby');
+    stopBtn.classList.remove('fsb-foreign-owned-disabled');
+  }
   if (typeof isRunning !== 'undefined' && isRunning) stopBtn.classList.remove('hidden');
   else stopBtn.classList.add('hidden');
 }
@@ -1474,7 +1489,11 @@ function _syncDelegationStopControls(snapshot) {
   var stopLabel = stopping ? 'Stopping agent…' : 'Stop agent';
   if (stopBtn) {
     stopBtn.classList.remove('hidden');
-    stopBtn.disabled = stopping || _chatLockedByOwnerChip === true;
+    stopBtn.classList.remove('fsb-foreign-owned-disabled');
+    stopBtn.removeAttribute('aria-describedby');
+    stopBtn.disabled = stopping;
+    if (stopping) stopBtn.setAttribute('aria-disabled', 'true');
+    else stopBtn.removeAttribute('aria-disabled');
     stopBtn.setAttribute('data-delegation-action', 'stop');
     stopBtn.setAttribute('title', stopLabel);
     stopBtn.setAttribute('aria-label', stopLabel);
@@ -2592,9 +2611,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // the aria-describedby span at sidepanel.html line ~27 supplies
 // screen-reader semantics.
 //
-// D-13: stopBtn is included in the lockout because stopBtn is
-// FSB-Autopilot-local; surfacing it as enabled while a foreign agent owns
-// the tab creates a false affordance.
+// D-13: stopBtn is included in the lockout while it remains the legacy
+// FSB-Autopilot-local control. A selected delegated run reuses that location
+// for its own idempotent kill switch, which must stay operable for its owner.
 function applyInputLockout(foreignOwned) {
   var ariaDescribedById = 'fsb-lockout-aria-description';
   var controls = [
@@ -2607,7 +2626,12 @@ function applyInputLockout(foreignOwned) {
     var spec = controls[i];
     var el = document.getElementById(spec.id);
     if (!el) continue;
-    if (foreignOwned) {
+    var isDelegatedFixedStop = foreignOwned
+      && spec.id === 'stopBtn'
+      && typeof _delegationUsesFixedStop === 'function'
+      && typeof _delegationUiState !== 'undefined'
+      && _delegationUsesFixedStop(_delegationUiState.snapshot);
+    if (foreignOwned && !isDelegatedFixedStop) {
       if (spec.kind === 'button') {
         el.disabled = true;
       } else {
@@ -2649,6 +2673,9 @@ function applyInputLockout(foreignOwned) {
   }
   if (!foreignOwned && typeof _applyDelegationComposerLock === 'function') {
     try { _applyDelegationComposerLock(); } catch (_e) { /* swallow */ }
+  } else if (typeof _syncDelegationStopControls === 'function'
+      && typeof _delegationUiState !== 'undefined') {
+    try { _syncDelegationStopControls(_delegationUiState.snapshot); } catch (_e) { /* swallow */ }
   }
 }
 

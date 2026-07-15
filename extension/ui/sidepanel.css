@@ -1869,7 +1869,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
 .delegation-trust-checkbox {
   flex: 0 0 auto;
-  margin: 2px 0 0;
+  margin: var(--fsb-space-1) 0 0;
 }
 
 .delegation-inline-error {

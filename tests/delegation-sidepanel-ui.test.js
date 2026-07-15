@@ -299,12 +299,31 @@ console.log('\n--- Phase 61 delegation feed contract ---');
 
   const completedSummary = Feed.renderSummary(summary({ state: 'completed' }));
   const failedSummary = Feed.renderSummary(summary({ state: 'failed' }));
+  const stoppedSummary = Feed.renderSummary(summary({ state: 'stopped' }));
   const restartSummary = Feed.renderSummary(summary({ state: 'restart_lost' }));
   assert.equal(completedSummary.getAttribute('data-delegation-tone'), 'success');
   assert.equal(failedSummary.getAttribute('data-delegation-tone'), 'danger');
+  assert.equal(stoppedSummary.getAttribute('data-delegation-tone'), 'neutral');
   assert.equal(restartSummary.getAttribute('data-delegation-tone'), 'danger');
   assert(completedSummary.className.includes('delegation-tone-success'));
   assert(failedSummary.className.includes('delegation-tone-danger'));
+
+  const stateToneMatrix = {
+    running: 'info',
+    held: 'warning',
+    resuming: 'warning',
+    completed: 'success',
+    failed: 'danger',
+    stopped: 'neutral',
+    restart_lost: 'danger'
+  };
+  Object.entries(stateToneMatrix).forEach(([state, tone], index) => {
+    const stateCard = Feed.renderEntry(entry(10 + index, 'state', state));
+    assert.equal(stateCard.getAttribute('data-delegation-state'), state);
+    assert.equal(stateCard.getAttribute('data-delegation-tone'), tone,
+      `persisted ${state} state row uses its canonical ${tone} tone`);
+    assert.equal(findAll(stateCard, 'i')[0].getAttribute('aria-hidden'), 'true');
+  });
 
   const failedTool = clone(snapshot().entries[1]);
   failedTool.tool.status = 'failed';
@@ -412,9 +431,22 @@ assert(!/\.delegation-entry-tool-call\s*\{[^}]*var\(--fsb-primary\)/s.test(cssSo
   'tool rows no longer spend the primary accent');
 assert(cssSource.includes('color: var(--fsb-text-inverse);'),
   'primary delegation actions use the theme-aware inverse text token');
-const delegationCss = cssSource.slice(cssSource.indexOf('.delegation-run {'));
-assert(!/(?:gap|margin(?:-\w+)?|padding(?:-\w+)?)\s*:[^;]*(?:12px|18px)/.test(delegationCss),
-  'Phase 61 layout spacing excludes off-scale 12px and 18px values');
+const delegationCssStart = cssSource.indexOf('.delegation-run {');
+const delegationCssEnd = cssSource.indexOf(
+  '/* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.',
+  delegationCssStart
+);
+const delegationCss = cssSource.slice(delegationCssStart, delegationCssEnd);
+const spacingDeclarations = Array.from(delegationCss.matchAll(
+  /^\s*(gap|margin(?:-[a-z-]+)?|padding(?:-[a-z-]+)?)\s*:\s*([^;]+);/gm
+));
+assert(spacingDeclarations.length >= 20, 'Phase 61 spacing gate covers the complete layout block');
+spacingDeclarations.forEach((match) => {
+  const values = match[2].trim().split(/\s+/);
+  assert(values.length >= 1 && values.length <= 4 && values.every((value) => (
+    value === '0' || /^var\(--fsb-space-(?:1|2|4|6|8|12)\)$/.test(value)
+  )), `Phase 61 ${match[1]} rejects off-scale spacing: ${match[2]}`);
+});
 assert(delegationCss.includes('var(--fsb-space-1)')
     && delegationCss.includes('var(--fsb-space-2)')
     && delegationCss.includes('var(--fsb-space-4)'),
@@ -520,6 +552,10 @@ assert(startSource.indexOf('_renderDelegationSnapshot(response.snapshot')
 assert(panelSource.includes("mount.state.setAttribute('role', 'alert')")
     && panelSource.includes("mount.state.setAttribute('aria-live', 'off')"),
   'connectivity cards retain alert semantics while hydrated/unchanged alerts stay silent');
+const preflightFailureSource = extractNamedFunction(panelSource, '_renderDelegationPreflightFailure');
+assert(preflightFailureSource.includes('_delegationSemanticHeading(')
+    && preflightFailureSource.includes("heading.setAttribute('data-delegation-tone', 'danger')"),
+  'offline preflight alert pairs its danger treatment with an explicit semantic heading icon');
 assert(panelSource.includes("announceSequence > previousLastSequence"),
   'only a strictly newer matching sequence reaches the polite announcer');
 assert(panelSource.includes('announcedTransitions: Object.create(null)')
@@ -1257,6 +1293,9 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
   {
     const fixedStop = new TestNode('button');
     fixedStop.classList.add('hidden');
+    const chatInput = new TestNode('div');
+    const sendButton = new TestNode('button');
+    const micButton = new TestNode('button');
     const runStop = new TestNode('button');
     const run = new TestNode('section');
     const state = {
@@ -1265,7 +1304,14 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     };
     let delegatedCalls = 0;
     let legacyCalls = 0;
+    const inputControls = {
+      chatInput,
+      sendBtn: sendButton,
+      stopBtn: fixedStop,
+      micBtn: micButton
+    };
     const context = {
+      document: { getElementById: (id) => inputControls[id] || null },
       stopBtn: fixedStop,
       isRunning: false,
       _chatLockedByOwnerChip: false,
@@ -1273,6 +1319,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       _delegationUiState: state,
       _delegationIsSelectedConversation: () => true,
       _ensureDelegationMount: () => ({ run }),
+      updateSendButtonState() {},
       _stopDelegation() { delegatedCalls += 1; return 'delegated'; },
       stopAutomation() { legacyCalls += 1; return 'legacy'; }
     };
@@ -1282,7 +1329,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       '_delegationUsesFixedStop',
       '_restoreLegacyStopControl',
       '_syncDelegationStopControls',
-      '_handleFixedStop'
+      '_handleFixedStop',
+      'applyInputLockout'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
 
     assert.equal(context._syncDelegationStopControls(state.snapshot), true);
@@ -1295,6 +1343,23 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert.equal(context._handleFixedStop({ currentTarget: fixedStop }), 'delegated');
     assert.equal(delegatedCalls, 1);
     assert.equal(legacyCalls, 0);
+
+    context._chatLockedByOwnerChip = true;
+    context.applyInputLockout(true);
+    assert.equal(chatInput.getAttribute('contenteditable'), 'false');
+    assert.equal(sendButton.disabled, true);
+    assert.equal(micButton.disabled, true);
+    assert.equal(fixedStop.disabled, false,
+      'owner lock keeps only the selected delegated fixed Stop operable');
+    assert.equal(fixedStop.getAttribute('aria-disabled'), null);
+    assert.equal(fixedStop.getAttribute('aria-describedby'), null);
+    assert.equal(fixedStop.classList.contains('fsb-foreign-owned-disabled'), false,
+      'delegated Stop retains pointer and keyboard interaction under owner lock');
+    context._syncDelegationStopControls(state.snapshot);
+    context.applyInputLockout(true);
+    assert.equal(fixedStop.disabled, false,
+      'either owner-lock/Stop-sync call order preserves the delegated kill switch');
+    assert.equal(sendButton.disabled, true, 'composer actions remain foreign-owner locked');
 
     state.pendingStop = true;
     context._syncDelegationStopControls(state.snapshot);
@@ -1313,6 +1378,9 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert.equal(fixedStop.getAttribute('title'), 'Stop Automation');
     assert.equal(fixedStop.getAttribute('aria-label'), null);
     assert.equal(fixedStop.getAttribute('data-delegation-action'), null);
+    assert.equal(fixedStop.disabled, true, 'terminal/API legacy Stop returns to owner lockout');
+    assert.equal(fixedStop.getAttribute('aria-disabled'), 'true');
+    assert.equal(fixedStop.classList.contains('fsb-foreign-owned-disabled'), true);
     assert.equal(context._handleFixedStop({ currentTarget: fixedStop }), 'legacy');
     assert.equal(legacyCalls, 1, 'API/terminal state retains the legacy stop handler');
   }
