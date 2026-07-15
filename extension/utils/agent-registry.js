@@ -43,7 +43,8 @@
   var FSB_AGENT_LOG_PREFIX = 'AGT';
   var FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE = 'agent-reaped';
   var FSB_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
-  var FSB_HOLD_LEASE_VERSION = 1;
+  var FSB_HOLD_LEASE_VERSION = 2;
+  var FSB_HOLD_LEASE_LEGACY_VERSION = 1;
   var FSB_HOLD_LEASE_MS = 5 * 60 * 1000;
 
   // Phase 241 plan 01: cap + grace constants ---------------------------------
@@ -539,12 +540,19 @@
     if (!lease
       || lease.delegationId !== input.delegationId
       || lease.agentId !== input.agentId
-      || !Number.isSafeInteger(lease.expiresAt)
-      || this._now() >= lease.expiresAt) {
-      return { ok: false, code: lease ? 'hold_expired' : 'resume_ownership_lost' };
+      || !Number.isSafeInteger(lease.expiresAt)) {
+      return { ok: false, code: 'resume_ownership_lost' };
+    }
+    if (lease.v !== FSB_HOLD_LEASE_VERSION) {
+      return { ok: false, code: 'resume_ownership_lost', disposition: 'cancel_required' };
+    }
+    if (this._now() >= lease.expiresAt) {
+      return { ok: false, code: 'hold_expired' };
     }
     var ownedTabs = canonicalOwnedTabs(lease.ownedTabs);
+    var tabSecurity = canonicalHeldTabSecurity(lease.tabSecurity);
     var exact = !!ownedTabs
+      && securityMatchesOwnedTabs(tabSecurity, ownedTabs)
       && ownedTabs.some(function(tab) { return tab.tabId === lease.activeTabId; });
     var self = this;
     if (exact) {
@@ -645,6 +653,59 @@
     return out.sort(function(a, b) { return a.tabId - b.tabId; });
   }
 
+  /**
+   * Validate the complete security snapshot carried by a v2 hold lease.
+   * These fields are deliberately closed and lossless: resume must restore
+   * the exact metadata that the dispatch gate trusted before the hold.
+   */
+  function canonicalHeldTabSecurity(value) {
+    if (!Array.isArray(value) || value.length === 0) return null;
+    var seen = new Set();
+    var out = [];
+    for (var index = 0; index < value.length; index += 1) {
+      var row = value[index];
+      if (!hasExactKeys(row, [
+        'tabId', 'ownershipToken', 'incognito', 'windowId', 'boundAt', 'forced',
+        'lastAgentNavigationAt'
+      ])
+        || !isPositiveInteger(row.tabId)
+        || typeof row.ownershipToken !== 'string'
+        || row.ownershipToken.length === 0
+        || typeof row.incognito !== 'boolean'
+        || (row.windowId !== null && !Number.isFinite(row.windowId))
+        || !Number.isSafeInteger(row.boundAt)
+        || row.boundAt < 0
+        || typeof row.forced !== 'boolean'
+        || (row.lastAgentNavigationAt !== null
+          && (!Number.isSafeInteger(row.lastAgentNavigationAt) || row.lastAgentNavigationAt < 0))
+        || seen.has(row.tabId)) {
+        return null;
+      }
+      seen.add(row.tabId);
+      out.push({
+        tabId: row.tabId,
+        ownershipToken: row.ownershipToken,
+        incognito: row.incognito,
+        windowId: row.windowId,
+        boundAt: row.boundAt,
+        forced: row.forced,
+        lastAgentNavigationAt: row.lastAgentNavigationAt
+      });
+    }
+    return out.sort(function(left, right) { return left.tabId - right.tabId; });
+  }
+
+  function securityMatchesOwnedTabs(securityRows, ownedTabs) {
+    if (!securityRows || !ownedTabs || securityRows.length !== ownedTabs.length) return false;
+    for (var index = 0; index < securityRows.length; index += 1) {
+      if (securityRows[index].tabId !== ownedTabs[index].tabId
+        || securityRows[index].ownershipToken !== ownedTabs[index].ownershipToken) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function sameOwnedTabs(left, right) {
     if (!left || !right || left.length !== right.length) return false;
     for (var index = 0; index < left.length; index += 1) {
@@ -698,6 +759,23 @@
       if (!sameOwnedTabs(supplied, current)) {
         return { ok: false, code: 'hold_lease_mapping_changed' };
       }
+      var tabSecurity = canonicalHeldTabSecurity(supplied.map(function(tab) {
+        var meta = self._tabMetadata.get(tab.tabId);
+        return meta ? {
+          tabId: tab.tabId,
+          ownershipToken: meta.ownershipToken,
+          incognito: meta.incognito,
+          windowId: meta.windowId,
+          boundAt: meta.boundAt,
+          forced: meta.forced,
+          lastAgentNavigationAt: Number.isSafeInteger(meta.lastAgentNavigationAt)
+            ? meta.lastAgentNavigationAt
+            : null
+        } : null;
+      }));
+      if (!securityMatchesOwnedTabs(tabSecurity, supplied)) {
+        return { ok: false, code: 'hold_lease_mapping_changed' };
+      }
       for (var index = 0; index < supplied.length; index += 1) {
         if (self._heldTabDelegations.has(supplied[index].tabId)) {
           return { ok: false, code: 'hold_lease_mapping_changed' };
@@ -713,6 +791,7 @@
         ownedTabs: supplied.map(function(tab) {
           return { tabId: tab.tabId, ownershipToken: tab.ownershipToken };
         }),
+        tabSecurity: tabSecurity,
         issuedAt: issuedAt,
         expiresAt: fixedExpiresAt
       };
@@ -778,27 +857,33 @@
       if (!lease
         || self.getAgentForDelegation(input.delegationId) !== input.agentId
         || lease.agentId !== input.agentId
-        || lease.delegationId !== input.delegationId) {
+        || lease.delegationId !== input.delegationId
+        || lease.v !== FSB_HOLD_LEASE_VERSION) {
         return { ok: false, code: 'resume_ownership_lost' };
       }
       if (self._now() >= lease.expiresAt) {
         return { ok: false, code: 'hold_expired', disposition: 'cancel_required' };
       }
       var liveTabIds = canonicalLiveTabIds(input.liveTabIds);
-      var heldTabIds = lease.ownedTabs.map(function(tab) { return tab.tabId; })
+      var ownedTabs = canonicalOwnedTabs(lease.ownedTabs);
+      var tabSecurity = canonicalHeldTabSecurity(lease.tabSecurity);
+      if (!securityMatchesOwnedTabs(tabSecurity, ownedTabs)) {
+        return { ok: false, code: 'resume_ownership_lost' };
+      }
+      var heldTabIds = ownedTabs.map(function(tab) { return tab.tabId; })
         .sort(function(a, b) { return a - b; });
       if (!liveTabIds
         || liveTabIds.length !== heldTabIds.length
         || liveTabIds.some(function(tabId, index) { return tabId !== heldTabIds[index]; })) {
         return { ok: false, code: 'resume_ownership_lost' };
       }
-      var exact = lease.ownedTabs.every(function(tab) {
+      var exact = ownedTabs.every(function(tab) {
         return self._heldTabDelegations.get(tab.tabId) === input.delegationId
           && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
           && !self._tabOwners.has(tab.tabId)
           && !self._tabMetadata.has(tab.tabId);
       });
-      var leaseTabIds = new Set(lease.ownedTabs.map(function(tab) { return tab.tabId; }));
+      var leaseTabIds = new Set(ownedTabs.map(function(tab) { return tab.tabId; }));
       self._heldTabDelegations.forEach(function(delegationId, tabId) {
         if (delegationId === input.delegationId && !leaseTabIds.has(tabId)) exact = false;
       });
@@ -813,16 +898,22 @@
       var activeTabs = shadow._tabsByAgent.get(input.agentId) || new Set();
       var record = shadow._agents.get(input.agentId);
       if (!record) return { ok: false, code: 'resume_ownership_lost' };
-      lease.ownedTabs.forEach(function(tab) {
+      var securityByTab = new Map(tabSecurity.map(function(row) { return [row.tabId, row]; }));
+      ownedTabs.forEach(function(tab) {
+        var security = securityByTab.get(tab.tabId);
         activeTabs.add(tab.tabId);
         shadow._tabOwners.set(tab.tabId, input.agentId);
-        shadow._tabMetadata.set(tab.tabId, {
-          ownershipToken: tab.ownershipToken,
-          incognito: false,
-          windowId: Number.isFinite(record.windowId) ? record.windowId : null,
-          boundAt: lease.issuedAt,
-          forced: false
-        });
+        var restoredMetadata = {
+          ownershipToken: security.ownershipToken,
+          incognito: security.incognito,
+          windowId: security.windowId,
+          boundAt: security.boundAt,
+          forced: security.forced
+        };
+        if (security.lastAgentNavigationAt !== null) {
+          restoredMetadata.lastAgentNavigationAt = security.lastAgentNavigationAt;
+        }
+        shadow._tabMetadata.set(tab.tabId, restoredMetadata);
         shadow._heldTabDelegations.delete(tab.tabId);
         shadow._heldTabTokens.delete(tab.tabId);
       });
@@ -1880,10 +1971,14 @@
       Object.keys(persistedHoldLeases).forEach(function(delegationId) {
         var raw = persistedHoldLeases[delegationId];
         var tabs = raw && canonicalOwnedTabs(raw.ownedTabs);
-        var valid = hasExactKeys(raw, [
+        var isCurrentLease = hasExactKeys(raw, [
+          'v', 'delegationId', 'agentId', 'activeTabId', 'ownedTabs', 'tabSecurity', 'issuedAt', 'expiresAt'
+        ]) && raw.v === FSB_HOLD_LEASE_VERSION;
+        var isLegacyLease = hasExactKeys(raw, [
           'v', 'delegationId', 'agentId', 'activeTabId', 'ownedTabs', 'issuedAt', 'expiresAt'
-        ])
-          && raw.v === FSB_HOLD_LEASE_VERSION
+        ]) && raw.v === FSB_HOLD_LEASE_LEGACY_VERSION;
+        var tabSecurity = isCurrentLease ? canonicalHeldTabSecurity(raw.tabSecurity) : null;
+        var valid = (isCurrentLease || isLegacyLease)
           && raw.delegationId === delegationId
           && isDelegationId(delegationId)
           && typeof raw.agentId === 'string'
@@ -1894,6 +1989,9 @@
           && Number.isSafeInteger(raw.issuedAt)
           && Number.isSafeInteger(raw.expiresAt)
           && raw.expiresAt === raw.issuedAt + FSB_HOLD_LEASE_MS;
+        if (valid && isCurrentLease) {
+          valid = securityMatchesOwnedTabs(tabSecurity, tabs);
+        }
         if (valid) {
           valid = tabs.every(function(tab) {
             return !self._tabOwners.has(tab.tabId) && !self._heldTabDelegations.has(tab.tabId);
@@ -1904,7 +2002,7 @@
           return;
         }
         var lease = {
-          v: FSB_HOLD_LEASE_VERSION,
+          v: raw.v,
           delegationId: delegationId,
           agentId: raw.agentId,
           activeTabId: raw.activeTabId,
@@ -1912,6 +2010,7 @@
           issuedAt: raw.issuedAt,
           expiresAt: raw.expiresAt
         };
+        if (isCurrentLease) lease.tabSecurity = tabSecurity;
         self._holdLeases.set(delegationId, lease);
         tabs.forEach(function(tab) {
           self._heldTabDelegations.set(tab.tabId, delegationId);
@@ -2158,7 +2257,7 @@
       if (!lease
         || self._delegations.get(delegationId) !== lease.agentId
         || self._delegationByAgent.get(lease.agentId) !== delegationId) return;
-      holdLeases[delegationId] = {
+      var storedLease = {
         v: lease.v,
         delegationId: lease.delegationId,
         agentId: lease.agentId,
@@ -2169,6 +2268,15 @@
         issuedAt: lease.issuedAt,
         expiresAt: lease.expiresAt
       };
+      if (lease.v === FSB_HOLD_LEASE_VERSION) {
+        var tabSecurity = canonicalHeldTabSecurity(lease.tabSecurity);
+        var ownedTabs = canonicalOwnedTabs(lease.ownedTabs);
+        if (!securityMatchesOwnedTabs(tabSecurity, ownedTabs)) return;
+        storedLease.tabSecurity = tabSecurity;
+      } else if (lease.v !== FSB_HOLD_LEASE_LEGACY_VERSION) {
+        return;
+      }
+      holdLeases[delegationId] = storedLease;
       hasHoldLeases = true;
     });
 

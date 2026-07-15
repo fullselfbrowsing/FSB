@@ -31,6 +31,7 @@
 const assert = require('assert');
 const path = require('path');
 const REGISTRY_MODULE_PATH = require.resolve('../extension/utils/agent-registry.js');
+const { dispatchMcpToolRoute } = require('../extension/ws/mcp-tool-dispatcher.js');
 
 // Initial require for plan 01 tests; plan 02 storage tests fresh-require per test
 // after installing chrome mock so the module's lazy globalThis.chrome reference
@@ -1223,6 +1224,18 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       const agentB = (await registry.registerAgent()).agentId;
       await registry.bindTab(agentA, 401);
       await registry.bindTab(agentA, 402);
+      const tabSecurity = [401, 402].map((tabId) => {
+        const meta = registry.getTabMetadata(tabId);
+        return {
+          tabId,
+          ownershipToken: meta.ownershipToken,
+          incognito: meta.incognito,
+          windowId: meta.windowId,
+          boundAt: meta.boundAt,
+          forced: meta.forced,
+          lastAgentNavigationAt: meta.lastAgentNavigationAt || null,
+        };
+      });
       const delegationId = 'Delegation_hold_complete_6104';
       await registry.bindDelegation({ delegationId, agentId: agentA });
       const ownedTabs = registry.getDelegationOwnedTabs({ delegationId, agentId: agentA });
@@ -1266,11 +1279,12 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       const envelope = mock.session._dump().fsbAgentRegistry;
       assert.strictEqual(envelope.v, 1, 'registry envelope version remains additive v1');
       assert.deepStrictEqual(envelope.holdLeases[delegationId], {
-        v: 1,
+        v: 2,
         delegationId,
         agentId: agentA,
         activeTabId: 401,
         ownedTabs,
+        tabSecurity,
         issuedAt: now,
         expiresAt: now + 300000,
       });
@@ -1474,6 +1488,182 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     }
   }
   console.log('  PASS: complete restore wins once and preserves exact tokens');
+
+  console.log('--- Phase 61 / CR2-01: hold/reload/resume preserves dispatch security metadata ---');
+  {
+    const now = 140_000;
+    setupChromeMock({
+      tabs: [
+        { id: 601, incognito: true, windowId: 10 },
+        { id: 602, incognito: false, windowId: 20 },
+      ]
+    });
+    try {
+      let fresh = freshRequireRegistry();
+      let registry = new fresh.AgentRegistry({ now: () => now });
+      const agentId = (await registry.registerAgent()).agentId;
+      const incognitoBinding = await registry.bindTab(agentId, 601, { forced: true });
+      const crossWindowBinding = await registry.bindTab(agentId, 602);
+      registry.stampAgentNavigation(601);
+      await Promise.resolve();
+      assert.ok(registry.getTabMetadata(601).lastAgentNavigationAt > 0,
+        'test fixture stamps the optional navigation-suppression timestamp');
+      const delegationId = 'Delegation_security_metadata_6104';
+      await registry.bindDelegation({ delegationId, agentId });
+
+      const securitySnapshot = new Map([601, 602].map((tabId) => {
+        const meta = registry.getTabMetadata(tabId);
+        return [tabId, {
+          ownershipToken: meta.ownershipToken,
+          incognito: meta.incognito,
+          windowId: meta.windowId,
+          boundAt: meta.boundAt,
+          forced: meta.forced,
+          lastAgentNavigationAt: meta.lastAgentNavigationAt,
+        }];
+      }));
+      assert.strictEqual(securitySnapshot.get(601).incognito, true, 'incognito bit starts restrictive');
+      assert.strictEqual(securitySnapshot.get(601).forced, true, 'forced audit bit starts true');
+      assert.strictEqual(securitySnapshot.get(602).windowId, 20, 'mixed-window tab retains its own window');
+      assert.strictEqual(registry.getAgentWindowId(agentId), 10, 'agent remains pinned to first window');
+
+      globalThis.fsbAgentRegistryInstance = registry;
+      const beforeIncognito = await dispatchMcpToolRoute({
+        tool: 'navigate',
+        params: {
+          url: 'https://example.com', tabId: 601, agentId,
+          ownershipToken: incognitoBinding.ownershipToken,
+        },
+      });
+      const beforeCrossWindow = await dispatchMcpToolRoute({
+        tool: 'navigate',
+        params: {
+          url: 'https://example.com', tabId: 602, agentId,
+          ownershipToken: crossWindowBinding.ownershipToken,
+        },
+      });
+      assert.strictEqual(beforeIncognito.code, 'TAB_INCOGNITO_NOT_SUPPORTED');
+      assert.strictEqual(beforeCrossWindow.code, 'TAB_OUT_OF_SCOPE');
+
+      const ownedTabs = registry.getDelegationOwnedTabs({ delegationId, agentId });
+      assert.deepStrictEqual(await registry.sealHoldLease({
+        delegationId,
+        agentId,
+        activeTabId: 601,
+        ownedTabs,
+        expiresAt: now + fresh.FSB_HOLD_LEASE_MS,
+      }), {
+        ok: true,
+        code: 'hold_lease_sealed',
+        expiresAt: now + fresh.FSB_HOLD_LEASE_MS,
+      });
+
+      fresh = freshRequireRegistry();
+      registry = new fresh.AgentRegistry({ now: () => now });
+      await registry.hydrate();
+      assert.strictEqual(registry.getTabMetadata(601), null, 'held metadata is not exposed as active authority');
+      assert.strictEqual(registry.getTabMetadata(602), null, 'all held metadata remains sealed after reload');
+      assert.strictEqual((await registry.getDelegationHoldLease({ delegationId, agentId })).ok, true,
+        'v2 sealed lease survives a worker reload as restorable');
+      assert.deepStrictEqual(await registry.restoreHoldLease({
+        delegationId,
+        agentId,
+        liveTabIds: [602, 601],
+      }), { ok: true, code: 'hold_lease_restored' });
+
+      for (const tabId of [601, 602]) {
+        const restored = registry.getTabMetadata(tabId);
+        const original = securitySnapshot.get(tabId);
+        assert.deepStrictEqual({
+          ownershipToken: restored.ownershipToken,
+          incognito: restored.incognito,
+          windowId: restored.windowId,
+          boundAt: restored.boundAt,
+          forced: restored.forced,
+          lastAgentNavigationAt: restored.lastAgentNavigationAt,
+        }, original, 'resume restores the exact security metadata for tab ' + tabId);
+      }
+
+      fresh = freshRequireRegistry();
+      registry = new fresh.AgentRegistry({ now: () => now });
+      await registry.hydrate();
+      globalThis.fsbAgentRegistryInstance = registry;
+      const afterIncognito = await dispatchMcpToolRoute({
+        tool: 'navigate',
+        params: {
+          url: 'https://example.com', tabId: 601, agentId,
+          ownershipToken: incognitoBinding.ownershipToken,
+        },
+      });
+      const afterCrossWindow = await dispatchMcpToolRoute({
+        tool: 'navigate',
+        params: {
+          url: 'https://example.com', tabId: 602, agentId,
+          ownershipToken: crossWindowBinding.ownershipToken,
+        },
+      });
+      assert.strictEqual(afterIncognito.code, 'TAB_INCOGNITO_NOT_SUPPORTED',
+        'incognito dispatch remains rejected after hold/resume/reload');
+      assert.strictEqual(afterCrossWindow.code, 'TAB_OUT_OF_SCOPE',
+        'cross-window dispatch remains rejected after hold/resume/reload');
+      assert.strictEqual(afterCrossWindow.reason, 'cross_window');
+    } finally {
+      delete globalThis.fsbAgentRegistryInstance;
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: incognito/window/bound/forced/token metadata stays exact across hold/reload/resume');
+
+  console.log('--- Phase 61 / CR2-01: legacy token-only holds remain cancellation-only ---');
+  {
+    const now = 160_000;
+    const agentId = 'agent_legacy_hold_security';
+    const delegationId = 'Delegation_legacy_hold_6104';
+    setupChromeMock({
+      session: {
+        fsbAgentRegistry: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [], windowId: 30 },
+          },
+          delegations: { [delegationId]: agentId },
+          holdLeases: {
+            [delegationId]: {
+              v: 1,
+              delegationId,
+              agentId,
+              activeTabId: 603,
+              ownedTabs: [{ tabId: 603, ownershipToken: 'legacy-token' }],
+              issuedAt: now,
+              expiresAt: now + 300000,
+            },
+          },
+        },
+      },
+      tabs: [{ id: 603, incognito: true, windowId: 30 }],
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      await registry.hydrate();
+      assert.deepStrictEqual(
+        registry.getDelegationHoldLease({ delegationId, agentId }),
+        { ok: false, code: 'resume_ownership_lost', disposition: 'cancel_required' },
+        'unsafe v1 lease cannot be restored with synthesized metadata',
+      );
+      const otherAgentId = (await registry.registerAgent()).agentId;
+      assert.strictEqual(await registry.bindTab(otherAgentId, 603), false,
+        'legacy held tab remains reserved until exact cancellation cleanup');
+      assert.deepStrictEqual(await registry.releaseDelegation({ delegationId, agentId }), {
+        ok: true,
+        code: 'delegation_released',
+        releasedTabCount: 1,
+      }, 'exact release remains available for the fail-closed legacy lease');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: unsafe legacy holds cannot resume or become claimable before exact cleanup');
 
   console.log('--- Phase 61 / Task 3: restore loss/expiry/persistence failures remain fully sealed ---');
   {
