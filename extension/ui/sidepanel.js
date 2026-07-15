@@ -498,6 +498,163 @@ const automationRunner = document.getElementById('automationRunner');
 const automationTimer = document.getElementById('automationTimer');
 const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 
+// Phase 61 delegated-run presentation state. This object tracks only which
+// canonical background snapshot belongs to the selected conversation and
+// which exact delivery identities were already announced. It never derives
+// lifecycle state from provider output, chat history, registry storage, or
+// presentation strings.
+var _delegationUiState = {
+  delegationId: null,
+  snapshot: null,
+  lastRenderedSequence: null,
+  announced: Object.create(null),
+  subscribed: false
+};
+
+function _delegationHasExactKeys(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  var actual = Object.keys(value).sort();
+  var expected = keys.slice().sort();
+  if (actual.length !== expected.length) return false;
+  for (var index = 0; index < expected.length; index++) {
+    if (actual[index] !== expected[index]) return false;
+  }
+  return true;
+}
+
+function _ensureDelegationMount() {
+  var run = document.getElementById('delegationRun');
+  if (run) {
+    return {
+      run: run,
+      state: document.getElementById('delegationStateCard'),
+      feed: document.getElementById('delegationFeed'),
+      announcer: document.getElementById('delegationAnnouncer'),
+      control: document.getElementById('delegationControlBar')
+    };
+  }
+  run = document.createElement('section');
+  run.id = 'delegationRun';
+  run.className = 'delegation-run hidden';
+  run.setAttribute('data-runtime-contract', 'FSB_DELEGATION');
+  run.setAttribute('aria-labelledby', 'delegationRunHeading');
+  run.setAttribute('aria-busy', 'false');
+  var state = document.createElement('div');
+  state.id = 'delegationStateCard';
+  state.className = 'delegation-state-card';
+  var feed = document.createElement('div');
+  feed.id = 'delegationFeed';
+  feed.className = 'delegation-feed';
+  run.appendChild(state);
+  run.appendChild(feed);
+  if (chatMessages.firstChild) chatMessages.insertBefore(run, chatMessages.firstChild);
+  else chatMessages.appendChild(run);
+  return {
+    run: run,
+    state: state,
+    feed: feed,
+    announcer: document.getElementById('delegationAnnouncer'),
+    control: document.getElementById('delegationControlBar')
+  };
+}
+
+function _clearDelegationNode(node) {
+  if (!node) return;
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function _delegationStateLabel(snapshot) {
+  var label = snapshot.provider && snapshot.provider.label
+    ? snapshot.provider.label
+    : 'Agent';
+  if (snapshot.state === 'starting') return 'Starting agent';
+  if (snapshot.state === 'running') return label + ' running';
+  if (snapshot.state === 'held') return 'Human control';
+  if (snapshot.state === 'stopping') return 'Stopping agent';
+  if (snapshot.state === 'completed') return 'Completed';
+  if (snapshot.state === 'stopped') return 'Stopped';
+  if (snapshot.state === 'restart_lost') return 'Run ended';
+  if (snapshot.state === 'failed') return 'Agent could not finish this task';
+  return 'Ready';
+}
+
+function _renderDelegationRunHeader(container, snapshot) {
+  _clearDelegationNode(container);
+  var heading = document.createElement('h2');
+  heading.id = 'delegationRunHeading';
+  heading.className = 'delegation-state-heading';
+  heading.textContent = _delegationStateLabel(snapshot);
+  container.appendChild(heading);
+  if (snapshot.state === 'running') {
+    var body = document.createElement('p');
+    body.className = 'delegation-state-body';
+    body.textContent = (snapshot.provider ? snapshot.provider.label : 'Agent')
+      + ' is working in the background';
+    container.appendChild(body);
+  }
+}
+
+function _delegationAnnouncement(entry) {
+  if (!entry) return '';
+  if (entry.kind === 'init') return 'Agent initialized';
+  if (entry.kind === 'tool-call') return 'Tool call: ' + entry.tool.name;
+  if (entry.kind === 'retry') return 'Retrying: ' + entry.retry.class;
+  if (entry.kind === 'result') return 'Result: ' + entry.state;
+  return 'Agent state: ' + entry.state;
+}
+
+function _renderDelegationSnapshot(snapshot, options) {
+  options = options || {};
+  if (typeof FsbDelegationFeed === 'undefined'
+      || typeof FsbDelegationFeed.validateSnapshot !== 'function'
+      || !FsbDelegationFeed.validateSnapshot(snapshot)) return false;
+  if (_delegationUiState.delegationId !== null
+      && snapshot.delegationId !== _delegationUiState.delegationId) return false;
+
+  var mount = _ensureDelegationMount();
+  if (!mount.run || !mount.state || !mount.feed) return false;
+  _delegationUiState.delegationId = snapshot.delegationId;
+  _delegationUiState.snapshot = snapshot;
+  mount.run.classList.remove('hidden');
+  _renderDelegationRunHeader(mount.state, snapshot);
+  var rendered = FsbDelegationFeed.render(mount.feed, snapshot, {
+    hydrated: options.hydrated === true
+  });
+  if (!rendered || rendered.ok !== true) return false;
+  _delegationUiState.lastRenderedSequence = rendered.lastSequence;
+
+  var announceSequence = options.announceSequence;
+  if (options.hydrated !== true
+      && Number.isSafeInteger(announceSequence)
+      && announceSequence > 0
+      && mount.announcer) {
+    var deliveryKey = snapshot.delegationId + ':' + announceSequence;
+    if (!_delegationUiState.announced[deliveryKey]) {
+      var entry = snapshot.entries[announceSequence - 1];
+      if (entry && entry.sequence === announceSequence) {
+        _delegationUiState.announced[deliveryKey] = true;
+        mount.announcer.textContent = _delegationAnnouncement(entry);
+      }
+    }
+  }
+  return true;
+}
+
+function _handleDelegationRuntimeUpdate(message) {
+  if (!_delegationUiState.subscribed
+      || !_delegationHasExactKeys(message, ['announceSequence', 'snapshot', 'type'])
+      || message.type !== 'FSB_DELEGATION_UPDATED'
+      || (message.announceSequence !== null
+        && (!Number.isSafeInteger(message.announceSequence) || message.announceSequence < 1))
+      || typeof FsbDelegationFeed === 'undefined'
+      || !FsbDelegationFeed.validateSnapshot(message.snapshot)
+      || message.snapshot.delegationId !== _delegationUiState.delegationId) return false;
+  return _renderDelegationSnapshot(message.snapshot, {
+    hydrated: false,
+    announceSequence: message.announceSequence
+  });
+}
+
 let automationTimerInterval = null;
 let automationTimerStartedAt = null;
 let automationPixelCycleTimeout = null;

@@ -214,6 +214,12 @@ ok(sidepanelHtmlSrc.indexOf('fsb-owner-chip') >= 0,
   'Test 9d: sidepanel.html contains fsb-owner-chip element');
 ok(sidepanelHtmlSrc.indexOf('owner-chip.js') >= 0,
   'Test 9e: sidepanel.html loads owner-chip.js');
+ok((sidepanelHtmlSrc.match(/delegation-feed\.js/g) || []).length === 1
+    && sidepanelHtmlSrc.indexOf('owner-chip.js') < sidepanelHtmlSrc.indexOf('delegation-feed.js')
+    && sidepanelHtmlSrc.indexOf('delegation-feed.js') < sidepanelHtmlSrc.indexOf('sidepanel.js'),
+  'Test 9f: sidepanel delegation feed is loaded once without disturbing owner-chip-before-sidepanel order');
+ok((sidepanelHtmlSrc.match(/id="fsb-owner-chip"/g) || []).length === 1,
+  'Test 9g: sidepanel retains exactly one read-only owner chip after delegation mount additions');
 
 // Read-only enforcement: chip span MUST NOT be a button or anchor (no click affordance).
 // Threat T-243-03-03 "Elevation via chip click-to-switch" mitigation.

@@ -107,6 +107,7 @@ globalThis.chrome = {
 // --- Module loads (sidecar + owner-chip; Plan 11-01+ will require additional modules) ---
 const TabConvStore = require('../extension/ui/sidepanel-tab-conv-store.js');
 require('../extension/ui/owner-chip.js'); // registers globalThis.FSBOwnerChip
+const DelegationFeed = require('../extension/ui/delegation-feed.js');
 
 // --- DOM stub helpers (forward-compat for Plan 11-02 lockout assertions) ---
 function createButtonStub() {
@@ -360,6 +361,22 @@ function installDomStub(idMap) {
   // 4.5 sidepanel.html carries the aria-describedby description span
   ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
+
+  // Phase 61 Plan 07: the delegation renderer is loaded exactly once before
+  // sidepanel.js and every fixed delegation mount id is unique.
+  const feedScriptCount = (sidepanelHtmlSrc.match(/<script src="delegation-feed\.js"><\/script>/g) || []).length;
+  ok(feedScriptCount === 1
+      && sidepanelHtmlSrc.indexOf('delegation-feed.js') < sidepanelHtmlSrc.indexOf('sidepanel.js'),
+     'Part 4.6 -- delegation-feed.js loads exactly once before sidepanel.js');
+  const delegationIds = ['delegationRun', 'delegationStateCard', 'delegationFeed', 'delegationAnnouncer', 'delegationControlBar'];
+  const uniqueDelegationIds = delegationIds.every(function(id) {
+    return (sidepanelHtmlSrc.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1;
+  });
+  ok(uniqueDelegationIds,
+     'Part 4.7 -- every fixed delegation DOM id appears exactly once');
+  ok(DelegationFeed && typeof DelegationFeed.render === 'function'
+      && globalThis.FsbDelegationFeed === DelegationFeed,
+     'Part 4.8 -- delegation feed preserves classic-global/CommonJS dual export');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
 

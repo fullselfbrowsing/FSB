@@ -55,11 +55,28 @@
 
     <div class="chat-messages-area">
       <div id="chatMessages" class="chat-messages">
+        <section
+          id="delegationRun"
+          class="delegation-run hidden"
+          data-runtime-contract="FSB_DELEGATION"
+          aria-labelledby="delegationRunHeading"
+          aria-busy="false"
+        >
+          <div id="delegationStateCard" class="delegation-state-card"></div>
+          <div id="delegationFeed" class="delegation-feed"></div>
+        </section>
         <!-- Messages will be dynamically added here -->
       </div>
+      <div
+        id="delegationAnnouncer"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+      ></div>
     </div>
 
-    <div id="automationRunner" class="automation-runner hidden" aria-live="polite" aria-hidden="true">
+    <div id="automationRunner" class="automation-runner hidden" aria-live="off" aria-hidden="true">
       <div class="pixel-loader" aria-hidden="true">
         <div class="pixel-letter pixel-letter-f">
           <span></span><span></span><span></span>
@@ -86,6 +103,8 @@
       <span id="automationTimer" class="automation-timer">0s</span>
       <span id="automationRunnerLabel" class="sr-only">Automation running</span>
     </div>
+
+    <div id="delegationControlBar" class="delegation-control-bar hidden"></div>
     
     <div class="chat-input-area">
       <div class="input-container">
@@ -154,6 +173,7 @@
   <script src="owner-chip.js"></script>
   <script src="sidepanel-tab-conv-store.js"></script>
   <script src="sidepanel-message-log.js"></script>
+  <script src="delegation-feed.js"></script>
   <script src="speech-to-text.js"></script>
   <script src="sidepanel.js"></script>
 </body>
