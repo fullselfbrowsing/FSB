@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 61 Plan 04 complete; Plan 05 ready
-last_updated: "2026-07-15T10:18:19.000Z"
-last_activity: 2026-07-15 -- Phase 61 Plan 04 completed
+stopped_at: Phase 61 Plan 05 complete; Plan 06 ready
+last_updated: "2026-07-15T10:50:22.000Z"
+last_activity: 2026-07-15 -- Phase 61 Plan 05 completed
 progress:
   total_phases: 18
   completed_phases: 4
   total_plans: 22
-  completed_plans: 18
-  percent: 82
+  completed_plans: 19
+  percent: 86
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -22,7 +22,7 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 36/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 9 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 37/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 61 (Delegation UX & SW-Eviction Persistence) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
-Last activity: 2026-07-15 -- Phase 61 Plan 04 completed
+Last activity: 2026-07-15 -- Phase 61 Plan 05 completed
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -46,13 +46,13 @@ Last activity: 2026-07-15 -- Phase 61 Plan 04 completed
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
-| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | In progress (4/8 plans; UAT deferred to milestone end) |
+| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | In progress (5/8 plans; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 36/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
+Coverage: 51/51 v0.9.91 requirements mapped, 37/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -121,17 +121,20 @@ v0.9.91-specific decisions so far:
 - [Phase 61 Plan 04]: Persist cloned candidate registry state before adopting delegation binding, hold seal, restore, or exact release, so storage rejection and index drift leave the prior complete authority unchanged.
 - [Phase 61 Plan 04]: Treat the five-minute hold deadline as cancellation-required rather than ownership release; complete tab/token reservations remain unclaimable through expiry and worker reload.
 - [Phase 61 Plan 04]: Refuse generic/grace release for controller-mapped agents; only exact delegation-plus-agent cleanup may remove their distinct active and held tab union and report its count.
+- [Phase 61 Plan 05]: Keep hold, resume, cancel, settlement, and status inside the one serve-owned supervisor; the five-method adapter contract remains unchanged.
+- [Phase 61 Plan 05]: A POSIX lifecycle transition is acknowledged only after the retained group and exact tree are confirmed before and after its signal; unsupported or unverifiable paths converge to confirmed cancellation.
+- [Phase 61 Plan 05]: Restart loss requires a prior daemon generation plus an owner-only persisted post-cleanup disposition; same-generation records, transport disconnect, and failed cleanup never qualify.
 - [Milestone]: Defer every live/human UAT checklist to one milestone-end sweep; automated/source verification and clean review remain mandatory per phase, and no deferred item is silently marked passed.
 
 ### Pending Todos
 
-None. Phases 57-60 and Phase 61 Plans 01-04 are complete; Plan 05 is ready for autonomous execution.
+None. Phases 57-60 and Phase 61 Plans 01-05 are complete; Plan 06 is ready for autonomous execution.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61 Plan 03's real Chrome 116 service-worker/daemon heartbeat-disconnect timing, and Plan 04's live active-tab human-control handoff remain pending. Per user instruction, all live UAT is accumulated and audited at milestone end; these phases and plans are automated/source green, and no live pass is inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61 Plan 03's real Chrome 116 service-worker/daemon heartbeat-disconnect timing, Plan 04's live active-tab human-control handoff, and Plan 05's real POSIX group suspension/expiry plus daemon-restart evidence remain pending. Per user instruction, all live UAT is accumulated and audited at milestone end; these phases and plans are automated/source green, and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -165,10 +168,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-15T10:18:19.000Z
-Stopped at: Phase 61 Plan 04 complete; Plan 05 ready
-Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-05-PLAN.md
+Last session: 2026-07-15T10:50:22.000Z
+Stopped at: Phase 61 Plan 05 complete; Plan 06 ready
+Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-06-PLAN.md
 
 ## Next Actions
 
-Execute Phase 61 Plan 05, preserve Plans 01-04's exact authority, persistence, observer, heartbeat, sealed ownership, and no-native contracts, and keep every live CLI/OS/browser UAT pending for the single milestone-end gate.
+Execute Phase 61 Plan 06, preserve Plans 01-05's exact authority, persistence, observer, heartbeat, sealed ownership, confirmed supervisor lifecycle, generation-backed restart evidence, and no-native contracts, and keep every live CLI/kernel/OS/browser UAT pending for the single milestone-end gate.

@@ -64,7 +64,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **LIFE-01**: Every progress event received from the supervisor is written to `chrome.storage.session` under a per-delegation key before it fans out to UI subscribers, so a MV3 service worker eviction mid-run reloads exactly the delivered feed on re-open.
 - [x] **LIFE-02**: While a delegation is active, the extension pings the bridge every 20 s over the existing WS heartbeat channel to keep the Chrome 116+ SW-lifetime extension applied; if 3 heartbeats are missed the extension shows a `daemon:disconnected` fallback that offers a doctor-relaunch button but does not attempt an in-extension restart.
 - [x] **LIFE-03**: If `fsb-mcp-server serve` is not running when a delegated send is attempted, the side panel shows an "Agent offline" state with a deep-link to `fsb-mcp-server doctor` output and does not enqueue or optimistically show the message.
-- [ ] **LIFE-04**: On daemon restart while a delegation was mid-flight, the supervisor does not re-adopt any surviving spawned CLI; it kills it (LIFE-04 restart-is-clean) and reports `daemon_restart_lost_run` in the side panel so the user knows the run ended.
+- [x] **LIFE-04**: On daemon restart while a delegation was mid-flight, the supervisor does not re-adopt any surviving spawned CLI; it kills it (LIFE-04 restart-is-clean) and reports `daemon_restart_lost_run` in the side panel so the user knows the run ended.
 
 ### DRIFT -- CI Drift-Smoke Gate & Doctor Extensions
 
@@ -166,7 +166,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | LIFE-01 | Phase 61 | Complete |
 | LIFE-02 | Phase 61 | Complete |
 | LIFE-03 | Phase 61 | Complete |
-| LIFE-04 | Phase 61 | Pending |
+| LIFE-04 | Phase 61 | Complete |
 | DRIFT-01 | Phase 62 | Pending |
 | DRIFT-02 | Phase 62 | Pending |
 | DRIFT-03 | Phase 62 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-15 after Phase 61 Plan 04 completion (36/51 requirements complete; all live checks deferred to milestone end)*
+*Last updated: 2026-07-15 after Phase 61 Plan 05 completion (37/51 requirements complete; all live checks deferred to milestone end)*
