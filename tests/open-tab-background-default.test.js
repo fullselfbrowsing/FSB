@@ -28,6 +28,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 
 let passed = 0;
 let failed = 0;
@@ -245,12 +246,33 @@ async function test5_ownershipTokenSurfaced() {
   }
 }
 
+// =========================================================================
+// Test 6 (Phase 61) -- delegation ownership does not change focus policy
+// =========================================================================
+async function test6_delegationLeavesBackgroundDefaultUntouched() {
+  console.log('--- Test 6: Phase 61 delegation lifecycle leaves background-open policy untouched ---');
+  const dispatcherPath = path.resolve(__dirname, '..', 'extension', 'ws', 'mcp-tool-dispatcher.js');
+  const source = fs.readFileSync(dispatcherPath, 'utf8');
+  const start = source.indexOf('async function handleOpenTabRoute');
+  const end = source.indexOf('\nasync function ', start + 1);
+  const body = source.slice(start, end === -1 ? source.length : end);
+  check(start !== -1, 'handleOpenTabRoute source exists');
+  check(
+    body.includes("chrome.tabs.create({ url: params.url || 'about:blank', active: params.active === true })"),
+    'open_tab still defaults to background and focuses only on explicit active:true',
+  );
+  check(!body.includes('sealHoldLease') && !body.includes('restoreHoldLease')
+    && !body.includes('releaseDelegation'),
+  'open_tab route does not perform delegation lease transitions');
+}
+
 async function run() {
   await test1_defaultBackground();
   await test2_explicitActiveTrue();
   await test3_explicitActiveFalse();
   await test4_bindTabPreserved();
   await test5_ownershipTokenSurfaced();
+  await test6_delegationLeavesBackgroundDefaultUntouched();
 
   console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
   process.exit(failed > 0 ? 1 : 0);
