@@ -118,6 +118,7 @@ const {
   installLocalizedProgressRenderer,
   installViewerLocalization,
   payloadMayInstallFrames,
+  payloadMayRemoveFrames,
 } = bridgeModule.exports;
 const localizedCopy = {
   phasePlanning: 'PLAN',
@@ -146,9 +147,12 @@ ok(payloadMayInstallFrames(globalThis.FSBPhantomStreamViewer.STREAM.MUTATIONS, {
 ok(!payloadMayInstallFrames(globalThis.FSBPhantomStreamViewer.STREAM.MUTATIONS, {
   mutations: [{ op: 'text' }],
 }), 'frame refresh skips ordinary text-only mutation batches');
-ok(payloadMayInstallFrames(globalThis.FSBPhantomStreamViewer.STREAM.MUTATIONS, {
+ok(!payloadMayInstallFrames(globalThis.FSBPhantomStreamViewer.STREAM.MUTATIONS, {
   mutations: [{ op: 'rm', nid: 'detached-frame-host' }],
-}), 'frame refresh reconciles removals that may detach frame trees');
+}), 'frame discovery skips removal-only mutation batches');
+ok(payloadMayRemoveFrames(globalThis.FSBPhantomStreamViewer.STREAM.MUTATIONS, {
+  mutations: [{ op: 'rm', nid: 'detached-frame-host' }],
+}), 'frame reconciliation recognizes removals that may detach frame trees');
 
 class FakeMutationObserver {
   constructor(callback) {
@@ -222,6 +226,7 @@ const shadowFrame = {
   tagName: 'IFRAME',
   contentDocument: shadowFrameDocument,
   matches: (selector) => selector === 'iframe',
+  getRootNode: () => shadowRoot,
   querySelectorAll: () => [],
   getAttribute: () => null,
   setAttribute() {},
@@ -237,6 +242,7 @@ const shadowFrame = {
 };
 const shadowRoot = {
   nodeType: 11,
+  host: null,
   matches: () => false,
   querySelectorAll: (selector) => selector === 'iframe' ? [shadowFrame] : [],
 };
@@ -246,12 +252,19 @@ const shadowHost = {
   matches: () => false,
   querySelectorAll: () => [],
 };
+shadowRoot.host = shadowHost;
 let lightFrames = [frame];
 let shadowHosts = [shadowHost];
+let containerQueries = 0;
 const container = {
   nodeType: 1,
   matches: () => false,
+  contains(node) {
+    return (node === frame && lightFrames.includes(frame))
+      || (node === shadowHost && shadowHosts.includes(shadowHost));
+  },
   querySelectorAll(selector) {
+    containerQueries += 1;
     if (selector === 'iframe') return lightFrames;
     if (selector === '*') return shadowHosts;
     return [];
@@ -291,9 +304,12 @@ localization.refresh();
 ok(frameLoadListeners.size === 1 && secondFrameDocument.listeners.size === 1,
   'viewer refresh rewires a currently attached frame');
 lightFrames = [];
-localization.refresh();
+const queriesBeforeRemovalReconcile = containerQueries;
+localization.reconcile();
 ok(frameLoadListeners.size === 0 && secondFrameDocument.listeners.size === 0,
-  'viewer refresh reconciles a detached frame retained outside the DOM');
+  'viewer removal reconciliation unwires a detached frame retained outside the DOM');
+ok(containerQueries === queriesBeforeRemovalReconcile,
+  'viewer removal reconciliation does not rescan the mirrored host tree');
 shadowHosts = [];
 FakeMutationObserver.instances[0].callback([{
   type: 'childList',

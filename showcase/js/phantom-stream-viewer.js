@@ -3441,11 +3441,17 @@
     if (type !== STREAM.MUTATIONS || !payload || !Array.isArray(payload.mutations)) return false;
     return payload.mutations.some(function(mutation) {
       if (!mutation || typeof mutation !== "object") return false;
-      return mutation.op === "frame" || mutation.op === "shadow-root" || mutation.op === "rm" || Array.isArray(mutation.frames) && mutation.frames.length > 0 || Array.isArray(mutation.shadowRoots) && mutation.shadowRoots.length > 0;
+      return mutation.op === "frame" || mutation.op === "shadow-root" || Array.isArray(mutation.frames) && mutation.frames.length > 0 || Array.isArray(mutation.shadowRoots) && mutation.shadowRoots.length > 0;
+    });
+  }
+  function payloadMayRemoveFrames(type, payload) {
+    if (type !== STREAM.MUTATIONS || !payload || !Array.isArray(payload.mutations)) return false;
+    return payload.mutations.some(function(mutation) {
+      return !!(mutation && typeof mutation === "object" && mutation.op === "rm");
     });
   }
   function installViewerLocalization(container, copy, logger) {
-    if (!container) return { refresh: noop, stop: noop };
+    if (!container) return { reconcile: noop, refresh: noop, stop: noop };
     var strings = copy || {};
     var frameLoadCleanup = /* @__PURE__ */ new WeakMap();
     var frameDocumentCleanup = /* @__PURE__ */ new WeakMap();
@@ -3648,14 +3654,64 @@
         }
       });
     }
+    function frameConnectionToContainer(frame) {
+      var current = frame;
+      var seen = /* @__PURE__ */ new Set();
+      var hasConnectionSignal = false;
+      while (current && !seen.has(current)) {
+        seen.add(current);
+        if (current === container) return true;
+        if (typeof container.contains === "function") {
+          try {
+            var contained = container.contains(current);
+            hasConnectionSignal = true;
+            if (contained) return true;
+          } catch (_error) {
+          }
+        }
+        if (typeof current.isConnected === "boolean") {
+          hasConnectionSignal = true;
+          if (!current.isConnected) return false;
+        }
+        var treeRoot = null;
+        try {
+          treeRoot = typeof current.getRootNode === "function" ? current.getRootNode() : null;
+        } catch (_error) {
+          treeRoot = null;
+        }
+        if (treeRoot && treeRoot.host) {
+          current = treeRoot.host;
+          continue;
+        }
+        var parentFrame = null;
+        try {
+          var ownerWindow = current.ownerDocument && current.ownerDocument.defaultView;
+          parentFrame = ownerWindow && ownerWindow.frameElement;
+        } catch (_error) {
+          parentFrame = null;
+        }
+        if (!parentFrame) return hasConnectionSignal ? false : null;
+        current = parentFrame;
+      }
+      return hasConnectionSignal ? false : null;
+    }
     function reconcileTrackedFrames() {
-      var liveFrames = /* @__PURE__ */ new Set();
-      collectLiveFrames(container, liveFrames);
+      var fallbackLiveFrames = null;
       Array.from(frameRefs).forEach(function(ref) {
         var frame = ref.deref();
         if (!frame) {
           frameRefs.delete(ref);
-        } else if (!liveFrames.has(frame)) {
+          return;
+        }
+        var connected = frameConnectionToContainer(frame);
+        if (connected === null) {
+          if (!fallbackLiveFrames) {
+            fallbackLiveFrames = /* @__PURE__ */ new Set();
+            collectLiveFrames(container, fallbackLiveFrames);
+          }
+          connected = fallbackLiveFrames.has(frame);
+        }
+        if (!connected) {
           unwireFrame(frame);
         }
       });
@@ -3679,6 +3735,9 @@
     }
     localizeHostTree(container);
     return {
+      reconcile: function reconcileViewerFrames() {
+        if (!stopped) reconcileTrackedFrames();
+      },
       refresh: function refreshViewerLocalization() {
         if (!stopped) {
           localizeHostTree(container);
@@ -3764,7 +3823,11 @@
     function dispatch(type, payload) {
       var nextPayload = payload || {};
       hostTransport.dispatch(type, nextPayload);
-      if (payloadMayInstallFrames(type, nextPayload)) localization.refresh();
+      if (payloadMayInstallFrames(type, nextPayload)) {
+        localization.refresh();
+      } else if (payloadMayRemoveFrames(type, nextPayload)) {
+        localization.reconcile();
+      }
     }
     function dispatchMessage(message) {
       var msg = message || {};
