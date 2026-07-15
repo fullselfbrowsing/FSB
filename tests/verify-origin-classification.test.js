@@ -484,6 +484,25 @@ function check(cond, msg) {
     && runtimeProxyContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
     '(b) negative control: a content-action runtime message cannot become a generic authenticated network proxy');
 
+  const dynamicImportContent = verifyInjectedSheetsContent('await import(params.range);');
+  check(dynamicImportContent && dynamicImportContent.ok === false
+    && dynamicImportContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: dynamic module loading cannot turn a Sheets argument into a network target');
+
+  const serviceWorkerContent = verifyInjectedSheetsContent(
+    'await navigator.serviceWorker.register(params.range);'
+  );
+  check(serviceWorkerContent && serviceWorkerContent.ok === false
+    && serviceWorkerContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: service-worker and worklet loaders are forbidden in the UI-only action');
+
+  const dynamicCodeContent = verifyInjectedSheetsContent(
+    'const generated = Function(params.range); generated();'
+  );
+  check(dynamicCodeContent && dynamicCodeContent.ok === false
+    && dynamicCodeContent.failures.includes('FORBIDDEN_SHEETS_CREDENTIAL_OR_NETWORK_SOURCE'),
+    '(b) negative control: generated code cannot synthesize a network primitive in the Sheets action');
+
   // (b) REAL end-to-end: checkOriginClassification() over the LIVE catalog + vendored
   // slack-api.ts -- proves the real heads all pass and slack rides the dynamic
   // accommodation against the genuinely-extracted vendored dynamic form (not a stub).

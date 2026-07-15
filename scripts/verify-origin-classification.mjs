@@ -4490,8 +4490,12 @@ function hasForbiddenSheetsContentNetworkSource(source) {
   const dynamicOrProxyCall =
     /\b(?:globalThis|window|self|document|navigator|tools|chrome(?:Api)?|browser)\s*\[/i.test(text)
     || /\]\s*\(/.test(text)
+    || /\bimport\s*\(/i.test(text)
+    || /\beval\b|\bFunction\b/.test(text)
     || /\.\s*request\s*\(/i.test(text)
     || /\b(?:gapi|postMessage|MessageChannel|BroadcastChannel)\b/i.test(text)
+    || /\b(?:serviceWorker|sharedStorage|audioWorklet|paintWorklet|layoutWorklet)\b/i.test(text)
+    || /\.\s*addModule\s*\(/i.test(text)
     || /\b(?:chrome(?:Api)?|browser)\s*\.\s*(?:runtime|tabs|scripting|webRequest|cookies|identity)\b/i.test(text)
     || /\bReflect\s*\.\s*(?:get|set|apply|construct)\s*\(/i.test(text);
 
@@ -4511,6 +4515,7 @@ function hasForbiddenSheetsContentNetworkSource(source) {
     || /\bObject\s*\.\s*(?:assign|defineProperty|defineProperties)\s*\(/i.test(text)
     || /\.\s*(?:innerHTML|outerHTML|cssText|background|backgroundImage|borderImage|content|cursor|listStyle|listStyleImage|mask|maskImage)\s*=/i.test(text)
     || /\.\s*(?:createContextualFragment|insertAdjacentHTML|submit|requestSubmit|setProperty)\s*\(/i.test(text)
+    || /\bdocument\s*\.\s*(?:write|writeln)\s*\(/i.test(text)
     || /\b(?:window|globalThis|self)\s*\.\s*open\s*\(/i.test(text)
     || /\b(?:window\s*\.\s*)?(?:document\s*\.\s*)?location\s*(?:\.\s*href\s*)?=/i.test(text)
     || /\blocation\s*\.\s*(?:assign|replace|reload)\s*\(/i.test(text);
