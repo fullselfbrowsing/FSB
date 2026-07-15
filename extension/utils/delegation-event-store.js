@@ -650,6 +650,25 @@
     };
   }
 
+  function _validatedLedgerRows(all) {
+    var rows = [];
+    var aggregateBytes = 0;
+    Object.keys(all).sort().forEach(function(key) {
+      if (key.indexOf(STORAGE_KEY_PREFIX) !== 0) return;
+      var delegationId = key.slice(STORAGE_KEY_PREFIX.length);
+      if (!delegationId || _characterLength(delegationId) > MAX_ID_CHARS) {
+        _corrupt('ledger storage key is invalid');
+      }
+      var envelope = _assertValidEnvelope(all[key], delegationId);
+      aggregateBytes += _serializedBytes(envelope);
+      rows.push({ delegationId: delegationId, envelope: envelope });
+    });
+    if (aggregateBytes > MAX_AGGREGATE_BYTES) {
+      _corrupt('persisted aggregate ledger exceeds quota');
+    }
+    return rows;
+  }
+
   var _storageTail = Promise.resolve();
   function _withStorageLock(operation) {
     var next = _storageTail.then(operation, operation);
@@ -715,19 +734,42 @@
     return _withStorageLock(async function() {
       var all = await _read(null);
       var ledgers = [];
-      var aggregateBytes = 0;
-      Object.keys(all).sort().forEach(function(key) {
-        if (key.indexOf(STORAGE_KEY_PREFIX) !== 0) return;
-        var delegationId = key.slice(STORAGE_KEY_PREFIX.length);
-        if (!delegationId || _characterLength(delegationId) > MAX_ID_CHARS) {
-          _corrupt('ledger storage key is invalid');
-        }
-        var envelope = _assertValidEnvelope(all[key], delegationId);
-        aggregateBytes += _serializedBytes(envelope);
-        if (!envelope.terminal) ledgers.push(_clone(envelope));
+      _validatedLedgerRows(all).forEach(function(row) {
+        if (!row.envelope.terminal) ledgers.push(_clone(row.envelope));
       });
-      if (aggregateBytes > MAX_AGGREGATE_BYTES) _corrupt('persisted aggregate ledger exceeds quota');
       return _deepFreeze(ledgers);
+    });
+  }
+
+  /**
+   * Return only ids whose current-schema ledger is durably terminal after the
+   * entire persisted ledger namespace passes the canonical entry, sequence,
+   * identity, per-entry, and aggregate validators. Release-proof callers must
+   * not infer terminal state from a top-level flag or a partially valid row.
+   */
+  async function readDurablyTerminalDelegations(delegationIds) {
+    if (!Array.isArray(delegationIds)) {
+      _persistence('delegationIds must be an array');
+    }
+    if (delegationIds.length > 128) {
+      _quota('delegationIds exceeds its item limit');
+    }
+    var wanted = new Set();
+    delegationIds.forEach(function(delegationId) {
+      wanted.add(_boundedId(delegationId, 'delegationId', false));
+    });
+    return _withStorageLock(async function() {
+      var all = await _read(null);
+      var terminal = [];
+      _validatedLedgerRows(all).forEach(function(row) {
+        if (wanted.has(row.delegationId)
+          && row.envelope.terminal === true
+          && row.envelope.cleanupPending === null
+          && _hasExactKeys(row.envelope, ENVELOPE_KEYS)) {
+          terminal.push(row.delegationId);
+        }
+      });
+      return Object.freeze(terminal);
     });
   }
 
@@ -871,6 +913,7 @@
     project: project,
     appendBeforeFanout: appendBeforeFanout,
     hydrateNonterminal: hydrateNonterminal,
+    readDurablyTerminalDelegations: readDurablyTerminalDelegations,
     markCleanupPending: markCleanupPending,
     markTerminal: markTerminal,
     normalizeTerminalCode: _normalizeTerminalCode,

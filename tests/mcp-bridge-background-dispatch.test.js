@@ -387,10 +387,9 @@ async function runAgentActionDeprecationCase() {
 // Part B -- fsbDispatchInternalMessage wrapper (extracted from background.js)
 // ---------------------------------------------------------------------------
 
-function extractWrapperSource(backgroundSource) {
-  const anchor = 'function fsbDispatchInternalMessage(request) {';
+function extractNamedFunctionSource(backgroundSource, anchor) {
   const start = backgroundSource.indexOf(anchor);
-  if (start === -1) throw new Error('fsbDispatchInternalMessage anchor not found in background.js');
+  if (start === -1) throw new Error(`${anchor} not found in background.js`);
   let depth = 0;
   for (let i = start + anchor.length - 1; i < backgroundSource.length; i++) {
     const ch = backgroundSource[i];
@@ -400,7 +399,14 @@ function extractWrapperSource(backgroundSource) {
       if (depth === 0) return backgroundSource.slice(start, i + 1);
     }
   }
-  throw new Error('Unbalanced braces while extracting fsbDispatchInternalMessage');
+  throw new Error(`Unbalanced braces while extracting ${anchor}`);
+}
+
+function extractWrapperSource(backgroundSource) {
+  return extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbDispatchInternalMessage(request) {'
+  );
 }
 
 function extractDelegationCompositionSource(backgroundSource) {
@@ -614,6 +620,45 @@ async function runWrapperBehaviorCases() {
     assertDeepEqual(result, { success: true, clients }, 'same-context inventory response passes through unchanged');
     assertEqual(harness.handlerCalls[0].sender.fsbInternal, 'mcp-bridge', 'inventory wrapper uses the synthetic MCP bridge sender');
   }
+}
+
+async function runAgentRegistryBootstrapFailureCase() {
+  console.log('\n--- B2: corrupt registry hydration blocks dependent authority boot ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractNamedFunctionSource(
+    backgroundSource,
+    'async function bootstrapAgentRegistry() {'
+  );
+  const warnings = [];
+  const sandbox = {
+    FsbAgentRegistry: {
+      AgentRegistry: class AgentRegistry {
+        async hydrate() {
+          throw new Error('corrupt registry proof');
+        }
+      }
+    },
+    fsbAgentRegistryInstance: null,
+    rateLimitedWarn(...args) {
+      warnings.push(args);
+    },
+    redactForLog() {
+      return { kind: 'error' };
+    }
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(`${source}\nthis.__bootstrapAgentRegistry = bootstrapAgentRegistry;`, sandbox);
+
+  let rejected = null;
+  try {
+    await sandbox.__bootstrapAgentRegistry();
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'corrupt registry proof',
+    'registry hydration rejection propagates to dependent boot');
+  assertEqual(warnings.length, 1, 'registry hydration rejection is logged once');
 }
 
 function buildPairingRuntimeHarness(reloadImpl) {
@@ -1057,6 +1102,7 @@ async function run() {
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
   await runWrapperBehaviorCases();
+  await runAgentRegistryBootstrapFailureCase();
   await runPairingRuntimeActionCases();
   await runDelegationAuthorityCases();
   runSourceContractCase();

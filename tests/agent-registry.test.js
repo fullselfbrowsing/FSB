@@ -1027,6 +1027,8 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(meta.incognito, false, 'persisted incognito flag');
       assert.strictEqual(meta.windowId, 10, 'persisted windowId');
       assert.ok(typeof meta.boundAt === 'number', 'persisted boundAt is numeric');
+      assert.strictEqual(meta.lastAgentNavigationAt, null,
+        'unstamped navigation metadata persists an explicit safe null');
     } finally {
       teardownDiagnosticCapture();
       teardownChromeMock();
@@ -1053,7 +1055,8 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
               ownershipToken: 'persist-token-aaa',
               incognito: false,
               windowId: 10,
-              boundAt: 999
+              boundAt: 999,
+              lastAgentNavigationAt: 777
             }
           }
         }
@@ -1072,6 +1075,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(meta.incognito, false);
       assert.strictEqual(meta.windowId, 10);
       assert.strictEqual(meta.boundAt, 999);
+      assert.strictEqual(meta.lastAgentNavigationAt, 777);
     } finally {
       teardownDiagnosticCapture();
       teardownChromeMock();
@@ -1607,6 +1611,11 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
       assert.strictEqual(afterCrossWindow.code, 'TAB_OUT_OF_SCOPE',
         'cross-window dispatch remains rejected after hold/resume/reload');
       assert.strictEqual(afterCrossWindow.reason, 'cross_window');
+      assert.strictEqual(
+        registry.getTabMetadata(601).lastAgentNavigationAt,
+        securitySnapshot.get(601).lastAgentNavigationAt,
+        'navigation-suppression timestamp survives hold, restore, and a second worker reload',
+      );
     } finally {
       delete globalThis.fsbAgentRegistryInstance;
       teardownChromeMock();
@@ -1664,6 +1673,135 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     }
   }
   console.log('  PASS: unsafe legacy holds cannot resume or become claimable before exact cleanup');
+
+  console.log('--- Phase 61 / CR3: malformed v2 holds remain cancellation-only and reserved ---');
+  {
+    const now = 165_000;
+    const agentId = 'agent_malformed_v2_hold_security';
+    const delegationId = 'Delegation_malformed_v2_hold_6104';
+    const ownershipToken = 'malformed-v2-held-token';
+    const mock = setupChromeMock({
+      session: {
+        fsbAgentRegistry: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [], windowId: 31 },
+          },
+          delegations: { [delegationId]: agentId },
+          holdLeases: {
+            [delegationId]: {
+              v: 2,
+              delegationId,
+              agentId,
+              activeTabId: 604,
+              ownedTabs: [{ tabId: 604, ownershipToken }],
+              tabSecurity: [{
+                tabId: 604,
+                ownershipToken,
+                incognito: false,
+                windowId: 31,
+                boundAt: 100,
+                forced: false,
+                // Deliberately missing lastAgentNavigationAt.
+              }],
+              issuedAt: now,
+              expiresAt: now + 300000,
+            },
+          },
+        },
+      },
+      tabs: [{ id: 604, incognito: false, windowId: 31 }],
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      await registry.hydrate();
+      assert.deepStrictEqual(
+        registry.getDelegationHoldLease({ delegationId, agentId }),
+        { ok: false, code: 'resume_ownership_lost', disposition: 'cancel_required' },
+        'malformed current metadata can never become resumable',
+      );
+      const persistedLease = mock.session._dump().fsbAgentRegistry.holdLeases[delegationId];
+      assert.strictEqual(persistedLease.v, 1, 'malformed v2 lease is durably quarantined');
+      assert.strictEqual(persistedLease.tabSecurity, undefined,
+        'untrusted security metadata is stripped from cancellation-only proof');
+      const otherAgentId = (await registry.registerAgent()).agentId;
+      assert.strictEqual(await registry.bindTab(otherAgentId, 604), false,
+        'identified held tab remains unclaimable after worker hydration');
+      assert.deepStrictEqual(
+        await registry.restoreHoldLease({ delegationId, agentId, liveTabIds: [604] }),
+        { ok: false, code: 'resume_ownership_lost' },
+        'quarantined hold cannot restore authority',
+      );
+      assert.deepStrictEqual(await registry.releaseDelegation({ delegationId, agentId }), {
+        ok: true,
+        code: 'delegation_released',
+        releasedTabCount: 1,
+      }, 'only exact delegation cleanup releases the quarantined reservation');
+      assert.ok(await registry.bindTab(otherAgentId, 604),
+        'tab becomes claimable only after exact cleanup');
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: malformed current holds fail closed across wake and exact cleanup');
+
+  console.log('--- Phase 61 / CR3: orphaned hold proofs quarantine registry hydration ---');
+  {
+    const now = 167_000;
+    const agentId = 'agent_orphaned_hold_security';
+    const delegationId = 'Delegation_orphaned_hold_6104';
+    const ownershipToken = 'orphaned-hold-token';
+    setupChromeMock({
+      session: {
+        fsbAgentRegistry: {
+          v: 1,
+          records: {
+            [agentId]: { agentId, createdAt: 1, tabIds: [], windowId: 32 },
+          },
+          delegations: {},
+          holdLeases: {
+            [delegationId]: {
+              v: 2,
+              delegationId,
+              agentId,
+              activeTabId: 605,
+              ownedTabs: [{ tabId: 605, ownershipToken }],
+              tabSecurity: [{
+                tabId: 605,
+                ownershipToken,
+                incognito: false,
+                windowId: 32,
+                boundAt: 100,
+                forced: false,
+                lastAgentNavigationAt: 150,
+              }],
+              issuedAt: now,
+              expiresAt: now + 300000,
+            },
+          },
+        },
+      },
+      tabs: [{ id: 605, incognito: false, windowId: 32 }],
+    });
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry({ now: () => now });
+      await assert.rejects(
+        registry.hydrate(),
+        /mapped hold lease is corrupt/,
+        'orphaned canonical hold proof rejects hydration',
+      );
+      await assert.rejects(
+        registry.registerAgent(),
+        /hydration failed/,
+        'failed hydration quarantines later authority mutations',
+      );
+    } finally {
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: orphaned hold proofs cannot be discarded or overwritten after wake');
 
   console.log('--- Phase 61 / Task 3: restore loss/expiry/persistence failures remain fully sealed ---');
   {
@@ -1953,9 +2091,9 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
           v: 1,
           delegationId,
           terminal: true,
-          terminalCode: 'provider_private_code',
+          terminalCode: 'stopped',
           cleanupPending: null,
-          entries: [],
+          entries: [{}],
         },
       },
     });
@@ -1978,6 +2116,21 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         [ledgerKey]: {
           v: 1,
           delegationId,
+          terminal: true,
+          terminalCode: 'provider_private_code',
+          cleanupPending: null,
+          entries: [],
+        },
+      });
+      assert.strictEqual(
+        await registry.acknowledgeDelegationRelease({ delegationId, agentId }),
+        false,
+        'a noncanonical terminal code cannot acknowledge a receipt',
+      );
+      await mock.session.set({
+        [ledgerKey]: {
+          v: 1,
+          delegationId,
           terminal: false,
           terminalCode: null,
           cleanupPending: {
@@ -1993,11 +2146,87 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         false,
         'nonterminal cleanup evidence cannot acknowledge a receipt',
       );
+      await mock.session.set({
+        [ledgerKey]: {
+          v: 1,
+          delegationId,
+          terminal: true,
+          terminalCode: 'stopped',
+          cleanupPending: null,
+          entries: [],
+        },
+      });
+      assert.strictEqual(
+        await registry.acknowledgeDelegationRelease({ delegationId, agentId }),
+        true,
+        'only a fully canonical current-schema terminal ledger acknowledges proof',
+      );
+      assert.strictEqual(
+        mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY]
+          .delegationReleaseReceipts[delegationId].acknowledged,
+        true,
+        'canonical acknowledgement is itself durable',
+      );
     } finally {
       teardownChromeMock();
     }
   }
   console.log('  PASS: only canonical durable terminal evidence can acknowledge release proof');
+
+  console.log('--- Phase 61 / CR3: malformed release proof quarantines every later mutation ---');
+  {
+    const delegationId = 'Delegation_receipt_malformed_6104';
+    const baseReceipt = {
+      v: 1,
+      delegationId,
+      agentId: 'agent_receipt_malformed_6104',
+      releasedTabCount: 1,
+      releasedAt: 123,
+      acknowledged: false,
+    };
+    const cases = [
+      ['missing releasedAt', (() => {
+        const value = { ...baseReceipt };
+        delete value.releasedAt;
+        return value;
+      })()],
+      ['oversized agentId', { ...baseReceipt, agentId: 'agent_' + 'x'.repeat(5000) }],
+      ['impossible releasedTabCount', {
+        ...baseReceipt,
+        releasedTabCount: Number.MAX_SAFE_INTEGER,
+      }],
+    ];
+    for (const [label, receipt] of cases) {
+      const originalEnvelope = {
+        v: 1,
+        records: {},
+        delegationReleaseReceipts: { [delegationId]: receipt },
+      };
+      const mock = setupChromeMock({
+        session: { fsbAgentRegistry: originalEnvelope },
+      });
+      try {
+        const fresh = freshRequireRegistry();
+        const registry = new fresh.AgentRegistry();
+        await assert.rejects(registry.hydrate(), /release receipt is corrupt/, label);
+        assert.deepStrictEqual(registry.listAgents(), [],
+          label + ': failed hydration quarantines partially rebuilt authority');
+        await assert.rejects(
+          registry.registerAgent(),
+          /mutations are quarantined/,
+          label + ': later mutation is blocked before it can overwrite proof',
+        );
+        assert.deepStrictEqual(
+          mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY],
+          originalEnvelope,
+          label + ': original receipt envelope remains byte-for-byte structural proof',
+        );
+      } finally {
+        teardownChromeMock();
+      }
+    }
+  }
+  console.log('  PASS: malformed receipt fields never disappear through hydrate or later writes');
 
   console.log('--- Phase 61 / CR2-02: over-cap persisted outstanding receipts fail hydrate closed ---');
   {
@@ -2034,6 +2263,17 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
           .delegationReleaseReceipts).length,
         129,
         'fail-closed hydrate never truncates an outstanding proof',
+      );
+      await assert.rejects(
+        registry.registerAgent(),
+        /mutations are quarantined/,
+        'post-failure registration cannot overwrite the original over-cap proof envelope',
+      );
+      assert.strictEqual(
+        Object.keys(mock.session._dump()[fresh.FSB_AGENT_REGISTRY_STORAGE_KEY]
+          .delegationReleaseReceipts).length,
+        129,
+        'quarantined registry preserves all outstanding proof after a later mutation attempt',
       );
     } finally {
       teardownChromeMock();

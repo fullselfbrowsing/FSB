@@ -144,6 +144,7 @@ function project(store, event, overrides = {}) {
       'STORAGE_KEY_PREFIX',
       'appendBeforeFanout',
       'hydrateNonterminal',
+      'readDurablyTerminalDelegations',
       'markCleanupPending',
       'markTerminal',
       'normalizeTerminalCode',
@@ -713,6 +714,11 @@ function project(store, event, overrides = {}) {
       assert.strictEqual(terminal.terminalCode, 'completed');
       assert.strictEqual(terminal.entries.length, 1);
       assert.strictEqual((await store.hydrateNonterminal()).length, 0);
+      assert.deepStrictEqual(
+        await store.readDurablyTerminalDelegations([delegationId, 'delegation_missing_01']),
+        [delegationId],
+        'canonical full-ledger validation proves only the exact durable terminal id',
+      );
       assert.strictEqual(mock.data[storageKey(store)].entries.length, 1);
       const repeated = await store.markTerminal(delegationId, 'completed');
       assert.deepStrictEqual(repeated, terminal);

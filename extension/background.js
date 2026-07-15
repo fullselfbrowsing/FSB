@@ -1152,7 +1152,8 @@ async function restorePersistedMcpVisualSessions() {
 // Phase 237 -- Agent Registry boot.
 // Hydrates registry from chrome.storage.session and reconciles against live tabs.
 // Idempotent: subsequent calls within the same SW lifetime are no-ops.
-// Failure mode: log via rateLimitedWarn and continue; never poison SW startup.
+// Failure mode: log via rateLimitedWarn and propagate so dependent lifecycle
+// authorities cannot start against an empty or quarantined registry.
 async function bootstrapAgentRegistry() {
   if (!globalThis.FsbAgentRegistry || !globalThis.FsbAgentRegistry.AgentRegistry) return;
   if (!globalThis.fsbAgentRegistryInstance) {
@@ -1169,6 +1170,7 @@ async function bootstrapAgentRegistry() {
         typeof globalThis.redactForLog === 'function' ? globalThis.redactForLog(err) : { kind: 'error' }
       );
     }
+    throw err;
   }
 }
 
@@ -3512,9 +3514,9 @@ async function restoreSessionsFromStorage() {
     await restoreConversationSessions();
     // Phase 237 -- hydrate the agent registry adjacent to the visual-session
     // restore site so registry ownership is reconciled before any message
-    // handler can read getOwner(tabId). The bootstrap function swallows its
-    // own errors, but we still chain a defensive .catch in case construction
-    // throws so SW boot is never poisoned.
+    // handler can read getOwner(tabId). A failure remains isolated from
+    // unrelated startup work here, while bootstrapDelegationController awaits
+    // the same failing hydration and therefore cannot create an authority.
     await bootstrapAgentRegistry().catch(() => {});
     await bootstrapDelegationController().catch((error) => {
       console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
