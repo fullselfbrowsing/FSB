@@ -15,8 +15,16 @@ class TestNode {
     this.className = '';
     this.id = '';
     this.open = false;
+    this.disabled = false;
+    this.focusCount = 0;
     this._text = text === undefined ? '' : String(text);
     this._listeners = Object.create(null);
+    const classes = new Set();
+    this.classList = {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      contains: (name) => classes.has(name)
+    };
   }
 
   appendChild(child) {
@@ -38,6 +46,14 @@ class TestNode {
 
   getAttribute(name) {
     return this.attributes[name] === undefined ? null : this.attributes[name];
+  }
+
+  removeAttribute(name) {
+    delete this.attributes[name];
+  }
+
+  focus() {
+    this.focusCount += 1;
   }
 
   addEventListener(type, listener) {
@@ -353,11 +369,27 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'You have control of this tab',
   'Resume with agent',
   'Stop agent',
+  'Stopping agent…',
+  'Agent offline',
+  'FSB cannot reach the local agent service. Run the doctor command, then try this message again.',
+  'Copy doctor command',
+  'Open provider setup',
+  'Agent connection lost',
+  'FSB missed three replies from the local agent service. The run cannot continue safely.',
+  'Agent run ended after daemon restart',
+  'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.',
+  'Start a new task',
+  'Pair this browser before starting Claude Code',
+  'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.',
+  'The selected provider does not support agents that control browser tabs. Choose a supported agent provider, then try this message again.',
+  'Choose another provider',
   'Agent could not resume control',
   'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.',
   'Agent could not finish this task',
   'Claude Code stopped before the task was complete. Review the error details, then try the same message again.'
 ].forEach((copy) => assert(panelSource.includes(copy), 'exact delegated copy is pinned: ' + copy));
+assert(panelSource.includes("+ ' cannot run browser tasks'"),
+  'unsupported-provider heading retains the exact dynamic provider-label suffix');
 
 const delegationUiSource = panelSource.slice(
   panelSource.indexOf('var _delegationUiState = {'),
@@ -381,7 +413,7 @@ assert(panelSource.includes("if ((_delegationUiState.pendingTake && message.snap
   'intermediate hold/resume snapshots retain the prior truthful focused control');
 assert(panelSource.includes("if (changes.fsbAgentRegistry && typeof _refreshSelectedDelegationSnapshot === 'function')")
     && panelSource.includes('_refreshSelectedDelegationSnapshot();')
-    && panelSource.includes('await _refreshSelectedDelegationSnapshot();'),
+    && panelSource.includes('await _hydrateDelegationForSelectedConversation();'),
   'registry and active-tab events refresh controller-owned eligibility without UI ownership reads');
 const consentRenderSource = extractNamedFunction(panelSource, '_renderDelegationConsent');
 assert(!/checkbox\.addEventListener|addEventListener\(['"]change/.test(consentRenderSource),
@@ -391,6 +423,43 @@ assert(consentRenderSource.includes('heading.tabIndex = -1')
   'consent focus lands programmatically on its heading');
 assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panelSource),
   'Escape follows the same non-starting consent back path');
+
+console.log('\n--- Phase 61 stop, recovery, and hydration contract ---');
+
+assert(panelSource.includes("'fsbSidepanelDelegationConversations'")
+    && panelSource.includes('DELEGATION_CONVERSATION_CAP = 50')
+    && panelSource.includes('chrome.storage.session.get(DELEGATION_CONVERSATION_STORAGE_KEY)')
+    && panelSource.includes('chrome.storage.session.set(payload)'),
+  'conversation-to-delegation selection is bounded and session-scoped');
+const hydrationSource = extractNamedFunction(panelSource, '_hydrateDelegationForSelectedConversation');
+assert(hydrationSource.includes("type: 'FSB_DELEGATION_SNAPSHOT'")
+    && hydrationSource.includes('delegationId: selectedDelegationId')
+    && hydrationSource.indexOf('hydrated: true') < hydrationSource.lastIndexOf('_delegationUiState.subscribed = true'),
+  'selected exact snapshot hydrates before the runtime subscription gate opens');
+const startSource = extractNamedFunction(panelSource, '_beginDelegationStart');
+assert(startSource.indexOf('_renderDelegationSnapshot(response.snapshot')
+      < startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
+    && startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
+      < startSource.lastIndexOf('_delegationUiState.subscribed = true'),
+  'accepted start catches up silently before opening its live subscription gate');
+assert(panelSource.includes("mount.state.setAttribute('role', 'alert')")
+    && panelSource.includes("mount.state.setAttribute('aria-live', 'off')"),
+  'connectivity cards retain alert semantics while hydrated/unchanged alerts stay silent');
+assert(panelSource.includes("announceSequence > previousLastSequence"),
+  'only a strictly newer matching sequence reaches the polite announcer');
+assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
+    && panelSource.includes("count === 1 ? 'tab' : 'tabs'"),
+  'stopped copy uses only the canonical release count with singular grammar');
+assert(panelSource.includes("snapshot.state === 'stopping' ? 'Stopping agent…' : 'Stop agent'"),
+  'stopping wording is selected only by the canonical stopping snapshot');
+const doctorSource = extractNamedFunction(panelSource, '_copyDelegationDoctorCommand');
+const setupSource = extractNamedFunction(panelSource, '_openDelegationProviderSetup');
+assert(doctorSource.includes("var command = 'fsb-mcp-server doctor'")
+    && doctorSource.includes('navigator.clipboard.writeText(command)')
+    && setupSource.includes("openControlPanelSection('providers')"),
+  'doctor recovery copies only the literal and opens only the local Providers section');
+assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n' + setupSource),
+  'doctor/setup actions cannot execute or restart a daemon, native host, or shell');
 
 (async function runInteractionContract() {
   {
@@ -414,10 +483,18 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     const renders = [];
     const running = { delegationId: DELEGATION_ID, state: 'running' };
     const held = { delegationId: DELEGATION_ID, state: 'held' };
-    const state = { snapshot: running, pendingTake: false, errorCode: null };
+    const state = {
+      snapshot: running,
+      delegationId: DELEGATION_ID,
+      conversationId: 'conv_fixture',
+      pendingTake: false,
+      errorCode: null
+    };
     const context = {
+      conversationId: 'conv_fixture',
       _delegationUiState: state,
       _delegationCanTakeControl: () => true,
+      _delegationIsSelectedConversation: () => true,
       _sendDelegationCommand(message) {
         commands.push(clone(message));
         return new Promise((resolve) => { resolveCommand = resolve; });
@@ -449,10 +526,18 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     const renders = [];
     const held = { delegationId: DELEGATION_ID, state: 'held' };
     const running = { delegationId: DELEGATION_ID, state: 'running' };
-    const state = { snapshot: held, pendingResume: false, errorCode: null };
+    const state = {
+      snapshot: held,
+      delegationId: DELEGATION_ID,
+      conversationId: 'conv_fixture',
+      pendingResume: false,
+      errorCode: null
+    };
     const context = {
+      conversationId: 'conv_fixture',
       _delegationUiState: state,
       _delegationCanResume: () => true,
+      _delegationIsSelectedConversation: () => true,
       _sendDelegationCommand(message) {
         commands.push(clone(message));
         return new Promise((resolve) => { resolveCommand = resolve; });
@@ -538,6 +623,400 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     assert.equal(state.challengeId, null);
     assert.equal(readyRenders, 1);
     assert.equal(focuses, 1, 'Back restores composer focus');
+  }
+
+  {
+    const session = Object.create(null);
+    const context = {
+      DELEGATION_CONVERSATION_CAP: 50,
+      DELEGATION_CONVERSATION_STORAGE_KEY: 'fsbSidepanelDelegationConversations',
+      DELEGATION_ID_PATTERN: /^[A-Za-z0-9_-]{8,128}$/,
+      DELEGATION_CONVERSATION_ID_PATTERN: /^conv_[A-Za-z0-9_-]{1,250}$/,
+      _delegationConversationEnvelope: { v: 1, byConversation: {}, lru: [] },
+      _delegationBindingWriteChain: Promise.resolve(),
+      chrome: {
+        storage: {
+          session: {
+            async get(key) {
+              return Object.hasOwn(session, key) ? { [key]: clone(session[key]) } : {};
+            },
+            async set(payload) { Object.assign(session, clone(payload)); }
+          }
+        }
+      }
+    };
+    vm.createContext(context);
+    [
+      '_delegationHasExactKeys',
+      '_delegationEmptyConversationEnvelope',
+      '_delegationValidConversationId',
+      '_delegationValidConversationEnvelope',
+      '_delegationCloneConversationEnvelope',
+      '_serializeDelegationBindingWrite',
+      '_writeDelegationConversationBinding'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+    assert.equal(context._delegationValidConversationEnvelope({
+      v: 1,
+      byConversation: { conv_valid: DELEGATION_ID },
+      lru: ['conv_valid']
+    }), true, 'closed conversation binding envelope validates');
+    assert.equal(context._delegationValidConversationEnvelope({
+      v: 1,
+      byConversation: { conv_valid: DELEGATION_ID },
+      lru: ['conv_valid'],
+      raw: true
+    }), false, 'conversation binding rejects extra storage fields');
+
+    for (let index = 0; index < 51; index += 1) {
+      await context._writeDelegationConversationBinding(
+        `conv_${index}`,
+        `delegation_map_${index}`
+      );
+    }
+    const envelope = session.fsbSidepanelDelegationConversations;
+    assert.equal(envelope.lru.length, 50, 'conversation binding is capped at 50 rows');
+    assert.equal(envelope.byConversation.conv_0, undefined, 'binding LRU evicts the oldest row');
+    assert.equal(envelope.byConversation.conv_50, 'delegation_map_50', 'binding LRU retains newest row');
+  }
+
+  {
+    let resolveSnapshot;
+    const commands = [];
+    const renders = [];
+    const state = { subscribed: true };
+    const hydratedSnapshot = {
+      delegationId: DELEGATION_ID,
+      provider: { id: 'claude-code', label: 'Claude Code' }
+    };
+    const context = {
+      conversationId: 'conv_selected',
+      _delegationHydrationGeneration: 0,
+      _delegationUiState: state,
+      _lastUserTaskByConversation: new Map([['conv_selected', 'retained delegated task']]),
+      _delegationForConversation: () => DELEGATION_ID,
+      _resetDelegationSelection(selectedConversationId) {
+        state.conversationId = selectedConversationId;
+        state.delegationId = null;
+        state.subscribed = false;
+      },
+      _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return new Promise((resolve) => { resolveSnapshot = resolve; });
+      },
+      _delegationValidSnapshotResponse: () => true,
+      _removeDelegationConversationBinding: async () => true,
+      _renderDelegationReadyState() { throw new Error('ready state was not expected'); },
+      _renderDelegationSnapshot(next, options) {
+        renders.push({ next, options, subscribedWhileRendering: state.subscribed });
+        return true;
+      }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_hydrateDelegationForSelectedConversation'), context);
+    const pending = context._hydrateDelegationForSelectedConversation();
+    assert.deepEqual(commands, [{
+      type: 'FSB_DELEGATION_SNAPSHOT',
+      delegationId: DELEGATION_ID
+    }]);
+    assert.equal(state.subscribed, false, 'subscription gate closes before hydration request');
+    resolveSnapshot({ ok: true, snapshot: hydratedSnapshot });
+    assert.equal(await pending, true);
+    assert.equal(renders.length, 1);
+    assert.equal(renders[0].options.hydrated, true);
+    assert.equal(renders[0].subscribedWhileRendering, false,
+      'historical rows render before subscription opens');
+    assert.equal(state.subscribed, true, 'subscription opens only after hydrated render');
+    assert.equal(state.task, 'retained delegated task', 'hydration restores retry text from ordinary conversation history');
+  }
+
+  {
+    const commands = [];
+    let readyRenders = 0;
+    const state = { subscribed: true };
+    const context = {
+      conversationId: null,
+      _delegationHydrationGeneration: 0,
+      _delegationUiState: state,
+      _delegationForConversation: () => null,
+      _resetDelegationSelection(selectedConversationId) {
+        state.conversationId = selectedConversationId;
+        state.delegationId = null;
+        state.subscribed = false;
+      },
+      async _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return { ok: true, snapshot: null };
+      },
+      _delegationValidSnapshotResponse: () => true,
+      _removeDelegationConversationBinding: async () => true,
+      _renderDelegationReadyState() { readyRenders += 1; },
+      _renderDelegationSnapshot() { throw new Error('cleared session cannot hydrate a run'); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_hydrateDelegationForSelectedConversation'), context);
+    assert.equal(await context._hydrateDelegationForSelectedConversation(), true);
+    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_SNAPSHOT', delegationId: null }]);
+    assert.equal(readyRenders, 1, 'cleared session renders the honest ready state');
+    assert.equal(state.subscribed, true);
+  }
+
+  {
+    const delivered = [];
+    const state = {
+      subscribed: true,
+      delegationId: 'delegation_selected',
+      conversationId: 'conv_selected',
+      pendingTake: false,
+      pendingResume: false
+    };
+    const context = {
+      conversationId: 'conv_selected',
+      _delegationUiState: state,
+      _delegationHasExactKeys(value, keys) {
+        return value && Object.keys(value).sort().join('|') === [...keys].sort().join('|');
+      },
+      FsbDelegationFeed: { validateSnapshot: () => true },
+      _delegationIsSelectedConversation: () => true,
+      _renderDelegationSnapshot(next, options) {
+        delivered.push({ next, options });
+        return true;
+      }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_handleDelegationRuntimeUpdate'), context);
+    assert.equal(context._handleDelegationRuntimeUpdate({
+      type: 'FSB_DELEGATION_UPDATED',
+      snapshot: { delegationId: 'delegation_other', state: 'running' },
+      announceSequence: 1
+    }), false, 'interleaved updates for another delegation stay hidden');
+    assert.equal(delivered.length, 0);
+    assert.equal(context._handleDelegationRuntimeUpdate({
+      type: 'FSB_DELEGATION_UPDATED',
+      snapshot: { delegationId: 'delegation_selected', state: 'running' },
+      announceSequence: 1
+    }), true, 'matching selected delegation update renders');
+    assert.equal(delivered.length, 1);
+  }
+
+  {
+    const run = new TestNode('section');
+    const stateNode = new TestNode('div');
+    const feed = new TestNode('div');
+    const announcer = new TestNode('div');
+    announcer.textContent = 'silent';
+    const uiState = {
+      delegationId: DELEGATION_ID,
+      snapshot: null,
+      pendingTake: false,
+      pendingResume: false,
+      pendingStop: false,
+      lastRenderedSequence: null,
+      lastAlertKey: null,
+      announced: Object.create(null)
+    };
+    const context = {
+      _delegationUiState: uiState,
+      _ensureDelegationMount: () => ({ run, state: stateNode, feed, announcer, control: null }),
+      FsbDelegationFeed: {
+        validateSnapshot: () => true,
+        render(_feed, next, options) {
+          return { ok: true, lastSequence: next.entries.length, hydrated: options.hydrated };
+        }
+      },
+      _renderDelegationRunHeader() {},
+      _renderDelegationControlBar() {},
+      _setDelegationHeaderStatus() {},
+      _setDelegationComposerLocked() {},
+      _delegationStateLabel: () => 'status',
+      _delegationSnapshotLocksComposer: () => true,
+      _delegationAnnouncement: () => 'new persisted row'
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationSnapshotAlertKey'), context);
+    vm.runInContext(extractNamedFunction(panelSource, '_renderDelegationSnapshot'), context);
+    const rows = [1, 2, 3, 4].map((sequence) => ({ sequence }));
+    const disconnected = {
+      delegationId: DELEGATION_ID,
+      provider: { label: 'Claude Code' },
+      state: 'running',
+      connection: 'disconnected',
+      terminal: null,
+      entries: rows
+    };
+    assert.equal(context._renderDelegationSnapshot(disconnected, {
+      hydrated: true,
+      announceSequence: null
+    }), true);
+    assert.equal(announcer.textContent, 'silent', 'hydrated history never reaches the live announcer');
+    assert.equal(stateNode.getAttribute('role'), 'alert');
+    assert.equal(stateNode.getAttribute('aria-live'), 'off',
+      'hydrated alert retains semantics without replay');
+
+    const connected = { ...disconnected, connection: 'connected', entries: rows.concat({ sequence: 5 }) };
+    assert.equal(context._renderDelegationSnapshot(connected, {
+      hydrated: false,
+      announceSequence: 5
+    }), true);
+    assert.equal(announcer.textContent, 'new persisted row', 'strictly newer live row announces once');
+    announcer.textContent = 'dedupe sentinel';
+    context._renderDelegationSnapshot(connected, { hydrated: false, announceSequence: 5 });
+    assert.equal(announcer.textContent, 'dedupe sentinel', 'duplicate sequence stays silent');
+
+    const disconnectedLive = { ...disconnected, entries: connected.entries };
+    context._renderDelegationSnapshot(disconnectedLive, { hydrated: false, announceSequence: null });
+    assert.equal(stateNode.getAttribute('role'), 'alert');
+    assert.equal(stateNode.getAttribute('aria-live'), null, 'new disconnect transition alerts once');
+    context._renderDelegationSnapshot(disconnectedLive, { hydrated: false, announceSequence: null });
+    assert.equal(stateNode.getAttribute('aria-live'), 'off', 'unchanged disconnect avoids an alert storm');
+  }
+
+  {
+    let resolveStop;
+    const commands = [];
+    const renders = [];
+    const running = { delegationId: DELEGATION_ID, state: 'running' };
+    const stopped = {
+      delegationId: DELEGATION_ID,
+      state: 'stopped',
+      terminal: { code: 'stopped', releasedTabCount: 1 }
+    };
+    const state = {
+      snapshot: running,
+      delegationId: DELEGATION_ID,
+      conversationId: 'conv_fixture',
+      pendingStop: false,
+      errorCode: null
+    };
+    const context = {
+      conversationId: 'conv_fixture',
+      _delegationUiState: state,
+      _delegationIsActiveSnapshot: () => true,
+      _delegationIsSelectedConversation: () => true,
+      _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return new Promise((resolve) => { resolveStop = resolve; });
+      },
+      _delegationValidLifecycleResponse: () => true,
+      _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_stopDelegation'), context);
+    const button = new TestNode('button');
+    const first = context._stopDelegation({ currentTarget: button });
+    const duplicate = context._stopDelegation({ currentTarget: button });
+    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID }]);
+    assert.equal(state.pendingStop, true);
+    assert.equal(button.disabled, true);
+    assert.equal(button.focusCount, 1, 'Stop retains focus on its disabled control while pending');
+    assert.equal(renders.length, 0, 'Stop renders no terminal result before authority replies');
+    assert.equal(await duplicate, undefined, 'duplicate Stop click has no lifecycle effect');
+    resolveStop({ ok: true, snapshot: stopped });
+    await first;
+    assert.equal(renders.length, 1);
+
+    const headingContext = {};
+    vm.createContext(headingContext);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationStoppedHeading'), headingContext);
+    assert.equal(headingContext._delegationStoppedHeading(stopped), 'Agent stopped, 1 tab released');
+    assert.equal(headingContext._delegationStoppedHeading({
+      terminal: { releasedTabCount: 2 }
+    }), 'Agent stopped, 2 tabs released');
+  }
+
+  {
+    const context = {
+      document: globalThis.document,
+      _delegationUiState: {
+        errorCode: null,
+        pendingStop: false
+      },
+      _copyDelegationDoctorCommand() {},
+      _openDelegationProviderSetup() {},
+      _prepareDelegationTask() {},
+      _stopDelegation() {}
+    };
+    vm.createContext(context);
+    [
+      '_clearDelegationNode',
+      '_delegationElement',
+      '_delegationAction',
+      '_renderDelegationInlineError',
+      '_delegationStoppedHeading',
+      '_delegationStateLabel',
+      '_delegationIsActiveSnapshot',
+      '_renderDelegationRunActions',
+      '_appendDelegationActionRow',
+      '_appendDelegationDoctorRecovery',
+      '_appendDelegationTechnicalCode',
+      '_renderDelegationRunHeader'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+    const base = {
+      delegationId: DELEGATION_ID,
+      provider: { id: 'claude-code', label: 'Claude Code' },
+      state: 'running',
+      connection: 'connected',
+      terminal: null
+    };
+    const card = new TestNode('div');
+
+    context._renderDelegationRunHeader(card, { ...base, connection: 'disconnected' });
+    assert(card.textContent.includes('Agent connection lost'));
+    assert(card.textContent.includes('FSB missed three replies from the local agent service. The run cannot continue safely.'));
+    assert(card.textContent.includes('fsb-mcp-server doctor'));
+    assert(card.textContent.includes('Copy doctor command'));
+    assert(card.textContent.includes('Open provider setup'));
+    assert(!card.textContent.includes('daemon restart'), 'ordinary disconnect never receives restart copy');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'restart_lost',
+      connection: 'disconnected',
+      terminal: { code: 'daemon_restart_lost_run', releasedTabCount: 0 }
+    });
+    assert(card.textContent.includes('Agent run ended after daemon restart'));
+    assert(card.textContent.includes('The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.'));
+    assert(card.textContent.includes('daemon_restart_lost_run'));
+    assert(card.textContent.includes('Start a new task'));
+    assert(!card.textContent.includes('missed three replies'),
+      'explicit restart disposition takes precedence over disconnected transport state');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'stopped',
+      terminal: { code: 'stopped', releasedTabCount: 2 }
+    });
+    assert(card.textContent.includes('Agent stopped, 2 tabs released'));
+    assert(card.textContent.includes('Start a new task'));
+  }
+
+  {
+    const copied = [];
+    const opened = [];
+    const announcer = new TestNode('div');
+    const context = {
+      navigator: { clipboard: { async writeText(value) { copied.push(value); } } },
+      _ensureDelegationMount: () => ({ announcer }),
+      openControlPanelSection(section) { opened.push(section); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_copyDelegationDoctorCommand'), context);
+    vm.runInContext(extractNamedFunction(panelSource, '_openDelegationProviderSetup'), context);
+    await context._copyDelegationDoctorCommand();
+    assert.deepEqual(copied, ['fsb-mcp-server doctor']);
+    assert.equal(announcer.textContent, 'Doctor command copied');
+    context._openDelegationProviderSetup();
+    assert.deepEqual(opened, ['providers']);
+  }
+
+  {
+    const context = {};
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationSnapshotLocksComposer'), context);
+    assert.equal(context._delegationSnapshotLocksComposer({ state: 'running', connection: 'disconnected' }), true,
+      'disconnected nonterminal run keeps composer locked');
+    assert.equal(context._delegationSnapshotLocksComposer({ state: 'stopped', connection: 'connected' }), false,
+      'composer restores only after canonical terminal settlement');
   }
 
   console.log('delegation-sidepanel-ui: PASS');

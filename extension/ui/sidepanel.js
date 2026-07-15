@@ -99,6 +99,7 @@ function _resolveTabIdForSession(sessionId) {
 //                           write at 200ms after the last call.
 var _messageLogDebouncer = null;
 var _messageLogPendingBuffer = new Map();
+var _lastUserTaskByConversation = new Map();
 
 // Phase 11 debug-phase-11-sidepanel-reopen-empty -- declare module-scope
 // thread state that pre-existing renderAutomationCompletionPayload /
@@ -278,6 +279,7 @@ async function swapToTabConversation(tabId) {
     if (!FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return;
     var nextConvId = FSBSidepanelTabConvStore.getTabConversation(tabConvEnvelope, tabId);
     if (nextConvId === conversationId) return; // same conversation; no-op
+    _delegationUiState.subscribed = false;
     conversationId = nextConvId; // may be null (D-17 lazy mint deferred)
     if (chatMessages && typeof chatMessages.innerHTML !== 'undefined') {
       chatMessages.innerHTML = '';
@@ -354,6 +356,23 @@ async function ensureTabConversationForActiveTab(overwrite) {
   }
 }
 
+async function ensureTabConversationForTab(tabId) {
+  try {
+    await _envelopeReadyPromise;
+    if (!Number.isSafeInteger(tabId)
+        || typeof FSBSidepanelTabConvStore === 'undefined'
+        || !FSBSidepanelTabConvStore.isValidEnvelope(tabConvEnvelope)) return null;
+    var selectedConversationId = FSBSidepanelTabConvStore.ensureTabConversation(
+      tabConvEnvelope, tabId, _mintConversationId
+    );
+    await _persistEnvelope();
+    if (_activeTabIdSnapshot === tabId) conversationId = selectedConversationId;
+    return selectedConversationId;
+  } catch (_error) {
+    return null;
+  }
+}
+
 // Phase 11 debug-phase-11-sidepanel-reopen-empty -- hydrate the chat
 // surface from persisted session logs for a given conversationId.
 //
@@ -402,6 +421,14 @@ async function hydrateChatFromConversationId(convId) {
         });
         for (var i = 0; i < sorted.length; i++) {
           var m = sorted[i];
+          if (m.role === 'user'
+              && typeof m.content === 'string'
+              && m.content.length > 0
+              && typeof _lastUserTaskByConversation !== 'undefined'
+              && _lastUserTaskByConversation
+              && typeof _lastUserTaskByConversation.set === 'function') {
+            _lastUserTaskByConversation.set(convId, m.content);
+          }
           renderPersistedMessage(m.content, m.role, m.kind);
         }
         activeConversationId = convId;
@@ -449,6 +476,11 @@ async function hydrateChatFromConversationId(convId) {
       for (var c = 0; c < commands.length; c++) {
         var cmd = commands[c];
         if (typeof cmd === 'string' && cmd.trim().length > 0) {
+          if (typeof _lastUserTaskByConversation !== 'undefined'
+              && _lastUserTaskByConversation
+              && typeof _lastUserTaskByConversation.set === 'function') {
+            _lastUserTaskByConversation.set(convId, cmd);
+          }
           renderPersistedMessage(cmd, 'user', 'text');
         }
       }
@@ -498,6 +530,14 @@ const automationRunner = document.getElementById('automationRunner');
 const automationTimer = document.getElementById('automationTimer');
 const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 
+var DELEGATION_CONVERSATION_STORAGE_KEY = 'fsbSidepanelDelegationConversations';
+var DELEGATION_CONVERSATION_CAP = 50;
+var DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+var DELEGATION_CONVERSATION_ID_PATTERN = /^conv_[A-Za-z0-9_-]{1,250}$/;
+var _delegationConversationEnvelope = { v: 1, byConversation: {}, lru: [] };
+var _delegationBindingWriteChain = Promise.resolve();
+var _delegationHydrationGeneration = 0;
+
 // Phase 61 delegated-run presentation state. This object tracks only which
 // canonical background snapshot belongs to the selected conversation and
 // which exact delivery identities were already announced. It never derives
@@ -522,6 +562,7 @@ var _delegationUiState = {
   pendingStop: false,
   composerLocked: false,
   lastRenderedSequence: null,
+  lastAlertKey: null,
   announced: Object.create(null),
   subscribed: false
 };
@@ -592,6 +633,139 @@ function _delegationValidLifecycleResponse(value) {
         && FsbDelegationFeed.validateSnapshot(value.snapshot)));
 }
 
+function _delegationValidSnapshotResponse(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (value.ok === true) {
+    return _delegationHasExactKeys(value, ['ok', 'snapshot'])
+      && (value.snapshot === null
+        || (typeof FsbDelegationFeed !== 'undefined'
+          && FsbDelegationFeed.validateSnapshot(value.snapshot)));
+  }
+  return _delegationHasExactKeys(value, ['code', 'ok', 'snapshot'])
+    && value.ok === false
+    && typeof value.code === 'string'
+    && (value.snapshot === null
+      || (typeof FsbDelegationFeed !== 'undefined'
+        && FsbDelegationFeed.validateSnapshot(value.snapshot)));
+}
+
+function _delegationEmptyConversationEnvelope() {
+  return { v: 1, byConversation: {}, lru: [] };
+}
+
+function _delegationValidConversationId(value) {
+  return typeof value === 'string'
+    && DELEGATION_CONVERSATION_ID_PATTERN.test(value);
+}
+
+function _delegationValidConversationEnvelope(value) {
+  if (!_delegationHasExactKeys(value, ['byConversation', 'lru', 'v'])
+      || value.v !== 1
+      || !value.byConversation
+      || typeof value.byConversation !== 'object'
+      || Array.isArray(value.byConversation)
+      || !Array.isArray(value.lru)
+      || value.lru.length > DELEGATION_CONVERSATION_CAP) return false;
+  var keys = Object.keys(value.byConversation);
+  if (keys.length !== value.lru.length || keys.length > DELEGATION_CONVERSATION_CAP) return false;
+  var seen = Object.create(null);
+  for (var index = 0; index < value.lru.length; index++) {
+    var conversationKey = value.lru[index];
+    if (!_delegationValidConversationId(conversationKey)
+        || seen[conversationKey]
+        || !Object.prototype.hasOwnProperty.call(value.byConversation, conversationKey)
+        || typeof value.byConversation[conversationKey] !== 'string'
+        || !DELEGATION_ID_PATTERN.test(value.byConversation[conversationKey])) return false;
+    seen[conversationKey] = true;
+  }
+  return true;
+}
+
+function _delegationCloneConversationEnvelope(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function _loadDelegationConversationEnvelope() {
+  try {
+    var stored = await chrome.storage.session.get(DELEGATION_CONVERSATION_STORAGE_KEY);
+    var candidate = stored && stored[DELEGATION_CONVERSATION_STORAGE_KEY];
+    _delegationConversationEnvelope = _delegationValidConversationEnvelope(candidate)
+      ? _delegationCloneConversationEnvelope(candidate)
+      : _delegationEmptyConversationEnvelope();
+  } catch (_error) {
+    _delegationConversationEnvelope = _delegationEmptyConversationEnvelope();
+  }
+  return _delegationConversationEnvelope;
+}
+
+function _delegationForConversation(selectedConversationId) {
+  if (!_delegationValidConversationId(selectedConversationId)
+      || !_delegationValidConversationEnvelope(_delegationConversationEnvelope)) return null;
+  var delegationId = _delegationConversationEnvelope.byConversation[selectedConversationId];
+  return typeof delegationId === 'string' && DELEGATION_ID_PATTERN.test(delegationId)
+    ? delegationId
+    : null;
+}
+
+function _serializeDelegationBindingWrite(operation) {
+  var next = _delegationBindingWriteChain.then(operation, operation);
+  _delegationBindingWriteChain = next.catch(function() { /* keep later writes live */ });
+  return next;
+}
+
+function _writeDelegationConversationBinding(selectedConversationId, delegationId) {
+  if (!_delegationValidConversationId(selectedConversationId)
+      || typeof delegationId !== 'string'
+      || !DELEGATION_ID_PATTERN.test(delegationId)) return Promise.resolve(false);
+  return _serializeDelegationBindingWrite(async function() {
+    try {
+      var stored = await chrome.storage.session.get(DELEGATION_CONVERSATION_STORAGE_KEY);
+      var current = stored && stored[DELEGATION_CONVERSATION_STORAGE_KEY];
+      var envelope = _delegationValidConversationEnvelope(current)
+        ? _delegationCloneConversationEnvelope(current)
+        : _delegationEmptyConversationEnvelope();
+      envelope.byConversation[selectedConversationId] = delegationId;
+      var existingIndex = envelope.lru.indexOf(selectedConversationId);
+      if (existingIndex !== -1) envelope.lru.splice(existingIndex, 1);
+      envelope.lru.unshift(selectedConversationId);
+      while (envelope.lru.length > DELEGATION_CONVERSATION_CAP) {
+        var evicted = envelope.lru.pop();
+        delete envelope.byConversation[evicted];
+      }
+      var payload = {};
+      payload[DELEGATION_CONVERSATION_STORAGE_KEY] = envelope;
+      await chrome.storage.session.set(payload);
+      _delegationConversationEnvelope = envelope;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  });
+}
+
+function _removeDelegationConversationBinding(selectedConversationId) {
+  if (!_delegationValidConversationId(selectedConversationId)) return Promise.resolve(false);
+  return _serializeDelegationBindingWrite(async function() {
+    try {
+      var stored = await chrome.storage.session.get(DELEGATION_CONVERSATION_STORAGE_KEY);
+      var current = stored && stored[DELEGATION_CONVERSATION_STORAGE_KEY];
+      var envelope = _delegationValidConversationEnvelope(current)
+        ? _delegationCloneConversationEnvelope(current)
+        : _delegationEmptyConversationEnvelope();
+      delete envelope.byConversation[selectedConversationId];
+      var existingIndex = envelope.lru.indexOf(selectedConversationId);
+      if (existingIndex !== -1) envelope.lru.splice(existingIndex, 1);
+      var payload = {};
+      payload[DELEGATION_CONVERSATION_STORAGE_KEY] = envelope;
+      await chrome.storage.session.set(payload);
+      _delegationConversationEnvelope = envelope;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  });
+}
+
 function _ensureDelegationMount() {
   var run = document.getElementById('delegationRun');
   if (run) {
@@ -654,8 +828,7 @@ function _delegationAction(label, className, handler) {
 }
 
 function _delegationIsSelectedConversation() {
-  return _delegationUiState.conversationId !== null
-    && _delegationUiState.conversationId === conversationId;
+  return _delegationUiState.conversationId === conversationId;
 }
 
 function _setDelegationHeaderStatus(label, tone) {
@@ -721,6 +894,8 @@ function _renderDelegationReadyState() {
   _clearDelegationNode(mount.state);
   _clearDelegationNode(mount.feed);
   mount.state.removeAttribute('role');
+  mount.state.removeAttribute('aria-live');
+  _delegationUiState.lastAlertKey = null;
   var heading = _delegationElement(
     'h2', 'delegation-state-heading', 'Delegate a browser task'
   );
@@ -737,6 +912,93 @@ function _renderDelegationReadyState() {
   }
   _setDelegationHeaderStatus('Ready');
   _setDelegationComposerLocked(false);
+}
+
+function _resetDelegationSelection(selectedConversationId) {
+  _delegationUiState.delegationId = null;
+  _delegationUiState.conversationId = selectedConversationId;
+  _delegationUiState.snapshot = null;
+  _delegationUiState.mode = 'ready';
+  _delegationUiState.task = null;
+  _delegationUiState.providerId = null;
+  _delegationUiState.providerLabel = null;
+  _delegationUiState.challengeId = null;
+  _delegationUiState.challengeExpiresAt = null;
+  _delegationUiState.errorCode = null;
+  _delegationUiState.pendingPreflight = false;
+  _delegationUiState.pendingStart = false;
+  _delegationUiState.pendingTrust = false;
+  _delegationUiState.pendingTake = false;
+  _delegationUiState.pendingResume = false;
+  _delegationUiState.pendingStop = false;
+  _delegationUiState.lastRenderedSequence = null;
+  _delegationUiState.lastAlertKey = null;
+  _delegationUiState.announced = Object.create(null);
+  _delegationUiState.subscribed = false;
+}
+
+async function _hydrateDelegationForSelectedConversation() {
+  var selectedConversationId = conversationId;
+  var hydrationGeneration = ++_delegationHydrationGeneration;
+  var selectedDelegationId = _delegationForConversation(selectedConversationId);
+  _resetDelegationSelection(selectedConversationId);
+
+  var response = await _sendDelegationCommand({
+    type: 'FSB_DELEGATION_SNAPSHOT',
+    delegationId: selectedDelegationId
+  });
+  if (hydrationGeneration !== _delegationHydrationGeneration
+      || selectedConversationId !== conversationId) return false;
+
+  if (!_delegationValidSnapshotResponse(response)
+      || response.ok !== true
+      || (selectedDelegationId === null && response.snapshot !== null)
+      || (selectedDelegationId !== null
+        && (!response.snapshot || response.snapshot.delegationId !== selectedDelegationId))) {
+    if (_delegationValidSnapshotResponse(response)
+        && response.ok === false
+        && response.code === 'delegation_mismatch'
+        && selectedDelegationId !== null) {
+      await _removeDelegationConversationBinding(selectedConversationId);
+      if (hydrationGeneration !== _delegationHydrationGeneration
+          || selectedConversationId !== conversationId) return false;
+    }
+    _resetDelegationSelection(selectedConversationId);
+    _renderDelegationReadyState();
+    _delegationUiState.subscribed = true;
+    return false;
+  }
+
+  if (response.snapshot === null) {
+    _renderDelegationReadyState();
+    _delegationUiState.subscribed = true;
+    return true;
+  }
+
+  _delegationUiState.delegationId = selectedDelegationId;
+  _delegationUiState.providerId = response.snapshot.provider
+    ? response.snapshot.provider.id
+    : null;
+  _delegationUiState.providerLabel = response.snapshot.provider
+    ? response.snapshot.provider.label
+    : null;
+  _delegationUiState.task = _lastUserTaskByConversation.has(selectedConversationId)
+    ? _lastUserTaskByConversation.get(selectedConversationId)
+    : null;
+  var rendered = _renderDelegationSnapshot(response.snapshot, {
+    hydrated: true,
+    announceSequence: null
+  });
+  if (!rendered) {
+    _resetDelegationSelection(selectedConversationId);
+    _renderDelegationReadyState();
+    _delegationUiState.subscribed = true;
+    return false;
+  }
+  // The listener is installed eagerly, but its gate remains closed until
+  // every persisted row for the selected conversation has rendered silently.
+  _delegationUiState.subscribed = true;
+  return true;
 }
 
 function _renderDelegationInlineError(container, textValue) {
@@ -891,6 +1153,7 @@ function _renderDelegationPreflightFailure(result) {
   mount.run.setAttribute('aria-busy', 'false');
   _clearDelegationNode(mount.state);
   _clearDelegationNode(mount.feed);
+  mount.state.removeAttribute('aria-live');
   if (code === 'agent_offline' || code === 'runtime_unavailable') {
     mount.state.setAttribute('role', 'alert');
   } else {
@@ -914,7 +1177,11 @@ function _renderDelegationPreflightFailure(result) {
     _clearDelegationNode(mount.control);
     mount.control.classList.add('hidden');
   }
-  _setDelegationHeaderStatus(code === 'agent_offline' ? 'Agent offline' : 'Ready', code === 'agent_offline' ? 'error' : '');
+  var offlinePresentation = code === 'agent_offline' || code === 'runtime_unavailable';
+  _setDelegationHeaderStatus(
+    offlinePresentation ? 'Agent offline' : 'Ready',
+    offlinePresentation ? 'error' : ''
+  );
   _setDelegationComposerLocked(false);
   if (typeof heading.focus === 'function') heading.focus();
 }
@@ -923,15 +1190,53 @@ function _delegationStateLabel(snapshot) {
   var label = snapshot.provider && snapshot.provider.label
     ? snapshot.provider.label
     : 'Agent';
+  if (snapshot.state === 'restart_lost'
+      && snapshot.terminal
+      && snapshot.terminal.code === 'daemon_restart_lost_run') {
+    return 'Agent run ended after daemon restart';
+  }
+  if (snapshot.state === 'completed') return 'Completed';
+  if (snapshot.state === 'stopped') return _delegationStoppedHeading(snapshot);
+  if (snapshot.state === 'failed' && snapshot.terminal) {
+    if (snapshot.terminal.code === 'agent_offline') return 'Agent offline';
+    return 'Agent could not finish this task';
+  }
+  if (snapshot.connection === 'offline') return 'Agent offline';
+  if (snapshot.connection === 'disconnected') return 'Agent connection lost';
   if (snapshot.state === 'starting') return 'Starting agent';
   if (snapshot.state === 'running' || snapshot.state === 'holding') return label + ' running';
   if (snapshot.state === 'held' || snapshot.state === 'resuming') return 'Human control';
   if (snapshot.state === 'stopping') return 'Stopping agent';
-  if (snapshot.state === 'completed') return 'Completed';
-  if (snapshot.state === 'stopped') return 'Stopped';
   if (snapshot.state === 'restart_lost') return 'Run ended';
   if (snapshot.state === 'failed') return 'Agent could not finish this task';
   return 'Ready';
+}
+
+function _delegationStoppedHeading(snapshot) {
+  var count = snapshot
+    && snapshot.terminal
+    && Number.isSafeInteger(snapshot.terminal.releasedTabCount)
+    && snapshot.terminal.releasedTabCount >= 0
+    ? snapshot.terminal.releasedTabCount
+    : 0;
+  return 'Agent stopped, ' + count + ' ' + (count === 1 ? 'tab' : 'tabs') + ' released';
+}
+
+function _delegationSnapshotAlertKey(snapshot) {
+  if (!snapshot) return null;
+  if (snapshot.state === 'restart_lost'
+      && snapshot.terminal
+      && snapshot.terminal.code === 'daemon_restart_lost_run') {
+    return snapshot.delegationId + ':daemon_restart_lost_run';
+  }
+  if (snapshot.connection === 'offline'
+      || (snapshot.terminal && snapshot.terminal.code === 'agent_offline')) {
+    return snapshot.delegationId + ':agent_offline';
+  }
+  if (snapshot.connection === 'disconnected') {
+    return snapshot.delegationId + ':agent_disconnected';
+  }
+  return null;
 }
 
 function _delegationSnapshotLocksComposer(snapshot) {
@@ -1030,20 +1335,126 @@ function _renderDelegationRunActions(container, snapshot) {
   container.appendChild(actions);
 }
 
+function _appendDelegationActionRow(container, actions) {
+  var row = _delegationElement('div', 'delegation-state-actions');
+  for (var index = 0; index < actions.length; index++) {
+    row.appendChild(_delegationAction(
+      actions[index].label,
+      actions[index].className || '',
+      actions[index].handler
+    ));
+  }
+  container.appendChild(row);
+}
+
+function _appendDelegationDoctorRecovery(container) {
+  container.appendChild(_delegationElement(
+    'code', 'delegation-doctor-command', 'fsb-mcp-server doctor'
+  ));
+  _appendDelegationActionRow(container, [
+    { label: 'Copy doctor command', handler: _copyDelegationDoctorCommand },
+    { label: 'Open provider setup', handler: _openDelegationProviderSetup }
+  ]);
+}
+
+function _appendDelegationTechnicalCode(container, code) {
+  var details = _delegationElement('details', 'delegation-technical-details');
+  details.appendChild(_delegationElement(
+    'summary', 'delegation-technical-summary', 'Technical details'
+  ));
+  details.appendChild(_delegationElement('code', 'delegation-machine-value', code));
+  container.appendChild(details);
+}
+
 function _renderDelegationRunHeader(container, snapshot) {
   _clearDelegationNode(container);
+  var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
+  var restartLost = snapshot.state === 'restart_lost'
+    && terminalCode === 'daemon_restart_lost_run';
+  var stopped = snapshot.state === 'stopped' && snapshot.terminal !== null;
+  var unpaired = terminalCode === 'agent_unpaired' || snapshot.connection === 'unpaired';
+  var unsupported = terminalCode === 'unsupported_provider'
+    || snapshot.connection === 'unsupported';
+  var offline = !restartLost && (
+    snapshot.connection === 'offline' || terminalCode === 'agent_offline'
+  );
+  var disconnected = !restartLost
+    && !offline
+    && !unpaired
+    && !unsupported
+    && snapshot.connection === 'disconnected';
   var resumeOwnershipFailure = snapshot.terminal
-    && (snapshot.terminal.code === 'resume_ownership_lost'
-      || snapshot.terminal.code === 'hold_expired');
-  var genericRunFailure = snapshot.state === 'failed' && !resumeOwnershipFailure;
+    && (terminalCode === 'resume_ownership_lost' || terminalCode === 'hold_expired');
+  var genericRunFailure = snapshot.state === 'failed'
+    && !resumeOwnershipFailure
+    && !offline
+    && !unpaired
+    && !unsupported;
   var heading = document.createElement('h2');
   heading.id = 'delegationRunHeading';
   heading.className = 'delegation-state-heading';
-  heading.textContent = resumeOwnershipFailure
-    ? 'Agent could not resume control'
-    : _delegationStateLabel(snapshot);
+  if (restartLost) heading.textContent = 'Agent run ended after daemon restart';
+  else if (stopped) heading.textContent = _delegationStoppedHeading(snapshot);
+  else if (offline) heading.textContent = 'Agent offline';
+  else if (disconnected) heading.textContent = 'Agent connection lost';
+  else if (unpaired) heading.textContent = 'Pair this browser before starting Claude Code';
+  else if (unsupported) {
+    heading.textContent = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
+      + ' cannot run browser tasks';
+  } else if (resumeOwnershipFailure) heading.textContent = 'Agent could not resume control';
+  else heading.textContent = _delegationStateLabel(snapshot);
   container.appendChild(heading);
-  if (resumeOwnershipFailure) {
+  if (restartLost) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.'
+    ));
+    _appendDelegationTechnicalCode(container, 'daemon_restart_lost_run');
+    _appendDelegationActionRow(container, [{
+      label: 'Start a new task',
+      handler: function() { _prepareDelegationTask(false); }
+    }]);
+  } else if (stopped) {
+    _appendDelegationActionRow(container, [{
+      label: 'Start a new task',
+      handler: function() { _prepareDelegationTask(false); }
+    }]);
+  } else if (offline) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'FSB cannot reach the local agent service. Run the doctor command, then try this message again.'
+    ));
+    _appendDelegationDoctorRecovery(container);
+  } else if (disconnected) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'FSB missed three replies from the local agent service. The run cannot continue safely.'
+    ));
+    _appendDelegationDoctorRecovery(container);
+  } else if (unpaired) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.'
+    ));
+    _appendDelegationActionRow(container, [{
+      label: 'Open provider setup',
+      handler: _openDelegationProviderSetup
+    }]);
+  } else if (unsupported) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'The selected provider does not support agents that control browser tabs. Choose a supported agent provider, then try this message again.'
+    ));
+    _appendDelegationActionRow(container, [{
+      label: 'Choose another provider',
+      handler: _openDelegationProviderSetup
+    }]);
+  } else if (resumeOwnershipFailure) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
@@ -1081,23 +1492,28 @@ function _renderDelegationRunHeader(container, snapshot) {
   } else if (_delegationUiState.errorCode === 'hold_failed'
       || _delegationUiState.errorCode === 'hold_lease_failed') {
     _renderDelegationInlineError(container, 'Claude Code could not pause for human control.');
+  } else if (_delegationUiState.errorCode === 'stop_failed'
+      || _delegationUiState.errorCode === 'runtime_unavailable') {
+    _renderDelegationInlineError(
+      container,
+      'Stop could not be confirmed. The previous agent state is still shown.'
+    );
   }
   _renderDelegationRunActions(container, snapshot);
 }
 
-function _prepareDelegationTask(retrySameMessage) {
+async function _prepareDelegationTask(retrySameMessage) {
+  var selectedConversationId = _delegationUiState.conversationId;
   var retainedTask = retrySameMessage === true && typeof _delegationUiState.task === 'string'
     ? _delegationUiState.task
     : '';
-  _delegationUiState.delegationId = null;
-  _delegationUiState.snapshot = null;
-  _delegationUiState.subscribed = false;
-  _delegationUiState.errorCode = null;
-  _delegationUiState.pendingTake = false;
-  _delegationUiState.pendingResume = false;
-  _delegationUiState.pendingStop = false;
+  await _removeDelegationConversationBinding(selectedConversationId);
+  if (selectedConversationId !== conversationId
+      || selectedConversationId !== _delegationUiState.conversationId) return;
+  _resetDelegationSelection(selectedConversationId);
   chatInput.textContent = retainedTask;
   _renderDelegationReadyState();
+  _delegationUiState.subscribed = true;
   updateSendButtonState();
   if (chatInput && typeof chatInput.focus === 'function') chatInput.focus();
 }
@@ -1118,9 +1534,15 @@ function _renderDelegationSnapshot(snapshot, options) {
       || !FsbDelegationFeed.validateSnapshot(snapshot)) return false;
   if (_delegationUiState.delegationId !== null
       && snapshot.delegationId !== _delegationUiState.delegationId) return false;
+  if (_delegationUiState.delegationId === snapshot.delegationId
+      && Number.isSafeInteger(_delegationUiState.lastRenderedSequence)
+      && snapshot.entries.length < _delegationUiState.lastRenderedSequence) return false;
 
   var mount = _ensureDelegationMount();
   if (!mount.run || !mount.state || !mount.feed) return false;
+  var previousLastSequence = Number.isSafeInteger(_delegationUiState.lastRenderedSequence)
+    ? _delegationUiState.lastRenderedSequence
+    : 0;
   _delegationUiState.delegationId = snapshot.delegationId;
   _delegationUiState.snapshot = snapshot;
   _delegationUiState.mode = 'snapshot';
@@ -1136,7 +1558,19 @@ function _renderDelegationSnapshot(snapshot, options) {
       ? 'true'
       : 'false'
   );
-  mount.state.removeAttribute('role');
+  var alertKey = _delegationSnapshotAlertKey(snapshot);
+  if (alertKey) {
+    mount.state.setAttribute('role', 'alert');
+    if (options.hydrated === true || alertKey === _delegationUiState.lastAlertKey) {
+      mount.state.setAttribute('aria-live', 'off');
+    } else {
+      mount.state.removeAttribute('aria-live');
+    }
+  } else {
+    mount.state.removeAttribute('role');
+    mount.state.removeAttribute('aria-live');
+  }
+  _delegationUiState.lastAlertKey = alertKey;
   _renderDelegationRunHeader(mount.state, snapshot);
   var rendered = FsbDelegationFeed.render(mount.feed, snapshot, {
     hydrated: options.hydrated === true
@@ -1148,6 +1582,7 @@ function _renderDelegationSnapshot(snapshot, options) {
   if (options.hydrated !== true
       && Number.isSafeInteger(announceSequence)
       && announceSequence > 0
+      && announceSequence > previousLastSequence
       && mount.announcer) {
     var deliveryKey = snapshot.delegationId + ':' + announceSequence;
     if (!_delegationUiState.announced[deliveryKey]) {
@@ -1162,7 +1597,12 @@ function _renderDelegationSnapshot(snapshot, options) {
   _setDelegationHeaderStatus(
     _delegationStateLabel(snapshot),
     snapshot.state === 'running' || snapshot.state === 'holding' ? 'running'
-      : (snapshot.state === 'failed' || snapshot.state === 'restart_lost' ? 'error' : '')
+      : (snapshot.state === 'failed'
+        || snapshot.state === 'restart_lost'
+        || snapshot.connection === 'offline'
+        || snapshot.connection === 'disconnected'
+        ? 'error'
+        : '')
   );
   _setDelegationComposerLocked(_delegationSnapshotLocksComposer(snapshot));
   return true;
@@ -1194,6 +1634,9 @@ function _handleDelegationRuntimeUpdate(message) {
 
 async function _beginDelegationStart(challengeId) {
   if (_delegationUiState.pendingStart || typeof _delegationUiState.task !== 'string') return;
+  var originTabId = _activeTabIdSnapshot;
+  var originConversationId = conversationId;
+  var originTask = _delegationUiState.task;
   _delegationUiState.pendingStart = true;
   _delegationUiState.errorCode = null;
   updateSendButtonState();
@@ -1202,9 +1645,12 @@ async function _beginDelegationStart(challengeId) {
     challengeId: challengeId,
     task: _delegationUiState.task
   });
-  _delegationUiState.pendingStart = false;
+  if (originTabId === _activeTabIdSnapshot && originConversationId === conversationId) {
+    _delegationUiState.pendingStart = false;
+  }
 
   if (!_delegationValidLifecycleResponse(response) || response.ok !== true) {
+    if (originTabId !== _activeTabIdSnapshot || originConversationId !== conversationId) return;
     _delegationUiState.errorCode = response && typeof response.code === 'string'
       ? response.code
       : 'start_rejected';
@@ -1223,20 +1669,47 @@ async function _beginDelegationStart(challengeId) {
     return;
   }
 
-  try {
-    conversationId = await ensureTabConversationForActiveTab(false);
-  } catch (_error) { /* the helper already supplies a fallback id */ }
-  _delegationUiState.conversationId = conversationId;
+  var acceptedConversationId = originConversationId;
+  if (!_delegationValidConversationId(acceptedConversationId)
+      && Number.isSafeInteger(originTabId)) {
+    acceptedConversationId = await ensureTabConversationForTab(originTabId);
+  }
+  if (!_delegationValidConversationId(acceptedConversationId)
+      && originTabId === _activeTabIdSnapshot) {
+    try { acceptedConversationId = await ensureTabConversationForActiveTab(false); }
+    catch (_error) { acceptedConversationId = null; }
+  }
+  if (_delegationValidConversationId(acceptedConversationId)) {
+    await _writeDelegationConversationBinding(
+      acceptedConversationId,
+      response.snapshot.delegationId
+    );
+  }
+
+  if (originTabId !== _activeTabIdSnapshot || acceptedConversationId !== conversationId) {
+    if (_delegationValidConversationId(acceptedConversationId)) {
+      _persistMessageToConversation('user', originTask, 'text', acceptedConversationId);
+    }
+    return;
+  }
+
+  _resetDelegationSelection(acceptedConversationId);
+  _delegationUiState.task = originTask;
   _delegationUiState.delegationId = response.snapshot.delegationId;
   _delegationUiState.snapshot = response.snapshot;
   _delegationUiState.challengeId = null;
   _delegationUiState.challengeExpiresAt = null;
   _delegationUiState.errorCode = null;
-  _delegationUiState.subscribed = true;
-  addMessage(_delegationUiState.task, 'user');
+  addMessage(originTask, 'user');
   chatInput.textContent = '';
   updateSendButtonState();
   _renderDelegationSnapshot(response.snapshot, { hydrated: false, announceSequence: null });
+  await _refreshSelectedDelegationSnapshot();
+  if (acceptedConversationId === _delegationUiState.conversationId
+      && response.snapshot.delegationId === _delegationUiState.delegationId
+      && _delegationIsSelectedConversation()) {
+    _delegationUiState.subscribed = true;
+  }
 }
 
 async function _allowDelegationFromConsent(checkbox) {
@@ -1274,6 +1747,7 @@ async function _allowDelegationFromConsent(checkbox) {
 async function _takeDelegationControl(event) {
   var snapshot = _delegationUiState.snapshot;
   if (_delegationUiState.pendingTake || !_delegationCanTakeControl(snapshot)) return;
+  var selectedConversationId = _delegationUiState.conversationId;
   _delegationUiState.pendingTake = true;
   _delegationUiState.errorCode = null;
   var control = event && event.currentTarget;
@@ -1285,6 +1759,9 @@ async function _takeDelegationControl(event) {
     type: 'FSB_DELEGATION_TAKE_CONTROL',
     delegationId: snapshot.delegationId
   });
+  if (selectedConversationId !== _delegationUiState.conversationId
+      || snapshot.delegationId !== _delegationUiState.delegationId
+      || !_delegationIsSelectedConversation()) return;
   _delegationUiState.pendingTake = false;
   if (_delegationValidLifecycleResponse(response) && response.snapshot) {
     _delegationUiState.errorCode = response.ok === true ? null : response.code;
@@ -1302,6 +1779,7 @@ async function _takeDelegationControl(event) {
 async function _resumeDelegationControl(event) {
   var snapshot = _delegationUiState.snapshot;
   if (_delegationUiState.pendingResume || !_delegationCanResume(snapshot)) return;
+  var selectedConversationId = _delegationUiState.conversationId;
   _delegationUiState.pendingResume = true;
   _delegationUiState.errorCode = null;
   var control = event && event.currentTarget;
@@ -1313,6 +1791,9 @@ async function _resumeDelegationControl(event) {
     type: 'FSB_DELEGATION_RESUME',
     delegationId: snapshot.delegationId
   });
+  if (selectedConversationId !== _delegationUiState.conversationId
+      || snapshot.delegationId !== _delegationUiState.delegationId
+      || !_delegationIsSelectedConversation()) return;
   _delegationUiState.pendingResume = false;
   if (_delegationValidLifecycleResponse(response) && response.snapshot) {
     _delegationUiState.errorCode = response.ok === true ? null : response.code;
@@ -1330,6 +1811,7 @@ async function _resumeDelegationControl(event) {
 async function _stopDelegation(event) {
   var snapshot = _delegationUiState.snapshot;
   if (_delegationUiState.pendingStop || !_delegationIsActiveSnapshot(snapshot)) return;
+  var selectedConversationId = _delegationUiState.conversationId;
   _delegationUiState.pendingStop = true;
   var control = event && event.currentTarget;
   if (control) {
@@ -1340,20 +1822,27 @@ async function _stopDelegation(event) {
     type: 'FSB_DELEGATION_STOP',
     delegationId: snapshot.delegationId
   });
+  if (selectedConversationId !== _delegationUiState.conversationId
+      || snapshot.delegationId !== _delegationUiState.delegationId
+      || !_delegationIsSelectedConversation()) return;
   _delegationUiState.pendingStop = false;
   if (_delegationValidLifecycleResponse(response) && response.snapshot) {
     _delegationUiState.errorCode = response.ok === true ? null : response.code;
     _renderDelegationSnapshot(response.snapshot, { hydrated: false, announceSequence: null });
     return;
   }
-  _delegationUiState.errorCode = response && response.code ? response.code : 'stop_failed';
+  _delegationUiState.errorCode = 'stop_failed';
   _renderDelegationSnapshot(snapshot, { hydrated: false, announceSequence: null });
 }
 
 async function _refreshSelectedDelegationSnapshot() {
-  if (!_delegationIsSelectedConversation() || !_delegationUiState.delegationId) {
+  if (!_delegationIsSelectedConversation()) {
     _hideDelegationPresentation();
     return false;
+  }
+  if (!_delegationUiState.delegationId) {
+    _renderDelegationReadyState();
+    return true;
   }
   var selectedId = _delegationUiState.delegationId;
   var response = await _sendDelegationCommand({
@@ -1719,6 +2208,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.showSidepanelProgress != null) {
     showSidepanelProgressEnabled = changes.showSidepanelProgress.newValue ?? true;
   }
+  if (area === 'session'
+      && changes
+      && changes.fsbSidepanelDelegationConversations) {
+    var nextDelegationEnvelope = changes.fsbSidepanelDelegationConversations.newValue;
+    _delegationConversationEnvelope = _delegationValidConversationEnvelope(nextDelegationEnvelope)
+      ? _delegationCloneConversationEnvelope(nextDelegationEnvelope)
+      : _delegationEmptyConversationEnvelope();
+  }
   // Phase 243 plan 03 (UI-02) follow-up: refresh chip when registry mutates
   // for the active tab (ownership claimed/released/transferred). The
   // sidepanel persists across tab switches, so without this branch the chip
@@ -2005,13 +2502,8 @@ try {
       // entry (never had a loader), this nulls the module-scope vars so
       // subsequent code does not inherit the outgoing tab's references.
       try { _restoreTabStatusIntent(_activeTabIdSnapshot); } catch (_e) { /* swallow */ }
-      try {
-        if (_delegationIsSelectedConversation()) {
-          await _refreshSelectedDelegationSnapshot();
-        } else {
-          _renderDelegationReadyState();
-        }
-      } catch (_e) { /* delegated tab resync is best-effort */ }
+      try { await _hydrateDelegationForSelectedConversation(); }
+      catch (_e) { /* delegated tab resync is best-effort */ }
     });
   }
 } catch (_e) {
@@ -2096,11 +2588,7 @@ try {
         if (tabs && tabs[0] && typeof tabs[0].id === 'number') {
           _activeTabIdSnapshot = tabs[0].id;  // QT-93i-02
           await swapToTabConversation(tabs[0].id);
-          if (_delegationIsSelectedConversation()) {
-            await _refreshSelectedDelegationSnapshot();
-          } else {
-            _renderDelegationReadyState();
-          }
+          await _hydrateDelegationForSelectedConversation();
         }
       } catch (_e) { /* swallow */ }
     });
@@ -2125,6 +2613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Phase 11 FINT-21 -- per-tab envelope hydration + legacy migration
   // (replaces previous single-key conversation init flow).
   await initTabConversationStore();
+  await _loadDelegationConversationEnvelope();
 
   // Phase 12 FINT-23 -- init message-log debouncer + beforeunload force flush.
   if (typeof FSBSidepanelMessageLog !== 'undefined'
@@ -2271,10 +2760,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     addMessage('Welcome to FSB. How can I help?', 'system');
   }
 
-  _renderDelegationReadyState();
+  await _hydrateDelegationForSelectedConversation();
 
   // Focus the input
-  chatInput.focus();
+  if (!_delegationUiState.composerLocked) chatInput.focus();
 });
 
 // Check if using encrypted configuration
@@ -2395,11 +2884,18 @@ async function handleSendMessage() {
       || preflight.kind !== 'agent'
       || preflight.providerId !== 'claude-code'
       || preflight.providerLabel !== 'Claude Code') {
+    var safePreflightFailure = _delegationValidPreflightResponse(preflight)
+      && preflight.ok === false
+      ? preflight
+      : {
+        ok: false,
+        code: 'agent_offline',
+        providerId: '',
+        providerLabel: 'Selected provider'
+      };
     _delegationUiState.task = message;
-    _delegationUiState.errorCode = preflight && preflight.code
-      ? preflight.code
-      : 'agent_offline';
-    _renderDelegationPreflightFailure(preflight || {});
+    _delegationUiState.errorCode = safePreflightFailure.code;
+    _renderDelegationPreflightFailure(safePreflightFailure);
     updateSendButtonState();
     return;
   }
@@ -2412,10 +2908,8 @@ async function handleSendMessage() {
     task: message
   });
   if (!_delegationValidConsentResponse(consent)) {
-    _delegationUiState.errorCode = consent && consent.code
-      ? consent.code
-      : 'consent_required';
-    _renderDelegationPreflightFailure(consent || {});
+    _delegationUiState.errorCode = 'consent_required';
+    _renderDelegationPreflightFailure({ code: 'consent_required' });
     updateSendButtonState();
     return;
   }
@@ -2628,20 +3122,12 @@ async function startNewChat() {
   chatInput.textContent = '';
   updateSendButtonState();
 
-  _delegationUiState.delegationId = null;
-  _delegationUiState.conversationId = null;
-  _delegationUiState.snapshot = null;
-  _delegationUiState.task = null;
-  _delegationUiState.providerId = null;
-  _delegationUiState.providerLabel = null;
-  _delegationUiState.challengeId = null;
-  _delegationUiState.challengeExpiresAt = null;
-  _delegationUiState.errorCode = null;
-  _delegationUiState.subscribed = false;
+  _resetDelegationSelection(conversationId);
 
   // Add fresh welcome message
   addMessage('Welcome to FSB. How can I help?', 'system');
   _renderDelegationReadyState();
+  _delegationUiState.subscribed = true;
 
   // Focus the input
   chatInput.focus();
@@ -3128,6 +3614,7 @@ function _persistMessage(role, content, kind) {
 
   var resolvedRole = (role === 'user') ? 'user' : 'assistant';
   var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+  if (resolvedRole === 'user') _lastUserTaskByConversation.set(conversationId, content);
 
   // Append to in-memory buffer immediately for read consistency.
   var convId = conversationId;
@@ -3181,6 +3668,7 @@ function _persistMessageToConversation(role, content, kind, convId, sessionId, t
 
   var resolvedRole = (role === 'user') ? 'user' : 'assistant';
   var resolvedKind = (typeof kind === 'string' && kind.length > 0) ? kind : 'text';
+  if (resolvedRole === 'user') _lastUserTaskByConversation.set(convId, content);
 
   var buffer = _messageLogPendingBuffer.get(convId);
   if (!buffer) {

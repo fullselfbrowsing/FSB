@@ -387,7 +387,7 @@ function installDomStub(idMap) {
       && delegationEligibility[0].indexOf('snapshot.activeTab.canTakeControl === true') !== -1
       && delegationEligibility[0].indexOf('FSBOwnerChip') === -1,
      'Part 4.9 -- Take control uses only exact canonical snapshot eligibility for the active tab');
-  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?await _refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4);
+  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?await _hydrateDelegationForSelectedConversation\(\)/.test(sidepanelSrcForP4);
   ok(activationDelegationRefresh,
      'Part 4.10 -- active-tab swaps refresh delegated eligibility after updating the tab snapshot');
   ok(/changes\.fsbAgentRegistry[\s\S]{0,160}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4),

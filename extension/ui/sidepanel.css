@@ -1890,7 +1890,23 @@ body[data-sidepanel-view="history"] .author-footer {
   background: var(--fsb-surface-muted);
 }
 
-.delegation-tool-breakdown-toggle {
+.delegation-technical-details {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--fsb-surface-muted);
+  color: var(--fsb-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.delegation-technical-details code {
+  display: block;
+  margin-top: 8px;
+}
+
+.delegation-tool-breakdown-toggle,
+.delegation-technical-summary {
   color: var(--fsb-text-primary);
   cursor: pointer;
   font-size: 12px;
@@ -1949,6 +1965,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
 .delegation-action:focus-visible,
 .delegation-tool-breakdown-toggle:focus-visible,
+.delegation-technical-summary:focus-visible,
 .delegation-trust-control input:focus-visible {
   outline: 2px solid var(--fsb-primary);
   outline-offset: 2px;
