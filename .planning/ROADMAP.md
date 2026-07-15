@@ -110,13 +110,13 @@
   4. A prominent Stop button in the side panel triggers `stopDelegatedTask`, routes to the supervisor's kill, and — on confirmed exit — releases every tab that was owned by the spawned agent (per v0.9.60 ownership) and reports "Agent stopped, N tab(s) released" in the feed; a post-run summary card displays tokens (in/out/total), turn count, wall-clock duration, cost bucket (`included in your subscription` for agent kind, real USD for api kind), and an expandable per-tool-call breakdown.
   5. Every progress event received from the supervisor is written to `chrome.storage.session` under a per-delegation key BEFORE it fans out to UI subscribers, so a mid-run MV3 service worker eviction reloads exactly the delivered feed on re-open — no ghost state, no fabricated events, no dropped events; the fifth `EXECUTION_MODES` entry works end-to-end across a forced SW eviction in a test fixture.
   6. While a delegation is active, the extension pings the bridge every 20 s over the existing WS heartbeat channel to keep the Chrome 116+ SW-lifetime extension applied; if 3 heartbeats are missed the side panel switches to a `daemon:disconnected` fallback that offers a doctor-relaunch button but does not attempt an in-extension restart; if `fsb-mcp-server serve` is not running when a delegated send is attempted, the side panel shows an "Agent offline" state with a deep-link to `fsb-mcp-server doctor` output and does not enqueue or optimistically show the message; if the daemon restarts while a delegation was mid-flight, the supervisor kills any surviving spawned CLI (never re-adopts) and reports `daemon_restart_lost_run` in the side panel so the user knows the run ended.
-**Plans**: 5/8 complete
+**Plans**: 6/8 complete
 - [x] 61-01: Freeze exact agent routing, delegated mode, read-only preflight, one-use consent, and provider-local trust.
 - [x] 61-02: Build the bounded write-before-fanout event ledger and sole delegated lifecycle controller.
 - [x] 61-03: Serialize async bridge observers, add acknowledged active-delegation heartbeat, and pin Chrome 116/no-native authority.
 - [x] 61-04: Correlate server delegation ids with extension agents and add sealed complete mapped-tab hold leases.
 - [x] 61-05: Add supervisor hold/resume/status plus generation-backed restart-loss evidence.
-- [ ] 61-06: Integrate start, handoff, Stop, hydration, heartbeat, and recovery in the service worker.
+- [x] 61-06: Integrate start, handoff, Stop, hydration, heartbeat, and recovery in the service worker.
 - [ ] 61-07: Implement the safe, exact-copy, accessible delegated side-panel feed and lifecycle UI.
 - [ ] 61-08: Install complete regression/evidence gates and defer genuine live UAT to the milestone-end ledger.
 **UI hint**: yes
@@ -177,7 +177,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 58. Providers Panel | 3/3 | Complete    | 2026-07-12 |
 | 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
-| 61. Delegation UX & SW-Eviction Persistence | 5/8 | In Progress|  |
+| 61. Delegation UX & SW-Eviction Persistence | 6/8 | In Progress|  |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 0/0 | Not started | — |
 | 63. Native-Messaging Host | 0/0 | Not started | — |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
