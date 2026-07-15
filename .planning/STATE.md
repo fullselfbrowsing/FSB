@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 61 Plan 07 complete; Plan 08 ready
-last_updated: "2026-07-15T12:52:46.000Z"
-last_activity: 2026-07-15 -- Phase 61 Plan 07 completed
+stopped_at: Phase 61 Plan 08 complete; phase review and verifier pending
+last_updated: "2026-07-15T16:25:09.000Z"
+last_activity: 2026-07-15 -- Phase 61 Plan 08 completed with live UAT deferred
 progress:
   total_phases: 18
   completed_phases: 4
   total_plans: 22
-  completed_plans: 21
-  percent: 95
+  completed_plans: 22
+  percent: 100
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 61 — Delegation UX & SW-Eviction Persistence
+**Current focus:** Phase 61 — plan execution complete; automated phase review and verifier pending
 
 ## Current Position
 
-Phase: 61 (Delegation UX & SW-Eviction Persistence) — EXECUTING
+Phase: 61 (Delegation UX & SW-Eviction Persistence) — EXECUTION COMPLETE
 Plan: 8 of 8
-Status: Ready to execute
-Last activity: 2026-07-15 -- Phase 61 Plan 07 completed
+Status: Pending phase review and verifier; eight live UAT scenarios remain deferred
+Last activity: 2026-07-15 -- Phase 61 Plan 08 completed
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -46,7 +46,7 @@ Last activity: 2026-07-15 -- Phase 61 Plan 07 completed
 | 58 | Providers Panel | PROV-01, PROV-02, PROV-03, PROV-04, PROV-05, PROV-06 | Complete (2026-07-12; UAT deferred to milestone end) |
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
-| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | In progress (7/8 plans; UAT deferred to milestone end) |
+| 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Execution complete (8/8 plans; review/verifier pending; UAT deferred) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Not started |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
@@ -132,17 +132,21 @@ v0.9.91-specific decisions so far:
 - [Phase 61 Plan 07]: Bind one exact server delegation id to one selected conversation in bounded session storage, hydrate silently before subscribing, and announce only strictly newer matching sequences.
 - [Phase 61 Plan 07]: Change consent, held/running, stopping/stopped, disconnect, and restart-loss presentation only after authoritative background snapshots; pending controls never invent lifecycle state.
 - [Phase 61 Plan 07]: Limit recovery actions to copying the literal doctor command or opening the local Providers surface; no side-panel action executes, restarts, or invokes native code.
+- [Phase 61 Plan 08]: Keep one eight-scenario milestone-end live ledger with every result `human_needed`, pending, and empty; deterministic evidence proves the ledger is honest but never substitutes for performing it.
+- [Phase 61 Plan 08]: Close the phase contract mechanically across all 23 task rows, UX/LIFE requirements, D-01..D-28, T61-01..14, typed schemas, architecture links, UI rules, and forbidden authority patterns.
+- [Phase 61 Plan 08]: Restore only exact paths that were already unstaged before a full-suite run; never restore, stage, or otherwise mutate the Git index, and continue failing closed on newly dirty clean paths or untracked entries.
+- [Phase 61 Plan 08]: Preserve the first Wave-5 wrapper preservation red separately from the explicitly authorized corrected green; no failed evidence is erased or relabeled.
 - [Milestone]: Defer every live/human UAT checklist to one milestone-end sweep; automated/source verification and clean review remain mandatory per phase, and no deferred item is silently marked passed.
 
 ### Pending Todos
 
-None. Phases 57-60 and Phase 61 Plans 01-07 are complete; Plan 08 is ready for autonomous execution.
+None. Phases 57-60 and all eight Phase 61 plans are complete; Phase 61 review and verifier are next.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61 Plan 03's real Chrome 116 service-worker/daemon heartbeat-disconnect timing, Plan 04's live active-tab human-control handoff, Plan 05's real POSIX group suspension/expiry plus daemon-restart evidence, Plan 06's genuine accepted start/handoff/Stop across Chrome worker eviction and daemon reconciliation, and Plan 07's real side-panel visual/accessibility/feed/alert/hydration behavior remain pending. Per user instruction, all live UAT is accumulated and audited at milestone end; these phases and plans are automated/source green, and no live pass is inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, and Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios remain pending. Per user instruction, all live UAT is accumulated and audited at milestone end; automated/source evidence is green through Phase 61 Plan 08, and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -156,6 +160,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | deferred to v0.9.91 milestone end; 8 scenarios | Phase 61 Plan 08 |
 | uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | deferred to v0.9.91 milestone end; 7 scenarios | Phase 60 Plan 04 |
 | uat_gap | Phase 59 / 59-HUMAN-UAT.md (live pair, daemon restart invalidation, Chrome session clearing, accessibility/theme) | deferred to v0.9.91 milestone end; 4 scenarios | Phase 59 Plan 04 |
 | uat_gap | Phase 58 / 58-HUMAN-UAT.md + 58-VISUAL-QA.md (live Providers theme/responsive/keyboard/motion and extension-state checks) | deferred to v0.9.91 milestone end; 12 scenarios | Phase 58 Plan 03 |
@@ -176,10 +181,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-15T12:52:46.000Z
-Stopped at: Phase 61 Plan 07 complete; Plan 08 ready
-Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-08-PLAN.md
+Last session: 2026-07-15T16:25:09.000Z
+Stopped at: Phase 61 Plan 08 complete; phase review and verifier pending
+Resume file: .planning/phases/61-delegation-ux-sw-eviction-persistence/61-08-SUMMARY.md
 
 ## Next Actions
 
-Execute Phase 61 Plan 08, install the complete source/security/regression evidence gate and milestone-end UAT ledger against Plans 01-07, preserve the exact authority, persistence, observer, heartbeat, ownership, lifecycle, hydration, accessibility, and no-native contracts, and keep every genuine live CLI/kernel/OS/browser/visual check pending until that single milestone-end sweep.
+Run Phase 61 code review and verifier against all eight completed plans, keep the eight live scenarios pending in the sole milestone-end ledger, then advance to Phase 62 only after deterministic review/verifier findings are clean.
