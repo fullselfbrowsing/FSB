@@ -71,6 +71,43 @@ type TaskState = 'idle' | 'running' | 'success' | 'failed';
 type PreviewState = 'hidden' | 'loading' | 'streaming' | 'disconnected' | 'error' | 'paused' | 'frozen-disconnect' | 'frozen-complete' | 'restricted';
 type PreviewLayoutMode = 'inline' | 'maximized' | 'pip' | 'fullscreen';
 
+const PACKAGE_OWNED_TASK_ACTIONS: ReadonlySet<string> = new Set([
+  'clicking element',
+  'entering text',
+  'submitting',
+  'opening page',
+  'scrolling',
+  'reading content',
+  'inspecting page',
+  'selecting option',
+  'selecting text',
+  'toggling checkbox',
+  'hovering',
+  'focusing field',
+  'clearing field',
+  'waiting for element',
+  'double-clicking',
+  'right-clicking',
+  'going back',
+  'going forward',
+  'refreshing',
+  'moving cursor',
+  'pressing key',
+  'solving captcha',
+  'opening new tab',
+  'switching tab',
+  'closing tab',
+  'checking tabs',
+  'signing in...',
+]);
+
+function ownRecordValue(
+  values: Readonly<Record<string, string>>,
+  key: string,
+): string | undefined {
+  return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
+}
+
 interface PreviewOverlayIdentity {
   clientLabel: string;
   lifecycle: string;
@@ -4246,7 +4283,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       unknown: this.dashboardCopy.phaseWorking,
       working: this.dashboardCopy.phaseWorking,
     };
-    return labels[value.toLowerCase()] || value || this.dashboardCopy.phaseWorking;
+    return ownRecordValue(labels, value.toLowerCase()) || value || this.dashboardCopy.phaseWorking;
   }
 
   private translateTaskAction(action: unknown): string {
@@ -4278,22 +4315,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       'working...': this.dashboardCopy.phaseWorking,
     };
     const normalized = value.toLowerCase();
-    if (known[normalized]) return known[normalized];
-    const generatedAction = [
-      /^clicking (?:".*"|element)$/i,
-      /^typing ".*"(?: into .*)?$/i,
-      /^entering text$/i,
-      /^submitting$/i,
-      /^opening (?:page|.+)$/i,
-      /^scrolling$/i,
-      /^reading content$/i,
-      /^inspecting page$/i,
-      /^selecting (?:".*"|option|text)$/i,
-      /^toggling (?:".*"|checkbox)$/i,
-      /^waiting for .+$/i,
-      /^signing in\.\.\.$/i,
-    ].some((pattern) => pattern.test(value));
-    return generatedAction ? this.dashboardCopy.progressPerformingAction : value;
+    const knownAction = ownRecordValue(known, normalized);
+    if (knownAction) return knownAction;
+    return PACKAGE_OWNED_TASK_ACTIONS.has(normalized)
+      ? this.dashboardCopy.progressPerformingAction
+      : value;
   }
 
   private formatTaskEta(eta: unknown): string {
@@ -4320,7 +4346,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         'no usable browser tab found for automation': 'dashboard_task_no_usable_tab',
         'failed to start automation': 'dashboard_task_start_failed',
       };
-      code = legacyCodes[value.toLowerCase()] || '';
+      code = ownRecordValue(legacyCodes, value.toLowerCase()) || '';
     }
     const known: Record<string, string> = {
       dashboard_task_missing: this.dashboardCopy.taskErrorMissing,
@@ -4329,7 +4355,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       dashboard_task_start_failed: this.dashboardCopy.taskCouldNotStart,
       dashboard_task_start_exception: this.dashboardCopy.taskCouldNotStart,
     };
-    return known[code] || value || fallback;
+    return ownRecordValue(known, code) || value || fallback;
   }
 
   private translateRestrictedPageType(pageType: unknown): string {
@@ -4356,7 +4382,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       'new-tab': this.dashboardCopy.newTab,
       'new tab': this.dashboardCopy.newTab,
     };
-    return known[value.toLowerCase()] || value || this.dashboardCopy.newTab;
+    return ownRecordValue(known, value.toLowerCase()) || value || this.dashboardCopy.newTab;
   }
 
   private pairingErrorMessage(code: unknown): string {
@@ -4398,7 +4424,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       'not-ready': this.dashboardCopy.previewNotReadyLabel,
       error: this.dashboardCopy.previewErrorLabel,
     };
-    return labels[state] || state;
+    return ownRecordValue(labels, state) || state;
   }
 
   private formatDuration(ms: number): string {
