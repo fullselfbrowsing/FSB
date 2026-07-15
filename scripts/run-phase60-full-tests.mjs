@@ -3,14 +3,17 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readlinkSync,
   readdirSync,
+  rmSync,
   rmdirSync,
   symlinkSync,
   unlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,6 +105,61 @@ function fingerprintPaths(paths) {
   return hash.digest('hex');
 }
 
+function snapshotWorkspacePath(relativePath) {
+  const absolutePath = resolve(repositoryRoot, relativePath);
+  const repositoryRelativePath = relative(repositoryRoot, absolutePath);
+  if (repositoryRelativePath.startsWith('..') || isAbsolute(repositoryRelativePath)) {
+    throw new Error('git returned a path outside the repository');
+  }
+  const stat = lstatIfPresent(absolutePath);
+  if (!stat) return Object.freeze({ relativePath, kind: 'missing' });
+  if (stat.isSymbolicLink()) {
+    return Object.freeze({
+      relativePath,
+      kind: 'symlink',
+      target: readlinkSync(absolutePath),
+    });
+  }
+  if (stat.isFile()) {
+    return Object.freeze({
+      relativePath,
+      kind: 'file',
+      mode: stat.mode & 0o777,
+      bytes: Buffer.from(readFileSync(absolutePath)),
+    });
+  }
+  throw new Error(`unsupported dirty workspace entry type: ${relativePath}`);
+}
+
+function removeWorkspacePath(absolutePath) {
+  const stat = lstatIfPresent(absolutePath);
+  if (!stat) return;
+  if (stat.isDirectory() && !stat.isSymbolicLink()) {
+    rmSync(absolutePath, { recursive: true, force: true });
+    return;
+  }
+  unlinkSync(absolutePath);
+}
+
+function restoreWorkspacePaths(snapshots) {
+  for (const snapshot of snapshots) {
+    const absolutePath = resolve(repositoryRoot, snapshot.relativePath);
+    removeWorkspacePath(absolutePath);
+    if (snapshot.kind === 'missing') continue;
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    if (snapshot.kind === 'symlink') {
+      symlinkSync(snapshot.target, absolutePath);
+      continue;
+    }
+    if (snapshot.kind === 'file') {
+      writeFileSync(absolutePath, snapshot.bytes);
+      chmodSync(absolutePath, snapshot.mode);
+      continue;
+    }
+    throw new Error(`unsupported dirty workspace snapshot: ${snapshot.relativePath}`);
+  }
+}
+
 function captureWorkspaceState(label) {
   const unstagedPaths = nulPaths(captureGitBuffer(
     ['diff', '--name-only', '-z', '--no-ext-diff', '--no-textconv'],
@@ -116,6 +174,8 @@ function captureWorkspaceState(label) {
     `${label} untracked-path capture`,
   );
   const untrackedPaths = nulPaths(untrackedListing);
+  const worktreeDirtyPaths = [...new Set(unstagedPaths)].sort();
+  const trackedDirtyPaths = [...new Set([...worktreeDirtyPaths, ...stagedPaths])].sort();
   return Object.freeze({
     status: createHash('sha256').update(captureGitBuffer(
       ['status', '--short', '-z', '--untracked-files=all'],
@@ -125,7 +185,9 @@ function captureWorkspaceState(label) {
       ['ls-files', '--stage', '-z'],
       `${label} index-entry capture`,
     )).digest('hex'),
-    trackedPaths: fingerprintPaths([...unstagedPaths, ...stagedPaths]),
+    trackedPaths: fingerprintPaths(trackedDirtyPaths),
+    trackedDirtyPaths: Object.freeze(trackedDirtyPaths),
+    worktreeDirtyPaths: Object.freeze(worktreeDirtyPaths),
     untrackedPaths: fingerprintPaths(untrackedPaths),
     untrackedListing: createHash('sha256').update(untrackedListing).digest('hex'),
   });
@@ -167,9 +229,13 @@ let primaryExitCode = 0;
 let createdDirectory = false;
 let createdLink = false;
 let workspaceBefore;
+let trackedDirtySnapshots;
 
 try {
   workspaceBefore = captureWorkspaceState('initial');
+  trackedDirtySnapshots = Object.freeze(
+    workspaceBefore.worktreeDirtyPaths.map(snapshotWorkspacePath),
+  );
 
   if (lstatIfPresent(compatibilityPath) !== null) {
     throw new Error('compatibility path must be absent before the full-suite run');
@@ -233,6 +299,16 @@ try {
       rmdirSync(compatibilityDirectory);
     } catch (error) {
       failures.push(error instanceof Error ? error.message : 'compatibility directory cleanup failed');
+    }
+  }
+
+  if (trackedDirtySnapshots !== undefined) {
+    try {
+      restoreWorkspacePaths(trackedDirtySnapshots);
+    } catch (error) {
+      failures.push(error instanceof Error
+        ? `pre-existing tracked dirty byte restoration failed: ${error.message}`
+        : 'pre-existing tracked dirty byte restoration failed');
     }
   }
 

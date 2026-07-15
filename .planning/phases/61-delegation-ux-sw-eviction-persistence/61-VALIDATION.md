@@ -1,19 +1,19 @@
 ---
 phase: 61
 slug: delegation-ux-sw-eviction-persistence
-status: executing
+status: automated_complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-07-14
 last_updated: 2026-07-15
 validation_tasks: 23
-automated_rows_green: 22
-automated_rows_pending: 1
+automated_rows_green: 23
+automated_rows_pending: 0
 ---
 
 # Phase 61 — Validation Strategy
 
-> Per-phase validation contract and execution evidence. The exact 23 task ids and focused commands are synchronized mechanically with the approved plans. Green rows below are backed by actual command results recorded here or in the corresponding committed plan summary; Plan 08 Task 2 remains pending until its command runs.
+> Per-phase validation contract and execution evidence. The exact 23 task ids and focused commands are synchronized mechanically with the approved plans. All 23 automated rows are green from actual command results recorded here or in the corresponding committed plan summary. Live UAT remains separately pending at the milestone-end gate.
 
 ## Test Infrastructure
 
@@ -63,7 +63,7 @@ The planner may refine plan boundaries, but every final task must map to one row
 | 61-07-02 | 07 | 4 | UX-03, UX-05 | T61-01, T61-07, T61-11 | Approved consent, trust, Take Control, Resume, and failure states have exact copy, focus, visible controls, and no optimism | accessibility/source | `node tests/delegation-sidepanel-ui.test.js && node tests/sidepanel-tab-aware-smoke.test.js && node tests/owner-chip.test.js` | ✅ | ✅ green |
 | 61-07-03 | 07 | 4 | UX-04, LIFE-01, LIFE-02, LIFE-03, LIFE-04 | T61-08, T61-12, T61-13 | Stop/offline/disconnected/restart UI consumes canonical snapshots, suppresses hydrate announcements, and retains composer correctly | UI integration | `node tests/delegation-sidepanel-ui.test.js && node tests/delegation-controller.test.js` | ✅ | ✅ green |
 | 61-08-01 | 08 | 5 | UX-01–06, LIFE-01–04 | T61-01–T61-14 | The milestone-end UAT ledger exists first, validation maps all 23 tasks, every live item is pending, and the root chain includes each focused gate once | contract/artifact | `node tests/delegation-phase-contract.test.js` | ✅ | ✅ green |
-| 61-08-02 | 08 | 5 | UX-01–06, LIFE-01–04 | T61-01–T61-14 | Focused source/security/compatibility gates are green; the complete fail-safe root suite runs separately as the required Wave-5 regression gate | system/regression | `node tests/delegation-phase-contract.test.js && node tests/mcp-version-parity.test.js && node tests/provider-parity.test.js && node tests/agent-provider-forbidden-flags.test.js` | ✅ | ⬜ pending |
+| 61-08-02 | 08 | 5 | UX-01–06, LIFE-01–04 | T61-01–T61-14 | Focused source/security/compatibility gates are green; the complete fail-safe root suite runs separately as the required Wave-5 regression gate | system/regression | `node tests/delegation-phase-contract.test.js && node tests/mcp-version-parity.test.js && node tests/provider-parity.test.js && node tests/agent-provider-forbidden-flags.test.js` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -73,7 +73,11 @@ The planner may refine plan boundaries, but every final task must map to one row
 - Wave-1 full-suite gate: `node scripts/run-phase60-full-tests.mjs` exited 0 after Plan 01 and preserved the unrelated workspace bytes, as recorded in `61-01-SUMMARY.md`.
 - Additional integration full-suite gates after Plans 06 and 07 also exited 0 through the guarded harness and preserved the protected generated hashes.
 - Wave-5 focused Task 1: `node --check tests/delegation-phase-contract.test.js && node tests/delegation-phase-contract.test.js` exited 0 on 2026-07-15; the contract reported **486 passed, 0 failed**.
-- Wave-5 focused Task 2 and the separate final full-suite gate remain intentionally pending until Plan 08 executes them in order.
+- Wave-5 focused Task 2: `node tests/delegation-phase-contract.test.js && node tests/mcp-version-parity.test.js && node tests/provider-parity.test.js && node tests/agent-provider-forbidden-flags.test.js` exited 0 on 2026-07-15. Results were **524 passed, 0 failed** for the phase contract, **53 passed, 0 failed** for version parity, **67 passed, 0 failed** for provider parity, and all forbidden-flag assertions passed.
+- First Wave-5 full-suite wrapper invocation: the root tests completed, but the wrapper correctly exited red because date-sensitive generated files that were already dirty before the run no longer matched their exact pre-run bytes. This deterministic preservation failure is retained as evidence and was not relabeled green.
+- Narrow harness correction: `scripts/run-phase60-full-tests.mjs` now snapshots and restores only exact pre-existing unstaged worktree dirty paths, while never restoring or modifying the Git index. `node tests/phase60-full-tests-harness.test.js` exited 0 and also proved that newly dirtied clean paths, new untracked paths, and index mutations still fail closed.
+- Explicitly authorized corrected Wave-5 full-suite invocation: `node scripts/run-phase60-full-tests.mjs` exited 0 once with `[phase60-full-tests] PASS`; the protected `mcp/build/index.js` and showcase hashes were exact, the Git index was empty, and the temporary Phase 39 compatibility path was absent afterward.
+- Recovery confirmation: the focused Task 2 gate and `node tests/phase60-full-tests-harness.test.js` both exited 0 again on 2026-07-15. The several-minute full suite was not rerun during recovery.
 
 ## Wave 0 Requirements
 

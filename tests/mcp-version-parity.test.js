@@ -53,6 +53,14 @@ const prePhase61ContentScripts = [
     world: 'MAIN',
   },
 ];
+const phase59ExtErrorCodes = [
+  'agent_provider_offline',
+  'bridge_topology_changed',
+  'ext_unauthorized',
+  'invalid_ext_request',
+  'ext_request_timeout',
+];
+const phase60AdapterMethods = ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'];
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -115,6 +123,9 @@ async function run() {
   const backgroundSource = readText('extension/background.js');
   const bridgeSource = readText('extension/ws/mcp-bridge-client.js');
   const delegationUiSpec = readText('.planning/phases/61-delegation-ux-sw-eviction-persistence/61-UI-SPEC.md');
+  const extProtocolSource = readText('mcp/src/ext-protocol.ts');
+  const adapterSource = readText('mcp/src/agent-providers/adapter.ts');
+  const adapterRegistrySource = readText('mcp/src/agent-providers/registry.ts');
 
   console.log('\n--- metadata parity ---');
   assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
@@ -163,6 +174,59 @@ async function run() {
   assert(
     dispatcherSource.includes('return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };'),
     'agent:register response remains the exact established envelope',
+  );
+
+  console.log('\n--- Phase 59 wire and Phase 60 adapter freeze ---');
+  assert(
+    messageTypes.every((type) => !type.startsWith('ext:')),
+    'the Phase 59 ext frame family remains outside the historical MCPMessageType union',
+  );
+  for (const shape of [
+    "type: 'ext:request';",
+    "type: 'ext:event';",
+    "type: 'ext:response'; payload: Record<string, unknown>; error?: never",
+    "type: 'ext:response'; error: ExtError; payload?: never",
+    "export type BridgeCapability = 'agent-spawn';",
+    'capabilities?: BridgeCapability[];',
+  ]) {
+    assert(typesSource.includes(shape), `Phase 59 additive wire shape remains exact: ${shape}`);
+  }
+  const extErrorBlock = extProtocolSource.match(/EXT_ERROR_CODES = Object\.freeze\(\[([\s\S]*?)\]\s*as const\)/);
+  const actualExtErrorCodes = extErrorBlock
+    ? Array.from(extErrorBlock[1].matchAll(/'([^']+)'/g), (match) => match[1])
+    : [];
+  assert(
+    JSON.stringify(actualExtErrorCodes) === JSON.stringify(phase59ExtErrorCodes),
+    'Phase 59 transport errors remain the exact five-value ordered set',
+  );
+  assert(
+    /const REQUEST_KEYS = new Set\(\['id', 'type', 'method', 'payload'\]\);/.test(extProtocolSource)
+      && /const EVENT_KEYS = new Set\(\['id', 'type', 'event', 'payload'\]\);/.test(extProtocolSource)
+      && /const RESPONSE_KEYS = new Set\(\['id', 'type', 'payload', 'error'\]\);/.test(extProtocolSource)
+      && /if \(hasPayload === hasError\) return null;/.test(extProtocolSource),
+    'Phase 59 request/event/response parsers remain closed and response payload/error stays exclusive',
+  );
+
+  const adapterInterface = adapterSource.match(/export interface AgentProviderAdapter\s*\{([\s\S]*?)\n\}/);
+  const actualAdapterMethods = adapterInterface
+    ? Array.from(adapterInterface[1].matchAll(/^\s*([A-Za-z][A-Za-z0-9]*)\(/gm), (match) => match[1])
+    : [];
+  assert(
+    JSON.stringify(actualAdapterMethods) === JSON.stringify(phase60AdapterMethods),
+    'Phase 60 provider-neutral adapter remains exactly five methods in order',
+  );
+  assert(
+    /export interface AgentEvent\s*\{\s*readonly type: AgentEventType;\s*readonly sessionId: string;\s*readonly payload: Readonly<Record<string, unknown>>;\s*\}/m.test(adapterSource),
+    'Phase 60 adapter still exposes only normalized type/sessionId/payload events',
+  );
+  assert(
+    /const CANONICAL_IDS = Object\.freeze\(\[CLAUDE_CODE_ADAPTER_ID\] as const\);/.test(adapterRegistrySource)
+      && /id: CLAUDE_CODE_ADAPTER_ID,\s*adapter: createClaudeCodeAdapter\(dependencies\)/m.test(adapterRegistrySource),
+    'Phase 60 production registry remains the single closed Claude Code adapter slot',
+  );
+  assert(
+    !/(?:hold|resume|status)\s*\(/.test(adapterInterface ? adapterInterface[1] : ''),
+    'Phase 61 lifecycle does not expand the frozen Phase 60 adapter interface',
   );
 
   console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');

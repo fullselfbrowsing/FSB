@@ -47,63 +47,142 @@ function main() {
       '.planning/milestones/v1.0.0-phases/39-breadth-c-commerce-travel-misc-most-sensitive/39-06-REMAINING-APPS.md',
       'archived compatibility bytes\n',
     );
+    write(repository, 'clean.txt', 'committed clean baseline\n');
     write(repository, 'dirty.txt', 'committed dirty baseline\n');
     write(repository, 'staged.txt', 'committed staged baseline\n');
+    write(
+      repository,
+      'showcase/angular/public/llms.txt',
+      '<!-- generated 2026-07-07 by build-crawler-files.mjs -->\n',
+    );
     runGit(repository, ['add', '--all']);
     runGit(repository, ['commit', '--quiet', '-m', 'fixture baseline']);
 
     write(repository, 'dirty.txt', 'user dirty bytes\n');
     write(repository, 'staged.txt', 'user staged bytes\n');
+    write(
+      repository,
+      'showcase/angular/public/llms.txt',
+      '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
+    );
     runGit(repository, ['add', '--', 'staged.txt']);
 
-    const childSource = [
-      "const { spawnSync } = require('node:child_process');",
+    function runHarness(childSource) {
+      const environment = {
+        ...process.env,
+        FSB_PHASE60_INJECT_FAILURE: '',
+        FSB_PHASE60_TEST_REPOSITORY_ROOT: repository,
+        FSB_PHASE60_TEST_COMMAND_JSON: JSON.stringify([
+          process.execPath,
+          '-e',
+          childSource,
+        ]),
+      };
+      for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete environment[name];
+      return spawnSync(process.execPath, [harnessPath], {
+        cwd: repoRoot,
+        env: environment,
+        encoding: 'utf8',
+        shell: false,
+      });
+    }
+
+    const restoredDirtySource = [
       "const fs = require('node:fs');",
       "fs.writeFileSync('dirty.txt', 'child overwrote dirty bytes\\n');",
-      "fs.writeFileSync('staged.txt', 'child replaced staged bytes\\n');",
-      "fs.writeFileSync('unexpected.txt', 'child added an untracked path\\n');",
-      "const added = spawnSync('git', ['add', '--', 'staged.txt'], { shell: false });",
-      "if (added.status !== 0) process.exit(91);",
+      "fs.writeFileSync('showcase/angular/public/llms.txt', '<!-- generated 2026-07-15 by build-crawler-files.mjs -->\\n');",
     ].join('\n');
-    const environment = {
-      ...process.env,
-      FSB_PHASE60_INJECT_FAILURE: '',
-      FSB_PHASE60_TEST_REPOSITORY_ROOT: repository,
-      FSB_PHASE60_TEST_COMMAND_JSON: JSON.stringify([
-        process.execPath,
-        '-e',
-        childSource,
-      ]),
-    };
-    for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete environment[name];
-    const result = spawnSync(process.execPath, [harnessPath], {
-      cwd: repoRoot,
-      env: environment,
-      encoding: 'utf8',
-      shell: false,
-    });
+    const restored = runHarness(restoredDirtySource);
 
-    assert.equal(result.status, 1, 'workspace byte mutation makes the harness fail closed');
-    assert.match(result.stderr, /staged index bytes changed/);
-    assert.match(result.stderr, /pre-existing tracked dirty bytes changed/);
-    assert.match(result.stderr, /untracked workspace entries changed/);
-    assert.match(result.stderr, /workspace path\/status set changed/);
+    assert.equal(restored.status, 0,
+      `pre-existing dirty worktree mutation is restored: ${restored.stderr}`);
+    assert.match(restored.stdout, /PASS: full suite passed and workspace state was preserved/);
+    assert.doesNotMatch(restored.stderr, /staged index bytes changed/);
+    assert.doesNotMatch(restored.stderr, /pre-existing tracked dirty bytes changed/);
     assert.equal(fs.existsSync(compatibilityPath), false, 'harness removes only its compatibility symlink');
     assert.equal(fs.existsSync(compatibilityDirectory), false, 'harness removes its newly-created compatibility directory');
     assert.equal(
       fs.readFileSync(path.join(repository, 'dirty.txt'), 'utf8'),
-      'child overwrote dirty bytes\n',
-      'harness detects but does not restore overwritten dirty bytes',
+      'user dirty bytes\n',
+      'harness restores overwritten dirty bytes from its in-memory snapshot',
     );
     assert.equal(
       runGit(repository, ['show', ':staged.txt']),
-      'child replaced staged bytes\n',
-      'harness detects but does not restore changed staged bytes',
+      'user staged bytes\n',
+      'harness leaves pre-existing staged index bytes unchanged',
+    );
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'staged.txt'), 'utf8'),
+      'user staged bytes\n',
+      'harness leaves the staged path worktree bytes unchanged',
+    );
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'showcase/angular/public/llms.txt'), 'utf8'),
+      '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
+      'date-sensitive generated dirty bytes are restored exactly',
+    );
+
+    const unexpectedSource = [
+      restoredDirtySource,
+      "fs.writeFileSync('clean.txt', 'child changed a previously clean tracked path\\n');",
+      "fs.writeFileSync('unexpected.txt', 'child added an untracked path\\n');",
+    ].join('\n');
+    const unexpected = runHarness(unexpectedSource);
+    assert.equal(unexpected.status, 1,
+      'new clean-tracked and untracked mutations still make the harness fail closed');
+    assert.doesNotMatch(unexpected.stderr, /staged index bytes changed/);
+    assert.match(unexpected.stderr, /pre-existing tracked dirty bytes changed/);
+    assert.match(unexpected.stderr, /untracked workspace entries changed/);
+    assert.match(unexpected.stderr, /workspace path\/status set changed/);
+    assert.equal(fs.readFileSync(path.join(repository, 'dirty.txt'), 'utf8'), 'user dirty bytes\n');
+    assert.equal(runGit(repository, ['show', ':staged.txt']), 'user staged bytes\n');
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'showcase/angular/public/llms.txt'), 'utf8'),
+      '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
+    );
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'clean.txt'), 'utf8'),
+      'child changed a previously clean tracked path\n',
+      'harness leaves newly-mutated clean tracked paths untouched',
     );
     assert.equal(
       fs.readFileSync(path.join(repository, 'unexpected.txt'), 'utf8'),
       'child added an untracked path\n',
-      'harness leaves child-created paths untouched',
+      'harness leaves newly-created untracked paths untouched',
+    );
+
+    write(repository, 'clean.txt', 'committed clean baseline\n');
+    fs.unlinkSync(path.join(repository, 'unexpected.txt'));
+
+    const stagedMutationSource = [
+      "const { spawnSync } = require('node:child_process');",
+      "const fs = require('node:fs');",
+      "fs.writeFileSync('dirty.txt', 'child overwrote dirty bytes\\n');",
+      "fs.writeFileSync('staged.txt', 'child replaced staged bytes\\n');",
+      "fs.writeFileSync('showcase/angular/public/llms.txt', '<!-- generated 2026-07-15 by build-crawler-files.mjs -->\\n');",
+      "const added = spawnSync('git', ['add', '--', 'staged.txt'], { shell: false });",
+      "if (added.status !== 0) process.exit(91);",
+    ].join('\n');
+    const stagedMutation = runHarness(stagedMutationSource);
+    assert.equal(stagedMutation.status, 1,
+      'staged index mutations still make the harness fail closed');
+    assert.match(stagedMutation.stderr, /staged index bytes changed/);
+    assert.match(stagedMutation.stderr, /pre-existing tracked dirty bytes changed/);
+    assert.doesNotMatch(stagedMutation.stderr, /untracked workspace entries changed/);
+    assert.equal(
+      runGit(repository, ['show', ':staged.txt']),
+      'child replaced staged bytes\n',
+      'harness detects but does not overwrite changed staged index bytes',
+    );
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'staged.txt'), 'utf8'),
+      'child replaced staged bytes\n',
+      'harness does not restore a staged-only path from HEAD or the index',
+    );
+    assert.equal(fs.readFileSync(path.join(repository, 'dirty.txt'), 'utf8'), 'user dirty bytes\n');
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'showcase/angular/public/llms.txt'), 'utf8'),
+      '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
     );
     console.log('phase60-full-tests-harness.test.js: PASS');
   } finally {

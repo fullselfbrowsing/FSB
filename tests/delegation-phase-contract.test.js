@@ -103,6 +103,17 @@ function extractFunction(source, name) {
   return '';
 }
 
+function extractFrozenTrueKeys(source, name) {
+  const start = source.indexOf(`${name} = Object.freeze({`);
+  if (start < 0) return [];
+  const end = source.indexOf('\n  });', start);
+  if (end < 0) return [];
+  return Array.from(
+    source.slice(start, end).matchAll(/^\s+(?:'([^']+)'|([A-Za-z][A-Za-z0-9_-]*)):\s*true,?$/gm),
+    (match) => match[1] || match[2],
+  );
+}
+
 function hasEvidence(relativePath, pattern) {
   return exists(relativePath) && pattern.test(read(relativePath));
 }
@@ -407,6 +418,65 @@ const closedSchemaEvidence = Object.freeze({
 });
 for (const [label, rows] of Object.entries(closedSchemaEvidence)) checkEvidence(label, rows);
 
+const auditedEventStoreSource = read('extension/utils/delegation-event-store.js');
+const auditedFeedSource = read('extension/ui/delegation-feed.js');
+const auditedControllerSource = read('extension/utils/delegation-controller.js');
+const auditedRegistrySource = read('extension/utils/agent-registry.js');
+const auditedBridgeSource = read('extension/ws/mcp-bridge-client.js');
+
+for (const constant of [
+  'MAX_ENTRIES_PER_DELEGATION = 2000',
+  'MAX_ENTRY_BYTES = 4 * 1024',
+  'MAX_AGGREGATE_BYTES = 6 * 1024 * 1024',
+  'MAX_PRESENTATION_CHARS = 256',
+  'MAX_ID_CHARS = 128',
+  'MAX_TOOL_NAME_CHARS = 128',
+  'MAX_ALLOWED_TOOL_CHARS = 96',
+  'MAX_ALLOWED_TOOLS = 16',
+  'MAX_TOOL_COUNT_ROWS = 128',
+]) {
+  check(auditedEventStoreSource.includes(constant), `delegation ledger retains exact bound ${constant}`);
+}
+for (const [source, constant] of [
+  [auditedControllerSource, 'WALL_CLOCK_TIMEOUT_MS = 45 * 60 * 1000'],
+  [auditedControllerSource, 'EVENT_SILENCE_TIMEOUT_MS = 120 * 1000'],
+  [auditedControllerSource, 'HOLD_LEASE_MS = 5 * 60 * 1000'],
+  [auditedRegistrySource, 'FSB_HOLD_LEASE_MS = 5 * 60 * 1000'],
+  [auditedBridgeSource, 'DELEGATION_HEARTBEAT_INTERVAL_MS = 20000'],
+  [auditedBridgeSource, 'DELEGATION_HEARTBEAT_MISS_LIMIT = 3'],
+]) {
+  check(source.includes(constant), `delegation lifecycle retains exact constant ${constant}`);
+}
+
+const terminalCodes = [
+  'completed', 'stopped', 'cancelled', 'start_rejected', 'wall_clock_timeout',
+  'event_silence_timeout', 'delegation_persistence_failed', 'delegation_quota_exceeded',
+  'delegation_ledger_corrupt', 'route_lost', 'agent_offline', 'agent_unpaired',
+  'unsupported_provider', 'hold_expired', 'resume_ownership_lost',
+  'daemon_restart_lost_run', 'agent_protocol_drift', 'tree_unsettled', 'agent_failed',
+  'unknown_failure',
+];
+equal(extractFrozenTrueKeys(auditedEventStoreSource, 'VALID_TERMINAL_CODES'), terminalCodes,
+  'persistence retains the exact closed terminal-code set');
+equal(extractFrozenTrueKeys(auditedFeedSource, 'VALID_TERMINAL_CODES'), terminalCodes,
+  'presentation retains the exact same closed terminal-code set');
+equal(extractFrozenTrueKeys(auditedControllerSource, 'VALID_TERMINAL_CODES'), terminalCodes,
+  'controller retains the exact same closed terminal-code set');
+
+check(/var expectedInit = entry\.kind === 'init';[\s\S]*var expectedTool = entry\.kind === 'tool-call';[\s\S]*var expectedRetry = entry\.kind === 'retry';[\s\S]*var expectedMetrics = entry\.kind === 'result';/.test(auditedEventStoreSource),
+  'ledger derives every typed payload slot only from the closed kind');
+check(/\(entry\.init !== null\) !== expectedInit[\s\S]*\(entry\.tool !== null\) !== expectedTool[\s\S]*\(entry\.retry !== null\) !== expectedRetry[\s\S]*\(entry\.metrics !== null\) !== expectedMetrics/.test(auditedEventStoreSource),
+  'ledger rejects every kind/payload exclusivity mismatch');
+check(/_hasExactKeys\(value, INIT_KEYS\)/.test(auditedEventStoreSource)
+  && /_hasExactKeys\(value\.client, CLIENT_KEYS\)/.test(auditedEventStoreSource)
+  && /\['profileVersion', 'model', 'sessionId'\]/.test(auditedEventStoreSource)
+  && /allowedTools\.length > MAX_ALLOWED_TOOLS/.test(auditedEventStoreSource),
+'init client/profile/model/session/allowed-tools fields receive dedicated closed validation');
+check(/_hasExactKeys\(value, TOOL_KEYS\)[\s\S]*VALID_TOOL_STATUSES\[value\.status\]/.test(auditedEventStoreSource),
+  'tool-call payload and status receive dedicated closed validation');
+check(/_hasExactKeys\(value, RETRY_KEYS\)[\s\S]*VALID_RETRY_CLASSES\[value\.class\]/.test(auditedEventStoreSource),
+  'retry payload and class receive dedicated closed validation');
+
 const architectureLinks = Object.freeze({
   'config to preflight': [['extension/config/config.js', /providerKind/], ['extension/utils/delegation-preflight.js', /agentProviderId/]],
   'background to controller': [['extension/background.js', /FsbDelegationController/]],
@@ -544,6 +614,39 @@ check(!/confirmed|consent\s*:|trusted\s*:/.test(startFunction),
 check(!/fallback/i.test(read('extension/utils/delegation-preflight.js')),
   'provider preflight has no agent-to-API fallback');
 
+const backgroundSource = read('extension/background.js');
+const sidepanelSource = read('extension/ui/sidepanel.js');
+const optionsSource = read('extension/ui/options.js');
+const setTrustFunction = extractFunction(backgroundSource, 'fsbDelegationSetTrustCommand');
+const clearTrustFunction = extractFunction(backgroundSource, 'fsbDelegationClearTrustCommand');
+const sidepanelTrustFunction = extractFunction(sidepanelSource, '_allowDelegationFromConsent');
+const optionsClearTrustFunction = extractFunction(optionsSource, 'clearDelegationTrust');
+check(setTrustFunction.includes("fsbDelegationHasExactKeys(request, ['challengeId', 'providerId', 'trusted', 'type'])")
+  && setTrustFunction.indexOf('fsbDelegationPreflightResult')
+    < setTrustFunction.indexOf('writeTrustFromChallenge')
+  && setTrustFunction.includes('trusted: true'),
+'trust enable requires the exact true, provider-bound challenge after authoritative preflight');
+check(!/chrome\.storage|localStorage|setTrusted\s*\(/.test(setTrustFunction),
+  'trust enable cannot bypass the challenge-bound consent primitive');
+check(sidepanelTrustFunction.includes("type: 'FSB_DELEGATION_SET_TRUST'")
+  && sidepanelTrustFunction.indexOf('await _sendDelegationCommand')
+    < sidepanelTrustFunction.indexOf('await _beginDelegationStart(null)')
+  && !/FSB_DELEGATION_START[\s\S]{0,180}(?:trusted|consent)/.test(sidepanelTrustFunction),
+'checked trust waits for separate background authority before a boolean-free start');
+check(startFunction.indexOf('issueChallenge') < startFunction.indexOf('consumeChallenge')
+  && startFunction.indexOf('consumeChallenge') < startFunction.indexOf("sendExtRequest(\n      'delegate.start'"),
+'trusted and untrusted starts consume one exact task-bound challenge before transport');
+check(clearTrustFunction.includes("fsbDelegationHasExactKeys(request, ['providerId', 'type'])")
+  && clearTrustFunction.includes('FsbDelegationConsent.clearTrusted')
+  && !/(?:issueChallenge|consumeChallenge|writeTrustFromChallenge|controller|delegate\.start)/.test(clearTrustFunction),
+'background clear is the canonical Providers-only authority-reducing path');
+check(/chrome\.runtime\.sendMessage\(\{\s*type: 'FSB_DELEGATION_CLEAR_TRUST',\s*providerId: 'claude-code'\s*\}\)/.test(optionsClearTrustFunction)
+  && !/chrome\.storage|localStorage|saveSettings|markUnsavedChanges/.test(optionsClearTrustFunction),
+'Providers clears trust through one runtime command with no direct storage mutation');
+check(/clear does not consume the fresh challenge required after trust is removed/.test(read('tests/delegation-consent.test.js'))
+  && /untrusted consent mints a background challenge/.test(read('tests/mcp-bridge-background-dispatch.test.js')),
+'cleared trust deterministically restores fresh consent on the next run');
+
 const eventStoreSource = read('extension/utils/delegation-event-store.js');
 const feedSource = read('extension/ui/delegation-feed.js');
 check(!/raw(?:Claude|Provider|Event)|providerPayload/.test(eventStoreSource + feedSource),
@@ -552,7 +655,7 @@ check(!/innerHTML|insertAdjacentHTML|outerHTML/.test(feedSource),
   'delegation feed has no unsafe HTML sink');
 check(/textContent/.test(feedSource) && /createTextNode/.test(feedSource),
   'delegation feed uses text-only DOM sinks');
-check(!/JSON\.parse\([^\n]*(?:title|detail)|switch\s*\([^\n]*(?:title|detail)/.test(feedSource),
+check(!/JSON\.parse\([^\n]*(?:title|detail)|switch\s*\([^\n]*(?:title|detail)/.test(eventStoreSource + feedSource),
   'presentation title/detail fields are never parsed as authority data');
 check(/VALID_TERMINAL_CODES = Object\.freeze/.test(eventStoreSource)
   && /VALID_TERMINAL_CODES = Object\.freeze/.test(feedSource),
@@ -561,14 +664,61 @@ check(/VALID_TERMINAL_CODES = Object\.freeze/.test(eventStoreSource)
 const bridgeSource = read('extension/ws/mcp-bridge-client.js');
 check(/eventTail/.test(bridgeSource) && /pending\.eventTail|eventTail =/.test(bridgeSource),
   'observer failure/order state remains per pending correlation');
+check(/eventTail: Promise\.resolve\(\),\s*observerError: null/.test(bridgeSource)
+  && !/this\.(?:_)?eventTail|this\.(?:_)?observerError/.test(bridgeSource),
+'event ordering and observer failure have no global cross-correlation state');
 check(!/chrome\.tabs\.query\(\s*\{\s*active\s*:\s*true/.test(read('extension/utils/agent-registry.js')),
   'registry never derives delegation authority from the active tab');
-check(/sealHoldLease/.test(read('extension/utils/agent-registry.js'))
-  && /mappedTabIds|tabIds/.test(read('extension/utils/agent-registry.js')),
-'hold leases represent the complete mapped tab set, not one active tab');
-check(/bindRegisteredAgent/.test(read('extension/ws/mcp-tool-dispatcher.js'))
-  && /rollback|releaseAgent/.test(read('extension/ws/mcp-tool-dispatcher.js')),
-'unauthorized delegation registration is gated and rolled back');
+const takeControlFunction = extractFunction(auditedControllerSource, 'takeControl');
+const sealHoldLeaseFunction = between(
+  auditedRegistrySource,
+  'AgentRegistry.prototype.sealHoldLease = function(input) {',
+  'function canonicalLiveTabIds(value) {',
+);
+check(takeControlFunction.indexOf('getDelegationOwnedTabs') < takeControlFunction.indexOf('sealHoldLease')
+  && /completeOwnedSet/.test(takeControlFunction)
+  && /activeOwned/.test(takeControlFunction)
+  && /ownedTabs: ownedTabs/.test(takeControlFunction)
+  && !/ownedTabs:\s*\[\s*(?:activeTab|\{\s*tabId:\s*activeTabId)/.test(takeControlFunction),
+'controller seals the complete verified ownership set rather than one active tab');
+check(/canonicalOwnedTabs\(input\.ownedTabs\)/.test(sealHoldLeaseFunction)
+  && /canonicalOwnedTabs\(self\.getDelegationOwnedTabs/.test(sealHoldLeaseFunction)
+  && /sameOwnedTabs\(supplied, current\)/.test(sealHoldLeaseFunction)
+  && /supplied\.forEach/.test(sealHoldLeaseFunction),
+'registry atomically compares and leases every exact owned tab/token');
+
+for (const functionName of [
+  '_takeDelegationControl', '_resumeDelegationControl', '_stopDelegation',
+]) {
+  const lifecycleFunction = extractFunction(sidepanelSource, functionName);
+  check(lifecycleFunction.includes('_renderDelegationSnapshot(response.snapshot')
+    && !/(?:snapshot|_delegationUiState\.snapshot)\.state\s*=(?!=)|state:\s*['"](?:held|stopped)['"]/.test(lifecycleFunction),
+  `${functionName} renders only the authoritative response snapshot without optimistic held/stopped state`);
+}
+const runtimeUpdateFunction = extractFunction(sidepanelSource, '_handleDelegationRuntimeUpdate');
+check(/pendingTake[\s\S]*state === 'holding'[\s\S]*pendingResume[\s\S]*state === 'resuming'/.test(runtimeUpdateFunction),
+  'pending Take Control/Resume suppress intermediate optimistic presentation');
+const wakeReconcileFunction = extractFunction(backgroundSource, 'fsbReconcileDelegationSnapshots');
+check(/controller\.reconcile/.test(wakeReconcileFunction)
+  && !/delegate\.start|runAgentLoop|spawn|replay|adopt/i.test(wakeReconcileFunction),
+'worker wake observes controller status without replaying or adopting execution');
+
+const dispatcherSource = read('extension/ws/mcp-tool-dispatcher.js');
+const registerFunction = between(
+  dispatcherSource,
+  'async function handleAgentRegisterRoute({ payload, client, bindRegisteredAgent, authorizeDelegation } = {}) {',
+  'async function handleAgentReleaseRoute({ payload } = {}) {',
+);
+check(registerFunction.includes('resolveDelegationRegistrationGate')
+  && registerFunction.includes('await gate({ delegationId, agentId })')
+  && registerFunction.includes('rollbackDelegatedAgentRegistration')
+  && registerFunction.indexOf('if (!binding || binding.ok !== true)')
+    < registerFunction.indexOf('stampConnectionId'),
+'delegation registration is authorized and rejection is rolled back before any connection stamping');
+check(/expectedRegistration/.test(auditedControllerSource)
+  && /delegation_binding_rejected/.test(auditedControllerSource)
+  && !/bindDelegation[\s\S]{0,180}expectedRegistration\s*=\s*true/.test(auditedControllerSource),
+'controller rejects unknown/stale pre-registration instead of creating delegation authority');
 
 check(/Automated\/source verification remains blocking now/.test(validation),
   'validation explicitly keeps deterministic failures blocking');

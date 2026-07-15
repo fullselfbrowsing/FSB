@@ -55,6 +55,13 @@ function check(cond, msg) {
   }
 }
 
+function sourceBetween(source, start, end) {
+  const startIndex = source.indexOf(start);
+  if (startIndex < 0) return '';
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  return endIndex < 0 ? source.slice(startIndex) : source.slice(startIndex, endIndex);
+}
+
 // formattedToolNames -- copied verbatim from tool-definitions-parity.test.js:75-84.
 // Handles the gemini functionDeclarations / anthropic flat / OpenAI function.name
 // shape differences.
@@ -71,9 +78,12 @@ function formattedToolNames(formatted, provider) {
 
 const { formatToolsForProvider } = require(path.join(REPO_ROOT, 'extension', 'ai', 'tool-use-adapter.js'));
 const agentLoop = require(path.join(REPO_ROOT, 'extension', 'ai', 'agent-loop.js'));
+const { EXECUTION_MODES } = require(path.join(REPO_ROOT, 'extension', 'ai', 'engine-config.js'));
 const delegationPreflight = require(path.join(REPO_ROOT, 'extension', 'utils', 'delegation-preflight.js'));
 const { Config } = require(path.join(REPO_ROOT, 'extension', 'config', 'config.js'));
 const optionsSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 'options.js'), 'utf8');
+const sidepanelSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 'sidepanel.js'), 'utf8');
+const backgroundSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'background.js'), 'utf8');
 
 async function run() {
   // -------------------------------------------------------------------------
@@ -92,19 +102,37 @@ async function run() {
   check(/providerKind:\s*'api'/.test(optionsSource) && /agentProviderId:\s*''/.test(optionsSource),
     'options keeps its canonical API/empty-agent default storage shape');
 
+  const modeNames = Object.keys(EXECUTION_MODES);
+  check(JSON.stringify(modeNames) === JSON.stringify([
+    'autopilot', 'mcp-manual', 'mcp-agent', 'dashboard-remote', 'delegated'
+  ]), 'delegated is exactly the fifth execution mode without renaming the four established modes');
+  check(EXECUTION_MODES.delegated.name === 'delegated'
+      && JSON.stringify(Object.keys(EXECUTION_MODES.delegated.safetyLimits))
+        === JSON.stringify(['wallClockMs', 'eventSilenceMs'])
+      && EXECUTION_MODES.delegated.safetyLimits.wallClockMs === 2700000
+      && EXECUTION_MODES.delegated.safetyLimits.eventSilenceMs === 120000,
+    'the fifth mode has its separate lifecycle namespace and no legacy iteration/cost cap');
+  check(PROVIDER_KEYS.every((provider) => !modeNames.includes(provider))
+      && !PROVIDER_KEYS.includes('delegated')
+      && !PROVIDER_KEYS.includes('claude-code'),
+    'execution modes, API providers, and executable agent ids remain disjoint namespaces');
+
   for (const modelProvider of PROVIDER_KEYS) {
-    const apiInput = {
-      providerKind: 'api',
-      agentProviderId: 'claude-code',
-      modelProvider,
-      bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
-    };
-    const apiResult = delegationPreflight.check(apiInput);
-    check(apiResult.ok === true
-        && apiResult.kind === 'api'
-        && apiResult.providerId === modelProvider
-        && apiResult.agentProviderId === '',
-    modelProvider + ': API routing ignores the latent agent id without rewriting storage');
+    for (const storedAgentId of ['', 'claude-code']) {
+      const apiInput = {
+        providerKind: 'api',
+        agentProviderId: storedAgentId,
+        modelProvider,
+        bridgeState: { status: 'connected', connected: true, pairingStatus: 'paired' }
+      };
+      const apiResult = delegationPreflight.check(apiInput);
+      check(apiResult.ok === true
+          && apiResult.kind === 'api'
+          && apiResult.providerId === modelProvider
+          && apiResult.agentProviderId === '',
+      modelProvider + ': API routing preserves ' + (storedAgentId || 'empty-string')
+        + ' storage compatibility without write-back');
+    }
   }
 
   for (const candidate of [
@@ -123,6 +151,41 @@ async function run() {
           : result.code === 'unsupported_provider'),
     (candidate || 'empty') + ': only the exact Phase 60 Claude agent pair is executable');
   }
+
+  const sendHandler = sourceBetween(
+    sidepanelSource,
+    'async function handleSendMessage() {',
+    'async function _handleLegacySendMessage(message) {',
+  );
+  const legacySend = sourceBetween(
+    sidepanelSource,
+    'async function _handleLegacySendMessage(message) {',
+    '// Stop automation',
+  );
+  check(sendHandler.indexOf("preflight.kind === 'api'")
+      < sendHandler.indexOf("preflight.kind !== 'agent'")
+      && /preflight\.kind === 'api'[\s\S]*await _handleLegacySendMessage\(message\);[\s\S]*return;/.test(sendHandler),
+    'normal API side-panel sends fall through to the established legacy handler before agent UI mutation');
+  check(/action: 'startAutomation'/.test(legacySend)
+      && /addMessage\(message, 'user'\)/.test(legacySend)
+      && !/FSB_DELEGATION_(?:CONSENT|START)/.test(legacySend),
+    'the established API side-panel send envelope remains behaviorally separate from delegation');
+
+  const backgroundStart = sourceBetween(
+    backgroundSource,
+    'async function handleStartAutomation(request, sender, sendResponse) {',
+    'async function handleStopAutomation',
+  );
+  const agentBranch = sourceBetween(
+    backgroundStart,
+    "if (authoritativeProvider.providerKind === 'agent') {",
+    '// Get the target tab ID',
+  );
+  check(agentBranch.includes('fsbDelegationConsentCommand')
+      && !/agentProviderId|modelProvider/.test(agentBranch)
+      && backgroundStart.indexOf("providerKind === 'agent'")
+        < backgroundStart.indexOf('chrome.sidePanel.setOptions'),
+    'background diverts only authoritative agent kind while API start ordering remains intact');
 
   // -------------------------------------------------------------------------
   // (a) FORMAT half (INV-01) -- the capability surface is provider-independent.
