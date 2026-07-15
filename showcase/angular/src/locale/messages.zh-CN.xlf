@@ -2947,7 +2947,7 @@
         <target state="translated">FSB 仪表板</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">97</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.meta.description" datatype="html">
@@ -2955,7 +2955,7 @@
         <target state="translated">控制已配对的 FSB 扩展，运行一次性浏览器任务，并监控实时浏览器预览。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">98</context>
+          <context context-type="linenumber">136</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.openNormalPage" datatype="html">
@@ -2963,7 +2963,7 @@
         <target state="translated">打开普通浏览器页面以恢复预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">170</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.tabClosed" datatype="html">
@@ -2971,7 +2971,7 @@
         <target state="translated">流式传输标签页已关闭。请打开另一个页面以恢复预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">133</context>
+          <context context-type="linenumber">171</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.waitingForPage" datatype="html">
@@ -2979,7 +2979,7 @@
         <target state="translated">正在等待浏览器页面加载完毕</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">134</context>
+          <context context-type="linenumber">172</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.openStreamableTab" datatype="html">
@@ -2987,7 +2987,7 @@
         <target state="translated">打开包含普通网页的浏览器标签页以开始预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">135</context>
+          <context context-type="linenumber">173</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.streamingLabel" datatype="html">
@@ -2995,7 +2995,7 @@
         <target state="translated">正在传输</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">136</context>
+          <context context-type="linenumber">174</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.liveDetail" datatype="html">
@@ -3003,7 +3003,7 @@
         <target state="translated">实时浏览器预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">137</context>
+          <context context-type="linenumber">175</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pausedLabel" datatype="html">
@@ -3011,7 +3011,7 @@
         <target state="translated">已暂停</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">138</context>
+          <context context-type="linenumber">176</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pausedDetail" datatype="html">
@@ -3019,7 +3019,7 @@
         <target state="translated">预览已暂停</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">139</context>
+          <context context-type="linenumber">177</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.notReadyLabel" datatype="html">
@@ -3027,7 +3027,7 @@
         <target state="translated">尚未就绪</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">140</context>
+          <context context-type="linenumber">178</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.recoveringLabel" datatype="html">
@@ -3035,7 +3035,7 @@
         <target state="translated">正在恢复</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">141</context>
+          <context context-type="linenumber">179</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.recoveringDetail" datatype="html">
@@ -3043,7 +3043,7 @@
         <target state="translated">正在恢复浏览器预览…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">142</context>
+          <context context-type="linenumber">180</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.loadingLabel" datatype="html">
@@ -3051,7 +3051,7 @@
         <target state="translated">正在加载</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">143</context>
+          <context context-type="linenumber">181</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.loadingDetail" datatype="html">
@@ -3059,7 +3059,7 @@
         <target state="translated">正在等待实时页面预览…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">144</context>
+          <context context-type="linenumber">182</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.readyLabel" datatype="html">
@@ -3067,7 +3067,7 @@
         <target state="translated">已就绪</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">145</context>
+          <context context-type="linenumber">183</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.errorLabel" datatype="html">
@@ -3075,7 +3075,7 @@
         <target state="translated">错误</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">146</context>
+          <context context-type="linenumber">184</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.hiddenLabel" datatype="html">
@@ -3083,7 +3083,7 @@
         <target state="translated">已隐藏</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">147</context>
+          <context context-type="linenumber">185</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedLabel" datatype="html">
@@ -3091,7 +3091,7 @@
         <target state="translated">已断开连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">148</context>
+          <context context-type="linenumber">186</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedLastFrame" datatype="html">
@@ -3099,7 +3099,7 @@
         <target state="translated">流已断开连接——正在显示最后一帧</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">149</context>
+          <context context-type="linenumber">187</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedFrozenLabel" datatype="html">
@@ -3107,7 +3107,7 @@
         <target state="translated">已断开连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">150</context>
+          <context context-type="linenumber">188</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeLabel" datatype="html">
@@ -3115,7 +3115,7 @@
         <target state="translated">已完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">151</context>
+          <context context-type="linenumber">189</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeDetail" datatype="html">
@@ -3123,7 +3123,7 @@
         <target state="translated">任务已完成——正在显示最终页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">152</context>
+          <context context-type="linenumber">190</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.completeFrozenLabel" datatype="html">
@@ -3131,7 +3131,7 @@
         <target state="translated">任务已完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">153</context>
+          <context context-type="linenumber">191</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.disconnectedDetail" datatype="html">
@@ -3139,7 +3139,7 @@
         <target state="translated">流已断开连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">154</context>
+          <context context-type="linenumber">192</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedLabel" datatype="html">
@@ -3147,7 +3147,7 @@
         <target state="translated">受限页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">155</context>
+          <context context-type="linenumber">193</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedDetail" datatype="html">
@@ -3155,7 +3155,7 @@
         <target state="translated">受限页面——请使用地址栏导航</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">156</context>
+          <context context-type="linenumber">194</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.errorDetail" datatype="html">
@@ -3163,7 +3163,7 @@
         <target state="translated">无法加载页面预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">157</context>
+          <context context-type="linenumber">195</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.offDetail" datatype="html">
@@ -3171,7 +3171,7 @@
         <target state="translated">远程控制已关闭</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">158</context>
+          <context context-type="linenumber">196</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.offLabel" datatype="html">
@@ -3179,7 +3179,7 @@
         <target state="translated">远程控制已关闭</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">159</context>
+          <context context-type="linenumber">197</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.requestingLabel" datatype="html">
@@ -3187,7 +3187,7 @@
         <target state="translated">正在请求</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">160</context>
+          <context context-type="linenumber">198</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.requestingDetail" datatype="html">
@@ -3195,7 +3195,7 @@
         <target state="translated">已向扩展程序发送远程控制请求</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">161</context>
+          <context context-type="linenumber">199</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.readyLabel" datatype="html">
@@ -3203,7 +3203,7 @@
         <target state="translated">远程控制已就绪</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">162</context>
+          <context context-type="linenumber">200</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.readyDetail" datatype="html">
@@ -3211,7 +3211,7 @@
         <target state="translated">远程控制已连接到实时预览</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">163</context>
+          <context context-type="linenumber">201</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.rearmLabel" datatype="html">
@@ -3219,7 +3219,7 @@
         <target state="translated">重新启用远程控制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">164</context>
+          <context context-type="linenumber">202</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.rearmDetail" datatype="html">
@@ -3227,7 +3227,7 @@
         <target state="translated">预览目标已更改。请重新启用远程控制以继续。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">165</context>
+          <context context-type="linenumber">203</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.retryLabel" datatype="html">
@@ -3235,7 +3235,7 @@
         <target state="translated">重试远程控制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">166</context>
+          <context context-type="linenumber">204</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.retryDetail" datatype="html">
@@ -3243,7 +3243,7 @@
         <target state="translated">远程控制的调试器会话已丢失。请重新启用后重试。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">167</context>
+          <context context-type="linenumber">205</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.blockedLabel" datatype="html">
@@ -3251,7 +3251,7 @@
         <target state="translated">远程控制受阻</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">168</context>
+          <context context-type="linenumber">206</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.externalDebuggerDetail" datatype="html">
@@ -3259,7 +3259,7 @@
         <target state="translated">另一个调试器已占用该浏览器标签页。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">169</context>
+          <context context-type="linenumber">207</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.blockedDetail" datatype="html">
@@ -3267,7 +3267,7 @@
         <target state="translated">远程控制无法连接到该浏览器标签页。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">170</context>
+          <context context-type="linenumber">208</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noTabLabel" datatype="html">
@@ -3275,7 +3275,7 @@
         <target state="translated">无标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">171</context>
+          <context context-type="linenumber">209</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noTabDetail" datatype="html">
@@ -3283,7 +3283,7 @@
         <target state="translated">远程控制需要一个普通浏览器标签页。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">172</context>
+          <context context-type="linenumber">210</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noResponseLabel" datatype="html">
@@ -3291,7 +3291,7 @@
         <target state="translated">无响应</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">173</context>
+          <context context-type="linenumber">211</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.noResponseDetail" datatype="html">
@@ -3299,7 +3299,7 @@
         <target state="translated">扩展程序未确认远程控制。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">174</context>
+          <context context-type="linenumber">212</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.dashboardOfflineLabel" datatype="html">
@@ -3307,7 +3307,7 @@
         <target state="translated">控制面板离线</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">175</context>
+          <context context-type="linenumber">213</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.dashboardOfflineDetail" datatype="html">
@@ -3315,7 +3315,7 @@
         <target state="translated">使用远程控制前，请重新连接控制面板。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">176</context>
+          <context context-type="linenumber">214</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.unavailableDetail" datatype="html">
@@ -3323,7 +3323,7 @@
         <target state="translated">在实时预览恢复之前，远程控制不可用。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">177</context>
+          <context context-type="linenumber">215</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timedOutLabel" datatype="html">
@@ -3331,7 +3331,7 @@
         <target state="translated">任务超时</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">178</context>
+          <context context-type="linenumber">216</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timedOutAction" datatype="html">
@@ -3339,7 +3339,7 @@
         <target state="translated">任务恢复超时</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">179</context>
+          <context context-type="linenumber">217</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.waitingLabel" datatype="html">
@@ -3347,7 +3347,7 @@
         <target state="translated">正在等待任务</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">180</context>
+          <context context-type="linenumber">218</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.waitingAction" datatype="html">
@@ -3355,7 +3355,7 @@
         <target state="translated">正在等待任务恢复…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">181</context>
+          <context context-type="linenumber">219</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.recoveringLabel" datatype="html">
@@ -3363,7 +3363,7 @@
         <target state="translated">正在恢复任务</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">182</context>
+          <context context-type="linenumber">220</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.liveLabel" datatype="html">
@@ -3371,7 +3371,7 @@
         <target state="translated">任务进行中</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">183</context>
+          <context context-type="linenumber">221</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.workingAction" datatype="html">
@@ -3379,7 +3379,7 @@
         <target state="translated">正在处理…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">184</context>
+          <context context-type="linenumber">222</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stopping" datatype="html">
@@ -3387,7 +3387,7 @@
         <target state="translated">正在停止…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">185</context>
+          <context context-type="linenumber">223</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.extension.waking" datatype="html">
@@ -3395,7 +3395,7 @@
         <target state="translated">正在唤醒…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">186</context>
+          <context context-type="linenumber">224</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.extension.wake" datatype="html">
@@ -3403,7 +3403,7 @@
         <target state="translated">唤醒扩展程序</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">187</context>
+          <context context-type="linenumber">225</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pauseStream" datatype="html">
@@ -3411,7 +3411,7 @@
         <target state="translated">暂停流式传输</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">188</context>
+          <context context-type="linenumber">226</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.resumeStream" datatype="html">
@@ -3419,7 +3419,7 @@
         <target state="translated">恢复流式传输</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">189</context>
+          <context context-type="linenumber">227</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.refreshing" datatype="html">
@@ -3427,7 +3427,7 @@
         <target state="translated">正在刷新浏览器预览…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">190</context>
+          <context context-type="linenumber">228</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.reconnecting" datatype="html">
@@ -3435,7 +3435,7 @@
         <target state="translated">正在重新连接浏览器预览…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">191</context>
+          <context context-type="linenumber">229</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.connecting" datatype="html">
@@ -3443,7 +3443,7 @@
         <target state="translated">正在连接浏览器…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">192</context>
+          <context context-type="linenumber">230</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.connectingToBrowser" datatype="html">
@@ -3451,7 +3451,7 @@
         <target state="translated">正在连接浏览器…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">193</context>
+          <context context-type="linenumber">231</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.frozen" datatype="html">
@@ -3459,7 +3459,7 @@
         <target state="translated">已冻结</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">194</context>
+          <context context-type="linenumber">232</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.newTab" datatype="html">
@@ -3467,7 +3467,7 @@
         <target state="translated">新标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">195</context>
+          <context context-type="linenumber">233</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.chromeInternalPage" datatype="html">
@@ -3475,7 +3475,7 @@
         <target state="translated">Chrome 内部页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">196</context>
+          <context context-type="linenumber">234</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.chromeExtensionPage" datatype="html">
@@ -3483,7 +3483,7 @@
         <target state="translated">Chrome 扩展程序页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">197</context>
+          <context context-type="linenumber">235</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.edgeInternalPage" datatype="html">
@@ -3491,7 +3491,7 @@
         <target state="translated">Edge 内部页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">198</context>
+          <context context-type="linenumber">236</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.browserInternalPage" datatype="html">
@@ -3499,7 +3499,7 @@
         <target state="translated">浏览器内部页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">199</context>
+          <context context-type="linenumber">237</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.localFile" datatype="html">
@@ -3507,7 +3507,7 @@
         <target state="translated">本地文件</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">200</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.restrictedPageType" datatype="html">
@@ -3515,7 +3515,7 @@
         <target state="translated">受限页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">201</context>
+          <context context-type="linenumber">239</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.noActiveTab" datatype="html">
@@ -3523,7 +3523,7 @@
         <target state="translated">没有活动标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">202</context>
+          <context context-type="linenumber">240</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.metrics.remoteOn" datatype="html">
@@ -3531,7 +3531,7 @@
         <target state="translated">远程控制已开启</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">203</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.status.connected" datatype="html">
@@ -3539,7 +3539,7 @@
         <target state="translated">已连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">204</context>
+          <context context-type="linenumber">242</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.status.offline" datatype="html">
@@ -3547,7 +3547,7 @@
         <target state="translated">离线</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">205</context>
+          <context context-type="linenumber">243</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.notConnected" datatype="html">
@@ -3555,7 +3555,7 @@
         <target state="translated">未连接到服务器。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">206</context>
+          <context context-type="linenumber">244</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.extensionOffline" datatype="html">
@@ -3563,7 +3563,7 @@
         <target state="translated">扩展程序离线。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">207</context>
+          <context context-type="linenumber">245</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.timeoutTenMinutes" datatype="html">
@@ -3571,7 +3571,7 @@
         <target state="translated">任务超时（10 分钟）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">208</context>
+          <context context-type="linenumber">246</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaPending" datatype="html">
@@ -3579,7 +3579,7 @@
         <target state="translated">正在估算剩余时间</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">209</context>
+          <context context-type="linenumber">247</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseNavigating" datatype="html">
@@ -3587,7 +3587,7 @@
         <target state="translated">正在导航</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">210</context>
+          <context context-type="linenumber">248</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseReading" datatype="html">
@@ -3595,7 +3595,7 @@
         <target state="translated">正在读取页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">211</context>
+          <context context-type="linenumber">249</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseFilling" datatype="html">
@@ -3603,7 +3603,7 @@
         <target state="translated">正在填写表单</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">212</context>
+          <context context-type="linenumber">250</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseAnalyzing" datatype="html">
@@ -3611,7 +3611,7 @@
         <target state="translated">正在分析</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">213</context>
+          <context context-type="linenumber">251</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phasePlanning" datatype="html">
@@ -3619,7 +3619,7 @@
         <target state="translated">正在规划</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">214</context>
+          <context context-type="linenumber">252</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseActing" datatype="html">
@@ -3627,7 +3627,7 @@
         <target state="translated">正在执行操作</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">215</context>
+          <context context-type="linenumber">253</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWriting" datatype="html">
@@ -3635,7 +3635,7 @@
         <target state="translated">正在写入</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">216</context>
+          <context context-type="linenumber">254</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseSwitchingTabs" datatype="html">
@@ -3643,7 +3643,7 @@
         <target state="translated">正在切换标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">217</context>
+          <context context-type="linenumber">255</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseCallingApi" datatype="html">
@@ -3651,7 +3651,7 @@
         <target state="translated">正在调用 API</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">218</context>
+          <context context-type="linenumber">256</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWatchingTrigger" datatype="html">
@@ -3659,7 +3659,7 @@
         <target state="translated">正在监视触发器</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">219</context>
+          <context context-type="linenumber">257</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWaiting" datatype="html">
@@ -3667,7 +3667,7 @@
         <target state="translated">正在等待</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">220</context>
+          <context context-type="linenumber">258</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.phaseWorking" datatype="html">
@@ -3675,7 +3675,7 @@
         <target state="translated">正在处理</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">221</context>
+          <context context-type="linenumber">259</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressSearching" datatype="html">
@@ -3683,7 +3683,7 @@
         <target state="translated">正在搜索</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">222</context>
+          <context context-type="linenumber">260</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressFormatting" datatype="html">
@@ -3691,7 +3691,7 @@
         <target state="translated">正在格式化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">223</context>
+          <context context-type="linenumber">261</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressFormatted" datatype="html">
@@ -3699,7 +3699,7 @@
         <target state="translated">格式化完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">224</context>
+          <context context-type="linenumber">262</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskCompleted" datatype="html">
@@ -3707,7 +3707,7 @@
         <target state="translated">任务完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">225</context>
+          <context context-type="linenumber">263</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskPartiallyCompleted" datatype="html">
@@ -3715,7 +3715,7 @@
         <target state="translated">任务部分完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">226</context>
+          <context context-type="linenumber">264</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressTaskError" datatype="html">
@@ -3723,7 +3723,7 @@
         <target state="translated">任务因错误而结束</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">227</context>
+          <context context-type="linenumber">265</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressReviewingPage" datatype="html">
@@ -3731,7 +3731,7 @@
         <target state="translated">正在检查页面状态</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">228</context>
+          <context context-type="linenumber">266</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressPlanningNextStep" datatype="html">
@@ -3739,7 +3739,7 @@
         <target state="translated">正在规划下一步</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">229</context>
+          <context context-type="linenumber">267</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressPerformingAction" datatype="html">
@@ -3747,7 +3747,7 @@
         <target state="translated">正在执行浏览器操作</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">230</context>
+          <context context-type="linenumber">268</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressRecoveringInterruption" datatype="html">
@@ -3755,7 +3755,7 @@
         <target state="translated">正在从中断中恢复</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">231</context>
+          <context context-type="linenumber">269</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressUpdatingPage" datatype="html">
@@ -3763,7 +3763,7 @@
         <target state="translated">正在更新页面</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">232</context>
+          <context context-type="linenumber">270</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressSwitchingTab" datatype="html">
@@ -3771,7 +3771,7 @@
         <target state="translated">正在切换到另一个标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">233</context>
+          <context context-type="linenumber">271</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressWatchingDom" datatype="html">
@@ -3779,7 +3779,7 @@
         <target state="translated">正在监视 DOM 变化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">234</context>
+          <context context-type="linenumber">272</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.progressReconnectOrUpdate" datatype="html">
@@ -3787,7 +3787,7 @@
         <target state="translated">重新连接或发送另一条进度更新</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">235</context>
+          <context context-type="linenumber">273</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.couldNotStart" datatype="html">
@@ -3795,7 +3795,7 @@
         <target state="translated">无法启动任务</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">236</context>
+          <context context-type="linenumber">274</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorMissing" datatype="html">
@@ -3803,7 +3803,7 @@
         <target state="translated">未提供任务</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">237</context>
+          <context context-type="linenumber">275</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorAlreadyRunning" datatype="html">
@@ -3811,7 +3811,7 @@
         <target state="translated">已有另一项任务正在运行</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">238</context>
+          <context context-type="linenumber">276</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.errorNoUsableTab" datatype="html">
@@ -3819,7 +3819,7 @@
         <target state="translated">未找到可用的浏览器标签页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">239</context>
+          <context context-type="linenumber">277</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.couldNotComplete" datatype="html">
@@ -3827,7 +3827,7 @@
         <target state="translated">无法完成任务</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">240</context>
+          <context context-type="linenumber">278</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stopped" datatype="html">
@@ -3835,7 +3835,7 @@
         <target state="translated">已由用户停止</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">241</context>
+          <context context-type="linenumber">279</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.reconnected" datatype="html">
@@ -3843,7 +3843,7 @@
         <target state="translated">已重新连接…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">242</context>
+          <context context-type="linenumber">280</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.extensionOfflinePlaceholder" datatype="html">
@@ -3851,7 +3851,7 @@
         <target state="translated">扩展程序离线…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">243</context>
+          <context context-type="linenumber">281</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.placeholder" datatype="html">
@@ -3859,7 +3859,7 @@
         <target state="translated">FSB 应该做什么？</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">244</context>
+          <context context-type="linenumber">282</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.connecting" datatype="html">
@@ -3867,7 +3867,7 @@
         <target state="translated">正在连接…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">245</context>
+          <context context-type="linenumber">283</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.connectWithKey" datatype="html">
@@ -3875,7 +3875,7 @@
         <target state="translated">使用密钥连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">246</context>
+          <context context-type="linenumber">284</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.invalidKey" datatype="html">
@@ -3883,7 +3883,7 @@
         <target state="translated">哈希密钥无效。请检查密钥后重试。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">247</context>
+          <context context-type="linenumber">285</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.cannotConnect" datatype="html">
@@ -3891,7 +3891,7 @@
         <target state="translated">无法连接到服务器。请检查网络连接后重试。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">248</context>
+          <context context-type="linenumber">286</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.auth.sessionExpired" datatype="html">
@@ -3899,7 +3899,7 @@
         <target state="translated">会话已过期。请扫描二维码以重新连接。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">249</context>
+          <context context-type="linenumber">287</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.unavailable" datatype="html">
@@ -3907,7 +3907,7 @@
         <target state="translated">二维码扫描器不可用</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">250</context>
+          <context context-type="linenumber">288</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.cameraUnavailable" datatype="html">
@@ -3915,7 +3915,7 @@
         <target state="translated">相机不可用</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">251</context>
+          <context context-type="linenumber">289</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.missingToken" datatype="html">
@@ -3923,7 +3923,7 @@
         <target state="translated">二维码中不含配对令牌</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">252</context>
+          <context context-type="linenumber">290</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.exchangeFailed" datatype="html">
@@ -3931,7 +3931,7 @@
         <target state="translated">配对交换失败</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">253</context>
+          <context context-type="linenumber">291</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.invalidOrExpired" datatype="html">
@@ -3939,7 +3939,7 @@
         <target state="translated">配对码无效或已过期</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">254</context>
+          <context context-type="linenumber">292</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.tokenUsed" datatype="html">
@@ -3947,7 +3947,7 @@
         <target state="translated">该配对码已被使用</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">255</context>
+          <context context-type="linenumber">293</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.tokenExpired" datatype="html">
@@ -3955,7 +3955,7 @@
         <target state="translated">该配对码已过期</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">256</context>
+          <context context-type="linenumber">294</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.scanFailed" datatype="html">
@@ -3963,7 +3963,7 @@
         <target state="translated">扫描失败——请改为粘贴密钥</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">257</context>
+          <context context-type="linenumber">295</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.pointCamera" datatype="html">
@@ -3971,7 +3971,7 @@
         <target state="translated">将相机对准 FSB 扩展程序中的二维码</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">258</context>
+          <context context-type="linenumber">296</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.qr.viewfinder" datatype="html">
@@ -3979,7 +3979,7 @@
         <target state="translated">二维码相机取景框</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">259</context>
+          <context context-type="linenumber">297</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.aria" datatype="html">
@@ -3987,7 +3987,7 @@
         <target state="translated">远程浏览器控制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">260</context>
+          <context context-type="linenumber">298</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.disable" datatype="html">
@@ -3995,7 +3995,7 @@
         <target state="translated">关闭远程控制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">261</context>
+          <context context-type="linenumber">299</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.remote.control" datatype="html">
@@ -4003,7 +4003,7 @@
         <target state="translated">远程控制</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">262</context>
+          <context context-type="linenumber">300</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.minimize" datatype="html">
@@ -4011,7 +4011,7 @@
         <target state="translated">最小化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">263</context>
+          <context context-type="linenumber">301</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.exitPip" datatype="html">
@@ -4019,7 +4019,7 @@
         <target state="translated">退出画中画</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">264</context>
+          <context context-type="linenumber">302</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.exitFullscreen" datatype="html">
@@ -4027,7 +4027,7 @@
         <target state="translated">退出全屏</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">265</context>
+          <context context-type="linenumber">303</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.maximize" datatype="html">
@@ -4035,7 +4035,7 @@
         <target state="translated">最大化</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">266</context>
+          <context context-type="linenumber">304</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.pip" datatype="html">
@@ -4043,7 +4043,7 @@
         <target state="translated">画中画</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">267</context>
+          <context context-type="linenumber">305</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.preview.fullscreen" datatype="html">
@@ -4051,7 +4051,7 @@
         <target state="translated">全屏</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">268</context>
+          <context context-type="linenumber">306</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.alert" datatype="html">
@@ -4059,7 +4059,7 @@
         <target state="translated">警告</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">269</context>
+          <context context-type="linenumber">307</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.confirm" datatype="html">
@@ -4067,7 +4067,7 @@
         <target state="translated">确认</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">270</context>
+          <context context-type="linenumber">308</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.dialog.prompt" datatype="html">
@@ -4075,7 +4075,7 @@
         <target state="translated">输入</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">271</context>
+          <context context-type="linenumber">309</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.crossOriginFrame" datatype="html">
@@ -4083,7 +4083,7 @@
         <target state="translated">跨源 iframe</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">272</context>
+          <context context-type="linenumber">310</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.originLabel" datatype="html">
@@ -4091,7 +4091,7 @@
         <target state="translated">源站</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">273</context>
+          <context context-type="linenumber">311</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.sourceLabel" datatype="html">
@@ -4099,7 +4099,7 @@
         <target state="translated">来源</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">274</context>
+          <context context-type="linenumber">312</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.playMedia" datatype="html">
@@ -4107,7 +4107,7 @@
         <target state="translated">播放镜像媒体</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">275</context>
+          <context context-type="linenumber">313</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.unmuteMedia" datatype="html">
@@ -4115,7 +4115,7 @@
         <target state="translated">取消镜像媒体静音</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">276</context>
+          <context context-type="linenumber">314</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.unmute" datatype="html">
@@ -4123,7 +4123,7 @@
         <target state="translated">取消静音</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">277</context>
+          <context context-type="linenumber">315</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.mediaPosterOnly" datatype="html">
@@ -4131,7 +4131,7 @@
         <target state="translated">媒体（仅显示封面）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">278</context>
+          <context context-type="linenumber">316</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.mediaUnavailable" datatype="html">
@@ -4139,7 +4139,7 @@
         <target state="translated">媒体不可用</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">279</context>
+          <context context-type="linenumber">317</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.viewer.liveMirrorTitle" datatype="html">
@@ -4147,7 +4147,7 @@
         <target state="translated">PhantomStream 实时镜像</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">280</context>
+          <context context-type="linenumber">318</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.connected" datatype="html">
@@ -4155,7 +4155,7 @@
         <target state="translated">已连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">281</context>
+          <context context-type="linenumber">319</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.disconnected" datatype="html">
@@ -4163,7 +4163,7 @@
         <target state="translated">已断开连接</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">282</context>
+          <context context-type="linenumber">320</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.ws.reconnecting" datatype="html">
@@ -4171,7 +4171,7 @@
         <target state="translated">正在重新连接…</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">283</context>
+          <context context-type="linenumber">321</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.success" datatype="html">
@@ -4179,7 +4179,7 @@
         <target state="translated">成功</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">284</context>
+          <context context-type="linenumber">322</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.partial" datatype="html">
@@ -4187,7 +4187,7 @@
         <target state="translated">部分完成</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">285</context>
+          <context context-type="linenumber">323</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.failed" datatype="html">
@@ -4195,7 +4195,7 @@
         <target state="translated">失败</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">286</context>
+          <context context-type="linenumber">324</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.stopped" datatype="html">
@@ -4203,7 +4203,7 @@
         <target state="translated">已停止</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">287</context>
+          <context context-type="linenumber">325</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.actions" datatype="html">
@@ -4211,7 +4211,7 @@
         <target state="translated">操作</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">288</context>
+          <context context-type="linenumber">326</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.cost" datatype="html">
@@ -4219,7 +4219,7 @@
         <target state="translated">成本</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">289</context>
+          <context context-type="linenumber">327</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.result.finalUrl" datatype="html">
@@ -4227,7 +4227,7 @@
         <target state="translated">最终网址</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">290</context>
+          <context context-type="linenumber">328</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.recoveryTimeoutWithAction" datatype="html">
@@ -4235,7 +4235,7 @@
         <target state="translated">任务恢复超时——此前操作：<x id="action" equiv-text="this.lastProgressAction"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">1583</context>
+          <context context-type="linenumber">1621</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastSnapshot" datatype="html">
@@ -4243,7 +4243,7 @@
         <target state="translated">上次快照：<x id="snapshotTime" equiv-text="snapshotTime"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3813</context>
+          <context context-type="linenumber">3851</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.state" datatype="html">
@@ -4251,7 +4251,7 @@
         <target state="translated">状态：<x id="streamState" equiv-text="state"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3817</context>
+          <context context-type="linenumber">3855</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.reason" datatype="html">
@@ -4259,7 +4259,7 @@
         <target state="translated">原因：<x id="reason" equiv-text="reason"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3821</context>
+          <context context-type="linenumber">3859</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.recoveringFor" datatype="html">
@@ -4267,7 +4267,7 @@
         <target state="translated">正在恢复（已持续 <x id="seconds" equiv-text="seconds"/> 秒）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3825</context>
+          <context context-type="linenumber">3863</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.lastFrame" datatype="html">
@@ -4275,7 +4275,7 @@
         <target state="translated">上一帧：<x id="seconds" equiv-text="frameSeconds"/> 秒前</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3831</context>
+          <context context-type="linenumber">3869</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.mutations" datatype="html">
@@ -4283,7 +4283,7 @@
         <target state="translated">变更数：<x id="count" equiv-text="this.mutationsAppliedTotal"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3832</context>
+          <context context-type="linenumber">3870</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.applyFailures" datatype="html">
@@ -4291,7 +4291,7 @@
         <target state="translated">应用失败次数：<x id="count" equiv-text="this.mutationApplyFailures"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3833</context>
+          <context context-type="linenumber">3871</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.stale" datatype="html">
@@ -4299,7 +4299,7 @@
         <target state="translated">过期变更数：<x id="count" equiv-text="this.staleMutationCount"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3834</context>
+          <context context-type="linenumber">3872</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.tooltip.noData" datatype="html">
@@ -4307,7 +4307,7 @@
         <target state="translated">暂无流数据</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">3835</context>
+          <context context-type="linenumber">3873</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.api.requestFailed" datatype="html">
@@ -4315,7 +4315,7 @@
         <target state="translated">请求失败，状态码为 <x id="status" equiv-text="status"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4138</context>
+          <context context-type="linenumber">4176</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaMinutes" datatype="html">
@@ -4323,7 +4323,7 @@
         <target state="translated">约剩 <x id="minutes" equiv-text="amount"/> 分钟</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4304</context>
+          <context context-type="linenumber">4331</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.etaSeconds" datatype="html">
@@ -4331,7 +4331,7 @@
         <target state="translated">约剩 <x id="seconds" equiv-text="amount"/> 秒</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4305</context>
+          <context context-type="linenumber">4332</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.runningFor" datatype="html">
@@ -4339,7 +4339,7 @@
         <target state="translated">已运行 <x id="duration" equiv-text="duration"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4379</context>
+          <context context-type="linenumber">4406</context>
         </context-group>
       </trans-unit>
       <trans-unit id="dashboard.runtime.task.stoppedWithAction" datatype="html">
@@ -4347,7 +4347,7 @@
         <target state="translated">已由用户停止——此前操作：<x id="action" equiv-text="action"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/dashboard/dashboard-page.component.ts</context>
-          <context context-type="linenumber">4384</context>
+          <context context-type="linenumber">4411</context>
         </context-group>
       </trans-unit>
       <trans-unit id="home.hero.title" datatype="html">
