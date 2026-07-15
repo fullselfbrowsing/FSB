@@ -893,6 +893,18 @@ function runSourceContractCase() {
     'snapshot responses wait for the shared hydrated boot promise');
   assert(snapshotCommand.includes('await fsbReconcileDelegationSnapshots(boot.controller, [before])'),
     'id-keyed snapshot refresh observes supervisor status before replying');
+  assert(snapshotCommand.includes('await boot.controller.refreshActiveTab({ delegationId: request.delegationId })'),
+    'snapshot replies derive active-tab eligibility inside the controller before replying');
+  const lifecycleCommand = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationLifecycleCommand(request, operation) {'),
+    delegationComposition.indexOf('async function fsbDelegationSnapshotCommand(request) {')
+  );
+  assert(lifecycleCommand.includes('await controller.refreshActiveTab({ delegationId: request.delegationId })')
+      && lifecycleCommand.includes('const refreshed = controller.getSnapshot(request.delegationId)'),
+    'lifecycle replies refresh and return canonical active-tab eligibility after settlement');
+  assert(lifecycleCommand.indexOf("fsbDelegationHasExactKeys(request, ['delegationId', 'type'])")
+      < lifecycleCommand.indexOf('controller.takeControl'),
+    'lifecycle requests reject caller ownership fields before controller mutation');
 
   for (const type of [
     'FSB_DELEGATION_PREFLIGHT', 'FSB_DELEGATION_CONSENT', 'FSB_DELEGATION_SET_TRUST',

@@ -1796,6 +1796,55 @@ body[data-sidepanel-view="history"] .author-footer {
   line-height: 1.5;
 }
 
+.delegation-consent-forbidden,
+.delegation-state-note {
+  margin-top: 8px;
+}
+
+.delegation-trust-control {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--fsb-text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.delegation-trust-checkbox {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+}
+
+.delegation-inline-error {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--fsb-danger);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fsb-danger) 8%, var(--fsb-surface-elevated) 92%);
+  color: var(--fsb-danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.delegation-state-card[role="alert"] {
+  border-left: 4px solid var(--fsb-danger);
+}
+
+.delegation-doctor-command {
+  display: block;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--fsb-surface-muted);
+  color: var(--fsb-text-primary);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .delegation-definition-list,
 .delegation-summary-metrics,
 .delegation-tool-breakdown-list {

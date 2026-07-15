@@ -1076,6 +1076,98 @@
       });
     }
 
+    async function _refreshActiveTabRecord(record) {
+      var activeTab;
+      try {
+        activeTab = await getActiveTab({ delegationId: record.delegationId });
+      } catch (_activeTabError) {
+        activeTab = null;
+      }
+      var activeTabId = activeTab && Number.isSafeInteger(activeTab.tabId)
+        ? activeTab.tabId
+        : (Number.isSafeInteger(activeTab) ? activeTab : null);
+
+      if (!Number.isSafeInteger(activeTabId) || record.terminal || record.terminalPromise) {
+        record.activeTab = null;
+        return _snapshot(record);
+      }
+
+      // A sealed hold lease is the only authority for associating an
+      // unowned tab with a held delegation. This lets the presentation hide
+      // Resume when the user activates some unrelated tab without consulting
+      // registry storage or slicing identifiers locally.
+      if ((record.state === 'held' || record.state === 'resuming') && record.hold) {
+        record.activeTab = record.hold.tabIds.indexOf(activeTabId) !== -1
+          ? { tabId: activeTabId, owned: false, canTakeControl: false }
+          : null;
+        return _snapshot(record);
+      }
+
+      if (record.state !== 'running') {
+        record.activeTab = null;
+        return _snapshot(record);
+      }
+
+      var agentId = record.agentId;
+      if (!agentId && registry && typeof registry.getAgentForDelegation === 'function') {
+        try {
+          agentId = await registry.getAgentForDelegation(record.delegationId);
+          if (agentId && typeof agentId === 'object') agentId = agentId.agentId;
+        } catch (_mappingError) {
+          agentId = null;
+        }
+      }
+      if (typeof agentId !== 'string'
+        || agentId.length === 0
+        || !registry
+        || typeof registry.getDelegationOwnedTabs !== 'function') {
+        record.activeTab = null;
+        return _snapshot(record);
+      }
+
+      var ownedResult;
+      try {
+        ownedResult = await registry.getDelegationOwnedTabs({
+          delegationId: record.delegationId,
+          agentId: agentId
+        });
+      } catch (_ownedTabsError) {
+        ownedResult = null;
+      }
+      var ownedTabs = Array.isArray(ownedResult)
+        ? ownedResult
+        : (ownedResult && Array.isArray(ownedResult.ownedTabs) ? ownedResult.ownedTabs : []);
+      var seen = Object.create(null);
+      var completeOwnedSet = ownedTabs.length > 0 && ownedTabs.every(function(tab) {
+        if (!tab
+          || !Number.isSafeInteger(tab.tabId)
+          || tab.tabId < 0
+          || typeof tab.ownershipToken !== 'string'
+          || tab.ownershipToken.length === 0
+          || seen[tab.tabId]) return false;
+        seen[tab.tabId] = true;
+        return true;
+      });
+      record.agentId = agentId;
+      record.activeTab = completeOwnedSet && seen[activeTabId]
+        ? { tabId: activeTabId, owned: true, canTakeControl: true }
+        : null;
+      return _snapshot(record);
+    }
+
+    function refreshActiveTab(input) {
+      _requireHydrated();
+      input = input || {};
+      if (!_hasExactKeys(input, ['delegationId'])) {
+        return Promise.reject(_error('invalid_delegation_id', 'an exact server delegation id is required'));
+      }
+      var record;
+      try { record = _recordForOperation(input); } catch (error) { return Promise.reject(error); }
+      return _enqueue(record, function() {
+        return _refreshActiveTabRecord(record);
+      });
+    }
+
     function takeControl(input) {
       _requireHydrated();
       input = input || {};
@@ -1340,6 +1432,7 @@
       hydrate: hydrate,
       reconcile: reconcile,
       bindRegisteredAgent: bindRegisteredAgent,
+      refreshActiveTab: refreshActiveTab,
       getSnapshot: getSnapshot,
       subscribe: subscribe
     });

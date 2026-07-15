@@ -286,7 +286,7 @@ function terminalState(code) {
       exactKeys(controller, [
         'preflight', 'awaitConsent', 'start', 'acceptEvent', 'takeControl',
         'resume', 'stop', 'hydrate', 'reconcile', 'bindRegisteredAgent',
-        'getSnapshot', 'subscribe',
+        'refreshActiveTab', 'getSnapshot', 'subscribe',
       ]);
       await expectCode(() => controller.subscribe(() => {}), 'delegation_not_hydrated');
       await controller.hydrate();
@@ -945,6 +945,73 @@ function terminalState(code) {
         ['running', 'held', 'running', 'stopped'],
       );
       assert.strictEqual(clock.pending(), 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('active-tab eligibility is controller-derived from the exact delegation mapping', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      let activeTabId = 71;
+      let mappedAgentId = 'agent-active-tab-authority';
+      let ownedTabs = [
+        { tabId: 71, ownershipToken: 'token-71' },
+        { tabId: 72, ownershipToken: 'token-72' },
+      ];
+      const registry = {
+        async bindDelegation() { return { ok: true }; },
+        getAgentForDelegation() { return mappedAgentId; },
+        getDelegationOwnedTabs(input) {
+          exactKeys(input, ['agentId', 'delegationId']);
+          assert.strictEqual(input.agentId, mappedAgentId);
+          return clone(ownedTabs);
+        },
+      };
+      const { deps } = makeDeps(store, {
+        registry,
+        getActiveTab: async (input) => {
+          exactKeys(input, ['delegationId']);
+          return { tabId: activeTabId };
+        },
+      });
+      const controller = controllerModule.create(deps);
+      await controller.hydrate();
+      const id = 'delegation_active_tab_authority';
+      await controller.start({ delegationId: id });
+      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      await controller.bindRegisteredAgent({ delegationId: id, agentId: mappedAgentId });
+
+      const exactOwned = await controller.refreshActiveTab({ delegationId: id });
+      assert.deepStrictEqual(exactOwned.activeTab, {
+        tabId: 71,
+        owned: true,
+        canTakeControl: true,
+      });
+
+      activeTabId = 99;
+      const unrelated = await controller.refreshActiveTab({ delegationId: id });
+      assert.strictEqual(unrelated.activeTab, null);
+
+      activeTabId = 71;
+      mappedAgentId = null;
+      const mappingLost = await controller.refreshActiveTab({ delegationId: id });
+      assert.strictEqual(mappingLost.activeTab, null);
+
+      await expectCode(() => controller.refreshActiveTab({
+        delegationId: id,
+        activeTabId: 71,
+        owned: true,
+      }), 'invalid_delegation_id');
+      assert.strictEqual(controller.getSnapshot(id).activeTab, null,
+        'caller-supplied ownership never changes the canonical snapshot');
+
+      mappedAgentId = 'agent-active-tab-authority';
+      ownedTabs = [{ tabId: 71, ownershipToken: '' }];
+      const incompleteAuthority = await controller.refreshActiveTab({ delegationId: id });
+      assert.strictEqual(incompleteAuthority.activeTab, null,
+        'missing ownership token metadata fails closed');
     } finally {
       storage.restore();
     }

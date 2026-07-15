@@ -1631,13 +1631,21 @@ async function fsbDelegationLifecycleCommand(request, operation) {
       controller.getSnapshot(request.delegationId) || before
     );
   }
+  try {
+    await controller.refreshActiveTab({ delegationId: request.delegationId });
+  } catch (_error) {
+    // Active-tab eligibility is presentation authority, not lifecycle
+    // settlement. A failed refresh hides contextual controls by leaving the
+    // canonical snapshot fail-closed; it never changes the operation result.
+  }
+  const refreshed = controller.getSnapshot(request.delegationId);
   if (!result || result.ok !== true) {
     return fsbDelegationFailure(
       fsbDelegationMapLifecycleFailure(operation, result),
-      (result && result.snapshot) || controller.getSnapshot(request.delegationId) || before
+      refreshed || (result && result.snapshot) || before
     );
   }
-  return { ok: true, snapshot: result.snapshot };
+  return { ok: true, snapshot: refreshed || result.snapshot };
 }
 
 async function fsbDelegationSnapshotCommand(request) {
@@ -1652,6 +1660,14 @@ async function fsbDelegationSnapshotCommand(request) {
   if (request.delegationId === null) return { ok: true, snapshot: null };
   const before = boot.controller.getSnapshot(request.delegationId);
   if (before) await fsbReconcileDelegationSnapshots(boot.controller, [before]);
+  if (before) {
+    try {
+      await boot.controller.refreshActiveTab({ delegationId: request.delegationId });
+    } catch (_error) {
+      // The controller owns the fail-closed activeTab field. Snapshot reads
+      // remain available even if the browser cannot resolve an active tab.
+    }
+  }
   const snapshot = boot.controller.getSnapshot(request.delegationId);
   return snapshot
     ? { ok: true, snapshot }

@@ -3,6 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 class TestNode {
   constructor(tagName, text) {
@@ -166,6 +167,25 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function extractNamedFunction(source, name) {
+  const anchor = 'function ' + name + '(';
+  const anchorStart = source.indexOf(anchor);
+  assert(anchorStart >= 0, name + ' source anchor exists');
+  const start = source.slice(Math.max(0, anchorStart - 6), anchorStart) === 'async '
+    ? anchorStart - 6
+    : anchorStart;
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index++) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  throw new Error('unbalanced function source for ' + name);
+}
+
 console.log('\n--- Phase 61 delegation feed contract ---');
 
 {
@@ -317,4 +337,211 @@ assert(cssSource.includes('.delegation-action:focus-visible')
 assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation: none !important[\s\S]*?transition: none !important/.test(cssSource),
   'reduced-motion removes delegation animation and transition');
 
-console.log('delegation-sidepanel-ui: PASS');
+console.log('\n--- Phase 61 consent and human-control contract ---');
+
+[
+  'Let ' + 'Claude Code' + ' control this browser?',
+  'Claude Code may drive FSB browser tools for this task.',
+  'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
+  'Allow & start ' + 'Claude Code',
+  'Back to message',
+  'Trust ' + 'Claude Code' + ' for future runs',
+  'This turns off confirmation for future ' + 'Claude Code' + ' runs on this browser. You can restore confirmation in Providers.',
+  'Delegate a browser task',
+  'Choose an agent provider, describe the outcome, and FSB will run it in a background tab.',
+  'Take control',
+  'You have control of this tab',
+  'Resume with agent',
+  'Stop agent',
+  'Agent could not resume control',
+  'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.',
+  'Agent could not finish this task',
+  'Claude Code stopped before the task was complete. Review the error details, then try the same message again.'
+].forEach((copy) => assert(panelSource.includes(copy), 'exact delegated copy is pinned: ' + copy));
+
+const delegationUiSource = panelSource.slice(
+  panelSource.indexOf('var _delegationUiState = {'),
+  panelSource.indexOf('let automationTimerInterval = null;')
+);
+assert(!/faster mode|\bfree\b|unlimited/i.test(delegationUiSource),
+  'delegation UI makes no faster/free/unlimited marketing claim');
+assert(panelSource.includes("type: 'FSB_DELEGATION_PREFLIGHT'")
+    && panelSource.includes("type: 'FSB_DELEGATION_CONSENT'")
+    && panelSource.includes("type: 'FSB_DELEGATION_SET_TRUST'")
+    && panelSource.includes("type: 'FSB_DELEGATION_START'")
+    && panelSource.includes("type: 'FSB_DELEGATION_TAKE_CONTROL'")
+    && panelSource.includes("type: 'FSB_DELEGATION_RESUME'")
+    && panelSource.includes("type: 'FSB_DELEGATION_STOP'")
+    && panelSource.includes("type: 'FSB_DELEGATION_SNAPSHOT'"),
+  'side panel routes every delegated action through the closed background commands');
+assert(!/FSB_DELEGATION_START[\s\S]{0,180}(?:trusted|consentGranted|consent\s*:)/.test(panelSource),
+  'START carries no caller trust or consent boolean');
+assert(panelSource.includes("if ((_delegationUiState.pendingTake && message.snapshot.state === 'holding')")
+    && panelSource.includes("(_delegationUiState.pendingResume && message.snapshot.state === 'resuming')"),
+  'intermediate hold/resume snapshots retain the prior truthful focused control');
+assert(panelSource.includes("if (changes.fsbAgentRegistry && typeof _refreshSelectedDelegationSnapshot === 'function')")
+    && panelSource.includes('_refreshSelectedDelegationSnapshot();')
+    && panelSource.includes('await _refreshSelectedDelegationSnapshot();'),
+  'registry and active-tab events refresh controller-owned eligibility without UI ownership reads');
+const consentRenderSource = extractNamedFunction(panelSource, '_renderDelegationConsent');
+assert(!/checkbox\.addEventListener|addEventListener\(['"]change/.test(consentRenderSource),
+  'changing the trust checkbox alone performs no authority write');
+assert(consentRenderSource.includes('heading.tabIndex = -1')
+    && consentRenderSource.includes("options.focusHeading === true"),
+  'consent focus lands programmatically on its heading');
+assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panelSource),
+  'Escape follows the same non-starting consent back path');
+
+(async function runInteractionContract() {
+  {
+    const context = { _activeTabIdSnapshot: 42 };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_delegationCanTakeControl'), context);
+    const exact = { state: 'running', activeTab: { tabId: 42, owned: true, canTakeControl: true } };
+    assert.equal(context._delegationCanTakeControl(exact), true,
+      'Take control appears for the exact canonical active owned tab');
+    assert.equal(context._delegationCanTakeControl({ ...exact, activeTab: { ...exact.activeTab, owned: false } }), false,
+      'Take control hides for an unowned tab');
+    assert.equal(context._delegationCanTakeControl({ ...exact, activeTab: { ...exact.activeTab, tabId: 43 } }), false,
+      'Take control hides for a different active tab');
+    assert.equal(context._delegationCanTakeControl({ ...exact, state: 'holding' }), false,
+      'Take control hides outside canonical running');
+  }
+
+  {
+    let resolveCommand;
+    const commands = [];
+    const renders = [];
+    const running = { delegationId: DELEGATION_ID, state: 'running' };
+    const held = { delegationId: DELEGATION_ID, state: 'held' };
+    const state = { snapshot: running, pendingTake: false, errorCode: null };
+    const context = {
+      _delegationUiState: state,
+      _delegationCanTakeControl: () => true,
+      _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return new Promise((resolve) => { resolveCommand = resolve; });
+      },
+      _delegationValidLifecycleResponse: () => true,
+      FsbDelegationFeed: { validateSnapshot: () => true },
+      _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_takeDelegationControl'), context);
+    const button = { disabled: false, focusCount: 0, focus() { this.focusCount += 1; } };
+    const pending = context._takeDelegationControl({ currentTarget: button });
+    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_TAKE_CONTROL', delegationId: DELEGATION_ID }]);
+    assert.equal(state.pendingTake, true);
+    assert.equal(button.disabled, true);
+    assert.equal(button.focusCount, 1);
+    assert.equal(renders.length, 0, 'Take control renders no held state before authority replies');
+    resolveCommand({ ok: true, snapshot: held });
+    await pending;
+    assert.equal(state.pendingTake, false);
+    assert.equal(renders.length, 1);
+    assert.equal(renders[0].options.focusAction, 'resume',
+      'confirmed hold moves focus to Resume with agent');
+  }
+
+  {
+    let resolveCommand;
+    const commands = [];
+    const renders = [];
+    const held = { delegationId: DELEGATION_ID, state: 'held' };
+    const running = { delegationId: DELEGATION_ID, state: 'running' };
+    const state = { snapshot: held, pendingResume: false, errorCode: null };
+    const context = {
+      _delegationUiState: state,
+      _delegationCanResume: () => true,
+      _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return new Promise((resolve) => { resolveCommand = resolve; });
+      },
+      _delegationValidLifecycleResponse: () => true,
+      FsbDelegationFeed: { validateSnapshot: () => true },
+      _renderDelegationSnapshot(next, options) { renders.push({ next, options }); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_resumeDelegationControl'), context);
+    const button = { disabled: false, focusCount: 0, focus() { this.focusCount += 1; } };
+    const pending = context._resumeDelegationControl({ currentTarget: button });
+    assert.deepEqual(commands, [{ type: 'FSB_DELEGATION_RESUME', delegationId: DELEGATION_ID }]);
+    assert.equal(state.pendingResume, true);
+    assert.equal(button.disabled, true);
+    assert.equal(button.focusCount, 1);
+    assert.equal(renders.length, 0, 'Resume renders no running state before authority replies');
+    resolveCommand({ ok: true, snapshot: running });
+    await pending;
+    assert.equal(state.pendingResume, false);
+    assert.equal(renders.length, 1);
+    assert.equal(renders[0].options.focusAction, 'take',
+      'confirmed ownership restoration returns focus to the contextual control');
+  }
+
+  {
+    let resolveTrust;
+    const commands = [];
+    const starts = [];
+    const state = {
+      mode: 'consent', pendingTrust: false, pendingStart: false,
+      errorCode: null, challengeId: 'dch_fixture'
+    };
+    const context = {
+      _delegationUiState: state,
+      _renderDelegationConsent() {},
+      _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        return new Promise((resolve) => { resolveTrust = resolve; });
+      },
+      _delegationValidTrustResponse: () => true,
+      async _beginDelegationStart(challengeId) { starts.push(challengeId); }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_allowDelegationFromConsent'), context);
+    const pending = context._allowDelegationFromConsent({ checked: true });
+    assert.deepEqual(commands, [{
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: 'dch_fixture',
+      providerId: 'claude-code',
+      trusted: true
+    }]);
+    assert.equal(starts.length, 0, 'checked trust does not start before trust authority succeeds');
+    resolveTrust({ ok: true, providerId: 'claude-code', trusted: true });
+    await pending;
+    assert.deepEqual(starts, [null], 'trusted flow starts separately with a null caller challenge');
+
+    state.mode = 'consent';
+    state.challengeId = 'dch_second';
+    commands.length = 0;
+    starts.length = 0;
+    await context._allowDelegationFromConsent({ checked: false });
+    assert.deepEqual(commands, [], 'unchecked Allow writes no trust setting');
+    assert.deepEqual(starts, ['dch_second'], 'unchecked Allow uses only its one-use challenge');
+  }
+
+  {
+    let readyRenders = 0;
+    let focuses = 0;
+    const state = {
+      pendingStart: false, pendingTrust: false, challengeId: 'dch',
+      challengeExpiresAt: 123, errorCode: 'old', task: 'unchanged task'
+    };
+    const context = {
+      _delegationUiState: state,
+      _renderDelegationReadyState() { readyRenders += 1; },
+      chatInput: { focus() { focuses += 1; } }
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_backToDelegationMessage'), context);
+    context._backToDelegationMessage();
+    assert.equal(state.task, 'unchanged task', 'Back preserves the exact composer task');
+    assert.equal(state.challengeId, null);
+    assert.equal(readyRenders, 1);
+    assert.equal(focuses, 1, 'Back restores composer focus');
+  }
+
+  console.log('delegation-sidepanel-ui: PASS');
+})().catch((error) => {
+  console.error(error && error.stack ? error.stack : error);
+  process.exitCode = 1;
+});

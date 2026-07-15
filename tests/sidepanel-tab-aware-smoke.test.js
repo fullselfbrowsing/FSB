@@ -377,6 +377,25 @@ function installDomStub(idMap) {
   ok(DelegationFeed && typeof DelegationFeed.render === 'function'
       && globalThis.FsbDelegationFeed === DelegationFeed,
      'Part 4.8 -- delegation feed preserves classic-global/CommonJS dual export');
+  const delegationEligibility = sidepanelSrcForP4.match(
+    /function _delegationCanTakeControl\(snapshot\)\s*\{[\s\S]*?^\}/m
+  );
+  ok(delegationEligibility
+      && delegationEligibility[0].indexOf("snapshot.state === 'running'") !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.tabId === _activeTabIdSnapshot') !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.owned === true') !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.canTakeControl === true') !== -1
+      && delegationEligibility[0].indexOf('FSBOwnerChip') === -1,
+     'Part 4.9 -- Take control uses only exact canonical snapshot eligibility for the active tab');
+  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?await _refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4);
+  ok(activationDelegationRefresh,
+     'Part 4.10 -- active-tab swaps refresh delegated eligibility after updating the tab snapshot');
+  ok(/changes\.fsbAgentRegistry[\s\S]{0,160}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4),
+     'Part 4.11 -- registry ownership changes refresh the controller-owned delegated snapshot');
+  ok(handleSendBodyMatch
+      && handleSendBodyMatch[0].indexOf("type: 'FSB_DELEGATION_PREFLIGHT'")
+        < handleSendBodyMatch[0].indexOf('_handleLegacySendMessage(message)'),
+     'Part 4.12 -- background preflight routes API tasks to the untouched legacy send path');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
 
