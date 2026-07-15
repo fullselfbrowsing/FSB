@@ -33,7 +33,7 @@ See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIRE
 Phase: none active
 Plan: none active
 Status: v1.1.0 milestone complete, audited, and archived
-Last activity: 2026-07-07 - Completed quick task 260707-7id: Record MCP agent sessions into logs, history, replay, and memory like autopilot runs
+Last activity: 2026-07-15 - Completed quick task 260715-8wh: Implement production-safe Google Sheets API MVP with Chrome OAuth, typed read/write capabilities, and spreadsheet-data recording redaction
 
 Progress: [##########] 100%
 
@@ -154,6 +154,7 @@ None active.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260715-8wh | Implement production-safe Google Sheets API MVP with Chrome OAuth, typed read/write capabilities, and spreadsheet-data recording redaction | 2026-07-15 | a83d21b8 | [260715-8wh-implement-production-safe-google-sheets-](./quick/260715-8wh-implement-production-safe-google-sheets-/) |
 | 260707-7id | Record MCP agent sessions into logs, history, replay, and memory like autopilot runs | 2026-07-07 | 721e2826 | [260707-7id-record-mcp-agent-sessions-into-logs-hist](./quick/260707-7id-record-mcp-agent-sessions-into-logs-hist/) |
 | 260701-e6c | Implement Supabase to be T1 ready | 2026-07-01 | 2619d949 | [260701-e6c-implement-this-supabase-to-be-t1-ready-u](./quick/260701-e6c-implement-this-supabase-to-be-t1-ready-u/) |
 | 260701-e6d | Implement Microsoft Teams to be T1 ready | 2026-07-01 | working-tree | [260701-e6d-implement-this-microsoft-teams-to-be-t1-](./quick/260701-e6d-implement-this-microsoft-teams-to-be-t1-/) |
