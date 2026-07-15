@@ -190,6 +190,7 @@ try {
 // before the router's post-fetch classify hook runs.
 try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
 try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/google-sheets-api.js'); } catch (e) { console.error('[FSB] Failed to load google-sheets-api.js:', e.message); }
 try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
 
 // Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
@@ -7625,6 +7626,43 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
   automationLogger.logComm(null, 'receive', request.action || 'unknown', true, { tabId: sender.tab?.id });
 
   switch (request.action) {
+    case 'google-sheets:get-status': {
+      var sheetsStatusApi = globalThis && globalThis.FsbGoogleSheetsApi;
+      if (!sheetsStatusApi || typeof sheetsStatusApi.status !== 'function') {
+        sendResponse({ success: false, code: 'GOOGLE_SHEETS_IDENTITY_UNAVAILABLE', errorCode: 'GOOGLE_SHEETS_IDENTITY_UNAVAILABLE', error: 'Google Sheets integration is unavailable.' });
+        return false;
+      }
+      Promise.resolve(sheetsStatusApi.status()).then(sendResponse, function () {
+        sendResponse({ success: false, code: 'GOOGLE_SHEETS_API_ERROR', errorCode: 'GOOGLE_SHEETS_API_ERROR', error: 'Google Sheets status check failed.' });
+      });
+      return true;
+    }
+
+    case 'google-sheets:connect':
+    case 'google-sheets:disconnect': {
+      var controlPanelUrl = chrome.runtime.getURL('ui/control_panel.html');
+      var senderUrl = sender && typeof sender.url === 'string' ? sender.url : '';
+      var fromControlPanel = !sender.tab && (
+        senderUrl === controlPanelUrl ||
+        senderUrl.indexOf(controlPanelUrl + '#') === 0 ||
+        senderUrl.indexOf(controlPanelUrl + '?') === 0
+      );
+      if (!fromControlPanel || request.userInitiated !== true) {
+        sendResponse({ success: false, code: 'GOOGLE_SHEETS_AUTH_FAILED', errorCode: 'GOOGLE_SHEETS_AUTH_FAILED', error: 'Google Sheets connection changes require a control-panel click.' });
+        return false;
+      }
+      var sheetsAuthApi = globalThis && globalThis.FsbGoogleSheetsApi;
+      var authMethod = request.action === 'google-sheets:connect' ? 'connect' : 'disconnect';
+      if (!sheetsAuthApi || typeof sheetsAuthApi[authMethod] !== 'function') {
+        sendResponse({ success: false, code: 'GOOGLE_SHEETS_IDENTITY_UNAVAILABLE', errorCode: 'GOOGLE_SHEETS_IDENTITY_UNAVAILABLE', error: 'Google Sheets integration is unavailable.' });
+        return false;
+      }
+      Promise.resolve(sheetsAuthApi[authMethod]()).then(sendResponse, function () {
+        sendResponse({ success: false, code: 'GOOGLE_SHEETS_AUTH_FAILED', errorCode: 'GOOGLE_SHEETS_AUTH_FAILED', error: 'Google Sheets connection change failed.' });
+      });
+      return true;
+    }
+
     case 'fsbAuditLogClearAndExport': {
       // Race-safe clear-and-export delegated from a page realm (control
       // panel / sidepanel). Running the read/set here serializes it against

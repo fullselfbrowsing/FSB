@@ -6,6 +6,8 @@
   "homepage_url": "https://full-selfbrowsing.com",
   "permissions": [
     "activeTab",
+    "identity",
+    "identity.email",
     "scripting",
     "storage",
     "unlimitedStorage",
@@ -24,6 +26,12 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "oauth2": {
+    "client_id": "REPLACE_WITH_FSB_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/spreadsheets"
+    ]
   },
   "icons": {
     "16": "assets/icon16.png",
