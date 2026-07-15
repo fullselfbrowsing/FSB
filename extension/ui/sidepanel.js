@@ -1679,11 +1679,38 @@ async function _beginDelegationStart(challengeId) {
     try { acceptedConversationId = await ensureTabConversationForActiveTab(false); }
     catch (_error) { acceptedConversationId = null; }
   }
+  var acceptedDelegationId = response.snapshot.delegationId;
+  var bindingCommitted = false;
   if (_delegationValidConversationId(acceptedConversationId)) {
-    await _writeDelegationConversationBinding(
+    bindingCommitted = await _writeDelegationConversationBinding(
       acceptedConversationId,
-      response.snapshot.delegationId
+      acceptedDelegationId
     );
+  }
+  if (!bindingCommitted) {
+    await _sendDelegationCommand({
+      type: 'FSB_DELEGATION_STOP',
+      delegationId: acceptedDelegationId
+    });
+    if (originTabId !== _activeTabIdSnapshot || originConversationId !== conversationId) return;
+    _delegationUiState.pendingStart = false;
+    _delegationUiState.delegationId = null;
+    _delegationUiState.snapshot = null;
+    _delegationUiState.task = originTask;
+    _delegationUiState.challengeId = null;
+    _delegationUiState.challengeExpiresAt = null;
+    _delegationUiState.subscribed = true;
+    _renderDelegationReadyState();
+    _delegationUiState.task = originTask;
+    _delegationUiState.errorCode = 'delegation_binding_persistence_failed';
+    var bindingFailureMount = _ensureDelegationMount();
+    bindingFailureMount.state.setAttribute('role', 'alert');
+    _renderDelegationInlineError(
+      bindingFailureMount.state,
+      'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
+    );
+    updateSendButtonState();
+    return;
   }
 
   if (originTabId !== _activeTabIdSnapshot || acceptedConversationId !== conversationId) {
@@ -1695,7 +1722,7 @@ async function _beginDelegationStart(challengeId) {
 
   _resetDelegationSelection(acceptedConversationId);
   _delegationUiState.task = originTask;
-  _delegationUiState.delegationId = response.snapshot.delegationId;
+  _delegationUiState.delegationId = acceptedDelegationId;
   _delegationUiState.snapshot = response.snapshot;
   _delegationUiState.challengeId = null;
   _delegationUiState.challengeExpiresAt = null;

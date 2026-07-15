@@ -386,7 +386,8 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'Agent could not resume control',
   'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.',
   'Agent could not finish this task',
-  'Claude Code stopped before the task was complete. Review the error details, then try the same message again.'
+  'Claude Code stopped before the task was complete. Review the error details, then try the same message again.',
+  'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
 ].forEach((copy) => assert(panelSource.includes(copy), 'exact delegated copy is pinned: ' + copy));
 assert(panelSource.includes("+ ' cannot run browser tasks'"),
   'unsupported-provider heading retains the exact dynamic provider-label suffix');
@@ -437,6 +438,11 @@ assert(hydrationSource.includes("type: 'FSB_DELEGATION_SNAPSHOT'")
     && hydrationSource.indexOf('hydrated: true') < hydrationSource.lastIndexOf('_delegationUiState.subscribed = true'),
   'selected exact snapshot hydrates before the runtime subscription gate opens');
 const startSource = extractNamedFunction(panelSource, '_beginDelegationStart');
+assert(startSource.includes('bindingCommitted = await _writeDelegationConversationBinding(')
+    && startSource.includes("type: 'FSB_DELEGATION_STOP'")
+    && startSource.indexOf('if (!bindingCommitted)')
+      < startSource.indexOf('_renderDelegationSnapshot(response.snapshot'),
+  'conversation binding is part of start commit and exact Stop precedes any unbound run render');
 assert(startSource.indexOf('_renderDelegationSnapshot(response.snapshot')
       < startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
     && startSource.indexOf('await _refreshSelectedDelegationSnapshot()')
@@ -627,6 +633,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
 
   {
     const session = Object.create(null);
+    let rejectBindingWrites = false;
     const context = {
       DELEGATION_CONVERSATION_CAP: 50,
       DELEGATION_CONVERSATION_STORAGE_KEY: 'fsbSidepanelDelegationConversations',
@@ -640,7 +647,10 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
             async get(key) {
               return Object.hasOwn(session, key) ? { [key]: clone(session[key]) } : {};
             },
-            async set(payload) { Object.assign(session, clone(payload)); }
+            async set(payload) {
+              if (rejectBindingWrites) throw new Error('fixture binding storage rejection');
+              Object.assign(session, clone(payload));
+            }
           }
         }
       }
@@ -678,6 +688,125 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     assert.equal(envelope.lru.length, 50, 'conversation binding is capped at 50 rows');
     assert.equal(envelope.byConversation.conv_0, undefined, 'binding LRU evicts the oldest row');
     assert.equal(envelope.byConversation.conv_50, 'delegation_map_50', 'binding LRU retains newest row');
+
+    rejectBindingWrites = true;
+    assert.equal(
+      await context._writeDelegationConversationBinding('conv_unbound', DELEGATION_ID),
+      false,
+      'session-storage rejection is a blocking binding failure',
+    );
+    assert.equal(envelope.byConversation.conv_unbound, undefined);
+
+    const reloadContext = {
+      DELEGATION_CONVERSATION_CAP: 50,
+      DELEGATION_CONVERSATION_STORAGE_KEY: 'fsbSidepanelDelegationConversations',
+      DELEGATION_ID_PATTERN: /^[A-Za-z0-9_-]{8,128}$/,
+      DELEGATION_CONVERSATION_ID_PATTERN: /^conv_[A-Za-z0-9_-]{1,250}$/,
+      _delegationConversationEnvelope: { v: 1, byConversation: {}, lru: [] },
+      chrome: {
+        storage: {
+          session: {
+            async get(key) {
+              return Object.hasOwn(session, key) ? { [key]: clone(session[key]) } : {};
+            }
+          }
+        }
+      }
+    };
+    vm.createContext(reloadContext);
+    [
+      '_delegationHasExactKeys',
+      '_delegationEmptyConversationEnvelope',
+      '_delegationValidConversationId',
+      '_delegationValidConversationEnvelope',
+      '_delegationCloneConversationEnvelope',
+      '_loadDelegationConversationEnvelope',
+      '_delegationForConversation'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), reloadContext));
+    await reloadContext._loadDelegationConversationEnvelope();
+    assert.equal(
+      reloadContext._delegationForConversation('conv_unbound'),
+      null,
+      'reload discovers no hidden delegation after a rejected binding write',
+    );
+  }
+
+  {
+    const commands = [];
+    const inlineErrors = [];
+    const stateNode = new TestNode('div');
+    let readyRenders = 0;
+    let acceptedRenders = 0;
+    let addedMessages = 0;
+    let persistedMessages = 0;
+    const state = {
+      pendingStart: false,
+      task: 'keep this exact delegated task',
+      errorCode: null,
+      challengeId: 'consumed-challenge',
+      challengeExpiresAt: 12345,
+      delegationId: null,
+      snapshot: null,
+      subscribed: false
+    };
+    const context = {
+      _activeTabIdSnapshot: 42,
+      conversationId: 'conv_selected',
+      _delegationUiState: state,
+      chatInput: { textContent: 'keep this exact delegated task' },
+      async _sendDelegationCommand(message) {
+        commands.push(clone(message));
+        if (message.type === 'FSB_DELEGATION_START') {
+          return { ok: true, snapshot: { delegationId: DELEGATION_ID } };
+        }
+        return { ok: true, snapshot: { delegationId: DELEGATION_ID, state: 'stopped' } };
+      },
+      _delegationValidLifecycleResponse: () => true,
+      _delegationValidConversationId: (value) => /^conv_[A-Za-z0-9_-]+$/.test(value),
+      _writeDelegationConversationBinding: async () => false,
+      _renderDelegationReadyState() {
+        readyRenders += 1;
+        state.errorCode = null;
+      },
+      _ensureDelegationMount: () => ({ state: stateNode }),
+      _renderDelegationInlineError(_container, text) { inlineErrors.push(text); },
+      updateSendButtonState() {},
+      _persistMessageToConversation() { persistedMessages += 1; },
+      _resetDelegationSelection() { throw new Error('unbound run cannot become selected'); },
+      addMessage() { addedMessages += 1; },
+      _renderDelegationSnapshot() { acceptedRenders += 1; },
+      async _refreshSelectedDelegationSnapshot() {
+        throw new Error('unbound run cannot refresh');
+      },
+      _delegationIsSelectedConversation: () => true
+    };
+    vm.createContext(context);
+    vm.runInContext(extractNamedFunction(panelSource, '_beginDelegationStart'), context);
+    await context._beginDelegationStart(null);
+    assert.deepEqual(commands, [
+      {
+        type: 'FSB_DELEGATION_START',
+        challengeId: null,
+        task: 'keep this exact delegated task'
+      },
+      { type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID }
+    ]);
+    assert.equal(state.task, 'keep this exact delegated task');
+    assert.equal(context.chatInput.textContent, 'keep this exact delegated task');
+    assert.equal(state.pendingStart, false);
+    assert.equal(state.delegationId, null);
+    assert.equal(state.snapshot, null);
+    assert.equal(state.errorCode, 'delegation_binding_persistence_failed');
+    assert.equal(state.challengeId, null);
+    assert.equal(state.subscribed, true);
+    assert.equal(readyRenders, 1);
+    assert.equal(stateNode.getAttribute('role'), 'alert');
+    assert.deepEqual(inlineErrors, [
+      'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
+    ]);
+    assert.equal(addedMessages, 0, 'failed binding keeps the composer message out of chat history');
+    assert.equal(persistedMessages, 0, 'failed binding does not persist a consumed user message');
+    assert.equal(acceptedRenders, 0, 'failed binding never renders an untracked accepted run');
   }
 
   {
