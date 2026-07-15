@@ -112,6 +112,12 @@ export type DelegationTerminalStatus = 'succeeded' | 'failed' | 'cancelled';
 
 export type DelegationRestartLoss = AgentRestartLossDisposition;
 
+export interface DelegationRouteLoss {
+  readonly delegationId: string;
+  readonly code: 'route_lost';
+  readonly lostAt: number;
+}
+
 export interface DelegationStatus {
   readonly [key: string]: unknown;
   readonly generation: string;
@@ -120,6 +126,7 @@ export interface DelegationStatus {
     state: 'running' | 'held' | 'stopping';
   }>[];
   readonly restartLosses: readonly DelegationRestartLoss[];
+  readonly routeLosses: readonly DelegationRouteLoss[];
 }
 
 export type DelegationFailureCode =
@@ -641,6 +648,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly schedule: NonNullable<SpawnSupervisorDependencies['schedule']>;
   private readonly clearScheduled: NonNullable<SpawnSupervisorDependencies['clearScheduled']>;
   private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
+  private readonly routeLosses = new Map<string, DelegationRouteLoss>();
   private readonly terminationGrace: number;
   private readonly activationAttempts: number;
   private readonly allowSpawnOnPlatform: (platform: NodeJS.Platform) => boolean;
@@ -954,6 +962,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         DELEGATION_ID_PATTERN.test(value)
         && !this.activeRuns.has(value)
         && !this.completedRuns.has(value)
+        && !this.routeLosses.has(value)
       ) return value;
     }
     throw new Error('Unable to mint delegation identity');
@@ -1270,10 +1279,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ))
       .slice(-RECOVERY_STATUS_LIMIT)
       .map((entry) => Object.freeze({ ...entry }));
+    const routeLosses = [...this.routeLosses.values()]
+      .sort((left, right) => (
+        left.lostAt - right.lostAt
+        || left.delegationId.localeCompare(right.delegationId)
+      ))
+      .slice(-RECOVERY_STATUS_LIMIT)
+      .map((entry) => Object.freeze({ ...entry }));
     return Object.freeze({
       generation: this.generation,
       active: Object.freeze(active),
       restartLosses: Object.freeze(restartLosses),
+      routeLosses: Object.freeze(routeLosses),
     });
   }
 
@@ -1578,6 +1595,23 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       status,
       terminal,
     });
+    if (status === 'failed'
+      && terminal.type === 'diagnostic'
+      && terminal.code === 'route_lost') {
+      const lostAt = this.wallNow();
+      if (Number.isSafeInteger(lostAt) && lostAt >= 0) {
+        this.routeLosses.set(run.delegationId, Object.freeze({
+          delegationId: run.delegationId,
+          code: 'route_lost',
+          lostAt,
+        }));
+        while (this.routeLosses.size > RECOVERY_STATUS_LIMIT) {
+          const first = this.routeLosses.keys().next().value as string | undefined;
+          if (!first) break;
+          this.routeLosses.delete(first);
+        }
+      }
+    }
     this.activeRuns.delete(run.delegationId);
     this.completedRuns.set(run.delegationId, result);
     while (this.completedRuns.size > COMPLETED_RUN_LIMIT) {

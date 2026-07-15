@@ -1016,6 +1016,10 @@ function runSourceContractCase() {
       && controllerReconcile.includes('if (restartLoss && !active)')
       && controllerReconcile.includes("_settle(record, 'daemon_restart_lost_run', { cancel: false })"),
     'restart loss requires prior generation change and matching explicit disposition');
+  assert(controllerSource.includes("_hasExactKeys(value, ['active', 'generation', 'restartLosses', 'routeLosses'])")
+      && controllerReconcile.includes('priorGeneration === status.generation && routeLoss')
+      && controllerReconcile.includes("_settle(record, 'route_lost', { cancel: false })"),
+    'wake route loss requires exact same-generation daemon evidence and never re-cancels');
   assert(!controllerSource.includes('recoveryDisposition'),
     'controller rejects caller-authored restart disposition shortcuts');
   assert(!/(?:startOperation|delegate\.start|\badopt\b|\breplay\b)/.test(controllerReconcile),

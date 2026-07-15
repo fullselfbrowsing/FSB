@@ -7,17 +7,16 @@ const { PassThrough, Writable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
+const mcpBuildRoot = process.env.FSB_MCP_BUILD_ROOT
+  ? path.resolve(process.env.FSB_MCP_BUILD_ROOT)
+  : path.join(repoRoot, 'mcp', 'build');
 const supervisorBuildPath = path.join(
-  repoRoot,
-  'mcp',
-  'build',
+  mcpBuildRoot,
   'agent-providers',
   'spawn-supervisor.js',
 );
 const registryBuildPath = path.join(
-  repoRoot,
-  'mcp',
-  'build',
+  mcpBuildRoot,
   'agent-providers',
   'registry.js',
 );
@@ -442,7 +441,8 @@ function makeHarness(supervisorModule, options = {}) {
       waitCalls.push(milliseconds);
       monotonicClock += milliseconds;
     },
-    mintDelegationId: () => `delegation_fixture_${String(++delegationCounter).padStart(4, '0')}`,
+    mintDelegationId: options.mintDelegationId
+      ?? (() => `delegation_fixture_${String(++delegationCounter).padStart(4, '0')}`),
     mintFingerprint: () => 'runtime_fingerprint_fixture_0001',
     mintGeneration: () => 'generation_fixture_0001',
     signalProcessGroup(group, signal) {
@@ -575,11 +575,16 @@ async function runLifecycleProtocolTests(supervisorModule) {
     generation: 'generation_fixture_0001',
     active: [],
     restartLosses: [],
+    routeLosses: [],
   });
-  assert.deepEqual(Object.keys(initial).sort(), ['active', 'generation', 'restartLosses']);
+  assert.deepEqual(
+    Object.keys(initial).sort(),
+    ['active', 'generation', 'restartLosses', 'routeLosses'],
+  );
   assert(Object.isFrozen(initial));
   assert(Object.isFrozen(initial.active));
   assert(Object.isFrozen(initial.restartLosses));
+  assert(Object.isFrozen(initial.routeLosses));
 
   const startPromise = harness.supervisor.handleExtRequest(
     startRequest({ adapterId: 'claude-code', task: 'lifecycle protocol fixture' }),
@@ -1470,10 +1475,42 @@ async function runCancelAndShutdownTests(supervisorModule) {
     assert.equal(harness.terminationCalls.length, 1, 'route loss stops the tree exactly once');
     assert.equal(harness.counters.remove, 1, 'route loss removes the verified runtime journal');
     assert.deepEqual(
-      (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).restartLosses,
-      [],
-      'transport disconnect alone never becomes daemon-restart loss',
+      await harness.supervisor.handleExtRequest(statusRequest(), harness.emit),
+      {
+        generation: 'generation_fixture_0001',
+        active: [],
+        restartLosses: [],
+        routeLosses: [{
+          delegationId: terminal.delegationId,
+          code: 'route_lost',
+          lostAt: 1003,
+        }],
+      },
+      'confirmed route cleanup is distinct from daemon-restart loss',
     );
+  }
+
+  {
+    const route = new AbortController();
+    const harness = makeHarness(supervisorModule, {
+      onStdinEnd: () => {},
+      terminateError: true,
+    });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'unsettled route loss fixture' }),
+      harness.emit,
+      { signal: route.signal },
+    );
+    await waitFor(
+      () => harness.emitted.some((event) => event.event === 'delegation.started'),
+      'delegation.started before unsettled route loss',
+    );
+    route.abort(new Error('fixture route lost before failed cleanup'));
+    const terminal = await startPromise;
+    assert.equal(terminal.terminal.code, 'tree_unsettled');
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(harness.supervisor.routeLosses.size, 0,
+      'failed cleanup never records route-loss disposition evidence before degradation');
   }
 
   {
@@ -1774,6 +1811,73 @@ async function runRecoveryStatusTests(supervisorModule) {
   }
 }
 
+async function runRouteLossStatusTests(supervisorModule) {
+  const secret = 'ROUTE_STATUS_SECRET_CANARY_MUST_NOT_LEAK';
+  const harness = makeHarness(supervisorModule, { emitError: 'delegation.started' });
+  const expectedIds = [];
+  for (let index = 0; index < supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT + 2; index += 1) {
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest(
+        { adapterId: 'claude-code', task: `${secret}-${index}` },
+        { id: `ext-route-loss-bound-${index}` },
+      ),
+      harness.emit,
+    );
+    assert.equal(terminal.terminal.code, 'route_lost');
+    expectedIds.push(terminal.delegationId);
+  }
+  const first = await harness.supervisor.handleExtRequest(statusRequest(), harness.emit);
+  const second = await harness.supervisor.handleExtRequest(statusRequest(), harness.emit);
+  assert.deepEqual(second, first, 'route-loss status is non-destructive across repeated reads');
+  assert.equal(first.routeLosses.length, supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT);
+  assert.deepEqual(
+    first.routeLosses.map((entry) => entry.delegationId),
+    expectedIds.slice(-supervisorModule.DELEGATION_RECOVERY_STATUS_LIMIT),
+    'route-loss evidence retains only the newest bounded exact ids',
+  );
+  assert.deepEqual(
+    first.routeLosses,
+    [...first.routeLosses].sort((left, right) => (
+      left.lostAt - right.lostAt
+      || left.delegationId.localeCompare(right.delegationId)
+    )),
+    'route-loss evidence has deterministic status order',
+  );
+  assert(Object.isFrozen(first.routeLosses));
+  assert(first.routeLosses.every((entry) => (
+    Object.isFrozen(entry)
+    && Object.keys(entry).sort().join(',') === 'code,delegationId,lostAt'
+    && entry.code === 'route_lost'
+  )));
+  const serialized = JSON.stringify(first.routeLosses);
+  for (const forbidden of [secret, 'pid', 'argv', 'env', 'cwd', 'task']) {
+    assert.equal(serialized.includes(forbidden), false, `${forbidden} is absent from route-loss status`);
+  }
+
+  const oldId = 'delegation_route_loss_reuse_old';
+  const freshId = 'delegation_route_loss_reuse_fresh';
+  const minted = [oldId, oldId, freshId];
+  const reuseHarness = makeHarness(supervisorModule, {
+    emitError: 'delegation.started',
+    mintDelegationId: () => minted.shift(),
+  });
+  const firstTerminal = await reuseHarness.supervisor.handleExtRequest(
+    startRequest({ adapterId: 'claude-code', task: 'route loss identity reserve' }),
+    reuseHarness.emit,
+  );
+  assert.equal(firstTerminal.delegationId, oldId);
+  reuseHarness.supervisor.completedRuns.delete(oldId);
+  const secondTerminal = await reuseHarness.supervisor.handleExtRequest(
+    startRequest(
+      { adapterId: 'claude-code', task: 'route loss identity cannot be recycled' },
+      { id: 'ext-route-loss-reuse' },
+    ),
+    reuseHarness.emit,
+  );
+  assert.equal(secondTerminal.delegationId, freshId,
+    'retained route-loss evidence reserves its exact id after completed-result eviction');
+}
+
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
@@ -1795,6 +1899,7 @@ async function main() {
   await runStdinLifecycleTests(supervisorModule);
   await runRecoveryAndRegistryTests(supervisorModule, registryModule);
   await runRecoveryStatusTests(supervisorModule);
+  await runRouteLossStatusTests(supervisorModule);
   console.log('mcp-spawn-supervisor.test.js: PASS');
 }
 

@@ -206,8 +206,8 @@ function makeRecoveryDeps(store, options = {}) {
   };
 }
 
-function supervisorStatus(generation, active = [], restartLosses = []) {
-  return { generation, active, restartLosses };
+function supervisorStatus(generation, active = [], restartLosses = [], routeLosses = []) {
+  return { generation, active, restartLosses, routeLosses };
 }
 
 async function seedRunningLedger(store, controllerModule, delegationId) {
@@ -2263,6 +2263,147 @@ function terminalState(code) {
         assert.strictEqual(envelope.entries.filter((entry) => (
           entry.state === 'restart_lost' || entry.state === 'completed'
         )).length, 1);
+      }
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('same-generation route loss survives worker reload and terminalizes exactly once', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const id = 'delegation_route_loss_wake_exact';
+      await seedRunningLedger(modules.store, modules.controllerModule, id);
+
+      modules = freshModules();
+      const generation = 'generation_route_loss_wake_6106';
+      const generations = new Map([[id, generation]]);
+      const harness = makeRecoveryDeps(modules.store, { generations });
+      let controller = modules.controllerModule.create(harness.deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1);
+      assert.strictEqual(restored[0].terminal, null);
+
+      const routeLoss = {
+        delegationId: id,
+        code: 'route_lost',
+        lostAt: 1720000000100,
+      };
+      const settled = await controller.reconcile({
+        delegationId: id,
+        connection: 'connected',
+        status: supervisorStatus(generation, [], [], [routeLoss]),
+      });
+      assert.strictEqual(settled.code, 'route_lost');
+      assert.deepStrictEqual(settled.snapshot.terminal, {
+        code: 'route_lost',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(settled.snapshot.state, 'failed');
+      assert.deepStrictEqual(harness.calls.cancel, [],
+        'daemon route-loss evidence already proves cancellation cleanup');
+      assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
+      assert.deepStrictEqual(harness.recoveryCalls.clearGeneration, [id]);
+      const ledger = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+      assert.strictEqual(ledger.terminal, true);
+      assert.strictEqual(ledger.terminalCode, 'route_lost');
+      assert.strictEqual(ledger.entries.filter((entry) => entry.state === 'failed').length, 1);
+
+      await controller.reconcile({
+        delegationId: id,
+        connection: 'connected',
+        status: supervisorStatus(generation, [], [], [routeLoss]),
+      });
+      assert.strictEqual(ledger.entries.filter((entry) => entry.state === 'failed').length, 1);
+
+      modules = freshModules();
+      const reloadedHarness = makeRecoveryDeps(modules.store, { generations });
+      controller = modules.controllerModule.create(reloadedHarness.deps);
+      assert.deepStrictEqual(await controller.hydrate(), [],
+        'terminal route-loss evidence cannot replay or adopt work on the next wake');
+      assert.deepStrictEqual(reloadedHarness.calls.cancel, []);
+      assert.deepStrictEqual(reloadedHarness.recoveryCalls.retainHeartbeat, []);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('route loss is never inferred from absence or mismatched status evidence', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const ids = {
+        absent: 'delegation_route_loss_absent',
+        mismatch: 'delegation_route_loss_mismatch',
+        generation: 'delegation_route_loss_generation',
+        active: 'delegation_route_loss_active_overlap',
+        malformed: 'delegation_route_loss_malformed',
+        unknownGeneration: 'delegation_route_loss_unknown_generation',
+      };
+      const seed = modules.controllerModule.create(makeDeps(modules.store).deps);
+      await seed.hydrate();
+      for (const id of Object.values(ids)) {
+        await seed.start({ delegationId: id });
+        await seed.acceptEvent(eventInput(id, fixtures.initEvent, {
+          timestamp: 1720000000000,
+          state: 'running',
+        }));
+      }
+
+      modules = freshModules();
+      const generation = 'generation_route_loss_negative_6106';
+      const generations = new Map(Object.values(ids)
+        .filter((id) => id !== ids.unknownGeneration)
+        .map((id) => [id, generation]));
+      const harness = makeRecoveryDeps(modules.store, { generations });
+      const controller = modules.controllerModule.create(harness.deps);
+      assert.strictEqual((await controller.hydrate()).length, Object.keys(ids).length);
+
+      const evidence = (delegationId) => ({
+        delegationId,
+        code: 'route_lost',
+        lostAt: 1720000000200,
+      });
+      const cases = [
+        [ids.absent, supervisorStatus(generation)],
+        [ids.mismatch, supervisorStatus(generation, [], [], [evidence(ids.absent)])],
+        [ids.generation, supervisorStatus(
+          'generation_route_loss_other_6106',
+          [],
+          [],
+          [evidence(ids.generation)],
+        )],
+        [ids.active, supervisorStatus(
+          generation,
+          [{ delegationId: ids.active, state: 'running' }],
+          [],
+          [evidence(ids.active)],
+        )],
+        [ids.malformed, {
+          ...supervisorStatus(generation),
+          routeLosses: [{ ...evidence(ids.malformed), secret: 'must-not-be-accepted' }],
+        }],
+        [ids.unknownGeneration, supervisorStatus(
+          generation,
+          [],
+          [],
+          [evidence(ids.unknownGeneration)],
+        )],
+      ];
+      for (const [id, status] of cases) {
+        const observed = await controller.reconcile({
+          delegationId: id,
+          connection: 'connected',
+          status,
+        });
+        assert.strictEqual(observed.snapshot.terminal, null, `${id} remains nonterminal`);
+        assert.strictEqual(observed.snapshot.state, 'running', `${id} remains observational`);
+      }
+      assert.deepStrictEqual(harness.calls.cancel, []);
+
+      for (const id of Object.values(ids)) {
+        await acceptSuccessfulFinal(controller, id, 1720000001000);
       }
     } finally {
       storage.restore();

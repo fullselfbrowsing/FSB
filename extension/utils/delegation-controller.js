@@ -19,6 +19,7 @@
   var HOLD_LEASE_MS = 5 * 60 * 1000;
   var STATUS_ACTIVE_LIMIT = 64;
   var STATUS_RESTART_LOSS_LIMIT = 128;
+  var STATUS_ROUTE_LOSS_LIMIT = 128;
   var SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
   var VALID_STATES = Object.freeze({
@@ -210,13 +211,15 @@
   }
 
   function _normalizeSupervisorStatus(value) {
-    if (!_hasExactKeys(value, ['active', 'generation', 'restartLosses'])
+    if (!_hasExactKeys(value, ['active', 'generation', 'restartLosses', 'routeLosses'])
       || typeof value.generation !== 'string'
       || !SERVER_ID_PATTERN.test(value.generation)
       || !Array.isArray(value.active)
       || value.active.length > STATUS_ACTIVE_LIMIT
       || !Array.isArray(value.restartLosses)
-      || value.restartLosses.length > STATUS_RESTART_LOSS_LIMIT) {
+      || value.restartLosses.length > STATUS_RESTART_LOSS_LIMIT
+      || !Array.isArray(value.routeLosses)
+      || value.routeLosses.length > STATUS_ROUTE_LOSS_LIMIT) {
       return null;
     }
     var activeIds = Object.create(null);
@@ -256,10 +259,33 @@
         recoveredAt: loss.recoveredAt
       });
     }
+    var routeLossIds = Object.create(null);
+    var routeLosses = [];
+    for (var routeLossIndex = 0; routeLossIndex < value.routeLosses.length; routeLossIndex++) {
+      var routeLoss = value.routeLosses[routeLossIndex];
+      if (!_hasExactKeys(routeLoss, ['code', 'delegationId', 'lostAt'])
+        || typeof routeLoss.delegationId !== 'string'
+        || !SERVER_ID_PATTERN.test(routeLoss.delegationId)
+        || routeLoss.code !== 'route_lost'
+        || !Number.isSafeInteger(routeLoss.lostAt)
+        || routeLoss.lostAt < 0
+        || routeLossIds[routeLoss.delegationId]
+        || lossIds[routeLoss.delegationId]
+        || activeIds[routeLoss.delegationId]) {
+        return null;
+      }
+      routeLossIds[routeLoss.delegationId] = true;
+      routeLosses.push({
+        delegationId: routeLoss.delegationId,
+        code: routeLoss.code,
+        lostAt: routeLoss.lostAt
+      });
+    }
     return {
       generation: value.generation,
       active: active,
-      restartLosses: restartLosses
+      restartLosses: restartLosses,
+      routeLosses: routeLosses
     };
   }
 
@@ -1113,6 +1139,13 @@
             break;
           }
         }
+        var routeLoss = null;
+        for (var routeLossIndex = 0; routeLossIndex < status.routeLosses.length; routeLossIndex++) {
+          if (status.routeLosses[routeLossIndex].delegationId === record.delegationId) {
+            routeLoss = status.routeLosses[routeLossIndex];
+            break;
+          }
+        }
 
         var priorGeneration = record.daemonGeneration;
         if (priorGeneration && priorGeneration !== status.generation) {
@@ -1132,6 +1165,9 @@
 
         if (!active) {
           record.connection = 'disconnected';
+          if (priorGeneration === status.generation && routeLoss) {
+            return _settle(record, 'route_lost', { cancel: false });
+          }
           return _emit(record, null);
         }
 
