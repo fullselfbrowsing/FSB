@@ -128,6 +128,71 @@ function makeDeps(store, overrides = {}) {
   return { deps, calls };
 }
 
+function makeRecoveryDeps(store, options = {}) {
+  const generations = options.generations || new Map();
+  const heartbeatOwners = options.heartbeatOwners || new Set();
+  const recoveryCalls = {
+    loadGeneration: [],
+    saveGeneration: [],
+    clearGeneration: [],
+    retainHeartbeat: [],
+    releaseHeartbeat: [],
+  };
+  const overrides = { ...(options.overrides || {}) };
+  const harness = makeDeps(store, {
+    loadGeneration: async ({ delegationId }) => {
+      recoveryCalls.loadGeneration.push(delegationId);
+      return generations.get(delegationId) || null;
+    },
+    saveGeneration: async ({ delegationId, generation }) => {
+      recoveryCalls.saveGeneration.push({ delegationId, generation });
+      generations.set(delegationId, generation);
+    },
+    clearGeneration: async ({ delegationId }) => {
+      recoveryCalls.clearGeneration.push(delegationId);
+      generations.delete(delegationId);
+    },
+    retainHeartbeat: (delegationId) => {
+      recoveryCalls.retainHeartbeat.push(delegationId);
+      if (heartbeatOwners.has(delegationId)) return false;
+      heartbeatOwners.add(delegationId);
+      return true;
+    },
+    releaseHeartbeat: (delegationId) => {
+      recoveryCalls.releaseHeartbeat.push(delegationId);
+      return heartbeatOwners.delete(delegationId);
+    },
+    getConnectionSnapshot: () => ({
+      state: 'connected',
+      consecutiveMisses: 0,
+      lastAckAt: null,
+    }),
+    ...overrides,
+  });
+  return {
+    ...harness,
+    generations,
+    heartbeatOwners,
+    recoveryCalls,
+  };
+}
+
+function supervisorStatus(generation, active = [], restartLosses = []) {
+  return { generation, active, restartLosses };
+}
+
+async function seedRunningLedger(store, controllerModule, delegationId) {
+  const controller = controllerModule.create(makeDeps(store).deps);
+  await controller.hydrate();
+  await controller.start({ delegationId });
+  await controller.acceptEvent(eventInput(delegationId, fixtures.initEvent, {
+    timestamp: 1720000000000,
+    state: 'running',
+    client: { id: 'claude-code', label: 'Claude Code' },
+  }));
+  return controller;
+}
+
 function eventInput(delegationId, event, context = {}) {
   return { delegationId, event, context };
 }
@@ -225,6 +290,7 @@ function terminalState(code) {
       ]);
       await expectCode(() => controller.subscribe(() => {}), 'delegation_not_hydrated');
       await controller.hydrate();
+      await expectCode(() => controller.start({ delegationId: 'short' }), 'invalid_delegation_id');
     } finally {
       storage.restore();
     }
@@ -1222,50 +1288,362 @@ function terminalState(code) {
     }
   });
 
-  await test('reconcile keeps disconnect distinct from restart loss and emits only closed shapes', async () => {
+  await test('forced wake restores one heartbeat owner and only observes same-generation live state', async () => {
     const storage = installSessionStorage();
     try {
-      const { store, controllerModule } = freshModules();
-      const harness = makeDeps(store, {
-        status: async (input) => {
-          harness.calls.status.push(clone(input));
-          return { connection: 'disconnected' };
+      let modules = freshModules();
+      const id = 'delegation_wake_same_generation';
+      await seedRunningLedger(modules.store, modules.controllerModule, id);
+
+      modules = freshModules();
+      const generation = 'generation_wake_same_6106';
+      const generations = new Map([[id, generation]]);
+      const statusReads = [];
+      const liveStatus = supervisorStatus(generation, [{ delegationId: id, state: 'running' }]);
+      const harness = makeRecoveryDeps(modules.store, {
+        generations,
+        overrides: {
+          status: async (input) => {
+            statusReads.push(clone(input));
+            return liveStatus;
+          },
         },
       });
-      const controller = controllerModule.create(harness.deps);
-      await controller.hydrate();
-      const id = 'delegation_reconcile_restart_boundary';
-      await controller.start({ delegationId: id });
-      await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
+      const controller = modules.controllerModule.create(harness.deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1);
+      assert.strictEqual(restored[0].hydrated, true);
+      assert.strictEqual(restored[0].connection, 'disconnected');
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [id]);
+      assert.deepStrictEqual([...harness.heartbeatOwners], [id]);
 
-      const disconnectedEvent = await controller.reconcile({ delegationId: id });
-      exactKeys(disconnectedEvent, ['announceSequence', 'snapshot', 'type']);
-      assert.strictEqual(disconnectedEvent.announceSequence, null);
-      assert.strictEqual(disconnectedEvent.snapshot.connection, 'disconnected');
-      assert.strictEqual(disconnectedEvent.snapshot.state, 'running');
-      assert.strictEqual(disconnectedEvent.snapshot.terminal, null);
-      exactKeys(disconnectedEvent.snapshot.provider, ['id', 'label']);
-      assert.strictEqual(harness.calls.status.length, 1);
-      assert.strictEqual(harness.calls.cancel.length, 0);
+      const delivered = [];
+      controller.subscribe((event) => delivered.push(event));
+      assert.deepStrictEqual(delivered, [], 'hydrated history is silent before live reconcile');
 
-      const restart = await controller.reconcile({
+      const observed = await controller.reconcile({
         delegationId: id,
-        recoveryDisposition: 'daemon_restart_lost_run',
+        connection: 'connected',
       });
-      assert.strictEqual(restart.code, 'daemon_restart_lost_run');
-      exactKeys(restart.snapshot, [
-        'v', 'delegationId', 'provider', 'state', 'connection', 'entries',
-        'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
-      ]);
-      assert.strictEqual(restart.snapshot.state, 'restart_lost');
-      assert.deepStrictEqual(restart.snapshot.terminal, {
+      exactKeys(observed, ['announceSequence', 'snapshot', 'type']);
+      assert.strictEqual(observed.announceSequence, null);
+      assert.strictEqual(observed.snapshot.connection, 'connected');
+      assert.strictEqual(observed.snapshot.state, 'running');
+      assert.strictEqual(observed.snapshot.terminal, null);
+      exactKeys(observed.snapshot.provider, ['id', 'label']);
+      assert.deepStrictEqual(statusReads, [{ delegationId: id }]);
+      assert.deepStrictEqual(harness.recoveryCalls.saveGeneration, []);
+
+      await controller.reconcile({ delegationId: id, connection: 'connected' });
+      assert.strictEqual(statusReads.length, 2, 'duplicate status observes without replaying work');
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, [id]);
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+
+      const disconnected = await controller.reconcile({
+        delegationId: id,
+        connection: 'disconnected',
+      });
+      assert.strictEqual(disconnected.snapshot.connection, 'disconnected');
+      assert.strictEqual(disconnected.snapshot.state, 'running');
+      assert.strictEqual(disconnected.snapshot.terminal, null);
+      assert.strictEqual(statusReads.length, 2, 'disconnected reconciliation sends no status request');
+      assert.deepStrictEqual(harness.calls.cancel, []);
+
+      const terminalEntry = await controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
+        timestamp: 1720000001000,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      assert.strictEqual(terminalEntry.sequence, 2);
+      assert.strictEqual(delivered[delivered.length - 1].announceSequence, 2);
+      assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
+      assert.deepStrictEqual(harness.recoveryCalls.clearGeneration, [id]);
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
+      assert.strictEqual(generations.has(id), false);
+
+      await controller.reconcile({ delegationId: id, connection: 'connected', status: liveStatus });
+      await expectCode(
+        controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
+          timestamp: 1720000001001,
+          state: 'completed',
+        })),
+        'delegation_already_terminal',
+      );
+      assert.deepStrictEqual(harness.recoveryCalls.releaseHeartbeat, [id]);
+      const envelope = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+      assert.strictEqual(envelope.entries.filter((entry) => entry.state === 'completed').length, 1);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('restart loss requires both prior generation change and matching explicit disposition', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const ids = {
+        pending: 'delegation_generation_change_pending',
+        lost: 'delegation_generation_change_lost',
+        same: 'delegation_same_generation_disposition',
+        malformed: 'delegation_malformed_status_pending',
+      };
+      const seed = modules.controllerModule.create(makeDeps(modules.store).deps);
+      await seed.hydrate();
+      for (const id of Object.values(ids)) {
+        await seed.start({ delegationId: id });
+        await seed.acceptEvent(eventInput(id, fixtures.initEvent, {
+          timestamp: 1720000000000,
+          state: 'running',
+        }));
+      }
+
+      modules = freshModules();
+      const oldGeneration = 'generation_before_wake_6106';
+      const newGeneration = 'generation_after_wake_6106';
+      const generations = new Map(Object.values(ids).map((id) => [id, oldGeneration]));
+      const harness = makeRecoveryDeps(modules.store, { generations });
+      const controller = modules.controllerModule.create(harness.deps);
+      assert.strictEqual((await controller.hydrate()).length, 4);
+      assert.strictEqual(harness.heartbeatOwners.size, 4);
+
+      const pending = await controller.reconcile({
+        delegationId: ids.pending,
+        connection: 'connected',
+        status: supervisorStatus(newGeneration),
+      });
+      assert.strictEqual(pending.snapshot.connection, 'disconnected');
+      assert.strictEqual(pending.snapshot.state, 'running');
+      assert.strictEqual(pending.snapshot.terminal, null);
+      assert.strictEqual(generations.get(ids.pending), oldGeneration);
+
+      const restartLoss = {
+        delegationId: ids.lost,
+        code: 'daemon_restart_lost_run',
+        recoveredAt: 1720000000100,
+      };
+      const lost = await controller.reconcile({
+        delegationId: ids.lost,
+        connection: 'connected',
+        status: supervisorStatus(newGeneration, [], [restartLoss]),
+      });
+      assert.strictEqual(lost.code, 'daemon_restart_lost_run');
+      assert.strictEqual(lost.snapshot.state, 'restart_lost');
+      assert.deepStrictEqual(lost.snapshot.terminal, {
         code: 'daemon_restart_lost_run',
         releasedTabCount: 0,
       });
+      assert.strictEqual(harness.heartbeatOwners.has(ids.lost), false);
+
+      const sameGeneration = await controller.reconcile({
+        delegationId: ids.same,
+        connection: 'connected',
+        status: supervisorStatus(oldGeneration, [], [{
+          delegationId: ids.same,
+          code: 'daemon_restart_lost_run',
+          recoveredAt: 1720000000200,
+        }]),
+      });
+      assert.strictEqual(sameGeneration.snapshot.connection, 'disconnected');
+      assert.strictEqual(sameGeneration.snapshot.state, 'running');
+      assert.strictEqual(sameGeneration.snapshot.terminal, null);
+
+      const malformedWithExtra = {
+        ...supervisorStatus(newGeneration, [{
+          delegationId: ids.malformed,
+          state: 'running',
+        }]),
+        extra: true,
+      };
+      const malformed = await controller.reconcile({
+        delegationId: ids.malformed,
+        connection: 'connected',
+        status: malformedWithExtra,
+      });
+      assert.strictEqual(malformed.snapshot.connection, 'connected');
+      assert.strictEqual(malformed.snapshot.state, 'running');
+      assert.strictEqual(malformed.snapshot.terminal, null);
+      assert.strictEqual(generations.get(ids.malformed), oldGeneration);
+
+      const pendingLoss = await controller.reconcile({
+        delegationId: ids.pending,
+        connection: 'connected',
+        status: supervisorStatus(newGeneration, [], [{
+          delegationId: ids.pending,
+          code: 'daemon_restart_lost_run',
+          recoveredAt: 1720000000300,
+        }]),
+      });
+      assert.strictEqual(pendingLoss.code, 'daemon_restart_lost_run');
+      assert.strictEqual(pendingLoss.snapshot.state, 'restart_lost');
+
+      await controller.acceptEvent(eventInput(ids.same, fixtures.resultEvent, {
+        timestamp: 1720000000400,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      await controller.acceptEvent(eventInput(ids.malformed, fixtures.resultEvent, {
+        timestamp: 1720000000500,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      assert.deepStrictEqual(harness.calls.cancel, [], 'confirmed restart loss never sends cancel');
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
+      for (const id of Object.values(ids)) {
+        assert.strictEqual(
+          harness.recoveryCalls.releaseHeartbeat.filter((value) => value === id).length,
+          1,
+        );
+        const envelope = storage.data[`${modules.store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(envelope.entries.filter((entry) => (
+          entry.state === 'restart_lost' || entry.state === 'completed'
+        )).length, 1);
+      }
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('wake-held status restores only an exact sealed lease and cancels a mismatch', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const exactId = 'delegation_wake_held_exact';
+      const mismatchId = 'delegation_wake_held_mismatch';
+      for (const id of [exactId, mismatchId]) {
+        await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+          timestamp: 1720000000000,
+          state: 'running',
+          client: { id: 'claude-code', label: 'Claude Code' },
+        });
+        await modules.store.appendBeforeFanout(
+          id,
+          { type: 'state', sessionId: null, payload: {} },
+          { timestamp: 1720000000001, state: 'held', title: 'Delegation held', detail: null },
+        );
+      }
+
+      modules = freshModules();
+      const generation = 'generation_held_wake_6106';
+      const agentIds = new Map([
+        [exactId, 'agent-wake-exact'],
+        [mismatchId, 'agent-wake-mismatch'],
+      ]);
+      const released = [];
+      const ownedTabs = [
+        { tabId: 71, ownershipToken: 'sealed-token-71' },
+        { tabId: 73, ownershipToken: 'sealed-token-73' },
+      ];
+      const registry = {
+        getAgentForDelegation(delegationId) { return agentIds.get(delegationId) || null; },
+        getDelegationHoldLease({ delegationId }) {
+          if (delegationId !== exactId) {
+            return { ok: false, code: 'resume_ownership_lost' };
+          }
+          return {
+            ok: true,
+            code: 'hold_lease_present',
+            activeTabId: 71,
+            ownedTabs,
+            expiresAt: 1720000300000,
+          };
+        },
+        async releaseDelegation({ delegationId }) {
+          released.push(delegationId);
+          return { ok: true, releasedTabCount: 2 };
+        },
+      };
+      const generations = new Map([
+        [exactId, generation],
+        [mismatchId, generation],
+      ]);
+      const harness = makeRecoveryDeps(modules.store, {
+        generations,
+        overrides: { registry },
+      });
+      const controller = modules.controllerModule.create(harness.deps);
+      assert.strictEqual((await controller.hydrate()).length, 2);
+      const status = supervisorStatus(generation, [
+        { delegationId: exactId, state: 'held' },
+        { delegationId: mismatchId, state: 'held' },
+      ]);
+
+      const exact = await controller.reconcile({
+        delegationId: exactId,
+        connection: 'connected',
+        status,
+      });
+      assert.strictEqual(exact.announceSequence, null);
+      assert.strictEqual(exact.snapshot.state, 'held');
+      assert.deepStrictEqual(exact.snapshot.hold, {
+        tabIds: [71, 73],
+        expiresAt: 1720000300000,
+      });
+      assert.deepStrictEqual(exact.snapshot.activeTab, {
+        tabId: 71,
+        owned: false,
+        canTakeControl: false,
+      });
+      assert.strictEqual(exact.snapshot.entries.length, 2, 'status observation appends no replay row');
+
+      const mismatch = await controller.reconcile({
+        delegationId: mismatchId,
+        connection: 'connected',
+        status,
+      });
+      assert.strictEqual(mismatch.code, 'resume_ownership_lost');
+      assert.deepStrictEqual(mismatch.snapshot.terminal, {
+        code: 'resume_ownership_lost',
+        releasedTabCount: 2,
+      });
       assert.deepStrictEqual(harness.calls.cancel, [{
-        delegationId: id,
-        code: 'daemon_restart_lost_run',
+        delegationId: mismatchId,
+        code: 'resume_ownership_lost',
       }]);
+      assert.deepStrictEqual(released, [mismatchId]);
+      assert.strictEqual(harness.heartbeatOwners.has(mismatchId), false);
+
+      await controller.acceptEvent(eventInput(exactId, fixtures.resultEvent, {
+        timestamp: 1720000001000,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+      assert.deepStrictEqual(released, [mismatchId, exactId]);
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('terminal ledger or cleared session yields no recovered run or heartbeat owner', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      const terminalId = 'delegation_terminal_while_asleep';
+      const seed = await seedRunningLedger(modules.store, modules.controllerModule, terminalId);
+      await seed.acceptEvent(eventInput(terminalId, fixtures.resultEvent, {
+        timestamp: 1720000001000,
+        state: 'completed',
+        billingKind: 'subscription',
+      }));
+
+      modules = freshModules();
+      let harness = makeRecoveryDeps(modules.store, {
+        generations: new Map([[terminalId, 'generation_stale_terminal_6106']]),
+      });
+      let controller = modules.controllerModule.create(harness.deps);
+      assert.deepStrictEqual(await controller.hydrate(), []);
+      assert.strictEqual(controller.getSnapshot(terminalId), null);
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, []);
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
+
+      storage.clear();
+      modules = freshModules();
+      harness = makeRecoveryDeps(modules.store);
+      controller = modules.controllerModule.create(harness.deps);
+      assert.deepStrictEqual(await controller.hydrate(), []);
+      assert.strictEqual(controller.getSnapshot(terminalId), null);
+      assert.deepStrictEqual(harness.recoveryCalls.retainHeartbeat, []);
+      assert.strictEqual(harness.heartbeatOwners.size, 0);
     } finally {
       storage.restore();
     }

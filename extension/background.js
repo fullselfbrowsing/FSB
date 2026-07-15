@@ -1179,6 +1179,9 @@ async function bootstrapAgentRegistry() {
 let fsbDelegationBootPromise = null;
 let fsbDelegationBridgeObserverInstalled = false;
 const fsbDelegationProfiles = new Map();
+const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
+const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
 
 function fsbDelegationHasExactKeys(value, expected) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -1186,6 +1189,87 @@ function fsbDelegationHasExactKeys(value, expected) {
   const sortedExpected = expected.slice().sort();
   return actual.length === sortedExpected.length
     && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function fsbDelegationGenerationKey(delegationId) {
+  return FSB_DELEGATION_GENERATION_PREFIX + delegationId;
+}
+
+async function fsbLoadDelegationGeneration({ delegationId }) {
+  const key = fsbDelegationGenerationKey(delegationId);
+  const stored = await chrome.storage.session.get([key]);
+  const record = stored && stored[key];
+  if (!fsbDelegationHasExactKeys(record, ['delegationId', 'generation', 'v'])
+      || record.v !== 1
+      || record.delegationId !== delegationId
+      || typeof record.generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(record.generation)) {
+    return null;
+  }
+  return record.generation;
+}
+
+async function fsbSaveDelegationGeneration({ delegationId, generation }) {
+  if (typeof generation !== 'string'
+      || !FSB_DELEGATION_GENERATION_PATTERN.test(generation)) {
+    throw new Error('delegation generation is invalid');
+  }
+  const key = fsbDelegationGenerationKey(delegationId);
+  await chrome.storage.session.set({
+    [key]: { v: 1, delegationId, generation }
+  });
+}
+
+async function fsbClearDelegationGeneration({ delegationId }) {
+  await chrome.storage.session.remove(fsbDelegationGenerationKey(delegationId));
+}
+
+async function fsbWaitForDelegationBridge() {
+  armMcpBridge('delegation-reconcile');
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (mcpBridgeClient.isConnected === true) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return mcpBridgeClient.isConnected === true;
+}
+
+function fsbReadDelegationStatus() {
+  return mcpBridgeClient.sendExtRequest(
+    'delegate.status',
+    {},
+    { timeout: FSB_DELEGATION_STATUS_TIMEOUT_MS }
+  );
+}
+
+async function fsbReconcileDelegationSnapshots(controller, snapshots) {
+  if (!Array.isArray(snapshots) || snapshots.length === 0) return;
+  let connection = mcpBridgeClient.getDelegationConnectionSnapshot();
+  let status;
+  if ((connection && connection.state === 'connected')
+      || await fsbWaitForDelegationBridge()) {
+    try {
+      status = await fsbReadDelegationStatus();
+      connection = { state: 'connected' };
+    } catch (_error) {
+      status = undefined;
+      connection = mcpBridgeClient.getDelegationConnectionSnapshot();
+    }
+  }
+  const connectionState = connection && connection.state === 'connected'
+    ? 'connected'
+    : 'disconnected';
+  for (const snapshot of snapshots) {
+    if (!snapshot || typeof snapshot.delegationId !== 'string') continue;
+    try {
+      await controller.reconcile({
+        delegationId: snapshot.delegationId,
+        connection: connectionState,
+        status
+      });
+    } catch (_error) {
+      // A corrupt or concurrently-terminal record cannot poison other ids.
+    }
+  }
 }
 
 async function fsbReadAuthoritativeProviderConfig() {
@@ -1499,6 +1583,10 @@ async function fsbDelegationStartCommand(request) {
     (result) => fsbSettleDelegationFromFinal(delegationId, result, null),
     (error) => fsbSettleDelegationFromFinal(delegationId, null, error)
   ).catch(() => {});
+  const acceptedSnapshot = controller.getSnapshot(delegationId);
+  if (acceptedSnapshot) {
+    await fsbReconcileDelegationSnapshots(controller, [acceptedSnapshot]);
+  }
   const snapshot = controller.getSnapshot(delegationId);
   if (!snapshot) return fsbDelegationFailure('start_rejected', null);
   return { ok: true, snapshot };
@@ -1562,6 +1650,8 @@ async function fsbDelegationSnapshotCommand(request) {
     return fsbDelegationFailure('persistence_failed', null);
   }
   if (request.delegationId === null) return { ok: true, snapshot: null };
+  const before = boot.controller.getSnapshot(request.delegationId);
+  if (before) await fsbReconcileDelegationSnapshots(boot.controller, [before]);
   const snapshot = boot.controller.getSnapshot(request.delegationId);
   return snapshot
     ? { ok: true, snapshot }
@@ -1650,7 +1740,13 @@ async function bootstrapDelegationController() {
         cancel: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.cancel', { delegationId }),
         hold: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.hold', { delegationId }),
         resume: ({ delegationId }) => mcpBridgeClient.sendExtRequest('delegate.resume', { delegationId }),
-        status: () => mcpBridgeClient.sendExtRequest('delegate.status', {}),
+        status: fsbReadDelegationStatus,
+        loadGeneration: fsbLoadDelegationGeneration,
+        saveGeneration: fsbSaveDelegationGeneration,
+        clearGeneration: fsbClearDelegationGeneration,
+        retainHeartbeat: (delegationId) => mcpBridgeClient.retainDelegationHeartbeat(delegationId),
+        releaseHeartbeat: (delegationId) => mcpBridgeClient.releaseDelegationHeartbeat(delegationId),
+        getConnectionSnapshot: () => mcpBridgeClient.getDelegationConnectionSnapshot(),
         getActiveTab: async () => {
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
           const active = Array.isArray(tabs) && tabs.length === 1 ? tabs[0] : null;
@@ -1680,7 +1776,13 @@ async function bootstrapDelegationController() {
       mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent);
       fsbDelegationBridgeObserverInstalled = true;
     }
-    return { controller, hydratedSnapshots };
+    await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots);
+    return {
+      controller,
+      hydratedSnapshots: hydratedSnapshots.map((snapshot) => (
+        controller.getSnapshot(snapshot.delegationId)
+      )).filter(Boolean)
+    };
   })().catch((error) => {
     fsbDelegationBootPromise = null;
     throw error;

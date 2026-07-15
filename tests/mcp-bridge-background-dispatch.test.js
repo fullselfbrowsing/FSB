@@ -844,6 +844,56 @@ function runSourceContractCase() {
       < backgroundSource.indexOf('mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent)'),
     'hydrated subscription precedes the one live bridge observer');
 
+  const delegationComposition = extractDelegationCompositionSource(backgroundSource);
+  assertEqual((backgroundSource.match(/let fsbDelegationBootPromise = null;/g) || []).length, 1,
+    'background owns one delegation boot promise');
+  assert(delegationComposition.includes("const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:'"),
+    'wake reconciliation stores bounded per-id daemon generation metadata');
+  assert(delegationComposition.includes('chrome.storage.session.get([key])')
+      && delegationComposition.includes('chrome.storage.session.set({')
+      && delegationComposition.includes('chrome.storage.session.remove(fsbDelegationGenerationKey(delegationId))'),
+    'daemon generation metadata stays in session storage and clears at terminal');
+  assertEqual((delegationComposition.match(/'delegate\.status'/g) || []).length, 1,
+    'wake reconciliation has one exact empty-payload delegate.status transport');
+  assert(delegationComposition.includes('{},\n    { timeout: FSB_DELEGATION_STATUS_TIMEOUT_MS }'),
+    'wake status request remains empty-payload with a bounded transport timeout');
+  assertEqual((delegationComposition.match(/retainDelegationHeartbeat\(delegationId\)/g) || []).length, 1,
+    'controller receives one id-keyed heartbeat retain callback');
+  assertEqual((delegationComposition.match(/releaseDelegationHeartbeat\(delegationId\)/g) || []).length, 1,
+    'controller receives one id-keyed heartbeat release callback');
+
+  const bootSource = delegationComposition.slice(
+    delegationComposition.indexOf('async function bootstrapDelegationController() {')
+  );
+  const bootHydrate = bootSource.indexOf('const hydratedSnapshots = await controller.hydrate()');
+  const bootSubscribe = bootSource.indexOf('controller.subscribe((runtimeEvent)');
+  const bootObserver = bootSource.indexOf('mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent)');
+  const bootReconcile = bootSource.indexOf('await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots)');
+  assert(bootHydrate >= 0 && bootHydrate < bootSubscribe
+      && bootSubscribe < bootObserver && bootObserver < bootReconcile,
+    'boot hydrates silently before subscription, observer install, and status reconcile');
+  const reconcileSource = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbReconcileDelegationSnapshots(controller, snapshots) {'),
+    delegationComposition.indexOf('async function fsbReadAuthoritativeProviderConfig()')
+  );
+  assert(delegationComposition.includes("armMcpBridge('delegation-reconcile')")
+      && reconcileSource.includes('await fsbReadDelegationStatus()'),
+    'wake reconciliation uses the ordinary bridge and one shared status snapshot');
+  assert(reconcileSource.includes('for (const snapshot of snapshots)')
+      && reconcileSource.includes('delegationId: snapshot.delegationId'),
+    'one status response reconciles every hydrated server id independently');
+  assert(!/(?:delegate\.start|task\s*:|\badopt\b|\breplay\b)/.test(reconcileSource),
+    'wake reconciliation cannot start, adopt, or replay delegated work');
+  const snapshotCommand = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationSnapshotCommand(request) {'),
+    delegationComposition.indexOf('async function fsbDelegationLifecycleCommand(request, method)')
+  );
+  assert(snapshotCommand.indexOf('await bootstrapDelegationController()')
+      < snapshotCommand.indexOf('boot.controller.getSnapshot(request.delegationId)'),
+    'snapshot responses wait for the shared hydrated boot promise');
+  assert(snapshotCommand.includes('await fsbReconcileDelegationSnapshots(boot.controller, [before])'),
+    'id-keyed snapshot refresh observes supervisor status before replying');
+
   for (const type of [
     'FSB_DELEGATION_PREFLIGHT', 'FSB_DELEGATION_CONSENT', 'FSB_DELEGATION_SET_TRUST',
     'FSB_DELEGATION_CLEAR_TRUST', 'FSB_DELEGATION_START', 'FSB_DELEGATION_TAKE_CONTROL',
@@ -903,6 +953,39 @@ function runSourceContractCase() {
   assert(controllerSource.indexOf('await getLiveTabIds({')
       < controllerSource.indexOf('await registry.restoreHoldLease({'),
     'controller queries sealed tab identities before complete lease restoration');
+  const hydrateSource = controllerSource.slice(
+    controllerSource.indexOf('function hydrate() {'),
+    controllerSource.indexOf('function subscribe(listener) {')
+  );
+  assert(hydrateSource.includes('eventStore.hydrateNonterminal()')
+      && hydrateSource.includes('await _retainHeartbeatOnce(record)')
+      && !hydrateSource.includes('_emit('),
+    'controller hydration is silent and retains one owner for each nonterminal ledger');
+  const controllerReconcile = controllerSource.slice(
+    controllerSource.indexOf('function reconcile(input) {'),
+    controllerSource.indexOf('function bindRegisteredAgent(input) {')
+  );
+  assert(controllerReconcile.includes('priorGeneration && priorGeneration !== status.generation')
+      && controllerReconcile.includes('if (restartLoss && !active)')
+      && controllerReconcile.includes("_settle(record, 'daemon_restart_lost_run', { cancel: false })"),
+    'restart loss requires prior generation change and matching explicit disposition');
+  assert(!controllerSource.includes('recoveryDisposition'),
+    'controller rejects caller-authored restart disposition shortcuts');
+  assert(!/(?:startOperation|delegate\.start|\badopt\b|\breplay\b)/.test(controllerReconcile),
+    'same-generation reconcile observes without start, adopt, or replay');
+  assert(controllerReconcile.includes("typeof registry.getDelegationHoldLease === 'function'")
+      && controllerReconcile.indexOf('registry.getDelegationHoldLease({')
+        < controllerReconcile.indexOf("_settle(record, 'resume_ownership_lost', { cancel: true })"),
+    'held wake requires the exact sealed lease before continued observation');
+  const settleSource = controllerSource.slice(
+    controllerSource.indexOf('function _settle(record, requestedCode, options) {'),
+    controllerSource.indexOf('function hydrate() {')
+  );
+  assert(settleSource.indexOf('await eventStore.markTerminal(record.delegationId')
+      < settleSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+      && settleSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+        < settleSource.lastIndexOf('var runtimeEvent = _emit(record'),
+    'terminal ledger commit precedes one heartbeat release and live fanout');
   assert(!/chrome\.tabs\.query\s*\(\s*\{[^}]*\bactive\s*:/s.test(registrySource),
     'registry never queries current active-tab state');
   for (const method of ['sealHoldLease', 'restoreHoldLease', 'releaseDelegation']) {

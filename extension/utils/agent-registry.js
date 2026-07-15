@@ -528,6 +528,58 @@
     return out.sort(function(a, b) { return a.tabId - b.tabId; });
   };
 
+  /** Exact, mutation-free read used only to reconcile a supervisor-held run. */
+  AgentRegistry.prototype.getDelegationHoldLease = function(input) {
+    if (!hasExactKeys(input, ['delegationId', 'agentId'])
+      || !isDelegationId(input.delegationId)
+      || this.getAgentForDelegation(input.delegationId) !== input.agentId) {
+      return { ok: false, code: 'resume_ownership_lost' };
+    }
+    var lease = this._holdLeases.get(input.delegationId);
+    if (!lease
+      || lease.delegationId !== input.delegationId
+      || lease.agentId !== input.agentId
+      || !Number.isSafeInteger(lease.expiresAt)
+      || this._now() >= lease.expiresAt) {
+      return { ok: false, code: lease ? 'hold_expired' : 'resume_ownership_lost' };
+    }
+    var ownedTabs = canonicalOwnedTabs(lease.ownedTabs);
+    var exact = !!ownedTabs
+      && ownedTabs.some(function(tab) { return tab.tabId === lease.activeTabId; });
+    var self = this;
+    if (exact) {
+      exact = ownedTabs.every(function(tab) {
+        return self._heldTabDelegations.get(tab.tabId) === input.delegationId
+          && self._heldTabTokens.get(tab.tabId) === tab.ownershipToken
+          && !self._tabOwners.has(tab.tabId)
+          && !self._tabMetadata.has(tab.tabId);
+      });
+    }
+    var exactTabIds = new Set((ownedTabs || []).map(function(tab) { return tab.tabId; }));
+    this._heldTabDelegations.forEach(function(delegationId, tabId) {
+      if (delegationId === input.delegationId && !exactTabIds.has(tabId)) exact = false;
+    });
+    var activeTabs = this._tabsByAgent.get(input.agentId);
+    var record = this._agents.get(input.agentId);
+    if (!activeTabs
+      || activeTabs.size !== 0
+      || !record
+      || !Array.isArray(record.tabIds)
+      || record.tabIds.length !== 0) {
+      exact = false;
+    }
+    if (!exact) return { ok: false, code: 'resume_ownership_lost' };
+    return {
+      ok: true,
+      code: 'hold_lease_present',
+      activeTabId: lease.activeTabId,
+      ownedTabs: ownedTabs.map(function(tab) {
+        return { tabId: tab.tabId, ownershipToken: tab.ownershipToken };
+      }),
+      expiresAt: lease.expiresAt
+    };
+  };
+
   AgentRegistry.prototype._cloneAuthorityState = function() {
     var shadow = Object.create(AgentRegistry.prototype);
     shadow._agents = new Map();

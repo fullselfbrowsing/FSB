@@ -17,6 +17,9 @@
   var WALL_CLOCK_TIMEOUT_MS = 45 * 60 * 1000;
   var EVENT_SILENCE_TIMEOUT_MS = 120 * 1000;
   var HOLD_LEASE_MS = 5 * 60 * 1000;
+  var STATUS_ACTIVE_LIMIT = 64;
+  var STATUS_RESTART_LOSS_LIMIT = 128;
+  var SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
   var VALID_STATES = Object.freeze({
     idle: true,
@@ -170,6 +173,97 @@
     return null;
   }
 
+  function _normalizeSupervisorStatus(value) {
+    if (!_hasExactKeys(value, ['active', 'generation', 'restartLosses'])
+      || typeof value.generation !== 'string'
+      || !SERVER_ID_PATTERN.test(value.generation)
+      || !Array.isArray(value.active)
+      || value.active.length > STATUS_ACTIVE_LIMIT
+      || !Array.isArray(value.restartLosses)
+      || value.restartLosses.length > STATUS_RESTART_LOSS_LIMIT) {
+      return null;
+    }
+    var activeIds = Object.create(null);
+    var active = [];
+    for (var activeIndex = 0; activeIndex < value.active.length; activeIndex++) {
+      var activeRow = value.active[activeIndex];
+      if (!_hasExactKeys(activeRow, ['delegationId', 'state'])
+        || typeof activeRow.delegationId !== 'string'
+        || !SERVER_ID_PATTERN.test(activeRow.delegationId)
+        || (activeRow.state !== 'running'
+          && activeRow.state !== 'held'
+          && activeRow.state !== 'stopping')
+        || activeIds[activeRow.delegationId]) {
+        return null;
+      }
+      activeIds[activeRow.delegationId] = true;
+      active.push({ delegationId: activeRow.delegationId, state: activeRow.state });
+    }
+    var lossIds = Object.create(null);
+    var restartLosses = [];
+    for (var lossIndex = 0; lossIndex < value.restartLosses.length; lossIndex++) {
+      var loss = value.restartLosses[lossIndex];
+      if (!_hasExactKeys(loss, ['code', 'delegationId', 'recoveredAt'])
+        || typeof loss.delegationId !== 'string'
+        || !SERVER_ID_PATTERN.test(loss.delegationId)
+        || loss.code !== 'daemon_restart_lost_run'
+        || !Number.isSafeInteger(loss.recoveredAt)
+        || loss.recoveredAt < 0
+        || lossIds[loss.delegationId]
+        || activeIds[loss.delegationId]) {
+        return null;
+      }
+      lossIds[loss.delegationId] = true;
+      restartLosses.push({
+        delegationId: loss.delegationId,
+        code: loss.code,
+        recoveredAt: loss.recoveredAt
+      });
+    }
+    return {
+      generation: value.generation,
+      active: active,
+      restartLosses: restartLosses
+    };
+  }
+
+  function _normalizeHeldLease(value, timestamp) {
+    if (!_hasExactKeys(value, ['activeTabId', 'code', 'expiresAt', 'ok', 'ownedTabs'])
+      || value.ok !== true
+      || value.code !== 'hold_lease_present'
+      || !Number.isSafeInteger(value.activeTabId)
+      || value.activeTabId < 0
+      || !Number.isSafeInteger(value.expiresAt)
+      || value.expiresAt <= timestamp
+      || value.expiresAt > timestamp + HOLD_LEASE_MS
+      || !Array.isArray(value.ownedTabs)
+      || value.ownedTabs.length === 0) {
+      return null;
+    }
+    var ids = Object.create(null);
+    var ownedTabs = [];
+    for (var index = 0; index < value.ownedTabs.length; index++) {
+      var row = value.ownedTabs[index];
+      if (!_hasExactKeys(row, ['ownershipToken', 'tabId'])
+        || !Number.isSafeInteger(row.tabId)
+        || row.tabId < 0
+        || typeof row.ownershipToken !== 'string'
+        || row.ownershipToken.length === 0
+        || ids[row.tabId]) {
+        return null;
+      }
+      ids[row.tabId] = true;
+      ownedTabs.push({ tabId: row.tabId, ownershipToken: row.ownershipToken });
+    }
+    if (!ids[value.activeTabId]) return null;
+    ownedTabs.sort(function(left, right) { return left.tabId - right.tabId; });
+    return {
+      activeTabId: value.activeTabId,
+      ownedTabs: ownedTabs,
+      expiresAt: value.expiresAt
+    };
+  }
+
   function _newRecord(delegationId, options) {
     options = options || {};
     return {
@@ -185,6 +279,10 @@
       terminal: null,
       hydrated: options.hydrated === true,
       agentId: null,
+      daemonGeneration: null,
+      heartbeatRetained: false,
+      heartbeatRetainPromise: null,
+      heartbeatReleasePromise: null,
       operationTail: Promise.resolve(),
       persistenceFailure: null,
       startPromise: null,
@@ -257,6 +355,24 @@
     var getLiveTabIds = typeof options.getLiveTabIds === 'function'
       ? options.getLiveTabIds
       : function() { return Promise.resolve([]); };
+    var loadGeneration = typeof options.loadGeneration === 'function'
+      ? options.loadGeneration
+      : function() { return Promise.resolve(null); };
+    var saveGeneration = typeof options.saveGeneration === 'function'
+      ? options.saveGeneration
+      : function() { return Promise.resolve(); };
+    var clearGeneration = typeof options.clearGeneration === 'function'
+      ? options.clearGeneration
+      : function() { return Promise.resolve(); };
+    var retainHeartbeat = typeof options.retainHeartbeat === 'function'
+      ? options.retainHeartbeat
+      : function() { return false; };
+    var releaseHeartbeat = typeof options.releaseHeartbeat === 'function'
+      ? options.releaseHeartbeat
+      : function() { return false; };
+    var getConnectionSnapshot = typeof options.getConnectionSnapshot === 'function'
+      ? options.getConnectionSnapshot
+      : function() { return null; };
     var registry = options.registry || null;
     var records = new Map();
     var listeners = new Set();
@@ -269,7 +385,7 @@
     }
 
     function _requireId(delegationId) {
-      if (typeof delegationId !== 'string' || delegationId.length === 0) {
+      if (typeof delegationId !== 'string' || !SERVER_ID_PATTERN.test(delegationId)) {
         throw _error('invalid_delegation_id', 'an exact server delegation id is required');
       }
       return delegationId;
@@ -394,6 +510,52 @@
       return canonicalEntry;
     }
 
+    function _retainHeartbeatOnce(record) {
+      if (record.heartbeatRetained) return Promise.resolve(true);
+      if (record.heartbeatRetainPromise) return record.heartbeatRetainPromise;
+      record.heartbeatRetainPromise = Promise.resolve().then(function() {
+        return retainHeartbeat(record.delegationId);
+      }).then(function() {
+        record.heartbeatRetained = true;
+        return true;
+      }).catch(function() {
+        return false;
+      });
+      return record.heartbeatRetainPromise;
+    }
+
+    function _releaseHeartbeatOnce(record) {
+      if (!record.heartbeatRetained) return Promise.resolve(false);
+      if (record.heartbeatReleasePromise) return record.heartbeatReleasePromise;
+      record.heartbeatReleasePromise = Promise.resolve().then(function() {
+        return releaseHeartbeat(record.delegationId);
+      }).catch(function() {
+        return false;
+      }).then(function(result) {
+        record.heartbeatRetained = false;
+        return result;
+      });
+      return record.heartbeatReleasePromise;
+    }
+
+    async function _rememberGeneration(record, generation) {
+      if (record.daemonGeneration === generation) return;
+      record.daemonGeneration = generation;
+      try {
+        await saveGeneration({
+          delegationId: record.delegationId,
+          generation: generation
+        });
+      } catch (_generationWriteError) { /* later wakes remain classification-pending */ }
+    }
+
+    async function _forgetGeneration(record) {
+      record.daemonGeneration = null;
+      try {
+        await clearGeneration({ delegationId: record.delegationId });
+      } catch (_generationClearError) { /* terminal ledgers are never hydrated */ }
+    }
+
     function _cancelOnce(record, code) {
       if (!record.cancelPromise) {
         record.cancelPromise = Promise.resolve().then(function() {
@@ -433,12 +595,14 @@
           // transport is unavailable. No subscriber is notified in either case.
         }).then(function() { return _releaseOnce(record); }).catch(function() {
           return { releasedTabCount: 0 };
-        }).then(function(release) {
+        }).then(async function(release) {
           record.state = 'failed';
           record.terminal = {
             code: code,
             releasedTabCount: release.releasedTabCount || 0
           };
+          await _releaseHeartbeatOnce(record);
+          await _forgetGeneration(record);
           return code;
         });
       }
@@ -498,6 +662,8 @@
             code: persistenceCode,
             releasedTabCount: release.releasedTabCount || 0
           };
+          await _releaseHeartbeatOnce(record);
+          await _forgetGeneration(record);
           throw storageError;
         }
 
@@ -514,6 +680,8 @@
           code: settledCode,
           releasedTabCount: release.releasedTabCount || 0
         };
+        await _releaseHeartbeatOnce(record);
+        await _forgetGeneration(record);
         var runtimeEvent = _emit(record, terminalEntry ? terminalEntry.sequence : null);
         return _deepFreeze({
           ok: true,
@@ -530,7 +698,7 @@
       if (hydratePromise) return hydratePromise;
       hydratePromise = Promise.resolve().then(function() {
         return eventStore.hydrateNonterminal();
-      }).then(function(ledgers) {
+      }).then(async function(ledgers) {
         if (!Array.isArray(ledgers)) {
           throw _error('delegation_ledger_corrupt', 'hydration result must be an array');
         }
@@ -549,9 +717,30 @@
             summary: _latestSummary(entries),
             hydrated: true
           });
+          if (registry && typeof registry.getAgentForDelegation === 'function') {
+            try {
+              var restoredAgentId = registry.getAgentForDelegation(ledger.delegationId);
+              if (restoredAgentId && typeof restoredAgentId.then === 'function') {
+                throw _error('delegation_binding_rejected', 'registry mapping reads must be synchronous');
+              }
+              if (typeof restoredAgentId === 'string' && restoredAgentId.length > 0) {
+                record.agentId = restoredAgentId;
+                record.expectedRegistration = false;
+              }
+            } catch (_mappingReadError) { /* status reconciliation remains fail closed */ }
+          }
           restored.set(ledger.delegationId, record);
         });
         records = restored;
+        await Promise.all(Array.from(records.values()).map(async function(record) {
+          try {
+            var generation = await loadGeneration({ delegationId: record.delegationId });
+            if (typeof generation === 'string' && SERVER_ID_PATTERN.test(generation)) {
+              record.daemonGeneration = generation;
+            }
+          } catch (_generationReadError) { /* missing metadata means classification-pending */ }
+          await _retainHeartbeatOnce(record);
+        }));
         hydrated = true;
         return _deepFreeze(Array.from(records.values()).map(_snapshot));
       }).catch(function(error) {
@@ -606,12 +795,14 @@
       _refreshSilence(record);
       provisional = null;
       var runtimeEvent = _emit(record, null);
-      record.startPromise = Promise.resolve(_deepFreeze({
-        ok: true,
-        code: 'started',
-        runtimeEvent: runtimeEvent,
-        snapshot: _snapshot(record)
-      }));
+      record.startPromise = _retainHeartbeatOnce(record).then(function() {
+        return _deepFreeze({
+          ok: true,
+          code: 'started',
+          runtimeEvent: runtimeEvent,
+          snapshot: _snapshot(record)
+        });
+      });
       return record.startPromise;
     }
 
@@ -685,34 +876,134 @@
       if (!record) return null;
       return _enqueue(record, async function() {
         if (record.terminal) return _snapshot(record);
-        var resolved = input;
-        if (!VALID_CONNECTIONS[resolved.connection]
-          && !resolved.terminalCode
-          && !resolved.recoveryDisposition) {
-          resolved = await statusOperation({ delegationId: record.delegationId });
-          resolved = resolved || {};
+        var connection = VALID_CONNECTIONS[input.connection] ? input.connection : null;
+        if (!connection) {
+          try {
+            var connectionSnapshot = await getConnectionSnapshot();
+            if (connectionSnapshot && VALID_CONNECTIONS[connectionSnapshot.state]) {
+              connection = connectionSnapshot.state;
+            }
+          } catch (_connectionError) { /* a missing bridge is disconnected, not restart evidence */ }
         }
-        var explicitTerminal = resolved.terminalCode
-          || (resolved.recoveryDisposition === 'daemon_restart_lost_run'
-            ? 'daemon_restart_lost_run'
-            : null);
-        if (explicitTerminal) {
-          return _settle(record, explicitTerminal, { cancel: explicitTerminal !== 'completed' });
+
+        var rawStatus = input.status;
+        if (rawStatus === undefined && connection !== 'disconnected') {
+          try {
+            rawStatus = await statusOperation({ delegationId: record.delegationId });
+          } catch (_statusError) {
+            connection = 'disconnected';
+          }
         }
-        if (VALID_CONNECTIONS[resolved.connection]) record.connection = resolved.connection;
-        if (resolved.activeTab
-          && Number.isSafeInteger(resolved.activeTab.tabId)
-          && typeof resolved.activeTab.owned === 'boolean'
-          && typeof resolved.activeTab.canTakeControl === 'boolean') {
-          record.activeTab = {
-            tabId: resolved.activeTab.tabId,
-            owned: resolved.activeTab.owned,
-            canTakeControl: resolved.activeTab.canTakeControl
+        if (!connection && rawStatus && VALID_CONNECTIONS[rawStatus.connection]) {
+          connection = rawStatus.connection;
+        }
+        var status = _normalizeSupervisorStatus(rawStatus);
+        if (!status) {
+          record.connection = connection || 'disconnected';
+          if (record.connection !== 'connected') {
+            _clearTimer(record, 'wallTimer');
+            _clearTimer(record, 'silenceTimer');
+          }
+          return _emit(record, null);
+        }
+
+        var active = null;
+        for (var activeIndex = 0; activeIndex < status.active.length; activeIndex++) {
+          if (status.active[activeIndex].delegationId === record.delegationId) {
+            active = status.active[activeIndex];
+            break;
+          }
+        }
+        var restartLoss = null;
+        for (var lossIndex = 0; lossIndex < status.restartLosses.length; lossIndex++) {
+          if (status.restartLosses[lossIndex].delegationId === record.delegationId) {
+            restartLoss = status.restartLosses[lossIndex];
+            break;
+          }
+        }
+
+        var priorGeneration = record.daemonGeneration;
+        if (priorGeneration && priorGeneration !== status.generation) {
+          _clearTimer(record, 'wallTimer');
+          _clearTimer(record, 'silenceTimer');
+          record.connection = 'disconnected';
+          if (restartLoss && !active) {
+            return _settle(record, 'daemon_restart_lost_run', { cancel: false });
+          }
+          return _emit(record, null);
+        }
+        if (!priorGeneration) {
+          if (!active) {
+            _clearTimer(record, 'wallTimer');
+            _clearTimer(record, 'silenceTimer');
+            record.connection = 'disconnected';
+            return _emit(record, null);
+          }
+          await _rememberGeneration(record, status.generation);
+        }
+
+        if (!active) {
+          _clearTimer(record, 'wallTimer');
+          _clearTimer(record, 'silenceTimer');
+          record.connection = 'disconnected';
+          return _emit(record, null);
+        }
+
+        record.connection = 'connected';
+        if (active.state === 'held') {
+          var agentId = record.agentId;
+          if (!agentId && registry && typeof registry.getAgentForDelegation === 'function') {
+            try { agentId = await registry.getAgentForDelegation(record.delegationId); }
+            catch (_agentReadError) { agentId = null; }
+          }
+          var leaseResult = null;
+          if (typeof agentId === 'string'
+            && agentId.length > 0
+            && registry
+            && typeof registry.getDelegationHoldLease === 'function') {
+            try {
+              leaseResult = await registry.getDelegationHoldLease({
+                delegationId: record.delegationId,
+                agentId: agentId
+              });
+            } catch (_leaseReadError) { leaseResult = null; }
+          }
+          var lease = _normalizeHeldLease(leaseResult, now());
+          if (!lease) {
+            return _settle(record, 'resume_ownership_lost', { cancel: true });
+          }
+          record.agentId = agentId;
+          record.expectedRegistration = false;
+          record.state = 'held';
+          record.hold = {
+            tabIds: lease.ownedTabs.map(function(tab) { return tab.tabId; }),
+            expiresAt: lease.expiresAt
           };
-        }
-        if (record.connection === 'connected') {
+          record.holdOwnedTabs = _clone(lease.ownedTabs);
+          record.activeTab = {
+            tabId: lease.activeTabId,
+            owned: false,
+            canTakeControl: false
+          };
+          _clearTimer(record, 'silenceTimer');
+          _armHoldExpiry(record, lease.expiresAt);
           if (record.wallTimer === null) _armWallClock(record);
-          if (record.state !== 'held' && record.silenceTimer === null) _refreshSilence(record);
+          return _emit(record, null);
+        }
+
+        if (active.state === 'running' && (record.state === 'held' || record.hold)) {
+          return _settle(record, 'resume_ownership_lost', { cancel: true });
+        }
+        record.state = active.state;
+        if (active.state === 'running') {
+          record.hold = null;
+          record.holdOwnedTabs = null;
+          _clearTimer(record, 'holdTimer');
+          if (record.wallTimer === null) _armWallClock(record);
+          if (record.silenceTimer === null) _refreshSilence(record);
+        } else {
+          _clearTimer(record, 'silenceTimer');
+          if (record.wallTimer === null) _armWallClock(record);
         }
         return _emit(record, null);
       });

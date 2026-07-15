@@ -1250,6 +1250,18 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         'generic agent release cannot dissolve held state');
       assert.strictEqual(registry.getAgentForDelegation(delegationId), agentA,
         'exact delegation mapping remains live while held');
+      assert.deepStrictEqual(registry.getDelegationHoldLease({ delegationId, agentId: agentA }), {
+        ok: true,
+        code: 'hold_lease_present',
+        activeTabId: 401,
+        ownedTabs,
+        expiresAt: now + 300000,
+      }, 'held reconciliation reads the complete exact lease without restoring it');
+      assert.deepStrictEqual(
+        registry.getDelegationHoldLease({ delegationId, agentId: agentB }),
+        { ok: false, code: 'resume_ownership_lost' },
+        'mismatched reconciliation cannot inspect another agent lease',
+      );
 
       const envelope = mock.session._dump().fsbAgentRegistry;
       assert.strictEqual(envelope.v, 1, 'registry envelope version remains additive v1');
