@@ -51,6 +51,11 @@
     delegation_ledger_corrupt: true
   });
 
+  var CLEANUP_BLOCKED_CODES = Object.freeze({
+    delegation_mapping_mismatch: true,
+    delegation_release_persistence_failed: true
+  });
+
   var VALID_TERMINAL_CODES = Object.freeze({
     completed: true,
     stopped: true,
@@ -489,13 +494,13 @@
         : 'delegation_persistence_failed';
     }
 
-    async function _appendStateEntry(record, state, title) {
+    async function _appendStateEntry(record, state, title, detail) {
       var canonicalEntry;
       try {
         canonicalEntry = await eventStore.appendBeforeFanout(
           record.delegationId,
           { type: 'state', sessionId: null, payload: {} },
-          { timestamp: now(), state: state, title: title, detail: null }
+          { timestamp: now(), state: state, title: title, detail: detail || null }
         );
       } catch (error) {
         return _failPersistence(record, error);
@@ -577,11 +582,32 @@
             agentId: record.agentId
           });
         }).then(function(result) {
+          if (!result || result.ok !== true) {
+            var failureCode = result && CLEANUP_BLOCKED_CODES[result.code]
+              ? result.code
+              : 'delegation_release_persistence_failed';
+            return {
+              ok: false,
+              code: failureCode,
+              result: result || null,
+              releasedTabCount: 0
+            };
+          }
           var count = result && Number.isSafeInteger(result.releasedTabCount)
             && result.releasedTabCount >= 0
             ? result.releasedTabCount
             : 0;
-          return { result: result || null, releasedTabCount: count };
+          return { ok: true, code: result.code || 'delegation_released', result: result, releasedTabCount: count };
+        }).catch(function() {
+          return {
+            ok: false,
+            code: 'delegation_release_persistence_failed',
+            result: null,
+            releasedTabCount: 0
+          };
+        }).then(function(release) {
+          if (release.ok !== true) record.releasePromise = null;
+          return release;
         });
       }
       return record.releasePromise;
@@ -631,9 +657,29 @@
           }
         }
 
-        var release = { releasedTabCount: 0 };
+        var release = { ok: true, code: 'nothing_to_release', releasedTabCount: 0 };
         if (settledCode !== 'tree_unsettled') {
-          try { release = await _releaseOnce(record); } catch (_releaseError) { /* release zero, touch nothing else */ }
+          release = await _releaseOnce(record);
+          if (release.ok !== true) {
+            var cleanupEntry = await _appendStateEntry(
+              record,
+              'stopping',
+              'Delegation cleanup blocked',
+              release.code
+            );
+            _applyEntry(record, cleanupEntry, { notify: false, refreshSilence: false });
+            record.state = 'stopping';
+            record.terminalPromise = null;
+            var cleanupRuntimeEvent = _emit(record, cleanupEntry.sequence);
+            return _deepFreeze({
+              ok: false,
+              code: release.code,
+              entry: cleanupEntry,
+              releasedTabCount: 0,
+              runtimeEvent: cleanupRuntimeEvent,
+              snapshot: _snapshot(record)
+            });
+          }
         }
 
         try {
@@ -687,6 +733,7 @@
         return _deepFreeze({
           ok: true,
           code: settledCode,
+          entry: terminalEntry,
           releasedTabCount: record.terminal.releasedTabCount,
           runtimeEvent: runtimeEvent,
           snapshot: _snapshot(record)
@@ -822,6 +869,17 @@
         if (record.terminal || record.terminalPromise) {
           throw _error('delegation_already_terminal', 'delegation is already terminal');
         }
+        if (input.event.type === 'terminal') {
+          var terminalResult = await _settle(
+            record,
+            context.terminalCode || 'unknown_failure',
+            { cancel: context.treeSettled !== true }
+          );
+          if (terminalResult.ok !== true) {
+            throw _error(terminalResult.code, 'delegation cleanup remains incomplete');
+          }
+          return terminalResult.entry;
+        }
         var canonicalEntry;
         try {
           canonicalEntry = await eventStore.appendBeforeFanout(delegationId, input.event, context);
@@ -837,26 +895,6 @@
           );
         }
 
-        var terminalCode = null;
-        if (canonicalEntry.state === 'completed'
-          || canonicalEntry.state === 'failed'
-          || canonicalEntry.state === 'stopped'
-          || canonicalEntry.state === 'restart_lost') {
-          if (input.event.type === 'terminal' && context.terminalCode) {
-            terminalCode = context.terminalCode;
-          } else if (canonicalEntry.state === 'completed') terminalCode = 'completed';
-          else if (canonicalEntry.state === 'stopped') terminalCode = 'stopped';
-          else if (canonicalEntry.state === 'restart_lost') terminalCode = 'daemon_restart_lost_run';
-          else terminalCode = context.terminalCode || 'agent_failed';
-        }
-
-        if (terminalCode) {
-          await _settle(record, terminalCode, {
-            entry: canonicalEntry,
-            cancel: input.event.type !== 'result' && context.treeSettled !== true
-          });
-          return canonicalEntry;
-        }
         _applyEntry(record, canonicalEntry);
         return canonicalEntry;
       });
@@ -1416,7 +1454,12 @@
         record.state = 'stopping';
         _emit(record, null);
         var settled = await _settle(record, 'stopped', { cancel: true });
-        return _closedOperationResult(true, settled.code, record, settled.runtimeEvent);
+        return _closedOperationResult(settled.ok === true, settled.code, record, settled.runtimeEvent);
+      });
+      record.stopPromise.then(function(result) {
+        if (result && result.ok !== true && record.stopPromise) record.stopPromise = null;
+      }, function() {
+        record.stopPromise = null;
       });
       return record.stopPromise;
     }

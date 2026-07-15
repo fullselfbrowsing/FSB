@@ -1384,6 +1384,83 @@ function terminalState(code) {
     }
   });
 
+  await test('structured registry release failures retain authority and permit typed retry', async () => {
+    for (const item of [
+      { name: 'mapping mismatch', code: 'delegation_mapping_mismatch', finalPath: false },
+      { name: 'ownership mismatch', code: 'delegation_mapping_mismatch', finalPath: false },
+      { name: 'release persistence', code: 'delegation_release_persistence_failed', finalPath: true },
+    ]) {
+      const storage = installSessionStorage();
+      try {
+        const { store, controllerModule } = freshModules();
+        const id = `delegation_release_${item.name.replace(/\s+/g, '_')}`;
+        let releaseAttempts = 0;
+        let cancelAttempts = 0;
+        const registry = {
+          async bindDelegation() { return { ok: true }; },
+          async releaseDelegation() {
+            releaseAttempts += 1;
+            if (releaseAttempts === 1) {
+              return { ok: false, code: item.code, releasedTabCount: 0 };
+            }
+            return { ok: true, code: 'delegation_released', releasedTabCount: 2 };
+          },
+        };
+        const harness = makeDeps(store, {
+          registry,
+          cancel: async (input) => {
+            cancelAttempts += 1;
+            return { delegationId: input.delegationId, status: 'cancelled' };
+          },
+        });
+        const controller = controllerModule.create(harness.deps);
+        await controller.hydrate();
+        await controller.start({ delegationId: id });
+        await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
+
+        if (item.finalPath) {
+          await controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
+            timestamp: 1720000000800,
+            billingKind: 'subscription',
+          }));
+          await expectCode(
+            controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
+              timestamp: 1720000000801,
+              terminalCode: 'completed',
+              treeSettled: true,
+            })),
+            item.code,
+          );
+        } else {
+          const blocked = await controller.stop({ delegationId: id });
+          assert.strictEqual(blocked.ok, false, `${item.name} cannot report successful Stop`);
+          assert.strictEqual(blocked.code, item.code);
+        }
+
+        const blockedSnapshot = controller.getSnapshot(id);
+        assert.strictEqual(blockedSnapshot.terminal, null, `${item.name} remains nonterminal`);
+        assert.strictEqual(blockedSnapshot.state, 'stopping');
+        const ledger = storage.data[`${store.STORAGE_KEY_PREFIX}${id}`];
+        assert.strictEqual(ledger.terminal, false);
+        assert.strictEqual(ledger.entries[ledger.entries.length - 1].detail, item.code,
+          `${item.name} persists a typed cleanup diagnostic`);
+        assert.strictEqual(releaseAttempts, 1);
+
+        const retried = await controller.stop({ delegationId: id });
+        assert.strictEqual(retried.ok, true, `${item.name} allows exact cleanup retry`);
+        assert.strictEqual(retried.code, 'stopped');
+        assert.deepStrictEqual(retried.snapshot.terminal, {
+          code: 'stopped',
+          releasedTabCount: 2,
+        });
+        assert.strictEqual(releaseAttempts, 2);
+        assert.strictEqual(cancelAttempts, 1, 'confirmed cancellation is not repeated during release retry');
+      } finally {
+        storage.restore();
+      }
+    }
+  });
+
   await test('hold-stop overlap, hold expiry, and lost resume ownership each settle once', async () => {
     const storage = installSessionStorage();
     try {
