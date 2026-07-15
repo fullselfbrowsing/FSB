@@ -11,9 +11,11 @@
     "smoke:crawler": "node scripts/smoke-crawler.mjs",
     "smoke:crawler:local": "node scripts/smoke-crawler-local.mjs",
     "serve:ssr:showcase-angular": "node ../dist/showcase-angular/server/server.mjs",
-    "lint:i18n": "eslint \"src/**/*.html\" --ignore-pattern \"src/app/pages/dashboard/**\"",
+    "lint:i18n": "eslint \"src/**/*.html\"",
     "verify:hreflang": "node scripts/verify-hreflang.mjs",
-    "verify:translation-drift": "node scripts/verify-translation-drift.mjs"
+    "verify:translation-drift": "node scripts/verify-translation-drift.mjs",
+    "verify:translation-quality": "node scripts/verify-translation-quality.mjs",
+    "test:translation-tools": "node --test scripts/verify-translation-tools.test.mjs"
   },
   "dependencies": {
     "@angular/animations": "^20.3.19",

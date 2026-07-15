@@ -1,5 +1,5 @@
-import { AfterViewInit, Component, DOCUMENT, ElementRef, NgZone, OnDestroy, OnInit, Renderer2, inject } from '@angular/core';
-import { Meta } from '@angular/platform-browser';
+import { AfterViewInit, Component, DOCUMENT, ElementRef, LOCALE_ID, NgZone, OnDestroy, OnInit, Renderer2, inject } from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 
 /* CDN libraries loaded lazily on /dashboard only (see loadDashboardCdnScripts). */
 declare const Html5Qrcode: any;
@@ -89,10 +89,16 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly zone = inject(NgZone);
   private readonly meta = inject(Meta);
+  private readonly title = inject(Title);
   private readonly renderer = inject(Renderer2);
   private readonly doc = inject(DOCUMENT);
+  private readonly localeId = inject(LOCALE_ID);
 
   ngOnInit(): void {
+    const pageTitle = $localize`:@@dashboard.meta.title:FSB Dashboard`;
+    const pageDescription = $localize`:@@dashboard.meta.description:Control your paired FSB extension, run one-shot browser tasks, and monitor the live browser preview.`;
+    this.title.setTitle(pageTitle);
+    this.meta.updateTag({ name: 'description', content: pageDescription });
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
     this.loadDashboardCdnScripts();
   }
@@ -120,9 +126,170 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly POLL_INTERVAL = 30000;
   private readonly TASK_TIMEOUT_MS = 10 * 60 * 1000;
   private readonly TASK_RECOVERY_DEADLINE_MS = 20000;
-  private readonly TASK_RECOVERY_WAIT_TEXT = 'Waiting for task recovery...';
-  private readonly TASK_RECOVERY_TIMEOUT_TEXT = 'Task recovery timed out';
   private readonly DASHBOARD_TRANSPORT_DIAGNOSTIC_LIMIT = 100;
+
+  /** Copy rendered by imperative dashboard code and the shared runtime-state helper. */
+  private readonly dashboardCopy = {
+    previewOpenNormalPage: $localize`:@@dashboard.runtime.preview.openNormalPage:Open a normal browser page to resume preview`,
+    previewTabClosed: $localize`:@@dashboard.runtime.preview.tabClosed:The streaming tab was closed. Open another page to resume preview`,
+    previewWaitingForPage: $localize`:@@dashboard.runtime.preview.waitingForPage:Waiting for the browser page to finish loading`,
+    previewOpenStreamableTab: $localize`:@@dashboard.runtime.preview.openStreamableTab:Open a browser tab with a normal web page to start preview`,
+    previewStreamingLabel: $localize`:@@dashboard.runtime.preview.streamingLabel:streaming`,
+    previewLiveDetail: $localize`:@@dashboard.runtime.preview.liveDetail:Live browser preview`,
+    previewPausedLabel: $localize`:@@dashboard.runtime.preview.pausedLabel:paused`,
+    previewPausedDetail: $localize`:@@dashboard.runtime.preview.pausedDetail:Preview paused`,
+    previewNotReadyLabel: $localize`:@@dashboard.runtime.preview.notReadyLabel:not ready`,
+    previewRecoveringLabel: $localize`:@@dashboard.runtime.preview.recoveringLabel:recovering`,
+    previewRecoveringDetail: $localize`:@@dashboard.runtime.preview.recoveringDetail:Recovering browser preview...`,
+    previewLoadingLabel: $localize`:@@dashboard.runtime.preview.loadingLabel:loading`,
+    previewLoadingDetail: $localize`:@@dashboard.runtime.preview.loadingDetail:Waiting for live page preview...`,
+    previewReadyLabel: $localize`:@@dashboard.runtime.preview.readyLabel:ready`,
+    previewErrorLabel: $localize`:@@dashboard.runtime.preview.errorLabel:error`,
+    previewHiddenLabel: $localize`:@@dashboard.runtime.preview.hiddenLabel:hidden`,
+    previewDisconnectedLabel: $localize`:@@dashboard.runtime.preview.disconnectedLabel:disconnected`,
+    previewDisconnectedLastFrame: $localize`:@@dashboard.runtime.preview.disconnectedLastFrame:Stream disconnected -- showing last frame`,
+    previewDisconnectedFrozenLabel: $localize`:@@dashboard.runtime.preview.disconnectedFrozenLabel:Disconnected`,
+    previewCompleteLabel: $localize`:@@dashboard.runtime.preview.completeLabel:complete`,
+    previewCompleteDetail: $localize`:@@dashboard.runtime.preview.completeDetail:Task finished -- showing final page`,
+    previewCompleteFrozenLabel: $localize`:@@dashboard.runtime.preview.completeFrozenLabel:Task Complete`,
+    previewDisconnectedDetail: $localize`:@@dashboard.runtime.preview.disconnectedDetail:Stream disconnected`,
+    previewRestrictedLabel: $localize`:@@dashboard.runtime.preview.restrictedLabel:restricted page`,
+    previewRestrictedDetail: $localize`:@@dashboard.runtime.preview.restrictedDetail:Restricted page -- use the URL bar to navigate`,
+    previewErrorDetail: $localize`:@@dashboard.runtime.preview.errorDetail:Could not load page preview`,
+    remoteOffDetail: $localize`:@@dashboard.runtime.remote.offDetail:Remote control is off`,
+    remoteOffLabel: $localize`:@@dashboard.runtime.remote.offLabel:remote off`,
+    remoteRequestingLabel: $localize`:@@dashboard.runtime.remote.requestingLabel:requesting`,
+    remoteRequestingDetail: $localize`:@@dashboard.runtime.remote.requestingDetail:Remote control request sent to the extension`,
+    remoteReadyLabel: $localize`:@@dashboard.runtime.remote.readyLabel:remote ready`,
+    remoteReadyDetail: $localize`:@@dashboard.runtime.remote.readyDetail:Remote control is attached to the live preview`,
+    remoteRearmLabel: $localize`:@@dashboard.runtime.remote.rearmLabel:re-arm remote`,
+    remoteRearmDetail: $localize`:@@dashboard.runtime.remote.rearmDetail:Preview target changed. Re-enable remote control to continue.`,
+    remoteRetryLabel: $localize`:@@dashboard.runtime.remote.retryLabel:remote retry`,
+    remoteRetryDetail: $localize`:@@dashboard.runtime.remote.retryDetail:Remote control lost its debugger session. Re-enable it to retry.`,
+    remoteBlockedLabel: $localize`:@@dashboard.runtime.remote.blockedLabel:remote blocked`,
+    remoteExternalDebuggerDetail: $localize`:@@dashboard.runtime.remote.externalDebuggerDetail:Another debugger owns the browser tab.`,
+    remoteBlockedDetail: $localize`:@@dashboard.runtime.remote.blockedDetail:Remote control could not attach to the browser tab.`,
+    remoteNoTabLabel: $localize`:@@dashboard.runtime.remote.noTabLabel:no tab`,
+    remoteNoTabDetail: $localize`:@@dashboard.runtime.remote.noTabDetail:Remote control needs a normal browser tab.`,
+    remoteNoResponseLabel: $localize`:@@dashboard.runtime.remote.noResponseLabel:no response`,
+    remoteNoResponseDetail: $localize`:@@dashboard.runtime.remote.noResponseDetail:The extension did not confirm remote control.`,
+    remoteDashboardOfflineLabel: $localize`:@@dashboard.runtime.remote.dashboardOfflineLabel:dashboard offline`,
+    remoteDashboardOfflineDetail: $localize`:@@dashboard.runtime.remote.dashboardOfflineDetail:Reconnect the dashboard before using remote control.`,
+    remoteUnavailableDetail: $localize`:@@dashboard.runtime.remote.unavailableDetail:Remote control is unavailable until the preview is live again.`,
+    taskTimedOutLabel: $localize`:@@dashboard.runtime.task.timedOutLabel:task timed out`,
+    taskTimedOutAction: $localize`:@@dashboard.runtime.task.timedOutAction:Task recovery timed out`,
+    taskWaitingLabel: $localize`:@@dashboard.runtime.task.waitingLabel:waiting for task`,
+    taskWaitingAction: $localize`:@@dashboard.runtime.task.waitingAction:Waiting for task recovery...`,
+    taskRecoveringLabel: $localize`:@@dashboard.runtime.task.recoveringLabel:recovering task`,
+    taskLiveLabel: $localize`:@@dashboard.runtime.task.liveLabel:task live`,
+    taskWorkingAction: $localize`:@@dashboard.runtime.task.workingAction:Working...`,
+    stopping: $localize`:@@dashboard.runtime.task.stopping:Stopping...`,
+    waking: $localize`:@@dashboard.runtime.extension.waking:Waking...`,
+    wakeExtension: $localize`:@@dashboard.runtime.extension.wake:Wake Extension`,
+    pauseStream: $localize`:@@dashboard.runtime.preview.pauseStream:Pause stream`,
+    resumeStream: $localize`:@@dashboard.runtime.preview.resumeStream:Resume stream`,
+    refreshingPreview: $localize`:@@dashboard.runtime.preview.refreshing:Refreshing browser preview...`,
+    reconnectingPreview: $localize`:@@dashboard.runtime.preview.reconnecting:Reconnecting to browser preview...`,
+    connectingPreview: $localize`:@@dashboard.runtime.preview.connecting:Connecting to browser...`,
+    connectingToBrowser: $localize`:@@dashboard.runtime.preview.connectingToBrowser:Connecting to browser...`,
+    frozen: $localize`:@@dashboard.runtime.preview.frozen:Frozen`,
+    newTab: $localize`:@@dashboard.runtime.preview.newTab:New Tab`,
+    restrictedChromeInternalPage: $localize`:@@dashboard.runtime.preview.chromeInternalPage:Chrome internal page`,
+    restrictedChromeExtensionPage: $localize`:@@dashboard.runtime.preview.chromeExtensionPage:Chrome extension page`,
+    restrictedEdgeInternalPage: $localize`:@@dashboard.runtime.preview.edgeInternalPage:Edge internal page`,
+    restrictedBrowserInternalPage: $localize`:@@dashboard.runtime.preview.browserInternalPage:Browser internal page`,
+    restrictedLocalFile: $localize`:@@dashboard.runtime.preview.localFile:Local file`,
+    restrictedPageType: $localize`:@@dashboard.runtime.preview.restrictedPageType:Restricted page`,
+    restrictedNoActiveTab: $localize`:@@dashboard.runtime.preview.noActiveTab:No active tab`,
+    remoteOn: $localize`:@@dashboard.runtime.metrics.remoteOn:Remote on`,
+    connected: $localize`:@@dashboard.runtime.status.connected:Connected`,
+    offline: $localize`:@@dashboard.runtime.status.offline:Offline`,
+    notConnected: $localize`:@@dashboard.runtime.task.notConnected:Not connected to server.`,
+    extensionOffline: $localize`:@@dashboard.runtime.task.extensionOffline:Extension is offline.`,
+    taskTimedOutTenMinutes: $localize`:@@dashboard.runtime.task.timeoutTenMinutes:Task timed out (10 minutes)`,
+    etaPending: $localize`:@@dashboard.runtime.task.etaPending:Estimating remaining time`,
+    phaseNavigating: $localize`:@@dashboard.runtime.task.phaseNavigating:Navigating`,
+    phaseReading: $localize`:@@dashboard.runtime.task.phaseReading:Reading page`,
+    phaseFilling: $localize`:@@dashboard.runtime.task.phaseFilling:Filling form`,
+    phaseAnalyzing: $localize`:@@dashboard.runtime.task.phaseAnalyzing:Analyzing`,
+    phasePlanning: $localize`:@@dashboard.runtime.task.phasePlanning:Planning`,
+    phaseActing: $localize`:@@dashboard.runtime.task.phaseActing:Acting`,
+    phaseWriting: $localize`:@@dashboard.runtime.task.phaseWriting:Writing`,
+    phaseSwitchingTabs: $localize`:@@dashboard.runtime.task.phaseSwitchingTabs:Switching tabs`,
+    phaseCallingApi: $localize`:@@dashboard.runtime.task.phaseCallingApi:Calling API`,
+    phaseWatchingTrigger: $localize`:@@dashboard.runtime.task.phaseWatchingTrigger:Watching a trigger`,
+    phaseWaiting: $localize`:@@dashboard.runtime.task.phaseWaiting:Waiting`,
+    phaseWorking: $localize`:@@dashboard.runtime.task.phaseWorking:Working`,
+    progressSearching: $localize`:@@dashboard.runtime.task.progressSearching:Searching`,
+    progressFormatting: $localize`:@@dashboard.runtime.task.progressFormatting:Formatting`,
+    progressFormatted: $localize`:@@dashboard.runtime.task.progressFormatted:Formatted`,
+    progressTaskCompleted: $localize`:@@dashboard.runtime.task.progressTaskCompleted:Task completed`,
+    progressTaskPartiallyCompleted: $localize`:@@dashboard.runtime.task.progressTaskPartiallyCompleted:Task partially completed`,
+    progressTaskError: $localize`:@@dashboard.runtime.task.progressTaskError:Task ended with an error`,
+    progressReviewingPage: $localize`:@@dashboard.runtime.task.progressReviewingPage:Reviewing page state`,
+    progressPlanningNextStep: $localize`:@@dashboard.runtime.task.progressPlanningNextStep:Planning next step`,
+    progressPerformingAction: $localize`:@@dashboard.runtime.task.progressPerformingAction:Performing browser action`,
+    progressRecoveringInterruption: $localize`:@@dashboard.runtime.task.progressRecoveringInterruption:Recovering from interruption`,
+    progressUpdatingPage: $localize`:@@dashboard.runtime.task.progressUpdatingPage:Updating page`,
+    progressSwitchingTab: $localize`:@@dashboard.runtime.task.progressSwitchingTab:Switching to another tab`,
+    progressWatchingDom: $localize`:@@dashboard.runtime.task.progressWatchingDom:Watching DOM for change`,
+    progressReconnectOrUpdate: $localize`:@@dashboard.runtime.task.progressReconnectOrUpdate:Reconnect or send another progress update`,
+    taskCouldNotStart: $localize`:@@dashboard.runtime.task.couldNotStart:Task could not be started`,
+    taskErrorMissing: $localize`:@@dashboard.runtime.task.errorMissing:No task was provided`,
+    taskErrorAlreadyRunning: $localize`:@@dashboard.runtime.task.errorAlreadyRunning:Another task is already running`,
+    taskErrorNoUsableTab: $localize`:@@dashboard.runtime.task.errorNoUsableTab:No usable browser tab was found`,
+    taskCouldNotComplete: $localize`:@@dashboard.runtime.task.couldNotComplete:Task could not be completed`,
+    taskStopped: $localize`:@@dashboard.runtime.task.stopped:Stopped by user`,
+    taskReconnected: $localize`:@@dashboard.runtime.task.reconnected:Reconnected...`,
+    extensionOfflinePlaceholder: $localize`:@@dashboard.runtime.task.extensionOfflinePlaceholder:Extension offline...`,
+    taskPlaceholder: $localize`:@@dashboard.runtime.task.placeholder:What should FSB do?`,
+    connecting: $localize`:@@dashboard.runtime.auth.connecting:Connecting...`,
+    connectWithKey: $localize`:@@dashboard.runtime.auth.connectWithKey:Connect with Key`,
+    invalidHashKey: $localize`:@@dashboard.runtime.auth.invalidKey:Invalid hash key. Check your key and try again.`,
+    cannotConnect: $localize`:@@dashboard.runtime.auth.cannotConnect:Could not connect to server. Check your connection and try again.`,
+    sessionExpired: $localize`:@@dashboard.runtime.auth.sessionExpired:Session expired. Scan QR code to reconnect.`,
+    qrScannerUnavailable: $localize`:@@dashboard.runtime.qr.unavailable:QR scanner not available`,
+    cameraUnavailable: $localize`:@@dashboard.runtime.qr.cameraUnavailable:Camera unavailable`,
+    qrMissingToken: $localize`:@@dashboard.runtime.qr.missingToken:QR code does not contain a pairing token`,
+    qrExchangeFailed: $localize`:@@dashboard.runtime.qr.exchangeFailed:Pairing exchange failed`,
+    qrInvalidOrExpired: $localize`:@@dashboard.runtime.qr.invalidOrExpired:The pairing code is invalid or expired`,
+    qrTokenUsed: $localize`:@@dashboard.runtime.qr.tokenUsed:The pairing code has already been used`,
+    qrTokenExpired: $localize`:@@dashboard.runtime.qr.tokenExpired:The pairing code has expired`,
+    scanFailed: $localize`:@@dashboard.runtime.qr.scanFailed:Scan failed -- paste your key instead`,
+    pointCamera: $localize`:@@dashboard.runtime.qr.pointCamera:Point camera at QR code in FSB extension`,
+    qrViewfinder: $localize`:@@dashboard.runtime.qr.viewfinder:QR code camera viewfinder`,
+    remoteControlAria: $localize`:@@dashboard.runtime.remote.aria:Remote browser control`,
+    disableRemoteControl: $localize`:@@dashboard.runtime.remote.disable:Disable remote control`,
+    remoteControl: $localize`:@@dashboard.runtime.remote.control:Remote control`,
+    minimize: $localize`:@@dashboard.runtime.preview.minimize:Minimize`,
+    exitPip: $localize`:@@dashboard.runtime.preview.exitPip:Exit picture-in-picture`,
+    exitFullscreen: $localize`:@@dashboard.runtime.preview.exitFullscreen:Exit fullscreen`,
+    maximize: $localize`:@@dashboard.runtime.preview.maximize:Maximize`,
+    pip: $localize`:@@dashboard.runtime.preview.pip:Picture-in-picture`,
+    fullscreen: $localize`:@@dashboard.runtime.preview.fullscreen:Fullscreen`,
+    dialogAlert: $localize`:@@dashboard.runtime.dialog.alert:Alert`,
+    dialogConfirm: $localize`:@@dashboard.runtime.dialog.confirm:Confirm`,
+    dialogPrompt: $localize`:@@dashboard.runtime.dialog.prompt:Prompt`,
+    viewerCrossOriginFrame: $localize`:@@dashboard.runtime.viewer.crossOriginFrame:Cross-origin iframe`,
+    viewerOriginLabel: $localize`:@@dashboard.runtime.viewer.originLabel:Origin`,
+    viewerSourceLabel: $localize`:@@dashboard.runtime.viewer.sourceLabel:Source`,
+    viewerPlayMedia: $localize`:@@dashboard.runtime.viewer.playMedia:Play mirrored media`,
+    viewerUnmuteMedia: $localize`:@@dashboard.runtime.viewer.unmuteMedia:Unmute mirrored media`,
+    viewerUnmute: $localize`:@@dashboard.runtime.viewer.unmute:Unmute`,
+    viewerMediaPosterOnly: $localize`:@@dashboard.runtime.viewer.mediaPosterOnly:Media (poster only)`,
+    viewerMediaUnavailable: $localize`:@@dashboard.runtime.viewer.mediaUnavailable:Media unavailable`,
+    viewerLiveMirrorTitle: $localize`:@@dashboard.runtime.viewer.liveMirrorTitle:PhantomStream live mirror`,
+    wsConnected: $localize`:@@dashboard.runtime.ws.connected:connected`,
+    wsDisconnected: $localize`:@@dashboard.runtime.ws.disconnected:disconnected`,
+    wsReconnecting: $localize`:@@dashboard.runtime.ws.reconnecting:reconnecting...`,
+    resultSuccess: $localize`:@@dashboard.runtime.result.success:Success`,
+    resultPartial: $localize`:@@dashboard.runtime.result.partial:Partial`,
+    resultFailed: $localize`:@@dashboard.runtime.result.failed:Failed`,
+    resultStopped: $localize`:@@dashboard.runtime.result.stopped:Stopped`,
+    resultActions: $localize`:@@dashboard.runtime.result.actions:Actions`,
+    resultCost: $localize`:@@dashboard.runtime.result.cost:Cost`,
+    resultFinalUrl: $localize`:@@dashboard.runtime.result.finalUrl:Final URL`,
+  } as const;
 
   // ---- Persistent state ----
   private hashKey = '';
@@ -623,7 +790,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       this.sendDashboardWSMessage('dash:stop-task', {});
       if (this.taskAction) {
         this.taskAction.style.display = '';
-        this.taskAction.textContent = 'Stopping...';
+        this.taskAction.textContent = this.dashboardCopy.stopping;
       }
       if (this.taskStopBtn) (this.taskStopBtn as HTMLButtonElement).disabled = true;
     });
@@ -735,7 +902,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       if (this.wakeBtn) {
         (this.wakeBtn as HTMLButtonElement).disabled = true;
-        this.wakeBtn.innerHTML = '<span class="dash-spinner"></span> Waking...';
+        this.wakeBtn.innerHTML = '<span class="dash-spinner"></span> ' + this.escapeHtml(this.dashboardCopy.waking);
       }
       this.sendDashboardWSMessage('dash:request-status', { trigger: 'wake-button' });
       this.sendDashboardWSMessage('dash:dom-stream-start', { trigger: 'wake-button' });
@@ -747,7 +914,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       setTimeout(() => {
         if (this.wakeBtn && !this.extensionOnline) {
           (this.wakeBtn as HTMLButtonElement).disabled = false;
-          this.wakeBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Wake Extension';
+          this.wakeBtn.innerHTML = '<i class="fa-solid fa-bell"></i> ' + this.escapeHtml(this.dashboardCopy.wakeExtension);
         }
       }, 5000);
     });
@@ -756,7 +923,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.listen(this.previewToggle, 'click', () => {
       this.streamToggleOn = !this.streamToggleOn;
       if (this.previewToggle) {
-        this.previewToggle.title = this.streamToggleOn ? 'Pause stream' : 'Resume stream';
+        this.previewToggle.title = this.streamToggleOn ? this.dashboardCopy.pauseStream : this.dashboardCopy.resumeStream;
         this.previewToggle.innerHTML = this.streamToggleOn
           ? '<i class="fa-solid fa-pause"></i>'
           : '<i class="fa-solid fa-play"></i>';
@@ -1051,6 +1218,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     this.previewViewer = bridge.createDashboardViewer({
       container: this.previewViewerHost,
+      copy: this.dashboardCopy,
       logger: console,
       onResync: (payload: any) => {
         payload = payload || {};
@@ -1130,7 +1298,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.previewLoadStartedAt = Date.now();
     this.lastRecoveredStreamState = 'recovering';
     this.recordTransportEvent('mutation-resync-requested', { reason, ...details });
-    this.setPreviewLoadingText('Refreshing browser preview...');
+    this.setPreviewLoadingText(this.dashboardCopy.refreshingPreview);
     this.setPreviewState('loading');
     const statusSent = this.sendDashboardWSMessage('dash:request-status', { trigger: 'preview-resync', reason });
     const streamStartSent = this.sendDashboardWSMessage('dash:dom-stream-start', { trigger: 'preview-resync', reason });
@@ -1298,6 +1466,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         streamToggleOn: this.streamToggleOn,
         previewResyncPending: this.previewResyncPending,
         hasLiveSnapshot: !!this.previewSnapshotData,
+        copy: this.dashboardCopy,
       });
     }
     return {
@@ -1322,6 +1491,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         reason: payload.reason,
         ownership: payload.ownership,
         requestPending: this.isRemoteControlStartPending(),
+        copy: this.dashboardCopy,
       });
     }
     return {
@@ -1348,6 +1518,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         recoveryPending: this.taskRecoveryPending,
         recoveryTimedOut: timedOut,
         lastActionText: this.lastProgressAction || '',
+        copy: this.dashboardCopy,
       });
     }
     return {
@@ -1409,10 +1580,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.taskRecoveryPending = false;
     this.taskRecoveryStartedAt = 0;
     this.taskRecoverySource = 'timeout';
-    let timeoutMessage = this.TASK_RECOVERY_TIMEOUT_TEXT;
-    if (this.lastProgressAction) {
-      timeoutMessage += ' -- was: ' + this.lastProgressAction;
-    }
+    const timeoutMessage = this.lastProgressAction
+      ? $localize`:@@dashboard.runtime.task.recoveryTimeoutWithAction:Task recovery timed out -- was: ${this.lastProgressAction}:action:`
+      : this.dashboardCopy.taskTimedOutAction;
     this.setTaskState('failed', {
       error: timeoutMessage,
       elapsed: this.taskStartTime ? (Date.now() - this.taskStartTime) : 0,
@@ -1432,7 +1602,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     if (this.taskAction && this.taskState === 'running' && surface.actionText) {
       this.taskAction.style.display = '';
-      this.taskAction.textContent = surface.actionText || this.TASK_RECOVERY_WAIT_TEXT;
+      this.taskAction.textContent = surface.actionText || this.dashboardCopy.taskWaitingAction;
     }
   }
 
@@ -1548,8 +1718,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (rateEl) rateEl.textContent = Math.round(successRate) + '%';
     if (costEl) costEl.textContent = '$' + totalCost.toFixed(2);
     if (remoteEl) remoteEl.textContent = this.remoteControlOn
-      ? 'Remote on'
-      : (payload.connection?.connected ? 'Connected' : 'Offline');
+      ? this.dashboardCopy.remoteOn
+      : (payload.connection?.connected ? this.dashboardCopy.connected : this.dashboardCopy.offline);
   }
 
   private clearMetrics(): void {
@@ -1563,14 +1733,14 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (runsEl) runsEl.textContent = '0';
     if (rateEl) rateEl.textContent = '0%';
     if (costEl) costEl.textContent = '$0.00';
-    if (remoteEl) remoteEl.textContent = 'Offline';
+    if (remoteEl) remoteEl.textContent = this.dashboardCopy.offline;
   }
 
   // ==================== REMOTE CONTROL HELPERS ====================
 
   private formatStatNumber(value: number): string {
     const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
-    return Math.round(safe).toLocaleString();
+    return Math.round(safe).toLocaleString(this.localeId);
   }
 
   private getRemoteViewportSize(): { width: number; height: number } {
@@ -1628,11 +1798,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.taskState === 'running') return;
     if (!text) return;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      if (this.taskAction) { this.taskAction.textContent = 'Not connected to server.'; this.taskAction.style.display = 'block'; }
+      if (this.taskAction) { this.taskAction.textContent = this.dashboardCopy.notConnected; this.taskAction.style.display = 'block'; }
       return;
     }
     if (!this.extensionOnline) {
-      if (this.taskAction) { this.taskAction.textContent = 'Extension is offline.'; this.taskAction.style.display = 'block'; }
+      if (this.taskAction) { this.taskAction.textContent = this.dashboardCopy.extensionOffline; this.taskAction.style.display = 'block'; }
       return;
     }
 
@@ -1697,18 +1867,18 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         if (this.taskPercent) this.taskPercent.textContent = '0%';
         if (this.taskPhase) this.taskPhase.textContent = '';
         if (this.taskEta) this.taskEta.textContent = '';
-        if (this.taskElapsed) this.taskElapsed.textContent = 'Running for 0s';
-        if (this.taskAction) { this.taskAction.textContent = 'Working...'; this.taskAction.style.display = ''; }
+        if (this.taskElapsed) this.taskElapsed.textContent = this.formatRunningFor(0);
+        if (this.taskAction) { this.taskAction.textContent = this.dashboardCopy.taskWorkingAction; this.taskAction.style.display = ''; }
         if (this.taskStopBtn) this.taskStopBtn.style.display = '';
         this.taskElapsedTimer = setInterval(() => {
           if (this.taskElapsed && this.taskStartTime) {
-            this.taskElapsed.textContent = 'Running for ' + this.formatDuration(Date.now() - this.taskStartTime);
+            this.taskElapsed.textContent = this.formatRunningFor(Date.now() - this.taskStartTime);
           }
         }, 1000);
         if (this.taskTimeoutTimer) clearTimeout(this.taskTimeoutTimer);
         this.taskTimeoutTimer = setTimeout(() => {
           if (this.taskState === 'running') {
-            this.setTaskState('failed', { error: 'Task timed out (10 minutes)' });
+            this.setTaskState('failed', { error: this.dashboardCopy.taskTimedOutTenMinutes });
           }
         }, this.TASK_TIMEOUT_MS);
         this.disableAllTaskInputs(true);
@@ -1778,28 +1948,23 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     }
     if (this.taskPercent) this.taskPercent.textContent = Math.round(progress) + '%';
 
-    const phaseLabels: Record<string, string> = {
-      navigation: 'Navigating',
-      extraction: 'Reading page',
-      writing: 'Filling form',
-      unknown: 'Working',
-    };
     if (this.taskPhase && payload.phase) {
-      this.taskPhase.textContent = phaseLabels[payload.phase] || payload.phase;
+      this.taskPhase.textContent = this.translateTaskPhase(payload.phase);
     }
     if (this.taskEta && payload.eta) {
-      this.taskEta.textContent = '~' + payload.eta;
+      this.taskEta.textContent = this.formatTaskEta(payload.eta);
     }
     if (this.taskElapsed && payload.elapsed) {
-      this.taskElapsed.textContent = 'Running for ' + this.formatDuration(payload.elapsed);
+      this.taskElapsed.textContent = this.formatRunningFor(payload.elapsed);
     }
-    if (this.taskAction && payload.action) {
+    const actionText = payload.action ? this.translateTaskAction(payload.action) : '';
+    if (this.taskAction && actionText) {
       this.taskAction.style.display = '';
-      this.taskAction.textContent = payload.action;
-      this.lastProgressAction = payload.action;
+      this.taskAction.textContent = actionText;
+      this.lastProgressAction = actionText;
     }
     // Action feed: append timestamped entry (Phase 189)
-    if (this.actionFeed && payload.action) {
+    if (this.actionFeed && actionText) {
       const entry = document.createElement('div');
       entry.className = 'dash-action-feed-entry';
       const ts = document.createElement('span');
@@ -1808,7 +1973,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       ts.textContent = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
       const txt = document.createElement('span');
       txt.className = 'dash-action-feed-text';
-      txt.textContent = payload.action;
+      txt.textContent = actionText;
       entry.appendChild(ts);
       entry.appendChild(txt);
       this.actionFeed.appendChild(entry);
@@ -1829,7 +1994,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.taskState === 'idle' && !payload.success) {
       if (this.taskAction) {
         this.taskAction.style.display = '';
-        this.taskAction.textContent = payload.error || 'Task could not be started';
+        this.taskAction.textContent = this.translateTaskError(
+          payload.errorCode,
+          payload.error,
+          this.dashboardCopy.taskCouldNotStart,
+        );
         setTimeout(() => {
           if (this.taskState === 'idle' && this.taskAction) this.taskAction.style.display = 'none';
         }, 5000);
@@ -1860,14 +2029,16 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (payload.success) {
       this.setTaskState('success', resultData);
     } else if (payload.stopped) {
-      let stopMsg = 'Stopped by user';
       const actionContext = payload.lastAction || this.lastProgressAction;
-      if (actionContext) stopMsg += ' -- was: ' + actionContext;
-      resultData.error = stopMsg;
+      resultData.error = this.formatStoppedTask(actionContext);
       resultData.taskStatus = resultData.taskStatus || 'stopped';
       this.setTaskState('failed', resultData);
     } else {
-      resultData.error = payload.error || 'Task could not be completed';
+      resultData.error = this.translateTaskError(
+        payload.errorCode,
+        payload.error,
+        this.dashboardCopy.taskCouldNotComplete,
+      );
       resultData.taskStatus = resultData.taskStatus || 'failed';
       this.setTaskState('failed', resultData);
     }
@@ -1895,7 +2066,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         phase: snapshot.phase || '',
         eta: snapshot.eta || null,
         elapsed: snapshot.elapsed || 0,
-        action: snapshot.action || snapshot.lastAction || 'Reconnected...',
+        action: snapshot.action || snapshot.lastAction || this.dashboardCopy.taskReconnected,
         updatedAt: recoveredUpdatedAt || Date.now(),
       });
       return;
@@ -1909,16 +2080,21 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     if (recoveredStatus === 'stopped') {
       this.markTaskRunCompleted(this.getTaskRunId(snapshot));
-      let stoppedMessage = 'Stopped by user';
       const stoppedAction = snapshot.lastAction || snapshot.action || this.lastProgressAction;
-      if (stoppedAction) stoppedMessage += ' -- was: ' + stoppedAction;
-      this.setTaskState('failed', { error: stoppedMessage, elapsed: snapshot.elapsed || 0 });
+      this.setTaskState('failed', { error: this.formatStoppedTask(stoppedAction), elapsed: snapshot.elapsed || 0 });
       return;
     }
 
     if (recoveredStatus === 'failed') {
       this.markTaskRunCompleted(this.getTaskRunId(snapshot));
-      this.setTaskState('failed', { error: snapshot.error || 'Task could not be completed', elapsed: snapshot.elapsed || 0 });
+      this.setTaskState('failed', {
+        error: this.translateTaskError(
+          snapshot.errorCode,
+          snapshot.error,
+          this.dashboardCopy.taskCouldNotComplete,
+        ),
+        elapsed: snapshot.elapsed || 0,
+      });
     }
   }
 
@@ -1943,7 +2119,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.extensionOnline) {
       this.taskArea.classList.add('dash-task-offline');
       if (this.taskState === 'idle' && this.taskInput) {
-        this.taskInput.placeholder = 'Extension offline...';
+        this.taskInput.placeholder = this.dashboardCopy.extensionOfflinePlaceholder;
       }
       if (this.taskState === 'running') {
         this.setTaskRecoveryPending(true, (!this.ws || this.ws.readyState !== WebSocket.OPEN) ? 'ws-disconnected' : 'extension-offline');
@@ -1954,7 +2130,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     } else {
       this.taskArea.classList.remove('dash-task-offline');
       if (this.taskState === 'idle' && this.taskInput) {
-        this.taskInput.placeholder = 'What should FSB do?';
+        this.taskInput.placeholder = this.dashboardCopy.taskPlaceholder;
         this.taskInput.disabled = false;
       }
       if (this.wakeBtn) this.wakeBtn.style.display = 'none';
@@ -1967,13 +2143,13 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private connect(key: string): void {
     this.clearLoginError();
     if (this.connectBtn) {
-      this.connectBtn.innerHTML = '<span class="dash-spinner"></span> Connecting...';
+      this.connectBtn.innerHTML = '<span class="dash-spinner"></span> ' + this.escapeHtml(this.dashboardCopy.connecting);
       (this.connectBtn as HTMLButtonElement).disabled = true;
     }
 
     this.validateKey(key).then(result => {
       if (this.connectBtn) {
-        this.connectBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Connect with Key';
+        this.connectBtn.innerHTML = '<i class="fa-solid fa-plug"></i> ' + this.escapeHtml(this.dashboardCopy.connectWithKey);
         (this.connectBtn as HTMLButtonElement).disabled = false;
       }
       if (result.valid) {
@@ -1987,14 +2163,14 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
         // this.startPolling();
       } else {
-        this.showLoginError(result.error || 'Invalid hash key. Check your key and try again.');
+        this.showLoginError(this.dashboardCopy.invalidHashKey);
       }
     }).catch(() => {
       if (this.connectBtn) {
-        this.connectBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Connect with Key';
+        this.connectBtn.innerHTML = '<i class="fa-solid fa-plug"></i> ' + this.escapeHtml(this.dashboardCopy.connectWithKey);
         (this.connectBtn as HTMLButtonElement).disabled = false;
       }
-      this.showLoginError('Could not connect to server. Check your connection and try again.');
+      this.showLoginError(this.dashboardCopy.cannotConnect);
     });
   }
 
@@ -2098,7 +2274,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private showExpiredLogin(): void {
     this.showLogin();
     if (this.loginMessage) {
-      this.loginMessage.textContent = 'Session expired. Scan QR code to reconnect.';
+      this.loginMessage.textContent = this.dashboardCopy.sessionExpired;
       this.loginMessage.className = 'dash-login-message expired';
       this.loginMessage.style.display = 'block';
     }
@@ -2186,7 +2362,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private startQRScanner(): void {
     if (this.qrScanner) return;
     if (typeof Html5Qrcode === 'undefined') {
-      this.showScanError('QR scanner not available');
+      this.showScanError(this.dashboardCopy.qrScannerUnavailable);
       this.switchTab('paste');
       return;
     }
@@ -2207,7 +2383,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       () => { /* Ignore per-frame decode failures */ }
     ).catch((err: any) => {
       this.qrScanner = null;
-      this.showScanError('Camera unavailable');
+      this.showScanError(this.dashboardCopy.cameraUnavailable);
       this.switchTab('paste');
     });
   }
@@ -2225,10 +2401,10 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private handleScannedQR(decodedText: string): void {
     try {
       const data = JSON.parse(decodedText);
-      if (!data.t) throw new Error('No token in QR data');
+      if (!data.t) throw new Error(this.dashboardCopy.qrMissingToken);
 
       if (this.tabScanContent) {
-        this.tabScanContent.innerHTML = '<p class="dash-scan-instruction">Connecting...</p>';
+        this.tabScanContent.innerHTML = '<p class="dash-scan-instruction">' + this.escapeHtml(this.dashboardCopy.connecting) + '</p>';
       }
 
       let exchangeUrl = (data.s || '') + '/api/pair/exchange';
@@ -2240,7 +2416,15 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: data.t }),
       }).then(resp => {
-        if (!resp.ok) return resp.json().then(body => { throw new Error(body.error || 'Exchange failed'); });
+        if (!resp.ok) {
+          return resp.json().catch(() => ({})).then(body => {
+            const exchangeError = new Error('pairing-exchange-rejected') as Error & {
+              localizedMessage?: string;
+            };
+            exchangeError.localizedMessage = this.pairingErrorMessage(body?.code);
+            throw exchangeError;
+          });
+        }
         return resp.json();
       }).then(result => {
         this.storeSession(result.hashKey, result.sessionToken, result.expiresAt);
@@ -2250,18 +2434,18 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
         this.connectWS();
         // DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md
         // this.startPolling();
-      }).catch(err => {
-        this.showScanError(err.message || 'Scan failed -- paste your key instead');
+      }).catch((err: Error & { localizedMessage?: string }) => {
+        this.showScanError(err?.localizedMessage || this.dashboardCopy.scanFailed);
         if (this.tabScanContent) {
           this.tabScanContent.innerHTML =
-            '<p class="dash-scan-instruction">Point camera at QR code in FSB extension</p>' +
-            '<div id="qr-reader" class="dash-qr-reader" aria-label="QR code camera viewfinder"></div>' +
+            '<p class="dash-scan-instruction">' + this.escapeHtml(this.dashboardCopy.pointCamera) + '</p>' +
+            '<div id="qr-reader" class="dash-qr-reader" aria-label="' + this.escapeAttr(this.dashboardCopy.qrViewfinder) + '"></div>' +
             '<p id="dash-scan-error" class="dash-scan-error" style="display: none;"></p>';
         }
         this.switchTab('paste');
       });
     } catch (err) {
-      this.showScanError('Scan failed -- paste your key instead');
+      this.showScanError(this.dashboardCopy.scanFailed);
       this.switchTab('paste');
     }
   }
@@ -2834,22 +3018,22 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private setPreviewLoadingText(text: string): void {
     if (!this.previewLoading) return;
     const label = this.previewLoading.querySelector('span');
-    if (label) label.textContent = text || 'Connecting to browser...';
+    if (label) label.textContent = text || this.dashboardCopy.connectingToBrowser;
   }
 
   private setPreviewDisconnectedText(text: string): void {
     if (!this.previewDisconnected) return;
     const label = this.previewDisconnected.querySelector('span');
-    if (label) label.textContent = text || 'Stream disconnected';
+    if (label) label.textContent = text || this.dashboardCopy.previewDisconnectedDetail;
   }
 
   private getPreviewNotReadyText(reason: string): string {
     switch (reason) {
-      case 'restricted-tab': return 'Open a normal browser page to resume preview';
-      case 'tab-closed': return 'The streaming tab was closed. Open another page to resume preview';
-      case 'waiting-for-page-ready': return 'Waiting for the browser page to finish loading';
+      case 'restricted-tab': return this.dashboardCopy.previewOpenNormalPage;
+      case 'tab-closed': return this.dashboardCopy.previewTabClosed;
+      case 'waiting-for-page-ready': return this.dashboardCopy.previewWaitingForPage;
       case 'no-streamable-tab':
-      default: return 'Open a browser tab with a normal web page to start preview';
+      default: return this.dashboardCopy.previewOpenStreamableTab;
     }
   }
 
@@ -2887,8 +3071,8 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     this.previewNotReadyReason = '';
     this.pageReady = false;
     this.lastRecoveredStreamState = 'recovering';
-    this.setPreviewLoadingText(trigger === 'extension-online' ? 'Reconnecting to browser preview...' : 'Connecting to browser...');
-    this.setPreviewDisconnectedText('Stream disconnected');
+    this.setPreviewLoadingText(trigger === 'extension-online' ? this.dashboardCopy.reconnectingPreview : this.dashboardCopy.connectingPreview);
+    this.setPreviewDisconnectedText(this.dashboardCopy.previewDisconnectedDetail);
     this.setPreviewState('loading');
     const streamStartSent = this.sendDashboardWSMessage('dash:dom-stream-start', { trigger });
     this.recordTransportEvent('recovery-request-sent', { trigger, streamStartSent, streamToggleOn: this.streamToggleOn });
@@ -2924,7 +3108,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private showRestrictedPlaceholder(payload: any): void {
     if (!this.previewRestricted) return;
     const url = (payload && payload.url) || '';
-    const pageType = (payload && payload.pageType) || 'New Tab';
+    const pageType = this.translateRestrictedPageType(payload && payload.pageType);
     if (this.previewRestrictedTitle) this.previewRestrictedTitle.textContent = pageType;
     if (this.previewRestrictedUrl) this.previewRestrictedUrl.textContent = url;
     this.previewRestricted.style.display = 'flex';
@@ -2982,14 +3166,14 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       this.pageReady = true;
       this.previewNotReadyReason = '';
       this.previewLoadStartedAt = this.previewLoadStartedAt || Date.now();
-      this.setPreviewLoadingText('Waiting for live page preview...');
+      this.setPreviewLoadingText(this.dashboardCopy.previewLoadingDetail);
       if (this.previewState !== 'streaming') this.setPreviewState('loading');
       if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('stream-state:ready');
     } else if (status === 'recovering') {
       this.recordTransportEvent('stream-state-recovering', { type: 'ext:stream-state' });
       this.pageReady = false;
       this.previewLoadStartedAt = Date.now();
-      this.setPreviewLoadingText('Recovering browser preview...');
+      this.setPreviewLoadingText(this.dashboardCopy.previewRecoveringDetail);
       if (this.previewState !== 'streaming') this.setPreviewState('loading');
       if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('stream-state:recovering');
     }
@@ -3039,7 +3223,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
           this.previewFrozenOverlay.style.display = 'flex';
           this.renderPreviewFrozenIdentity();
           if (this.previewFrozenLabel) {
-            this.previewFrozenLabel.textContent = previewSurface.frozenLabel || 'Frozen';
+            this.previewFrozenLabel.textContent = previewSurface.frozenLabel || this.dashboardCopy.frozen;
             this.previewFrozenLabel.className = 'dash-preview-frozen-label ' + (previewSurface.frozenType || '');
           }
         }
@@ -3244,7 +3428,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.remoteOverlay) {
       this.remoteOverlay.tabIndex = on ? 0 : -1;
       this.remoteOverlay.setAttribute('role', 'application');
-      this.remoteOverlay.setAttribute('aria-label', 'Remote browser control');
+      this.remoteOverlay.setAttribute('aria-label', this.dashboardCopy.remoteControlAria);
       this.remoteOverlay.style.display = on ? '' : 'none';
       if (on) {
         this.remoteOverlay.classList.add('active');
@@ -3260,10 +3444,10 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (this.previewRcBtn) {
       if (on) {
         this.previewRcBtn.classList.add('dash-rc-on');
-        this.previewRcBtn.title = 'Disable remote control';
+        this.previewRcBtn.title = this.dashboardCopy.disableRemoteControl;
       } else {
         this.previewRcBtn.classList.remove('dash-rc-on');
-        this.previewRcBtn.title = 'Remote control';
+        this.previewRcBtn.title = this.dashboardCopy.remoteControl;
       }
       this.previewRcBtn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i>';
     }
@@ -3294,21 +3478,21 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       case 'maximized':
         if (this.previewContainer) this.previewContainer.classList.add('dash-preview-maximized');
         document.body.classList.add('dash-layout-maximized');
-        if (this.previewMaximizeBtn) { this.previewMaximizeBtn.innerHTML = '<i class="fa-solid fa-compress"></i>'; this.previewMaximizeBtn.title = 'Minimize'; }
+        if (this.previewMaximizeBtn) { this.previewMaximizeBtn.innerHTML = '<i class="fa-solid fa-compress"></i>'; this.previewMaximizeBtn.title = this.dashboardCopy.minimize; }
         break;
       case 'pip':
         if (this.previewContainer) this.previewContainer.classList.add('dash-preview-pip');
-        if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-arrow-down-left-and-up-right-to-center"></i>'; this.previewPipBtn.title = 'Exit picture-in-picture'; }
+        if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-arrow-down-left-and-up-right-to-center"></i>'; this.previewPipBtn.title = this.dashboardCopy.exitPip; }
         break;
       case 'fullscreen':
         if (this.previewFsExit) this.previewFsExit.style.display = 'block';
-        if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>'; this.previewFullscreenBtn.title = 'Exit fullscreen'; }
+        if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-down-left-and-up-right-to-center"></i>'; this.previewFullscreenBtn.title = this.dashboardCopy.exitFullscreen; }
         break;
       case 'inline':
       default:
-        if (this.previewMaximizeBtn) { this.previewMaximizeBtn.innerHTML = '<i class="fa-solid fa-expand"></i>'; this.previewMaximizeBtn.title = 'Maximize'; }
-        if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-window-restore"></i>'; this.previewPipBtn.title = 'Picture-in-picture'; }
-        if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i>'; this.previewFullscreenBtn.title = 'Fullscreen'; }
+        if (this.previewMaximizeBtn) { this.previewMaximizeBtn.innerHTML = '<i class="fa-solid fa-expand"></i>'; this.previewMaximizeBtn.title = this.dashboardCopy.maximize; }
+        if (this.previewPipBtn) { this.previewPipBtn.innerHTML = '<i class="fa-solid fa-window-restore"></i>'; this.previewPipBtn.title = this.dashboardCopy.pip; }
+        if (this.previewFullscreenBtn) { this.previewFullscreenBtn.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i>'; this.previewFullscreenBtn.title = this.dashboardCopy.fullscreen; }
         if (this.previewFsExit) this.previewFsExit.style.display = 'none';
         if (this.previewContainer) {
           this.previewContainer.style.left = '';
@@ -3400,7 +3584,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.remoteOverlay) return;
     this.remoteOverlay.tabIndex = -1;
     this.remoteOverlay.setAttribute('role', 'application');
-    this.remoteOverlay.setAttribute('aria-label', 'Remote browser control');
+    this.remoteOverlay.setAttribute('aria-label', this.dashboardCopy.remoteControlAria);
 
     this.listen(this.remoteOverlay, 'focus', () => {
       if (!this.remoteControlOn) return;
@@ -3563,17 +3747,17 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     const hasActiveProgress = !!(payload.progress && payload.progress.lifecycle !== 'cleared');
     if (hasActiveProgress && this.previewProgress) {
       this.previewProgress.style.display = '';
-      const phaseText = payload.progress.phase || 'Working';
-      let progressText: string;
-      if (payload.progress.mode === 'determinate' && typeof payload.progress.percent === 'number') {
-        progressText = Math.round(payload.progress.percent) + '%';
-      } else {
-        progressText = payload.progress.label || phaseText || 'Working';
-      }
+      const helpers = this.getDashboardRuntimeStateHelpers();
+      const progressText = typeof helpers.formatProgressOverlay === 'function'
+        ? helpers.formatProgressOverlay(payload.progress, this.dashboardCopy)
+        : this.dashboardCopy.phaseWorking + ' - ' + this.dashboardCopy.phaseWorking;
       if (this.previewProgressStatus) {
-        this.previewProgressStatus.textContent = progressText + ' - ' + phaseText;
+        this.previewProgressStatus.textContent = progressText;
       }
-      const detailText = String(payload.progress.detail || '').trim();
+      const rawDetailText = String(payload.progress.detail || '').trim();
+      const detailText = typeof helpers.translateProgressDetail === 'function'
+        ? helpers.translateProgressDetail(rawDetailText, this.dashboardCopy)
+        : rawDetailText;
       if (this.previewProgressDetail) {
         this.previewProgressDetail.textContent = detailText;
         this.previewProgressDetail.style.display = detailText ? 'block' : 'none';
@@ -3597,7 +3781,12 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     if (dialog.state === 'open') {
       if (this.previewDialogType) {
-        this.previewDialogType.textContent = (dialog.type || 'alert').charAt(0).toUpperCase() + (dialog.type || 'alert').slice(1);
+        const dialogType = String(dialog.type || 'alert').toLowerCase();
+        this.previewDialogType.textContent = dialogType === 'confirm'
+          ? this.dashboardCopy.dialogConfirm
+          : dialogType === 'prompt'
+            ? this.dashboardCopy.dialogPrompt
+            : this.dashboardCopy.dialogAlert;
       }
       if (this.previewDialogMessage) this.previewDialogMessage.textContent = dialog.message || '';
       if (this.previewDialog) {
@@ -3620,20 +3809,31 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.previewTooltip) return;
     const parts: string[] = [];
     if (this.streamTabUrl) parts.push(this.streamTabUrl.length > 60 ? this.streamTabUrl.substring(0, 60) + '...' : this.streamTabUrl);
-    if (this.lastSnapshotTime) parts.push('Last snapshot: ' + new Date(this.lastSnapshotTime).toLocaleTimeString());
-    if (this.lastRecoveredStreamState) parts.push('State: ' + this.lastRecoveredStreamState);
-    if (this.previewNotReadyReason) parts.push('Reason: ' + this.previewNotReadyReason);
+    if (this.lastSnapshotTime) {
+      const snapshotTime = new Date(this.lastSnapshotTime).toLocaleTimeString(this.localeId);
+      parts.push($localize`:@@dashboard.runtime.tooltip.lastSnapshot:Last snapshot: ${snapshotTime}:snapshotTime:`);
+    }
+    if (this.lastRecoveredStreamState) {
+      const state = this.translateStreamState(this.lastRecoveredStreamState);
+      parts.push($localize`:@@dashboard.runtime.tooltip.state:State: ${state}:streamState:`);
+    }
+    if (this.previewNotReadyReason) {
+      const reason = this.getPreviewNotReadyText(this.previewNotReadyReason);
+      parts.push($localize`:@@dashboard.runtime.tooltip.reason:Reason: ${reason}:reason:`);
+    }
     if (this.previewLoadStartedAt && this.previewState === 'loading') {
-      parts.push('Recovering for ' + Math.max(1, Math.round((Date.now() - this.previewLoadStartedAt) / 1000)) + 's');
+      const seconds = Math.max(1, Math.round((Date.now() - this.previewLoadStartedAt) / 1000));
+      parts.push($localize`:@@dashboard.runtime.tooltip.recoveringFor:Recovering for ${seconds}:seconds: s`);
     }
     // Phase 276 STREAM-04: stream-state diagnostic counters. The four lines
     // below mirror the values already in this.* state; they make the live
     // pipeline state visible to the user without opening DevTools.
-    parts.push('last-frame: ' + this.lastFrameAgo() + 's ago');
-    parts.push('mutations: ' + this.mutationsAppliedTotal);
-    parts.push('apply failures: ' + this.mutationApplyFailures);
-    parts.push('stale: ' + this.staleMutationCount);
-    this.previewTooltip.textContent = parts.join(' | ') || 'No stream data';
+    const frameSeconds = this.lastFrameAgo();
+    parts.push($localize`:@@dashboard.runtime.tooltip.lastFrame:last frame: ${frameSeconds}:seconds: s ago`);
+    parts.push($localize`:@@dashboard.runtime.tooltip.mutations:mutations: ${this.mutationsAppliedTotal}:count:`);
+    parts.push($localize`:@@dashboard.runtime.tooltip.applyFailures:apply failures: ${this.mutationApplyFailures}:count:`);
+    parts.push($localize`:@@dashboard.runtime.tooltip.stale:stale: ${this.staleMutationCount}:count:`);
+    this.previewTooltip.textContent = parts.join(' | ') || $localize`:@@dashboard.runtime.tooltip.noData:No stream data`;
   }
 
   // ==================== WEBSOCKET ====================
@@ -3740,9 +3940,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private setWsState(state: string): void {
     if (!this.sseStatusEl) return;
     const labels: Record<string, string> = {
-      connected: 'connected',
-      disconnected: 'disconnected',
-      reconnecting: 'reconnecting...',
+      connected: this.dashboardCopy.wsConnected,
+      disconnected: this.dashboardCopy.wsDisconnected,
+      reconnecting: this.dashboardCopy.wsReconnecting,
     };
     this.sseStatusEl.textContent = labels[state] || state;
     this.sseStatusEl.className = 'dash-sse-badge ' +
@@ -3815,7 +4015,9 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       } else if (snapshot.streamStatus === 'ready' || snapshot.streamStatus === 'recovering') {
         this.pageReady = snapshot.streamStatus === 'ready';
         this.previewLoadStartedAt = Date.now();
-        this.setPreviewLoadingText(snapshot.streamStatus === 'recovering' ? 'Recovering browser preview...' : 'Waiting for live page preview...');
+        this.setPreviewLoadingText(snapshot.streamStatus === 'recovering'
+          ? this.dashboardCopy.previewRecoveringDetail
+          : this.dashboardCopy.previewLoadingDetail);
         if (this.previewState !== 'streaming') this.setPreviewState('loading');
         if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('snapshot:' + (snapshot.snapshotSource || 'unknown'));
       }
@@ -3884,7 +4086,7 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
       if (this.streamToggleOn && this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.sendDashboardWSMessage('dash:dom-stream-start', {});
         this.previewLoadStartedAt = Date.now();
-        this.setPreviewLoadingText('Waiting for live page preview...');
+        this.setPreviewLoadingText(this.dashboardCopy.previewLoadingDetail);
         if (this.previewState !== 'streaming') this.setPreviewState('loading');
         if (!this.pendingStreamRecovery) this.armPreviewRecoveryWatchdog('page-ready');
       }
@@ -3932,7 +4134,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     const url = this.API_BASE + path;
     return fetch(url, options).then(resp => {
       if (!resp.ok) {
-        return resp.json().then(body => Promise.reject(body)).catch(() => Promise.reject({ error: 'Request failed with status ' + resp.status }));
+        return resp.json().then(body => Promise.reject(body)).catch(() => {
+          const status = resp.status;
+          const error = $localize`:@@dashboard.runtime.api.requestFailed:Request failed with status ${status}:status:`;
+          return Promise.reject({ error });
+        });
       }
       return resp.json();
     });
@@ -3961,7 +4167,12 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
     const taskStatus = data.taskStatus || (isSuccess ? 'success' : 'failed');
     const badgeClass = 'dash-result-badge-' + taskStatus;
-    const badgeLabels: Record<string, string> = { success: 'Success', partial: 'Partial', failed: 'Failed', stopped: 'Stopped' };
+    const badgeLabels: Record<string, string> = {
+      success: this.dashboardCopy.resultSuccess,
+      partial: this.dashboardCopy.resultPartial,
+      failed: this.dashboardCopy.resultFailed,
+      stopped: this.dashboardCopy.resultStopped,
+    };
     const badgeLabel = badgeLabels[taskStatus] || taskStatus;
 
     const elapsed = data.elapsed || 0;
@@ -3977,11 +4188,11 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     html += '</div>';
 
     html += '<div class="dash-result-metrics">';
-    html += '<div class="dash-result-metric"><span class="dash-result-metric-val">' + actionCount + '</span><span class="dash-result-metric-label">Actions</span></div>';
-    html += '<div class="dash-result-metric"><span class="dash-result-metric-val">$' + totalCost.toFixed(4) + '</span><span class="dash-result-metric-label">Cost</span></div>';
+    html += '<div class="dash-result-metric"><span class="dash-result-metric-val">' + actionCount + '</span><span class="dash-result-metric-label">' + this.escapeHtml(this.dashboardCopy.resultActions) + '</span></div>';
+    html += '<div class="dash-result-metric"><span class="dash-result-metric-val">$' + totalCost.toFixed(4) + '</span><span class="dash-result-metric-label">' + this.escapeHtml(this.dashboardCopy.resultCost) + '</span></div>';
     if (finalUrl) {
       const displayUrl = finalUrl.length > 50 ? finalUrl.substring(0, 50) + '...' : finalUrl;
-      html += '<div class="dash-result-metric dash-result-metric-url"><span class="dash-result-metric-val"><a href="' + this.escapeHtml(finalUrl) + '" target="_blank" rel="noopener" title="' + this.escapeHtml(finalUrl) + '">' + this.escapeHtml(displayUrl) + '</a></span><span class="dash-result-metric-label">Final URL</span></div>';
+      html += '<div class="dash-result-metric dash-result-metric-url"><span class="dash-result-metric-val"><a href="' + this.escapeHtml(finalUrl) + '" target="_blank" rel="noopener" title="' + this.escapeHtml(finalUrl) + '">' + this.escapeHtml(displayUrl) + '</a></span><span class="dash-result-metric-label">' + this.escapeHtml(this.dashboardCopy.resultFinalUrl) + '</span></div>';
     }
     html += '</div>';
 
@@ -3999,6 +4210,195 @@ export class DashboardPageComponent implements OnInit, AfterViewInit, OnDestroy 
     if (oldStatus) oldStatus.style.display = 'none';
     if (oldResult) oldResult.style.display = 'none';
     if (oldError) oldError.style.display = 'none';
+  }
+
+  private translateTaskPhase(phase: unknown): string {
+    const value = typeof phase === 'string' ? phase.trim() : '';
+    const helpers = this.getDashboardRuntimeStateHelpers();
+    if (typeof helpers.translateProgressPhase === 'function') {
+      return helpers.translateProgressPhase(value, this.dashboardCopy);
+    }
+    const labels: Record<string, string> = {
+      navigation: this.dashboardCopy.phaseNavigating,
+      navigating: this.dashboardCopy.phaseNavigating,
+      extraction: this.dashboardCopy.phaseReading,
+      reading: this.dashboardCopy.phaseReading,
+      filling: this.dashboardCopy.phaseFilling,
+      analyzing: this.dashboardCopy.phaseAnalyzing,
+      thinking: this.dashboardCopy.phaseAnalyzing,
+      planning: this.dashboardCopy.phasePlanning,
+      acting: this.dashboardCopy.phaseActing,
+      recovering: this.dashboardCopy.previewRecoveringLabel,
+      writing: this.dashboardCopy.phaseWriting,
+      switching_tab: this.dashboardCopy.phaseSwitchingTabs,
+      'switching tabs': this.dashboardCopy.phaseSwitchingTabs,
+      calling: this.dashboardCopy.phaseCallingApi,
+      'calling api': this.dashboardCopy.phaseCallingApi,
+      'trigger-watch': this.dashboardCopy.phaseWatchingTrigger,
+      watching: this.dashboardCopy.phaseWatchingTrigger,
+      'watching a trigger': this.dashboardCopy.phaseWatchingTrigger,
+      waiting: this.dashboardCopy.phaseWaiting,
+      complete: this.dashboardCopy.previewCompleteLabel,
+      done: this.dashboardCopy.previewCompleteLabel,
+      error: this.dashboardCopy.previewErrorLabel,
+      cleared: this.dashboardCopy.previewHiddenLabel,
+      hidden: this.dashboardCopy.previewHiddenLabel,
+      unknown: this.dashboardCopy.phaseWorking,
+      working: this.dashboardCopy.phaseWorking,
+    };
+    return labels[value.toLowerCase()] || value || this.dashboardCopy.phaseWorking;
+  }
+
+  private translateTaskAction(action: unknown): string {
+    const value = typeof action === 'string' ? action.trim() : '';
+    const helpers = this.getDashboardRuntimeStateHelpers();
+    if (typeof helpers.translateProgressDetail === 'function') {
+      return helpers.translateProgressDetail(value, this.dashboardCopy);
+    }
+    const step = value.match(/^Step (\d+)\/(\d+):\s*(.+)$/i);
+    if (step) return `${step[1]}/${step[2]}: ${this.translateTaskAction(step[3])}`;
+    const known: Record<string, string> = {
+      'task completed': this.dashboardCopy.progressTaskCompleted,
+      'task partially completed': this.dashboardCopy.progressTaskPartiallyCompleted,
+      'task ended with an error': this.dashboardCopy.progressTaskError,
+      'task stopped': this.dashboardCopy.taskStopped,
+      'reviewing page state': this.dashboardCopy.progressReviewingPage,
+      'planning next step': this.dashboardCopy.progressPlanningNextStep,
+      'planning next browser step': this.dashboardCopy.progressPlanningNextStep,
+      'performing browser action': this.dashboardCopy.progressPerformingAction,
+      'recovering from interruption': this.dashboardCopy.progressRecoveringInterruption,
+      'updating page': this.dashboardCopy.progressUpdatingPage,
+      'switching to another tab': this.dashboardCopy.progressSwitchingTab,
+      'watching dom for change': this.dashboardCopy.progressWatchingDom,
+      'reconnect or send another progress update': this.dashboardCopy.progressReconnectOrUpdate,
+      'switched tab -- preparing next step...': this.dashboardCopy.progressSwitchingTab,
+      'ready to begin': this.dashboardCopy.phasePlanning,
+      'waiting for mcp client': this.dashboardCopy.phaseWaiting,
+      working: this.dashboardCopy.phaseWorking,
+      'working...': this.dashboardCopy.phaseWorking,
+    };
+    const normalized = value.toLowerCase();
+    if (known[normalized]) return known[normalized];
+    const generatedAction = [
+      /^clicking (?:".*"|element)$/i,
+      /^typing ".*"(?: into .*)?$/i,
+      /^entering text$/i,
+      /^submitting$/i,
+      /^opening (?:page|.+)$/i,
+      /^scrolling$/i,
+      /^reading content$/i,
+      /^inspecting page$/i,
+      /^selecting (?:".*"|option|text)$/i,
+      /^toggling (?:".*"|checkbox)$/i,
+      /^waiting for .+$/i,
+      /^signing in\.\.\.$/i,
+    ].some((pattern) => pattern.test(value));
+    return generatedAction ? this.dashboardCopy.progressPerformingAction : value;
+  }
+
+  private formatTaskEta(eta: unknown): string {
+    const raw = typeof eta === 'number' ? String(Math.max(0, Math.round(eta))) + 's' : String(eta || '').trim();
+    const match = raw.match(/^~?\s*(\d+)\s*(s|m)(?:\s+remaining)?$/i);
+    if (!match) return this.dashboardCopy.etaPending;
+    const amount = Number.parseInt(match[1], 10);
+    return match[2].toLowerCase() === 'm'
+      ? $localize`:@@dashboard.runtime.task.etaMinutes:~${amount}:minutes: min remaining`
+      : $localize`:@@dashboard.runtime.task.etaSeconds:~${amount}:seconds: s remaining`;
+  }
+
+  private translateTaskError(errorCode: unknown, error: unknown, fallback: string): string {
+    const helpers = this.getDashboardRuntimeStateHelpers();
+    if (typeof helpers.translateTaskError === 'function') {
+      return helpers.translateTaskError(errorCode, error, this.dashboardCopy) || fallback;
+    }
+    let code = typeof errorCode === 'string' ? errorCode.trim().toLowerCase() : '';
+    const value = typeof error === 'string' ? error.trim() : '';
+    if (!code) {
+      const legacyCodes: Record<string, string> = {
+        'no task provided': 'dashboard_task_missing',
+        'another task is already running': 'dashboard_task_already_running',
+        'no usable browser tab found for automation': 'dashboard_task_no_usable_tab',
+        'failed to start automation': 'dashboard_task_start_failed',
+      };
+      code = legacyCodes[value.toLowerCase()] || '';
+    }
+    const known: Record<string, string> = {
+      dashboard_task_missing: this.dashboardCopy.taskErrorMissing,
+      dashboard_task_already_running: this.dashboardCopy.taskErrorAlreadyRunning,
+      dashboard_task_no_usable_tab: this.dashboardCopy.taskErrorNoUsableTab,
+      dashboard_task_start_failed: this.dashboardCopy.taskCouldNotStart,
+      dashboard_task_start_exception: this.dashboardCopy.taskCouldNotStart,
+    };
+    return known[code] || value || fallback;
+  }
+
+  private translateRestrictedPageType(pageType: unknown): string {
+    const value = typeof pageType === 'string' ? pageType.trim() : '';
+    const helpers = this.getDashboardRuntimeStateHelpers();
+    if (typeof helpers.translateRestrictedPageType === 'function') {
+      return helpers.translateRestrictedPageType(value, this.dashboardCopy);
+    }
+    const known: Record<string, string> = {
+      'chrome-internal': this.dashboardCopy.restrictedChromeInternalPage,
+      'chrome internal page': this.dashboardCopy.restrictedChromeInternalPage,
+      'chrome-extension': this.dashboardCopy.restrictedChromeExtensionPage,
+      'chrome extension page': this.dashboardCopy.restrictedChromeExtensionPage,
+      'edge-internal': this.dashboardCopy.restrictedEdgeInternalPage,
+      'edge internal page': this.dashboardCopy.restrictedEdgeInternalPage,
+      'browser-internal': this.dashboardCopy.restrictedBrowserInternalPage,
+      'browser internal page': this.dashboardCopy.restrictedBrowserInternalPage,
+      'local-file': this.dashboardCopy.restrictedLocalFile,
+      'local file': this.dashboardCopy.restrictedLocalFile,
+      restricted: this.dashboardCopy.restrictedPageType,
+      'restricted page': this.dashboardCopy.restrictedPageType,
+      'no-active-tab': this.dashboardCopy.restrictedNoActiveTab,
+      'no active tab': this.dashboardCopy.restrictedNoActiveTab,
+      'new-tab': this.dashboardCopy.newTab,
+      'new tab': this.dashboardCopy.newTab,
+    };
+    return known[value.toLowerCase()] || value || this.dashboardCopy.newTab;
+  }
+
+  private pairingErrorMessage(code: unknown): string {
+    switch (typeof code === 'string' ? code : '') {
+      case 'pair_token_required':
+        return this.dashboardCopy.qrMissingToken;
+      case 'pair_token_invalid_or_expired':
+        return this.dashboardCopy.qrInvalidOrExpired;
+      case 'pair_token_already_used':
+        return this.dashboardCopy.qrTokenUsed;
+      case 'pair_token_expired':
+        return this.dashboardCopy.qrTokenExpired;
+      case 'pair_exchange_failed':
+      default:
+        return this.dashboardCopy.qrExchangeFailed;
+    }
+  }
+
+  private formatRunningFor(ms: number): string {
+    const duration = this.formatDuration(ms);
+    return $localize`:@@dashboard.runtime.task.runningFor:Running for ${duration}:duration:`;
+  }
+
+  private formatStoppedTask(action: string): string {
+    if (!action) return this.dashboardCopy.taskStopped;
+    return $localize`:@@dashboard.runtime.task.stoppedWithAction:Stopped by user -- was: ${action}:action:`;
+  }
+
+  private translateStreamState(state: string): string {
+    const labels: Record<string, string> = {
+      hidden: this.dashboardCopy.previewHiddenLabel,
+      ready: this.dashboardCopy.previewReadyLabel,
+      streaming: this.dashboardCopy.previewStreamingLabel,
+      recovering: this.dashboardCopy.previewRecoveringLabel,
+      loading: this.dashboardCopy.previewLoadingLabel,
+      paused: this.dashboardCopy.previewPausedLabel,
+      disconnected: this.dashboardCopy.previewDisconnectedLabel,
+      restricted: this.dashboardCopy.previewRestrictedLabel,
+      'not-ready': this.dashboardCopy.previewNotReadyLabel,
+      error: this.dashboardCopy.previewErrorLabel,
+    };
+    return labels[state] || state;
   }
 
   private formatDuration(ms: number): string {

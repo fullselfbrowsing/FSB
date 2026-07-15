@@ -22,17 +22,33 @@ type LatticeSection = 'install' | 'capabilities' | 'quickstart' | 'modules' | 'p
 
 const ROUTE_PATH = '/lattice';
 const OG_IMAGE = `${HOST}/assets/lattice/logo-mark-dark.png`;
-const OG_IMAGE_ALT = 'Lattice capability mesh';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@lattice.og.imageAlt:Lattice capability mesh`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const COPY_RESET_MS = 1600;
 const SCROLL_SPY_OFFSET = 90;
+
+function escapeCodeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const RESOLVE_TASK = $localize`:@@lattice.code.resolveTask:Resolve this support case`;
+const CLI_VERIFY_COMMENT = $localize`:@@lattice.code.verifyComment:check receipt signatures`;
+const CLI_REPLAY_COMMENT = $localize`:@@lattice.code.replayComment:offline replay of a run`;
+const CLI_EVAL_COMMENT = $localize`:@@lattice.code.evalComment:regression gates`;
+const CLI_RECEIPT_COMMENT = $localize`:@@lattice.code.receiptComment:inspect a receipt`;
+const escapedResolveTask = escapeCodeHtml(RESOLVE_TASK.replace(/\\/g, '\\\\').replace(/"/g, '\\"'));
 const RESOLVE_CODE_HTML = `<span class="tk-k">import</span> { z } <span class="tk-k">from</span> <span class="tk-s">"zod"</span>;
 <span class="tk-k">import</span> { artifact, createAI, output } <span class="tk-k">from</span> <span class="tk-s">"@full-self-browsing/lattice"</span>;
 
 <span class="tk-k">const</span> ai = <span class="tk-f">createAI</span>({ providers });
 
 <span class="tk-k">const</span> result = <span class="tk-k">await</span> ai.<span class="tk-f">run</span>({
-  task: <span class="tk-s">"Resolve this support case"</span>,
+  task: <span class="tk-s">"${escapedResolveTask}"</span>,
   artifacts: [
     artifact.<span class="tk-f">text</span>(caseText, { privacy: <span class="tk-s">"sensitive"</span> }),
   ],
@@ -50,10 +66,10 @@ const RESOLVE_CODE_HTML = `<span class="tk-k">import</span> { z } <span class="t
 <span class="tk-c">// → result.outputs.action.kind   "refund"</span>
 <span class="tk-c">// → result.plan.status           inspectable</span>`;
 const CLI_CODE_HTML = `<span class="pr">$</span> lattice --help
-<span class="pr">$</span> lattice verify <span class="sub">--help</span>      <span class="cm"># check receipt signatures</span>
-<span class="pr">$</span> lattice repro <span class="sub">--help</span>       <span class="cm"># offline replay of a run</span>
-<span class="pr">$</span> lattice eval <span class="sub">--help</span>        <span class="cm"># regression gates</span>
-<span class="pr">$</span> lattice receipt <span class="sub">--help</span>     <span class="cm"># inspect a receipt</span>
+<span class="pr">$</span> lattice verify <span class="sub">--help</span>      <span class="cm"># ${escapeCodeHtml(CLI_VERIFY_COMMENT)}</span>
+<span class="pr">$</span> lattice repro <span class="sub">--help</span>       <span class="cm"># ${escapeCodeHtml(CLI_REPLAY_COMMENT)}</span>
+<span class="pr">$</span> lattice eval <span class="sub">--help</span>        <span class="cm"># ${escapeCodeHtml(CLI_EVAL_COMMENT)}</span>
+<span class="pr">$</span> lattice receipt <span class="sub">--help</span>     <span class="cm"># ${escapeCodeHtml(CLI_RECEIPT_COMMENT)}</span>
 <span class="pr">$</span> lattice diagnostics lm-studio <span class="sub">--help</span>`;
 
 @Component({
@@ -181,9 +197,6 @@ export class LatticePageComponent implements OnInit, AfterViewInit, OnDestroy {
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
   }
 
-  // Structured data stays English-only on purpose: angular.json sets
-  // i18nMissingTranslation=error, so new $localize units would break every
-  // locale build until all five xlf targets are hand-updated.
   private injectLatticeJsonLd(): void {
     if (this.doc.head.querySelector('script[data-ld="lattice-page"]')) {
       return;
@@ -194,10 +207,10 @@ export class LatticePageComponent implements OnInit, AfterViewInit, OnDestroy {
       '@id': `${HOST}/lattice#lattice-sdk`,
       name: 'Lattice',
       applicationCategory: 'DeveloperApplication',
-      applicationSubCategory: 'Capability runtime SDK for multimodal AI applications',
+      applicationSubCategory: $localize`:@@lattice.schema.subcategory:Capability runtime SDK for multimodal AI applications`,
       operatingSystem: 'macOS, Linux, Windows (Node 18+)',
       url: `${HOST}/lattice`,
-      description: 'Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.',
+      description: $localize`:@@lattice.schema.description:Lattice is the capability runtime SDK for multimodal AI applications: typed outputs, inspectable plans, provider routing, artifacts, tools, audit receipts, and replay-friendly records.`,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       publisher: { '@id': `${HOST}/#org` },
     };

@@ -48,6 +48,22 @@ const KnowledgeGraph = (function () {
   var TASK_SITE_COLOR = '#0d9488';
   var TASK_SITE_COLOR_DARK = '#2dd4bf';
 
+  function categoryLabel(name) {
+    var labels = window.__FSB_CATEGORY_LABELS || {};
+    return labels[name] || name;
+  }
+
+  function siteLabel(name) {
+    var labels = window.__FSB_SITE_LABELS || {};
+    return labels[name] || name;
+  }
+
+  function graphCopy(key, value, fallback) {
+    var copy = window.__FSB_GRAPH_COPY || {};
+    if (typeof copy[key] === 'function') return copy[key](value);
+    return copy[key] || fallback;
+  }
+
   // ---------------------------------------------------------------
   // State
   // ---------------------------------------------------------------
@@ -90,6 +106,7 @@ const KnowledgeGraph = (function () {
 
     for (var ci = 0; ci < nCat; ci++) {
       var catName = allCats[ci];
+      var localizedCatName = categoryLabel(catName);
       var guides = grouped[catName] || [];
       var colorIdx = ci % COLORS.length;
       var catColor = COLORS[colorIdx];
@@ -104,14 +121,14 @@ const KnowledgeGraph = (function () {
       var catId = 'cat:' + ci;
       nodes.push({
         id: catId,
-        label: catName,
-        fullLabel: [catName].concat(guides.map(function (g) { return g.site || ''; })).join(' '),
+        label: localizedCatName,
+        fullLabel: [localizedCatName].concat(guides.map(function (g) { return siteLabel(g.site || ''); })).join(' '),
         depth: 1,
         type: 'site',
         isCat: true,
         color: catColor,
         colorIndex: colorIdx,
-        categoryName: catName,
+        categoryName: localizedCatName,
         siteCount: guides.length,
         selectorCount: 0,
         workflowCount: 0,
@@ -134,6 +151,7 @@ const KnowledgeGraph = (function () {
 
       for (var si = 0; si < k; si++) {
         var g = guides[si];
+        var localizedSiteName = siteLabel(g.site || graphCopy('unknown', 0, 'Unknown'));
         var a = goldenAngle * si;
         var rr = capR * Math.sqrt((si + 0.5) / k);
         var ox = (perp1.x * Math.cos(a) + perp2.x * Math.sin(a)) * rr;
@@ -145,13 +163,13 @@ const KnowledgeGraph = (function () {
 
         nodes.push({
           id: 'site:' + ci + ':' + si,
-          label: g.site || 'Unknown',
-          fullLabel: [g.site || 'Unknown', catName].join(' '),
+          label: localizedSiteName,
+          fullLabel: [localizedSiteName, localizedCatName].join(' '),
           depth: 2,
           type: 'site',
           color: catColor,
           colorIndex: colorIdx,
-          categoryName: catName,
+          categoryName: localizedCatName,
           selectorCount: g.selectors ? Object.keys(g.selectors).length : 0,
           workflowCount: g.workflows ? Object.keys(g.workflows).length : 0,
           warningCount: g.warnings ? g.warnings.length : 0,
@@ -775,16 +793,16 @@ const KnowledgeGraph = (function () {
     var html = '';
     if (node.isCat) {
       html = '<strong>' + escapeHtml(node.label) + '</strong>';
-      html += '<br><span style="opacity:0.7">' + (node.siteCount || 0) + ' sites</span>';
+      html += '<br><span style="opacity:0.7">' + escapeHtml(graphCopy('siteCount', node.siteCount || 0, (node.siteCount || 0) + ' sites')) + '</span>';
     } else if (node.type === 'site' || node.type === 'task-site') {
       html = '<strong>' + escapeHtml(node.label) + '</strong>';
       if (node.categoryName) html += '<br><span style="opacity:0.6">' + escapeHtml(node.categoryName) + '</span>';
       var meta = [];
-      if (node.selectorCount > 0) meta.push(node.selectorCount + ' selectors');
-      if (node.workflowCount > 0) meta.push(node.workflowCount + ' workflows');
-      if (node.warningCount > 0) meta.push(node.warningCount + ' warnings');
-      if (node.type === 'task-site') meta.push('task-discovered');
-      if (meta.length > 0) html += '<br>' + meta.join(' | ');
+      if (node.selectorCount > 0) meta.push(graphCopy('selectorCount', node.selectorCount, node.selectorCount + ' selectors'));
+      if (node.workflowCount > 0) meta.push(graphCopy('workflowCount', node.workflowCount, node.workflowCount + ' workflows'));
+      if (node.warningCount > 0) meta.push(graphCopy('warningCount', node.warningCount, node.warningCount + ' warnings'));
+      if (node.type === 'task-site') meta.push(graphCopy('taskDiscovered', 0, 'task-discovered'));
+      if (meta.length > 0) html += '<br>' + escapeHtml(meta.join(' | '));
     } else if (node.type === 'detail') {
       html = '<strong>' + escapeHtml(node.label) + '</strong>';
       html += '<br><span style="opacity:0.7">' + (node.detailType || 'detail') + '</span>';

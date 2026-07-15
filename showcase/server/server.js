@@ -18,6 +18,7 @@ const createPairRouter = require('./src/routes/pair');
 const { setupWSHandler } = require('./src/ws/handler');
 const { RELAY_PER_MESSAGE_LIMIT_BYTES } = require('./src/ws/phantomstream-relay-compat');
 const { createAcceptLanguageMiddleware } = require('./src/middleware/accept-language');
+const { createLegacyHtmlRedirectHandler } = require('./src/middleware/legacy-html-redirects');
 const { LOCALES, SOURCE_LOCALE, LOCALE_SUBPATHS } = require('./src/utils/locale-constants');
 
 // Configuration
@@ -164,9 +165,10 @@ const htmlRedirects = {
   '/privacy.html': '/privacy',
   '/support.html': '/support',
 };
-app.get(Object.keys(htmlRedirects), (req, res) => {
-  res.redirect(301, htmlRedirects[req.path]);
-});
+app.get(
+  Object.keys(htmlRedirects),
+  createLegacyHtmlRedirectHandler(htmlRedirects, { cookieName: 'fsb-locale' })
+);
 
 // Phase 267 / ROUTE-03: Accept-Language auto-detection on bare `/`.
 // Cookie-respecting (fsb-locale wins), bot-safe (no header => no redirect),

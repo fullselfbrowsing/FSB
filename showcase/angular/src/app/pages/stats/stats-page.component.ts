@@ -271,8 +271,12 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Runs on server + browser. Static head-only work: title + robots noindex.
+    // Runs on server + browser. Static head-only work: metadata + robots noindex.
     this.title.setTitle($localize`:@@stats.meta.title:FSB · Stats`);
+    this.meta.updateTag({
+      name: 'description',
+      content: $localize`:@@stats.meta.description:Live aggregate adoption, usage, and repository signals for FSB.`,
+    });
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
   }
 
@@ -494,7 +498,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       // Per-dataset error; only surface globally if we have nothing else.
       if (this.viewState === 'loading') {
         this.viewState = 'error';
-        this.errorMessage = state.message;
+        this.errorMessage = this.fallbackErrorMessage;
       }
       return;
     }

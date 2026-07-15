@@ -190,17 +190,21 @@
           <h2 i18n="@@lattice.modules.title">Adopt one slice at a time</h2>
           <p i18n="@@lattice.modules.copy">The full runtime targets <span [attr.translate]="'no'">Node 24</span>. Several facades are validated <span [attr.translate]="'no'">Node 20</span> compatible, so you can adopt <span [attr.translate]="'no'">Lattice</span> incrementally.</p>
         </div>
-        <div class="lat-mods" i18n="@@lattice.modules.table" [attr.translate]="'no'">
-          <div class="lat-mod lat-mod-head"><div>Import path</div><div>Compatibility</div><div>Use it for</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/providers</div><div><span class="lat-tag lat-tag-ad">adapter-specific</span></div><div class="lat-mod-use">Provider factories, contracts, streaming helpers, capability negotiation.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/audit</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Receipts, signing, verification, CIDs, replay envelopes, redaction.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/context</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Context packing, token estimates, artifact reference extraction.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/artifacts</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Artifact builders, refs, metadata, fingerprints, storage refs, lineage.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/routing</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Deterministic routing, catalogs, policies, capability profiles.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/tools</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Tool definitions, execution, MCP-shaped artifacts, call validation.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/eval</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Regression gates for agent and executor traces.</div></div>
-          <div class="lat-mod"><div class="lat-mod-path">/agents</div><div><span class="lat-tag lat-tag-n24">node24</span></div><div class="lat-mod-use">Single-agent loops, crew runs, hosts, rate limits, agent infrastructure.</div></div>
-          <div class="lat-mod lat-mod-last"><div class="lat-mod-path">/core</div><div><span class="lat-tag lat-tag-n20">node20</span></div><div class="lat-mod-use">Non-agent artifacts, context, outputs, contracts, routing, providers, results.</div></div>
+        <div class="lat-mods">
+          <div class="lat-mod lat-mod-head" i18n="@@lattice.modules.header">
+            <div>Import path</div>
+            <div>Compatibility</div>
+            <div>Use it for</div>
+          </div>
+          <div class="lat-mod" i18n="@@lattice.modules.providers.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/providers</span></div><div><span class="lat-tag lat-tag-ad">adapter-specific</span></div><div class="lat-mod-use">Provider factories, contracts, streaming helpers, capability negotiation.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.audit.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/audit</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Receipts, signing, verification, <span [attr.translate]="'no'">CIDs</span>, replay envelopes, redaction.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.context.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/context</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Context packing, token estimates, artifact reference extraction.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.artifacts.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/artifacts</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Artifact builders, refs, metadata, fingerprints, storage refs, lineage.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.routing.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/routing</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Deterministic routing, catalogs, policies, capability profiles.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.tools.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/tools</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Tool definitions, execution, <span [attr.translate]="'no'">MCP</span>-shaped artifacts, call validation.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.eval.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/eval</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Regression gates for agent and executor traces.</div></div>
+          <div class="lat-mod" i18n="@@lattice.modules.agents.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/agents</span></div><div><span class="lat-tag lat-tag-n24" [attr.translate]="'no'">node24</span></div><div class="lat-mod-use">Single-agent loops, crew runs, hosts, rate limits, agent infrastructure.</div></div>
+          <div class="lat-mod lat-mod-last" i18n="@@lattice.modules.core.row"><div class="lat-mod-path"><span [attr.translate]="'no'">/core</span></div><div><span class="lat-tag lat-tag-n20" [attr.translate]="'no'">node20</span></div><div class="lat-mod-use">Non-agent artifacts, context, outputs, contracts, routing, providers, results.</div></div>
         </div>
       </div>
     </section>
@@ -243,16 +247,21 @@
               <li i18n="@@lattice.audit.tick.redaction"><i class="fa-solid fa-check" aria-hidden="true"></i> Redaction and replay built into the record</li>
             </ul>
           </div>
-          <div class="lat-receipt" i18n="@@lattice.audit.receipt" [attr.translate]="'no'">
+          <div class="lat-receipt">
             <div class="lat-receipt-top">
-              <h4>Execution receipt</h4>
-              <span class="vr"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> verified</span>
+              <h4 i18n="@@lattice.audit.receipt.title">Execution receipt</h4>
+              <span class="vr" i18n="@@lattice.audit.receipt.verified"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> verified</span>
             </div>
-            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-hashtag" aria-hidden="true"></i> runId</span><span class="v">run-1</span></div>
-            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> route</span><span class="v">external · attempt 1</span></div>
-            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-key" aria-hidden="true"></i> signature</span><span class="v">Ed25519 · kid local</span></div>
-            <div class="lat-rrow"><span class="k"><i class="fa-solid fa-cube" aria-hidden="true"></i> cid</span><span class="v">bafy…q7m4</span></div>
-            <div class="lat-rrow lat-rrow-last"><span class="k"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> envelope</span><span class="v">DSSE · JCS canonical</span></div>
+            <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+            <div class="lat-rrow" [attr.translate]="'no'"><span class="k"><i class="fa-solid fa-hashtag" aria-hidden="true"></i> runId</span><span class="v">run-1</span></div>
+            <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+            <div class="lat-rrow" [attr.translate]="'no'"><span class="k"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> route</span><span class="v">external · attempt 1</span></div>
+            <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+            <div class="lat-rrow" [attr.translate]="'no'"><span class="k"><i class="fa-solid fa-key" aria-hidden="true"></i> signature</span><span class="v">Ed25519 · kid local</span></div>
+            <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+            <div class="lat-rrow" [attr.translate]="'no'"><span class="k"><i class="fa-solid fa-cube" aria-hidden="true"></i> cid</span><span class="v">bafy…q7m4</span></div>
+            <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
+            <div class="lat-rrow lat-rrow-last" [attr.translate]="'no'"><span class="k"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> envelope</span><span class="v">DSSE · JCS canonical</span></div>
           </div>
         </div>
       </div>
