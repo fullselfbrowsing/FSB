@@ -488,7 +488,10 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.',
   'Agent could not finish this task',
   'Claude Code stopped before the task was complete. Review the error details, then try the same message again.',
-  'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
+  'FSB accepted this run but could not save it, and Stop is not confirmed.',
+  'Your original message is still here. Retry Stop to finish cleanup.',
+  'Finish the pending agent cleanup in its original tab and conversation before starting another task. Your message was kept.',
+  'FSB could not save this agent run. Stop was confirmed for that exact run, and your message was kept. Try again.'
 ].forEach((copy) => assert(panelSource.includes(copy), 'exact delegated copy is pinned: ' + copy));
 assert(panelSource.includes("+ ' cannot run browser tasks'"),
   'unsupported-provider heading retains the exact dynamic provider-label suffix');
@@ -565,9 +568,11 @@ assert(panelSource.includes('announcedTransitions: Object.create(null)')
 assert(panelSource.includes("return 'Agent stopped, ' + count + ' '")
     && panelSource.includes("count === 1 ? 'tab' : 'tabs'"),
   'stopped copy uses only the canonical release count with singular grammar');
-assert(panelSource.includes("var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop")
+assert(panelSource.includes('var stopping = _delegationStopControlPending(snapshot)')
+    && panelSource.includes("snapshot.state === 'stopping'")
+    && panelSource.includes('_delegationUiState.bindingCleanupPending !== true')
     && panelSource.includes("stopping ? 'Stopping agent…' : 'Stop agent'"),
-  'canonical stopping and the one pending command share exact Stop wording');
+  'pending Stop wording stays canonical while failed unbound cleanup becomes retryable');
 assert(panelSource.includes("stopBtn.addEventListener('click', _handleFixedStop)")
     && panelSource.includes('_delegationUsesFixedStop(_delegationUiState.snapshot)')
     && panelSource.includes('return _stopDelegation(event);')
@@ -847,81 +852,402 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
   }
 
   {
-    const commands = [];
-    const inlineErrors = [];
-    const stateNode = new TestNode('div');
-    let readyRenders = 0;
-    let acceptedRenders = 0;
-    let addedMessages = 0;
-    let persistedMessages = 0;
-    const state = {
-      pendingStart: false,
-      task: 'keep this exact delegated task',
-      errorCode: null,
-      challengeId: 'consumed-challenge',
-      challengeExpiresAt: 12345,
-      delegationId: null,
-      snapshot: null,
-      subscribed: false
-    };
-    const context = {
-      _activeTabIdSnapshot: 42,
-      conversationId: 'conv_selected',
-      _delegationUiState: state,
-      chatInput: { textContent: 'keep this exact delegated task' },
-      async _sendDelegationCommand(message) {
-        commands.push(clone(message));
-        if (message.type === 'FSB_DELEGATION_START') {
-          return { ok: true, snapshot: { delegationId: DELEGATION_ID } };
-        }
-        return { ok: true, snapshot: { delegationId: DELEGATION_ID, state: 'stopped' } };
-      },
-      _delegationValidLifecycleResponse: () => true,
-      _delegationValidConversationId: (value) => /^conv_[A-Za-z0-9_-]+$/.test(value),
-      _writeDelegationConversationBinding: async () => false,
-      _renderDelegationReadyState() {
-        readyRenders += 1;
-        state.errorCode = null;
-      },
-      _ensureDelegationMount: () => ({ state: stateNode }),
-      _renderDelegationInlineError(_container, text) { inlineErrors.push(text); },
-      updateSendButtonState() {},
-      _persistMessageToConversation() { persistedMessages += 1; },
-      _resetDelegationSelection() { throw new Error('unbound run cannot become selected'); },
-      addMessage() { addedMessages += 1; },
-      _renderDelegationSnapshot() { acceptedRenders += 1; },
-      async _refreshSelectedDelegationSnapshot() {
-        throw new Error('unbound run cannot refresh');
-      },
-      _delegationIsSelectedConversation: () => true
-    };
-    vm.createContext(context);
-    vm.runInContext(extractNamedFunction(panelSource, '_beginDelegationStart'), context);
-    await context._beginDelegationStart(null);
-    assert.deepEqual(commands, [
-      {
-        type: 'FSB_DELEGATION_START',
-        challengeId: null,
-        task: 'keep this exact delegated task'
-      },
+    const task = 'keep this exact delegated task';
+    const accepted = snapshot({
+      state: 'running',
+      summary: summary({ state: 'running' }),
+      terminal: null,
+      hydrated: false
+    });
+    const stopping = snapshot({
+      state: 'stopping',
+      summary: summary({ state: 'running' }),
+      terminal: null,
+      hydrated: false
+    });
+    const stopped = snapshot({
+      state: 'stopped',
+      summary: summary({ state: 'stopped' }),
+      terminal: { code: 'stopped', releasedTabCount: 1 },
+      hydrated: false
+    });
+    const treeUnsettled = snapshot({
+      state: 'failed',
+      summary: summary({ state: 'failed' }),
+      terminal: { code: 'tree_unsettled', releasedTabCount: 0 },
+      hydrated: false
+    });
+    const mismatchedStopped = clone(stopped);
+    mismatchedStopped.delegationId = 'delegation_other';
+    mismatchedStopped.entries.forEach((row) => { row.delegationId = 'delegation_other'; });
+
+    function makeBindingFailureHarness(stopOutcomes) {
+      const commands = [];
+      const inlineErrors = [];
+      const rendered = [];
+      const stateNode = new TestNode('div');
+      const counts = { ready: 0, added: 0, persisted: 0 };
+      const outcomes = stopOutcomes.slice();
+      const state = {
+        conversationId: 'conv_selected',
+        pendingStart: false,
+        pendingStop: false,
+        task,
+        errorCode: null,
+        challengeId: 'consumed-challenge',
+        challengeExpiresAt: 12345,
+        delegationId: null,
+        snapshot: null,
+        bindingCleanupPending: false,
+        bindingCleanupOriginKey: null,
+        subscribed: false
+      };
+      const context = {
+        FsbDelegationFeed: Feed,
+        DELEGATION_UNBOUND_CLEANUP_CAP: 8,
+        _delegationUnboundCleanupByOrigin: new Map(),
+        _activeTabIdSnapshot: 42,
+        conversationId: 'conv_selected',
+        _delegationUiState: state,
+        chatInput: { textContent: task },
+        async _sendDelegationCommand(message) {
+          commands.push(clone(message));
+          if (message.type === 'FSB_DELEGATION_START') {
+            return { ok: true, snapshot: clone(accepted) };
+          }
+          const outcome = outcomes.shift();
+          if (outcome instanceof Error) throw outcome;
+          const resolved = outcome && typeof outcome.then === 'function'
+            ? await outcome
+            : outcome;
+          return clone(resolved);
+        },
+        _delegationValidConversationId: (value) => /^conv_[A-Za-z0-9_-]+$/.test(value),
+        async ensureTabConversationForTab() {
+          context.conversationId = 'conv_generated';
+          return 'conv_generated';
+        },
+        async ensureTabConversationForActiveTab() {
+          context.conversationId = 'conv_generated';
+          return 'conv_generated';
+        },
+        _writeDelegationConversationBinding: async () => false,
+        _renderDelegationReadyState() {
+          counts.ready += 1;
+          state.errorCode = null;
+        },
+        _ensureDelegationMount: () => ({ state: stateNode }),
+        _renderDelegationInlineError(_container, text) { inlineErrors.push(text); },
+        updateSendButtonState() {},
+        _persistMessageToConversation() { counts.persisted += 1; },
+        _resetDelegationSelection() { throw new Error('unbound run cannot become selected'); },
+        addMessage() { counts.added += 1; },
+        _renderDelegationSnapshot(next) { rendered.push(clone(next)); },
+        async _refreshSelectedDelegationSnapshot() {
+          throw new Error('unbound run cannot refresh');
+        },
+        _delegationIsSelectedConversation: () => state.conversationId === context.conversationId,
+        _syncDelegationStopControls() {},
+        _announceDelegationLifecycleKey() {}
+      };
+      vm.createContext(context);
+      [
+        '_delegationHasExactKeys',
+        '_delegationValidLifecycleResponse',
+        '_delegationStopProvesTerminal',
+        '_delegationExactStopSnapshot',
+        '_delegationUnboundCleanupKey',
+        '_delegationRememberUnboundCleanup',
+        '_delegationUpdateUnboundCleanup',
+        '_delegationForgetUnboundCleanup',
+        '_delegationUnboundCleanupForSelection',
+        '_delegationOriginIsSelected',
+        '_delegationReserveUnboundCleanup',
+        '_delegationMoveCleanupReservation',
+        '_delegationReleaseCleanupReservation',
+        '_delegationIsActiveSnapshot',
+        '_delegationStopIsActionable',
+        '_renderDelegationBindingFailureReady',
+        '_retainUnboundDelegationCleanup',
+        '_beginDelegationStart',
+        '_stopDelegation'
+      ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+      return { commands, context, counts, inlineErrors, outcomes, rendered, state, stateNode };
+    }
+
+    const successful = makeBindingFailureHarness([{ ok: true, snapshot: stopped }]);
+    await successful.context._beginDelegationStart(null);
+    assert.deepEqual(successful.commands, [
+      { type: 'FSB_DELEGATION_START', challengeId: null, task },
       { type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID }
     ]);
-    assert.equal(state.task, 'keep this exact delegated task');
-    assert.equal(context.chatInput.textContent, 'keep this exact delegated task');
-    assert.equal(state.pendingStart, false);
-    assert.equal(state.delegationId, null);
-    assert.equal(state.snapshot, null);
-    assert.equal(state.errorCode, 'delegation_binding_persistence_failed');
-    assert.equal(state.challengeId, null);
-    assert.equal(state.subscribed, true);
-    assert.equal(readyRenders, 1);
-    assert.equal(stateNode.getAttribute('role'), 'alert');
-    assert.deepEqual(inlineErrors, [
-      'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
+    assert.equal(successful.state.delegationId, null);
+    assert.equal(successful.state.snapshot, null);
+    assert.equal(successful.state.bindingCleanupPending, false);
+    assert.equal(successful.context._delegationUnboundCleanupByOrigin.size, 0,
+      'exact terminal compensation prunes the origin-scoped cleanup record');
+    assert.equal(successful.state.errorCode, 'delegation_binding_persistence_failed');
+    assert.equal(successful.stateNode.getAttribute('role'), 'alert');
+    assert.deepEqual(successful.inlineErrors, [
+      'FSB could not save this agent run. Stop was confirmed for that exact run, and your message was kept. Try again.'
     ]);
-    assert.equal(addedMessages, 0, 'failed binding keeps the composer message out of chat history');
-    assert.equal(persistedMessages, 0, 'failed binding does not persist a consumed user message');
-    assert.equal(acceptedRenders, 0, 'failed binding never renders an untracked accepted run');
+    assert.equal(successful.counts.ready, 1);
+    assert.equal(successful.rendered.length, 0,
+      'exact terminal compensation never presents an unbound accepted run');
+
+    const unsettledCases = [
+      {
+        name: 'structured cleanup failure',
+        response: { ok: false, code: 'stop_failed', snapshot: stopping },
+        expectedSnapshot: stopping
+      },
+      {
+        name: 'tree-unsettled terminal',
+        response: { ok: true, snapshot: treeUnsettled },
+        expectedSnapshot: treeUnsettled
+      },
+      {
+        name: 'invalid response',
+        response: { ok: true, snapshot: stopped, extra: true },
+        expectedSnapshot: accepted
+      },
+      {
+        name: 'mismatched response',
+        response: { ok: true, snapshot: mismatchedStopped },
+        expectedSnapshot: accepted
+      },
+      {
+        name: 'throwing Stop transport',
+        response: new Error('fixture Stop transport rejection'),
+        expectedSnapshot: accepted
+      }
+    ];
+    for (const item of unsettledCases) {
+      const harness = makeBindingFailureHarness([item.response]);
+      await harness.context._beginDelegationStart(null);
+      assert.equal(harness.state.delegationId, DELEGATION_ID,
+        `${item.name} retains the accepted exact id`);
+      assert.deepEqual(harness.state.snapshot, item.expectedSnapshot,
+        `${item.name} retains the best exact authoritative snapshot`);
+      assert.equal(harness.state.bindingCleanupPending, true,
+        `${item.name} remains explicitly actionable`);
+      assert.equal(harness.context._delegationStopIsActionable(harness.state.snapshot), true,
+        `${item.name} retains a retryable delegated Stop`);
+      assert.equal(harness.context._delegationUnboundCleanupByOrigin.size, 1,
+        `${item.name} retains one memory-only origin record`);
+      assert.equal(harness.state.errorCode, 'delegation_binding_cleanup_unsettled');
+      assert.equal(harness.state.task, task);
+      assert.equal(harness.context.chatInput.textContent, task);
+      assert.equal(harness.state.pendingStart, false);
+      assert.equal(harness.state.challengeId, null);
+      assert.equal(harness.counts.ready, 0,
+        `${item.name} cannot render a false ready state`);
+      assert.equal(harness.rendered.length, 1,
+        `${item.name} renders the retained authority`);
+      assert.deepEqual(harness.commands[1], {
+        type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID
+      });
+      assert.equal(harness.counts.added, 0,
+        `${item.name} keeps the task out of chat history`);
+      assert.equal(harness.counts.persisted, 0,
+        `${item.name} does not invent persisted accepted history`);
+    }
+
+    const retry = makeBindingFailureHarness([
+      { ok: false, code: 'stop_failed', snapshot: stopping },
+      { ok: true, snapshot: stopped }
+    ]);
+    await retry.context._beginDelegationStart(null);
+    await retry.context._stopDelegation({ currentTarget: new TestNode('button') });
+    assert.deepEqual(retry.commands, [
+      { type: 'FSB_DELEGATION_START', challengeId: null, task },
+      { type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID },
+      { type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID }
+    ], 'retry reuses only the exact accepted delegation id');
+    assert.equal(retry.state.delegationId, null);
+    assert.equal(retry.state.snapshot, null);
+    assert.equal(retry.state.bindingCleanupPending, false);
+    assert.equal(retry.context._delegationUnboundCleanupByOrigin.size, 0,
+      'retry terminal proof prunes only its exact origin record');
+    assert.equal(retry.state.pendingStop, false);
+    assert.equal(retry.state.errorCode, 'delegation_binding_persistence_failed');
+    assert.equal(retry.context.chatInput.textContent, task,
+      'successful retry restores the exact unconsumed composer task');
+    assert.equal(retry.counts.ready, 1);
+    assert.equal(retry.counts.added, 0);
+    assert.equal(retry.counts.persisted, 0,
+      'cleanup success creates no hidden accepted history');
+
+    let resolveRacingStop;
+    const racingStop = new Promise((resolve) => { resolveRacingStop = resolve; });
+    const raced = makeBindingFailureHarness([racingStop]);
+    const racedStart = raced.context._beginDelegationStart(null);
+    for (let turn = 0; turn < 10 && raced.commands.length < 2; turn += 1) {
+      await Promise.resolve();
+    }
+    assert.equal(raced.commands.length, 2,
+      'compensating Stop is pending before the origin selection changes');
+    raced.context._activeTabIdSnapshot = 99;
+    raced.context.conversationId = 'conv_other';
+    Object.assign(raced.state, {
+      conversationId: 'conv_other',
+      delegationId: null,
+      snapshot: null,
+      task: 'other conversation draft',
+      errorCode: null,
+      pendingStart: false,
+      pendingStop: false,
+      bindingCleanupPending: false,
+      bindingCleanupOriginKey: null,
+      subscribed: true
+    });
+    raced.context.chatInput.textContent = 'other conversation draft';
+    resolveRacingStop({ ok: false, code: 'stop_failed', snapshot: stopping });
+    await racedStart;
+    assert.equal(raced.state.conversationId, 'conv_other');
+    assert.equal(raced.state.delegationId, null);
+    assert.equal(raced.state.task, 'other conversation draft');
+    assert.equal(raced.context.chatInput.textContent, 'other conversation draft',
+      'late cleanup failure never hijacks the newly selected composer');
+    assert.equal(raced.rendered.length, 0,
+      'late cleanup failure does not render into the new selection');
+    const racedRecord = raced.context._delegationUnboundCleanupByOrigin.get(
+      '42:conv_selected'
+    );
+    assert(racedRecord, 'origin-scoped memory retains the switched-away run');
+    assert.equal(racedRecord.delegationId, DELEGATION_ID);
+    assert.equal(racedRecord.pendingStop, false);
+
+    raced.context._activeTabIdSnapshot = 42;
+    raced.context.conversationId = 'conv_selected';
+    raced.context._delegationHydrationGeneration = 0;
+    raced.context._delegationForConversation = () => null;
+    raced.context._lastUserTaskByConversation = new Map();
+    raced.context._resetDelegationSelection = (selectedConversationId) => {
+      Object.assign(raced.state, {
+        conversationId: selectedConversationId,
+        delegationId: null,
+        snapshot: null,
+        task: null,
+        errorCode: null,
+        pendingStart: false,
+        pendingStop: false,
+        bindingCleanupPending: false,
+        bindingCleanupOriginKey: null,
+        subscribed: false
+      });
+    };
+    vm.runInContext(
+      extractNamedFunction(panelSource, '_hydrateDelegationForSelectedConversation'),
+      raced.context
+    );
+    assert.equal(await raced.context._hydrateDelegationForSelectedConversation(), true);
+    assert.equal(raced.state.delegationId, DELEGATION_ID,
+      'returning to the origin selection resurfaces the exact accepted id');
+    assert.equal(raced.state.bindingCleanupPending, true);
+    assert.equal(raced.state.bindingCleanupOriginKey, '42:conv_selected');
+    assert.equal(raced.state.task, task);
+    assert.equal(raced.context.chatInput.textContent, task);
+    assert.equal(raced.commands.length, 2,
+      'memory-only cleanup hydration invents no persisted snapshot command');
+    raced.outcomes.push({ ok: true, snapshot: stopped });
+    await raced.context._stopDelegation({ currentTarget: new TestNode('button') });
+    assert.deepEqual(raced.commands[2], {
+      type: 'FSB_DELEGATION_STOP', delegationId: DELEGATION_ID
+    });
+    assert.equal(raced.context._delegationUnboundCleanupByOrigin.size, 0);
+    assert.equal(raced.state.delegationId, null);
+    assert.equal(raced.context.chatInput.textContent, task);
+
+    const freshTab = makeBindingFailureHarness([
+      { ok: false, code: 'stop_failed', snapshot: stopping }
+    ]);
+    freshTab.context.conversationId = null;
+    freshTab.state.conversationId = null;
+    await freshTab.context._beginDelegationStart(null);
+    assert.equal(freshTab.context.conversationId, 'conv_generated');
+    assert.equal(freshTab.state.conversationId, 'conv_generated');
+    assert.equal(freshTab.state.bindingCleanupOriginKey, '42:conv_generated');
+    assert(freshTab.context._delegationUnboundCleanupByOrigin.has('42:conv_generated'),
+      'fresh-tab reservation moves to the conversation identity hydration will select');
+    assert(!freshTab.context._delegationUnboundCleanupByOrigin.has('42:<no-conversation>'));
+    assert.equal(freshTab.context._delegationStopIsActionable(freshTab.state.snapshot), true);
+
+    const reservations = makeBindingFailureHarness([]);
+    const reservedKeys = [];
+    for (let index = 0; index < 8; index += 1) {
+      reservedKeys.push(reservations.context._delegationReserveUnboundCleanup(
+        100 + index,
+        `conv_reserved_${index}`
+      ));
+    }
+    assert(reservedKeys.every(Boolean),
+      'each origin claims its cleanup slot synchronously before async start work');
+    assert.equal(reservations.context._delegationReserveUnboundCleanup(
+      200,
+      'conv_reserved_overflow'
+    ), null, 'the ninth concurrent origin cannot overrun cleanup capacity');
+    assert.equal(reservations.context._delegationUnboundCleanupByOrigin.size, 8);
+    assert(Array.from(reservations.context._delegationUnboundCleanupByOrigin.values())
+      .every((record) => record.reserved === true && record.delegationId === null),
+      'capacity contains only live pre-acceptance reservations and evicts none');
+    reservedKeys.forEach((key) => {
+      assert.equal(reservations.context._delegationReleaseCleanupReservation(key), true);
+    });
+    assert.equal(reservations.context._delegationUnboundCleanupByOrigin.size, 0);
+
+    const rejectedStart = makeBindingFailureHarness([]);
+    rejectedStart.state.challengeId = null;
+    rejectedStart.context._sendDelegationCommand = async (message) => {
+      rejectedStart.commands.push(clone(message));
+      return { ok: false, code: 'start_rejected', snapshot: null };
+    };
+    await rejectedStart.context._beginDelegationStart(null);
+    assert.equal(rejectedStart.context._delegationUnboundCleanupByOrigin.size, 0,
+      'rejected start releases its synchronous cleanup reservation');
+
+    const committedBinding = makeBindingFailureHarness([]);
+    committedBinding.context._writeDelegationConversationBinding = async () => {
+      committedBinding.context._activeTabIdSnapshot = 99;
+      committedBinding.context.conversationId = 'conv_other';
+      return true;
+    };
+    await committedBinding.context._beginDelegationStart(null);
+    assert.equal(committedBinding.context._delegationUnboundCleanupByOrigin.size, 0,
+      'successful session binding releases its no-longer-needed cleanup reservation');
+    assert.equal(committedBinding.counts.persisted, 1,
+      'selection-switch behavior remains unchanged after a committed binding');
+
+    const capacity = makeBindingFailureHarness([]);
+    capacity.context.DELEGATION_UNBOUND_CLEANUP_CAP = 2;
+    const pendingOne = clone(accepted);
+    pendingOne.delegationId = 'delegation_pending_one';
+    pendingOne.entries.forEach((row) => { row.delegationId = pendingOne.delegationId; });
+    const pendingTwo = clone(accepted);
+    pendingTwo.delegationId = 'delegation_pending_two';
+    pendingTwo.entries.forEach((row) => { row.delegationId = pendingTwo.delegationId; });
+    assert(capacity.context._delegationRememberUnboundCleanup(
+      7, 'conv_pending_one', pendingOne, 'pending one', false
+    ));
+    assert(capacity.context._delegationRememberUnboundCleanup(
+      8, 'conv_pending_two', pendingTwo, 'pending two', false
+    ));
+    await capacity.context._beginDelegationStart(null);
+    assert.deepEqual(capacity.commands, [],
+      'full cleanup capacity rejects before accepting another agent run');
+    assert.deepEqual(
+      Array.from(capacity.context._delegationUnboundCleanupByOrigin.values())
+        .map((record) => record.delegationId),
+      ['delegation_pending_one', 'delegation_pending_two'],
+      'capacity guard never evicts an unsettled exact id'
+    );
+    assert.equal(capacity.context._delegationUnboundCleanupByOrigin.size, 2);
+    assert.equal(capacity.state.task, task);
+    assert.equal(capacity.context.chatInput.textContent, task);
+    assert.equal(capacity.state.errorCode, 'delegation_cleanup_capacity_reached');
+    assert.equal(capacity.stateNode.getAttribute('role'), 'alert');
+    assert.equal(capacity.counts.added, 0);
+    assert.equal(capacity.counts.persisted, 0);
   }
 
   {
@@ -934,11 +1260,13 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       provider: { id: 'claude-code', label: 'Claude Code' }
     };
     const context = {
+      _activeTabIdSnapshot: 42,
       conversationId: 'conv_selected',
       _delegationHydrationGeneration: 0,
       _delegationUiState: state,
       _lastUserTaskByConversation: new Map([['conv_selected', 'retained delegated task']]),
       _delegationForConversation: () => DELEGATION_ID,
+      _delegationUnboundCleanupForSelection: () => null,
       _resetDelegationSelection(selectedConversationId) {
         state.conversationId = selectedConversationId;
         state.delegationId = null;
@@ -979,10 +1307,12 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     let readyRenders = 0;
     const state = { subscribed: true };
     const context = {
+      _activeTabIdSnapshot: 42,
       conversationId: null,
       _delegationHydrationGeneration: 0,
       _delegationUiState: state,
       _delegationForConversation: () => null,
+      _delegationUnboundCleanupForSelection: () => null,
       _resetDelegationSelection(selectedConversationId) {
         state.conversationId = selectedConversationId;
         state.delegationId = null;
@@ -1326,6 +1656,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     vm.createContext(context);
     [
       '_delegationIsActiveSnapshot',
+      '_delegationStopIsActionable',
+      '_delegationStopControlPending',
       '_delegationUsesFixedStop',
       '_restoreLegacyStopControl',
       '_syncDelegationStopControls',
@@ -1407,6 +1739,7 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       conversationId: 'conv_fixture',
       _delegationUiState: state,
       _delegationIsActiveSnapshot: () => true,
+      _delegationStopIsActionable: () => true,
       _delegationIsSelectedConversation: () => true,
       _sendDelegationCommand(message) {
         commands.push(clone(message));
@@ -1479,6 +1812,8 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
       '_delegationStoppedHeading',
       '_delegationStateLabel',
       '_delegationIsActiveSnapshot',
+      '_delegationStopIsActionable',
+      '_delegationStopControlPending',
       '_clearDelegationElapsedTimer',
       '_delegationPersistedStartAt',
       '_formatDelegationElapsed',
@@ -1550,6 +1885,26 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
     });
     assert.equal(card.getAttribute('data-delegation-tone'), 'success');
 
+    context._delegationUiState.bindingCleanupPending = true;
+    context._delegationUiState.delegationId = DELEGATION_ID;
+    context._delegationUiState.errorCode = 'delegation_binding_cleanup_unsettled';
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      state: 'failed',
+      terminal: { code: 'tree_unsettled', releasedTabCount: 0 }
+    });
+    assert(card.textContent.includes('Agent cleanup needs attention'));
+    assert(card.textContent.includes('FSB accepted this run but could not save it, and Stop is not confirmed.'));
+    assert(card.textContent.includes('Your original message is still here. Retry Stop to finish cleanup.'));
+    assert(card.textContent.includes('Stop agent'),
+      'tree-unsettled binding cleanup retains a delegated Stop control');
+    assert.equal(findByClass(card, 'delegation-action-danger')[0].disabled, false,
+      'canonical stopping/failed snapshots cannot disable the unbound cleanup retry');
+    assert(!/stopped/i.test(card.textContent),
+      'unsettled cleanup copy never claims the exact run stopped');
+    context._delegationUiState.bindingCleanupPending = false;
+    context._delegationUiState.errorCode = null;
+
     context._renderDelegationRunHeader(card, {
       ...base,
       state: 'held',
@@ -1579,13 +1934,16 @@ assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n
   }
 
   {
-    const context = {};
+    const context = { _delegationUiState: { bindingCleanupPending: false } };
     vm.createContext(context);
     vm.runInContext(extractNamedFunction(panelSource, '_delegationSnapshotLocksComposer'), context);
     assert.equal(context._delegationSnapshotLocksComposer({ state: 'running', connection: 'disconnected' }), true,
       'disconnected nonterminal run keeps composer locked');
     assert.equal(context._delegationSnapshotLocksComposer({ state: 'stopped', connection: 'connected' }), false,
       'composer restores only after canonical terminal settlement');
+    context._delegationUiState.bindingCleanupPending = true;
+    assert.equal(context._delegationSnapshotLocksComposer({ state: 'failed', connection: 'connected' }), true,
+      'unsettled unbound cleanup keeps the original composer task locked and intact');
   }
 
   console.log('delegation-sidepanel-ui: PASS');

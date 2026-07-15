@@ -532,10 +532,15 @@ const automationRunnerLabel = document.getElementById('automationRunnerLabel');
 
 var DELEGATION_CONVERSATION_STORAGE_KEY = 'fsbSidepanelDelegationConversations';
 var DELEGATION_CONVERSATION_CAP = 50;
+var DELEGATION_UNBOUND_CLEANUP_CAP = 8;
 var DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 var DELEGATION_CONVERSATION_ID_PATTERN = /^conv_[A-Za-z0-9_-]{1,250}$/;
 var _delegationConversationEnvelope = { v: 1, byConversation: {}, lru: [] };
 var _delegationBindingWriteChain = Promise.resolve();
+// Binding failures cannot be written to session storage by definition. Keep
+// their exact cleanup authority only in this process, scoped to the tab and
+// conversation that started the run, until a same-id Stop proves settlement.
+var _delegationUnboundCleanupByOrigin = new Map();
 var _delegationHydrationGeneration = 0;
 var _delegationRunStopControls = [];
 var _delegationElapsedInterval = null;
@@ -562,6 +567,8 @@ var _delegationUiState = {
   pendingTake: false,
   pendingResume: false,
   pendingStop: false,
+  bindingCleanupPending: false,
+  bindingCleanupOriginKey: null,
   composerLocked: false,
   lastRenderedSequence: null,
   lastAlertKey: null,
@@ -636,6 +643,27 @@ function _delegationValidLifecycleResponse(value) {
         && FsbDelegationFeed.validateSnapshot(value.snapshot)));
 }
 
+function _delegationStopProvesTerminal(response, delegationId) {
+  if (!_delegationValidLifecycleResponse(response)
+      || response.ok !== true
+      || !response.snapshot
+      || response.snapshot.delegationId !== delegationId
+      || !response.snapshot.terminal
+      || response.snapshot.terminal.code === 'tree_unsettled') return false;
+  return response.snapshot.state === 'completed'
+    || response.snapshot.state === 'failed'
+    || response.snapshot.state === 'stopped'
+    || response.snapshot.state === 'restart_lost';
+}
+
+function _delegationExactStopSnapshot(response, delegationId, fallbackSnapshot) {
+  return _delegationValidLifecycleResponse(response)
+    && response.snapshot
+    && response.snapshot.delegationId === delegationId
+    ? response.snapshot
+    : fallbackSnapshot;
+}
+
 function _delegationValidSnapshotResponse(value) {
   if (!value || typeof value !== 'object') return false;
   if (value.ok === true) {
@@ -659,6 +687,112 @@ function _delegationEmptyConversationEnvelope() {
 function _delegationValidConversationId(value) {
   return typeof value === 'string'
     && DELEGATION_CONVERSATION_ID_PATTERN.test(value);
+}
+
+function _delegationUnboundCleanupKey(tabId, selectedConversationId) {
+  if (!Number.isSafeInteger(tabId)
+      || tabId < 0
+      || (selectedConversationId !== null
+        && !_delegationValidConversationId(selectedConversationId))) return null;
+  return String(tabId) + ':' + (selectedConversationId === null
+    ? '<no-conversation>'
+    : selectedConversationId);
+}
+
+function _delegationRememberUnboundCleanup(
+  tabId,
+  selectedConversationId,
+  snapshot,
+  task,
+  pendingStop
+) {
+  var key = _delegationUnboundCleanupKey(tabId, selectedConversationId);
+  if (!key
+      || typeof FsbDelegationFeed === 'undefined'
+      || !FsbDelegationFeed.validateSnapshot(snapshot)
+      || typeof task !== 'string') return null;
+  var current = _delegationUnboundCleanupByOrigin.get(key);
+  if (current
+      && current.reserved !== true
+      && current.delegationId !== snapshot.delegationId) return null;
+  _delegationUnboundCleanupByOrigin.delete(key);
+  _delegationUnboundCleanupByOrigin.set(key, {
+    tabId: tabId,
+    conversationId: selectedConversationId,
+    delegationId: snapshot.delegationId,
+    snapshot: snapshot,
+    task: task,
+    pendingStop: pendingStop === true,
+    reserved: false
+  });
+  return key;
+}
+
+function _delegationUpdateUnboundCleanup(key, delegationId, snapshot, task, pendingStop) {
+  var current = key ? _delegationUnboundCleanupByOrigin.get(key) : null;
+  if (!current
+      || current.delegationId !== delegationId
+      || !snapshot
+      || snapshot.delegationId !== delegationId) return false;
+  return _delegationRememberUnboundCleanup(
+    current.tabId,
+    current.conversationId,
+    snapshot,
+    task,
+    pendingStop
+  ) === key;
+}
+
+function _delegationForgetUnboundCleanup(key, delegationId) {
+  var current = key ? _delegationUnboundCleanupByOrigin.get(key) : null;
+  if (!current || current.delegationId !== delegationId) return false;
+  return _delegationUnboundCleanupByOrigin.delete(key);
+}
+
+function _delegationUnboundCleanupForSelection(tabId, selectedConversationId) {
+  var key = _delegationUnboundCleanupKey(tabId, selectedConversationId);
+  var record = key ? _delegationUnboundCleanupByOrigin.get(key) : null;
+  return record && record.reserved !== true ? record : null;
+}
+
+function _delegationOriginIsSelected(tabId, selectedConversationId) {
+  return tabId === _activeTabIdSnapshot && selectedConversationId === conversationId;
+}
+
+function _delegationReserveUnboundCleanup(tabId, selectedConversationId) {
+  var key = _delegationUnboundCleanupKey(tabId, selectedConversationId);
+  if (key === null
+      || _delegationUnboundCleanupByOrigin.has(key)
+      || _delegationUnboundCleanupByOrigin.size >= DELEGATION_UNBOUND_CLEANUP_CAP) return null;
+  _delegationUnboundCleanupByOrigin.set(key, {
+    tabId: tabId,
+    conversationId: selectedConversationId,
+    delegationId: null,
+    snapshot: null,
+    task: null,
+    pendingStop: false,
+    reserved: true
+  });
+  return key;
+}
+
+function _delegationMoveCleanupReservation(key, tabId, selectedConversationId) {
+  var current = key ? _delegationUnboundCleanupByOrigin.get(key) : null;
+  var nextKey = _delegationUnboundCleanupKey(tabId, selectedConversationId);
+  if (!current || current.reserved !== true || nextKey === null) return null;
+  if (nextKey === key) return key;
+  if (_delegationUnboundCleanupByOrigin.has(nextKey)) return null;
+  _delegationUnboundCleanupByOrigin.delete(key);
+  current.tabId = tabId;
+  current.conversationId = selectedConversationId;
+  _delegationUnboundCleanupByOrigin.set(nextKey, current);
+  return nextKey;
+}
+
+function _delegationReleaseCleanupReservation(key) {
+  var current = key ? _delegationUnboundCleanupByOrigin.get(key) : null;
+  if (!current || current.reserved !== true) return false;
+  return _delegationUnboundCleanupByOrigin.delete(key);
 }
 
 function _delegationValidConversationEnvelope(value) {
@@ -1052,6 +1186,8 @@ function _resetDelegationSelection(selectedConversationId) {
   _delegationUiState.pendingTake = false;
   _delegationUiState.pendingResume = false;
   _delegationUiState.pendingStop = false;
+  _delegationUiState.bindingCleanupPending = false;
+  _delegationUiState.bindingCleanupOriginKey = null;
   _delegationUiState.lastRenderedSequence = null;
   _delegationUiState.lastAlertKey = null;
   _delegationUiState.announced = Object.create(null);
@@ -1065,6 +1201,20 @@ async function _hydrateDelegationForSelectedConversation() {
   var hydrationGeneration = ++_delegationHydrationGeneration;
   var selectedDelegationId = _delegationForConversation(selectedConversationId);
   _resetDelegationSelection(selectedConversationId);
+
+  var unboundCleanup = _delegationUnboundCleanupForSelection(
+    _activeTabIdSnapshot,
+    selectedConversationId
+  );
+  if (unboundCleanup) {
+    _retainUnboundDelegationCleanup(
+      unboundCleanup.snapshot,
+      unboundCleanup.task,
+      _delegationUnboundCleanupKey(_activeTabIdSnapshot, selectedConversationId),
+      unboundCleanup.pendingStop
+    );
+    return true;
+  }
 
   var response = await _sendDelegationCommand({
     type: 'FSB_DELEGATION_SNAPSHOT',
@@ -1358,6 +1508,10 @@ function _delegationStoppedHeading(snapshot) {
 
 function _delegationSnapshotAlertKey(snapshot) {
   if (!snapshot) return null;
+  if (_delegationUiState.bindingCleanupPending === true
+      && snapshot.delegationId === _delegationUiState.delegationId) {
+    return snapshot.delegationId + ':binding_cleanup_pending';
+  }
   if (snapshot.state === 'restart_lost'
       && snapshot.terminal
       && snapshot.terminal.code === 'daemon_restart_lost_run') {
@@ -1374,14 +1528,15 @@ function _delegationSnapshotAlertKey(snapshot) {
 }
 
 function _delegationSnapshotLocksComposer(snapshot) {
-  return snapshot && (
+  return (typeof _delegationUiState !== 'undefined'
+    && _delegationUiState.bindingCleanupPending === true) || (snapshot && (
     snapshot.state === 'starting'
     || snapshot.state === 'running'
     || snapshot.state === 'holding'
     || snapshot.state === 'held'
     || snapshot.state === 'resuming'
     || snapshot.state === 'stopping'
-  );
+  ));
 }
 
 function _delegationCanTakeControl(snapshot) {
@@ -1455,9 +1610,25 @@ function _delegationIsActiveSnapshot(snapshot) {
   );
 }
 
+function _delegationStopIsActionable(snapshot) {
+  return _delegationIsActiveSnapshot(snapshot) || (
+    _delegationUiState.bindingCleanupPending === true
+    && snapshot
+    && snapshot.delegationId === _delegationUiState.delegationId
+  );
+}
+
+function _delegationStopControlPending(snapshot) {
+  return _delegationUiState.pendingStop === true || (
+    snapshot
+    && snapshot.state === 'stopping'
+    && _delegationUiState.bindingCleanupPending !== true
+  );
+}
+
 function _delegationUsesFixedStop(snapshot) {
   return _delegationIsSelectedConversation()
-    && _delegationIsActiveSnapshot(snapshot);
+    && _delegationStopIsActionable(snapshot);
 }
 
 function _restoreLegacyStopControl() {
@@ -1485,7 +1656,7 @@ function _syncDelegationStopControls(snapshot) {
     _restoreLegacyStopControl();
     return false;
   }
-  var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop;
+  var stopping = _delegationStopControlPending(snapshot);
   var stopLabel = stopping ? 'Stopping agent…' : 'Stop agent';
   if (stopBtn) {
     stopBtn.classList.remove('hidden');
@@ -1517,8 +1688,8 @@ function _handleFixedStop(event) {
 }
 
 function _renderDelegationRunActions(container, snapshot) {
-  if (!_delegationIsActiveSnapshot(snapshot)) return;
-  var stopping = snapshot.state === 'stopping' || _delegationUiState.pendingStop;
+  if (!_delegationStopIsActionable(snapshot)) return;
+  var stopping = _delegationStopControlPending(snapshot);
   var actions = _delegationElement('div', 'delegation-state-actions');
   var stop = _delegationAction(
     stopping ? 'Stopping agent…' : 'Stop agent',
@@ -1602,6 +1773,8 @@ function _renderDelegationRunHeader(container, snapshot) {
   _delegationRunStopControls = [];
   _applyDelegationSnapshotTone(container, snapshot);
   var terminalCode = snapshot.terminal ? snapshot.terminal.code : null;
+  var bindingCleanupPending = _delegationUiState.bindingCleanupPending === true
+    && snapshot.delegationId === _delegationUiState.delegationId;
   var restartLost = snapshot.state === 'restart_lost'
     && terminalCode === 'daemon_restart_lost_run';
   var stopped = snapshot.state === 'stopped' && snapshot.terminal !== null;
@@ -1624,7 +1797,8 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !unpaired
     && !unsupported;
   var headingText = _delegationStateLabel(snapshot);
-  if (restartLost) headingText = 'Agent run ended after daemon restart';
+  if (bindingCleanupPending) headingText = 'Agent cleanup needs attention';
+  else if (restartLost) headingText = 'Agent run ended after daemon restart';
   else if (stopped) headingText = _delegationStoppedHeading(snapshot);
   else if (offline) headingText = 'Agent offline';
   else if (disconnected) headingText = 'Agent connection lost';
@@ -1642,7 +1816,13 @@ function _renderDelegationRunHeader(container, snapshot) {
   heading.id = 'delegationRunHeading';
   container.appendChild(heading);
   _appendDelegationRunMetadata(container, snapshot);
-  if (restartLost) {
+  if (bindingCleanupPending) {
+    container.appendChild(_delegationElement(
+      'p',
+      'delegation-state-body',
+      'FSB accepted this run but could not save it, and Stop is not confirmed.'
+    ));
+  } else if (restartLost) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
@@ -1736,9 +1916,61 @@ function _renderDelegationRunHeader(container, snapshot) {
       container,
       'Stop could not be confirmed. The previous agent state is still shown.'
     );
+  } else if (_delegationUiState.errorCode === 'delegation_binding_cleanup_unsettled') {
+    _renderDelegationInlineError(
+      container,
+      'Your original message is still here. Retry Stop to finish cleanup.'
+    );
   }
   _renderDelegationRunActions(container, snapshot);
   _syncDelegationStopControls(snapshot);
+}
+
+function _renderDelegationBindingFailureReady(originTask) {
+  _delegationUiState.pendingStart = false;
+  _delegationUiState.pendingStop = false;
+  _delegationUiState.delegationId = null;
+  _delegationUiState.snapshot = null;
+  _delegationUiState.task = originTask;
+  _delegationUiState.challengeId = null;
+  _delegationUiState.challengeExpiresAt = null;
+  _delegationUiState.bindingCleanupPending = false;
+  _delegationUiState.bindingCleanupOriginKey = null;
+  _delegationUiState.subscribed = true;
+  _renderDelegationReadyState();
+  _delegationUiState.task = originTask;
+  chatInput.textContent = originTask;
+  _delegationUiState.errorCode = 'delegation_binding_persistence_failed';
+  var bindingFailureMount = _ensureDelegationMount();
+  bindingFailureMount.state.setAttribute('role', 'alert');
+  _renderDelegationInlineError(
+    bindingFailureMount.state,
+    'FSB could not save this agent run. Stop was confirmed for that exact run, and your message was kept. Try again.'
+  );
+  updateSendButtonState();
+}
+
+function _retainUnboundDelegationCleanup(snapshot, originTask, originKey, pendingStop) {
+  var cleanupRecord = originKey
+    ? _delegationUnboundCleanupByOrigin.get(originKey)
+    : null;
+  _delegationUiState.pendingStart = false;
+  _delegationUiState.pendingStop = pendingStop === true;
+  _delegationUiState.delegationId = snapshot.delegationId;
+  _delegationUiState.snapshot = snapshot;
+  _delegationUiState.task = originTask;
+  _delegationUiState.challengeId = null;
+  _delegationUiState.challengeExpiresAt = null;
+  _delegationUiState.errorCode = 'delegation_binding_cleanup_unsettled';
+  _delegationUiState.bindingCleanupPending = true;
+  _delegationUiState.bindingCleanupOriginKey = originKey || null;
+  if (cleanupRecord) {
+    _delegationUiState.conversationId = cleanupRecord.conversationId;
+  }
+  _delegationUiState.subscribed = true;
+  chatInput.textContent = originTask;
+  _renderDelegationSnapshot(snapshot, { hydrated: false, announceSequence: null });
+  updateSendButtonState();
 }
 
 async function _prepareDelegationTask(retrySameMessage) {
@@ -1923,6 +2155,15 @@ function _handleDelegationRuntimeUpdate(message) {
       || !FsbDelegationFeed.validateSnapshot(message.snapshot)
       || message.snapshot.delegationId !== _delegationUiState.delegationId
       || !_delegationIsSelectedConversation()) return false;
+  if (_delegationUiState.bindingCleanupPending === true) {
+    _delegationUpdateUnboundCleanup(
+      _delegationUiState.bindingCleanupOriginKey,
+      message.snapshot.delegationId,
+      message.snapshot,
+      _delegationUiState.task,
+      _delegationUiState.pendingStop
+    );
+  }
   // The controller may publish canonical intermediate `holding`/`resuming`
   // snapshots while the command is still pending. Keep the prior truthful
   // control in place (disabled and focused) until the authoritative command
@@ -1942,19 +2183,55 @@ async function _beginDelegationStart(challengeId) {
   var originTabId = _activeTabIdSnapshot;
   var originConversationId = conversationId;
   var originTask = _delegationUiState.task;
+  var cleanupOriginKey = _delegationReserveUnboundCleanup(
+    originTabId,
+    originConversationId
+  );
+  if (!cleanupOriginKey) {
+    var existingCleanup = _delegationUnboundCleanupForSelection(
+      originTabId,
+      originConversationId
+    );
+    if (existingCleanup) {
+      _retainUnboundDelegationCleanup(
+        existingCleanup.snapshot,
+        existingCleanup.task,
+        _delegationUnboundCleanupKey(originTabId, originConversationId),
+        existingCleanup.pendingStop
+      );
+      return;
+    }
+    _delegationUiState.errorCode = 'delegation_cleanup_capacity_reached';
+    _renderDelegationReadyState();
+    _delegationUiState.task = originTask;
+    chatInput.textContent = originTask;
+    _delegationUiState.errorCode = 'delegation_cleanup_capacity_reached';
+    var cleanupCapacityMount = _ensureDelegationMount();
+    cleanupCapacityMount.state.setAttribute('role', 'alert');
+    _renderDelegationInlineError(
+      cleanupCapacityMount.state,
+      'Finish the pending agent cleanup in its original tab and conversation before starting another task. Your message was kept.'
+    );
+    updateSendButtonState();
+    return;
+  }
   _delegationUiState.pendingStart = true;
   _delegationUiState.errorCode = null;
   updateSendButtonState();
-  var response = await _sendDelegationCommand({
-    type: 'FSB_DELEGATION_START',
-    challengeId: challengeId,
-    task: _delegationUiState.task
-  });
+  var response = null;
+  try {
+    response = await _sendDelegationCommand({
+      type: 'FSB_DELEGATION_START',
+      challengeId: challengeId,
+      task: _delegationUiState.task
+    });
+  } catch (_startError) { /* handled as a rejected start below */ }
   if (originTabId === _activeTabIdSnapshot && originConversationId === conversationId) {
     _delegationUiState.pendingStart = false;
   }
 
   if (!_delegationValidLifecycleResponse(response) || response.ok !== true) {
+    _delegationReleaseCleanupReservation(cleanupOriginKey);
     if (originTabId !== _activeTabIdSnapshot || originConversationId !== conversationId) return;
     _delegationUiState.errorCode = response && typeof response.code === 'string'
       ? response.code
@@ -1984,6 +2261,15 @@ async function _beginDelegationStart(challengeId) {
     try { acceptedConversationId = await ensureTabConversationForActiveTab(false); }
     catch (_error) { acceptedConversationId = null; }
   }
+  var cleanupConversationId = _delegationValidConversationId(acceptedConversationId)
+    ? acceptedConversationId
+    : originConversationId;
+  var movedCleanupOriginKey = _delegationMoveCleanupReservation(
+    cleanupOriginKey,
+    originTabId,
+    cleanupConversationId
+  );
+  if (movedCleanupOriginKey) cleanupOriginKey = movedCleanupOriginKey;
   var acceptedDelegationId = response.snapshot.delegationId;
   var bindingCommitted = false;
   if (_delegationValidConversationId(acceptedConversationId)) {
@@ -1993,30 +2279,52 @@ async function _beginDelegationStart(challengeId) {
     );
   }
   if (!bindingCommitted) {
-    await _sendDelegationCommand({
-      type: 'FSB_DELEGATION_STOP',
-      delegationId: acceptedDelegationId
-    });
-    if (originTabId !== _activeTabIdSnapshot || originConversationId !== conversationId) return;
-    _delegationUiState.pendingStart = false;
-    _delegationUiState.delegationId = null;
-    _delegationUiState.snapshot = null;
-    _delegationUiState.task = originTask;
-    _delegationUiState.challengeId = null;
-    _delegationUiState.challengeExpiresAt = null;
-    _delegationUiState.subscribed = true;
-    _renderDelegationReadyState();
-    _delegationUiState.task = originTask;
-    _delegationUiState.errorCode = 'delegation_binding_persistence_failed';
-    var bindingFailureMount = _ensureDelegationMount();
-    bindingFailureMount.state.setAttribute('role', 'alert');
-    _renderDelegationInlineError(
-      bindingFailureMount.state,
-      'FSB could not save this agent run. A stop request was sent, and your message was kept. Try again.'
+    var cleanupRecord = _delegationUnboundCleanupByOrigin.get(cleanupOriginKey);
+    cleanupOriginKey = _delegationRememberUnboundCleanup(
+      cleanupRecord ? cleanupRecord.tabId : originTabId,
+      cleanupRecord ? cleanupRecord.conversationId : cleanupConversationId,
+      response.snapshot,
+      originTask,
+      true
     );
-    updateSendButtonState();
+    var stopResponse = null;
+    try {
+      stopResponse = await _sendDelegationCommand({
+        type: 'FSB_DELEGATION_STOP',
+        delegationId: acceptedDelegationId
+      });
+    } catch (_stopError) { /* retain the accepted in-memory authority below */ }
+    if (_delegationStopProvesTerminal(stopResponse, acceptedDelegationId)) {
+      _delegationForgetUnboundCleanup(cleanupOriginKey, acceptedDelegationId);
+      if (_delegationOriginIsSelected(originTabId, cleanupConversationId)) {
+        _delegationUiState.conversationId = cleanupConversationId;
+        _renderDelegationBindingFailureReady(originTask);
+      }
+      return;
+    }
+    var cleanupSnapshot = _delegationExactStopSnapshot(
+      stopResponse,
+      acceptedDelegationId,
+      response.snapshot
+    );
+    _delegationUpdateUnboundCleanup(
+      cleanupOriginKey,
+      acceptedDelegationId,
+      cleanupSnapshot,
+      originTask,
+      false
+    );
+    if (_delegationOriginIsSelected(originTabId, cleanupConversationId)) {
+      _retainUnboundDelegationCleanup(
+        cleanupSnapshot,
+        originTask,
+        cleanupOriginKey,
+        false
+      );
+    }
     return;
   }
+  _delegationReleaseCleanupReservation(cleanupOriginKey);
 
   if (originTabId !== _activeTabIdSnapshot || acceptedConversationId !== conversationId) {
     if (_delegationValidConversationId(acceptedConversationId)) {
@@ -2142,9 +2450,21 @@ async function _resumeDelegationControl(event) {
 
 async function _stopDelegation(event) {
   var snapshot = _delegationUiState.snapshot;
-  if (_delegationUiState.pendingStop || !_delegationIsActiveSnapshot(snapshot)) return;
+  if (_delegationUiState.pendingStop || !_delegationStopIsActionable(snapshot)) return;
   var selectedConversationId = _delegationUiState.conversationId;
+  var bindingCleanupPending = _delegationUiState.bindingCleanupPending === true;
+  var bindingCleanupOriginKey = _delegationUiState.bindingCleanupOriginKey;
+  var retainedTask = _delegationUiState.task;
   _delegationUiState.pendingStop = true;
+  if (bindingCleanupPending) {
+    _delegationUpdateUnboundCleanup(
+      bindingCleanupOriginKey,
+      snapshot.delegationId,
+      snapshot,
+      retainedTask,
+      true
+    );
+  }
   var control = event && event.currentTarget;
   if (control) {
     control.disabled = true;
@@ -2155,10 +2475,47 @@ async function _stopDelegation(event) {
     snapshot.delegationId + ':lifecycle:stopping',
     'Stopping agent'
   );
-  var response = await _sendDelegationCommand({
-    type: 'FSB_DELEGATION_STOP',
-    delegationId: snapshot.delegationId
-  });
+  var response = null;
+  try {
+    response = await _sendDelegationCommand({
+      type: 'FSB_DELEGATION_STOP',
+      delegationId: snapshot.delegationId
+    });
+  } catch (_stopError) { /* the exact in-memory authority stays actionable */ }
+  if (bindingCleanupPending) {
+    if (_delegationStopProvesTerminal(response, snapshot.delegationId)) {
+      _delegationForgetUnboundCleanup(bindingCleanupOriginKey, snapshot.delegationId);
+      if (selectedConversationId === _delegationUiState.conversationId
+          && snapshot.delegationId === _delegationUiState.delegationId
+          && _delegationIsSelectedConversation()) {
+        _renderDelegationBindingFailureReady(retainedTask);
+      }
+      return;
+    }
+    var retainedCleanupSnapshot = _delegationExactStopSnapshot(
+      response,
+      snapshot.delegationId,
+      snapshot
+    );
+    _delegationUpdateUnboundCleanup(
+      bindingCleanupOriginKey,
+      snapshot.delegationId,
+      retainedCleanupSnapshot,
+      retainedTask,
+      false
+    );
+    if (selectedConversationId === _delegationUiState.conversationId
+        && snapshot.delegationId === _delegationUiState.delegationId
+        && _delegationIsSelectedConversation()) {
+      _retainUnboundDelegationCleanup(
+        retainedCleanupSnapshot,
+        retainedTask,
+        bindingCleanupOriginKey,
+        false
+      );
+    }
+    return;
+  }
   if (selectedConversationId !== _delegationUiState.conversationId
       || snapshot.delegationId !== _delegationUiState.delegationId
       || !_delegationIsSelectedConversation()) return;
@@ -3436,9 +3793,9 @@ async function startNewChat() {
       sessionId: currentSessionId
     });
   }
-  if (_delegationIsActiveSnapshot(_delegationUiState.snapshot)) {
+  if (_delegationStopIsActionable(_delegationUiState.snapshot)) {
     await _stopDelegation();
-    if (_delegationIsActiveSnapshot(_delegationUiState.snapshot)) return;
+    if (_delegationStopIsActionable(_delegationUiState.snapshot)) return;
   }
 
   // Reset session state
