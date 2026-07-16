@@ -1,6 +1,6 @@
 ---
 phase: 62-ci-drift-smoke-gate-doctor-extensions
-reviewed: 2026-07-16T21:12:40Z
+reviewed: 2026-07-16T21:37:23Z
 depth: standard
 files_reviewed: 34
 files_reviewed_list:
@@ -46,22 +46,26 @@ findings:
 status: issues_found
 ---
 
-# Phase 62 Code Review — Final Fix Re-review
+# Phase 62 Code Review — Terminal Re-review
 
 ## Summary
 
-Iteration two resolves the snapshot-only row defect and the stale executable-contract pins. It also makes the ordinary expiry transition compatibility-only and preserves a manual success when the causal storage event arrives before the live response settles. Two composition gaps remain: the manual-success preservation depends on that event ordering, and the new expiry request is not tracked against a concurrent manual live refresh. Both were reproduced in the existing provider VM harness with adversarial response ordering.
+Iteration three closes the two orderings reported by the preceding review: causal provider-storage delivery is preserved both before the live response and after settlement, and an older expiry projection is discarded for both manual-first and expiry-first completion orders. Timer cancellation/replacement, compatibility-only expiry merging, the newer external generation path, and all asserted non-compatibility and UI identity invariants pass.
 
-The earlier CR-01 daemon/write recursion, stale badge/copy mismatch, missing exact-boundary expiry, doctor Date-range failure, and duplicate compatibility live-region owner remain resolved. This final standard review covered the original 34-file Phase 62 scope, the prior fix series, and iteration-two commits `79634d66`, `1cbafdcc`, `560db4ba`, `48983332`, and `d005d1eb` at HEAD `d005d1ebc1f27f8ce5812da85527aa9c75555649`.
+Two adjacent supersession gaps remain. A provider-storage debounce armed before a newer manual refresh can be reclassified as queued work and erase that successful refresh. Separately, a newer external/cache-only full evidence generation does not supersede an older expiry projection, so the late expiry result can overwrite it and cancel its deadline. Both were reproduced in the existing source VM harness with controlled response/timer ordering.
 
-## Iteration-Two Finding Disposition
+All findings predating iteration three remain closed: the daemon/write recursion, stale badge/copy mismatch, exact-boundary expiry defect, doctor Date-range failure, duplicate compatibility live-region ownership, snapshot-only canonical-row defect, stale executable-contract pins, late causal storage ordering, and manual/expiry overlap ordering. This terminal standard review covers the original 34-file Phase 62 scope and iteration-three commits `695b9171` and `7bab77a3` at HEAD `25e9746119d7dbbf86de82a0923022a381599f28`.
 
-| Prior finding | Final disposition |
+## Iteration-Three Disposition
+
+| Reviewed behavior | Terminal disposition |
 |---|---|
-| WR-01 — manual success erased by causal storage hydration | **Not fully resolved.** The new preservation path works when `fsbAgentProviders` changes while the live promise is still active, and the stock causal test covers that order. If the same cross-context notification is delivered after settlement, the generic debounce path still clears the announcement and changes `ready` to `stale`. |
-| WR-02 — expiry mutates unrelated evidence/recommendation | **Core side-effect resolved; concurrency regression remains.** Sequential expiry now merges compatibility only and preserves non-compatibility state. Its cache request is not registered as in flight, so an older expiry response can overwrite a newer manual refresh. |
-| WR-03 — snapshot-only compatibility has no agent rows | **Resolved.** A valid snapshot seeds exactly Claude Code, OpenCode, and Codex canonical rows with null clicked/installed/connected/live evidence; recommendation remains the API fallback and API rows are not manufactured. |
-| WR-04 — Phase 62 contract pins pre-fix source | **Resolved.** The pins now target the exact `>=` boundary and separated cache/live functions, and the complete contract passes 763/0 without dropping task, requirement, threat, authority, leakage, or deferred-UAT checks. |
+| Causal provider storage before the live response settles | **Resolved.** One cache-only hydration retains the manual `ready` state, polite announcement, and fresh evidence markers without repeating the daemon request or durable write. |
+| Causal provider storage after settlement | **Resolved.** The matching checked-at token preserves the settled manual success through the debounced cache hydration. |
+| Newer external provider generation after the causal event | **Resolved for the tested sequential path.** The newer generation hydrates normally and is not suppressed by causal deduplication. |
+| Expiry/manual overlap in manual-first and expiry-first completion orders | **Resolved.** Beginning the manual generation invalidates the older expiry projection in both orders. |
+| Compatibility expiry timer cancellation/replacement | **Resolved for the tested manual path.** The old deadline cannot fire after the manual generation replaces it, and the newer deadline remains armed. |
+| Compatibility-only and non-compatibility/UI invariants | **Resolved.** Expiry work preserves non-compatibility evidence, recommendation, focus, provider/model selection, row order, form values, dirty state, and storage writes. |
 
 ## Critical Findings
 
@@ -69,33 +73,33 @@ None.
 
 ## Warning Findings
 
-### WR-01 — Manual-success preservation depends on storage-event delivery order
+### WR-01 — A pending older provider-storage debounce can erase a newer manual success
 
 **Severity:** Warning
 
-**Files:** `extension/background.js:244-260`, `extension/ui/options.js:1209-1312`, `extension/ui/options.js:1626-1637`, `tests/providers-panel-ui.test.js:2423-2483`
+**Files:** `extension/ui/options.js:1277-1420`, `tests/providers-panel-ui.test.js:2610-2767`
 
-**Issue:** `preserveSuccessfulRefresh` is passed only when `providerEvidenceRefreshQueued` was set before the live refresh's `finally` clears `providerEvidenceRefreshPromise`. The durable compatibility write and the Options `chrome.storage.onChanged` callback cross extension contexts, but the implementation carries no refresh generation or causal token across that boundary. If `fsbAgentProviders` is delivered after the live promise settles, `scheduleProviderEvidenceRefresh()` sees no active promise and starts its ordinary debounced hydration. That call enters with `preserveSuccessfulRefresh: false`, clears the shared announcement, and maps the valid cache response to global `stale`. The new stock test emits storage synchronously inside the runtime dispatcher before returning the live response, so it exercises only the favorable ordering.
+**Issue:** A storage notification can arm `providerEvidenceRefreshDebounceHandle` before the user starts a newer manual refresh. Manual generation startup invalidates expiry work but does not cancel or generation-order that pending evidence debounce (`extension/ui/options.js:1289-1296`). If the debounce fires while the manual request is active, it moves its older checked-at value into `providerEvidenceRefreshQueued` (`extension/ui/options.js:1405-1414`). After the newer manual result succeeds, `finally` launches the queued cache hydration (`extension/ui/options.js:1372-1378`). Because the queued checked-at predates the manual result, `getProviderManualSuccessToken()` returns no preservation token, and the ordinary cache path clears the announcement and maps the response to global `stale`.
 
-**Reproduction:** A source-only VM composition completed a manual `refreshed` response first, then emitted its causal local storage notification. Final state was `announcement === ''` and `evidenceStatus === 'stale'` after one cache hydration.
+**Reproduction:** The source VM scheduled a provider-storage event at checked-at 600, began and held a manual refresh that would return checked-at 700, fired the old 100 ms debounce while the manual request was active, then resolved the manual response. The queued cache read ran afterward. Final state was `evidenceStatus === 'stale'` and an empty announcement, with one live request followed by one cache request.
 
-**Impact:** Depending on cross-context scheduling, the same successful authenticated refresh can either retain its one polite result or immediately lose it and display stale evidence. The accessibility and visible outcome is nondeterministic.
+**Impact:** An invalidation already represented by the newer manual result can deterministically erase its visible and accessible success state. The outcome depends on whether an older debounce happens to fire during the manual request.
 
-**Fix:** Carry an explicit manual-refresh generation through the next matching provider-storage hydration, independent of whether the notification arrives before or after promise settlement. Consume it only when the cache projection corresponds to the just-written or newer compatibility snapshot. Add both event-before-response and event-after-settlement cases, asserting one retained announcement, `ready`, no stale markers, one daemon request, and one durable write.
+**Fix:** Supersede or cancel pending older evidence debounce/queued invalidations when a manual generation starts, or retain their observed checked-at values and discard them after a newer manual result. Add a held-response test that schedules checked-at 600, starts manual checked-at 700, fires the debounce during the manual request, and asserts that no older post-manual hydration downgrades `ready` or clears the one success announcement.
 
-### WR-02 — An untracked expiry read can overwrite a newer manual refresh
+### WR-02 — An older expiry projection can overwrite a newer external evidence generation
 
 **Severity:** Warning
 
-**Files:** `extension/ui/options.js:1157-1206`, `extension/ui/options.js:1209-1233`, `tests/providers-panel-ui.test.js:2251-2361`
+**Files:** `extension/ui/options.js:1227-1306`, `extension/ui/options.js:1385-1420`, `tests/providers-panel-ui.test.js:2395-2555`, `tests/providers-panel-ui.test.js:2686-2767`
 
-**Issue:** `refreshProviderCompatibilityProjection()` checks `providerEvidenceRefreshPromise` at entry but never registers its own cache request in shared in-flight or generation state. Once the expiry request has started, `refreshProviderEvidence({ announce: true })` can concurrently start a live compatibility refresh. If the live response returns fresh Supported evidence first and the older expiry response returns Degraded afterward, the expiry merge applies that older compatibility to the newly refreshed client map and wins final state. The stock expiry test is sequential and resolves the cache projection before any other refresh, so it cannot expose this ordering.
+**Issue:** `refreshProviderCompatibilityProjection()` protects its result with `providerCompatibilityProjectionGeneration`, but only a manual live refresh advances that generation and clears the expiry timer (`extension/ui/options.js:1289-1296`). A full cache-only refresh started by a newer external provider-storage generation does neither. Therefore, if an old expiry read is pending, the newer external hydration can finish first and install Supported compatibility plus a new deadline; the old expiry response can then still pass its generation check, merge Degraded compatibility, and clear the newer deadline through `scheduleProviderCompatibilityExpiry(null)` (`extension/ui/options.js:1231-1248`).
 
-**Reproduction:** A source-only VM composition held the expiry cache response, completed a manual live refresh to Supported, then released the older Degraded expiry response. Final visible compatibility was Degraded while the retained live region still said `Provider status refreshed.`
+**Reproduction:** The source VM held an old expiry cache response, delivered a newer external provider-storage generation, completed its full cache hydration with Supported compatibility and a newer deadline, then released the old Degraded expiry response. Final compatibility was Degraded and no replacement expiry timer remained; the runtime performed the initial cache read, the held expiry read, and the external hydration read.
 
-**Impact:** A user can successfully refresh compatibility and immediately see older stale evidence overwrite it, with the success announcement contradicting the final badge. The stale response also replaces the newer expiry schedule with its own null deadline.
+**Impact:** Newer external evidence can be overwritten by older automatic expiry work, and its valid deadline can be silently cancelled. The final projection violates checked-at ordering even though each individual path works sequentially.
 
-**Fix:** Serialize or generation-order compatibility projections without causing a manual request to coalesce into a cache-only expiry operation. A manual live generation should supersede any older expiry read, and late results must be ignored. Add a held-response test that completes manual Supported before releasing old Degraded and asserts the final Supported projection, matching announcement, and newer deadline remain intact.
+**Fix:** Any full provider-evidence generation capable of returning a newer compatibility projection—manual or cache hydration—must supersede older expiry work, or expiry application must compare checked-at/generation ordering before merging. Add a held-response test that starts old expiry work, completes a newer external Supported hydration, releases old Degraded expiry, and asserts that Supported compatibility and the newer timer remain unchanged.
 
 ## Informational Findings
 
@@ -103,11 +107,11 @@ None.
 
 ## Verification Context
 
-- Syntax checks passed for the modified UI/storage sources and all three modified test files.
-- Focused stock checks passed: `providers-panel-ui`, `providers-panel-logic`, `mcp-agent-providers-storage`, `mcp-bridge-background-dispatch` (293/0), and `delegation-phase-contract` (763/0).
-- WR-03 was verified through the new snapshot-only test: exactly three neutral canonical agent rows, Claude Supported, OpenCode/Codex Unsupported, no API rows, no recommendation authority, and an available Claude expiry deadline.
-- WR-04 was verified against the updated exact-boundary and separated cache/live source pins; all 763 contract assertions passed.
-- Two read-only in-memory VM compositions reproduced WR-01's late-storage order and WR-02's expiry/manual response race. The temporary probe was removed; implementation and test files were not edited.
+- Syntax checks passed for `extension/ui/options.js` and `tests/providers-panel-ui.test.js`.
+- Focused stock suites passed: `providers-panel-ui`, `providers-panel-logic`, `mcp-agent-providers-storage`, `mcp-bridge-background-dispatch` (293/0), and `delegation-phase-contract` (763/0).
+- The stock UI suite verifies both causal storage orders, the later newer external generation, both expiry/manual completion orders, old-timer cancellation/new-timer replacement, compatibility-only merging, and all non-compatibility/UI identity invariants listed above.
+- Two read-only in-memory VM compositions reproduced WR-01's pre-existing-debounce ordering and WR-02's expiry/external-generation ordering. The temporary probe was removed; implementation and test files were not modified.
+- `git diff --check a93d6a0f..25e97461` passed.
 - No full or guarded root suite, live browser, installed CLI/native integration, network operation, or human UAT was run. All UAT remains deferred to the milestone-end sweep.
 - No commit was created by this review. Existing unrelated workspace changes were preserved.
 
