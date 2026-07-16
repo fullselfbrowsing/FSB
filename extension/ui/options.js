@@ -244,6 +244,10 @@ function cacheElements() {
   elements.providerRecommendationBadges = document.querySelectorAll('[data-provider-recommendation]');
   elements.providerEvidenceBadges = document.querySelectorAll('[data-provider-evidence]');
   elements.providerDescriptions = document.querySelectorAll('[data-provider-description]');
+  elements.providerCompatibilityGroups = document.querySelectorAll('[data-provider-compatibility-group]');
+  elements.providerCompatibilityIcons = document.querySelectorAll('[data-provider-compatibility-icon]');
+  elements.providerCompatibilityStatuses = document.querySelectorAll('[data-provider-compatibility-status]');
+  elements.providerCompatibilityDescriptions = document.querySelectorAll('[data-provider-compatibility-description]');
   elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
   elements.providerEvidenceAnnouncement = document.getElementById('providerEvidenceAnnouncement');
   elements.apiProviderDetails = document.getElementById('apiProviderDetails');
@@ -253,6 +257,9 @@ function cacheElements() {
   elements.agentEvidenceEmptyState = document.getElementById('agentEvidenceEmptyState');
   elements.agentInstallationStatus = document.getElementById('agentInstallationStatus');
   elements.agentConnectionStatus = document.getElementById('agentConnectionStatus');
+  elements.agentCompatibilityStatus = document.getElementById('agentCompatibilityStatus');
+  elements.agentCompatibilityHelp = document.getElementById('agentCompatibilityHelp');
+  elements.agentCompatibilityChecked = document.getElementById('agentCompatibilityChecked');
   elements.agentAccountStatus = document.getElementById('agentAccountStatus');
   elements.agentAccountHelp = document.getElementById('agentAccountHelp');
   elements.agentSetupStatus = document.getElementById('agentSetupStatus');
@@ -456,6 +463,8 @@ function getProviderPanelHelper() {
     && typeof helper.isApiProvider === 'function'
     && typeof helper.isAgentProvider === 'function'
     && typeof helper.normalizeSettings === 'function'
+    && typeof helper.getCompatibilityDisplayModel === 'function'
+    && typeof helper.getAgentAuthDisplay === 'function'
     ? helper
     : null;
 }
@@ -530,11 +539,12 @@ function requestMcpClients() {
           return;
         }
         const clients = copyProviderClientMap(getOwnDataValue(response, 'clients'));
-        if (!clients) {
+        const refreshOutcome = getOwnDataValue(response, 'refreshOutcome');
+        if (!clients || !['refreshed', 'stale', 'unavailable'].includes(refreshOutcome)) {
           settle(reject, new Error('provider_status_unavailable'));
           return;
         }
-        settle(resolve, clients);
+        settle(resolve, { clients: clients, refreshOutcome: refreshOutcome });
       });
     } catch (_error) {
       settle(reject, new Error('provider_status_unavailable'));
@@ -550,6 +560,59 @@ function getProviderBadgeByData(badges, dataKey, providerId) {
     return true;
   });
   return match;
+}
+
+function getProviderCompatibilityModel(helper, providerId) {
+  const row = getOwnDataValue(providerPanelState.clients, providerId);
+  return helper.getCompatibilityDisplayModel(providerId, row, (checkedAt) => {
+    return new Date(checkedAt).toLocaleString();
+  });
+}
+
+function setProviderCompatibilityClass(status, model) {
+  if (!status || !status.classList || !model) return;
+  status.classList.remove(
+    'compatibility-badge--supported',
+    'compatibility-badge--degraded',
+    'compatibility-badge--unsupported'
+  );
+  status.classList.add(model.className);
+}
+
+function setProviderCompatibilityIcon(icon, model) {
+  if (!icon || !icon.classList || !model) return;
+  icon.classList.remove('fa-circle-check', 'fa-triangle-exclamation', 'fa-circle-xmark');
+  icon.classList.add(model.icon);
+  icon.setAttribute('aria-hidden', 'true');
+}
+
+function renderProviderCompatibility() {
+  const helper = getProviderPanelHelper();
+  if (!helper || typeof helper.getCompatibilityDisplayModel !== 'function') return;
+  const statuses = elements.providerCompatibilityStatuses || [];
+
+  Array.prototype.forEach.call(statuses, (status) => {
+    const providerId = status.dataset?.providerCompatibilityStatus;
+    if (!helper.isAgentProvider(providerId)) return;
+    const model = getProviderCompatibilityModel(helper, providerId);
+    if (!model) return;
+    const icon = getProviderBadgeByData(
+      elements.providerCompatibilityIcons,
+      'providerCompatibilityIcon',
+      providerId
+    );
+    const description = getProviderBadgeByData(
+      elements.providerCompatibilityDescriptions,
+      'providerCompatibilityDescription',
+      providerId
+    );
+    status.textContent = model.label;
+    setProviderCompatibilityClass(status, model);
+    setProviderCompatibilityIcon(icon, model);
+    if (description) {
+      description.textContent = `Compatibility: ${model.label}. ${model.detail}`;
+    }
+  });
 }
 
 function renderProviderAccessibleDescriptions() {
@@ -721,6 +784,7 @@ function renderProviderEvidence() {
       && !hasSupportedAgentEvidence(helper);
     elements.agentEvidenceEmptyState.hidden = !absenceConfirmed;
   }
+  renderProviderCompatibility();
   renderOtherMcpClients(helper);
 }
 
@@ -734,6 +798,8 @@ function renderSelectedAgentDetails() {
   if (!definition) return;
   const row = getOwnDataValue(providerPanelState.clients, providerId);
   const status = helper.getAgentStatus(row);
+  const compatibility = getProviderCompatibilityModel(helper, providerId);
+  const auth = helper.getAgentAuthDisplay(providerId);
   const unavailable = providerPanelState.evidenceStatus === 'unavailable';
   const initialLoading = providerPanelState.evidenceStatus === 'loading'
     && !providerPanelState.hasSuccessfulEvidence;
@@ -759,9 +825,19 @@ function renderSelectedAgentDetails() {
       ? 'Status unavailable'
       : (status.live ? 'Connected now' : (status.seenBefore ? 'Seen before' : 'Not connected'));
   }
-  if (elements.agentAccountStatus) elements.agentAccountStatus.textContent = 'Not reported';
+  if (elements.agentCompatibilityStatus && compatibility) {
+    elements.agentCompatibilityStatus.textContent = compatibility.label;
+  }
+  if (elements.agentCompatibilityHelp && compatibility) {
+    elements.agentCompatibilityHelp.textContent = compatibility.detail;
+  }
+  if (elements.agentCompatibilityChecked && compatibility) {
+    elements.agentCompatibilityChecked.textContent = compatibility.checkedText || '';
+    elements.agentCompatibilityChecked.hidden = !compatibility.checkedText;
+  }
+  if (elements.agentAccountStatus && auth) elements.agentAccountStatus.textContent = auth.label;
   if (elements.agentAccountHelp) {
-    elements.agentAccountHelp.textContent = 'The CLI has not reported its account type.';
+    elements.agentAccountHelp.textContent = auth ? auth.help : '';
   }
   if (elements.agentSetupStatus) {
     if (providerPanelState.evidenceStatus === 'stale') {
@@ -944,28 +1020,50 @@ function setProviderEvidenceAnnouncement(message, isAlert = false) {
   announcement.setAttribute('aria-live', isAlert ? 'assertive' : 'polite');
 }
 
+function getSelectedCompatibilityLabel(helper) {
+  if (!helper || providerPanelState.providerKind !== 'agent'
+      || !helper.isAgentProvider(providerPanelState.agentProviderId)) return null;
+  const model = getProviderCompatibilityModel(helper, providerPanelState.agentProviderId);
+  return model ? model.label : null;
+}
+
 function refreshProviderEvidence({ announce = false } = {}) {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
+  const helper = getProviderPanelHelper();
+  const previousCompatibilityLabel = getSelectedCompatibilityLabel(helper);
   providerPanelState.evidenceStatus = 'loading';
   setProviderStatusRefreshing(true);
-  setProviderEvidenceAnnouncement('Refreshing provider status…');
+  setProviderEvidenceAnnouncement('');
   renderProviderRecommendation();
   renderProviderEvidence();
   renderSelectedAgentDetails();
 
   providerEvidenceRefreshPromise = requestMcpClients()
-    .then((clients) => {
-      const helper = getProviderPanelHelper();
-      providerPanelState.clients = clients;
-      providerPanelState.hasSuccessfulEvidence = true;
-      providerPanelState.evidenceStatus = 'ready';
-      providerPanelState.recommendation = helper.getRecommendation(clients);
-      setProviderEvidenceAnnouncement('Provider status refreshed.');
-      return clients;
+    .then((result) => {
+      providerPanelState.clients = result.clients;
+      providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';
+      providerPanelState.evidenceStatus = result.refreshOutcome === 'refreshed'
+        ? 'ready'
+        : result.refreshOutcome;
+      providerPanelState.recommendation = helper.getRecommendation(result.clients);
+      if (announce && result.refreshOutcome === 'refreshed') {
+        const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
+        const changed = previousCompatibilityLabel && nextCompatibilityLabel
+          && previousCompatibilityLabel !== nextCompatibilityLabel;
+        const compatibilityText = changed
+          ? ` Compatibility is now ${nextCompatibilityLabel}.`
+          : '';
+        setProviderEvidenceAnnouncement(`Provider status refreshed.${compatibilityText}`);
+      } else if (announce) {
+        const message = result.refreshOutcome === 'stale'
+          ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+          : 'Compatibility data is unavailable. Showing Unsupported.';
+        setProviderEvidenceAnnouncement(message, true);
+      }
+      return result.clients;
     })
     .catch(() => {
-      const helper = getProviderPanelHelper();
       if (providerPanelState.hasSuccessfulEvidence) {
         providerPanelState.evidenceStatus = 'stale';
       } else {
@@ -973,10 +1071,12 @@ function refreshProviderEvidence({ announce = false } = {}) {
         providerPanelState.evidenceStatus = 'unavailable';
         providerPanelState.recommendation = helper.getRecommendation(providerPanelState.clients);
       }
-      const message = providerPanelState.evidenceStatus === 'stale'
-        ? 'Provider status may be stale. Refresh after the FSB server reconnects.'
-        : 'Provider status is unavailable. Your selection is unchanged.';
-      setProviderEvidenceAnnouncement(message, announce);
+      if (announce) {
+        const message = providerPanelState.evidenceStatus === 'stale'
+          ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+          : 'Compatibility data is unavailable. Showing Unsupported.';
+        setProviderEvidenceAnnouncement(message, true);
+      }
       return providerPanelState.clients;
     })
     .finally(() => {

@@ -174,7 +174,13 @@
                           </span>
                           <span id="provider-agent-claude-code-description" class="visually-hidden" data-provider-description="claude-code"></span>
                         </span>
-                        <input class="provider-radio" type="radio" id="provider-agent-claude-code" name="fsbProviderSelection" value="claude-code" data-provider-kind="agent" data-provider-id="claude-code" aria-labelledby="provider-agent-claude-code-name" aria-describedby="provider-agent-claude-code-description">
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="claude-code">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="claude-code" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="claude-code">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-claude-code-compatibility-description" class="visually-hidden" data-provider-compatibility-description="claude-code">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-claude-code" name="fsbProviderSelection" value="claude-code" data-provider-kind="agent" data-provider-id="claude-code" aria-labelledby="provider-agent-claude-code-name" aria-describedby="provider-agent-claude-code-description provider-agent-claude-code-compatibility-description">
                       </label>
                       <label class="provider-row" for="provider-agent-opencode" data-provider-kind="agent" data-provider-id="opencode">
                         <span class="provider-row__content">
@@ -185,7 +191,13 @@
                           </span>
                           <span id="provider-agent-opencode-description" class="visually-hidden" data-provider-description="opencode"></span>
                         </span>
-                        <input class="provider-radio" type="radio" id="provider-agent-opencode" name="fsbProviderSelection" value="opencode" data-provider-kind="agent" data-provider-id="opencode" aria-labelledby="provider-agent-opencode-name" aria-describedby="provider-agent-opencode-description">
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="opencode">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="opencode" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="opencode">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-opencode-compatibility-description" class="visually-hidden" data-provider-compatibility-description="opencode">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-opencode" name="fsbProviderSelection" value="opencode" data-provider-kind="agent" data-provider-id="opencode" aria-labelledby="provider-agent-opencode-name" aria-describedby="provider-agent-opencode-description provider-agent-opencode-compatibility-description">
                       </label>
                       <label class="provider-row" for="provider-agent-codex" data-provider-kind="agent" data-provider-id="codex">
                         <span class="provider-row__content">
@@ -196,7 +208,13 @@
                           </span>
                           <span id="provider-agent-codex-description" class="visually-hidden" data-provider-description="codex"></span>
                         </span>
-                        <input class="provider-radio" type="radio" id="provider-agent-codex" name="fsbProviderSelection" value="codex" data-provider-kind="agent" data-provider-id="codex" aria-labelledby="provider-agent-codex-name" aria-describedby="provider-agent-codex-description">
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="codex">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="codex" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="codex">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-codex-compatibility-description" class="visually-hidden" data-provider-compatibility-description="codex">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-codex" name="fsbProviderSelection" value="codex" data-provider-kind="agent" data-provider-id="codex" aria-labelledby="provider-agent-codex-name" aria-describedby="provider-agent-codex-description provider-agent-codex-compatibility-description">
                       </label>
                     </div>
                   </section>
@@ -519,9 +537,15 @@
                   <dd id="agentConnectionStatus">Not reported</dd>
                 </div>
                 <div class="agent-provider-details__fact">
-                  <dt>Account</dt>
+                  <dt>Compatibility</dt>
+                  <dd id="agentCompatibilityStatus">Unsupported</dd>
+                  <dd id="agentCompatibilityHelp" class="agent-provider-details__help">FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</dd>
+                  <dd id="agentCompatibilityChecked" class="agent-provider-details__help" hidden></dd>
+                </div>
+                <div class="agent-provider-details__fact">
+                  <dt>Account/Auth</dt>
                   <dd id="agentAccountStatus">Not reported</dd>
-                  <dd id="agentAccountHelp" class="agent-provider-details__help">The CLI has not reported its account type.</dd>
+                  <dd id="agentAccountHelp" class="agent-provider-details__help">Claude Code does not report an auth state that FSB can safely read.</dd>
                 </div>
               </dl>
 

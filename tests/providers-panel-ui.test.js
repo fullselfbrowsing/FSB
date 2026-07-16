@@ -149,8 +149,11 @@ providerLabels.forEach((label, index) => {
     'provider row contains stable name and description spans plus its radio');
   assert.strictEqual(attribute(radio[0], 'aria-labelledby'), nameSpan[1],
     'radio accessible name resolves only from its stable provider-name span');
-  assert.strictEqual(attribute(radio[0], 'aria-describedby'), descriptionSpan[1],
-    'radio references its stable recommendation and evidence description');
+  const describedBy = String(attribute(radio[0], 'aria-describedby') || '').split(/\s+/).filter(Boolean);
+  const compatibilityDescriptionId = 'provider-agent-' + expectedContract[index].id
+    + '-compatibility-description';
+  assert.strictEqual(describedBy[0], descriptionSpan[1],
+    'radio retains its stable recommendation and evidence description first');
   assert.strictEqual(descriptionSpan[2], expectedContract[index].id,
     'description state is keyed to the same closed provider id');
   assert.strictEqual(nameSpan[2], PROVIDERS.getProviderDefinition(expectedContract[index].kind, expectedContract[index].id).displayName,
@@ -161,7 +164,48 @@ providerLabels.forEach((label, index) => {
     assert.strictEqual(attribute(badge, 'aria-hidden'), 'true',
       'changing recommendation and evidence text is excluded from the radio name');
   });
+  if (expectedContract[index].kind === 'agent') {
+    assert.deepStrictEqual(describedBy, [descriptionSpan[1], compatibilityDescriptionId],
+      'agent radio references compatibility alongside recommendation and evidence');
+    assert.match(label, new RegExp(
+      '<span class="provider-row__compatibility" data-provider-compatibility-group="'
+        + expectedContract[index].id + '">'
+    ));
+    assert.match(label, /<span class="provider-row__compatibility-label">Compatibility<\/span>/);
+    assert.match(label, new RegExp(
+      '<i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="'
+        + expectedContract[index].id + '" aria-hidden="true"><\\/i>'
+    ));
+    assert.match(label, new RegExp(
+      '<span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="'
+        + expectedContract[index].id + '">Unsupported<\\/span>'
+    ));
+    assert.match(label, new RegExp(
+      '<span id="' + compatibilityDescriptionId
+        + '" class="visually-hidden" data-provider-compatibility-description="'
+        + expectedContract[index].id + '">Compatibility: Unsupported\\. '
+    ));
+    const compatibilityGroup = label.match(
+      /<span class="provider-row__compatibility"[\s\S]*?<\/span>\s*<span id="provider-agent-[^"]+-compatibility-description"/
+    );
+    assert.ok(compatibilityGroup, 'compatibility is a sibling after the evidence content');
+    assert.doesNotMatch(compatibilityGroup[0], /role="status"|aria-live|tabindex=/,
+      'row compatibility is descriptive, non-live, and non-interactive');
+    assert.ok(
+      label.indexOf('class="provider-row__compatibility"') < label.indexOf('<input class="provider-radio"'),
+      'compatibility precedes the trailing native radio without moving it'
+    );
+  } else {
+    assert.deepStrictEqual(describedBy, [descriptionSpan[1]],
+      'API radio retains only its recommendation/evidence description');
+    assert.doesNotMatch(label, /provider-row__compatibility|data-provider-compatibility/,
+      'API rows receive no compatibility group or description');
+  }
 });
+assert.strictEqual((providersSection.match(/data-provider-compatibility-group=/g) || []).length, 3,
+  'exactly the three agent rows contain one compatibility group');
+assert.strictEqual((providersSection.match(/data-provider-compatibility-description=/g) || []).length, 3,
+  'exactly the three agent radios receive one stable compatibility description');
 
 const modelProviderMatch = HTML.match(/<select\b[^>]*\bid="modelProvider"[^>]*>[\s\S]*?<\/select>/);
 assert.ok(modelProviderMatch, 'hidden compatibility #modelProvider remains present');
@@ -233,9 +277,14 @@ assert.match(HTML, /id="agentProviderDetails"[^>]*hidden[^>]*aria-live="polite"/
 ].forEach((id) => assert.match(extractElement(HTML, 'div', 'apiProviderDetails'), new RegExp('id="' + id + '"')));
 
 const agentDetails = extractElement(HTML, 'div', 'agentProviderDetails');
-['Installation', 'Connection', 'Account', 'Setup', 'Usage', 'Tokens', 'Turns', 'Duration'].forEach((label) => {
+['Installation', 'Connection', 'Compatibility', 'Account/Auth', 'Setup', 'Usage', 'Tokens', 'Turns', 'Duration'].forEach((label) => {
   assert.ok(agentDetails.includes(label), 'agent details include ' + label);
 });
+assert.match(agentDetails, /<dt>Compatibility<\/dt>/);
+assert.match(agentDetails, /id="agentCompatibilityStatus">Unsupported<\/dd>/);
+assert.match(agentDetails,
+  /id="agentCompatibilityHelp"[^>]*>FSB cannot verify compatibility for this CLI\. Refresh status or review setup before starting a task\.<\/dd>/);
+assert.match(agentDetails, /id="agentCompatibilityChecked"[^>]*hidden><\/dd>/);
 assert.match(agentDetails, /id="agentUsageTokens">—<\/dd>/);
 assert.match(agentDetails, /id="agentUsageTurns">—<\/dd>/);
 assert.match(agentDetails, /id="agentUsageDuration">—<\/dd>/);
@@ -243,7 +292,7 @@ assert.match(agentDetails, /No delegated runs yet/);
 assert.strictEqual((agentDetails.match(/>—<\/dd>/g) || []).length, 3,
   'agent usage begins with exactly three unknown metric values');
 assert.match(agentDetails, /id="agentAccountStatus">Not reported<\/dd>/);
-assert.match(agentDetails, /The CLI has not reported its account type\./);
+assert.match(agentDetails, /Claude Code does not report an auth state that FSB can safely read\./);
 assert.match(agentDetails,
   /FSB uses this CLI's existing sign-in and does not need its credential\. Billing and limits follow the account or provider configured in the CLI\./);
 const pairingInputTag = agentDetails.match(/<input\b[^>]*\bid="mcpBridgePairingCode"[^>]*>/);
@@ -408,6 +457,8 @@ const requestClientsSource = extractFunction(JS, 'requestMcpClients');
 const refreshEvidenceSource = extractFunction(JS, 'refreshProviderEvidence');
 const recommendationRenderSource = extractFunction(JS, 'renderProviderRecommendation');
 const evidenceRenderSource = extractFunction(JS, 'renderProviderEvidence');
+const compatibilityRenderSource = extractFunction(JS, 'renderProviderCompatibility');
+const compatibilityModelSource = extractFunction(JS, 'getProviderCompatibilityModel');
 const descriptionRenderSource = extractFunction(JS, 'renderProviderAccessibleDescriptions');
 const otherClientsRenderSource = extractFunction(JS, 'renderOtherMcpClients');
 const agentDetailsRenderSource = extractFunction(JS, 'renderSelectedAgentDetails');
@@ -418,6 +469,10 @@ assert.match(requestClientsSource, /sendMessage\(\{ action: 'getMcpClients' \}/,
   'evidence uses the one Phase 57 runtime action');
 assert.match(requestClientsSource, /runtime\.lastError/);
 assert.match(requestClientsSource, /getOwnDataValue\(response, 'success'\) !== true/);
+assert.match(requestClientsSource, /getOwnDataValue\(response, 'refreshOutcome'\)/,
+  'Providers consumes the background-owned closed refresh outcome');
+assert.match(requestClientsSource, /\['refreshed', 'stale', 'unavailable'\]\.includes\(refreshOutcome\)/,
+  'unknown refresh outcomes fail closed before rendering');
 assert.match(JS, /const PROVIDER_EVIDENCE_TIMEOUT_MS\s*=\s*5000/);
 assert.match(requestClientsSource, /clearTimeout\(timeoutHandle\)/,
   'runtime request timer is cleared on callback settlement');
@@ -440,6 +495,25 @@ assert.doesNotMatch(descriptionRenderSource, /innerHTML|insertAdjacentHTML/,
 assert.match(evidenceRenderSource, /status\.checkedAt/);
 assert.doesNotMatch(evidenceRenderSource, /lastSeenAt|connectedAt|lastClickedAt/,
   'evidence rendering cannot substitute non-installed timestamps');
+assert.match(compatibilityRenderSource, /status\.textContent\s*=\s*model\.label/);
+assert.match(compatibilityRenderSource,
+  /description\.textContent\s*=\s*`Compatibility: \$\{model\.label\}\. \$\{model\.detail\}`/,
+  'compatibility descriptions use the closed model through text-only DOM assignment');
+assert.doesNotMatch(compatibilityRenderSource, /innerHTML|insertAdjacentHTML|role|aria-live/,
+  'compatibility rendering cannot interpret markup or create per-row live regions');
+assert.doesNotMatch(compatibilityRenderSource + compatibilityModelSource,
+  /setProviderSelection|markUnsavedChanges|getRecommendation|chrome\.storage|saveSettings|doctor|shell|process|native|wake|semver|version/i,
+  'compatibility rendering has no selection, recommendation, persistence, process, or version authority');
+assert.doesNotMatch(refreshEvidenceSource,
+  /setProviderSelection|markUnsavedChanges|saveSettings|chrome\.storage|doctor|shell|process|native|wake|semver|version/i,
+  'refresh never invokes selection, dirty-state, persistence, process, or version APIs');
+assert.match(refreshEvidenceSource,
+  /Compatibility is now \$\{nextCompatibilityLabel\}\./,
+  'manual success appends the exact selected-status transition sentence');
+assert.match(refreshEvidenceSource,
+  /Compatibility data could not be refreshed\. Cached support is now Degraded\./);
+assert.match(refreshEvidenceSource,
+  /Compatibility data is unavailable\. Showing Unsupported\./);
 assert.match(otherClientsRenderSource, /item\.textContent/);
 assert.doesNotMatch(otherClientsRenderSource, /innerHTML|insertAdjacentHTML/,
   'raw client names use text-only DOM population');
@@ -591,12 +665,19 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const recommendationBadges = [];
   const evidenceBadges = [];
   const providerDescriptions = [];
+  const compatibilityGroups = [];
+  const compatibilityIcons = [];
+  const compatibilityStatuses = [];
+  const compatibilityDescriptions = [];
   const providerIds = [
     ...PROVIDERS.AGENT_PROVIDER_IDS.map((id) => ['agent', id]),
     ...PROVIDERS.API_PROVIDER_IDS.map((id) => ['api', id])
   ];
   providerIds.forEach(([kind, id]) => {
-    const row = makeElement('row-' + kind + '-' + id, { classes: ['provider-row'] });
+    const row = makeElement('row-' + kind + '-' + id, {
+      classes: ['provider-row'],
+      dataset: { providerKind: kind, providerId: id }
+    });
     const radio = makeElement('provider-' + kind + '-' + id, {
       tagName: 'input',
       type: 'radio',
@@ -619,10 +700,50 @@ function createProviderHarness(initialStorage, harnessOptions) {
       classes: ['visually-hidden'],
       dataset: { providerDescription: id }
     });
+    let compatibilityGroup = null;
+    let compatibilityIcon = null;
+    let compatibilityStatus = null;
+    let compatibilityDescription = null;
+    if (kind === 'agent') {
+      compatibilityGroup = makeElement('', {
+        classes: ['provider-row__compatibility'],
+        dataset: { providerCompatibilityGroup: id }
+      });
+      compatibilityIcon = makeElement('', {
+        tagName: 'i',
+        classes: ['fas', 'fa-circle-xmark', 'provider-row__compatibility-icon'],
+        dataset: { providerCompatibilityIcon: id }
+      });
+      compatibilityStatus = makeElement('', {
+        classes: ['compatibility-badge', 'compatibility-badge--unsupported'],
+        dataset: { providerCompatibilityStatus: id },
+        textContent: 'Unsupported'
+      });
+      compatibilityDescription = makeElement(
+        'provider-agent-' + id + '-compatibility-description',
+        {
+          classes: ['visually-hidden'],
+          dataset: { providerCompatibilityDescription: id },
+          textContent: 'Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.'
+        }
+      );
+      compatibilityGroup.appendChild(compatibilityIcon);
+      compatibilityGroup.appendChild(compatibilityStatus);
+      compatibilityGroups.push(compatibilityGroup);
+      compatibilityIcons.push(compatibilityIcon);
+      compatibilityStatuses.push(compatibilityStatus);
+      compatibilityDescriptions.push(compatibilityDescription);
+      radio.setAttribute('aria-describedby',
+        providerDescription.id + ' ' + compatibilityDescription.id);
+    } else {
+      radio.setAttribute('aria-describedby', providerDescription.id);
+    }
     radio._providerRow = row;
     row.appendChild(recommendationBadge);
     row.appendChild(evidenceBadge);
     row.appendChild(providerDescription);
+    if (compatibilityGroup) row.appendChild(compatibilityGroup);
+    if (compatibilityDescription) row.appendChild(compatibilityDescription);
     row.appendChild(radio);
     providerRows.push(row);
     radios.push(radio);
@@ -631,6 +752,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     providerDescriptions.push(providerDescription);
     registry[radio.id] = radio;
     registry[providerDescription.id] = providerDescription;
+    if (compatibilityDescription) registry[compatibilityDescription.id] = compatibilityDescription;
   });
 
   const providerRoster = makeElement('providerRoster', { tagName: 'fieldset' });
@@ -651,6 +773,11 @@ function createProviderHarness(initialStorage, harnessOptions) {
   const agentEmptyState = makeElement('agentEvidenceEmptyState', { hidden: true });
   const agentInstallationStatus = makeElement('agentInstallationStatus');
   const agentConnectionStatus = makeElement('agentConnectionStatus');
+  const agentCompatibilityStatus = makeElement('agentCompatibilityStatus', { textContent: 'Unsupported' });
+  const agentCompatibilityHelp = makeElement('agentCompatibilityHelp', {
+    textContent: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.'
+  });
+  const agentCompatibilityChecked = makeElement('agentCompatibilityChecked', { hidden: true });
   const agentAccountStatus = makeElement('agentAccountStatus');
   const agentAccountHelp = makeElement('agentAccountHelp');
   const agentSetupStatus = makeElement('agentSetupStatus');
@@ -691,7 +818,8 @@ function createProviderHarness(initialStorage, harnessOptions) {
     providerRoster, modelProvider, modelName, modelDiscoveryStatus, refreshModelsBtn,
     apiDetails, agentDetails,
     agentDetailsHeading, agentNoCredentialCaption, agentEmptyState, agentInstallationStatus,
-    agentConnectionStatus, agentAccountStatus, agentAccountHelp, agentSetupStatus,
+    agentConnectionStatus, agentCompatibilityStatus, agentCompatibilityHelp,
+    agentCompatibilityChecked, agentAccountStatus, agentAccountHelp, agentSetupStatus,
     openAgentSetupGuideBtn, mcpBridgePairingCode, pairMcpBridgeBtn,
     removeMcpBridgePairingBtn, mcpBridgePairingStatus,
     agentUsageTokens, agentUsageTurns, agentUsageDuration,
@@ -731,16 +859,51 @@ function createProviderHarness(initialStorage, harnessOptions) {
       if (selector === '[data-provider-recommendation]') return recommendationBadges;
       if (selector === '[data-provider-evidence]') return evidenceBadges;
       if (selector === '[data-provider-description]') return providerDescriptions;
+      if (selector === '[data-provider-compatibility-group]') return compatibilityGroups;
+      if (selector === '[data-provider-compatibility-icon]') return compatibilityIcons;
+      if (selector === '[data-provider-compatibility-status]') return compatibilityStatuses;
+      if (selector === '[data-provider-compatibility-description]') return compatibilityDescriptions;
       if (selector === '.form-select, .chart-select') return [modelProvider];
       return [];
     },
     createElement(tagName) { return makeElement('', { tagName: tagName }); },
-    addEventListener() {}
+    addEventListener() {},
+    activeElement: null
   };
+  [
+    ...providerRows,
+    ...radios,
+    ...recommendationBadges,
+    ...evidenceBadges,
+    ...providerDescriptions,
+    ...compatibilityGroups,
+    ...compatibilityIcons,
+    ...compatibilityStatuses,
+    ...compatibilityDescriptions,
+    refreshButton,
+    modelProvider,
+    modelName,
+    apiKey,
+    geminiApiKey,
+    openaiApiKey,
+    anthropicApiKey,
+    customApiKey,
+    customEndpoint,
+    openrouterApiKey,
+    lmstudioBaseUrl
+  ].forEach((element) => {
+    element.focus = () => { document.activeElement = element; };
+  });
   function deliverRuntime(callback, response, error) {
     Promise.resolve().then(() => {
       chrome.runtime.lastError = error ? { message: String(error) } : null;
-      callback(response);
+      let delivered = response;
+      if (!error && delivered && delivered.success === true
+          && Object.prototype.hasOwnProperty.call(delivered, 'clients')
+          && !Object.prototype.hasOwnProperty.call(delivered, 'refreshOutcome')) {
+        delivered = { ...delivered, refreshOutcome: 'refreshed' };
+      }
+      callback(delivered);
       chrome.runtime.lastError = null;
     });
   }
@@ -872,10 +1035,15 @@ function createProviderHarness(initialStorage, harnessOptions) {
     sessionReads,
     runtimeCalls,
     scheduledTimeoutDelays,
+    providerRows,
     radios,
     recommendationBadges,
     evidenceBadges,
     providerDescriptions,
+    compatibilityGroups,
+    compatibilityIcons,
+    compatibilityStatuses,
+    compatibilityDescriptions,
     modelProvider,
     modelName,
     modelDiscoveryStatus,
@@ -891,6 +1059,9 @@ function createProviderHarness(initialStorage, harnessOptions) {
     agentEmptyState,
     agentInstallationStatus,
     agentConnectionStatus,
+    agentCompatibilityStatus,
+    agentCompatibilityHelp,
+    agentCompatibilityChecked,
     agentAccountStatus,
     agentAccountHelp,
     agentSetupStatus,
@@ -912,7 +1083,13 @@ function createProviderHarness(initialStorage, harnessOptions) {
     otherSummary,
     otherList,
     apiKey,
+    geminiApiKey,
+    openaiApiKey,
     anthropicApiKey,
+    customApiKey,
+    customEndpoint,
+    openrouterApiKey,
+    lmstudioBaseUrl,
     get storage() { return storage; },
     get sessionStorage() { return sessionStorage; },
     setStorage(next) { storage = { ...next }; },
@@ -1237,6 +1414,54 @@ function evidenceBadge(harness, providerId) {
   return harness.evidenceBadges.find((badge) => badge.dataset.providerEvidence === providerId);
 }
 
+function compatibilityStatus(harness, providerId) {
+  return harness.compatibilityStatuses.find(
+    (status) => status.dataset.providerCompatibilityStatus === providerId
+  );
+}
+
+function compatibilityIcon(harness, providerId) {
+  return harness.compatibilityIcons.find(
+    (icon) => icon.dataset.providerCompatibilityIcon === providerId
+  );
+}
+
+function compatibilityDescription(harness, providerId) {
+  return harness.compatibilityDescriptions.find(
+    (description) => description.dataset.providerCompatibilityDescription === providerId
+  );
+}
+
+function compatibilityIdentitySnapshot(harness) {
+  return {
+    selected: selectedRadio(harness)?.dataset.providerId || null,
+    focused: harness.context.document.activeElement?.id || null,
+    rowOrder: harness.providerRows.map((row) => [
+      row.dataset.providerKind,
+      row.dataset.providerId
+    ]),
+    recommendation: JSON.stringify(harness.state().recommendation),
+    providerKind: harness.state().providerKind,
+    agentProviderId: harness.state().agentProviderId,
+    modelProvider: harness.modelProvider.value,
+    modelName: harness.modelName.value,
+    apiKey: harness.apiKey.value,
+    geminiApiKey: harness.geminiApiKey.value,
+    openaiApiKey: harness.openaiApiKey.value,
+    anthropicApiKey: harness.anthropicApiKey.value,
+    customApiKey: harness.customApiKey.value,
+    customEndpoint: harness.customEndpoint.value,
+    openrouterApiKey: harness.openrouterApiKey.value,
+    lmstudioBaseUrl: harness.lmstudioBaseUrl.value,
+    dirty: harness.dashboardState().hasUnsavedChanges,
+    account: harness.agentAccountStatus.textContent,
+    accountHelp: harness.agentAccountHelp.textContent,
+    billing: harness.agentBillingStatus.textContent,
+    billingCopy: harness.agentBillingCopy.textContent,
+    writes: harness.writes.length
+  };
+}
+
 function providerDescription(harness, providerId) {
   return harness.providerDescriptions.find(
     (description) => description.dataset.providerDescription === providerId
@@ -1250,9 +1475,20 @@ async function runAgentDetailsTests() {
   harness.state().hasSuccessfulEvidence = true;
   harness.state().evidenceStatus = 'ready';
   harness.state().clients = {
-    'claude-code': { live: { agentId: 'claude-live' } },
-    opencode: { connected: { lastSeenAt: 20 } },
-    codex: { installed: { detected: true, checkedAt: 30 } }
+    'claude-code': {
+      live: { agentId: 'claude-live' },
+      compatibility: {
+        status: 'supported', reason: 'within_tested_range', checkedAt: 1_000
+      }
+    },
+    opencode: {
+      connected: { lastSeenAt: 20 },
+      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 1_000 }
+    },
+    codex: {
+      installed: { detected: true, checkedAt: 30 },
+      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 1_000 }
+    }
   };
 
   const expected = {
@@ -1260,6 +1496,9 @@ async function runAgentDetailsTests() {
       heading: 'Claude Code details',
       installation: 'Not installed',
       connection: 'Connected now',
+      compatibility: 'Supported',
+      compatibilityHelp: "This CLI is within FSB's fixture-tested compatibility range.",
+      authHelp: 'Claude Code does not report an auth state that FSB can safely read.',
       copy: "Uses the account signed into Claude Code. FSB does not need your Anthropic credential. Usage and charges follow that account's Claude plan or API configuration.",
       label: 'Review Claude plans and billing',
       url: 'https://claude.com/pricing'
@@ -1268,6 +1507,9 @@ async function runAgentDetailsTests() {
       heading: 'OpenCode details',
       installation: 'Not installed',
       connection: 'Seen before',
+      compatibility: 'Unsupported',
+      compatibilityHelp: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
+      authHelp: 'The CLI has not reported its account type.',
       copy: 'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.',
       label: 'Review OpenCode providers and billing',
       url: 'https://opencode.ai/docs/providers/'
@@ -1276,6 +1518,9 @@ async function runAgentDetailsTests() {
       heading: 'Codex details',
       installation: 'Installed',
       connection: 'Not connected',
+      compatibility: 'Unsupported',
+      compatibilityHelp: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
+      authHelp: 'The CLI has not reported its account type.',
       copy: "Uses the account signed into Codex. FSB does not need your OpenAI credential. Usage, credits, and charges follow that account's current OpenAI plan or API configuration.",
       label: 'Review current Codex billing',
       url: 'https://help.openai.com/en/articles/20001106-codex-rate-card-2'
@@ -1288,9 +1533,13 @@ async function runAgentDetailsTests() {
     assert.strictEqual(harness.agentDetailsHeading.textContent, contract.heading);
     assert.strictEqual(harness.agentInstallationStatus.textContent, contract.installation);
     assert.strictEqual(harness.agentConnectionStatus.textContent, contract.connection);
+    assert.strictEqual(harness.agentCompatibilityStatus.textContent, contract.compatibility);
+    assert.strictEqual(harness.agentCompatibilityHelp.textContent, contract.compatibilityHelp);
+    assert.match(harness.agentCompatibilityChecked.textContent, /^Checked /,
+      'validated compatibility timestamps render as localized absolute checked text');
+    assert.strictEqual(harness.agentCompatibilityChecked.hidden, false);
     assert.strictEqual(harness.agentAccountStatus.textContent, 'Not reported');
-    assert.strictEqual(harness.agentAccountHelp.textContent,
-      'The CLI has not reported its account type.');
+    assert.strictEqual(harness.agentAccountHelp.textContent, contract.authHelp);
     assert.strictEqual(harness.agentNoCredentialCaption.textContent,
       "FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.");
     assert.strictEqual(harness.agentUsageTokens.textContent, '—');
@@ -1421,15 +1670,18 @@ async function runProviderEvidenceTests() {
         codex: {
           id: 'codex', raw: false, displayName: 'Codex', clicked: null,
           installed: { detected: true, configPath: null, checkedAt: 500 },
-          connected: null, live: null
+          connected: null, live: null,
+          compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
         },
         opencode: {
           id: 'opencode', raw: false, displayName: 'OpenCode', clicked: { lastClickedAt: 900 },
-          installed: null, connected: null, live: { agentId: 'agent_open' }
+          installed: null, connected: null, live: { agentId: 'agent_open' },
+          compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
         },
         'claude-code': {
           id: 'claude-code', raw: false, displayName: 'Claude Code', clicked: null,
-          installed: null, connected: { lastSeenAt: 800 }, live: { agentId: 'agent_claude' }
+          installed: null, connected: { lastSeenAt: 800 }, live: { agentId: 'agent_claude' },
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 700 }
         }
       }
     }
@@ -1455,6 +1707,14 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(evidenceBadge(harness, 'claude-code').textContent, 'Connected now');
   assert.strictEqual(evidenceBadge(harness, 'opencode').textContent, 'Connected now');
   assert.strictEqual(evidenceBadge(harness, 'codex').textContent, 'Installed');
+  assert.strictEqual(compatibilityStatus(harness, 'claude-code').textContent, 'Supported');
+  assert.strictEqual(compatibilityIcon(harness, 'claude-code').classList.contains('fa-circle-check'), true);
+  assert.strictEqual(compatibilityDescription(harness, 'claude-code').textContent,
+    "Compatibility: Supported. This CLI is within FSB's fixture-tested compatibility range.");
+  for (const providerId of ['opencode', 'codex']) {
+    assert.strictEqual(compatibilityStatus(harness, providerId).textContent, 'Unsupported');
+    assert.strictEqual(compatibilityIcon(harness, providerId).classList.contains('fa-circle-xmark'), true);
+  }
   assert.strictEqual(providerDescription(harness, 'claude-code').textContent,
     'Recommended. Connected now.');
   assert.strictEqual(providerDescription(harness, 'opencode').textContent, 'Connected now.');
@@ -1598,7 +1858,7 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(harness.announcement.getAttribute('role'), 'alert');
   assert.strictEqual(harness.announcement.getAttribute('aria-live'), 'assertive');
   assert.strictEqual(harness.announcement.textContent,
-    'Provider status may be stale. Refresh after the FSB server reconnects.');
+    'Compatibility data could not be refreshed. Cached support is now Degraded.');
   assert.match(evidenceBadge(harness, 'codex').textContent, /Status may be stale/);
   assert.match(evidenceBadge(harness, 'codex').getAttribute('title'), /Status may be stale/);
   assert.doesNotMatch(evidenceBadge(harness, 'codex').getAttribute('title'), /private transport detail/);
@@ -1620,10 +1880,11 @@ async function runProviderEvidenceTests() {
     'unavailable agent evidence remains discoverable through the stable description');
   assert.strictEqual(providerDescription(malformed, 'xai').textContent, 'Recommended.');
   assert.strictEqual(malformed.announcement.getAttribute('role'), 'status',
-    'background failure retains polite status semantics');
+    'silent hydration retains non-alert semantics');
   assert.strictEqual(malformed.announcement.getAttribute('aria-live'), 'polite');
-  assert.strictEqual(malformed.announcement.textContent,
-    'Provider status is unavailable. Your selection is unchanged.');
+  assert.strictEqual(malformed.announcement.textContent, '');
+  assert.strictEqual(malformed.announcement.hidden, true,
+    'cold hydration failure is silent in the shared live region');
 
   const missingRuntime = createProviderHarness();
   missingRuntime.context.setProviderSelection('api', 'openai', { markDirty: false });
@@ -1632,6 +1893,127 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(missingRuntime.state().evidenceStatus, 'unavailable');
   assert.deepStrictEqual(visibleRecommendationIds(missingRuntime), ['xai']);
   assert.strictEqual(selectedRadio(missingRuntime).dataset.providerId, 'openai');
+
+  console.log('Providers panel UI: observational compatibility transitions');
+  const compatibilityClients = (compatibility) => ({
+    'claude-code': {
+      id: 'claude-code',
+      raw: false,
+      displayName: 'Claude Code',
+      clicked: null,
+      installed: { detected: true, configPath: null, checkedAt: 600 },
+      connected: null,
+      live: null,
+      compatibility
+    },
+    opencode: {
+      id: 'opencode', raw: false, displayName: 'OpenCode', clicked: null,
+      installed: null, connected: null, live: null,
+      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
+    },
+    codex: {
+      id: 'codex', raw: false, displayName: 'Codex', clicked: null,
+      installed: null, connected: null, live: null,
+      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
+    }
+  });
+  const supportedClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: 700
+  });
+  const observational = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      refreshOutcome: 'refreshed',
+      clients: supportedClients
+    }
+  });
+  observational.context.setupEventListeners();
+  observational.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  observational.state().clients = compatibilityClients({
+    status: 'unsupported', reason: 'matrix_invalid', checkedAt: 650
+  });
+  observational.state().recommendation = PROVIDERS.getRecommendation(observational.state().clients);
+  observational.state().evidenceStatus = 'ready';
+  observational.state().hasSuccessfulEvidence = true;
+  observational.modelName.appendChild(makeOption('preserved-model', 'preserved-model'));
+  observational.modelName.value = 'preserved-model';
+  observational.apiKey.value = 'xai-secret';
+  observational.geminiApiKey.value = 'gemini-secret';
+  observational.openaiApiKey.value = 'openai-secret';
+  observational.anthropicApiKey.value = 'anthropic-secret';
+  observational.customApiKey.value = 'custom-secret';
+  observational.customEndpoint.value = 'https://example.invalid/v1';
+  observational.openrouterApiKey.value = 'openrouter-secret';
+  observational.lmstudioBaseUrl.value = 'http://localhost:4444';
+  observational.dashboardState().hasUnsavedChanges = true;
+  observational.context.renderProviderRecommendation();
+  observational.context.renderProviderEvidence();
+  observational.context.renderSelectedAgentDetails();
+  observational.refreshButton.focus();
+  const beforeSupportedTransition = compatibilityIdentitySnapshot(observational);
+  await observational.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(compatibilityIdentitySnapshot(observational), beforeSupportedTransition,
+    'Unsupported to Supported refresh preserves focus, order, selection, recommendation, form, auth, billing, dirty state, and storage writes');
+  assert.strictEqual(compatibilityStatus(observational, 'claude-code').textContent, 'Supported');
+  assert.strictEqual(compatibilityStatus(observational, 'claude-code').classList.contains(
+    'compatibility-badge--supported'
+  ), true);
+  assert.strictEqual(compatibilityIcon(observational, 'claude-code').classList.contains(
+    'fa-circle-check'
+  ), true);
+  assert.strictEqual(observational.announcement.textContent,
+    'Provider status refreshed. Compatibility is now Supported.');
+  assert.strictEqual(observational.announcement.getAttribute('role'), 'status');
+  assert.strictEqual(observational.announcement.getAttribute('aria-live'), 'polite');
+  assert.strictEqual(observational.compatibilityGroups.length, 3);
+  assert.strictEqual(observational.compatibilityDescriptions.length, 3,
+    're-rendering reuses the three stable descriptions without duplication');
+
+  observational.setRuntimeResponse({
+    success: true,
+    refreshOutcome: 'stale',
+    clients: compatibilityClients({
+      status: 'degraded', reason: 'evidence_stale', checkedAt: 700
+    })
+  });
+  const beforeStaleTransition = compatibilityIdentitySnapshot(observational);
+  await observational.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(compatibilityIdentitySnapshot(observational), beforeStaleTransition,
+    'Supported to stale Degraded transition remains observational');
+  assert.strictEqual(compatibilityStatus(observational, 'claude-code').textContent, 'Degraded');
+  assert.strictEqual(compatibilityIcon(observational, 'claude-code').classList.contains(
+    'fa-triangle-exclamation'
+  ), true);
+  assert.strictEqual(observational.announcement.textContent,
+    'Compatibility data could not be refreshed. Cached support is now Degraded.');
+  assert.strictEqual(observational.announcement.getAttribute('role'), 'alert');
+  assert.strictEqual(observational.announcement.getAttribute('aria-live'), 'assertive');
+
+  observational.setRuntimeResponse({
+    success: true,
+    refreshOutcome: 'unavailable',
+    clients: compatibilityClients({
+      status: 'unsupported', reason: 'matrix_invalid', checkedAt: null
+    })
+  });
+  const beforeUnavailableTransition = compatibilityIdentitySnapshot(observational);
+  await observational.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(compatibilityIdentitySnapshot(observational), beforeUnavailableTransition,
+    'Degraded to Unsupported transition remains observational');
+  assert.strictEqual(compatibilityStatus(observational, 'claude-code').textContent, 'Unsupported');
+  assert.strictEqual(observational.announcement.textContent,
+    'Compatibility data is unavailable. Showing Unsupported.');
+
+  const invalidOutcome = createProviderHarness({}, {
+    runtimeResponse: { success: true, refreshOutcome: 'unknown', clients: supportedClients }
+  });
+  invalidOutcome.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  await invalidOutcome.context.refreshProviderEvidence({ announce: true });
+  assert.strictEqual(invalidOutcome.state().evidenceStatus, 'unavailable');
+  assert.strictEqual(compatibilityStatus(invalidOutcome, 'claude-code').textContent, 'Unsupported');
+  assert.strictEqual(invalidOutcome.announcement.textContent,
+    'Compatibility data is unavailable. Showing Unsupported.',
+    'unknown background outcomes fail closed without a fourth UI state');
 
   console.log('Providers panel UI: coalescing, manual refresh, storage debounce, and section entry');
   const coalesced = createProviderHarness({}, { holdRuntime: true });
