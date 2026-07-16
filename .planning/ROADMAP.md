@@ -131,7 +131,7 @@
   3. The diagnostics ring buffer classifies drift events as `agent_protocol_drift` with adapter id, expected vs observed fields, and rate-limits duplicate entries at the existing 1-per-10s bucket so a chatty drift does not blow the buffer.
   4. `doctor` emits a machine-readable adapter compatibility matrix that both the CI drift-smoke job and the extension can read; the extension consumes the matrix at boot (and on doctor refresh) to render `supported` / `degraded` / `unsupported` badges in the Providers panel — and never hardcodes CLI versions in extension source.
 **Plans**: 6 plans
-- [ ] 62-01: Establish the canonical adapter compatibility matrix/classifier and generalized offline drift-smoke CI gate.
+- [x] 62-01: Establish the canonical adapter compatibility matrix/classifier and generalized offline drift-smoke CI gate.
 - [ ] 62-02: Extend `doctor` with offline adapter diagnostics, safe spawn-secret metadata, and text/JSON parity.
 - [ ] 62-03: Carry the authenticated safe compatibility projection into background-owned durable, freshness-aware provider state.
 - [ ] 62-04: Project sanitized protocol-drift detail and report it exactly once through a true per-adapter pre-throttle.
@@ -184,7 +184,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
-| 62. CI Drift-Smoke Gate & Doctor Extensions | 0/0 | Not started | — |
+| 62. CI Drift-Smoke Gate & Doctor Extensions | 1/6 | In Progress | — |
 | 63. Native-Messaging Host | 0/0 | Not started | — |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
