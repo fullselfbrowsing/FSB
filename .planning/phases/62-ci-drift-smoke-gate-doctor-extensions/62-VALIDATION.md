@@ -1,10 +1,13 @@
 ---
 phase: 62
 slug: ci-drift-smoke-gate-doctor-extensions
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-15
+reviewed: 2026-07-16
+plan_count: 6
+validation_tasks: 17
 ---
 
 # Phase 62 — Validation Strategy
@@ -33,7 +36,7 @@ The guarded full-suite wrapper is mandatory because the workspace contains unrel
 
 ## Per-Task Verification Map
 
-The planner may refine plan boundaries, but every approved task must map to one row and retain an automated command. This draft assumes five bounded slices and must be synchronized with the final PLAN files before approval.
+Every approved task maps to one row and retains an automated command. The final plan set uses six bounded slices and 17 task IDs.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
@@ -45,12 +48,15 @@ The planner may refine plan boundaries, but every approved task must map to one 
 | 62-03-01 | 03 | 2 | DRIFT-04 | T62-05 | A separate authenticated read-only compatibility method accepts an exact empty payload and returns only the safe bounded projection | protocol/contract | `npm --prefix mcp run build && node tests/mcp-reverse-channel-contract.test.js && node tests/mcp-bridge-topology.test.js` | ✅ extend | ⬜ pending |
 | 62-03-02 | 03 | 2 | DRIFT-04 | T62-05, T62-06 | Background alone validates, freshness-downgrades, durably stores, and fans out compatibility while preserving sibling maps, unknown keys, and unsaved settings | VM/storage | `node tests/mcp-agent-providers-storage.test.js && node tests/mcp-bridge-background-dispatch.test.js` | ✅ extend | ⬜ pending |
 | 62-03-03 | 03 | 2 | DRIFT-04 | T62-05, T62-06 | Cold/manual refresh share the authenticated request, reject malformed/prototype data, never assert support on write failure, and do not overload `delegate.status` | bridge lifecycle | `node tests/mcp-bridge-client-lifecycle.test.js && node tests/mcp-bridge-background-dispatch.test.js && node tests/mcp-agent-providers-storage.test.js` | ✅ extend | ⬜ pending |
-| 62-04-01 | 04 | 2 | DRIFT-03 | T62-07 | Parser drift projects only closed bounded adapter/expected/observed labels into the existing exact-once domain terminal without expanding transport errors | daemon boundary | `npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js && node tests/mcp-reverse-channel-contract.test.js` | ✅ extend | ⬜ pending |
-| 62-04-02 | 04 | 2 | DRIFT-03 | T62-07, T62-08 | An injected-clock adapter bucket pre-throttles before `rateLimitedWarn`, so duplicate/reconnect delivery contributes at most one scrubbed FIFO row per 10 seconds | unit/fake-clock | `node tests/agent-protocol-drift-diagnostics.test.js && node tests/redact-for-log.test.js && node tests/diagnostics-ring-buffer.test.js` | ❌ W0/✅ retain | ⬜ pending |
-| 62-04-03 | 04 | 2 | DRIFT-03 | T62-07, T62-08 | Missing reporting helpers cannot break settlement; raw provider/task/path/secret data is unrepresentable and duplicate terminals remain idempotent | integration/security | `node tests/agent-protocol-drift-diagnostics.test.js && node tests/mcp-bridge-background-dispatch.test.js && npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js` | ❌ W0/✅ extend | ⬜ pending |
+| 62-04-01 | 04 | 3 | DRIFT-03 | T62-07 | Parser drift projects only closed bounded adapter/expected/observed labels into the existing exact-once domain terminal without expanding transport errors | daemon boundary | `npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js && node tests/mcp-reverse-channel-contract.test.js` | ✅ extend | ⬜ pending |
+| 62-04-02 | 04 | 3 | DRIFT-03 | T62-07, T62-08 | An injected-clock adapter bucket pre-throttles before `rateLimitedWarn`, so duplicate/reconnect delivery contributes at most one scrubbed FIFO row per 10 seconds | unit/fake-clock | `node tests/agent-protocol-drift-diagnostics.test.js && node tests/redact-for-log.test.js && node tests/diagnostics-ring-buffer.test.js` | ❌ W0/✅ retain | ⬜ pending |
+| 62-04-03 | 04 | 3 | DRIFT-03 | T62-07, T62-08 | Missing reporting helpers cannot break settlement; raw provider/task/path/secret data is unrepresentable and duplicate terminals remain idempotent | integration/security | `node tests/agent-protocol-drift-diagnostics.test.js && node tests/mcp-bridge-background-dispatch.test.js && npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js` | ❌ W0/✅ extend | ⬜ pending |
 | 62-05-01 | 05 | 3 | DRIFT-04 | T62-06 | Pure display mapping yields exactly Supported/Degraded/Unsupported, stale support only downgrades, and arbitrary version strings cannot influence UI status | unit/source | `node tests/providers-panel-logic.test.js` | ✅ extend | ⬜ pending |
 | 62-05-02 | 05 | 3 | DRIFT-04 | T62-06 | Agent rows render a separate accessible compatibility fact/badge while API rows do not; refresh preserves order, focus, selection, recommendation, auth, billing, dirty state, and persisted settings | DOM/accessibility contract | `node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js` | ✅ extend | ⬜ pending |
-| 62-05-03 | 05 | 3 | DRIFT-01–04 | T62-01–T62-08 | Root/CI/source contracts pin the named drift gate, all four requirements, no extension version/native/shell/wake authority, unchanged adapter/transport/provider contracts, and honest deferred UAT | phase/system contract | `node tests/delegation-phase-contract.test.js && node tests/mcp-agent-provider-contract.test.js && node tests/mcp-reverse-channel-contract.test.js && node tests/providers-panel-logic.test.js` | ✅ extend | ⬜ pending |
+| 62-05-03 | 05 | 3 | DRIFT-04 | T62-06 | Token-only compatibility badges, responsive dividers/wrapping, forced-colors, focus, and reduced-motion rules remain separate from existing row/radio/evidence styling | CSS/DOM source contract | `node tests/providers-panel-ui.test.js` | ✅ extend | ⬜ pending |
+| 62-06-01 | 06 | 4 | DRIFT-01–04 | T62-02 | Root serial tests add each new focused script exactly once, and root plus CI invoke the identical generalized drift command | package/source contract | `node -e "const p=require('./package.json');const s=p.scripts&&p.scripts.test||'';for(const x of ['node tests/mcp-adapter-compatibility.test.js','node tests/mcp-agent-drift-smoke.test.js','node tests/agent-protocol-drift-diagnostics.test.js'])if(s.split(x).length-1!==1)process.exit(1)"` | ✅ extend | ⬜ pending |
+| 62-06-02 | 06 | 4 | DRIFT-01–04 | T62-01–T62-08 | One final source contract pins all 17 task IDs, four requirements, trust schemas/key links, forbidden capabilities, and preserved Phase 59–61 interfaces | phase/security contract | `node tests/delegation-phase-contract.test.js && node tests/mcp-adapter-compatibility.test.js && node tests/mcp-reverse-channel-contract.test.js && node tests/providers-panel-logic.test.js` | ✅ extend | ⬜ pending |
+| 62-06-03 | 06 | 4 | DRIFT-02, DRIFT-04 | T62-01–T62-08 | Exactly three live/rendered/accessibility scenarios remain unchecked human_needed with pending results and empty evidence; the guarded full suite stays a separate final integration gate | artifact/contract | `node tests/delegation-phase-contract.test.js` | ❌ task creates/✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -75,6 +81,7 @@ The planner may refine plan boundaries, but every approved task must map to one 
 - [ ] Extend `tests/mcp-diagnostics-status.test.js` for injected registry/auth/clock inputs, offline rows, human/JSON parity, sentinel non-leak, and unchanged diagnostic-layer semantics.
 - [ ] Extend existing bridge/storage/UI tests for the authenticated safe projection, durable-write failure, prototype/unknown-key handling, staleness, exact badges, accessibility, and zero authority mutation.
 - [ ] Extend the existing phase/source contract so DRIFT-01–04, the named CI/root gate, invariant schemas, forbidden capabilities, and deferred UAT rows are mechanically pinned.
+- [ ] `.planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-HUMAN-UAT.md` — exactly three unchecked `human_needed` milestone-end scenarios with pending results and empty evidence.
 
 No new test runner, browser driver, process supervisor, network service, native host, or external dependency is required.
 
@@ -90,13 +97,13 @@ Every row remains `human_needed` and deferred to the single milestone-end UAT sw
 
 ## Validation Sign-Off
 
-- [ ] Final PLAN task ids match the per-task map.
-- [ ] Every task has an `<automated>` command or exact Wave 0 dependency.
-- [ ] Sampling continuity has no three consecutive tasks without automated verification.
-- [ ] Wave 0 covers every missing focused fixture.
-- [ ] No watch-mode, live provider, real process, browser, or retry-to-green command is used as automated evidence.
-- [ ] Guarded full-suite execution preserves unrelated dirty/staged state and protected hashes.
-- [ ] Manual checks remain pending at the milestone-end gate and are never fabricated.
-- [ ] `nyquist_compliant: true` is set only after plan-checker approval.
+- [x] Final PLAN task ids match the per-task map.
+- [x] Every task has an `<automated>` command or exact Wave 0 dependency.
+- [x] Sampling continuity has no three consecutive tasks without automated verification.
+- [x] Wave 0 covers every missing focused fixture.
+- [x] No watch-mode, live provider, real process, browser, or retry-to-green command is used as automated evidence.
+- [x] Guarded full-suite execution preserves unrelated dirty/staged state and protected hashes.
+- [x] Manual checks remain pending at the milestone-end gate and are never fabricated.
+- [x] `nyquist_compliant: true` is set only after plan-checker approval.
 
-**Approval:** pending
+**Approval:** approved 2026-07-16 after independent plan-checker PASS (6 plans, 17 tasks, 0 blockers, 0 warnings)

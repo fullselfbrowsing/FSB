@@ -130,7 +130,13 @@
   2. `fsb-mcp-server doctor` gains a per-adapter section reporting: binary path, version, auth state (parseable where the CLI exposes it), shared-secret presence, and the current spawn-secret rotation age — so an operator with only `doctor` output can identify which adapter failed and why.
   3. The diagnostics ring buffer classifies drift events as `agent_protocol_drift` with adapter id, expected vs observed fields, and rate-limits duplicate entries at the existing 1-per-10s bucket so a chatty drift does not blow the buffer.
   4. `doctor` emits a machine-readable adapter compatibility matrix that both the CI drift-smoke job and the extension can read; the extension consumes the matrix at boot (and on doctor refresh) to render `supported` / `degraded` / `unsupported` badges in the Providers panel — and never hardcodes CLI versions in extension source.
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 62-01: Establish the canonical adapter compatibility matrix/classifier and generalized offline drift-smoke CI gate.
+- [ ] 62-02: Extend `doctor` with offline adapter diagnostics, safe spawn-secret metadata, and text/JSON parity.
+- [ ] 62-03: Carry the authenticated safe compatibility projection into background-owned durable, freshness-aware provider state.
+- [ ] 62-04: Project sanitized protocol-drift detail and report it exactly once through a true per-adapter pre-throttle.
+- [ ] 62-05: Render exact, accessible, non-mutating compatibility badges and selected-provider details.
+- [ ] 62-06: Wire root/source/security gates and preserve all genuine live evidence in the pending milestone-end UAT ledger.
 
 ### Phase 63: Native-Messaging Host
 **Goal**: When the user has installed the optional native-messaging host, the "Agent offline" state auto-attempts to wake `fsb-mcp-server serve` before falling back to the Phase 61 doctor deep-link — closing the UX cliff introduced by the extension having no `nativeMessaging` permission through Phases 57-62. All spawn authority stays inside the serve daemon behind Phase 59's CHAN gates; the native host itself never spawns agent CLIs.
