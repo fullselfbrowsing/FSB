@@ -20,6 +20,13 @@ function assertEqual(actual, expected, msg) {
   assert(actual === expected, `${msg} (expected: ${expected}, got: ${actual})`);
 }
 
+function assertDeepEqual(actual, expected, msg) {
+  assert(
+    JSON.stringify(actual) === JSON.stringify(expected),
+    `${msg} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`,
+  );
+}
+
 const repoRoot = path.resolve(__dirname, '..');
 
 function makeSnapshot(overrides = {}) {
@@ -93,11 +100,71 @@ function assertOrdered(text, labels, msg) {
   }
 }
 
+function makeOfflineTopology() {
+  return {
+    instanceId: 'doctor-offline-test',
+    mode: 'disconnected',
+    hubConnected: false,
+    extensionConnected: false,
+    relayCount: 0,
+    pendingRequestCount: 0,
+    activeHubInstanceId: null,
+    lastExtensionHeartbeatAt: null,
+    lastDisconnectReason: 'offline-test',
+  };
+}
+
+function makeOfflineBridge() {
+  return {
+    topology: makeOfflineTopology(),
+    isConnected: false,
+    async connect() {
+      throw new Error('offline-test');
+    },
+    disconnect() {},
+    async sendAndWait() {
+      throw new Error('offline-test');
+    },
+  };
+}
+
+function makeAdapterRegistry(detect) {
+  const adapter = Object.freeze({ detect });
+  return Object.freeze({
+    ids() {
+      return Object.freeze(['claude-code']);
+    },
+    require(id) {
+      if (id !== 'claude-code') throw new Error('unknown adapter');
+      return adapter;
+    },
+  });
+}
+
+function makeDetection(overrides = {}) {
+  return {
+    installed: true,
+    version: '2.1.177',
+    authState: 'authenticated',
+    binary: {
+      command: '/opt/claude',
+      realPath: '/opt/claude',
+      argvPrefix: [],
+    },
+    profileVersion: '2.1.177',
+    ...overrides,
+  };
+}
+
 async function run() {
   const diagnosticsUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'diagnostics.js')).href;
   const indexUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'index.js')).href;
   const diagnostics = await import(diagnosticsUrl);
   const indexModule = await import(indexUrl);
+  const compatibilityUrl = pathToFileURL(
+    path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'compatibility.js'),
+  ).href;
+  const compatibility = await import(compatibilityUrl);
 
   const cases = [
     ['package', makeSnapshot({ versionParityOk: false, packageVersion: '0.5.2', serverJsonVersion: '0.5.2' }), 'package'],
@@ -155,6 +222,194 @@ async function run() {
   assert(packageDoctor.includes('Why:'), 'doctor output includes Why:');
   assert(packageDoctor.includes('Next action:'), 'doctor output includes Next action:');
   assert(packageDoctor.includes('Package / version parity'), 'doctor output includes package label');
+
+  console.log('\n--- offline adapter and bridge-auth collection ---');
+  const secretSentinel = 'DOCTOR_SHARED_SECRET_SENTINEL';
+  const sessionSentinel = 'DOCTOR_SESSION_ID_SENTINEL';
+  const envSentinel = 'DOCTOR_ENV_AUTH_SENTINEL';
+  const previousAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = envSentinel;
+  let offlineSnapshot;
+  try {
+    offlineSnapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0, includeConfig: true, includeTabs: true },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+        readBridgeAuthState: () => ({
+          version: 1,
+          allowedExtensionOrigin: 'chrome-extension://doctor-test',
+          sessionSecret: secretSentinel,
+          sessionId: sessionSentinel,
+          rotatedAt: 9000,
+        }),
+        now: () => 10_000,
+      },
+    );
+  } finally {
+    if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousAnthropicKey;
+  }
+
+  assertEqual(offlineSnapshot.diagnosticLayer, 'bridge', 'offline bridge keeps historical diagnostic-layer precedence');
+  assertEqual(offlineSnapshot.checkedAt, '1970-01-01T00:00:10.000Z', 'injected clock controls the deterministic snapshot timestamp');
+  assert(
+    offlineSnapshot.compatibilityMatrix === compatibility.ADAPTER_COMPATIBILITY_MATRIX,
+    'doctor snapshot reuses the canonical compatibility matrix object',
+  );
+  assertEqual(offlineSnapshot.adapterDiagnostics.length, 1, 'doctor emits one row for the shipped registry/matrix adapter');
+  const doctorRow = offlineSnapshot.adapterDiagnostics[0];
+  assertDeepEqual(
+    Object.keys(doctorRow).sort(),
+    [
+      'adapterId',
+      'authState',
+      'binaryPath',
+      'compatibilityReason',
+      'compatibilityStatus',
+      'detectedVersion',
+      'displayLabel',
+      'profileVersion',
+    ],
+    'adapter doctor row has exactly the eight allowed keys',
+  );
+  assertDeepEqual(
+    doctorRow,
+    {
+      adapterId: 'claude-code',
+      displayLabel: 'Claude Code',
+      binaryPath: '/opt/claude',
+      detectedVersion: '2.1.177',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'unknown',
+      profileVersion: '2.1.177',
+    },
+    'doctor row reports canonical detector-backed facts without inferring Claude auth',
+  );
+  assertDeepEqual(
+    offlineSnapshot.bridgeAuthMetadata,
+    {
+      sharedSecretPresent: true,
+      secretRotatedAt: 9000,
+      secretRotationAgeMs: 1000,
+    },
+    'bridge auth is immediately projected to the three allowed metadata fields',
+  );
+  assertDeepEqual(
+    Object.keys(offlineSnapshot.bridgeAuthMetadata).sort(),
+    ['secretRotatedAt', 'secretRotationAgeMs', 'sharedSecretPresent'],
+    'bridge-auth doctor metadata has exactly three allowed keys',
+  );
+  const serializedOfflineSnapshot = JSON.stringify(offlineSnapshot);
+  for (const sentinel of [secretSentinel, sessionSentinel, envSentinel, 'allowedExtensionOrigin']) {
+    assert(!serializedOfflineSnapshot.includes(sentinel), `serialized offline doctor snapshot omits ${sentinel}`);
+  }
+
+  console.log('\n--- malformed injected authorities fail closed ---');
+  const throwingSnapshot = await diagnostics.collectBridgeDiagnostics(
+    { waitForExtensionMs: 0 },
+    {
+      bridgeFactory: makeOfflineBridge,
+      adapterRegistry: makeAdapterRegistry(async () => {
+        throw new Error('detector-secret-DO-NOT-LEAK');
+      }),
+      readBridgeAuthState: () => {
+        throw new Error('auth-secret-DO-NOT-LEAK');
+      },
+      now: () => 10_000,
+    },
+  );
+  assertDeepEqual(
+    throwingSnapshot.adapterDiagnostics[0],
+    {
+      adapterId: 'claude-code',
+      displayLabel: 'Claude Code',
+      binaryPath: null,
+      detectedVersion: null,
+      compatibilityStatus: 'unsupported',
+      compatibilityReason: 'binary_not_found',
+      authState: 'unknown',
+      profileVersion: '2.1.177',
+    },
+    'detector exceptions become deterministic unsupported facts',
+  );
+  assertDeepEqual(
+    throwingSnapshot.bridgeAuthMetadata,
+    {
+      sharedSecretPresent: false,
+      secretRotatedAt: null,
+      secretRotationAgeMs: null,
+    },
+    'auth-reader exceptions become deterministic unavailable metadata',
+  );
+  assert(!JSON.stringify(throwingSnapshot).includes('DO-NOT-LEAK'), 'injected exception text never enters the snapshot');
+
+  const unshippedRegistrySnapshot = await diagnostics.collectBridgeDiagnostics(
+    { waitForExtensionMs: 0 },
+    {
+      bridgeFactory: makeOfflineBridge,
+      adapterRegistry: Object.freeze({
+        ids: () => Object.freeze(['future-adapter']),
+        require: () => { throw new Error('must not resolve an unshipped row'); },
+      }),
+      readBridgeAuthState: () => null,
+      now: () => 10_000,
+    },
+  );
+  assertEqual(
+    unshippedRegistrySnapshot.adapterDiagnostics.length,
+    0,
+    'doctor enumerates only adapter ids present in both the shipped registry and canonical matrix',
+  );
+
+  let accessorReads = 0;
+  const accessorDetection = makeDetection();
+  Object.defineProperty(accessorDetection, 'binary', {
+    enumerable: true,
+    get() {
+      accessorReads++;
+      return { realPath: '/poisoned/path' };
+    },
+  });
+  const poisonedAuth = Object.create({ sessionSecret: 'INHERITED_SECRET' });
+  poisonedAuth.rotatedAt = 9000;
+  const poisonedSnapshot = await diagnostics.collectBridgeDiagnostics(
+    { waitForExtensionMs: 0 },
+    {
+      bridgeFactory: makeOfflineBridge,
+      adapterRegistry: makeAdapterRegistry(async () => accessorDetection),
+      readBridgeAuthState: () => poisonedAuth,
+      now: () => 10_000,
+    },
+  );
+  assertEqual(accessorReads, 0, 'doctor never invokes an accessor on injected detector output');
+  assertEqual(poisonedSnapshot.adapterDiagnostics[0].compatibilityStatus, 'unsupported', 'accessor-bearing detection fails closed');
+  assertEqual(poisonedSnapshot.adapterDiagnostics[0].binaryPath, null, 'accessor-bearing path is discarded');
+  assertDeepEqual(
+    poisonedSnapshot.bridgeAuthMetadata,
+    { sharedSecretPresent: false, secretRotatedAt: null, secretRotationAgeMs: null },
+    'prototype-bearing auth state fails closed without inherited reads',
+  );
+
+  const futureAuthSnapshot = await diagnostics.collectBridgeDiagnostics(
+    { waitForExtensionMs: 0 },
+    {
+      bridgeFactory: makeOfflineBridge,
+      adapterRegistry: makeAdapterRegistry(async () => makeDetection({
+        binary: { command: '/opt/claude', realPath: '/'.repeat(4097), argvPrefix: [] },
+      })),
+      readBridgeAuthState: () => ({ sessionSecret: secretSentinel, rotatedAt: 10_001 }),
+      now: () => 10_000,
+    },
+  );
+  assertEqual(futureAuthSnapshot.adapterDiagnostics[0].binaryPath, null, 'overlong detector path is discarded');
+  assertEqual(futureAuthSnapshot.adapterDiagnostics[0].compatibilityStatus, 'unsupported', 'invalid retained path cannot assert compatibility');
+  assertDeepEqual(
+    futureAuthSnapshot.bridgeAuthMetadata,
+    { sharedSecretPresent: true, secretRotatedAt: null, secretRotationAgeMs: null },
+    'future rotation timestamp keeps presence but fails timestamp metadata closed',
+  );
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);

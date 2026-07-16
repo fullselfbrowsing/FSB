@@ -1,6 +1,21 @@
 import { readFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import type { WebSocketBridge } from './bridge.js';
 import { WebSocketBridge as Bridge } from './bridge.js';
+import { readBridgeAuthState as readPrivateBridgeAuthState } from './bridge-auth.js';
+import type { AdapterDetection } from './agent-providers/adapter.js';
+import {
+  ADAPTER_COMPATIBILITY_MATRIX,
+  classifyAdapterCompatibility,
+  getAdapterCompatibilityContract,
+  type AdapterCompatibilityMatrix,
+  type CompatibilityReason,
+  type CompatibilityStatus,
+} from './agent-providers/compatibility.js';
+import {
+  createProductionAdapterRegistry,
+  type AgentProviderRegistry,
+} from './agent-providers/registry.js';
 import type { BridgeTopologyState } from './types.js';
 import {
   DEFAULT_HTTP_HOST,
@@ -10,6 +25,9 @@ import {
 } from './version.js';
 
 const CONTENT_SCRIPT_STALE_MS = 10_000;
+const MAX_DOCTOR_ADAPTERS = 16;
+const MAX_DOCTOR_FIELD_LENGTH = 64;
+const MAX_DOCTOR_PATH_LENGTH = 4096;
 const VERSION_FILES = {
   packageJson: new URL('../package.json', import.meta.url),
   serverJson: new URL('../server.json', import.meta.url),
@@ -49,6 +67,23 @@ export type ContentScriptDiagnostics = {
   readinessSource: string | null;
 };
 
+export type AdapterDoctorRow = Readonly<{
+  adapterId: string;
+  displayLabel: string;
+  binaryPath: string | null;
+  detectedVersion: string | null;
+  compatibilityStatus: CompatibilityStatus;
+  compatibilityReason: CompatibilityReason;
+  authState: 'unknown';
+  profileVersion: string;
+}>;
+
+export type BridgeAuthDoctorMetadata = Readonly<{
+  sharedSecretPresent: boolean;
+  secretRotatedAt: number | null;
+  secretRotationAgeMs: number | null;
+}>;
+
 export type BridgeDiagnostics = {
   checkedAt: string;
   bridgeUrl: string;
@@ -65,6 +100,9 @@ export type BridgeDiagnostics = {
   versionParityOk: boolean;
   activeTab: BridgeActiveTabDiagnostics;
   contentScript: ContentScriptDiagnostics;
+  compatibilityMatrix: AdapterCompatibilityMatrix;
+  adapterDiagnostics: readonly AdapterDoctorRow[];
+  bridgeAuthMetadata: BridgeAuthDoctorMetadata;
   bridgeClient?: Record<string, unknown> | null;
   extensionConfig?: Record<string, unknown> | null;
   tabsSummary?: { totalTabs: number; activeTabId: number | null };
@@ -74,6 +112,18 @@ export type BridgeDiagnostics = {
   nextAction: string;
   error?: string;
 };
+
+type DiagnosticsBridge = Pick<
+  WebSocketBridge,
+  'topology' | 'isConnected' | 'connect' | 'disconnect' | 'sendAndWait'
+>;
+
+export interface BridgeDiagnosticsDependencies {
+  readonly bridgeFactory?: () => DiagnosticsBridge;
+  readonly adapterRegistry?: AgentProviderRegistry;
+  readonly readBridgeAuthState?: () => unknown;
+  readonly now?: () => number;
+}
 
 export const DIAGNOSTIC_LAYER_LABELS: Record<BridgeDiagnosticLayer, string> = {
   package: 'Package / version parity',
@@ -86,6 +136,200 @@ export const DIAGNOSTIC_LAYER_LABELS: Record<BridgeDiagnosticLayer, string> = {
 };
 
 type ProbeScope = Exclude<BridgeDiagnosticNote['scope'], 'package' | 'connect'>;
+
+function ownDataRecord(value: unknown): Readonly<Record<string, unknown>> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+
+  const record: Record<string, unknown> = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') return null;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+    record[key] = descriptor.value;
+  }
+  return record;
+}
+
+function denseStringArray(value: unknown): readonly string[] | null {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+  if (!Number.isSafeInteger(value.length) || value.length > MAX_DOCTOR_ADAPTERS) return null;
+
+  const values: string[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+    if (!boundedDoctorString(descriptor.value, MAX_DOCTOR_FIELD_LENGTH)) return null;
+    values.push(descriptor.value);
+  }
+  if (Reflect.ownKeys(value).length !== value.length + 1) return null;
+  return new Set(values).size === values.length ? Object.freeze(values) : null;
+}
+
+function boundedDoctorString(value: unknown, maximumLength: number): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= maximumLength
+    && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function readOwnCallable(
+  value: unknown,
+  name: string,
+): ((...args: unknown[]) => unknown) | null {
+  const record = ownDataRecord(value);
+  const candidate = record?.[name];
+  return typeof candidate === 'function'
+    ? candidate as (...args: unknown[]) => unknown
+    : null;
+}
+
+function readNowMs(now: () => number): number {
+  try {
+    const value = now();
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function defaultDoctorAdapterRegistry(): AgentProviderRegistry {
+  return createProductionAdapterRegistry({
+    kill: async () => {
+      throw new Error('Doctor registry has no process-termination authority');
+    },
+  });
+}
+
+function unavailableAdapterRow(
+  adapterId: string,
+  displayLabel: string,
+  profileVersion: string,
+): AdapterDoctorRow {
+  const compatibility = classifyAdapterCompatibility(adapterId, {
+    binaryFound: false,
+    version: null,
+  });
+  return Object.freeze({
+    adapterId,
+    displayLabel,
+    binaryPath: null,
+    detectedVersion: null,
+    compatibilityStatus: compatibility.status,
+    compatibilityReason: compatibility.reason,
+    authState: 'unknown',
+    profileVersion,
+  });
+}
+
+function normalizeAdapterDetection(
+  value: unknown,
+): { binaryPath: string | null; version: string | null; evidenceVersion: string | null } | null {
+  const detection = ownDataRecord(value);
+  if (!detection) return null;
+
+  const binary = detection.binary === null ? null : ownDataRecord(detection.binary);
+  const realPath = binary?.realPath;
+  const binaryPath = boundedDoctorString(realPath, MAX_DOCTOR_PATH_LENGTH)
+    && isAbsolute(realPath)
+    ? realPath
+    : null;
+  const evidenceVersion = typeof detection.version === 'string' ? detection.version : null;
+  const version = boundedDoctorString(evidenceVersion, MAX_DOCTOR_FIELD_LENGTH)
+    ? evidenceVersion
+    : null;
+
+  return Object.freeze({ binaryPath, version, evidenceVersion });
+}
+
+async function collectAdapterDoctorRows(
+  registry: AgentProviderRegistry,
+): Promise<readonly AdapterDoctorRow[]> {
+  const idsMethod = readOwnCallable(registry, 'ids');
+  const requireMethod = readOwnCallable(registry, 'require');
+  let registryIds: readonly string[] | null = null;
+  if (idsMethod) {
+    try {
+      registryIds = denseStringArray(idsMethod.call(registry));
+    } catch {
+      registryIds = null;
+    }
+  }
+
+  const rows: AdapterDoctorRow[] = [];
+  if (!registryIds || !requireMethod) return Object.freeze(rows);
+  for (const adapterId of registryIds) {
+    const contract = getAdapterCompatibilityContract(adapterId);
+    if (!contract) continue;
+
+    let detection: AdapterDetection | null = null;
+    try {
+      const adapter = requireMethod.call(registry, adapterId);
+      const detectMethod = readOwnCallable(adapter, 'detect');
+      if (detectMethod) {
+        detection = await detectMethod.call(adapter) as AdapterDetection;
+      }
+    } catch {
+      detection = null;
+    }
+
+    const normalized = normalizeAdapterDetection(detection);
+    if (!normalized) {
+      rows.push(unavailableAdapterRow(
+        contract.adapterId,
+        contract.displayLabel,
+        contract.profileVersion,
+      ));
+      continue;
+    }
+
+    const compatibility = classifyAdapterCompatibility(contract.adapterId, {
+      binaryFound: normalized.binaryPath !== null,
+      version: normalized.evidenceVersion,
+    });
+    rows.push(Object.freeze({
+      adapterId: contract.adapterId,
+      displayLabel: contract.displayLabel,
+      binaryPath: normalized.binaryPath,
+      detectedVersion: compatibility.reason === 'version_malformed'
+        || compatibility.reason === 'version_missing'
+        ? null
+        : normalized.version,
+      compatibilityStatus: compatibility.status,
+      compatibilityReason: compatibility.reason,
+      authState: 'unknown',
+      profileVersion: contract.profileVersion,
+    }));
+  }
+  return Object.freeze(rows);
+}
+
+function projectBridgeAuthMetadata(
+  reader: () => unknown,
+  nowMs: number,
+): BridgeAuthDoctorMetadata {
+  let auth: Readonly<Record<string, unknown>> | null = null;
+  try {
+    auth = ownDataRecord(reader());
+  } catch {
+    auth = null;
+  }
+
+  const sharedSecretPresent = boundedDoctorString(
+    auth?.sessionSecret,
+    MAX_DOCTOR_PATH_LENGTH,
+  );
+  const rotatedAt = auth?.rotatedAt;
+  const validRotatedAt = typeof rotatedAt === 'number'
+    && Number.isSafeInteger(rotatedAt)
+    && rotatedAt >= 0
+    && rotatedAt <= nowMs;
+  return Object.freeze({
+    sharedSecretPresent,
+    secretRotatedAt: validRotatedAt ? rotatedAt : null,
+    secretRotationAgeMs: validRotatedAt ? nowMs - rotatedAt : null,
+  });
+}
 
 function emptyActiveTab(): BridgeActiveTabDiagnostics {
   return {
@@ -200,7 +444,7 @@ function extractProbeFailure(
 }
 
 async function runBridgeProbe(
-  bridge: WebSocketBridge,
+  bridge: DiagnosticsBridge,
   scope: ProbeScope,
   type: string,
   timeout: number,
@@ -407,7 +651,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export async function waitForExtensionConnection(
-  bridge: WebSocketBridge,
+  bridge: DiagnosticsBridge,
   timeoutMs: number,
   pollMs = 100,
 ): Promise<boolean> {
@@ -423,13 +667,29 @@ export async function collectBridgeDiagnostics(options: {
   waitForExtensionMs?: number;
   includeConfig?: boolean;
   includeTabs?: boolean;
-} = {}): Promise<BridgeDiagnostics> {
-  const bridge = new Bridge();
+} = {}, dependencies: BridgeDiagnosticsDependencies = {}): Promise<BridgeDiagnostics> {
+  const dependencyRecord = ownDataRecord(dependencies);
+  const bridgeFactory = typeof dependencyRecord?.bridgeFactory === 'function'
+    ? dependencyRecord.bridgeFactory as () => DiagnosticsBridge
+    : () => new Bridge();
+  const adapterRegistry = dependencyRecord?.adapterRegistry as AgentProviderRegistry | undefined
+    ?? defaultDoctorAdapterRegistry();
+  const authReader = typeof dependencyRecord?.readBridgeAuthState === 'function'
+    ? dependencyRecord.readBridgeAuthState as () => unknown
+    : readPrivateBridgeAuthState;
+  const now = typeof dependencyRecord?.now === 'function'
+    ? dependencyRecord.now as () => number
+    : Date.now;
+  const nowMs = readNowMs(now);
+  const checkedAt = new Date(nowMs).toISOString();
+  const adapterDiagnostics = await collectAdapterDoctorRows(adapterRegistry);
+  const bridgeAuthMetadata = projectBridgeAuthMetadata(authReader, nowMs);
+  const bridge = bridgeFactory();
   const waitForExtensionMs = options.waitForExtensionMs ?? 1500;
   const versionMetadata = await readVersionMetadata();
   const notes = [...versionMetadata.notes];
   let diagnostics: BridgeDiagnostics = applyDiagnosticClassification({
-    checkedAt: new Date().toISOString(),
+    checkedAt,
     bridgeUrl: FSB_EXTENSION_BRIDGE_URL,
     bridgeMode: bridge.topology.mode,
     extensionConnected: bridge.topology.extensionConnected,
@@ -444,6 +704,9 @@ export async function collectBridgeDiagnostics(options: {
     versionParityOk: versionMetadata.versionParityOk,
     activeTab: emptyActiveTab(),
     contentScript: emptyContentScript(),
+    compatibilityMatrix: ADAPTER_COMPATIBILITY_MATRIX,
+    adapterDiagnostics,
+    bridgeAuthMetadata,
     extensionConfig: undefined,
     bridgeClient: null,
     tabsSummary: undefined,
@@ -498,7 +761,7 @@ export async function collectBridgeDiagnostics(options: {
   const probeNotes = uniqueNotes(notes);
   diagnostics = applyDiagnosticClassification({
     ...diagnostics,
-    checkedAt: new Date().toISOString(),
+    checkedAt,
     probeNotes: probeNotes.length > 0 ? probeNotes : undefined,
     error: probeNotes[0]?.message,
   });
