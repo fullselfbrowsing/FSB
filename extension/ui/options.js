@@ -552,6 +552,46 @@ function projectStaleProviderCompatibility(clients) {
   return projected;
 }
 
+function isValidProviderCompatibilityProjection(value) {
+  if (!isProviderDataRecord(value)) return false;
+  const status = getOwnDataValue(value, 'status');
+  const reason = getOwnDataValue(value, 'reason');
+  const checkedAt = getOwnDataValue(value, 'checkedAt');
+  if (!Number.isSafeInteger(checkedAt) || checkedAt < 0) return false;
+  if (status === 'supported') return reason === 'within_tested_range';
+  if (status === 'degraded') {
+    return reason === 'newer_than_tested_range' || reason === 'evidence_stale';
+  }
+  return status === 'unsupported' && [
+    'binary_not_found',
+    'version_missing',
+    'version_malformed',
+    'below_minimum',
+    'wrong_major',
+    'adapter_unshipped',
+    'matrix_invalid'
+  ].includes(reason);
+}
+
+function mergeProviderCompatibilityProjection(currentClients, projectedClients) {
+  const helper = getProviderPanelHelper();
+  const merged = copyProviderClientMap(currentClients) || Object.create(null);
+  if (!helper || !Array.isArray(helper.AGENT_PROVIDER_IDS)) return null;
+  let mergedAny = false;
+  helper.AGENT_PROVIDER_IDS.forEach((providerId) => {
+    const currentRow = getOwnDataValue(merged, providerId);
+    const projectedRow = getOwnDataValue(projectedClients, providerId);
+    const compatibility = getOwnDataValue(projectedRow, 'compatibility');
+    if (!isProviderDataRecord(currentRow)
+        || !isValidProviderCompatibilityProjection(compatibility)) return;
+    const nextRow = copyProviderDataRecord(currentRow);
+    nextRow.compatibility = copyProviderDataRecord(compatibility);
+    merged[providerId] = nextRow;
+    mergedAny = true;
+  });
+  return mergedAny ? merged : null;
+}
+
 function hasDegradedProviderCompatibility(clients) {
   const row = getOwnDataValue(clients, 'claude-code');
   const compatibility = getOwnDataValue(row, 'compatibility');
@@ -865,6 +905,20 @@ function renderProviderEvidence() {
   renderOtherMcpClients(helper);
 }
 
+function renderSelectedAgentCompatibility(helper, providerId) {
+  const compatibility = getProviderCompatibilityModel(helper, providerId);
+  if (elements.agentCompatibilityStatus && compatibility) {
+    elements.agentCompatibilityStatus.textContent = compatibility.label;
+  }
+  if (elements.agentCompatibilityHelp && compatibility) {
+    elements.agentCompatibilityHelp.textContent = compatibility.detail;
+  }
+  if (elements.agentCompatibilityChecked && compatibility) {
+    elements.agentCompatibilityChecked.textContent = compatibility.checkedText || '';
+    elements.agentCompatibilityChecked.hidden = !compatibility.checkedText;
+  }
+}
+
 function renderSelectedAgentDetails() {
   const helper = getProviderPanelHelper();
   renderDelegationTrustControl();
@@ -875,7 +929,6 @@ function renderSelectedAgentDetails() {
   if (!definition) return;
   const row = getOwnDataValue(providerPanelState.clients, providerId);
   const status = helper.getAgentStatus(row);
-  const compatibility = getProviderCompatibilityModel(helper, providerId);
   const auth = helper.getAgentAuthDisplay(providerId);
   const unavailable = providerPanelState.evidenceStatus === 'unavailable';
   const initialLoading = providerPanelState.evidenceStatus === 'loading'
@@ -902,16 +955,7 @@ function renderSelectedAgentDetails() {
       ? 'Status unavailable'
       : (status.live ? 'Connected now' : (status.seenBefore ? 'Seen before' : 'Not connected'));
   }
-  if (elements.agentCompatibilityStatus && compatibility) {
-    elements.agentCompatibilityStatus.textContent = compatibility.label;
-  }
-  if (elements.agentCompatibilityHelp && compatibility) {
-    elements.agentCompatibilityHelp.textContent = compatibility.detail;
-  }
-  if (elements.agentCompatibilityChecked && compatibility) {
-    elements.agentCompatibilityChecked.textContent = compatibility.checkedText || '';
-    elements.agentCompatibilityChecked.hidden = !compatibility.checkedText;
-  }
+  renderSelectedAgentCompatibility(helper, providerId);
   if (elements.agentAccountStatus && auth) elements.agentAccountStatus.textContent = auth.label;
   if (elements.agentAccountHelp) {
     elements.agentAccountHelp.textContent = auth ? auth.help : '';
@@ -1124,8 +1168,42 @@ function scheduleProviderCompatibilityExpiry(expiresAt) {
   if (!Number.isSafeInteger(delay) || delay > MAX_TIMEOUT_DELAY_MS) return;
   providerCompatibilityExpiryHandle = setTimeout(() => {
     providerCompatibilityExpiryHandle = null;
-    refreshProviderEvidence({ liveCompatibility: false });
+    refreshProviderCompatibilityProjection();
   }, delay);
+}
+
+function refreshProviderCompatibilityProjection() {
+  if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
+  const helper = getProviderPanelHelper();
+  return requestMcpClients(false)
+    .then((result) => {
+      if (result.refreshOutcome === 'unavailable') {
+        throw new Error('provider_compatibility_unavailable');
+      }
+      const merged = mergeProviderCompatibilityProjection(
+        providerPanelState.clients,
+        result.clients
+      );
+      if (!merged) throw new Error('provider_compatibility_unavailable');
+      providerPanelState.clients = merged;
+      scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
+      renderProviderCompatibility();
+      if (helper && providerPanelState.providerKind === 'agent'
+          && helper.isAgentProvider(providerPanelState.agentProviderId)) {
+        renderSelectedAgentCompatibility(helper, providerPanelState.agentProviderId);
+      }
+      return providerPanelState.clients;
+    })
+    .catch(() => {
+      clearProviderCompatibilityExpiryTimer();
+      providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
+      renderProviderCompatibility();
+      if (helper && providerPanelState.providerKind === 'agent'
+          && helper.isAgentProvider(providerPanelState.agentProviderId)) {
+        renderSelectedAgentCompatibility(helper, providerPanelState.agentProviderId);
+      }
+      return providerPanelState.clients;
+    });
 }
 
 function refreshProviderEvidence({

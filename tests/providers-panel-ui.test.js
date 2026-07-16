@@ -1629,6 +1629,13 @@ function compatibilityIdentitySnapshot(harness) {
   };
 }
 
+function nonCompatibilityClientSnapshot(harness) {
+  return Object.fromEntries(Object.entries(harness.state().clients).map(([providerId, row]) => [
+    providerId,
+    Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'compatibility'))
+  ]));
+}
+
 function providerDescription(harness, providerId) {
   return harness.providerDescriptions.find(
     (description) => description.dataset.providerDescription === providerId
@@ -2261,13 +2268,18 @@ async function runProviderEvidenceTests() {
           })
         };
       }
+      const changedEvidenceClients = compatibilityClients({
+        status: 'degraded', reason: 'evidence_stale', checkedAt: expiryCheckedAt
+      });
+      changedEvidenceClients['claude-code'].clicked = { lastClickedAt: expiryAt };
+      changedEvidenceClients['claude-code'].installed = null;
+      changedEvidenceClients['claude-code'].connected = { lastSeenAt: expiryAt };
+      changedEvidenceClients['claude-code'].live = { agentId: 'cache-only-claude' };
       return {
         success: true,
         refreshOutcome: 'stale',
         compatibilityExpiresAt: null,
-        clients: compatibilityClients({
-          status: 'degraded', reason: 'evidence_stale', checkedAt: expiryCheckedAt
-        })
+        clients: changedEvidenceClients
       };
     }
   });
@@ -2284,6 +2296,26 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(expiring.scheduledTimeoutDelays.includes(15 * 60 * 1000), true,
     'fresh supported evidence schedules one exact authoritative expiry deadline');
   const beforeAutomaticExpiry = compatibilityIdentitySnapshot(expiring);
+  const beforeNonCompatibilityClients = nonCompatibilityClientSnapshot(expiring);
+  const beforeAutomaticExpiryEvidence = {
+    evidenceStatus: expiring.state().evidenceStatus,
+    hasSuccessfulEvidence: expiring.state().hasSuccessfulEvidence,
+    badges: expiring.evidenceBadges.map((badge) => ({
+      providerId: badge.dataset.providerEvidence,
+      text: badge.textContent,
+      title: badge.getAttribute('title'),
+      stale: badge.getAttribute('data-stale')
+    })),
+    installation: expiring.agentInstallationStatus.textContent,
+    connection: expiring.agentConnectionStatus.textContent,
+    setup: expiring.agentSetupStatus.textContent
+  };
+  const beforeCompatibilityProjection = Object.fromEntries(
+    expiring.compatibilityStatuses.map((status) => [
+      status.dataset.providerCompatibilityStatus,
+      status.textContent
+    ])
+  );
 
   expiring.setNow(expiryAt);
   expiring.advanceTimersBy(15 * 60 * 1000);
@@ -2300,6 +2332,31 @@ async function runProviderEvidenceTests() {
     'the open provider row ages Supported to Degraded at exactly fifteen minutes');
   assert.strictEqual(expiring.agentCompatibilityStatus.textContent, 'Degraded',
     'selected-provider details stay coherent with the automatically aged row');
+  assert.deepStrictEqual(nonCompatibilityClientSnapshot(expiring), beforeNonCompatibilityClients,
+    'automatic expiry ignores cache changes to clicked, installed, connected, and live evidence');
+  assert.deepStrictEqual({
+    evidenceStatus: expiring.state().evidenceStatus,
+    hasSuccessfulEvidence: expiring.state().hasSuccessfulEvidence,
+    badges: expiring.evidenceBadges.map((badge) => ({
+      providerId: badge.dataset.providerEvidence,
+      text: badge.textContent,
+      title: badge.getAttribute('title'),
+      stale: badge.getAttribute('data-stale')
+    })),
+    installation: expiring.agentInstallationStatus.textContent,
+    connection: expiring.agentConnectionStatus.textContent,
+    setup: expiring.agentSetupStatus.textContent
+  }, beforeAutomaticExpiryEvidence,
+  'automatic expiry preserves evidence status, badges, and selected non-compatibility details');
+  assert.deepStrictEqual(Object.fromEntries(
+    expiring.compatibilityStatuses.map((status) => [
+      status.dataset.providerCompatibilityStatus,
+      status.textContent
+    ])
+  ), {
+    ...beforeCompatibilityProjection,
+    'claude-code': 'Degraded'
+  }, 'automatic expiry changes only the expiring Supported compatibility projection');
   assert.deepStrictEqual(compatibilityIdentitySnapshot(expiring), beforeAutomaticExpiry,
     'automatic expiry preserves focus, selection, row order, form values, dirty state, and storage');
 
