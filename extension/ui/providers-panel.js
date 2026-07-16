@@ -15,6 +15,42 @@
     'opencode',
     'codex'
   ]);
+  var COMPATIBILITY_UNSUPPORTED_REASONS = Object.freeze({
+    binary_not_found: true,
+    version_missing: true,
+    version_malformed: true,
+    below_minimum: true,
+    wrong_major: true,
+    adapter_unshipped: true,
+    matrix_invalid: true
+  });
+  var COMPATIBILITY_SUPPORTED_MODEL = Object.freeze({
+    label: 'Supported',
+    icon: 'fa-circle-check',
+    className: 'compatibility-badge--supported',
+    detail: "This CLI is within FSB's fixture-tested compatibility range."
+  });
+  var COMPATIBILITY_DEGRADED_NEWER_MODEL = Object.freeze({
+    label: 'Degraded',
+    icon: 'fa-triangle-exclamation',
+    className: 'compatibility-badge--degraded',
+    detail: "This CLI is newer than FSB's fixture-tested range. You can keep it selected; existing start checks still apply."
+  });
+  var COMPATIBILITY_DEGRADED_STALE_MODEL = Object.freeze({
+    label: 'Degraded',
+    icon: 'fa-triangle-exclamation',
+    className: 'compatibility-badge--degraded',
+    detail: 'Compatibility evidence is stale. Refresh status to check again.'
+  });
+  var COMPATIBILITY_UNSUPPORTED_MODEL = Object.freeze({
+    label: 'Unsupported',
+    icon: 'fa-circle-xmark',
+    className: 'compatibility-badge--unsupported',
+    detail: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.'
+  });
+  var AGENT_AUTH_NOT_REPORTED = 'Not reported';
+  var CLAUDE_AUTH_HELP = 'Claude Code does not report an auth state that FSB can safely read.';
+  var GENERIC_AGENT_AUTH_HELP = 'The CLI has not reported its account type.';
 
   var API_PROVIDER_SET = createProviderSet(API_PROVIDER_IDS);
   var AGENT_PROVIDER_SET = createProviderSet(AGENT_PROVIDER_IDS);
@@ -110,6 +146,15 @@
 
   function isRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isPlainDataRecord(value) {
+    if (!isRecord(value)) return false;
+    try {
+      return Object.getPrototypeOf(value) === Object.prototype;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function isApiProvider(id) {
@@ -213,8 +258,79 @@
       seenBefore: connected && !live,
       clicked: clicked,
       primaryLabel: primaryLabel,
-      authLabel: 'Not reported',
+      authLabel: AGENT_AUTH_NOT_REPORTED,
       checkedAt: checkedAt
+    };
+  }
+
+  function createCompatibilityDisplayModel(model, checkedText) {
+    return {
+      label: model.label,
+      icon: model.icon,
+      className: model.className,
+      detail: model.detail,
+      checkedText: checkedText
+    };
+  }
+
+  function formatCompatibilityCheckedText(checkedAt, formatAbsoluteDateTime) {
+    if (!Number.isSafeInteger(checkedAt) || checkedAt < 0
+        || typeof formatAbsoluteDateTime !== 'function') return null;
+    try {
+      var formatted = formatAbsoluteDateTime(checkedAt);
+      if (typeof formatted !== 'string' || !formatted.trim()) return null;
+      return 'Checked ' + formatted.trim();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getCompatibilityDisplayModel(providerId, row, formatAbsoluteDateTime) {
+    if (!isAgentProvider(providerId)) return null;
+    var fallback = createCompatibilityDisplayModel(COMPATIBILITY_UNSUPPORTED_MODEL, null);
+    if (!isPlainDataRecord(row)) return fallback;
+    var compatibility = getOwnValue(row, 'compatibility');
+    if (!isPlainDataRecord(compatibility)) return fallback;
+
+    var status = getOwnValue(compatibility, 'status');
+    var reason = getOwnValue(compatibility, 'reason');
+    var checkedAt = getOwnValue(compatibility, 'checkedAt');
+    var hasCheckedAt = Number.isSafeInteger(checkedAt) && checkedAt >= 0;
+    var checkedText = formatCompatibilityCheckedText(checkedAt, formatAbsoluteDateTime);
+
+    if (providerId !== 'claude-code') {
+      return createCompatibilityDisplayModel(
+        COMPATIBILITY_UNSUPPORTED_MODEL,
+        hasCheckedAt ? checkedText : null
+      );
+    }
+    if (reason === 'evidence_stale'
+        && (status === 'supported' || status === 'degraded')
+        && hasCheckedAt) {
+      return createCompatibilityDisplayModel(COMPATIBILITY_DEGRADED_STALE_MODEL, checkedText);
+    }
+    if (status === 'supported' && reason === 'within_tested_range' && hasCheckedAt) {
+      return createCompatibilityDisplayModel(COMPATIBILITY_SUPPORTED_MODEL, checkedText);
+    }
+    if (status === 'degraded' && reason === 'newer_than_tested_range' && hasCheckedAt) {
+      return createCompatibilityDisplayModel(COMPATIBILITY_DEGRADED_NEWER_MODEL, checkedText);
+    }
+    if (status === 'unsupported'
+        && typeof reason === 'string'
+        && hasOwn(COMPATIBILITY_UNSUPPORTED_REASONS, reason)) {
+      return createCompatibilityDisplayModel(
+        COMPATIBILITY_UNSUPPORTED_MODEL,
+        hasCheckedAt ? checkedText : null
+      );
+    }
+    return fallback;
+  }
+
+  function getAgentAuthDisplay(providerId) {
+    if (!isAgentProvider(providerId)) return null;
+    return {
+      label: AGENT_AUTH_NOT_REPORTED,
+      help: providerId === 'claude-code' ? CLAUDE_AUTH_HELP : GENERIC_AGENT_AUTH_HELP
     };
   }
 
@@ -253,6 +369,8 @@
     normalizeSettings: normalizeSettings,
     getRecommendation: getRecommendation,
     getAgentStatus: getAgentStatus,
+    getCompatibilityDisplayModel: getCompatibilityDisplayModel,
+    getAgentAuthDisplay: getAgentAuthDisplay,
     getBillingLabel: getBillingLabel,
     getProviderDefinition: getProviderDefinition
   });

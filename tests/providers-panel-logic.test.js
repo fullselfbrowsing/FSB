@@ -72,9 +72,11 @@ async function main() {
     'normalizeSettings',
     'getRecommendation',
     'getAgentStatus',
+    'getCompatibilityDisplayModel',
+    'getAgentAuthDisplay',
     'getBillingLabel',
     'getProviderDefinition'
-  ], 'helper exports only the ten declared interface members');
+  ], 'helper exports only the twelve declared interface members');
   assert.equal(globalThis.FSBProvidersPanel, providers,
     'CommonJS and classic-script consumers receive the same namespace');
   assert.equal(Object.isFrozen(providers), true, 'exported namespace is frozen');
@@ -390,6 +392,209 @@ async function main() {
     connected: { lastSeenAt: 202 },
     live: { connectedAt: 203 }
   }).checkedAt, null, 'unrelated evidence timestamps never substitute for installed checkedAt');
+
+  const supportedCompatibility = {
+    label: 'Supported',
+    icon: 'fa-circle-check',
+    className: 'compatibility-badge--supported',
+    detail: "This CLI is within FSB's fixture-tested compatibility range.",
+    checkedText: 'Checked absolute:1000'
+  };
+  const degradedNewerCompatibility = {
+    label: 'Degraded',
+    icon: 'fa-triangle-exclamation',
+    className: 'compatibility-badge--degraded',
+    detail: "This CLI is newer than FSB's fixture-tested range. You can keep it selected; existing start checks still apply.",
+    checkedText: 'Checked absolute:1000'
+  };
+  const degradedStaleCompatibility = {
+    label: 'Degraded',
+    icon: 'fa-triangle-exclamation',
+    className: 'compatibility-badge--degraded',
+    detail: 'Compatibility evidence is stale. Refresh status to check again.',
+    checkedText: 'Checked absolute:1000'
+  };
+  const unsupportedCompatibility = {
+    label: 'Unsupported',
+    icon: 'fa-circle-xmark',
+    className: 'compatibility-badge--unsupported',
+    detail: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
+    checkedText: 'Checked absolute:1000'
+  };
+  const formatCalls = [];
+  const formatAbsolute = (checkedAt) => {
+    formatCalls.push(checkedAt);
+    return `absolute:${checkedAt}`;
+  };
+  const compatibilityRow = (status, reason, checkedAt = 1000, extra = {}) => ({
+    id: 'claude-code',
+    version: '999.999.999-canary',
+    detectedVersion: '__must_not_be_read__',
+    compatibility: { status, reason, checkedAt, version: '0.0.0-canary' },
+    ...extra
+  });
+
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code',
+    compatibilityRow('supported', 'within_tested_range'),
+    formatAbsolute
+  ), supportedCompatibility, 'fresh validated supported evidence maps to the exact Supported model');
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code',
+    compatibilityRow('degraded', 'newer_than_tested_range'),
+    formatAbsolute
+  ), degradedNewerCompatibility, 'newer-than-tested evidence maps to the exact Degraded model');
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code',
+    compatibilityRow('degraded', 'evidence_stale'),
+    formatAbsolute
+  ), degradedStaleCompatibility, 'stale evidence maps to the exact Degraded stale model');
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code',
+    compatibilityRow('supported', 'evidence_stale'),
+    formatAbsolute
+  ), degradedStaleCompatibility,
+  'an inconsistent supported token cannot override the defensive stale downgrade');
+
+  const unsupportedReasons = [
+    'binary_not_found',
+    'version_missing',
+    'version_malformed',
+    'below_minimum',
+    'wrong_major',
+    'adapter_unshipped',
+    'matrix_invalid'
+  ];
+  for (const reason of unsupportedReasons) {
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      'claude-code',
+      compatibilityRow('unsupported', reason),
+      formatAbsolute
+    ), unsupportedCompatibility, `${reason} maps to the exact Unsupported model`);
+  }
+
+  for (const providerId of providers.API_PROVIDER_IDS) {
+    assert.equal(providers.getCompatibilityDisplayModel(
+      providerId,
+      compatibilityRow('supported', 'within_tested_range'),
+      formatAbsolute
+    ), null, `${providerId} receives no compatibility model`);
+  }
+  for (const providerId of ['opencode', 'codex']) {
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      providerId,
+      compatibilityRow('supported', 'within_tested_range'),
+      formatAbsolute
+    ), unsupportedCompatibility, `${providerId} remains Unsupported until its adapter ships`);
+  }
+
+  let rowAccessorCalls = 0;
+  const accessorRow = {};
+  Object.defineProperty(accessorRow, 'compatibility', {
+    enumerable: true,
+    get() {
+      rowAccessorCalls += 1;
+      return { status: 'supported', reason: 'within_tested_range', checkedAt: 1000 };
+    }
+  });
+  let fieldAccessorCalls = 0;
+  const accessorCompatibility = { reason: 'within_tested_range', checkedAt: 1000 };
+  Object.defineProperty(accessorCompatibility, 'status', {
+    enumerable: true,
+    get() {
+      fieldAccessorCalls += 1;
+      return 'supported';
+    }
+  });
+  const inheritedRow = Object.create({
+    compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1000 }
+  });
+  const inheritedCompatibility = Object.assign(Object.create({
+    status: 'supported', reason: 'within_tested_range', checkedAt: 1000
+  }), {});
+  const malformedRows = [
+    undefined,
+    null,
+    [],
+    'row',
+    {},
+    { compatibility: null },
+    { compatibility: [] },
+    { compatibility: { status: 'supported', reason: 'within_tested_range' } },
+    { compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: '1000' } },
+    { compatibility: { status: 'supported', reason: 'unknown', checkedAt: 1000 } },
+    { compatibility: { status: 'degraded', reason: 'within_tested_range', checkedAt: 1000 } },
+    { compatibility: { status: 'supported', reason: 'binary_not_found', checkedAt: 1000 } },
+    { compatibility: inheritedCompatibility },
+    inheritedRow,
+    accessorRow,
+    { compatibility: accessorCompatibility }
+  ];
+  const unsupportedWithoutTime = { ...unsupportedCompatibility, checkedText: null };
+  for (const row of malformedRows) {
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      'claude-code', row, formatAbsolute
+    ), unsupportedWithoutTime, 'malformed, inherited, or accessor evidence fails closed');
+  }
+  assert.equal(rowAccessorCalls, 0, 'row compatibility accessors are never invoked');
+  assert.equal(fieldAccessorCalls, 0, 'compatibility field accessors are never invoked');
+
+  const arbitraryVersionsA = compatibilityRow('supported', 'within_tested_range');
+  const arbitraryVersionsB = compatibilityRow('supported', 'within_tested_range');
+  arbitraryVersionsB.version = 'not-semver-at-all';
+  arbitraryVersionsB.detectedVersion = '../../../../bin/secret';
+  arbitraryVersionsB.compatibility.version = '<script>version</script>';
+  assert.deepEqual(
+    providers.getCompatibilityDisplayModel('claude-code', arbitraryVersionsA, formatAbsolute),
+    providers.getCompatibilityDisplayModel('claude-code', arbitraryVersionsB, formatAbsolute),
+    'arbitrary version canaries cannot influence compatibility mapping'
+  );
+  const callerCopy = compatibilityRow('supported', 'within_tested_range', 1000, {
+    label: 'Attacker label',
+    icon: 'attacker-icon',
+    className: 'attacker-class',
+    detail: 'Attacker detail'
+  });
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code', callerCopy, formatAbsolute
+  ), supportedCompatibility, 'display strings and classes come only from local constants');
+  assert.notEqual(
+    providers.getCompatibilityDisplayModel('claude-code', callerCopy, formatAbsolute),
+    providers.getCompatibilityDisplayModel('claude-code', callerCopy, formatAbsolute),
+    'compatibility mapping returns a fresh display model each time'
+  );
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code', compatibilityRow('unsupported', 'matrix_invalid', null), formatAbsolute
+  ), unsupportedWithoutTime, 'unsupported evidence may omit a validated check timestamp');
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code', compatibilityRow('supported', 'within_tested_range', Number.NaN), formatAbsolute
+  ), unsupportedWithoutTime, 'invalid supported timestamps fail closed without formatting');
+  assert.deepEqual(providers.getCompatibilityDisplayModel(
+    'claude-code', compatibilityRow('supported', 'within_tested_range'), () => { throw new Error('no locale'); }
+  ), { ...supportedCompatibility, checkedText: null }, 'formatter failure omits checked help safely');
+  assert.ok(formatCalls.every((value) => value === 1000),
+    'the injected absolute formatter receives only a validated timestamp');
+
+  assert.deepEqual(providers.getAgentAuthDisplay('claude-code'), {
+    label: 'Not reported',
+    help: 'Claude Code does not report an auth state that FSB can safely read.'
+  }, 'Claude auth display remains exact and does not infer a state');
+  assert.equal(providers.getAgentAuthDisplay('xai'), null,
+    'API providers receive no agent auth display model');
+  assert.notEqual(providers.getAgentAuthDisplay('claude-code'),
+    providers.getAgentAuthDisplay('claude-code'),
+    'agent auth display mapping returns a fresh object');
+
+  const compatibilityMapperSource = extractFunction(
+    helperSource,
+    'function getCompatibilityDisplayModel('
+  );
+  assert.doesNotMatch(compatibilityMapperSource,
+    /\b(?:version|semver|minimum|maximum|testedThrough|range)\b/i,
+    'UI compatibility mapping contains no version parser or compatibility range policy');
+  assert.doesNotMatch(compatibilityMapperSource,
+    /(?:split\s*\(\s*['"]\.['"]|localeCompare|parseInt|parseFloat)/,
+    'UI compatibility mapping contains no version-comparison primitive');
 
   for (const authState of ['subscription', ' SUBSCRIPTION ', { mode: 'subscription' }]) {
     assert.deepEqual(providers.getBillingLabel(authState), {
