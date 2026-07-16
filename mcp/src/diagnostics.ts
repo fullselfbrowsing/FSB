@@ -28,6 +28,7 @@ const CONTENT_SCRIPT_STALE_MS = 10_000;
 const MAX_DOCTOR_ADAPTERS = 16;
 const MAX_DOCTOR_FIELD_LENGTH = 64;
 const MAX_DOCTOR_PATH_LENGTH = 4096;
+const MAX_DATE_EPOCH_MS = 8_640_000_000_000_000;
 const VERSION_FILES = {
   packageJson: new URL('../package.json', import.meta.url),
   serverJson: new URL('../server.json', import.meta.url),
@@ -187,7 +188,9 @@ function readOwnCallable(
 function readNowMs(now: () => number): number {
   try {
     const value = now();
-    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    return Number.isSafeInteger(value) && value >= 0 && value <= MAX_DATE_EPOCH_MS
+      ? value
+      : 0;
   } catch {
     return 0;
   }

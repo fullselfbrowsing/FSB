@@ -443,6 +443,33 @@ async function run() {
   );
   assert(!JSON.stringify(throwingSnapshot).includes('DO-NOT-LEAK'), 'injected exception text never enters the snapshot');
 
+  let oversizedClockSnapshot = null;
+  let oversizedClockError = null;
+  try {
+    oversizedClockSnapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+        readBridgeAuthState: () => null,
+        now: () => 8_640_000_000_000_001,
+      },
+    );
+  } catch (error) {
+    oversizedClockError = error;
+  }
+  assertEqual(oversizedClockError, null,
+    'a safe integer outside the ECMAScript Date range cannot throw from doctor collection');
+  if (oversizedClockSnapshot) {
+    assertEqual(oversizedClockSnapshot.checkedAt, '1970-01-01T00:00:00.000Z',
+      'an out-of-range injected clock fails closed to the epoch timestamp');
+    const serializedOversizedClock = JSON.stringify(oversizedClockSnapshot);
+    assert(serializedOversizedClock.length < 100_000,
+      'the out-of-range clock still returns one bounded diagnostics snapshot');
+    assert(!serializedOversizedClock.includes('Invalid time value'),
+      'Date exception text never enters the bounded diagnostics snapshot');
+  }
+
   const unshippedRegistrySnapshot = await diagnostics.collectBridgeDiagnostics(
     { waitForExtensionMs: 0 },
     {
