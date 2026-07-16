@@ -2766,6 +2766,128 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(lateDurableWrites, 1,
     'newer external hydration cannot re-enter the manual daemon/write route');
 
+  const preManualResponse = createDeferred();
+  const preManualClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: 700
+  });
+  const preManualOlderClients = compatibilityClients({
+    status: 'degraded', reason: 'evidence_stale', checkedAt: 600
+  });
+  const preManualDebounce = createProviderHarness({}, {
+    heldTimerDelays: [100, 5000],
+    runtimeDispatch(message) {
+      if (message.action === 'refreshMcpCompatibility') return preManualResponse.promise;
+      if (message.action === 'getMcpClients') {
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: null,
+          clients: preManualOlderClients
+        };
+      }
+      throw new Error('unexpected pre-manual debounce runtime action');
+    }
+  });
+  preManualDebounce.context.setupEventListeners();
+  preManualDebounce.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  preManualDebounce.emitStorage(compatibilityStorageChange(600), 'local');
+  const preManualRefresh = preManualDebounce.context.refreshProviderEvidence({ announce: true });
+  preManualDebounce.advanceTimersBy(100);
+  await flushHarness();
+  preManualResponse.resolve({
+    success: true,
+    refreshOutcome: 'refreshed',
+    compatibilityExpiresAt: null,
+    clients: preManualClients
+  });
+  await preManualRefresh;
+  await flushHarness();
+  await flushHarness();
+  assert.strictEqual(preManualDebounce.state().evidenceStatus, 'ready',
+    'an older debounce armed before manual refresh cannot downgrade its success');
+  assert.strictEqual(preManualDebounce.announcement.textContent,
+    'Provider status refreshed. Compatibility is now Supported.',
+    'an older pre-manual debounce cannot erase the one success announcement');
+  assert.strictEqual(compatibilityStatus(preManualDebounce, 'claude-code').textContent, 'Supported');
+  assert.deepStrictEqual(preManualDebounce.runtimeCalls, [
+    { action: 'refreshMcpCompatibility' }
+  ], 'manual refresh subsumes an older provider-storage debounce before it can hydrate');
+
+  const externalOldExpiryResponse = createDeferred();
+  const externalInitialCheckedAt = 1_000;
+  const externalInitialExpiryAt = externalInitialCheckedAt + (15 * 60 * 1000);
+  const externalNewCheckedAt = 1_500;
+  const externalNewExpiryAt = externalNewCheckedAt + (15 * 60 * 1000);
+  const externalNewDelay = externalNewExpiryAt - externalInitialExpiryAt;
+  const externalInitialClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: externalInitialCheckedAt
+  });
+  const externalExpiredClients = compatibilityClients({
+    status: 'degraded', reason: 'evidence_stale', checkedAt: externalInitialCheckedAt
+  });
+  const externalNewClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: externalNewCheckedAt
+  });
+  let externalGenerationCacheReads = 0;
+  const externalGeneration = createProviderHarness({}, {
+    nowMs: externalInitialCheckedAt,
+    heldTimerDelays: [100, 15 * 60 * 1000, externalNewDelay],
+    runtimeDispatch(message) {
+      assert.strictEqual(message.action, 'getMcpClients',
+        'expiry and external evidence generations remain cache-only');
+      externalGenerationCacheReads += 1;
+      if (externalGenerationCacheReads === 1) {
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: externalInitialExpiryAt,
+          clients: externalInitialClients
+        };
+      }
+      if (externalGenerationCacheReads === 2) return externalOldExpiryResponse.promise;
+      if (externalGenerationCacheReads === 3) {
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: externalNewExpiryAt,
+          clients: externalNewClients
+        };
+      }
+      throw new Error('unexpected external-generation cache read');
+    }
+  });
+  externalGeneration.context.setupEventListeners();
+  externalGeneration.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  await externalGeneration.context.refreshProviderEvidence();
+  externalGeneration.setNow(externalInitialExpiryAt);
+  externalGeneration.advanceTimersBy(15 * 60 * 1000);
+  await Promise.resolve();
+  await Promise.resolve();
+  externalGeneration.emitStorage(compatibilityStorageChange(externalNewCheckedAt), 'local');
+  externalGeneration.advanceTimersBy(100);
+  await flushHarness();
+  await flushHarness();
+  assert.strictEqual(compatibilityStatus(externalGeneration, 'claude-code').textContent, 'Supported');
+  assert.strictEqual(externalGeneration.pendingTimeoutDelays.includes(externalNewDelay), true,
+    'newer external evidence installs its own compatibility deadline');
+  const externalGenerationEvidence = providerEvidenceStateSnapshot(externalGeneration);
+  externalOldExpiryResponse.resolve({
+    success: true,
+    refreshOutcome: 'stale',
+    compatibilityExpiresAt: null,
+    clients: externalExpiredClients
+  });
+  await flushHarness();
+  await flushHarness();
+  assert.strictEqual(compatibilityStatus(externalGeneration, 'claude-code').textContent, 'Supported',
+    'an older expiry response cannot overwrite newer external compatibility');
+  assert.strictEqual(externalGeneration.pendingTimeoutDelays.includes(externalNewDelay), true,
+    'an older expiry response cannot cancel the newer external deadline');
+  assert.deepStrictEqual(providerEvidenceStateSnapshot(externalGeneration), externalGenerationEvidence,
+    'late expiry work cannot alter the newer external evidence generation');
+  assert.strictEqual(externalGenerationCacheReads, 3,
+    'the ordering uses one initial, one expiry, and one external cache read');
+
   const queuedStorage = createProviderHarness({}, {
     holdRuntime: true,
     heldTimerDelays: [5000]

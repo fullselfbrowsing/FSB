@@ -137,7 +137,7 @@ let providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
 let providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
 let providerCompatibilityExpiryHandle = null;
 let providerCompatibilityProjectionPromise = null;
-let providerCompatibilityProjectionGeneration = 0;
+let providerCompatibilityGeneration = 0;
 let providerManualRefreshGeneration = 0;
 let providerManualSuccess = null;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
@@ -585,7 +585,7 @@ function getProviderManualSuccessToken(observedCheckedAt) {
   const success = providerManualSuccess;
   if (!success
       || !Number.isSafeInteger(observedCheckedAt)
-      || observedCheckedAt < success.checkedAt) return null;
+      || observedCheckedAt < 0) return null;
   return { generation: success.generation, checkedAt: success.checkedAt };
 }
 
@@ -1201,9 +1201,23 @@ function clearProviderCompatibilityExpiryTimer() {
   providerCompatibilityExpiryHandle = null;
 }
 
-function beginProviderCompatibilityProjectionGeneration() {
-  providerCompatibilityProjectionGeneration += 1;
-  return providerCompatibilityProjectionGeneration;
+function beginProviderCompatibilityGeneration() {
+  providerCompatibilityGeneration += 1;
+  return providerCompatibilityGeneration;
+}
+
+function clearProviderEvidenceRefreshDebounce() {
+  if (providerEvidenceRefreshDebounceHandle !== null) {
+    clearTimeout(providerEvidenceRefreshDebounceHandle);
+  }
+  providerEvidenceRefreshDebounceHandle = null;
+  providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
+}
+
+function discardPendingProviderEvidenceRefresh() {
+  clearProviderEvidenceRefreshDebounce();
+  providerEvidenceRefreshQueued = false;
+  providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
 }
 
 function scheduleProviderCompatibilityExpiry(expiresAt) {
@@ -1228,11 +1242,11 @@ function refreshProviderCompatibilityProjection() {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
   if (providerCompatibilityProjectionPromise) return providerCompatibilityProjectionPromise;
   const helper = getProviderPanelHelper();
-  const projectionGeneration = beginProviderCompatibilityProjectionGeneration();
+  const compatibilityGeneration = beginProviderCompatibilityGeneration();
   let tracked;
   tracked = requestMcpClients(false)
     .then((result) => {
-      if (projectionGeneration !== providerCompatibilityProjectionGeneration) {
+      if (compatibilityGeneration !== providerCompatibilityGeneration) {
         return providerPanelState.clients;
       }
       if (result.refreshOutcome === 'unavailable') {
@@ -1253,7 +1267,7 @@ function refreshProviderCompatibilityProjection() {
       return providerPanelState.clients;
     })
     .catch(() => {
-      if (projectionGeneration !== providerCompatibilityProjectionGeneration) {
+      if (compatibilityGeneration !== providerCompatibilityGeneration) {
         return providerPanelState.clients;
       }
       clearProviderCompatibilityExpiryTimer();
@@ -1279,19 +1293,21 @@ function refreshProviderEvidence({
   liveCompatibility = announce,
   preserveManualSuccess = null
 } = {}) {
+  const wantsLiveCompatibility = liveCompatibility === true;
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
+  beginProviderCompatibilityGeneration();
   const helper = getProviderPanelHelper();
   const previousCompatibilityLabel = getSelectedCompatibilityLabel(helper);
   const preserveCurrentSuccess = isCurrentProviderManualSuccess(preserveManualSuccess)
     && providerPanelState.hasSuccessfulEvidence
     && providerPanelState.evidenceStatus === 'ready';
-  const manualGeneration = liveCompatibility === true
+  const manualGeneration = wantsLiveCompatibility
     ? ++providerManualRefreshGeneration
     : null;
   if (manualGeneration !== null) {
     providerManualSuccess = null;
-    beginProviderCompatibilityProjectionGeneration();
+    discardPendingProviderEvidenceRefresh();
     clearProviderCompatibilityExpiryTimer();
   }
   setProviderStatusRefreshing(true);
@@ -1327,7 +1343,6 @@ function refreshProviderEvidence({
         providerPanelState.recommendation = helper.getRecommendation(result.clients);
         scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
       }
-      if (matchingManualSuccess) consumeProviderManualSuccess(preserveManualSuccess);
       if (announce && result.refreshOutcome === 'refreshed') {
         const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
         const changed = previousCompatibilityLabel && nextCompatibilityLabel
@@ -1368,6 +1383,7 @@ function refreshProviderEvidence({
       renderProviderRecommendation();
       renderProviderEvidence();
       renderSelectedAgentDetails();
+      if (preserveCurrentSuccess) consumeProviderManualSuccess(preserveManualSuccess);
       providerEvidenceRefreshPromise = null;
       if (providerEvidenceRefreshQueued) {
         const queuedCheckedAt = providerEvidenceRefreshQueuedCompatibilityCheckedAt;
@@ -1383,11 +1399,9 @@ function refreshProviderEvidence({
 }
 
 function scheduleProviderEvidenceRefresh(compatibilityCheckedAt = null) {
+  beginProviderCompatibilityGeneration();
   if (providerEvidenceRefreshPromise) {
-    if (providerEvidenceRefreshDebounceHandle !== null) {
-      clearTimeout(providerEvidenceRefreshDebounceHandle);
-      providerEvidenceRefreshDebounceHandle = null;
-    }
+    clearProviderEvidenceRefreshDebounce();
     providerEvidenceRefreshQueued = true;
     providerEvidenceRefreshQueuedCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
       providerEvidenceRefreshQueuedCompatibilityCheckedAt,
@@ -1395,13 +1409,14 @@ function scheduleProviderEvidenceRefresh(compatibilityCheckedAt = null) {
     );
     return;
   }
-  if (providerEvidenceRefreshDebounceHandle !== null) {
-    clearTimeout(providerEvidenceRefreshDebounceHandle);
-  }
-  providerEvidenceRefreshDebounceCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+  const debouncedCheckedAt = newestProviderCompatibilityCheckedAt(
     providerEvidenceRefreshDebounceCompatibilityCheckedAt,
     compatibilityCheckedAt
   );
+  if (providerEvidenceRefreshDebounceHandle !== null) {
+    clearTimeout(providerEvidenceRefreshDebounceHandle);
+  }
+  providerEvidenceRefreshDebounceCompatibilityCheckedAt = debouncedCheckedAt;
   providerEvidenceRefreshDebounceHandle = setTimeout(() => {
     const debouncedCheckedAt = providerEvidenceRefreshDebounceCompatibilityCheckedAt;
     providerEvidenceRefreshDebounceHandle = null;
