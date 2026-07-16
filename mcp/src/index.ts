@@ -114,6 +114,21 @@ Options:
 
 type DiagnosticsSnapshot = Awaited<ReturnType<typeof collectBridgeDiagnostics>>;
 
+const DOCTOR_COMPATIBILITY_LABELS: Record<
+  DiagnosticsSnapshot['adapterDiagnostics'][number]['compatibilityStatus'],
+  string
+> = {
+  supported: 'Supported',
+  degraded: 'Degraded',
+  unsupported: 'Unsupported',
+};
+
+function formatDoctorTimestamp(timestamp: number | null): string {
+  if (timestamp === null) return 'Not reported';
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? 'Not reported' : date.toISOString();
+}
+
 export function formatHeartbeat(
   lastHeartbeatAt: number | null,
   nowMs = Date.now(),
@@ -214,6 +229,30 @@ export function formatDoctor(diagnostics: DiagnosticsSnapshot): string {
   for (const note of diagnostics.probeNotes ?? []) {
     lines.push(`Note: [${note.scope}] ${note.message}`);
   }
+
+  lines.push('');
+  lines.push(`Adapter compatibility (matrix schema ${diagnostics.compatibilityMatrix.schemaVersion}):`);
+  for (const adapter of diagnostics.adapterDiagnostics) {
+    const contract = diagnostics.compatibilityMatrix.adapters.find(
+      (candidate) => candidate.adapterId === adapter.adapterId,
+    );
+    lines.push(`- ${adapter.displayLabel} (${adapter.adapterId})`);
+    lines.push(`  Binary: ${adapter.binaryPath ?? 'Not found'}`);
+    lines.push(`  Version: ${adapter.detectedVersion ?? 'Not reported'}`);
+    lines.push(`  Compatibility: ${DOCTOR_COMPATIBILITY_LABELS[adapter.compatibilityStatus]}`);
+    lines.push(`  Reason: ${adapter.compatibilityReason}`);
+    lines.push(`  Profile: ${adapter.profileVersion}`);
+    lines.push(`  Minimum version: ${contract?.minimumVersion ?? 'Not reported'}`);
+    lines.push(`  Tested through: ${contract?.testedThroughVersion ?? 'Not reported'}`);
+    lines.push('  Auth: Not reported');
+  }
+
+  const auth = diagnostics.bridgeAuthMetadata;
+  lines.push('');
+  lines.push('Bridge auth:');
+  lines.push(`  Shared secret: ${auth.sharedSecretPresent ? 'Present' : 'Not present'}`);
+  lines.push(`  Secret rotated at: ${formatDoctorTimestamp(auth.secretRotatedAt)}`);
+  lines.push(`  Secret rotation age: ${auth.secretRotationAgeMs === null ? 'Not reported' : `${auth.secretRotationAgeMs} ms`}`);
 
   lines.push('');
   lines.push('Install paths:');

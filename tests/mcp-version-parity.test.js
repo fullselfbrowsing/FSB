@@ -127,6 +127,9 @@ async function run() {
   const extProtocolSource = readText('mcp/src/ext-protocol.ts');
   const adapterSource = readText('mcp/src/agent-providers/adapter.ts');
   const adapterRegistrySource = readText('mcp/src/agent-providers/registry.ts');
+  const diagnosticsSource = readText('mcp/src/diagnostics.ts');
+  const indexSource = readText('mcp/src/index.ts');
+  const compatibilitySource = readText('mcp/src/agent-providers/compatibility.ts');
 
   console.log('\n--- metadata parity ---');
   assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
@@ -228,6 +231,63 @@ async function run() {
   assert(
     !/(?:hold|resume|status)\s*\(/.test(adapterInterface ? adapterInterface[1] : ''),
     'Phase 61 lifecycle does not expand the frozen Phase 60 adapter interface',
+  );
+
+  console.log('\n--- Phase 62 doctor compatibility authority ---');
+  const runDoctorBlock = indexSource.match(
+    /async function runDoctor\([\s\S]*?\n\}\n\nasync function runWaitForExtension/,
+  );
+  const runDoctorSource = runDoctorBlock ? runDoctorBlock[0] : '';
+  assertEqual(
+    (runDoctorSource.match(/collectBridgeDiagnostics\(/g) || []).length,
+    1,
+    'doctor collects exactly one diagnostics snapshot',
+  );
+  assert(
+    runDoctorSource.includes('JSON.stringify(diagnostics, null, 2)')
+      && runDoctorSource.includes('formatDoctor(diagnostics)'),
+    'doctor text and JSON modes consume the same collected snapshot',
+  );
+  assert(
+    runDoctorSource.includes("diagnostics.diagnosticLayer === 'healthy' ? 0 : 1"),
+    'doctor preserves its established healthy/unhealthy exit semantics',
+  );
+  assert(
+    diagnosticsSource.includes('ADAPTER_COMPATIBILITY_MATRIX')
+      && diagnosticsSource.includes('classifyAdapterCompatibility')
+      && diagnosticsSource.includes('compatibilityMatrix: ADAPTER_COMPATIBILITY_MATRIX'),
+    'doctor collection imports and returns the canonical compatibility authority',
+  );
+  assert(
+    !indexSource.includes('classifyAdapterCompatibility')
+      && !indexSource.includes('ADAPTER_COMPATIBILITY_MATRIX')
+      && !indexSource.includes("'2.1.177'"),
+    'doctor formatter neither reclassifies nor hardcodes canonical adapter versions',
+  );
+  assert(
+    compatibilitySource.includes("profileVersion: '2.1.177'")
+      && compatibilitySource.includes("minimumVersion: '2.1.177'")
+      && compatibilitySource.includes("testedThroughVersion: '2.1.177'"),
+    'canonical matrix remains the sole explicit Phase 62 version/profile authority',
+  );
+
+  const doctorCollectorBlock = diagnosticsSource.match(
+    /async function collectAdapterDoctorRows[\s\S]*?\n\}\n\nfunction projectBridgeAuthMetadata/,
+  );
+  const doctorCollectorSource = doctorCollectorBlock ? doctorCollectorBlock[0] : '';
+  assert(
+    doctorCollectorBlock !== null
+      && !/process\.env|providerConfig|sessionSecret\s*:|\.connect\s*\(|\.start\s*\(|browser|chrome\./.test(doctorCollectorSource),
+    'adapter doctor collection has no auth inference, provider start, or browser authority',
+  );
+  const authProjectionBlock = diagnosticsSource.match(
+    /function projectBridgeAuthMetadata[\s\S]*?\n\}\n\nfunction emptyActiveTab/,
+  );
+  const authProjectionSource = authProjectionBlock ? authProjectionBlock[0] : '';
+  assert(
+    authProjectionBlock !== null
+      && !/\.\.\.|sessionId|allowedExtensionOrigin|previousSecret|fingerprint|bearer|token/i.test(authProjectionSource),
+    'bridge-auth doctor projection neither spreads nor names forbidden private fields',
   );
 
   console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');

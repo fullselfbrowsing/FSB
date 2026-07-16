@@ -70,6 +70,45 @@ function makeSnapshot(overrides = {}) {
       lastReadyUrl: 'https://example.com',
       readinessSource: 'port',
     },
+    compatibilityMatrix: {
+      schemaVersion: 1,
+      adapters: [{
+        adapterId: 'claude-code',
+        displayLabel: 'Claude Code',
+        profileVersion: '2.1.177',
+        minimumVersion: '2.1.177',
+        testedThroughVersion: '2.1.177',
+        supportedMajor: 2,
+        fixtureManifest: 'tests/fixtures/agent-streams/claude-code-2.1.177/manifest.json',
+        requiredInitFields: ['type', 'subtype', 'session_id', 'tools', 'mcp_servers'],
+        requiredResultFields: ['type', 'subtype', 'session_id', 'is_error'],
+        expectedNormalizedSequence: [
+          'init',
+          'assistant',
+          'tool_use',
+          'assistant_delta',
+          'user',
+          'tool_result',
+          'retry',
+          'result',
+        ],
+      }],
+    },
+    adapterDiagnostics: [{
+      adapterId: 'claude-code',
+      displayLabel: 'Claude Code',
+      binaryPath: '/opt/claude',
+      detectedVersion: '2.1.177',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'unknown',
+      profileVersion: '2.1.177',
+    }],
+    bridgeAuthMetadata: {
+      sharedSecretPresent: true,
+      secretRotatedAt: 9000,
+      secretRotationAgeMs: 1000,
+    },
     extensionConfig: {
       modelProvider: 'openai',
       modelName: 'gpt-5.4',
@@ -223,6 +262,62 @@ async function run() {
   assert(packageDoctor.includes('Next action:'), 'doctor output includes Next action:');
   assert(packageDoctor.includes('Package / version parity'), 'doctor output includes package label');
 
+  const formattedSnapshot = makeSnapshot();
+  const formattedDoctor = indexModule.formatDoctor(formattedSnapshot);
+  const formattedJson = JSON.parse(JSON.stringify(formattedSnapshot));
+  const formattedRow = formattedJson.adapterDiagnostics[0];
+  const formattedContract = formattedJson.compatibilityMatrix.adapters[0];
+  const expectedDoctorFacts = [
+    `Adapter compatibility (matrix schema ${formattedJson.compatibilityMatrix.schemaVersion}):`,
+    `- ${formattedRow.displayLabel} (${formattedRow.adapterId})`,
+    `  Binary: ${formattedRow.binaryPath}`,
+    `  Version: ${formattedRow.detectedVersion}`,
+    '  Compatibility: Supported',
+    `  Reason: ${formattedRow.compatibilityReason}`,
+    `  Profile: ${formattedRow.profileVersion}`,
+    `  Minimum version: ${formattedContract.minimumVersion}`,
+    `  Tested through: ${formattedContract.testedThroughVersion}`,
+    '  Auth: Not reported',
+    'Bridge auth:',
+    '  Shared secret: Present',
+    '  Secret rotated at: 1970-01-01T00:00:09.000Z',
+    `  Secret rotation age: ${formattedJson.bridgeAuthMetadata.secretRotationAgeMs} ms`,
+  ];
+  for (const fact of expectedDoctorFacts) {
+    assert(formattedDoctor.includes(fact), `doctor text derives JSON snapshot fact: ${fact}`);
+  }
+  assertOrdered(
+    formattedDoctor,
+    ['Detected:', 'Mode:', 'Adapter compatibility', 'Bridge auth:', 'Install paths:'],
+    'doctor preserves existing diagnostics before additive local facts',
+  );
+
+  const unavailableDoctor = indexModule.formatDoctor(makeSnapshot({
+    adapterDiagnostics: [{
+      ...makeSnapshot().adapterDiagnostics[0],
+      binaryPath: null,
+      detectedVersion: null,
+      compatibilityStatus: 'unsupported',
+      compatibilityReason: 'binary_not_found',
+    }],
+    bridgeAuthMetadata: {
+      sharedSecretPresent: false,
+      secretRotatedAt: null,
+      secretRotationAgeMs: null,
+    },
+  }));
+  for (const fallback of [
+    '  Binary: Not found',
+    '  Version: Not reported',
+    '  Compatibility: Unsupported',
+    '  Auth: Not reported',
+    '  Shared secret: Not present',
+    '  Secret rotated at: Not reported',
+    '  Secret rotation age: Not reported',
+  ]) {
+    assert(unavailableDoctor.includes(fallback), `doctor uses exact unavailable label: ${fallback}`);
+  }
+
   console.log('\n--- offline adapter and bridge-auth collection ---');
   const secretSentinel = 'DOCTOR_SHARED_SECRET_SENTINEL';
   const sessionSentinel = 'DOCTOR_SESSION_ID_SENTINEL';
@@ -302,8 +397,11 @@ async function run() {
     'bridge-auth doctor metadata has exactly three allowed keys',
   );
   const serializedOfflineSnapshot = JSON.stringify(offlineSnapshot);
+  const formattedOfflineSnapshot = indexModule.formatDoctor(offlineSnapshot);
+  assert(formattedOfflineSnapshot.includes('  Auth: Not reported'), 'offline doctor text keeps Claude auth explicitly unreported');
   for (const sentinel of [secretSentinel, sessionSentinel, envSentinel, 'allowedExtensionOrigin']) {
     assert(!serializedOfflineSnapshot.includes(sentinel), `serialized offline doctor snapshot omits ${sentinel}`);
+    assert(!formattedOfflineSnapshot.includes(sentinel), `formatted offline doctor snapshot omits ${sentinel}`);
   }
 
   console.log('\n--- malformed injected authorities fail closed ---');
