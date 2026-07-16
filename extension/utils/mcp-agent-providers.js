@@ -500,6 +500,13 @@
       resolveNamedRow(record.clientInfo.name).live = record;
     });
 
+    if (Object.prototype.hasOwnProperty.call(envelope, 'compatibility')
+        && envelope.compatibility) {
+      Object.keys(FSB_COMPATIBILITY_AGENT_IDS).forEach(function(id) {
+        ensureCanonicalRow(id);
+      });
+    }
+
     Object.keys(merged).forEach(function(id) {
       if (!Object.prototype.hasOwnProperty.call(FSB_COMPATIBILITY_AGENT_IDS, id)) return;
       merged[id].compatibility = projectedCompatibility(

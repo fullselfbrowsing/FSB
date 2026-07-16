@@ -18,6 +18,7 @@ const registryPath = require.resolve('../extension/utils/agent-registry.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
 const dispatcherPath = require.resolve('../extension/ws/mcp-tool-dispatcher.js');
 const bridgePath = path.join(repoRoot, 'extension', 'ws', 'mcp-bridge-client.js');
+const providersPanel = require('../extension/ui/providers-panel.js');
 const COMPATIBILITY_MAX_AGE_MS = 15 * 60 * 1000;
 
 function compatibilityRow(overrides = {}) {
@@ -494,6 +495,60 @@ async function main() {
     assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility,
       compatibilitySnapshot(4_000_000),
       'compatibility replacement shares the existing mutation chain without losing siblings');
+  }
+
+  {
+    const checkedAt = 4_500_000;
+    installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: {},
+          connected: {},
+          installed: {},
+          compatibility: compatibilitySnapshot(checkedAt)
+        }
+      }
+    });
+    const providers = freshProviders();
+    const merged = await providers.getMergedClients([], () => checkedAt);
+    assert.deepEqual(Object.keys(merged).sort(), ['claude-code', 'codex', 'opencode'],
+      'a valid compatibility snapshot seeds exactly the three canonical agent rows');
+    assert.deepEqual(merged['claude-code'].compatibility, {
+      status: 'supported',
+      reason: 'within_tested_range',
+      checkedAt
+    }, 'snapshot-only Claude compatibility remains visible without unrelated evidence maps');
+    assert.deepEqual(merged.opencode.compatibility, {
+      status: 'unsupported',
+      reason: 'adapter_unshipped',
+      checkedAt
+    }, 'snapshot-only OpenCode compatibility remains closed until its adapter ships');
+    assert.deepEqual(merged.codex.compatibility, {
+      status: 'unsupported',
+      reason: 'adapter_unshipped',
+      checkedAt
+    }, 'snapshot-only Codex compatibility remains closed until its adapter ships');
+    for (const providerId of providersPanel.AGENT_PROVIDER_IDS) {
+      assert.deepEqual({
+        clicked: merged[providerId].clicked,
+        installed: merged[providerId].installed,
+        connected: merged[providerId].connected,
+        live: merged[providerId].live
+      }, { clicked: null, installed: null, connected: null, live: null },
+      `compatibility cannot manufacture ${providerId} recommendation or setup evidence`);
+    }
+    for (const providerId of providersPanel.API_PROVIDER_IDS) {
+      assert.equal(Object.prototype.hasOwnProperty.call(merged, providerId), false,
+        `snapshot-only compatibility does not create the ${providerId} API row`);
+    }
+    assert.deepEqual(providersPanel.getRecommendation(merged), {
+      providerKind: 'api', providerId: 'xai', reason: 'fallback'
+    }, 'compatibility-only rows do not influence the provider recommendation');
+    assert.equal(
+      merged['claude-code'].compatibility.checkedAt + providers.COMPATIBILITY_MAX_AGE_MS,
+      checkedAt + COMPATIBILITY_MAX_AGE_MS,
+      'snapshot-only Claude support exposes the exact background expiry deadline'
+    );
   }
 
   {
