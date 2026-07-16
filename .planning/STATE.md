@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: ready
-stopped_at: Phase 62 complete; ready to discuss Phase 63
-last_updated: "2026-07-16T22:41:11.000Z"
-last_activity: 2026-07-16 -- Phase 62 completed; automated/source/full-suite green, 3 UAT scenarios deferred
+status: planning
+stopped_at: Phase 63 UI-SPEC approved; technical research next
+last_updated: "2026-07-16T22:58:16.432Z"
+last_activity: 2026-07-16 -- Phase 63 context and UI-SPEC approved; technical research next
 progress:
   total_phases: 9
   completed_phases: 6
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 63 — Native-Messaging Host, ready for autonomous discussion and planning
+**Current focus:** Phase 63 — Native-Messaging Host, ready for technical research and planning
 
 ## Current Position
 
-Phase: 63 (native-messaging-host) — NOT STARTED
+Phase: 63 (native-messaging-host) — CONTEXT + UI-SPEC COMPLETE
 Plan: 0 of TBD
-Status: Ready for Phase 63 discussion
-Last activity: 2026-07-16 -- Phase 62 completed with 18/18 verifier must-haves and guarded full-suite PASS
+Status: Ready for technical research and planning
+Last activity: 2026-07-16 -- Phase 63 context and UI-SPEC approved; technical research next
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -200,10 +200,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-16T22:41:11.000Z
-Stopped at: Phase 62 complete; ready to discuss Phase 63
-Resume file: .planning/ROADMAP.md#phase-63-native-messaging-host
+Last session: 2026-07-16T22:58:16.423Z
+Stopped at: Phase 63 UI-SPEC approved
+Resume file: .planning/phases/63-native-messaging-host/63-UI-SPEC.md
 
 ## Next Actions
 
-Run autonomous Phase 63 discuss → plan → execute for the Native-Messaging Host. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Run autonomous Phase 63 technical research → plan → execute for the Native-Messaging Host. Keep every accumulated live UAT item pending until the single milestone-end sweep.
