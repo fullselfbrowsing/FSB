@@ -40,9 +40,9 @@ files_reviewed_list:
   - tests/providers-panel-ui.test.js
 findings:
   critical: 1
-  warning: 3
+  warning: 4
   info: 0
-  total: 4
+  total: 5
 status: issues_found
 ---
 
@@ -50,7 +50,7 @@ status: issues_found
 
 ## Summary
 
-Phase 62 has one critical integration defect and three narrower correctness gaps. The matrix, detector/profile, spawn supervision, drift redaction, and bounded smoke-gate work are otherwise internally consistent with the phase plans. The blocking issue is cross-context: a successful compatibility refresh writes the same storage key whose Options listener requests another successful compatibility refresh, creating an unbounded sequential probe/write loop while the panel is open and the daemon is paired.
+Phase 62 has one critical integration defect and four narrower correctness gaps. The matrix, detector/profile, spawn supervision, drift redaction, and bounded smoke-gate work are otherwise internally consistent with the phase plans. The blocking issue is cross-context: a successful compatibility refresh writes the same storage key whose Options listener requests another successful compatibility refresh, creating an unbounded sequential probe/write loop while the panel is open and the daemon is paired.
 
 The review cross-referenced `62-CONTEXT.md`, `62-RESEARCH.md`, `62-UI-SPEC.md`, all six Phase 62 plans and summaries, `62-VALIDATION.md`, and `62-HUMAN-UAT.md`. No live UAT was performed; the three milestone-end UAT rows remain deferred as requested.
 
@@ -101,6 +101,16 @@ The review cross-referenced `62-CONTEXT.md`, `62-RESEARCH.md`, `62-UI-SPEC.md`, 
 **Issue:** `readNowMs()` accepts every non-negative safe integer, but JavaScript `Date` supports only values through `8_640_000_000_000_000`. A dependency seam returning `8_640_000_000_000_001` passes validation and makes `new Date(nowMs).toISOString()` throw `RangeError: Invalid time value`, aborting doctor instead of failing malformed clock authority closed. The existing malformed-authority coverage tests future rotation metadata but not an out-of-Date-domain injected `now` value.
 
 **Fix:** Validate the clock against the ECMAScript Date range before returning it, and/or wrap ISO formatting and fall back to the deterministic epoch on failure. Add a regression using the first safe integer above the Date maximum and assert doctor still returns a bounded snapshot with no exception text.
+
+### WR-04 — Selected details create a second compatibility live-region owner
+
+**Severity:** Warning
+
+**Files:** `extension/ui/control_panel.html:521`, `extension/ui/options.js:791-837`, `tests/providers-panel-ui.test.js:270-272`
+
+**Issue:** Compatibility feedback is intended to use the single shared `#providerEvidenceAnnouncement` live region, but the entire selected `#agentProviderDetails` container also has `aria-live="polite"`. `renderSelectedAgentDetails()` rewrites compatibility status, help, and checked text during cold hydration and every refresh, so assistive technology can announce those mutations independently of the shared one-shot feedback region. This undermines the silent-hydration and single-owner announcement contract and can duplicate manual refresh speech.
+
+**Fix:** Remove container-level live behavior from `#agentProviderDetails` and keep compatibility refresh feedback exclusively in `#providerEvidenceAnnouncement`; preserve the separate pairing-status live region for pairing actions. Add DOM/source tests that cold hydration has no compatibility live-region owner beyond the shared region and that manual refresh uses exactly one compatibility announcement path.
 
 ## Informational Findings
 
