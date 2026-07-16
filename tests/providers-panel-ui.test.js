@@ -585,6 +585,7 @@ const otherClientsRenderSource = extractFunction(JS, 'renderOtherMcpClients');
 const agentDetailsRenderSource = extractFunction(JS, 'renderSelectedAgentDetails');
 const setupGuideSource = extractFunction(JS, 'openAgentSetupGuide');
 const announcementSource = extractFunction(JS, 'setProviderEvidenceAnnouncement');
+const refreshFailureMessageSource = extractFunction(JS, 'getCompatibilityRefreshFailureMessage');
 const eventSetupSource = extractFunction(JS, 'setupEventListeners');
 assert.match(requestClientsSource, /\? \{ action: 'refreshMcpCompatibility' \}/,
   'manual evidence refresh uses the explicit live compatibility action');
@@ -633,9 +634,9 @@ assert.doesNotMatch(refreshEvidenceSource,
 assert.match(refreshEvidenceSource,
   /Compatibility is now \$\{nextCompatibilityLabel\}\./,
   'manual success appends the exact selected-status transition sentence');
-assert.match(refreshEvidenceSource,
+assert.match(refreshFailureMessageSource,
   /Compatibility data could not be refreshed\. Cached support is now Degraded\./);
-assert.match(refreshEvidenceSource,
+assert.match(refreshFailureMessageSource,
   /Compatibility data is unavailable\. Showing Unsupported\./);
 assert.match(otherClientsRenderSource, /item\.textContent/);
 assert.doesNotMatch(otherClientsRenderSource, /innerHTML|insertAdjacentHTML/,
@@ -1992,7 +1993,8 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(harness.announcement.getAttribute('role'), 'alert');
   assert.strictEqual(harness.announcement.getAttribute('aria-live'), 'assertive');
   assert.strictEqual(harness.announcement.textContent,
-    'Compatibility data could not be refreshed. Cached support is now Degraded.');
+    'Compatibility data is unavailable. Showing Unsupported.',
+    'runtime failure without valid compatibility evidence does not claim Degraded support');
   assert.match(evidenceBadge(harness, 'codex').textContent, /Status may be stale/);
   assert.match(evidenceBadge(harness, 'codex').getAttribute('title'), /Status may be stale/);
   assert.doesNotMatch(evidenceBadge(harness, 'codex').getAttribute('title'), /private transport detail/);
@@ -2137,6 +2139,64 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(compatibilityStatus(observational, 'claude-code').textContent, 'Unsupported');
   assert.strictEqual(observational.announcement.textContent,
     'Compatibility data is unavailable. Showing Unsupported.');
+
+  const timeoutSupported = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      refreshOutcome: 'refreshed',
+      clients: supportedClients
+    }
+  });
+  timeoutSupported.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  await timeoutSupported.context.refreshProviderEvidence();
+  timeoutSupported.holdRuntime();
+  await timeoutSupported.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(timeoutSupported.state().clients['claude-code'].compatibility)),
+    { status: 'degraded', reason: 'evidence_stale', checkedAt: 700 },
+    'runtime timeout degrades retained supported compatibility to stale evidence'
+  );
+  assert.strictEqual(compatibilityStatus(timeoutSupported, 'claude-code').textContent, 'Degraded');
+  assert.strictEqual(timeoutSupported.agentCompatibilityStatus.textContent, 'Degraded',
+    'runtime timeout keeps row and selected-detail compatibility coherent');
+  assert.strictEqual(timeoutSupported.announcement.textContent,
+    'Compatibility data could not be refreshed. Cached support is now Degraded.');
+
+  for (const contract of [
+    {
+      label: 'degraded',
+      compatibility: { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 700 },
+      visible: 'Degraded',
+      announcement: 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+    },
+    {
+      label: 'unsupported',
+      compatibility: { status: 'unsupported', reason: 'wrong_major', checkedAt: 700 },
+      visible: 'Unsupported',
+      announcement: 'Compatibility data is unavailable. Showing Unsupported.'
+    }
+  ]) {
+    const retained = createProviderHarness({}, {
+      runtimeResponse: {
+        success: true,
+        refreshOutcome: 'refreshed',
+        clients: compatibilityClients(contract.compatibility)
+      }
+    });
+    retained.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+    await retained.context.refreshProviderEvidence();
+    retained.setRuntimeError('bounded runtime failure');
+    await retained.context.refreshProviderEvidence({ announce: true });
+    assert.deepStrictEqual(
+      JSON.parse(JSON.stringify(retained.state().clients['claude-code'].compatibility)),
+      contract.compatibility,
+      `runtime failure preserves retained ${contract.label} compatibility truth`
+    );
+    assert.strictEqual(compatibilityStatus(retained, 'claude-code').textContent, contract.visible);
+    assert.strictEqual(retained.agentCompatibilityStatus.textContent, contract.visible);
+    assert.strictEqual(retained.announcement.textContent, contract.announcement,
+      `runtime failure announcement agrees with retained ${contract.label} compatibility`);
+  }
 
   const invalidOutcome = createProviderHarness({}, {
     runtimeResponse: { success: true, refreshOutcome: 'unknown', clients: supportedClients }

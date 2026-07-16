@@ -504,6 +504,70 @@ function copyProviderClientMap(value) {
   return copy;
 }
 
+function copyProviderDataRecord(value) {
+  if (!isProviderDataRecord(value)) return {};
+  let prototype = Object.prototype;
+  try {
+    const candidate = Object.getPrototypeOf(value);
+    if (candidate && Object.getPrototypeOf(candidate) === null) prototype = candidate;
+  } catch (_error) { /* use this realm's plain-object prototype */ }
+  const copy = Object.create(prototype);
+  try {
+    Object.keys(value).forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return;
+      Object.defineProperty(copy, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely copied fields */ }
+  return copy;
+}
+
+function projectStaleProviderCompatibility(clients) {
+  const projected = copyProviderClientMap(clients) || Object.create(null);
+  Object.keys(projected).forEach((providerId) => {
+    const row = getOwnDataValue(projected, providerId);
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const status = getOwnDataValue(compatibility, 'status');
+    const reason = getOwnDataValue(compatibility, 'reason');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    if (status !== 'supported'
+        || reason !== 'within_tested_range'
+        || !Number.isSafeInteger(checkedAt)
+        || checkedAt < 0) return;
+    const nextRow = copyProviderDataRecord(row);
+    const nextCompatibility = copyProviderDataRecord(compatibility);
+    nextCompatibility.status = 'degraded';
+    nextCompatibility.reason = 'evidence_stale';
+    nextCompatibility.checkedAt = checkedAt;
+    nextRow.compatibility = nextCompatibility;
+    projected[providerId] = nextRow;
+  });
+  return projected;
+}
+
+function hasDegradedProviderCompatibility(clients) {
+  const row = getOwnDataValue(clients, 'claude-code');
+  const compatibility = getOwnDataValue(row, 'compatibility');
+  const status = getOwnDataValue(compatibility, 'status');
+  const reason = getOwnDataValue(compatibility, 'reason');
+  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+  return status === 'degraded'
+    && (reason === 'newer_than_tested_range' || reason === 'evidence_stale')
+    && Number.isSafeInteger(checkedAt)
+    && checkedAt >= 0;
+}
+
+function getCompatibilityRefreshFailureMessage(clients) {
+  return hasDegradedProviderCompatibility(clients)
+    ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+    : 'Compatibility data is unavailable. Showing Unsupported.';
+}
+
 function requestMcpClients(liveCompatibility = false) {
   return new Promise((resolve, reject) => {
     const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
@@ -1060,7 +1124,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
         setProviderEvidenceAnnouncement(`Provider status refreshed.${compatibilityText}`);
       } else if (announce) {
         const message = result.refreshOutcome === 'stale'
-          ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+          ? getCompatibilityRefreshFailureMessage(result.clients)
           : 'Compatibility data is unavailable. Showing Unsupported.';
         setProviderEvidenceAnnouncement(message, true);
       }
@@ -1068,6 +1132,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
     })
     .catch(() => {
       if (providerPanelState.hasSuccessfulEvidence) {
+        providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
         providerPanelState.evidenceStatus = 'stale';
       } else {
         providerPanelState.clients = Object.create(null);
@@ -1076,7 +1141,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
       }
       if (announce) {
         const message = providerPanelState.evidenceStatus === 'stale'
-          ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+          ? getCompatibilityRefreshFailureMessage(providerPanelState.clients)
           : 'Compatibility data is unavailable. Showing Unsupported.';
         setProviderEvidenceAnnouncement(message, true);
       }

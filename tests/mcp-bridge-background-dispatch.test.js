@@ -1097,10 +1097,27 @@ async function runCompatibilityRefreshCases() {
   {
     const harness = buildCompatibilityRefreshHarness({ pairingStatus: 'configured' });
     const result = await harness.refresh();
-    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
-      'unpaired/offline refresh returns validated cached rows as stale');
+    assertDeepEqual(result, {
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+        }
+      },
+      refreshOutcome: 'stale'
+    }, 'unpaired/offline refresh degrades retained supported compatibility coherently');
     assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
       'unpaired refresh never enters reverse-channel transport');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectRequest: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result.clients['claude-code'].compatibility,
+      { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+      'daemon refresh failure degrades fresh retained support to stale evidence');
+    assertEqual(result.refreshOutcome, 'stale',
+      'daemon refresh failure returns the coherent stale outcome');
   }
 
   {
@@ -1115,10 +1132,30 @@ async function runCompatibilityRefreshCases() {
   {
     const harness = buildCompatibilityRefreshHarness({ rejectReplace: true });
     const result = await harness.refresh();
-    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
-      'storage rejection preserves the prior validated cache and reports stale');
+    assertDeepEqual(result, {
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+        }
+      },
+      refreshOutcome: 'stale'
+    }, 'storage rejection degrades prior supported cache and reports stale');
     assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 1,
       'storage rejection still returns existing provider rows once');
+  }
+
+  for (const [label, compatibility] of [
+    ['degraded', { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 100 }],
+    ['unsupported', { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 }]
+  ]) {
+    const clients = {
+      'claude-code': { id: 'claude-code', compatibility }
+    };
+    const harness = buildCompatibilityRefreshHarness({ clients, rejectRequest: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result.clients['claude-code'].compatibility, compatibility,
+      `refresh failure preserves retained ${label} compatibility truth`);
   }
 
   {

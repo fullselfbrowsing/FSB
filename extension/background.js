@@ -136,6 +136,78 @@ async function fsbReadCachedMcpClients(providers = fsbGetMcpCompatibilityProvide
   return { clients, refreshOutcome };
 }
 
+function fsbCompatibilityOwnDataValue(value, key) {
+  if (!value || typeof value !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function fsbCopyCompatibilityDataRecord(value) {
+  const copy = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return copy;
+  try {
+    Object.keys(value).forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return;
+      Object.defineProperty(copy, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely copied fields */ }
+  return copy;
+}
+
+function fsbProjectStaleMcpClients(clients) {
+  const projected = {};
+  if (!clients || typeof clients !== 'object' || Array.isArray(clients)) return projected;
+  try {
+    Object.keys(clients).forEach((providerId) => {
+      const row = fsbCompatibilityOwnDataValue(clients, providerId);
+      let nextRow = row;
+      const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
+      const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
+      const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
+      const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
+      if (status === 'supported'
+          && reason === 'within_tested_range'
+          && Number.isSafeInteger(checkedAt)
+          && checkedAt >= 0) {
+        nextRow = fsbCopyCompatibilityDataRecord(row);
+        nextRow.compatibility = {
+          status: 'degraded',
+          reason: 'evidence_stale',
+          checkedAt
+        };
+      }
+      Object.defineProperty(projected, providerId, {
+        value: nextRow,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely projected rows */ }
+  return projected;
+}
+
+async function fsbReadStaleMcpClientFallback(providers) {
+  const fallback = await fsbReadCachedMcpClients(providers);
+  if (fallback.refreshOutcome !== 'stale') return fallback;
+  return {
+    clients: fsbProjectStaleMcpClients(fallback.clients),
+    refreshOutcome: 'stale'
+  };
+}
+
 function fsbMcpBridgeIsPaired() {
   if (typeof mcpBridgeClient === 'undefined'
       || !mcpBridgeClient
@@ -163,7 +235,7 @@ function fsbRefreshMcpCompatibility() {
       }
     }
 
-    return await fsbReadCachedMcpClients(providers);
+    return await fsbReadStaleMcpClientFallback(providers);
   };
 
   let tracked;
