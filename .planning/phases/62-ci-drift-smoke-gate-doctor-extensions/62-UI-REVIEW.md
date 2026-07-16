@@ -1,13 +1,13 @@
 ---
 phase: 62-ci-drift-smoke-gate-doctor-extensions
 reviewed: 2026-07-16
-iteration: 1
+iteration: 2
 status: source-needs-fixes
 baseline: 62-UI-SPEC.md
-overall_score: "21/24"
+overall_score: "22/24"
 screenshots: not-captured-source-only
 needs_human_review: true
-audited_head: b78793bd
+audited_head: 98727bf3
 source_actionable_findings: 2
 blockers: 0
 warnings: 2
@@ -15,11 +15,11 @@ warnings: 2
 
 # Phase 62 — UI Review
 
-**Audited:** 2026-07-16  
-**Baseline:** approved `62-UI-SPEC.md` design contract  
-**Implementation boundary:** `b78793bd` (`docs(62-06): complete drift closure plan`)  
-**Screenshots:** Not captured by explicit source-only scope. No browser, rendered-layout, keyboard, screen-reader, forced-colors, reduced-motion, or live-daemon probe was performed.  
-**Evidence mode:** Code, source-contract, and deterministic DOM/VM-test evidence only. The three rendered/live scenarios in `62-HUMAN-UAT.md` remain `human_needed`; this report does not promote synthetic evidence to a human pass.
+**Audited:** 2026-07-16
+**Baseline:** approved `62-UI-SPEC.md` design contract
+**Implementation boundary:** `98727bf3` (`docs(62): add code review fix report`)
+**Screenshots:** Not captured by explicit source-only scope. No browser, rendered-layout, keyboard, screen-reader, forced-colors, reduced-motion, installed-CLI, or live-daemon probe was performed.
+**Evidence mode:** Code, source-contract, deterministic DOM/VM tests, and two read-only composition probes. The three scenarios in `62-HUMAN-UAT.md` remain `human_needed`; this report does not promote synthetic evidence to a human pass.
 
 ---
 
@@ -27,98 +27,118 @@ warnings: 2
 
 | Pillar | Score | Key Finding |
 |--------|-------|-------------|
-| 1. Copywriting | 3/4 | Exact labels and recovery strings are implemented, but a `stale` outcome can announce that support is Degraded while the visible badge still says Supported. |
-| 2. Visuals | 4/4 | Source structure provides separate agent-only compatibility groups, semantic icons, trailing radios, and a distinct selected-detail fact exactly as specified. |
-| 3. Color | 4/4 | Semantic success/warning/error tokens are scoped to compatibility pills/icons, with text, icon shape, and forced-color border styles as non-color cues. |
-| 4. Typography | 4/4 | Compatibility uses the approved 12/14px roles, 400/600 weights, sentence case, wrapping, and inherited system type. |
-| 5. Spacing | 4/4 | Phase 62 compatibility declarations stay on the 4/8/16px subset and implement the specified wide, medium, and narrow divider layouts. |
-| 6. Experience Design | 2/4 | Stale state can be internally contradictory, and compatibility updates occur inside a second polite live region in addition to the shared announcement region. |
+| 1. Copywriting | 4/4 | Exact labels, detail text, and failure copy are closed and now agree with the visible stale/unsupported projection. |
+| 2. Visuals | 4/4 | Source structure retains three agent-only compatibility groups, distinct details, semantic icons, trailing radios, and the specified responsive hierarchy. |
+| 3. Color | 4/4 | Compatibility tones remain limited to semantic pills/icons with text, shape, and forced-color borders as non-color cues. |
+| 4. Typography | 4/4 | The approved 12/14px roles, 400/600 weights, sentence case, wrapping, and system type remain intact. |
+| 5. Spacing | 4/4 | Compatibility declarations remain on the approved scale and preserve the wide, medium, and narrow divider layouts. |
+| 6. Experience Design | 2/4 | Manual success feedback is erased by its causal storage hydration, and the compatibility-expiry timer can mutate unrelated connection and recommendation state. |
 
-**Overall source-contract score: 21/24**
+**Overall source-contract score: 22/24**
 
-No blocker was found. Two deterministic source warnings should be fixed before treating the UI source contract as complete.
+The two original UI warnings are resolved, but two deterministic composition warnings remain. There are no blockers.
+
+---
+
+## Fix Re-audit Disposition
+
+| Boundary | Result | Evidence |
+|----------|--------|----------|
+| Stale badge/copy coherence | **PASS** | Failed live refreshes project retained fresh support to `Degraded / evidence_stale`; already degraded and unsupported truth is preserved, and recovery copy is selected from the resulting closed model. |
+| Exact-boundary passive expiry | **PASS with side-effect warning** | Supported becomes Degraded at `>= 15 minutes`, and the timer uses cache-only `getMcpClients` rather than a daemon refresh. The whole-view refresh it invokes is still too broad (WR-02). |
+| One compatibility live-region owner | **PASS** | `#agentProviderDetails` is no longer live; `#providerEvidenceAnnouncement` is the sole compatibility announcement owner. The pairing status remains a separate action-specific region. |
+| Silent cold hydration | **PASS** | Non-announcing cache hydration leaves the shared region empty/hidden and the focused suites pin this behavior. |
+| Manual announcement across storage fan-out | **WARNING** | The compatibility write queues a cache hydration that clears the just-written success announcement and changes `ready` to `stale` (WR-01). |
+| Expiry-only recommendation/connection identity | **WARNING** | The expiry callback replaces the full client map and recomputes recommendation, so changed non-compatibility inputs leak into an expiry-only transition (WR-02). |
+| Focus/selection/form/persistence/no-authority invariants | **PASS within the audited paths** | Ordinary compatibility transitions preserve focus, selection, row order, inputs, dirty state, auth/billing, and storage; renderer/refresh source has no doctor, shell, native, version, selection, preflight, or persistence authority. |
 
 ---
 
 ## Top 3 Priority Fixes
 
-1. **Make every stale fallback visually truthful** — A valid fresh cached snapshot can produce `refreshOutcome: 'stale'` while retaining a `supported` projection, and the UI runtime-error branch also retains prior supported rows. The alert nevertheless says cached support is now Degraded. Ensure background stale fallback and UI timeout/error fallback both present prior support as `Degraded` / `evidence_stale` before announcing the exact recovery copy.
-2. **Restore one compatibility live-region owner** — Remove compatibility refresh/hydration updates from the broad `#agentProviderDetails[aria-live="polite"]` region, or remove that container-level live behavior and route compatibility feedback only through `#providerEvidenceAnnouncement`. Preserve the separate pairing status region for pairing actions.
-3. **Add regressions for the uncovered boundaries** — Test fresh supported cache plus daemon/storage failure, prior supported UI state plus runtime timeout/error, exact badge/description/selected-detail agreement with the recovery announcement, and a source/DOM assertion that cold hydration produces no compatibility live-region update and manual refresh has one compatibility announcement owner.
+1. **Preserve the manual refresh generation through causal storage fan-out** — Suppress/coalesce the `fsbAgentProviders` notification produced by the in-flight compatibility replacement, or make its queued hydration preserve the manual result, `ready` state, and one polite announcement.
+2. **Make expiry compatibility-only** — Merge only the background-validated `.compatibility` projection at the authoritative deadline. Preserve current clicked/installed/connected/live rows, evidence state, recommendation, selection, focus, and form state.
+3. **Close the composed regression gaps** — Extend the causal fan-out test through final settlement and assert one retained announcement with no stale evidence markers; make the expiry test deliberately vary unrelated client evidence and assert that only compatibility changes.
 
 ---
 
 ## Detailed Findings
 
-### Pillar 1: Copywriting (3/4)
+### Pillar 1: Copywriting (4/4)
 
-- **PASS:** The mapper owns the exact `Supported`, `Degraded`, and `Unsupported` labels, icons, classes, and four normative detail strings. Claude auth is exactly `Not reported` with the approved safe-read explanation (`extension/ui/providers-panel.js:27-52`, `extension/ui/providers-panel.js:288-334`).
-- **PASS:** The existing action labels remain exact: `Refresh status`, `Refreshing…`, and `Save Settings`; compatibility introduces no CTA or destructive action (`extension/ui/control_panel.html:152-162`).
-- **WARNING — state/copy contradiction:** The background returns `refreshOutcome: 'stale'` whenever any validated cache exists, but the merged projection degrades support only after the 15-minute age bound. A fresh cached supported row can therefore remain `Supported` while `options.js` announces `Compatibility data could not be refreshed. Cached support is now Degraded.` (`extension/background.js:121-162`, `extension/utils/mcp-agent-providers.js:398-428`, `extension/ui/options.js:1042-1063`). The same mismatch can occur after a UI-to-background runtime timeout because the catch branch retains prior clients and only changes `evidenceStatus` (`extension/ui/options.js:1066-1080`). The strings are exact, but the claim is not always truthful to the displayed state.
+- **PASS:** The mapper owns exactly `Supported`, `Degraded`, and `Unsupported`, the normative detail strings, and the Claude Code `Not reported` auth copy (`extension/ui/providers-panel.js:27-52`, `extension/ui/providers-panel.js:288-334`).
+- **PASS:** Manual failure after retained fresh support now visibly projects `Degraded / evidence_stale` before using `Compatibility data could not be refreshed. Cached support is now Degraded.` Existing degraded and unsupported states retain truthful corresponding copy (`extension/ui/options.js:532-570`, `extension/ui/options.js:1131-1183`; `extension/background.js:192-232`).
+- **PASS:** The action labels remain exactly `Refresh status`, `Refreshing…`, and `Save Settings`; compatibility adds no CTA or destructive action (`extension/ui/control_panel.html:152-162`).
 
 ### Pillar 2: Visuals (4/4)
 
-- **PASS:** Exactly three agent rows contain a dedicated compatibility sibling after evidence and before the native radio; all seven API rows omit it. Each group has the visible micro-label, decorative semantic icon, and closed badge (`extension/ui/control_panel.html:168-218`).
-- **PASS:** Selected agent details retain separate Installation, Connection, Compatibility, and Account/Auth facts rather than combining their meanings (`extension/ui/control_panel.html:530-550`).
-- **PASS:** Wide and medium layouts retain inline separation; the narrow layout converts compatibility to a full-width, top-divided group without CSS reordering (`extension/ui/options.css:6247-6327`).
-- **HUMAN_NEEDED:** Actual hierarchy, wrapping, divider placement, badge density, trailing-radio placement, and absence of clipping at desktop, 641–899px, and at-most-640px widths require the deferred rendered comparison.
+- **PASS:** Exactly three agent rows retain a dedicated compatibility sibling after evidence and before the native radio; the seven API rows omit compatibility. Each agent group has a visible micro-label, decorative semantic icon, and closed status pill (`extension/ui/control_panel.html:168-218`).
+- **PASS:** Selected-agent details keep Installation, Connection, Compatibility, and Account/Auth as distinct facts (`extension/ui/control_panel.html:530-550`).
+- **PASS:** Wide and medium source layouts retain inline separation; the narrow layout creates a full-width, top-divided compatibility group without DOM or CSS reordering (`extension/ui/options.css:6247-6327`).
+- **HUMAN_NEEDED:** Actual hierarchy, wrapping, divider placement, badge density, trailing-radio placement, and clipping at desktop, 641–899px, and at-most-640px widths remain deferred.
 
 ### Pillar 3: Color (4/4)
 
-- **PASS:** Supported, Degraded, and Unsupported use the exact success, warning, and error token pairs only on their pills and icons (`extension/ui/options.css:5972-6000`). Provider rows, radios, names, recommendation badges, evidence, auth, and billing are not included in compatibility-tone selectors.
-- **PASS:** Text and distinct Font Awesome shapes accompany color. Forced-colors source rules add Canvas text/background and solid/dashed/double borders, while dark mode stays token-based (`extension/ui/options.css:6231-6238`, `extension/ui/options.css:6329-6355`).
-- **HUMAN_NEEDED:** Real light/dark contrast and forced-colors distinguishability remain deferred; source presence is not recorded as a rendered contrast pass.
+- **PASS:** Supported, Degraded, and Unsupported use the specified success, warning, and error tokens only on compatibility pills/icons (`extension/ui/options.css:5972-6000`). Provider selection, names, recommendation, evidence, auth, billing, and setup controls are excluded from compatibility-tone selectors.
+- **PASS:** Visible text and distinct Font Awesome shapes accompany color. Forced-colors rules provide Canvas colors and solid/dashed/double borders; dark mode remains token-based (`extension/ui/options.css:6231-6238`, `extension/ui/options.css:6329-6355`).
+- **HUMAN_NEEDED:** Real light/dark contrast and forced-colors distinguishability require milestone-end rendered review.
 
 ### Pillar 4: Typography (4/4)
 
-- **PASS:** The micro-label is 12px/400/1.5, pills are 12px/600/1.2, and selected-detail status/help use the approved 14px and 12px roles (`extension/ui/options.css:5945-5969`, `extension/ui/options.css:6087-6124`).
-- **PASS:** Copy is sentence case, status remains visible beside decorative icons, and wrapping is enabled without ellipsis or text truncation (`extension/ui/options.css:5931-5970`).
-- **HUMAN_NEEDED:** Perceived hierarchy and line wrapping with real system fonts remain part of the rendered milestone-end check.
+- **PASS:** Compatibility uses the approved 12px metadata/badge roles and 14px detail role with only 400/600 weights (`extension/ui/options.css:5945-5969`, `extension/ui/options.css:6087-6124`).
+- **PASS:** Copy is sentence case, status text remains visible beside decorative icons, and long copy wraps without truncation.
+- **HUMAN_NEEDED:** Perceived hierarchy and real-font wrapping remain deferred.
 
 ### Pillar 5: Spacing (4/4)
 
-- **PASS:** Compatibility-specific gaps and padding use only approved 4px, 8px, and 16px values, with a one-pixel tokenized divider (`extension/ui/options.css:5931-5943`, `extension/ui/options.css:5958-5969`).
-- **PASS:** The explicit 900px, 641–899px, and at-most-640px rules preserve two columns, one column, and full-width stacked compatibility respectively (`extension/ui/options.css:6247-6327`).
-- **PASS:** The compatibility group remains non-interactive; existing refresh and radio focus/target rules are preserved (`extension/ui/options.css:5747-5755`, `extension/ui/options.css:5803-5878`).
-- **HUMAN_NEEDED:** No-overflow and usable target geometry must still be observed in the real extension rather than inferred from `overflow-x: hidden` and source rules alone.
+- **PASS:** Compatibility-specific gaps and padding stay on the 4/8/16px subset, with a tokenized one-pixel divider (`extension/ui/options.css:5931-5969`).
+- **PASS:** The 900px, 641–899px, and at-most-640px rules preserve two columns, one column, and stacked full-width compatibility respectively (`extension/ui/options.css:6247-6327`).
+- **PASS:** Compatibility is data-only and non-focusable; existing radio/refresh target and focus rules remain unchanged (`extension/ui/options.css:5747-5755`, `extension/ui/options.css:5803-5878`).
+- **HUMAN_NEEDED:** No-overflow behavior and target geometry require real rendered observation.
 
 ### Pillar 6: Experience Design (2/4)
 
-- **PASS:** The pure mapper is fail-closed for absent, malformed, accessor-bearing, inherited, unknown, and unshipped evidence; API providers receive no compatibility model (`extension/ui/providers-panel.js:266-327`).
-- **PASS:** Rendering uses constant-owned models and `textContent`, keeps stable descriptions, and has no selection, persistence, recommendation, doctor, shell, native, wake, or version authority (`extension/ui/options.js:565-615`). Focus, form, dirty-state, recommendation, and storage identity are covered across synthetic status transitions (`tests/providers-panel-ui.test.js:2030-2137`).
-- **WARNING — stale state is not closed end to end:** `refreshOutcome: 'stale'` does not guarantee a degraded row, and the UI catch path does not project retained support to Degraded. Badge, radio description, selected-detail fact, and assertive recovery message can disagree during precisely the failure state the contract requires to be coherent (`extension/background.js:121-162`, `extension/utils/mcp-agent-providers.js:424-428`, `extension/ui/options.js:1023-1087`).
-- **WARNING — more than one compatibility announcement path:** The shared `#providerEvidenceAnnouncement` is a polite/assertive live region, but the entire selected `#agentProviderDetails` container is also `aria-live="polite"`. `renderSelectedAgentDetails()` rewrites compatibility status/help/checked text during cold hydration and every refresh, while manual refresh separately writes the shared announcement (`extension/ui/control_panel.html:162`, `extension/ui/control_panel.html:521`, `extension/ui/options.js:791-837`, `extension/ui/options.js:1030-1087`). This source structure does not satisfy silent hydration or single-owner announcement guarantees; actual duplicate speech timing remains `human_needed`.
-- **TEST GAP:** The UI suite explicitly preserves the broad details live region, tests stale runtime failure without a supported compatibility row, and tests a stale outcome only when the supplied row is already degraded. It therefore passes without exercising either warning (`tests/providers-panel-ui.test.js:270-272`, `tests/providers-panel-ui.test.js:1968-1988`, `tests/providers-panel-ui.test.js:2093-2111`).
+- **PASS — stale coherence restored:** Background failure fallback and UI timeout fallback both degrade retained fresh support while preserving already degraded/unsupported truth. Row badge, stable radio description, selected detail, and recovery alert now agree (`extension/background.js:192-232`; `extension/ui/options.js:532-570`, `extension/ui/options.js:1160-1183`).
+- **PASS — exact boundary restored:** Fresh support exposes one authoritative expiry deadline; `>= 15 minutes` projects `degraded/evidence_stale`; the UI timer performs a cache-only call and does not invoke the daemon (`extension/utils/mcp-agent-providers.js:398-428`; `extension/background.js:133-142`, `extension/background.js:175-189`; `extension/ui/options.js:1107-1128`).
+- **PASS — single owner and cold silence restored:** `#agentProviderDetails` has no role/live attributes, while `#providerEvidenceAnnouncement` remains the sole compatibility live region. Initial non-announcing hydration leaves it hidden and empty (`extension/ui/control_panel.html:162`, `extension/ui/control_panel.html:521`; `extension/ui/options.js:1091-1098`, `extension/ui/options.js:1131-1165`).
+- **WARNING WR-01 — causal hydration erases manual success:** `replaceCompatibility()` completes before the live response and emits `fsbAgentProviders`. The storage listener schedules another non-announcing whole-view refresh; that call clears the live region at entry and maps every valid cache read to `stale`. A read-only composed assertion observed the final announcement as `''` instead of `Provider status refreshed.` (`extension/background.js:133-142`, `extension/background.js:244-260`; `extension/ui/options.js:1131-1195`, `extension/ui/options.js:1201-1219`, `extension/ui/options.js:1534-1545`). The stock causal test proves bounded request/write/read counts but does not assert final feedback or evidence state (`tests/providers-panel-ui.test.js:2359-2401`).
+- **WARNING WR-02 — expiry refresh is not compatibility-only:** The timer calls generic `refreshProviderEvidence()`, which rereads merged provider inventory, replaces `providerPanelState.clients`, sets global evidence state, and recomputes recommendation. A read-only fake-clock probe changed only the second response's unrelated evidence and observed recommendation move from Claude Code to Codex and selected connection move from `Connected now` to `Not connected` while compatibility aged to Degraded (`extension/background.js:113-142`; `extension/ui/options.js:1113-1151`). The stock expiry test supplies identical non-compatibility rows on both reads, so its snapshot cannot expose this (`tests/providers-panel-ui.test.js:2244-2304`).
+- **PASS — remaining observational/authority boundaries:** Ordinary transitions preserve radio, focus, row order, form values, dirty state, storage, auth/billing, and recommendation. Compatibility rendering contains no selection setter, storage writer, preflight/start bypass, doctor, shell/process, native messaging, daemon wake, version parser, or CLI constant (`tests/providers-panel-ui.test.js:2065-2304`; `extension/ui/options.js:642-728`, `extension/ui/options.js:868-925`).
 
 ---
 
 ## Deferred Human Review
 
-These are pending observations, not known source defects and not passes:
+These are pending observations, not source defects and not passes:
 
 1. **Rendered badge/layout comparison** — Supported, Degraded, and Unsupported in light/dark, desktop, compact, 641–899px, and at-most-640px layouts, including dividers, wrapping, radio placement, and horizontal overflow.
-2. **Keyboard and assistive technology** — Native radio behavior, names/descriptions, focus retention, cold-hydration silence, one-shot live-region feedback, screen-reader timing, forced colors, and reduced motion.
+2. **Keyboard and assistive technology** — Native radio behavior, names/descriptions, focus retention, real live-region timing, forced colors, and reduced motion.
 3. **Live compatibility projection** — Fresh, newer, stale, corrupt, absent, and refresh-failure states against an installed daemon/CLI without form, selection, recommendation, or persistence mutation.
 
 ---
 
 ## Verification
 
-Executed at `b78793bd`:
+Executed source-only at `98727bf3`:
 
-- `node --check extension/ui/providers-panel.js` — PASS
+- `node --check extension/background.js` — PASS
 - `node --check extension/ui/options.js` — PASS
+- `node --check extension/ui/providers-panel.js` — PASS
+- `node --check extension/utils/mcp-agent-providers.js` — PASS
 - `node tests/providers-panel-logic.test.js` — PASS
 - `node tests/providers-panel-ui.test.js` — PASS
-- `git diff --check` across the six Phase 62 Providers implementation/test files — PASS
+- `node tests/mcp-agent-providers-storage.test.js` — PASS
+- `node tests/mcp-bridge-background-dispatch.test.js` — PASS (293 assertions)
+- Read-only composed manual-refresh/storage-fan-out assertion — **REPRODUCED WR-01**: final live-region text was empty.
+- Read-only exact-expiry probe with deliberately changed unrelated evidence — **REPRODUCED WR-02**: recommendation changed Claude Code → Codex and connection changed Connected now → Not connected.
 
-The passing focused suites validate the implemented source contracts but do not cover the two warnings above.
+The negative probes dynamically instrumented test source in memory; no implementation or test file was changed.
 
 ## Audit Outcome
 
 - Source-actionable UI findings: 2 warnings
 - Blockers: 0
-- Priority fixes: 3
+- Original UI warnings resolved: 2 of 2
 - Human review required: yes — all three `62-HUMAN-UAT.md` scenarios remain pending
 - Screenshots: none captured
 - Registry audit: skipped; `components.json` is absent and `62-UI-SPEC.md` declares no shadcn or third-party registry blocks
@@ -140,4 +160,3 @@ The passing focused suites validate the implemented source contracts but do not 
 - `tests/providers-panel-ui.test.js`
 - `tests/mcp-agent-providers-storage.test.js`
 - `tests/mcp-bridge-background-dispatch.test.js`
-
