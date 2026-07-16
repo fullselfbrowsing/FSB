@@ -147,7 +147,7 @@ function createHarness(initial) {
 }
 
 function assertExactRow(row, expected, message) {
-  assert.deepEqual(Object.keys(row), [
+  const expectedKeys = [
     'id',
     'raw',
     'displayName',
@@ -155,7 +155,11 @@ function assertExactRow(row, expected, message) {
     'installed',
     'connected',
     'live'
-  ], `${message}: exact row keys`);
+  ];
+  if (Object.prototype.hasOwnProperty.call(expected, 'compatibility')) {
+    expectedKeys.push('compatibility');
+  }
+  assert.deepEqual(Object.keys(row), expectedKeys, `${message}: exact row keys`);
   assert.deepEqual(plain(row), expected, message);
 }
 
@@ -255,7 +259,12 @@ async function main() {
     clicked: null,
     installed: staleCodex,
     connected: null,
-    live: null
+    live: null,
+    compatibility: {
+      status: 'unsupported',
+      reason: 'adapter_unshipped',
+      checkedAt: null
+    }
   }, 'stale installed checkedAt is preserved without interpretation');
   assertExactRow(merged['claude-code'], {
     id: 'claude-code',
@@ -264,7 +273,12 @@ async function main() {
     clicked: null,
     installed: null,
     connected: connectedClaude,
-    live: liveClaude
+    live: liveClaude,
+    compatibility: {
+      status: 'unsupported',
+      reason: 'matrix_invalid',
+      checkedAt: null
+    }
   }, 'connected and live alias evidence joins without flattening');
   assertExactRow(merged['raw:novelagent'], {
     id: 'raw:novelagent',

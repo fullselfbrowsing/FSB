@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phase 57 Plan 02 -- durable MCP-agent provider evidence contracts.
+ * Phase 57 Plan 02 / Phase 62 Plan 03 -- durable MCP-agent provider evidence contracts.
  *
  * Run: node tests/mcp-agent-providers-storage.test.js
  */
@@ -18,6 +18,21 @@ const registryPath = require.resolve('../extension/utils/agent-registry.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
 const dispatcherPath = require.resolve('../extension/ws/mcp-tool-dispatcher.js');
 const bridgePath = path.join(repoRoot, 'extension', 'ws', 'mcp-bridge-client.js');
+const COMPATIBILITY_MAX_AGE_MS = 15 * 60 * 1000;
+
+function compatibilityRow(overrides = {}) {
+  return {
+    adapterId: 'claude-code',
+    displayLabel: 'Claude Code',
+    status: 'supported',
+    reason: 'within_tested_range',
+    ...overrides
+  };
+}
+
+function compatibilitySnapshot(checkedAt, adapters = [compatibilityRow()]) {
+  return { schemaVersion: 1, checkedAt, adapters };
+}
 
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -25,6 +40,7 @@ function clone(value) {
 
 function createStorageArea(initial, options = {}) {
   const store = clone(initial || {});
+  let setCount = 0;
   return {
     async get(keys) {
       if (options.rejectGet) throw new Error('storage get rejected');
@@ -37,6 +53,8 @@ function createStorageArea(initial, options = {}) {
       return out;
     },
     async set(values) {
+      setCount++;
+      if (typeof options.beforeSet === 'function') await options.beforeSet(values, setCount);
       if (options.rejectSet) throw new Error('storage set rejected');
       Object.assign(store, clone(values));
     },
@@ -46,6 +64,9 @@ function createStorageArea(initial, options = {}) {
     },
     dump() {
       return clone(store);
+    },
+    get setCount() {
+      return setCount;
     }
   };
 }
@@ -139,8 +160,11 @@ async function main() {
       'mutateSubmap',
       'read',
       'recordConnected',
+      'replaceCompatibility',
       'replaceInstalled'
-    ], 'classic script exposes only the four-method provider API');
+    ], 'classic script exposes the additive five-method provider API');
+    assert.equal(providers.COMPATIBILITY_MAX_AGE_MS, COMPATIBILITY_MAX_AGE_MS,
+      'the single exported compatibility freshness bound is fifteen minutes');
   }
 
   {
@@ -335,6 +359,283 @@ async function main() {
     const reloaded = freshProviders();
     assert.deepEqual(await reloaded.read(), localArea.dump().fsbAgentProviders,
       'a fresh classic-script load re-reads the durable envelope');
+  }
+
+  {
+    const checkedAt = 1_000_000;
+    const input = compatibilitySnapshot(checkedAt);
+    const inputBefore = clone(input);
+    const initial = {
+      fsbAgentProviders: {
+        clicked: { cursor: { count: 7 } },
+        connected: { claude: { name: 'Claude', lastSeenAt: 8 } },
+        installed: { cursor: { detected: true, configPath: null, checkedAt: 9 } },
+        futureEnvelope: { nested: ['preserve', 1] }
+      }
+    };
+    const { localArea } = installChrome({ local: initial });
+    const providers = freshProviders();
+    const written = await providers.replaceCompatibility(input);
+
+    assert.deepEqual(input, inputBefore, 'compatibility replacement never mutates caller data');
+    assert.deepEqual(written.compatibility, inputBefore,
+      'replacement resolves with the exact validated safe snapshot');
+    assert.deepEqual(localArea.dump().fsbAgentProviders, {
+      clicked: { cursor: { count: 7 } },
+      connected: { 'claude-code': { name: 'Claude', lastSeenAt: 8 } },
+      installed: { cursor: { detected: true, configPath: null, checkedAt: 9 } },
+      futureEnvelope: { nested: ['preserve', 1] },
+      compatibility: inputBefore
+    }, 'compatibility replacement preserves all sibling and forward-compatible envelope data');
+    assert.deepEqual((await freshProviders().read()).compatibility, inputBefore,
+      'fresh hydration validates and restores the durable compatibility snapshot');
+  }
+
+  {
+    const durable = compatibilitySnapshot(2_000_000, [compatibilityRow({
+      status: 'unsupported',
+      reason: 'binary_not_found'
+    })]);
+    const { localArea } = installChrome({
+      local: { fsbAgentProviders: { clicked: {}, connected: {}, installed: {}, compatibility: durable } }
+    });
+    const providers = freshProviders();
+    let accessorCalls = 0;
+    const accessorRow = compatibilityRow();
+    Object.defineProperty(accessorRow, 'reason', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        accessorCalls++;
+        return 'within_tested_range';
+      }
+    });
+    const poisonedRow = Object.assign(Object.create({ inherited: true }), compatibilityRow());
+    const sparseAdapters = new Array(1);
+    const inheritedSnapshot = Object.assign(Object.create({ inherited: true }),
+      compatibilitySnapshot(2_000_001));
+    const invalidSnapshots = [
+      { ...compatibilitySnapshot(2_000_001), extra: true },
+      compatibilitySnapshot(2_000_001, [{ ...compatibilityRow(), extra: true }]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow({ reason: 'arbitrary_reason' })]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow({
+        status: 'supported',
+        reason: 'evidence_stale'
+      })]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow(), compatibilityRow()]),
+      compatibilitySnapshot(2_000_001, sparseAdapters),
+      compatibilitySnapshot(2_000_001, [accessorRow]),
+      compatibilitySnapshot(2_000_001, [poisonedRow]),
+      inheritedSnapshot,
+      compatibilitySnapshot(Number.NaN),
+      compatibilitySnapshot(2_000_001, [compatibilityRow({ adapterId: 'x'.repeat(65) })])
+    ];
+
+    for (const candidate of invalidSnapshots) {
+      await assert.rejects(
+        providers.replaceCompatibility(candidate),
+        /Invalid MCP agent compatibility snapshot/,
+        'malformed, open-vocabulary, accessor, and prototype snapshots reject before storage'
+      );
+    }
+    assert.equal(accessorCalls, 0, 'validation rejects accessor fields without invoking them');
+    assert.equal(localArea.setCount, 0, 'invalid snapshots never enter the durable mutation path');
+    assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility, durable,
+      'invalid replacements preserve the last durably validated snapshot');
+  }
+
+  {
+    let enterSet;
+    let releaseSet;
+    const setEntered = new Promise((resolve) => { enterSet = resolve; });
+    const setGate = new Promise((resolve) => { releaseSet = resolve; });
+    const { localArea } = installChrome({
+      localOptions: {
+        async beforeSet() {
+          enterSet();
+          await setGate;
+        }
+      }
+    });
+    const providers = freshProviders();
+    let resolved = false;
+    const replacement = providers.replaceCompatibility(compatibilitySnapshot(3_000_000));
+    replacement.then(() => { resolved = true; });
+    await setEntered;
+    await tick();
+    assert.equal(resolved, false, 'replacement cannot resolve before the durable write settles');
+    assert.equal(localArea.dump().fsbAgentProviders, undefined,
+      'the new supported view is not observable before durable storage accepts it');
+    releaseSet();
+    await replacement;
+    assert.equal(resolved, true, 'replacement resolves after durable storage accepts the snapshot');
+  }
+
+  {
+    const { localArea } = installChrome();
+    const providers = freshProviders();
+    let enterMutation;
+    let releaseMutation;
+    const mutationEntered = new Promise((resolve) => { enterMutation = resolve; });
+    const mutationGate = new Promise((resolve) => { releaseMutation = resolve; });
+    const clickedWrite = providers.mutateSubmap('clicked', async (clicked) => {
+      enterMutation();
+      await mutationGate;
+      clicked.cursor = { count: 1 };
+    });
+    await mutationEntered;
+    const compatibilityWrite = providers.replaceCompatibility(compatibilitySnapshot(4_000_000));
+    await tick();
+    assert.equal(localArea.setCount, 0,
+      'compatibility replacement waits behind an existing provider-envelope mutation');
+    releaseMutation();
+    await Promise.all([clickedWrite, compatibilityWrite]);
+    assert.deepEqual(localArea.dump().fsbAgentProviders.clicked, { cursor: { count: 1 } });
+    assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility,
+      compatibilitySnapshot(4_000_000),
+      'compatibility replacement shares the existing mutation chain without losing siblings');
+  }
+
+  {
+    const checkedAt = 5_000_000;
+    const clicked = {
+      'claude-code': { count: 1 },
+      opencode: { count: 1 },
+      codex: { count: 1 },
+      cursor: { count: 1 }
+    };
+    installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked,
+          connected: {},
+          installed: {},
+          compatibility: compatibilitySnapshot(checkedAt)
+        }
+      }
+    });
+    const providers = freshProviders();
+    const atBoundary = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS);
+    assert.deepEqual(atBoundary['claude-code'].compatibility, {
+      status: 'supported',
+      reason: 'within_tested_range',
+      checkedAt
+    }, 'supported evidence remains supported at the exact fifteen-minute boundary');
+    assert.deepEqual(atBoundary.opencode.compatibility, {
+      status: 'unsupported',
+      reason: 'adapter_unshipped',
+      checkedAt
+    }, 'OpenCode remains visibly unsupported until its adapter ships');
+    assert.deepEqual(atBoundary.codex.compatibility, {
+      status: 'unsupported',
+      reason: 'adapter_unshipped',
+      checkedAt
+    }, 'Codex remains visibly unsupported until its adapter ships');
+    assert.equal(Object.prototype.hasOwnProperty.call(atBoundary.cursor, 'compatibility'), false,
+      'API rows receive no compatibility projection');
+
+    const stale = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
+    assert.deepEqual(stale['claude-code'].compatibility, {
+      status: 'degraded',
+      reason: 'evidence_stale',
+      checkedAt
+    }, 'supported evidence older than fifteen minutes downgrades one way to evidence_stale');
+
+    const rollback = await providers.getMergedClients([], () => checkedAt - 1);
+    assert.deepEqual(rollback['claude-code'].compatibility, {
+      status: 'unsupported',
+      reason: 'matrix_invalid',
+      checkedAt: null
+    }, 'clock rollback/future-dated evidence fails closed instead of manufacturing freshness');
+
+    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
+      status: 'degraded',
+      reason: 'newer_than_tested_range'
+    })]));
+    const oldDegraded = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
+    assert.deepEqual(oldDegraded['claude-code'].compatibility, {
+      status: 'degraded',
+      reason: 'newer_than_tested_range',
+      checkedAt
+    }, 'already degraded evidence is never rewritten into a more permissive state');
+
+    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
+      status: 'unsupported',
+      reason: 'wrong_major'
+    })]));
+    const oldUnsupported = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
+    assert.deepEqual(oldUnsupported['claude-code'].compatibility, {
+      status: 'unsupported',
+      reason: 'wrong_major',
+      checkedAt
+    }, 'already unsupported evidence retains its canonical fail-closed reason');
+
+    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
+      displayLabel: 'Matrix Mismatch'
+    })]));
+    const mismatched = await providers.getMergedClients([], () => checkedAt);
+    assert.deepEqual(mismatched['claude-code'].compatibility, {
+      status: 'unsupported',
+      reason: 'matrix_invalid',
+      checkedAt
+    }, 'a safe-shape row that mismatches the shipped matrix label still projects unsupported');
+  }
+
+  {
+    const corrupt = compatibilitySnapshot(6_000_000, [compatibilityRow({ reason: 'not_canonical' })]);
+    installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: { 'claude-code': { count: 1 }, cursor: { count: 1 } },
+          connected: {},
+          installed: {},
+          compatibility: corrupt
+        }
+      }
+    });
+    const providers = freshProviders();
+    assert.equal((await providers.read()).compatibility, null,
+      'corrupt hydrated compatibility is retained only as a fail-closed null view');
+    const merged = await providers.getMergedClients([], () => 6_000_000);
+    assert.deepEqual(merged['claude-code'].compatibility, {
+      status: 'unsupported',
+      reason: 'matrix_invalid',
+      checkedAt: null
+    }, 'corrupt/absent evidence projects unsupported');
+    assert.equal(Object.prototype.hasOwnProperty.call(merged.cursor, 'compatibility'), false,
+      'corrupt evidence cannot leak a compatibility property onto API rows');
+  }
+
+  {
+    const oldSnapshot = compatibilitySnapshot(7_000_000, [compatibilityRow({
+      status: 'unsupported',
+      reason: 'binary_not_found'
+    })]);
+    const { localArea } = installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: { 'claude-code': { count: 1 } },
+          connected: {},
+          installed: {},
+          compatibility: oldSnapshot
+        }
+      },
+      localOptions: { rejectSet: true }
+    });
+    const providers = freshProviders();
+    await assert.rejects(
+      providers.replaceCompatibility(compatibilitySnapshot(7_000_001)),
+      /storage set rejected/,
+      'durable write rejection reaches the refresh owner'
+    );
+    assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility, oldSnapshot,
+      'write rejection preserves the last durable compatibility evidence');
+    const merged = await providers.getMergedClients([], () => 7_000_001);
+    assert.deepEqual(merged['claude-code'].compatibility, {
+      status: 'unsupported',
+      reason: 'binary_not_found',
+      checkedAt: 7_000_000
+    }, 'a rejected newly-supported write cannot leak support through the merged view');
   }
 
   {
