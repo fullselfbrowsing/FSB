@@ -15,6 +15,13 @@ const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
 const adapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'adapter.js');
+const compatibilityBuildPath = path.join(
+  repoRoot,
+  'mcp',
+  'build',
+  'agent-providers',
+  'compatibility.js',
+);
 const claudeAdapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-code.js');
 const detectBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-detect.js');
 const profileBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-profile.js');
@@ -73,14 +80,18 @@ async function main() {
   assert.equal(shippedAgent.maxTurns, 40);
 
   const detectModule = await import(pathToFileURL(detectBuildPath).href);
+  const compatibilityModule = await import(pathToFileURL(compatibilityBuildPath).href);
   const profileModule = await import(pathToFileURL(profileBuildPath).href);
   const adapterModule = await import(pathToFileURL(adapterBuildPath).href);
   const claudeAdapterModule = await import(pathToFileURL(claudeAdapterBuildPath).href);
   const {
-    CLAUDE_MINIMUM_VERSION,
     CLAUDE_PROBE_OPTIONS,
     createClaudeCodeDetector,
   } = detectModule;
+  const {
+    classifyAdapterCompatibility,
+    getAdapterCompatibilityContract,
+  } = compatibilityModule;
   const {
     SERIALIZED_FSB_AGENTS,
     SHIPPED_FSB_AGENT_POLICY,
@@ -89,7 +100,9 @@ async function main() {
   const { TASK_ONLY_CAPABILITIES } = adapterModule;
   const { createClaudeCodeAdapter } = claudeAdapterModule;
 
-  assert.equal(CLAUDE_MINIMUM_VERSION, '2.1.177');
+  const compatibilityRow = getAdapterCompatibilityContract('claude-code');
+  assert.ok(compatibilityRow, 'the canonical compatibility row is available');
+  assert.equal(compatibilityRow.profileVersion, '2.1.177');
   assert.deepEqual(CLAUDE_PROBE_OPTIONS, {
     timeout: 3000,
     windowsHide: true,
@@ -132,8 +145,37 @@ async function main() {
   const oldDetection = await createClaudeCodeDetector(old.dependencies).detect();
   assert.equal(oldDetection.installed, false);
   assert.equal(oldDetection.version, '2.1.176');
-  assert.equal(oldDetection.binary, null);
+  assert.deepEqual(oldDetection.binary, detection.binary, 'safe path is retained for local doctor output');
   assert.equal(oldDetection.diagnostic.code, 'version_unsupported');
+
+  const newer = detectorDependencies({
+    probe: async () => ({ stdout: 'Claude Code 2.1.178', stderr: '' }),
+  });
+  const newerDetection = await createClaudeCodeDetector(newer.dependencies).detect();
+  assert.equal(newerDetection.installed, true, 'newer same-major evidence remains start eligible');
+  assert.equal(newerDetection.version, '2.1.178');
+  assert.equal(newerDetection.profileVersion, compatibilityRow.profileVersion);
+  assert.deepEqual(newerDetection.binary, detection.binary);
+  assert.equal(newerDetection.diagnostic, undefined);
+  assert.deepEqual(
+    classifyAdapterCompatibility('claude-code', newerDetection.version),
+    {
+      adapterId: 'claude-code',
+      displayLabel: 'Claude Code',
+      status: 'degraded',
+      reason: 'newer_than_tested_range',
+    },
+  );
+
+  const wrongMajor = detectorDependencies({
+    probe: async () => ({ stdout: 'Claude Code 3.0.0', stderr: '' }),
+  });
+  const wrongMajorDetection = await createClaudeCodeDetector(wrongMajor.dependencies).detect();
+  assert.equal(wrongMajorDetection.installed, false);
+  assert.equal(wrongMajorDetection.version, '3.0.0');
+  assert.deepEqual(wrongMajorDetection.binary, detection.binary);
+  assert.equal(wrongMajorDetection.profileVersion, null);
+  assert.equal(wrongMajorDetection.diagnostic.code, 'version_unsupported');
 
   const prerelease = detectorDependencies({
     probe: async () => ({ stdout: '2.1.177-rc.1', stderr: '' }),
@@ -149,8 +191,19 @@ async function main() {
   });
   const unparseableDetection = await createClaudeCodeDetector(unparseable.dependencies).detect();
   assert.equal(unparseableDetection.installed, false);
+  assert.equal(unparseableDetection.version, null);
+  assert.deepEqual(unparseableDetection.binary, detection.binary);
   assert.equal(unparseableDetection.diagnostic.code, 'version_unparseable');
   assert.equal(JSON.stringify(unparseableDetection).includes('Claude development build'), false);
+
+  const missingVersion = detectorDependencies({
+    probe: async () => ({ stdout: '', stderr: '' }),
+  });
+  const missingVersionDetection = await createClaudeCodeDetector(missingVersion.dependencies).detect();
+  assert.equal(missingVersionDetection.installed, false);
+  assert.equal(missingVersionDetection.version, null);
+  assert.deepEqual(missingVersionDetection.binary, detection.binary);
+  assert.equal(missingVersionDetection.diagnostic.code, 'version_unparseable');
 
   const missing = detectorDependencies({ resolveBinary: async () => null });
   const missingDetection = await createClaudeCodeDetector(missing.dependencies).detect();
@@ -163,6 +216,7 @@ async function main() {
   });
   const failedProbeDetection = await createClaudeCodeDetector(failedProbe.dependencies).detect();
   assert.equal(failedProbeDetection.installed, false);
+  assert.deepEqual(failedProbeDetection.binary, detection.binary);
   assert.equal(failedProbeDetection.diagnostic.code, 'adapter_unavailable');
   assert.equal(JSON.stringify(failedProbeDetection).includes(probeSecret), false);
 
@@ -311,6 +365,11 @@ async function main() {
   const retainedSpec = buildClaudeSpawnSpec({ text: 'Use the retained path.' }, context);
   assert.equal(retainedSpec.command, nativeCandidate.realPath, 'later PATH changes cannot alter the spec');
 
+  const degradedContext = Object.freeze({ ...context, detection: newerDetection });
+  const degradedSpec = buildClaudeSpawnSpec({ text: 'Use a newer same-major CLI.' }, degradedContext);
+  assert.equal(degradedSpec.profileVersion, compatibilityRow.profileVersion);
+  assert.deepEqual(degradedSpec.argv, exactArgv, 'degraded start eligibility preserves fixed spawn policy');
+
   assert.throws(
     () => buildClaudeSpawnSpec({ text: 'x'.repeat(65537) }, context),
     /safe byte limit/,
@@ -455,8 +514,16 @@ async function main() {
   assert.doesNotMatch(claudeAdapterSource, /\b(?:spawn|exec|execFile|fork)\s*\(/);
   assert.doesNotMatch(claudeAdapterSource, /shell\s*:/);
 
-  const source = `${fs.readFileSync(detectSourcePath, 'utf8')}\n${fs.readFileSync(profileSourcePath, 'utf8')}\n${claudeAdapterSource}`;
+  const detectSource = fs.readFileSync(detectSourcePath, 'utf8');
+  const profileSource = fs.readFileSync(profileSourcePath, 'utf8');
+  const source = `${detectSource}\n${profileSource}\n${claudeAdapterSource}`;
   assert.match(source, /shell:\s*false/);
+  assert.match(detectSource, /classifyAdapterCompatibility/);
+  assert.match(profileSource, /compatibility\.js/);
+  assert.doesNotMatch(detectSource, /CLAUDE_(?:MINIMUM|PROFILE)_VERSION/);
+  assert.doesNotMatch(profileSource, /CLAUDE_(?:MINIMUM|PROFILE)_VERSION/);
+  assert.doesNotMatch(`${detectSource}\n${profileSource}`, /2\.1\.177/);
+  assert.doesNotMatch(`${detectSource}\n${profileSource}`, /minimumVersion|testedThroughVersion/);
   for (const forbiddenSource of [
     'shell: true',
     'cmd /c',

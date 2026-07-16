@@ -3,13 +3,26 @@ import { constants as fsConstants } from 'node:fs';
 import { access, realpath, stat } from 'node:fs/promises';
 import { delimiter, extname, isAbsolute, join, win32 } from 'node:path';
 import {
+  CLAUDE_CODE_ADAPTER_ID,
   type AdapterDetection,
   type AdapterDiagnosticCode,
   type RetainedBinary,
 } from './adapter.js';
+import {
+  classifyAdapterCompatibility,
+  extractAdapterVersion,
+  getAdapterCompatibilityContract,
+} from './compatibility.js';
 
-export const CLAUDE_MINIMUM_VERSION = '2.1.177' as const;
-export const CLAUDE_PROFILE_VERSION = '2.1.177' as const;
+function requireClaudeCompatibility() {
+  const compatibility = getAdapterCompatibilityContract(CLAUDE_CODE_ADAPTER_ID);
+  if (!compatibility) {
+    throw new Error('Claude Code compatibility contract is unavailable');
+  }
+  return compatibility;
+}
+
+const CLAUDE_COMPATIBILITY = requireClaudeCompatibility();
 
 const PROBE_TIMEOUT_MS = 3000;
 const PROBE_OUTPUT_LIMIT_BYTES = 64 * 1024;
@@ -142,52 +155,21 @@ function makeDefaultDependencies(): ClaudeDetectDependencies {
   };
 }
 
-interface ParsedSemver {
-  readonly raw: string;
-  readonly major: number;
-  readonly minor: number;
-  readonly patch: number;
-  readonly prerelease: boolean;
-}
-
-function parseSemver(output: string): ParsedSemver | null {
-  const match = output.match(
-    /(?:^|[^0-9])(\d{1,9})\.(\d{1,9})\.(\d{1,9})(-[0-9A-Za-z.-]+)?(?:$|[^0-9A-Za-z.-])/,
-  );
-  if (!match) return null;
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  const patch = Number(match[3]);
-  if (![major, minor, patch].every(Number.isSafeInteger)) return null;
-  return {
-    raw: `${major}.${minor}.${patch}${match[4] ?? ''}`,
-    major,
-    minor,
-    patch,
-    prerelease: Boolean(match[4]),
-  };
-}
-
-function isSupportedVersion(version: ParsedSemver): boolean {
-  const current = [version.major, version.minor, version.patch];
-  const minimum = [2, 1, 177];
-  for (let index = 0; index < current.length; index += 1) {
-    if (current[index] > minimum[index]) return true;
-    if (current[index] < minimum[index]) return false;
-  }
-  return !version.prerelease;
+interface UnavailableEvidence {
+  readonly version?: string | null;
+  readonly binary?: RetainedBinary | null;
 }
 
 function unavailable(
   code: AdapterDiagnosticCode,
   message: string,
-  version: string | null = null,
+  evidence: UnavailableEvidence = {},
 ): AdapterDetection {
   return Object.freeze({
     installed: false,
-    version,
+    version: evidence.version ?? null,
     authState: 'unknown',
-    binary: null,
+    binary: evidence.binary ?? null,
     profileVersion: null,
     diagnostic: Object.freeze({ code, message }),
   });
@@ -288,12 +270,20 @@ export function createClaudeCodeDetector(
           CLAUDE_PROBE_OPTIONS,
         );
       } catch {
-        return unavailable('adapter_unavailable', 'Claude Code version probe failed');
+        return unavailable(
+          'adapter_unavailable',
+          'Claude Code version probe failed',
+          { binary },
+        );
       }
 
       const combined = `${String(output.stdout ?? '')}\n${String(output.stderr ?? '')}`;
       if (Buffer.byteLength(combined, 'utf8') > PROBE_OUTPUT_LIMIT_BYTES) {
-        return unavailable('version_unparseable', 'Claude Code version output exceeded the safe limit');
+        return unavailable(
+          'version_unparseable',
+          'Claude Code version output exceeded the safe limit',
+          { binary },
+        );
       }
 
       if (
@@ -303,24 +293,29 @@ export function createClaudeCodeDetector(
         return unavailable('binary_changed', 'Claude Code executable identity changed during detection');
       }
 
-      const version = parseSemver(combined);
+      const version = extractAdapterVersion(combined);
       if (!version) {
-        return unavailable('version_unparseable', 'Claude Code version could not be verified');
+        return unavailable(
+          'version_unparseable',
+          'Claude Code version could not be verified',
+          { binary },
+        );
       }
-      if (!isSupportedVersion(version)) {
+      const compatibility = classifyAdapterCompatibility(CLAUDE_CODE_ADAPTER_ID, version);
+      if (compatibility.status === 'unsupported') {
         return unavailable(
           'version_unsupported',
-          `Claude Code ${CLAUDE_MINIMUM_VERSION} or newer is required`,
-          version.raw,
+          'Claude Code version is outside the verified compatibility range',
+          { binary, version },
         );
       }
 
       return Object.freeze({
         installed: true,
-        version: version.raw,
+        version,
         authState: 'unknown',
         binary,
-        profileVersion: CLAUDE_PROFILE_VERSION,
+        profileVersion: CLAUDE_COMPATIBILITY.profileVersion,
       });
     },
   });

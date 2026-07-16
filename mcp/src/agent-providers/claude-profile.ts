@@ -7,7 +7,17 @@ import {
   type SpawnContext,
   type SpawnSpec,
 } from './adapter.js';
-import { CLAUDE_PROFILE_VERSION } from './claude-detect.js';
+import { getAdapterCompatibilityContract } from './compatibility.js';
+
+function requireClaudeCompatibility() {
+  const compatibility = getAdapterCompatibilityContract(CLAUDE_CODE_ADAPTER_ID);
+  if (!compatibility) {
+    throw new Error('Claude Code compatibility contract is unavailable');
+  }
+  return compatibility;
+}
+
+const CLAUDE_COMPATIBILITY = requireClaudeCompatibility();
 
 export const CLAUDE_TASK_LIMIT_BYTES = 64 * 1024;
 
@@ -127,7 +137,7 @@ function validateContext(ctx: SpawnContext): void {
     !ctx.detection.installed
     || !ctx.detection.binary
     || !ctx.detection.version
-    || ctx.detection.profileVersion !== CLAUDE_PROFILE_VERSION
+    || ctx.detection.profileVersion !== CLAUDE_COMPATIBILITY.profileVersion
   ) {
     throw new Error('Claude profile requires a supported retained detection');
   }
@@ -183,7 +193,7 @@ export function buildClaudeSpawnSpec(task: AgentTask, ctx: SpawnContext): SpawnS
   ];
   const fixedEnv = {
     FSB_AGENT_ADAPTER: CLAUDE_CODE_ADAPTER_ID,
-    FSB_AGENT_PROFILE: CLAUDE_PROFILE_VERSION,
+    FSB_AGENT_PROFILE: CLAUDE_COMPATIBILITY.profileVersion,
     FSB_DELEGATION_ID: ctx.delegationId,
     FSB_AGENT_FINGERPRINT: ctx.runtimeFingerprint,
   };
@@ -202,7 +212,7 @@ export function buildClaudeSpawnSpec(task: AgentTask, ctx: SpawnContext): SpawnS
 
   return freezeSpawnSpec({
     adapterId: CLAUDE_CODE_ADAPTER_ID,
-    profileVersion: CLAUDE_PROFILE_VERSION,
+    profileVersion: CLAUDE_COMPATIBILITY.profileVersion,
     command: binary.command,
     argv,
     cwd: ctx.cwd,
