@@ -422,7 +422,7 @@
       return compatibilityProjection('unsupported', 'matrix_invalid', checkedAt);
     }
     if (row.status === 'supported'
-        && now - snapshot.checkedAt > FSB_AGENT_COMPATIBILITY_MAX_AGE_MS) {
+        && now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS) {
       return compatibilityProjection('degraded', 'evidence_stale', snapshot.checkedAt);
     }
     return compatibilityProjection(row.status, row.reason, snapshot.checkedAt);

@@ -470,6 +470,7 @@ function buildCompatibilityRefreshHarness(options = {}) {
     }
   };
   const providers = {
+    COMPATIBILITY_MAX_AGE_MS: 15 * 60 * 1000,
     validateCompatibilitySnapshot(value) {
       calls.push(['validate', toPlainObject(value)]);
       if (value === null || value === undefined || options.rejectValidation) return null;
@@ -1041,7 +1042,11 @@ async function runCompatibilityRefreshCases() {
       'background exposes a cache-only merged-client inventory path');
     if (typeof harness.readCached === 'function') {
       const result = await harness.readCached();
-      assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
+      assertDeepEqual(result, {
+        clients: harness.clients,
+        refreshOutcome: 'stale',
+        compatibilityExpiresAt: 900_100
+      },
         'cache-only inventory projects durable rows without changing the closed outcome');
       assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
         'cache-only inventory never requests daemon compatibility');
@@ -1065,7 +1070,11 @@ async function runCompatibilityRefreshCases() {
       'merged rows cannot fan out while durable replacement is pending');
     replaceGate.resolve();
     const result = await pending;
-    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'refreshed' },
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'refreshed',
+      compatibilityExpiresAt: 900_100
+    },
       'durable success returns clients plus the exact refreshed outcome');
     assert(harness.calls.findIndex((call) => call[0] === 'replace:done')
         < harness.calls.findIndex((call) => call[0] === 'merge'),
@@ -1104,7 +1113,8 @@ async function runCompatibilityRefreshCases() {
           compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
         }
       },
-      refreshOutcome: 'stale'
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
     }, 'unpaired/offline refresh degrades retained supported compatibility coherently');
     assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
       'unpaired refresh never enters reverse-channel transport');
@@ -1123,7 +1133,11 @@ async function runCompatibilityRefreshCases() {
   {
     const harness = buildCompatibilityRefreshHarness({ rejectValidation: true });
     const result = await harness.refresh();
-    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'unavailable' },
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'unavailable',
+      compatibilityExpiresAt: null
+    },
       'malformed response with no validated cache returns unavailable rows');
     assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
       'malformed response never reaches durable replacement');
@@ -1139,7 +1153,8 @@ async function runCompatibilityRefreshCases() {
           compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
         }
       },
-      refreshOutcome: 'stale'
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
     }, 'storage rejection degrades prior supported cache and reports stale');
     assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 1,
       'storage rejection still returns existing provider rows once');
@@ -1164,7 +1179,11 @@ async function runCompatibilityRefreshCases() {
       rejectRequest: true
     });
     const result = await harness.refresh();
-    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'unavailable' },
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'unavailable',
+      compatibilityExpiresAt: null
+    },
       'transport failure with no cache returns existing rows as unavailable');
   }
 
@@ -1209,11 +1228,11 @@ async function runCompatibilityRefreshCases() {
     const handler = buildMcpClientsRuntimeHarness({
       readCachedImpl: async () => {
         cacheReads++;
-        return { clients, refreshOutcome: 'stale' };
+        return { clients, refreshOutcome: 'stale', compatibilityExpiresAt: null };
       },
       refreshImpl: async () => {
         liveRefreshes++;
-        return { clients, refreshOutcome: 'refreshed' };
+        return { clients, refreshOutcome: 'refreshed', compatibilityExpiresAt: null };
       }
     });
     const response = await new Promise((resolve) => {
@@ -1224,7 +1243,12 @@ async function runCompatibilityRefreshCases() {
       );
       assertEqual(keepOpen, true, 'cache-only inventory keeps its runtime channel open');
     });
-    assertDeepEqual(response, { success: true, clients, refreshOutcome: 'stale' },
+    assertDeepEqual(response, {
+      success: true,
+      clients,
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
+    },
       'getMcpClients returns cache-only rows plus one closed refresh outcome');
     assertEqual(cacheReads, 1, 'getMcpClients invokes the cache-only reader once');
     assertEqual(liveRefreshes, 0, 'getMcpClients cannot invoke live compatibility refresh');
@@ -1238,7 +1262,12 @@ async function runCompatibilityRefreshCases() {
     assertEqual(refreshKeepOpen, true,
       'explicit compatibility refresh keeps its runtime channel open');
     await flushMicrotasks();
-    assertDeepEqual(refreshResponse, { success: true, clients, refreshOutcome: 'refreshed' },
+    assertDeepEqual(refreshResponse, {
+      success: true,
+      clients,
+      refreshOutcome: 'refreshed',
+      compatibilityExpiresAt: null
+    },
       'explicit compatibility action returns the live refresh projection');
     assertEqual(cacheReads, 1, 'explicit live refresh does not re-enter cache-only route dispatch');
     assertEqual(liveRefreshes, 1, 'explicit compatibility action invokes one live refresh');

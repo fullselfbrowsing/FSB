@@ -515,12 +515,21 @@ async function main() {
       }
     });
     const providers = freshProviders();
-    const atBoundary = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS);
-    assert.deepEqual(atBoundary['claude-code'].compatibility, {
+    const beforeBoundary = await providers.getMergedClients(
+      [],
+      () => checkedAt + COMPATIBILITY_MAX_AGE_MS - 1
+    );
+    assert.deepEqual(beforeBoundary['claude-code'].compatibility, {
       status: 'supported',
       reason: 'within_tested_range',
       checkedAt
-    }, 'supported evidence remains supported at the exact fifteen-minute boundary');
+    }, 'supported evidence remains supported one millisecond before expiry');
+    const atBoundary = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS);
+    assert.deepEqual(atBoundary['claude-code'].compatibility, {
+      status: 'degraded',
+      reason: 'evidence_stale',
+      checkedAt
+    }, 'supported evidence becomes stale at the exact fifteen-minute boundary');
     assert.deepEqual(atBoundary.opencode.compatibility, {
       status: 'unsupported',
       reason: 'adapter_unshipped',

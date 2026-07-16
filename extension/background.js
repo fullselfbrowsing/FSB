@@ -133,7 +133,13 @@ async function fsbReadMcpCompatibilityFallbackOutcome(providers) {
 async function fsbReadCachedMcpClients(providers = fsbGetMcpCompatibilityProviders()) {
   const refreshOutcome = await fsbReadMcpCompatibilityFallbackOutcome(providers);
   const clients = await fsbReadMergedMcpClients(providers);
-  return { clients, refreshOutcome };
+  return {
+    clients,
+    refreshOutcome,
+    compatibilityExpiresAt: refreshOutcome === 'stale'
+      ? fsbReadMcpCompatibilityExpiryAt(providers, clients)
+      : null
+  };
 }
 
 function fsbCompatibilityOwnDataValue(value, key) {
@@ -164,6 +170,23 @@ function fsbCopyCompatibilityDataRecord(value) {
     });
   } catch (_error) { /* return only the safely copied fields */ }
   return copy;
+}
+
+function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
+  const maxAge = fsbCompatibilityOwnDataValue(providers, 'COMPATIBILITY_MAX_AGE_MS');
+  const row = fsbCompatibilityOwnDataValue(clients, 'claude-code');
+  const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
+  const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
+  const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
+  const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
+  if (status !== 'supported'
+      || reason !== 'within_tested_range'
+      || !Number.isSafeInteger(checkedAt)
+      || checkedAt < 0
+      || !Number.isSafeInteger(maxAge)
+      || maxAge <= 0
+      || checkedAt > Number.MAX_SAFE_INTEGER - maxAge) return null;
+  return checkedAt + maxAge;
 }
 
 function fsbProjectStaleMcpClients(clients) {
@@ -204,7 +227,8 @@ async function fsbReadStaleMcpClientFallback(providers) {
   if (fallback.refreshOutcome !== 'stale') return fallback;
   return {
     clients: fsbProjectStaleMcpClients(fallback.clients),
-    refreshOutcome: 'stale'
+    refreshOutcome: 'stale',
+    compatibilityExpiresAt: null
   };
 }
 
@@ -229,7 +253,11 @@ function fsbRefreshMcpCompatibility() {
         if (!validated) throw new Error('Invalid MCP adapter compatibility response');
         await providers.replaceCompatibility(validated);
         const clients = await fsbReadMergedMcpClients(providers);
-        return { clients, refreshOutcome: 'refreshed' };
+        return {
+          clients,
+          refreshOutcome: 'refreshed',
+          compatibilityExpiresAt: fsbReadMcpCompatibilityExpiryAt(providers, clients)
+        };
       } catch (_error) {
         // Preserve and project only the last durable cache below.
       }
@@ -8754,7 +8782,8 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           sendResponse({
             success: true,
             clients: result.clients,
-            refreshOutcome: result.refreshOutcome
+            refreshOutcome: result.refreshOutcome,
+            compatibilityExpiresAt: result.compatibilityExpiresAt
           });
         } catch (_error) {
           sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
@@ -8785,7 +8814,8 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
           sendResponse({
             success: true,
             clients: result.clients,
-            refreshOutcome: result.refreshOutcome
+            refreshOutcome: result.refreshOutcome,
+            compatibilityExpiresAt: result.compatibilityExpiresAt
           });
         } catch (_error) {
           sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });

@@ -133,7 +133,9 @@ const providerPanelState = {
 let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
 let providerEvidenceRefreshQueued = false;
+let providerCompatibilityExpiryHandle = null;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
+const MAX_TIMEOUT_DELAY_MS = 2_147_483_647;
 const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
 const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
 const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
@@ -607,11 +609,19 @@ function requestMcpClients(liveCompatibility = false) {
         }
         const clients = copyProviderClientMap(getOwnDataValue(response, 'clients'));
         const refreshOutcome = getOwnDataValue(response, 'refreshOutcome');
-        if (!clients || !['refreshed', 'stale', 'unavailable'].includes(refreshOutcome)) {
+        const compatibilityExpiresAt = getOwnDataValue(response, 'compatibilityExpiresAt');
+        const validExpiry = compatibilityExpiresAt === null
+          || (Number.isSafeInteger(compatibilityExpiresAt) && compatibilityExpiresAt >= 0);
+        if (!clients || !['refreshed', 'stale', 'unavailable'].includes(refreshOutcome)
+            || !validExpiry) {
           settle(reject, new Error('provider_status_unavailable'));
           return;
         }
-        settle(resolve, { clients: clients, refreshOutcome: refreshOutcome });
+        settle(resolve, {
+          clients: clients,
+          refreshOutcome: refreshOutcome,
+          compatibilityExpiresAt: compatibilityExpiresAt
+        });
       });
     } catch (_error) {
       settle(reject, new Error('provider_status_unavailable'));
@@ -1094,6 +1104,30 @@ function getSelectedCompatibilityLabel(helper) {
   return model ? model.label : null;
 }
 
+function clearProviderCompatibilityExpiryTimer() {
+  if (providerCompatibilityExpiryHandle === null) return;
+  clearTimeout(providerCompatibilityExpiryHandle);
+  providerCompatibilityExpiryHandle = null;
+}
+
+function scheduleProviderCompatibilityExpiry(expiresAt) {
+  clearProviderCompatibilityExpiryTimer();
+  if (!Number.isSafeInteger(expiresAt) || expiresAt < 0) return;
+  let now;
+  try {
+    now = Date.now();
+  } catch (_error) {
+    return;
+  }
+  if (!Number.isSafeInteger(now) || now < 0) return;
+  const delay = Math.max(0, expiresAt - now);
+  if (!Number.isSafeInteger(delay) || delay > MAX_TIMEOUT_DELAY_MS) return;
+  providerCompatibilityExpiryHandle = setTimeout(() => {
+    providerCompatibilityExpiryHandle = null;
+    refreshProviderEvidence({ liveCompatibility: false });
+  }, delay);
+}
+
 function refreshProviderEvidence({ announce = false, liveCompatibility = announce } = {}) {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
@@ -1114,6 +1148,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
         ? 'ready'
         : result.refreshOutcome;
       providerPanelState.recommendation = helper.getRecommendation(result.clients);
+      scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
       if (announce && result.refreshOutcome === 'refreshed') {
         const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
         const changed = previousCompatibilityLabel && nextCompatibilityLabel
@@ -1131,6 +1166,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
       return result.clients;
     })
     .catch(() => {
+      clearProviderCompatibilityExpiryTimer();
       if (providerPanelState.hasSuccessfulEvidence) {
         providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
         providerPanelState.evidenceStatus = 'stale';

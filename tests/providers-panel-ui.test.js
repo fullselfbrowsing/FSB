@@ -970,6 +970,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     ? options.runtimeResponse
     : { success: true, clients: {} };
   let runtimeError = null;
+  let currentNowMs = Number.isSafeInteger(options.nowMs) ? options.nowMs : Date.now();
   const pairingRuntimeResponse = Object.prototype.hasOwnProperty.call(options, 'pairingRuntimeResponse')
     ? options.pairingRuntimeResponse
     : { success: true, pairingStatus: 'paired' };
@@ -1026,6 +1027,11 @@ function createProviderHarness(initialStorage, harnessOptions) {
           && Object.prototype.hasOwnProperty.call(delivered, 'clients')
           && !Object.prototype.hasOwnProperty.call(delivered, 'refreshOutcome')) {
         delivered = { ...delivered, refreshOutcome: 'refreshed' };
+      }
+      if (!error && delivered && delivered.success === true
+          && Object.prototype.hasOwnProperty.call(delivered, 'clients')
+          && !Object.prototype.hasOwnProperty.call(delivered, 'compatibilityExpiresAt')) {
+        delivered = { ...delivered, compatibilityExpiresAt: null };
       }
       callback(delivered);
       chrome.runtime.lastError = null;
@@ -1127,6 +1133,9 @@ function createProviderHarness(initialStorage, harnessOptions) {
     FSBProvidersPanel: PROVIDERS,
     FSBAnalytics: function() {},
     Event: class { constructor(type) { this.type = type; } },
+    Date: class extends Date {
+      static now() { return currentNowMs; }
+    },
     setTimeout: setHarnessTimeout,
     clearTimeout: clearHarnessTimeout,
     requestAnimationFrame(fn) { return setTimeout(fn, 0); },
@@ -1260,6 +1269,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
         timer.fn();
       });
     },
+    setNow(value) { currentNowMs = value; },
     state() { return vm.runInContext('providerPanelState', context); },
     dashboardState() { return vm.runInContext('dashboardState', context); }
   };
@@ -2208,6 +2218,68 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(invalidOutcome.announcement.textContent,
     'Compatibility data is unavailable. Showing Unsupported.',
     'unknown background outcomes fail closed without a fourth UI state');
+
+  let expiryCacheReads = 0;
+  const expiryCheckedAt = 1_000;
+  const expiryAt = expiryCheckedAt + (15 * 60 * 1000);
+  const expiring = createProviderHarness({}, {
+    nowMs: expiryCheckedAt,
+    heldTimerDelays: [15 * 60 * 1000],
+    runtimeDispatch(message) {
+      assert.strictEqual(message.action, 'getMcpClients',
+        'automatic compatibility expiry can only use the cache-only inventory route');
+      expiryCacheReads += 1;
+      if (expiryCacheReads === 1) {
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: expiryAt,
+          clients: compatibilityClients({
+            status: 'supported', reason: 'within_tested_range', checkedAt: expiryCheckedAt
+          })
+        };
+      }
+      return {
+        success: true,
+        refreshOutcome: 'stale',
+        compatibilityExpiresAt: null,
+        clients: compatibilityClients({
+          status: 'degraded', reason: 'evidence_stale', checkedAt: expiryCheckedAt
+        })
+      };
+    }
+  });
+  expiring.context.setupEventListeners();
+  expiring.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+  expiring.modelName.appendChild(makeOption('expiry-model', 'expiry-model'));
+  expiring.modelName.value = 'expiry-model';
+  expiring.anthropicApiKey.value = 'preserved-expiry-key';
+  expiring.dashboardState().hasUnsavedChanges = true;
+  expiring.refreshButton.focus();
+  await expiring.context.refreshProviderEvidence();
+  assert.strictEqual(compatibilityStatus(expiring, 'claude-code').textContent, 'Supported');
+  assert.strictEqual(expiring.agentCompatibilityStatus.textContent, 'Supported');
+  assert.strictEqual(expiring.scheduledTimeoutDelays.includes(15 * 60 * 1000), true,
+    'fresh supported evidence schedules one exact authoritative expiry deadline');
+  const beforeAutomaticExpiry = compatibilityIdentitySnapshot(expiring);
+
+  expiring.setNow(expiryAt);
+  expiring.advanceTimersBy(15 * 60 * 1000);
+  await flushHarness();
+  await flushHarness();
+
+  assert.deepStrictEqual(expiring.runtimeCalls, [
+    { action: 'getMcpClients' },
+    { action: 'getMcpClients' }
+  ], 'the exact-boundary timer reprojects cache once without a daemon refresh');
+  assert.strictEqual(expiryCacheReads, 2,
+    'automatic expiry performs the initial cache read plus one bounded re-projection');
+  assert.strictEqual(compatibilityStatus(expiring, 'claude-code').textContent, 'Degraded',
+    'the open provider row ages Supported to Degraded at exactly fifteen minutes');
+  assert.strictEqual(expiring.agentCompatibilityStatus.textContent, 'Degraded',
+    'selected-provider details stay coherent with the automatically aged row');
+  assert.deepStrictEqual(compatibilityIdentitySnapshot(expiring), beforeAutomaticExpiry,
+    'automatic expiry preserves focus, selection, row order, form values, dirty state, and storage');
 
   console.log('Providers panel UI: coalescing, manual refresh, storage debounce, and section entry');
   const coalesced = createProviderHarness({}, { holdRuntime: true });
