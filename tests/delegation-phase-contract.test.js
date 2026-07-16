@@ -10,6 +10,9 @@ const PHASE_DIR = '.planning/phases/61-delegation-ux-sw-eviction-persistence';
 const UAT_PATH = `${PHASE_DIR}/61-HUMAN-UAT.md`;
 const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
 const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118cae72e0f0dfc758577f683';
+const PHASE62_DIR = '.planning/phases/62-ci-drift-smoke-gate-doctor-extensions';
+const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
+const PRE_PHASE62_ROOT_TEST_HASH = 'cc320c1dfb3fefb292ebb8edc789993ec5fcd42a2b2ec2a057a37d4c49281808';
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
@@ -18,6 +21,32 @@ const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-controller.test.js',
   'node tests/delegation-sidepanel-ui.test.js',
   'node tests/delegation-phase-contract.test.js',
+]);
+
+const PHASE62_NEW_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-adapter-compatibility.test.js',
+  'node tests/mcp-agent-drift-smoke.test.js',
+  'node tests/agent-protocol-drift-diagnostics.test.js',
+]);
+
+const PHASE62_EXPECTED_TASKS = Object.freeze([
+  ['62-01-01', 'npm --prefix mcp run build && node tests/mcp-adapter-compatibility.test.js'],
+  ['62-01-02', 'npm --prefix mcp run build && node tests/mcp-claude-code-adapter.test.js && node tests/mcp-adapter-compatibility.test.js'],
+  ['62-01-03', 'npm --prefix mcp run build && node tests/mcp-agent-drift-smoke.test.js && node tests/mcp-agent-stream-fixture.test.js'],
+  ['62-02-01', 'npm --prefix mcp run build && node tests/mcp-diagnostics-status.test.js && node tests/mcp-bridge-auth.test.js'],
+  ['62-02-02', 'npm --prefix mcp run build && node tests/mcp-diagnostics-status.test.js && node tests/mcp-version-parity.test.js'],
+  ['62-03-01', 'npm --prefix mcp run build && node tests/mcp-reverse-channel-contract.test.js && node tests/mcp-bridge-topology.test.js'],
+  ['62-03-02', 'node tests/mcp-agent-providers-storage.test.js && node tests/mcp-bridge-background-dispatch.test.js'],
+  ['62-03-03', 'node tests/mcp-bridge-client-lifecycle.test.js && node tests/mcp-bridge-background-dispatch.test.js && node tests/mcp-agent-providers-storage.test.js'],
+  ['62-04-01', 'npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js && node tests/mcp-reverse-channel-contract.test.js'],
+  ['62-04-02', 'node tests/agent-protocol-drift-diagnostics.test.js && node tests/redact-for-log.test.js && node tests/diagnostics-ring-buffer.test.js'],
+  ['62-04-03', 'node tests/agent-protocol-drift-diagnostics.test.js && node tests/mcp-bridge-background-dispatch.test.js && npm --prefix mcp run build && node tests/mcp-spawn-supervisor.test.js'],
+  ['62-05-01', 'node tests/providers-panel-logic.test.js'],
+  ['62-05-02', 'node tests/providers-panel-logic.test.js && node tests/providers-panel-ui.test.js'],
+  ['62-05-03', 'node tests/providers-panel-ui.test.js'],
+  ['62-06-01', `node -e "const p=require('./package.json');const s=p.scripts&&p.scripts.test||'';for(const x of ['node tests/mcp-adapter-compatibility.test.js','node tests/mcp-agent-drift-smoke.test.js','node tests/agent-protocol-drift-diagnostics.test.js'])if(s.split(x).length-1!==1)process.exit(1)"`],
+  ['62-06-02', 'node tests/delegation-phase-contract.test.js && node tests/mcp-adapter-compatibility.test.js && node tests/mcp-reverse-channel-contract.test.js && node tests/providers-panel-logic.test.js'],
+  ['62-06-03', 'node tests/delegation-phase-contract.test.js'],
 ]);
 
 const EXPECTED_TASKS = Object.freeze([
@@ -288,7 +317,10 @@ for (const command of PHASE61_NEW_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the serial root chain`);
 }
-const prePhase61Commands = rootCommands.filter((command) => !PHASE61_NEW_TEST_COMMANDS.includes(command));
+const prePhase61Commands = rootCommands.filter((command) => (
+  !PHASE61_NEW_TEST_COMMANDS.includes(command)
+  && !PHASE62_NEW_TEST_COMMANDS.includes(command)
+));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
 check(rootCommands.indexOf('node tests/phase60-full-tests-harness.test.js')
@@ -727,5 +759,525 @@ check(/All manual checks remain `human_needed`/.test(validation),
 check(validation.includes('61-HUMAN-UAT.md') || uat.includes('single v0.9.91 milestone-end execution'),
   'validation/UAT artifacts form one explicit milestone-end live ledger');
 
-console.log(`\n=== Phase 61 contract results: ${passed} passed, ${failed} failed ===`);
+console.log('\n--- Phase 62 exact task, requirement, and ownership map ---');
+
+const phase62Validation = read(PHASE62_VALIDATION_PATH);
+const phase62Context = read(`${PHASE62_DIR}/62-CONTEXT.md`);
+const phase62Research = read(`${PHASE62_DIR}/62-RESEARCH.md`);
+const phase62UiSpec = read(`${PHASE62_DIR}/62-UI-SPEC.md`);
+const phase62PlanSources = [];
+const phase62PlanCommands = [];
+const phase62TaskCounts = [3, 2, 3, 3, 3, 3];
+const phase62Waves = [1, 2, 2, 3, 3, 4];
+for (let planNumber = 1; planNumber <= 6; planNumber += 1) {
+  const plan = String(planNumber).padStart(2, '0');
+  const source = read(`${PHASE62_DIR}/62-${plan}-PLAN.md`);
+  phase62PlanSources.push(source);
+  const taskIds = Array.from(source.matchAll(/<name>(62-\d{2}-\d{2}):/g), (match) => match[1]);
+  const commands = Array.from(source.matchAll(/<automated>([^<]+)<\/automated>/g),
+    (match) => decodeXml(match[1]));
+  const wave = Number((source.match(/^wave: (\d+)$/m) || [null, NaN])[1]);
+  check(taskIds.length === phase62TaskCounts[planNumber - 1],
+    `Phase 62 Plan ${plan} owns its exact task count`);
+  check(commands.length === taskIds.length,
+    `Phase 62 Plan ${plan} gives every task one focused automated command`);
+  check(wave === phase62Waves[planNumber - 1],
+    `Phase 62 Plan ${plan} remains in dependency wave ${wave}`);
+  phase62PlanCommands.push(...commands);
+}
+
+const phase62ValidationRows = phase62Validation.split('\n')
+  .filter((line) => /^\| 62-\d{2}-\d{2} \|/.test(line))
+  .map((line) => {
+    const columns = line.split('|').map((column) => column.trim());
+    const command = Array.from(line.matchAll(/`([^`]+)`/g), (match) => match[1])
+      .find((value) => /^(?:node|npm)\b/.test(value)) || '';
+    return {
+      id: columns[1],
+      plan: columns[2],
+      wave: columns[3],
+      requirements: columns[4],
+      threats: columns[5],
+      behavior: columns[6],
+      command,
+    };
+  });
+equal(phase62ValidationRows.map((row) => [row.id, row.command]), PHASE62_EXPECTED_TASKS,
+  'Phase 62 validation maps exactly all 17 task ids to their focused commands');
+equal(phase62PlanCommands, PHASE62_EXPECTED_TASKS.map((row) => row[1]),
+  'Phase 62 plan commands and validation commands are byte-equal and ordered');
+check(new Set(phase62ValidationRows.map((row) => row.id)).size === 17,
+  'Phase 62 task ids are unique');
+check(phase62ValidationRows.every((row) => row.requirements.includes('DRIFT-')
+  && row.threats.includes('T62-') && row.behavior.length >= 40),
+'every Phase 62 task has explicit requirement, threat, and secure-behavior ownership');
+
+const phase62CriticalOwners = Object.freeze({
+  'mcp/src/agent-providers/compatibility.ts': ['01', '03'],
+  '.github/workflows/ci.yml': ['01'],
+  'mcp/src/diagnostics.ts': ['02'],
+  'mcp/src/index.ts': ['02'],
+  'mcp/src/agent-providers/serve-delegation.ts': ['03'],
+  'extension/utils/mcp-agent-providers.js': ['03'],
+  'extension/utils/agent-protocol-drift-diagnostics.js': ['04'],
+  'mcp/src/agent-providers/spawn-supervisor.ts': ['04'],
+  'extension/ui/providers-panel.js': ['05'],
+  'extension/ui/options.js': ['05'],
+  'package.json': ['06'],
+  'tests/delegation-phase-contract.test.js': ['06'],
+});
+for (const [file, expectedOwners] of Object.entries(phase62CriticalOwners)) {
+  const owners = phase62PlanSources.flatMap((source, index) => {
+    const fileBlock = (source.match(/files_modified:\n([\s\S]*?)\nautonomous:/) || [null, ''])[1];
+    return fileBlock.includes(`- ${file}`) ? [String(index + 1).padStart(2, '0')] : [];
+  });
+  equal(owners, expectedOwners, `${file} keeps its declared Phase 62 owner sequence`);
+}
+const phase62UatOwners = phase62PlanSources.flatMap((source, index) => {
+  const fileBlock = (source.match(/files_modified:\n([\s\S]*?)\nautonomous:/) || [null, ''])[1];
+  return fileBlock.split('\n').some((line) => line.trim() === '- .planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-HUMAN-UAT.md')
+    ? [String(index + 1).padStart(2, '0')] : [];
+});
+equal(phase62UatOwners, ['06'],
+  'Plan 06, not the Providers implementation plan, exclusively owns final UAT closure');
+
+const phase62RequirementIds = Array.from(
+  requirements.matchAll(/^- \[[ x]\] \*\*(DRIFT-\d{2})\*\*:/gm),
+  (match) => match[1],
+);
+equal(phase62RequirementIds, ['DRIFT-01', 'DRIFT-02', 'DRIFT-03', 'DRIFT-04'],
+  'all four Phase 62 requirements remain explicit and uniquely mapped');
+const phase62ThreatIds = Array.from(
+  phase62Validation.matchAll(/^\| (T62-\d{2}) \|/gm),
+  (match) => match[1],
+);
+equal(phase62ThreatIds, Array.from({ length: 8 }, (_, index) => `T62-${String(index + 1).padStart(2, '0')}`),
+  'validation enumerates every threat T62-01 through T62-08 exactly once');
+
+const phase62RequirementEvidence = Object.freeze({
+  'DRIFT-01': [['tests/mcp-agent-drift-smoke.test.js', /registry\.ids\(\)/], ['.github/workflows/ci.yml', /Phase 62 adapter drift smoke/]],
+  'DRIFT-02': [['mcp/src/diagnostics.ts', /adapterDiagnostics/], ['mcp/src/index.ts', /Adapter compatibility/]],
+  'DRIFT-03': [['extension/utils/agent-protocol-drift-diagnostics.js', /REPORT_WINDOW_MS = 10000/], ['mcp/src/agent-providers/spawn-supervisor.ts', /agent_protocol_drift/]],
+  'DRIFT-04': [['mcp/src/agent-providers/compatibility.ts', /ADAPTER_COMPATIBILITY_MATRIX/], ['extension/ui/providers-panel.js', /COMPATIBILITY_SUPPORTED_MODEL/]],
+});
+for (const id of phase62RequirementIds) checkEvidence(id, phase62RequirementEvidence[id]);
+
+const phase62ThreatEvidence = Object.freeze({
+  'T62-01': [['mcp/src/agent-providers/compatibility.ts', /parseAdapterCompatibilityMatrix/]],
+  'T62-02': [['tests/mcp-agent-drift-smoke.test.js', /assertRosterBijection/]],
+  'T62-03': [['tests/mcp-diagnostics-status.test.js', /sharedSecretPresent/]],
+  'T62-04': [['tests/mcp-version-parity.test.js', /doctor text and JSON modes consume the same collected snapshot/]],
+  'T62-05': [['mcp/src/agent-providers/serve-delegation.ts', /adapter\.compatibility/]],
+  'T62-06': [['tests/providers-panel-ui.test.js', /compatibility.*observational|observational.*compatibility/i]],
+  'T62-07': [['extension/utils/agent-protocol-drift-diagnostics.js', /REQUIRED_KEYS = Object\.freeze\(\['adapterId', 'expected', 'observed'\]\)/]],
+  'T62-08': [['extension/background.js', /FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512/]],
+});
+for (const id of phase62ThreatIds) checkEvidence(id, phase62ThreatEvidence[id]);
+
+console.log('\n--- Phase 62 canonical matrix, fixture, CI, and root gate ---');
+
+const compatibilitySource = read('mcp/src/agent-providers/compatibility.ts');
+const compatibilityStatusesBlock = between(
+  compatibilitySource,
+  'export const COMPATIBILITY_STATUSES',
+  'export const COMPATIBILITY_REASONS',
+);
+const compatibilityReasonsBlock = between(
+  compatibilitySource,
+  'export const COMPATIBILITY_REASONS',
+  'const MATRIX_KEYS',
+);
+equal(Array.from(compatibilityStatusesBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
+  ['supported', 'degraded', 'unsupported'],
+  'canonical compatibility statuses are the exact closed three-value set');
+equal(Array.from(compatibilityReasonsBlock.matchAll(/'([^']+)'/g), (match) => match[1]), [
+  'within_tested_range', 'newer_than_tested_range', 'evidence_stale',
+  'binary_not_found', 'version_missing', 'version_malformed', 'below_minimum',
+  'wrong_major', 'adapter_unshipped', 'matrix_invalid',
+], 'canonical compatibility reasons are the exact closed ten-value set');
+
+const rawCompatibilityMatrix = between(
+  compatibilitySource,
+  'const RAW_ADAPTER_COMPATIBILITY_MATRIX',
+  'const parsedMatrix',
+);
+equal(Array.from(rawCompatibilityMatrix.matchAll(/adapterId:\s*'([^']+)'/g), (match) => match[1]),
+  ['claude-code'], 'Phase 62 ships exactly one Claude Code matrix row');
+for (const exactMatrixToken of [
+  'schemaVersion: 1',
+  "profileVersion: '2.1.177'",
+  "minimumVersion: '2.1.177'",
+  "testedThroughVersion: '2.1.177'",
+  'supportedMajor: 2',
+  "fixtureManifest: 'tests/fixtures/agent-streams/claude-code-2.1.177/manifest.json'",
+  "requiredInitFields: ['type', 'subtype', 'session_id', 'tools', 'mcp_servers']",
+  "requiredResultFields: ['type', 'subtype', 'session_id', 'is_error']",
+]) {
+  check(rawCompatibilityMatrix.includes(exactMatrixToken),
+    `canonical Claude row retains ${exactMatrixToken}`);
+}
+check(/compareVersions\(version, minimum\) < 0[\s\S]*'below_minimum'[\s\S]*compareVersions\(version, testedThrough\) > 0[\s\S]*'degraded'[\s\S]*'newer_than_tested_range'[\s\S]*'supported'[\s\S]*'within_tested_range'/.test(compatibilitySource),
+  'canonical classifier keeps inclusive tested bounds and same-major newer degradation');
+
+const fixtureManifest = JSON.parse(read(
+  'tests/fixtures/agent-streams/claude-code-2.1.177/manifest.json',
+));
+equal({
+  schemaVersion: fixtureManifest.schemaVersion,
+  fixture: fixtureManifest.fixture,
+  profileVersion: fixtureManifest.profileVersion,
+  provenance: fixtureManifest.provenance,
+  liveCapturePending: fixtureManifest.liveCapturePending,
+  recordedProvenanceStatus: fixtureManifest.recordedProvenanceStatus,
+  sanitized: fixtureManifest.sanitized,
+}, {
+  schemaVersion: 1,
+  fixture: 'contract-stream.jsonl',
+  profileVersion: '2.1.177',
+  provenance: 'schema-derived-contract',
+  liveCapturePending: true,
+  recordedProvenanceStatus: 'human_needed',
+  sanitized: true,
+}, 'fixture provenance remains schema-derived, sanitized, and pending genuine capture');
+equal(fixtureManifest.expectedSequence, [
+  'init', 'assistant', 'tool_use', 'assistant_delta',
+  'user', 'tool_result', 'retry', 'result',
+], 'fixture and matrix retain the exact normalized sequence');
+
+const driftSmokeSource = read('tests/mcp-agent-drift-smoke.test.js');
+for (const productionHarnessToken of [
+  'createProductionAdapterRegistry',
+  'registry.ids()',
+  'registry.require(adapterId)',
+  'adapter.parseEvents',
+  'assertRosterBijection',
+  'assertRequiredFields',
+  'EXPECTED_PROVIDER_NATIVE_SEQUENCES',
+]) {
+  check(driftSmokeSource.includes(productionHarnessToken),
+    `drift smoke uses production-registry/parser evidence: ${productionHarnessToken}`);
+}
+check(!/child_process|execFile|spawnSync|fetch\s*\(|new WebSocket|claude\s+--/.test(driftSmokeSource),
+  'offline drift smoke invokes no live binary, process, network, browser, or account path');
+
+const ciSource = read('.github/workflows/ci.yml');
+check(exactOccurrences(ciSource, 'name: Phase 62 adapter drift smoke') === 1,
+  'CI contains exactly one named Phase 62 drift step');
+check(exactOccurrences(ciSource, 'run: node tests/mcp-agent-drift-smoke.test.js') === 1,
+  'CI invokes the exact direct generalized drift harness once');
+for (const command of PHASE62_NEW_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the serial root chain`);
+}
+const prePhase62Commands = rootCommands.filter((command) => !PHASE62_NEW_TEST_COMMANDS.includes(command));
+check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
+  'removing the three Phase 62 gates reproduces the exact prior serial chain');
+check(rootCommands.filter((command) => command === 'npm --prefix mcp run build').length === 1,
+  'root tests retain one MCP build boundary');
+check(rootCommands.indexOf('npm --prefix mcp run build')
+  < rootCommands.indexOf('node tests/mcp-adapter-compatibility.test.js')
+  && rootCommands.indexOf('npm --prefix mcp run build')
+    < rootCommands.indexOf('node tests/mcp-agent-drift-smoke.test.js'),
+'MCP compatibility and parser drift gates remain after the existing build boundary');
+check(rootCommands.indexOf('node tests/mcp-bridge-background-dispatch.test.js')
+  < rootCommands.indexOf('node tests/agent-protocol-drift-diagnostics.test.js'),
+'extension drift diagnostics stays beside the background diagnostics contract');
+check(!packageJson.scripts.test.includes('scripts/run-phase60-full-tests.mjs'),
+  'the guarded full-suite runner is not nested into the root test chain');
+
+console.log('\n--- Phase 62 doctor, authenticated projection, and durable freshness ---');
+
+const diagnosticsSource = read('mcp/src/diagnostics.ts');
+const indexSource = read('mcp/src/index.ts');
+const doctorRowType = (diagnosticsSource.match(
+  /export type AdapterDoctorRow = Readonly<\{([\s\S]*?)\}>;/,
+) || [null, ''])[1];
+equal(Array.from(doctorRowType.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9]+):/gm), (match) => match[1]), [
+  'adapterId', 'displayLabel', 'binaryPath', 'detectedVersion',
+  'compatibilityStatus', 'compatibilityReason', 'authState', 'profileVersion',
+], 'local doctor adapter rows retain their exact eight fields');
+const bridgeAuthType = (diagnosticsSource.match(
+  /export type BridgeAuthDoctorMetadata = Readonly<\{([\s\S]*?)\}>;/,
+) || [null, ''])[1];
+equal(Array.from(bridgeAuthType.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9]+):/gm), (match) => match[1]), [
+  'sharedSecretPresent', 'secretRotatedAt', 'secretRotationAgeMs',
+], 'doctor bridge-auth projection retains exactly three safe metadata fields');
+
+const doctorCollectorSource = between(
+  diagnosticsSource,
+  'async function collectAdapterDoctorRows',
+  'function projectBridgeAuthMetadata',
+);
+for (const doctorToken of [
+  'registryIds = denseStringArray(idsMethod.call(registry))',
+  'const adapter = requireMethod.call(registry, adapterId)',
+  'detection = await detectMethod.call(adapter)',
+  'classifyAdapterCompatibility',
+  "authState: 'unknown'",
+]) {
+  check(doctorCollectorSource.includes(doctorToken),
+    `doctor collection remains local and canonical: ${doctorToken}`);
+}
+check(!/process\.env|providerConfig|browser|chrome\.|\.connect\s*\(|\.start\s*\(/.test(doctorCollectorSource),
+  'doctor adapter collection has no account inference, browser, or start authority');
+const runDoctorSource = extractFunction(indexSource, 'runDoctor');
+check(exactOccurrences(runDoctorSource, 'collectBridgeDiagnostics(') === 1
+  && runDoctorSource.includes('JSON.stringify(diagnostics, null, 2)')
+  && runDoctorSource.includes('formatDoctor(diagnostics)'),
+'doctor text and JSON modes project one collected snapshot');
+check(runDoctorSource.includes("diagnostics.diagnosticLayer === 'healthy' ? 0 : 1"),
+  'doctor preserves historical healthy/unhealthy exit semantics');
+check(indexSource.includes("lines.push('  Auth: Not reported')"),
+  'human doctor keeps Claude auth exactly Not reported');
+const doctorDiagnosticsTest = read('tests/mcp-diagnostics-status.test.js');
+check(doctorDiagnosticsTest.includes('function makeOfflineBridge()')
+  && doctorDiagnosticsTest.includes('offlineSnapshot = await diagnostics.collectBridgeDiagnostics(')
+  && doctorDiagnosticsTest.includes("offline bridge keeps historical diagnostic-layer precedence")
+  && doctorDiagnosticsTest.includes('injected clock controls the deterministic snapshot timestamp'),
+  'doctor offline behavior remains deterministically covered');
+
+const serveDelegationSource = read('mcp/src/agent-providers/serve-delegation.ts');
+const compatibilityRouteSource = between(
+  serveDelegationSource,
+  'const handleExtRequest: ExtRequestHandler',
+  'const bridge = dependencies.createBridge',
+);
+check(compatibilityRouteSource.includes("request.method === 'adapter.compatibility'")
+  && compatibilityRouteSource.includes('isExactEmptyPayload(request.payload)')
+  && compatibilityRouteSource.includes('collectCompatibilitySnapshot')
+  && compatibilityRouteSource.indexOf("request.method === 'adapter.compatibility'")
+    < compatibilityRouteSource.indexOf('return supervisor.handleExtRequest'),
+'adapter.compatibility is a separate exact-empty-payload read before lifecycle authority');
+const extensionBridgeSource = read('extension/ws/mcp-bridge-client.js');
+const compatibilityRequestSource = between(
+  extensionBridgeSource,
+  '  requestAdapterCompatibility() {',
+  '  _handleExtFrame(msg) {',
+);
+check(compatibilityRequestSource.includes("this._pairingStatus !== 'paired'")
+  && compatibilityRequestSource.includes("sendExtRequest('adapter.compatibility', {}, { timeout: ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS })"),
+'extension requests compatibility only over the paired authenticated route with exact {}');
+check(extensionBridgeSource.includes('const ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS = 5000;'),
+  'compatibility requests retain the bounded five-second timeout');
+for (const forbiddenProjectionField of [
+  'sessionSecret', 'sessionId', 'fingerprint', 'protocolToken', 'task', 'prompt',
+  'binaryPath', 'realPath', 'providerOutput', 'environment',
+]) {
+  check(!compatibilityRouteSource.includes(forbiddenProjectionField),
+    `daemon compatibility projection excludes ${forbiddenProjectionField}`);
+}
+
+const providerStorageSource = read('extension/utils/mcp-agent-providers.js');
+check(providerStorageSource.includes("var FSB_AGENT_COMPATIBILITY_MAX_AGE_MS = 15 * 60 * 1000;")
+  && providerStorageSource.includes("var FSB_COMPATIBILITY_SNAPSHOT_KEYS = ['schemaVersion', 'checkedAt', 'adapters'];")
+  && providerStorageSource.includes("var FSB_COMPATIBILITY_ROW_KEYS = ['adapterId', 'displayLabel', 'status', 'reason'];"),
+'browser storage pins the exact safe schema and fifteen-minute freshness interval');
+const replaceCompatibilitySource = extractFunction(providerStorageSource, 'replaceCompatibility');
+check(replaceCompatibilitySource.includes('parseCompatibilitySnapshot(snapshot)')
+  && replaceCompatibilitySource.includes('enqueueMutation')
+  && replaceCompatibilitySource.indexOf('var envelope = await read()')
+    < replaceCompatibilitySource.indexOf('return await write(envelope)'),
+'compatibility replacement exact-validates and serializes one durable envelope write');
+const projectedCompatibilitySource = extractFunction(providerStorageSource, 'projectedCompatibility');
+check(projectedCompatibilitySource.includes('now - snapshot.checkedAt > FSB_AGENT_COMPATIBILITY_MAX_AGE_MS')
+  && projectedCompatibilitySource.includes("compatibilityProjection('degraded', 'evidence_stale'")
+  && projectedCompatibilitySource.includes("compatibilityProjection('unsupported', 'matrix_invalid'"),
+'freshness is a one-way supported-to-degraded downgrade and invalid evidence fails closed');
+const providerStorageTests = read('tests/mcp-agent-providers-storage.test.js');
+for (const durableEvidence of [
+  'a mutation preserves both sibling maps and unknown envelope keys',
+  'the new supported view is not observable before durable storage accepts it',
+  'write rejection preserves the last durable compatibility evidence',
+  'a rejected newly-supported write cannot leak support through the merged view',
+]) {
+  check(providerStorageTests.includes(durableEvidence),
+    `durable compatibility contract retains: ${durableEvidence}`);
+}
+const backgroundSource62 = read('extension/background.js');
+const backgroundCompatibilitySource = between(
+  backgroundSource62,
+  'let fsbMcpCompatibilityRefreshPromise = null;',
+  'function armMcpBridge(reason)',
+);
+check(backgroundCompatibilitySource.indexOf('validateCompatibilitySnapshot(response)')
+  < backgroundCompatibilitySource.indexOf('await providers.replaceCompatibility(validated)')
+  && backgroundCompatibilitySource.indexOf('await providers.replaceCompatibility(validated)')
+    < backgroundCompatibilitySource.indexOf('await fsbReadMergedMcpClients(providers)'),
+'background validates, durably writes, then fans out compatibility');
+check(backgroundCompatibilitySource.includes('if (fsbMcpCompatibilityRefreshPromise) return fsbMcpCompatibilityRefreshPromise')
+  && backgroundCompatibilitySource.includes("return { clients, refreshOutcome: 'refreshed' }")
+  && backgroundCompatibilitySource.includes("return cached ? 'stale' : 'unavailable'"),
+'cold/manual compatibility refresh coalesces and exposes only refreshed, stale, or unavailable');
+
+console.log('\n--- Phase 62 drift terminal, reporter, and preserved interfaces ---');
+
+const supervisorSource = read('mcp/src/agent-providers/spawn-supervisor.ts');
+const driftTerminalSource = between(
+  supervisorSource,
+  'function diagnosticTerminal',
+  'function eventTerminal',
+);
+check(driftTerminalSource.includes("code === 'agent_protocol_drift'")
+  && /return Object\.freeze\(\{\s*adapterId: safeAdapterId,\s*expected,\s*observed,\s*\}\)/m.test(driftTerminalSource),
+'daemon drift terminal exposes only adapterId, expected, and observed');
+check(supervisorSource.includes("code === 'agent_protocol_drift' ? driftDetail : undefined")
+  && supervisorSource.includes("if (code === 'agent_protocol_drift') return 'agent_protocol_drift'"),
+'typed drift remains a domain terminal and does not fabricate success');
+
+const driftReporterSource = read('extension/utils/agent-protocol-drift-diagnostics.js');
+check(driftReporterSource.includes('var REPORT_WINDOW_MS = 10000;')
+  && driftReporterSource.includes("var REQUIRED_KEYS = Object.freeze(['adapterId', 'expected', 'observed']);")
+  && driftReporterSource.includes('timestamp - previous < REPORT_WINDOW_MS')
+  && driftReporterSource.indexOf('timestamp - previous < REPORT_WINDOW_MS')
+    < driftReporterSource.indexOf("sink(\n            'BG'"),
+'reporter exact-validates and pre-throttles each adapter before the diagnostics sink');
+const backgroundDriftSource = extractFunction(backgroundSource62, 'fsbReportAgentProtocolDriftOnce');
+check(backgroundSource62.includes('const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;')
+  && backgroundDriftSource.includes('fsbAgentProtocolDriftSeenDelegationIds.has(delegationId)')
+  && backgroundDriftSource.indexOf('validate.call') < backgroundDriftSource.indexOf('.add(delegationId)')
+  && backgroundDriftSource.indexOf('.add(delegationId)') < backgroundDriftSource.indexOf('report.call'),
+'background reports each validated authoritative drift final once through a bounded FIFO');
+
+const adapterSource = read('mcp/src/agent-providers/adapter.ts');
+const adapterInterface = (adapterSource.match(/export interface AgentProviderAdapter \{([\s\S]*?)\n\}/) || [null, ''])[1];
+equal(Array.from(adapterInterface.matchAll(/^\s{2}([A-Za-z]+)\(/gm), (match) => match[1]),
+  ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+  'the Phase 60 adapter interface remains exactly five methods');
+const extProtocolSource = read('mcp/src/ext-protocol.ts');
+const extErrorBlock = between(extProtocolSource, 'export const EXT_ERROR_CODES', 'export const EXT_FRAME_LIMITS');
+equal(Array.from(extErrorBlock.matchAll(/'([^']+)'/g), (match) => match[1]), [
+  'agent_provider_offline', 'bridge_topology_changed', 'ext_unauthorized',
+  'invalid_ext_request', 'ext_request_timeout',
+], 'the actual Phase 59 reverse-channel transport union remains its exact five production codes');
+check(!extErrorBlock.includes('agent_protocol_drift'),
+  'agent protocol drift does not expand the transport-error union');
+
+const providersSource = read('extension/ui/providers-panel.js');
+const apiProviderBlock = between(providersSource, 'var API_PROVIDER_IDS', 'var AGENT_PROVIDER_IDS');
+const agentProviderBlock = between(providersSource, 'var AGENT_PROVIDER_IDS', 'var COMPATIBILITY_UNSUPPORTED_REASONS');
+equal(Array.from(apiProviderBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
+  ['xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'],
+  'Providers retains the exact seven API-provider order');
+equal(Array.from(agentProviderBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
+  ['claude-code', 'opencode', 'codex'],
+  'Providers retains the exact three agent-provider order');
+const providerParitySource = read('tests/provider-parity.test.js');
+check(providerParitySource.includes("const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];")
+  && providerParitySource.includes("!PROVIDER_KEYS.includes('claude-code')"),
+'legacy API provider parity remains explicit and excludes agent ids');
+
+console.log('\n--- Phase 62 Providers UI and negative authority guards ---');
+
+for (const modelContract of [
+  ["label: 'Supported'", "icon: 'fa-circle-check'", "className: 'compatibility-badge--supported'"],
+  ["label: 'Degraded'", "icon: 'fa-triangle-exclamation'", "className: 'compatibility-badge--degraded'"],
+  ["label: 'Unsupported'", "icon: 'fa-circle-xmark'", "className: 'compatibility-badge--unsupported'"],
+]) {
+  check(modelContract.every((token) => providersSource.includes(token)),
+    `Providers retains the closed compatibility display model ${modelContract[0]}`);
+}
+check(providersSource.includes("var AGENT_AUTH_NOT_REPORTED = 'Not reported';"),
+  'Claude account/auth UI remains exactly Not reported');
+const controlPanelSource = read('extension/ui/control_panel.html');
+check(exactOccurrences(controlPanelSource, 'data-provider-compatibility-group=') === 3
+  && exactOccurrences(controlPanelSource, 'data-provider-compatibility-description=') === 3,
+'exactly the three agent rows receive compatibility groups and descriptions');
+check(!/data-provider-kind="api"[\s\S]{0,700}data-provider-compatibility-group=/.test(controlPanelSource),
+  'API provider rows receive no compatibility group');
+check(exactOccurrences(controlPanelSource, 'id="providerEvidenceAnnouncement"') === 1
+  && /id="providerEvidenceAnnouncement"[^>]*role="status"[^>]*aria-live="polite"/.test(controlPanelSource),
+'Providers retains one shared polite live region rather than per-row announcements');
+
+const optionsSource62 = read('extension/ui/options.js');
+const compatibilityRendererSource = [
+  extractFunction(optionsSource62, 'getProviderCompatibilityModel'),
+  extractFunction(optionsSource62, 'setProviderCompatibilityClass'),
+  extractFunction(optionsSource62, 'setProviderCompatibilityIcon'),
+  extractFunction(optionsSource62, 'renderProviderCompatibility'),
+].join('\n');
+check(!/(?:saveSettings|markUnsavedChanges|modelProvider\s*=|agentProviderId\s*=|recommendation\s*=|chrome\.storage|focus\s*\()/.test(compatibilityRendererSource),
+  'compatibility renderer cannot mutate selection, recommendation, form state, focus, or storage');
+check(/textContent/.test(compatibilityRendererSource) && !/innerHTML|insertAdjacentHTML|outerHTML/.test(compatibilityRendererSource),
+  'compatibility renderer uses text-only DOM updates');
+const compatibilityMappingSource = extractFunction(providersSource, 'getCompatibilityDisplayModel');
+check(!/semver|parseVersion|compareVersion|2\.1\.177/.test(compatibilityMappingSource),
+  'UI mapping contains no semantic-version parser, comparator, or CLI version constant');
+
+const optionsCss = read('extension/ui/options.css');
+for (const cssContract of [
+  '.compatibility-badge--supported',
+  '.compatibility-badge--degraded',
+  '.compatibility-badge--unsupported',
+  '@media (min-width: 900px)',
+  '@media (min-width: 641px) and (max-width: 899px)',
+  '@media (max-width: 640px)',
+  '@media (forced-colors: active)',
+  '@media (prefers-reduced-motion: reduce)',
+  'var(--success-color)',
+  'var(--warning-color)',
+  'var(--error-color)',
+  'var(--fsb-focus-ring)',
+]) {
+  check(optionsCss.includes(cssContract), `Providers CSS retains ${cssContract}`);
+}
+
+const extensionManifest = JSON.parse(read('extension/manifest.json'));
+check(!extensionManifest.permissions.includes('nativeMessaging'),
+  'Phase 62 still has no nativeMessaging permission');
+const compatibilityUiScope = [providersSource, optionsSource62, controlPanelSource, optionsCss].join('\n');
+for (const forbiddenUiPattern of [
+  /adapter\.compatibility/,
+  /requestAdapterCompatibility/,
+  /sendExtRequest\s*\(/,
+  /\b(?:execFile|execSync|spawn|spawnSync|fork)\s*\(/,
+  /chrome\.runtime\.(?:connectNative|sendNativeMessage)\s*\(/,
+  /\bnativeMessaging\b/,
+  /\b(?:binaryPath|realPath|sessionSecret|protocolToken|providerOutput)\b/,
+]) {
+  check(!forbiddenUiPattern.test(compatibilityUiScope),
+    `Providers UI has no direct compatibility/process/private authority matching ${forbiddenUiPattern}`);
+}
+check(!exists('mcp/src/agent-providers/opencode.ts')
+  && !exists('mcp/src/agent-providers/codex.ts'),
+'Phase 62 ships no OpenCode or Codex adapter implementation');
+
+const compatibilityBrowserProjection = [
+  projectedCompatibilitySource,
+  replaceCompatibilitySource,
+  backgroundCompatibilitySource,
+].join('\n');
+for (const forbiddenBrowserField of [
+  'sessionSecret', 'sessionId', 'fingerprint', 'protocolToken', 'binaryPath',
+  'realPath', 'rawJsonl', 'providerOutput', 'prompt', 'task', 'environment',
+]) {
+  check(!compatibilityBrowserProjection.includes(forbiddenBrowserField),
+    `browser compatibility projection excludes ${forbiddenBrowserField}`);
+}
+
+console.log('\n--- Phase 62 pending evidence integrity before ledger creation ---');
+
+const phase62Plan06 = phase62PlanSources[5];
+for (const pendingLedgerToken of [
+  '### [ ] UAT62-*',
+  'status: human_needed',
+  'result: pending',
+  'evidence:',
+  'deferred to one milestone-end sweep',
+]) {
+  check(phase62Plan06.includes(pendingLedgerToken),
+    `final plan retains pending UAT contract: ${pendingLedgerToken}`);
+}
+check(!phase62PlanSources.join('\n').includes('liveCapturePending: false')
+  && !JSON.stringify(fixtureManifest).includes('genuine-live-capture'),
+'no plan or fixture promotes schema-derived evidence to a genuine live pass');
+check(fixtureManifest.milestoneEndTask.includes('keep liveCapturePending true'),
+  'genuine Claude stream comparison remains pending until milestone-end human review');
+check(Array.from(uat.matchAll(/^### \[([^\]]*)\] UAT61-/gm)).every((match) => match[1] === ' '),
+  'all existing Phase 61 UAT headings remain unchecked while Phase 62 closes');
+check(phase62Context.includes('single milestone-end UAT sweep')
+  && phase62Research.includes('liveCapturePending: true')
+  && phase62UiSpec.includes('must not be marked passed'),
+'context, research, and UI contract all preserve the milestone-end human-evidence boundary');
+
+console.log(`\n=== Phase 61-62 contract results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);
