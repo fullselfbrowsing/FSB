@@ -586,8 +586,10 @@ const agentDetailsRenderSource = extractFunction(JS, 'renderSelectedAgentDetails
 const setupGuideSource = extractFunction(JS, 'openAgentSetupGuide');
 const announcementSource = extractFunction(JS, 'setProviderEvidenceAnnouncement');
 const eventSetupSource = extractFunction(JS, 'setupEventListeners');
-assert.match(requestClientsSource, /sendMessage\(\{ action: 'getMcpClients' \}/,
-  'evidence uses the one Phase 57 runtime action');
+assert.match(requestClientsSource, /\? \{ action: 'refreshMcpCompatibility' \}/,
+  'manual evidence refresh uses the explicit live compatibility action');
+assert.match(requestClientsSource, /: \{ action: 'getMcpClients' \}/,
+  'hydration and inventory use the cache-only Phase 57 runtime action');
 assert.match(requestClientsSource, /runtime\.lastError/);
 assert.match(requestClientsSource, /getOwnDataValue\(response, 'success'\) !== true/);
 assert.match(requestClientsSource, /getOwnDataValue\(response, 'refreshOutcome'\)/,
@@ -603,7 +605,7 @@ assert.match(refreshEvidenceSource, /evidenceStatus = 'stale'/);
 assert.match(refreshEvidenceSource, /evidenceStatus = 'unavailable'/);
 assert.ok(
   refreshEvidenceSource.indexOf('renderProviderRecommendation()')
-    < refreshEvidenceSource.indexOf('requestMcpClients()'),
+    < refreshEvidenceSource.indexOf('requestMcpClients(liveCompatibility === true)'),
   'fallback or last recommendation renders before the runtime request starts'
 );
 assert.doesNotMatch(recommendationRenderSource,
@@ -1078,6 +1080,17 @@ function createProviderHarness(initialStorage, harnessOptions) {
       sendMessage(message, callback) {
         runtimeCalls.push(JSON.parse(JSON.stringify(message)));
         const isPairingReload = message && message.action === 'reloadMcpBridgePairing';
+        if (!isPairingReload && typeof options.runtimeDispatch === 'function') {
+          Promise.resolve().then(() => options.runtimeDispatch(message, {
+            emitStorage(changes, area) {
+              storageListeners.slice().forEach((listener) => listener(changes, area));
+            }
+          })).then(
+            (response) => deliverRuntime(callback, response, null),
+            (error) => deliverRuntime(callback, undefined, error && error.message ? error.message : error)
+          );
+          return;
+        }
         if (holdRuntime && !isPairingReload) pendingRuntimeCallbacks.push(callback);
         else deliverRuntime(
           callback,
@@ -2188,6 +2201,50 @@ async function runProviderEvidenceTests() {
   await flushHarness();
   assert.strictEqual(selectedRadio(coalesced).dataset.providerId, 'opencode',
     'storage, section, and manual refreshes all preserve in-form selection');
+
+  let causalDaemonRequests = 0;
+  let causalDurableWrites = 0;
+  let causalCacheReads = 0;
+  let explicitLiveActionSeen = false;
+  const causal = createProviderHarness({}, {
+    runtimeDispatch(message, controls) {
+      if (message.action === 'refreshMcpCompatibility') {
+        explicitLiveActionSeen = true;
+        causalDaemonRequests += 1;
+        causalDurableWrites += 1;
+        controls.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
+        return { success: true, refreshOutcome: 'refreshed', clients: {} };
+      }
+      if (message.action === 'getMcpClients' && explicitLiveActionSeen) {
+        causalCacheReads += 1;
+        return { success: true, refreshOutcome: 'stale', clients: {} };
+      }
+      if (message.action === 'getMcpClients') {
+        // Models the reviewed implementation where inventory itself was live.
+        causalDaemonRequests += 1;
+        causalDurableWrites += 1;
+        if (causalDurableWrites === 1) {
+          controls.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
+        }
+        return { success: true, refreshOutcome: 'refreshed', clients: {} };
+      }
+      throw new Error('unexpected provider runtime action');
+    }
+  });
+  causal.context.setupEventListeners();
+  causal.refreshButton.dispatchEvent({ type: 'click' });
+  await flushHarness();
+  await flushHarness();
+  assert.deepStrictEqual(causal.runtimeCalls, [
+    { action: 'refreshMcpCompatibility' },
+    { action: 'getMcpClients' }
+  ], 'one user refresh performs one explicit live request followed by cache-only storage hydration');
+  assert.strictEqual(causalDaemonRequests, 1,
+    'storage fan-out cannot cause a second daemon compatibility request');
+  assert.strictEqual(causalDurableWrites, 1,
+    'storage fan-out cannot cause a second compatibility replacement');
+  assert.strictEqual(causalCacheReads, 1,
+    'the compatibility storage event is reprojected through one cache-only inventory read');
 
   const queuedStorage = createProviderHarness({}, {
     holdRuntime: true,

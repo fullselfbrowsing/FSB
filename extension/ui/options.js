@@ -504,7 +504,7 @@ function copyProviderClientMap(value) {
   return copy;
 }
 
-function requestMcpClients() {
+function requestMcpClients(liveCompatibility = false) {
   return new Promise((resolve, reject) => {
     const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
     if (!runtime || typeof runtime.sendMessage !== 'function') {
@@ -528,7 +528,10 @@ function requestMcpClients() {
     }, PROVIDER_EVIDENCE_TIMEOUT_MS);
 
     try {
-      runtime.sendMessage({ action: 'getMcpClients' }, (response) => {
+      const request = liveCompatibility
+        ? { action: 'refreshMcpCompatibility' }
+        : { action: 'getMcpClients' };
+      runtime.sendMessage(request, (response) => {
         if (settled) return;
         if (runtime.lastError) {
           settle(reject, new Error('provider_status_unavailable'));
@@ -1027,7 +1030,7 @@ function getSelectedCompatibilityLabel(helper) {
   return model ? model.label : null;
 }
 
-function refreshProviderEvidence({ announce = false } = {}) {
+function refreshProviderEvidence({ announce = false, liveCompatibility = announce } = {}) {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
   const helper = getProviderPanelHelper();
@@ -1039,7 +1042,7 @@ function refreshProviderEvidence({ announce = false } = {}) {
   renderProviderEvidence();
   renderSelectedAgentDetails();
 
-  providerEvidenceRefreshPromise = requestMcpClients()
+  providerEvidenceRefreshPromise = requestMcpClients(liveCompatibility === true)
     .then((result) => {
       providerPanelState.clients = result.clients;
       providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';

@@ -130,6 +130,12 @@ async function fsbReadMcpCompatibilityFallbackOutcome(providers) {
   }
 }
 
+async function fsbReadCachedMcpClients(providers = fsbGetMcpCompatibilityProviders()) {
+  const refreshOutcome = await fsbReadMcpCompatibilityFallbackOutcome(providers);
+  const clients = await fsbReadMergedMcpClients(providers);
+  return { clients, refreshOutcome };
+}
+
 function fsbMcpBridgeIsPaired() {
   if (typeof mcpBridgeClient === 'undefined'
       || !mcpBridgeClient
@@ -157,9 +163,7 @@ function fsbRefreshMcpCompatibility() {
       }
     }
 
-    const refreshOutcome = await fsbReadMcpCompatibilityFallbackOutcome(providers);
-    const clients = await fsbReadMergedMcpClients(providers);
-    return { clients, refreshOutcome };
+    return await fsbReadCachedMcpClients(providers);
   };
 
   let tracked;
@@ -8672,6 +8676,37 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     }
 
     case 'getMcpClients': {
+      (async () => {
+        try {
+          const result = await fsbReadCachedMcpClients();
+          sendResponse({
+            success: true,
+            clients: result.clients,
+            refreshOutcome: result.refreshOutcome
+          });
+        } catch (_error) {
+          sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        }
+      })();
+      return true;
+    }
+
+    case 'refreshMcpCompatibility': {
+      let exactRequest = false;
+      try {
+        const keys = Reflect.ownKeys(request);
+        const action = Object.getOwnPropertyDescriptor(request, 'action');
+        exactRequest = keys.length === 1
+          && keys[0] === 'action'
+          && action
+          && action.enumerable
+          && Object.prototype.hasOwnProperty.call(action, 'value')
+          && action.value === 'refreshMcpCompatibility';
+      } catch (_error) { /* reject malformed runtime input below */ }
+      if (!exactRequest) {
+        sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
+        return false;
+      }
       (async () => {
         try {
           const result = await fsbRefreshMcpCompatibility();

@@ -537,11 +537,15 @@ function buildCompatibilityRefreshHarness(options = {}) {
   };
   context.globalThis = context;
   vm.runInNewContext(
-    `${source}\nthis.__refreshCompatibility = fsbRefreshMcpCompatibility;`,
+    `${source}\n`
+      + 'this.__readCachedClients = typeof fsbReadCachedMcpClients === \'function\' '
+      + '? fsbReadCachedMcpClients : null;\n'
+      + 'this.__refreshCompatibility = fsbRefreshMcpCompatibility;',
     context,
     { filename: 'background.js#compatibility-refresh' }
   );
   return {
+    readCached: context.__readCachedClients,
     refresh: context.__refreshCompatibility,
     calls,
     clients,
@@ -550,7 +554,7 @@ function buildCompatibilityRefreshHarness(options = {}) {
   };
 }
 
-function buildMcpClientsRuntimeHarness(refreshImpl) {
+function buildMcpClientsRuntimeHarness({ readCachedImpl, refreshImpl }) {
   const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
   const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
   const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
@@ -563,6 +567,7 @@ function buildMcpClientsRuntimeHarness(refreshImpl) {
     armMcpBridge() {},
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },
+    fsbReadCachedMcpClients: readCachedImpl,
     fsbRefreshMcpCompatibility: refreshImpl,
     Promise,
     Object,
@@ -1031,6 +1036,21 @@ async function runCompatibilityRefreshCases() {
   console.log('\n--- B1: Phase 62 bounded compatibility refresh orchestration ---');
 
   {
+    const harness = buildCompatibilityRefreshHarness();
+    assertEqual(typeof harness.readCached, 'function',
+      'background exposes a cache-only merged-client inventory path');
+    if (typeof harness.readCached === 'function') {
+      const result = await harness.readCached();
+      assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
+        'cache-only inventory projects durable rows without changing the closed outcome');
+      assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
+        'cache-only inventory never requests daemon compatibility');
+      assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+        'cache-only inventory never writes compatibility storage');
+    }
+  }
+
+  {
     const replaceGate = deferred();
     const harness = buildCompatibilityRefreshHarness({ replaceGate });
     const pending = harness.refresh();
@@ -1147,20 +1167,58 @@ async function runCompatibilityRefreshCases() {
 
   {
     const clients = { cursor: { id: 'cursor' } };
-    const handler = buildMcpClientsRuntimeHarness(async () => ({
-      clients,
-      refreshOutcome: 'stale'
-    }));
+    let cacheReads = 0;
+    let liveRefreshes = 0;
+    const handler = buildMcpClientsRuntimeHarness({
+      readCachedImpl: async () => {
+        cacheReads++;
+        return { clients, refreshOutcome: 'stale' };
+      },
+      refreshImpl: async () => {
+        liveRefreshes++;
+        return { clients, refreshOutcome: 'refreshed' };
+      }
+    });
     const response = await new Promise((resolve) => {
       const keepOpen = handler(
         { action: 'getMcpClients' },
         { id: 'mcp-clients-runtime-extension' },
         resolve
       );
-      assertEqual(keepOpen, true, 'manual compatibility refresh keeps its runtime channel open');
+      assertEqual(keepOpen, true, 'cache-only inventory keeps its runtime channel open');
     });
     assertDeepEqual(response, { success: true, clients, refreshOutcome: 'stale' },
-      'manual getMcpClients returns rows plus one closed refresh outcome');
+      'getMcpClients returns cache-only rows plus one closed refresh outcome');
+    assertEqual(cacheReads, 1, 'getMcpClients invokes the cache-only reader once');
+    assertEqual(liveRefreshes, 0, 'getMcpClients cannot invoke live compatibility refresh');
+
+    let refreshResponse = null;
+    const refreshKeepOpen = handler(
+      { action: 'refreshMcpCompatibility' },
+      { id: 'mcp-clients-runtime-extension' },
+      (value) => { refreshResponse = value; }
+    );
+    assertEqual(refreshKeepOpen, true,
+      'explicit compatibility refresh keeps its runtime channel open');
+    await flushMicrotasks();
+    assertDeepEqual(refreshResponse, { success: true, clients, refreshOutcome: 'refreshed' },
+      'explicit compatibility action returns the live refresh projection');
+    assertEqual(cacheReads, 1, 'explicit live refresh does not re-enter cache-only route dispatch');
+    assertEqual(liveRefreshes, 1, 'explicit compatibility action invokes one live refresh');
+
+    let malformedResponse = null;
+    const malformedKeepOpen = handler(
+      { action: 'refreshMcpCompatibility', extra: true },
+      { id: 'mcp-clients-runtime-extension' },
+      (value) => { malformedResponse = value; }
+    );
+    assertEqual(malformedKeepOpen, false,
+      'compatibility refresh rejects non-exact runtime requests synchronously');
+    assertDeepEqual(malformedResponse, {
+      success: false,
+      error: 'mcp_client_inventory_unavailable'
+    }, 'compatibility refresh rejects unknown request keys with the bounded error');
+    assertEqual(liveRefreshes, 1, 'malformed refresh cannot reach daemon compatibility');
   }
 }
 
@@ -1839,17 +1897,23 @@ function runSourceContractCase() {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
   }
   assertEqual((backgroundSource.match(/case 'getMcpClients'/g) || []).length, 1, 'background.js contains exactly one getMcpClients case');
+  assertEqual((backgroundSource.match(/case 'refreshMcpCompatibility'/g) || []).length, 1,
+    'background.js contains exactly one explicit compatibility refresh case');
   assert(backgroundSource.includes("error: 'mcp_client_inventory_unavailable'"), 'getMcpClients carries the bounded failure code');
   assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]getMcpClients['"]/.test(backgroundSource),
     'background.js never self-sends getMcpClients');
   const compatibilityComposition = extractCompatibilityCompositionSource(backgroundSource);
+  const liveCompatibilityRefresh = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbRefreshMcpCompatibility() {'
+  );
   assertEqual((backgroundSource.match(/let fsbMcpCompatibilityRefreshPromise = null;/g) || []).length, 1,
     'background owns one coalesced compatibility refresh promise');
   assertEqual((backgroundSource.match(/mcpBridgeClient\.addPairingStatusObserver\(/g) || []).length, 1,
     'background installs exactly one paired cold-refresh observer');
-  assert(compatibilityComposition.includes('await providers.replaceCompatibility(validated)')
-      && compatibilityComposition.indexOf('await providers.replaceCompatibility(validated)')
-        < compatibilityComposition.indexOf('await fsbReadMergedMcpClients(providers)'),
+  assert(liveCompatibilityRefresh.includes('await providers.replaceCompatibility(validated)')
+      && liveCompatibilityRefresh.indexOf('await providers.replaceCompatibility(validated)')
+        < liveCompatibilityRefresh.indexOf('await fsbReadMergedMcpClients(providers)'),
     'validated durable compatibility replacement precedes merged fan-out');
   assert(!compatibilityComposition.includes('chrome.runtime.sendMessage'),
     'cold compatibility hydration emits no explicit UI announcement');
