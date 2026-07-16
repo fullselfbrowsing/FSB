@@ -135,7 +135,7 @@
 - [x] 62-02: Extend `doctor` with offline adapter diagnostics, safe spawn-secret metadata, and text/JSON parity.
 - [x] 62-03: Carry the authenticated safe compatibility projection into background-owned durable, freshness-aware provider state.
 - [x] 62-04: Project sanitized protocol-drift detail and report it exactly once through a true per-adapter pre-throttle.
-- [ ] 62-05: Render exact, accessible, non-mutating compatibility badges and selected-provider details.
+- [x] 62-05: Render exact, accessible, non-mutating compatibility badges and selected-provider details.
 - [ ] 62-06: Wire root/source/security gates and preserve all genuine live evidence in the pending milestone-end UAT ledger.
 
 ### Phase 63: Native-Messaging Host
@@ -184,7 +184,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
-| 62. CI Drift-Smoke Gate & Doctor Extensions | 4/6 | In Progress | — |
+| 62. CI Drift-Smoke Gate & Doctor Extensions | 5/6 | In Progress | — |
 | 63. Native-Messaging Host | 0/0 | Not started | — |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
