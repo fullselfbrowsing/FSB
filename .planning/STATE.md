@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 62 planned and independently verified; ready for autonomous execution
-last_updated: "2026-07-16T17:12:15.202Z"
-last_activity: 2026-07-16 -- Phase 62 planning complete
+stopped_at: Phase 62 Plan 01 execution started
+last_updated: "2026-07-16T17:13:37.780Z"
+last_activity: 2026-07-16 -- Phase 62 execution started
 progress:
   total_phases: 9
   completed_phases: 5
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 62 — CI Drift-Smoke Gate & Doctor Extensions, planned and ready for autonomous execution
+**Current focus:** Phase 62 — CI Drift-Smoke Gate & Doctor Extensions, executing Plan 01 of 06
 
 ## Current Position
 
-Phase: 62
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-16 -- Phase 62 planning complete
+Phase: 62 (ci-drift-smoke-gate-doctor-extensions) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 62
+Last activity: 2026-07-16 -- Phase 62 execution started
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
