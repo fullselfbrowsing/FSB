@@ -100,13 +100,13 @@ function createRuntimeHarness(initial, options = {}) {
   if (Object.prototype.hasOwnProperty.call(options, 'registry')) {
     context.fsbAgentRegistryInstance = options.registry;
   }
-  context.fsbRefreshMcpCompatibility = async () => {
+  context.fsbReadCachedMcpClients = async () => {
     const registry = context.fsbAgentRegistryInstance;
     const liveRecords = registry && typeof registry.listAgents === 'function'
       ? await Promise.resolve(registry.listAgents())
       : [];
     const clients = await context.FsbMcpAgentProviders.getMergedClients(liveRecords);
-    return { clients, refreshOutcome: 'unavailable' };
+    return { clients, refreshOutcome: 'unavailable', compatibilityExpiresAt: null };
   };
   vm.runInNewContext(
     `${aliasesSource}\n${providersSource}\n${extractBackgroundRouter()}\n` +
@@ -443,6 +443,7 @@ async function main() {
   assert.deepEqual(crossContextResponse, {
     success: true,
     refreshOutcome: 'unavailable',
+    compatibilityExpiresAt: null,
     clients: {
       cursor: {
         id: 'cursor',
@@ -486,7 +487,8 @@ async function main() {
   assert.deepEqual(plain(await emptyRegistryCall.response), {
     success: true,
     clients: {},
-    refreshOutcome: 'unavailable'
+    refreshOutcome: 'unavailable',
+    compatibilityExpiresAt: null
   },
     'missing registry is treated as an empty live clone set');
 

@@ -181,7 +181,7 @@ function extractBetween(source, startMarker, endMarker) {
   return source.slice(start, end);
 }
 
-async function refreshMcpCompatibilityOffline(providers, registry) {
+async function readCachedMcpClientsOffline(providers, registry) {
   let refreshOutcome = 'unavailable';
   try {
     const envelope = await providers.read();
@@ -197,7 +197,7 @@ async function refreshMcpCompatibilityOffline(providers, registry) {
     ? await Promise.resolve(registry.listAgents())
     : [];
   const clients = await providers.getMergedClients(liveRecords);
-  return { clients, refreshOutcome };
+  return { clients, refreshOutcome, compatibilityExpiresAt: null };
 }
 
 function loadRuntimeQueryHarness(providers, registry) {
@@ -223,7 +223,7 @@ function loadRuntimeQueryHarness(providers, registry) {
     automationLogger: { logComm() {} },
     FsbMcpAgentProviders: providers,
     fsbAgentRegistryInstance: registry,
-    fsbRefreshMcpCompatibility: () => refreshMcpCompatibilityOffline(providers, registry)
+    fsbReadCachedMcpClients: () => readCachedMcpClientsOffline(providers, registry)
   };
   context.globalThis = context;
   vm.runInNewContext(
@@ -414,7 +414,9 @@ async function main() {
   const queryResponse = clone(await dispatchInventoryQuery({ action: 'getMcpClients' }));
   assert.equal(queryResponse.success, true, 'fresh same-context getMcpClients query succeeds');
   assert.equal(queryResponse.refreshOutcome, 'unavailable',
-    'offline compatibility refresh reports the bounded unavailable outcome');
+    'offline cache-only inventory reports the bounded unavailable outcome');
+  assert.equal(queryResponse.compatibilityExpiresAt, null,
+    'cache-only inventory preserves the current closed expiry envelope');
   const claude = queryResponse.clients['claude-code'];
   assert.equal(claude.clicked.source, 'fan');
   assert.equal(claude.installed.version, '2.1.178');
