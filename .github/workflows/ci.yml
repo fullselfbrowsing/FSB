@@ -47,6 +47,8 @@ jobs:
         run: npm --prefix mcp install --no-audit --no-fund
       - name: Build MCP server (TypeScript)
         run: npm --prefix mcp run build
+      - name: Phase 62 adapter drift smoke
+        run: node tests/mcp-agent-drift-smoke.test.js
       - name: MCP lifecycle + tools smoke
         run: npm run test:mcp-smoke
 
