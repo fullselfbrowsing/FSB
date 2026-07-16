@@ -2360,6 +2360,9 @@ async function runProviderEvidenceTests() {
   let causalDurableWrites = 0;
   let causalCacheReads = 0;
   let explicitLiveActionSeen = false;
+  const causalClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: 700
+  });
   const causal = createProviderHarness({}, {
     runtimeDispatch(message, controls) {
       if (message.action === 'refreshMcpCompatibility') {
@@ -2367,11 +2370,21 @@ async function runProviderEvidenceTests() {
         causalDaemonRequests += 1;
         causalDurableWrites += 1;
         controls.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
-        return { success: true, refreshOutcome: 'refreshed', clients: {} };
+        return {
+          success: true,
+          refreshOutcome: 'refreshed',
+          compatibilityExpiresAt: null,
+          clients: causalClients
+        };
       }
       if (message.action === 'getMcpClients' && explicitLiveActionSeen) {
         causalCacheReads += 1;
-        return { success: true, refreshOutcome: 'stale', clients: {} };
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: null,
+          clients: causalClients
+        };
       }
       if (message.action === 'getMcpClients') {
         // Models the reviewed implementation where inventory itself was live.
@@ -2399,6 +2412,18 @@ async function runProviderEvidenceTests() {
     'storage fan-out cannot cause a second compatibility replacement');
   assert.strictEqual(causalCacheReads, 1,
     'the compatibility storage event is reprojected through one cache-only inventory read');
+  assert.strictEqual(causal.announcement.textContent, 'Provider status refreshed.',
+    'the causal cache hydration retains the one manual success announcement');
+  assert.strictEqual(causal.announcement.getAttribute('role'), 'status');
+  assert.strictEqual(causal.announcement.getAttribute('aria-live'), 'polite');
+  assert.strictEqual(causal.announcement.hidden, false);
+  assert.strictEqual(causal.state().evidenceStatus, 'ready',
+    'the causal cache hydration cannot downgrade a successful manual generation to stale');
+  assert.strictEqual(evidenceBadge(causal, 'claude-code').textContent, 'Installed',
+    'fresh installation evidence retains its non-stale visible marker');
+  assert.doesNotMatch(evidenceBadge(causal, 'claude-code').getAttribute('title') || '',
+    /Status may be stale/,
+    'fresh installation evidence retains no stale tooltip after causal fan-out');
 
   const queuedStorage = createProviderHarness({}, {
     holdRuntime: true,

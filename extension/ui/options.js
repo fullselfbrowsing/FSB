@@ -1128,27 +1128,40 @@ function scheduleProviderCompatibilityExpiry(expiresAt) {
   }, delay);
 }
 
-function refreshProviderEvidence({ announce = false, liveCompatibility = announce } = {}) {
+function refreshProviderEvidence({
+  announce = false,
+  liveCompatibility = announce,
+  preserveSuccessfulRefresh = false
+} = {}) {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
   const helper = getProviderPanelHelper();
   const previousCompatibilityLabel = getSelectedCompatibilityLabel(helper);
-  providerPanelState.evidenceStatus = 'loading';
+  const preserveCurrentSuccess = preserveSuccessfulRefresh === true
+    && providerPanelState.hasSuccessfulEvidence
+    && providerPanelState.evidenceStatus === 'ready';
+  let liveRefreshSucceeded = false;
   setProviderStatusRefreshing(true);
-  setProviderEvidenceAnnouncement('');
-  renderProviderRecommendation();
-  renderProviderEvidence();
-  renderSelectedAgentDetails();
+  if (!preserveCurrentSuccess) {
+    providerPanelState.evidenceStatus = 'loading';
+    setProviderEvidenceAnnouncement('');
+    renderProviderRecommendation();
+    renderProviderEvidence();
+    renderSelectedAgentDetails();
+  }
 
   providerEvidenceRefreshPromise = requestMcpClients(liveCompatibility === true)
     .then((result) => {
-      providerPanelState.clients = result.clients;
-      providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';
-      providerPanelState.evidenceStatus = result.refreshOutcome === 'refreshed'
-        ? 'ready'
-        : result.refreshOutcome;
-      providerPanelState.recommendation = helper.getRecommendation(result.clients);
-      scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
+      liveRefreshSucceeded = liveCompatibility === true && result.refreshOutcome === 'refreshed';
+      if (!(preserveCurrentSuccess && result.refreshOutcome === 'unavailable')) {
+        providerPanelState.clients = result.clients;
+        providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';
+        providerPanelState.evidenceStatus = preserveCurrentSuccess
+          ? 'ready'
+          : (result.refreshOutcome === 'refreshed' ? 'ready' : result.refreshOutcome);
+        providerPanelState.recommendation = helper.getRecommendation(result.clients);
+        scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
+      }
       if (announce && result.refreshOutcome === 'refreshed') {
         const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
         const changed = previousCompatibilityLabel && nextCompatibilityLabel
@@ -1166,6 +1179,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
       return result.clients;
     })
     .catch(() => {
+      if (preserveCurrentSuccess) return providerPanelState.clients;
       clearProviderCompatibilityExpiryTimer();
       if (providerPanelState.hasSuccessfulEvidence) {
         providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
@@ -1191,7 +1205,7 @@ function refreshProviderEvidence({ announce = false, liveCompatibility = announc
       providerEvidenceRefreshPromise = null;
       if (providerEvidenceRefreshQueued) {
         providerEvidenceRefreshQueued = false;
-        refreshProviderEvidence();
+        refreshProviderEvidence({ preserveSuccessfulRefresh: liveRefreshSucceeded });
       }
     });
 
