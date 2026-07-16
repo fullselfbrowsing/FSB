@@ -4,6 +4,17 @@ import { startHttpServer } from '../http.js';
 import { pushMcpClientInventory } from '../client-inventory.js';
 import { TaskQueue } from '../queue.js';
 import {
+  ADAPTER_COMPATIBILITY_MATRIX,
+  classifyAdapterCompatibility,
+  createSafeCompatibilitySnapshot,
+  type AdapterCompatibilityEvidence,
+  type SafeCompatibilitySnapshot,
+} from './compatibility.js';
+import {
+  createProductionAdapterRegistry,
+  type AgentProviderRegistry,
+} from './registry.js';
+import {
   createProductionSpawnSupervisor,
   type SpawnSupervisor,
   type SpawnSupervisorCloseResult,
@@ -49,6 +60,8 @@ export interface ServeDelegationDependencies {
     endpoint: string,
     onDegraded: (code: 'tree_unsettled' | 'runtime_cleanup_failed') => void,
   ) => SpawnSupervisor;
+  readonly createCompatibilityRegistry?: () => AgentProviderRegistry;
+  readonly now?: () => number;
   readonly pushInventory?: (bridge: ServeDelegationBridge) => Promise<void>;
   readonly registerSignal?: (
     signal: 'SIGTERM' | 'SIGINT',
@@ -101,10 +114,98 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       endpoint,
       onDegraded,
     }),
+    createCompatibilityRegistry: () => createProductionAdapterRegistry({
+      kill: async () => {
+        throw new Error('Compatibility registry has no process-termination authority');
+      },
+    }),
+    now: () => Date.now(),
     pushInventory: async (bridge) => pushMcpClientInventory(bridge as WebSocketBridge),
     registerSignal: (signal, handler) => process.on(signal, handler),
     exit: (code) => process.exit(code),
   };
+}
+
+function isExactEmptyPayload(value: unknown): value is Record<string, never> {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype
+    && Reflect.ownKeys(value).length === 0;
+}
+
+function ownDataValue(record: object, key: string): unknown | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  return descriptor && descriptor.enumerable && 'value' in descriptor
+    ? descriptor.value
+    : undefined;
+}
+
+function isRetainedBinary(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.some((key) => typeof key !== 'string')
+    || JSON.stringify([...keys].sort()) !== JSON.stringify(['argvPrefix', 'command', 'realPath'])
+  ) {
+    return false;
+  }
+  const command = ownDataValue(value, 'command');
+  const realPath = ownDataValue(value, 'realPath');
+  const argvPrefix = ownDataValue(value, 'argvPrefix');
+  return typeof command === 'string'
+    && command.length > 0
+    && command.length <= 4_096
+    && typeof realPath === 'string'
+    && realPath.length > 0
+    && realPath.length <= 4_096
+    && Array.isArray(argvPrefix)
+    && Object.getPrototypeOf(argvPrefix) === Array.prototype
+    && argvPrefix.length <= 8
+    && argvPrefix.every((entry) => typeof entry === 'string' && entry.length <= 4_096);
+}
+
+function compatibilityEvidence(detection: unknown): AdapterCompatibilityEvidence {
+  if (!detection || typeof detection !== 'object' || Array.isArray(detection)) {
+    return Object.freeze({ binaryFound: false, version: null });
+  }
+  if (Object.getPrototypeOf(detection) !== Object.prototype) {
+    return Object.freeze({ binaryFound: false, version: null });
+  }
+  const binary = ownDataValue(detection, 'binary');
+  const version = ownDataValue(detection, 'version');
+  if (!(version === null || typeof version === 'string')) {
+    return Object.freeze({ binaryFound: false, version: null });
+  }
+  return Object.freeze({
+    binaryFound: isRetainedBinary(binary),
+    version,
+  });
+}
+
+async function collectCompatibilitySnapshot(
+  registry: AgentProviderRegistry,
+  checkedAt: number,
+): Promise<SafeCompatibilitySnapshot> {
+  const matrixIds = new Set(
+    ADAPTER_COMPATIBILITY_MATRIX.adapters.map((adapter) => adapter.adapterId),
+  );
+  const rows = [];
+  for (const adapterId of registry.ids()) {
+    if (!matrixIds.has(adapterId)) continue;
+    let detection: unknown = null;
+    try {
+      detection = await registry.require(adapterId).detect();
+    } catch {
+      // Detection failure is a closed unsupported fact, never response detail.
+    }
+    rows.push(classifyAdapterCompatibility(
+      adapterId,
+      compatibilityEvidence(detection),
+    ));
+  }
+  return createSafeCompatibilitySnapshot(checkedAt, rows);
 }
 
 async function closeStartupResources(
@@ -127,11 +228,23 @@ export async function startServeDelegation(
   const dependencies = { ...defaultDependencies(), ...options.dependencies };
   let supervisor: SpawnSupervisor | null = null;
   let httpServer: ServeDelegationHttpServer | null = null;
+  let compatibilityRegistry: AgentProviderRegistry | null = null;
   let degraded = false;
   let requestDegradedShutdown: (() => void) | null = null;
 
-  const handleExtRequest: ExtRequestHandler = (request, emit, context) => {
+  const handleExtRequest: ExtRequestHandler = async (request, emit, context) => {
     if (!supervisor) throw new ServeDelegationStartupError();
+    if (request.method === 'adapter.compatibility') {
+      if (!isExactEmptyPayload(request.payload)) {
+        throw new TypeError('Invalid adapter compatibility request');
+      }
+      compatibilityRegistry ??= dependencies.createCompatibilityRegistry();
+      const snapshot = await collectCompatibilitySnapshot(
+        compatibilityRegistry,
+        dependencies.now(),
+      );
+      return snapshot as unknown as Record<string, unknown>;
+    }
     return supervisor.handleExtRequest(request, emit, context);
   };
   const bridge = dependencies.createBridge({

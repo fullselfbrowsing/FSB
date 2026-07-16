@@ -25,6 +25,7 @@ async function run() {
     { id: 'delegate-hold-1', type: 'ext:request', method: 'delegate.hold', payload: { delegationId: 'delegation_server_0001' } },
     { id: 'delegate-resume-1', type: 'ext:request', method: 'delegate.resume', payload: { delegationId: 'delegation_server_0001' } },
     { id: 'delegate-status-1', type: 'ext:request', method: 'delegate.status', payload: {} },
+    { id: 'adapter-compatibility-1', type: 'ext:request', method: 'adapter.compatibility', payload: {} },
     { id: 'response-1', type: 'ext:response', payload: { authorized: true } },
     {
       id: 'delegate-start-1',
@@ -94,6 +95,35 @@ async function run() {
     serveDelegationSource.includes('return supervisor.handleExtRequest(request, emit, context);'),
     'all five closed delegate methods route through the one serve-owned supervisor instance',
   );
+  assert(
+    serveDelegationSource.includes("request.method === 'adapter.compatibility'"),
+    'compatibility uses one separately named additive request',
+  );
+  assert(
+    serveDelegationSource.includes('createSafeCompatibilitySnapshot'),
+    'the serve request returns only the canonical browser-safe snapshot projection',
+  );
+  assert(
+    serveDelegationSource.indexOf("request.method === 'adapter.compatibility'")
+      < serveDelegationSource.indexOf('return supervisor.handleExtRequest(request, emit, context);'),
+    'the read-only compatibility branch stays separate from supervisor lifecycle authority',
+  );
+  for (const forbiddenCompatibilityField of [
+    'sessionSecret',
+    'sessionId',
+    'realPath',
+    'profileVersion',
+    'detectedVersion',
+  ]) {
+    const compatibilityBranch = serveDelegationSource.slice(
+      serveDelegationSource.indexOf("request.method === 'adapter.compatibility'"),
+      serveDelegationSource.indexOf('return supervisor.handleExtRequest(request, emit, context);'),
+    );
+    assert(
+      !compatibilityBranch.includes(forbiddenCompatibilityField),
+      `compatibility branch cannot project ${forbiddenCompatibilityField}`,
+    );
+  }
   const indexSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'index.ts'), 'utf8');
   assert(indexSource.includes("import { startServeDelegation } from './agent-providers/serve-delegation.js';"));
   assert(indexSource.includes('const lifecycle = await startServeDelegation({ host, port });'));

@@ -275,6 +275,8 @@ function makeLifecycleFakes(overrides = {}) {
     httpCloseCalls: 0,
     disconnectCalls: 0,
     handlerCalls: 0,
+    compatibilityRegistryCalls: 0,
+    compatibilityDetectCalls: 0,
     onDegraded: null,
   };
   const bridge = {
@@ -363,6 +365,39 @@ function makeLifecycleFakes(overrides = {}) {
       state.onDegraded = onDegraded;
       return supervisor;
     },
+    createCompatibilityRegistry() {
+      state.compatibilityRegistryCalls++;
+      return {
+        ids() {
+          return ['claude-code'];
+        },
+        require(id) {
+          if (id !== 'claude-code') throw new Error('unknown adapter');
+          return {
+            async detect() {
+              state.compatibilityDetectCalls++;
+              if (overrides.compatibilityDetectionError) {
+                throw overrides.compatibilityDetectionError;
+              }
+              return overrides.compatibilityDetection ?? {
+                installed: true,
+                version: '2.1.177',
+                authState: 'unknown',
+                binary: {
+                  command: 'claude',
+                  realPath: '/private/compatibility-path-canary/claude',
+                  argvPrefix: [],
+                },
+                profileVersion: '2.1.177',
+              };
+            },
+          };
+        },
+      };
+    },
+    now() {
+      return 123_456_789;
+    },
     async pushInventory() {
       state.inventoryCalls++;
       order.push('inventory.push');
@@ -409,6 +444,85 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assertEqual(success.state.handlerCalls, 1, 'ready handler closure routes to the recovered supervisor');
   assertEqual(routedEvents[0]?.event, 'delegation.started', 'ready handler preserves the early delegation event');
   assertEqual(routed.status, 'completed', 'ready handler preserves the terminal domain payload');
+
+  const compatibility = await success.state.bridgeOptions.handleExtRequest({
+    id: 'compatibility-route',
+    type: 'ext:request',
+    method: 'adapter.compatibility',
+    payload: {},
+  }, () => {});
+  assertEqual(success.state.handlerCalls, 1, 'compatibility never invokes supervisor process authority');
+  assertEqual(success.state.compatibilityRegistryCalls, 1, 'compatibility creates one production-registry view lazily');
+  assertEqual(success.state.compatibilityDetectCalls, 1, 'compatibility invokes the registered production detector once');
+  assertEqual(
+    JSON.stringify(compatibility),
+    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range"}]}',
+    'compatibility returns only the exact bounded browser-safe projection',
+  );
+  for (const forbidden of [
+    'compatibility-path-canary',
+    '2.1.177',
+    'profileVersion',
+    'sessionSecret',
+    'sessionId',
+    'task',
+    'provider',
+  ]) {
+    assert(!JSON.stringify(compatibility).includes(forbidden), `compatibility response omits ${forbidden}`);
+  }
+
+  const invalidCompatibilityPayloads = [
+    null,
+    [],
+    { extra: true },
+    Object.create(null),
+    Object.create({ inherited: true }),
+  ];
+  const accessorPayload = {};
+  Object.defineProperty(accessorPayload, 'hidden', { enumerable: false, get() { return true; } });
+  invalidCompatibilityPayloads.push(accessorPayload);
+  for (const payload of invalidCompatibilityPayloads) {
+    let error = null;
+    try {
+      await success.state.bridgeOptions.handleExtRequest({
+        id: 'compatibility-invalid',
+        type: 'ext:request',
+        method: 'adapter.compatibility',
+        payload,
+      }, () => {});
+    } catch (caught) {
+      error = caught;
+    }
+    assert(
+      error,
+      `compatibility rejects non-empty/non-own/non-plain payload ${Object.prototype.toString.call(payload)}`,
+    );
+  }
+  assertEqual(success.state.handlerCalls, 1, 'invalid compatibility payloads never reach the supervisor');
+  assertEqual(success.state.compatibilityDetectCalls, 1, 'invalid compatibility payloads never run detection');
+
+  const failedDetection = makeLifecycleFakes({
+    compatibilityDetectionError: new Error('PRIVATE_DETECTOR_FAILURE'),
+  });
+  const failedDetectionRunning = await lifecycleModule.startServeDelegation({
+    host: '127.0.0.1',
+    port: 6015,
+    dependencies: failedDetection.dependencies,
+  });
+  const unavailableCompatibility = await failedDetection.state.bridgeOptions.handleExtRequest({
+    id: 'compatibility-detector-failure',
+    type: 'ext:request',
+    method: 'adapter.compatibility',
+    payload: {},
+  }, () => {});
+  assertEqual(
+    JSON.stringify(unavailableCompatibility),
+    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"unsupported","reason":"binary_not_found"}]}',
+    'detector exceptions become deterministic canonical unsupported rows',
+  );
+  assert(!JSON.stringify(unavailableCompatibility).includes('PRIVATE_DETECTOR_FAILURE'), 'detector exceptions cannot leak through the safe response');
+  assertEqual(failedDetection.state.handlerCalls, 0, 'detector failure still grants no supervisor authority');
+  await failedDetectionRunning.shutdown();
 
   const firstShutdown = running.shutdown();
   const secondShutdown = running.shutdown();
@@ -824,11 +938,11 @@ async function sendExtRequest(socket, id) {
   return messages;
 }
 
-async function assertUnprivilegedSocket(port, options, label) {
+async function assertUnprivilegedSocket(port, options, label, method = 'bridge.test') {
   const socket = await createBrowserSocket(port, options);
   const messages = collectSocketMessages(socket);
   const closePromise = waitForSocketClose(socket);
-  socket.send(JSON.stringify({ id: `request-${label}`, type: 'ext:request', method: 'bridge.test', payload: {} }));
+  socket.send(JSON.stringify({ id: `request-${label}`, type: 'ext:request', method, payload: {} }));
   const close = await closePromise;
   const unauthorized = messages.filter((message) => message.error?.code === 'ext_unauthorized');
   assertEqual(unauthorized.length, 1, `${label} receives exactly one generic ext_unauthorized response`);
@@ -893,6 +1007,12 @@ async function runPairingAuthorityMatrix(WebSocketBridge, auth) {
         port,
         { origin: 'chrome-extension://first-extension' },
         'missing auth token',
+      ));
+      resources.sockets.push(await assertUnprivilegedSocket(
+        port,
+        { origin: 'chrome-extension://first-extension' },
+        'missing auth token compatibility request',
+        'adapter.compatibility',
       ));
       resources.sockets.push(await assertUnprivilegedSocket(
         port,
