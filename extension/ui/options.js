@@ -133,7 +133,11 @@ const providerPanelState = {
 let providerEvidenceRefreshPromise = null;
 let providerEvidenceRefreshDebounceHandle = null;
 let providerEvidenceRefreshQueued = false;
+let providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
+let providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
 let providerCompatibilityExpiryHandle = null;
+let providerManualRefreshGeneration = 0;
+let providerManualSuccess = null;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
 const MAX_TIMEOUT_DELAY_MS = 2_147_483_647;
 const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
@@ -550,6 +554,47 @@ function projectStaleProviderCompatibility(clients) {
     projected[providerId] = nextRow;
   });
   return projected;
+}
+
+function getProviderCompatibilityCheckedAt(clients) {
+  const row = getOwnDataValue(clients, 'claude-code');
+  const compatibility = getOwnDataValue(row, 'compatibility');
+  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+  return Number.isSafeInteger(checkedAt) && checkedAt >= 0 ? checkedAt : null;
+}
+
+function getProviderStorageCompatibilityCheckedAt(change) {
+  const nextEnvelope = getOwnDataValue(change, 'newValue');
+  const compatibility = getOwnDataValue(nextEnvelope, 'compatibility');
+  const schemaVersion = getOwnDataValue(compatibility, 'schemaVersion');
+  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+  return schemaVersion === 1 && Number.isSafeInteger(checkedAt) && checkedAt >= 0
+    ? checkedAt
+    : null;
+}
+
+function newestProviderCompatibilityCheckedAt(current, candidate) {
+  if (!Number.isSafeInteger(candidate) || candidate < 0) return current;
+  if (!Number.isSafeInteger(current) || current < 0) return candidate;
+  return Math.max(current, candidate);
+}
+
+function getProviderManualSuccessToken(observedCheckedAt) {
+  const success = providerManualSuccess;
+  if (!success
+      || !Number.isSafeInteger(observedCheckedAt)
+      || observedCheckedAt < success.checkedAt) return null;
+  return { generation: success.generation, checkedAt: success.checkedAt };
+}
+
+function isCurrentProviderManualSuccess(token) {
+  return !!token && !!providerManualSuccess
+    && token.generation === providerManualSuccess.generation
+    && token.checkedAt === providerManualSuccess.checkedAt;
+}
+
+function consumeProviderManualSuccess(token) {
+  if (isCurrentProviderManualSuccess(token)) providerManualSuccess = null;
 }
 
 function isValidProviderCompatibilityProjection(value) {
@@ -1209,16 +1254,19 @@ function refreshProviderCompatibilityProjection() {
 function refreshProviderEvidence({
   announce = false,
   liveCompatibility = announce,
-  preserveSuccessfulRefresh = false
+  preserveManualSuccess = null
 } = {}) {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
 
   const helper = getProviderPanelHelper();
   const previousCompatibilityLabel = getSelectedCompatibilityLabel(helper);
-  const preserveCurrentSuccess = preserveSuccessfulRefresh === true
+  const preserveCurrentSuccess = isCurrentProviderManualSuccess(preserveManualSuccess)
     && providerPanelState.hasSuccessfulEvidence
     && providerPanelState.evidenceStatus === 'ready';
-  let liveRefreshSucceeded = false;
+  const manualGeneration = liveCompatibility === true
+    ? ++providerManualRefreshGeneration
+    : null;
+  if (manualGeneration !== null) providerManualSuccess = null;
   setProviderStatusRefreshing(true);
   if (!preserveCurrentSuccess) {
     providerPanelState.evidenceStatus = 'loading';
@@ -1230,16 +1278,29 @@ function refreshProviderEvidence({
 
   providerEvidenceRefreshPromise = requestMcpClients(liveCompatibility === true)
     .then((result) => {
-      liveRefreshSucceeded = liveCompatibility === true && result.refreshOutcome === 'refreshed';
-      if (!(preserveCurrentSuccess && result.refreshOutcome === 'unavailable')) {
+      const resultCheckedAt = getProviderCompatibilityCheckedAt(result.clients);
+      const matchingManualSuccess = preserveCurrentSuccess
+        && isCurrentProviderManualSuccess(preserveManualSuccess)
+        && result.refreshOutcome !== 'unavailable'
+        && resultCheckedAt !== null
+        && resultCheckedAt >= preserveManualSuccess.checkedAt;
+      if (manualGeneration !== null && result.refreshOutcome === 'refreshed'
+          && resultCheckedAt !== null) {
+        providerManualSuccess = {
+          generation: manualGeneration,
+          checkedAt: resultCheckedAt
+        };
+      }
+      if (!preserveCurrentSuccess || matchingManualSuccess) {
         providerPanelState.clients = result.clients;
         providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';
-        providerPanelState.evidenceStatus = preserveCurrentSuccess
+        providerPanelState.evidenceStatus = matchingManualSuccess
           ? 'ready'
           : (result.refreshOutcome === 'refreshed' ? 'ready' : result.refreshOutcome);
         providerPanelState.recommendation = helper.getRecommendation(result.clients);
         scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
       }
+      if (matchingManualSuccess) consumeProviderManualSuccess(preserveManualSuccess);
       if (announce && result.refreshOutcome === 'refreshed') {
         const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
         const changed = previousCompatibilityLabel && nextCompatibilityLabel
@@ -1282,32 +1343,52 @@ function refreshProviderEvidence({
       renderSelectedAgentDetails();
       providerEvidenceRefreshPromise = null;
       if (providerEvidenceRefreshQueued) {
+        const queuedCheckedAt = providerEvidenceRefreshQueuedCompatibilityCheckedAt;
         providerEvidenceRefreshQueued = false;
-        refreshProviderEvidence({ preserveSuccessfulRefresh: liveRefreshSucceeded });
+        providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
+        refreshProviderEvidence({
+          preserveManualSuccess: getProviderManualSuccessToken(queuedCheckedAt)
+        });
       }
     });
 
   return providerEvidenceRefreshPromise;
 }
 
-function scheduleProviderEvidenceRefresh() {
+function scheduleProviderEvidenceRefresh(compatibilityCheckedAt = null) {
   if (providerEvidenceRefreshPromise) {
     if (providerEvidenceRefreshDebounceHandle !== null) {
       clearTimeout(providerEvidenceRefreshDebounceHandle);
       providerEvidenceRefreshDebounceHandle = null;
     }
     providerEvidenceRefreshQueued = true;
+    providerEvidenceRefreshQueuedCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+      providerEvidenceRefreshQueuedCompatibilityCheckedAt,
+      compatibilityCheckedAt
+    );
     return;
   }
   if (providerEvidenceRefreshDebounceHandle !== null) {
     clearTimeout(providerEvidenceRefreshDebounceHandle);
   }
+  providerEvidenceRefreshDebounceCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+    providerEvidenceRefreshDebounceCompatibilityCheckedAt,
+    compatibilityCheckedAt
+  );
   providerEvidenceRefreshDebounceHandle = setTimeout(() => {
+    const debouncedCheckedAt = providerEvidenceRefreshDebounceCompatibilityCheckedAt;
     providerEvidenceRefreshDebounceHandle = null;
+    providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
     if (providerEvidenceRefreshPromise) {
       providerEvidenceRefreshQueued = true;
+      providerEvidenceRefreshQueuedCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+        providerEvidenceRefreshQueuedCompatibilityCheckedAt,
+        debouncedCheckedAt
+      );
     } else {
-      refreshProviderEvidence();
+      refreshProviderEvidence({
+        preserveManualSuccess: getProviderManualSuccessToken(debouncedCheckedAt)
+      });
     }
   }, 100);
 }
@@ -1634,7 +1715,9 @@ function setupEventListeners() {
         const nextStatus = nextState && nextState.pairingStatus;
         renderMcpBridgePairingStatus(nextStatus, nextStatus === 'expired');
       } else if (area === 'local' && changes && changes.fsbAgentProviders) {
-        scheduleProviderEvidenceRefresh();
+        scheduleProviderEvidenceRefresh(
+          getProviderStorageCompatibilityCheckedAt(changes.fsbAgentProviders)
+        );
       } else if (area === 'local' && changes && changes.fsbAgentCap) {
         scheduleRefreshActiveAgentCount();
       } else if (area === 'session' && changes && changes.fsbTriggerRegistry) {

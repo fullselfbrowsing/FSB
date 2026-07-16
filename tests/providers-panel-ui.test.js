@@ -2417,6 +2417,13 @@ async function runProviderEvidenceTests() {
   let causalDurableWrites = 0;
   let causalCacheReads = 0;
   let explicitLiveActionSeen = false;
+  const compatibilityStorageChange = (checkedAt) => ({
+    fsbAgentProviders: {
+      newValue: {
+        compatibility: { schemaVersion: 1, checkedAt, adapters: [] }
+      }
+    }
+  });
   const causalClients = compatibilityClients({
     status: 'supported', reason: 'within_tested_range', checkedAt: 700
   });
@@ -2426,7 +2433,7 @@ async function runProviderEvidenceTests() {
         explicitLiveActionSeen = true;
         causalDaemonRequests += 1;
         causalDurableWrites += 1;
-        controls.emitStorage({ fsbAgentProviders: { newValue: {} } }, 'local');
+        controls.emitStorage(compatibilityStorageChange(700), 'local');
         return {
           success: true,
           refreshOutcome: 'refreshed',
@@ -2481,6 +2488,89 @@ async function runProviderEvidenceTests() {
   assert.doesNotMatch(evidenceBadge(causal, 'claude-code').getAttribute('title') || '',
     /Status may be stale/,
     'fresh installation evidence retains no stale tooltip after causal fan-out');
+
+  let lateDaemonRequests = 0;
+  let lateDurableWrites = 0;
+  let lateCacheReads = 0;
+  let useNewerExternalProjection = false;
+  const newerExternalClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: 800
+  });
+  newerExternalClients['claude-code'].installed = null;
+  newerExternalClients.codex.live = { agentId: 'newer-external-codex' };
+  const lateCausal = createProviderHarness({}, {
+    heldTimerDelays: [100],
+    runtimeDispatch(message) {
+      if (message.action === 'refreshMcpCompatibility') {
+        lateDaemonRequests += 1;
+        lateDurableWrites += 1;
+        return {
+          success: true,
+          refreshOutcome: 'refreshed',
+          compatibilityExpiresAt: null,
+          clients: causalClients
+        };
+      }
+      if (message.action === 'getMcpClients') {
+        lateCacheReads += 1;
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: null,
+          clients: useNewerExternalProjection ? newerExternalClients : causalClients
+        };
+      }
+      throw new Error('unexpected late-causal provider runtime action');
+    }
+  });
+  lateCausal.context.setupEventListeners();
+  await lateCausal.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(lateCausal.runtimeCalls, [
+    { action: 'refreshMcpCompatibility' }
+  ], 'manual live success settles before its causal provider-storage event is delivered');
+  assert.strictEqual(lateCausal.state().evidenceStatus, 'ready');
+  assert.strictEqual(lateCausal.announcement.textContent, 'Provider status refreshed.');
+
+  lateCausal.emitStorage(compatibilityStorageChange(700), 'local');
+  assert.strictEqual(lateCausal.runtimeCalls.length, 1,
+    'late causal storage delivery waits for the ordinary evidence debounce');
+  lateCausal.advanceTimersBy(100);
+  await flushHarness();
+  await flushHarness();
+  assert.deepStrictEqual(lateCausal.runtimeCalls, [
+    { action: 'refreshMcpCompatibility' },
+    { action: 'getMcpClients' }
+  ], 'late causal delivery performs one bounded cache-only hydration after settlement');
+  assert.strictEqual(lateDaemonRequests, 1,
+    'late causal delivery cannot repeat the daemon compatibility request');
+  assert.strictEqual(lateDurableWrites, 1,
+    'late causal delivery cannot repeat the durable compatibility replacement');
+  assert.strictEqual(lateCacheReads, 1,
+    'late causal delivery consumes exactly one cache projection');
+  assert.strictEqual(lateCausal.state().evidenceStatus, 'ready',
+    'late causal hydration retains the settled manual ready generation');
+  assert.strictEqual(lateCausal.announcement.textContent, 'Provider status refreshed.',
+    'late causal hydration retains exactly one polite manual success announcement');
+  assert.strictEqual(evidenceBadge(lateCausal, 'claude-code').textContent, 'Installed');
+  assert.doesNotMatch(evidenceBadge(lateCausal, 'claude-code').getAttribute('title') || '',
+    /Status may be stale/,
+    'late causal hydration retains no stale evidence marker');
+
+  useNewerExternalProjection = true;
+  lateCausal.emitStorage(compatibilityStorageChange(800), 'local');
+  lateCausal.advanceTimersBy(100);
+  await flushHarness();
+  await flushHarness();
+  assert.strictEqual(lateCacheReads, 2,
+    'a newer external provider generation still performs its own cache hydration');
+  assert.deepStrictEqual(visibleRecommendationIds(lateCausal), ['codex'],
+    'newer external evidence is not suppressed by causal-generation deduplication');
+  assert.strictEqual(evidenceBadge(lateCausal, 'codex').textContent,
+    'Connected now · Status may be stale',
+    'newer external evidence hydrates through the ordinary cache-state semantics');
+  assert.strictEqual(lateDaemonRequests, 1);
+  assert.strictEqual(lateDurableWrites, 1,
+    'newer external hydration cannot re-enter the manual daemon/write route');
 
   const queuedStorage = createProviderHarness({}, {
     holdRuntime: true,
