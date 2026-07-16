@@ -1080,7 +1080,7 @@ check(replaceCompatibilitySource.includes('parseCompatibilitySnapshot(snapshot)'
     < replaceCompatibilitySource.indexOf('return await write(envelope)'),
 'compatibility replacement exact-validates and serializes one durable envelope write');
 const projectedCompatibilitySource = extractFunction(providerStorageSource, 'projectedCompatibility');
-check(projectedCompatibilitySource.includes('now - snapshot.checkedAt > FSB_AGENT_COMPATIBILITY_MAX_AGE_MS')
+check(projectedCompatibilitySource.includes('now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS')
   && projectedCompatibilitySource.includes("compatibilityProjection('degraded', 'evidence_stale'")
   && projectedCompatibilitySource.includes("compatibilityProjection('unsupported', 'matrix_invalid'"),
 'freshness is a one-way supported-to-degraded downgrade and invalid evidence fails closed');
@@ -1100,13 +1100,36 @@ const backgroundCompatibilitySource = between(
   'let fsbMcpCompatibilityRefreshPromise = null;',
   'function armMcpBridge(reason)',
 );
-check(backgroundCompatibilitySource.indexOf('validateCompatibilitySnapshot(response)')
-  < backgroundCompatibilitySource.indexOf('await providers.replaceCompatibility(validated)')
-  && backgroundCompatibilitySource.indexOf('await providers.replaceCompatibility(validated)')
-    < backgroundCompatibilitySource.indexOf('await fsbReadMergedMcpClients(providers)'),
+const backgroundCompatibilityRefreshSource = extractFunction(
+  backgroundSource62,
+  'fsbRefreshMcpCompatibility',
+);
+const backgroundCompatibilityCacheSource = extractFunction(
+  backgroundSource62,
+  'fsbReadCachedMcpClients',
+);
+const backgroundCompatibilityStaleSource = extractFunction(
+  backgroundSource62,
+  'fsbReadStaleMcpClientFallback',
+);
+check(backgroundCompatibilityRefreshSource.indexOf('requestAdapterCompatibility()') >= 0
+  && backgroundCompatibilityRefreshSource.indexOf('requestAdapterCompatibility()')
+    < backgroundCompatibilityRefreshSource.indexOf('validateCompatibilitySnapshot(response)')
+  && backgroundCompatibilityRefreshSource.indexOf('validateCompatibilitySnapshot(response)')
+    < backgroundCompatibilityRefreshSource.indexOf('await providers.replaceCompatibility(validated)')
+  && backgroundCompatibilityRefreshSource.indexOf('await providers.replaceCompatibility(validated)')
+    < backgroundCompatibilityRefreshSource.indexOf('await fsbReadMergedMcpClients(providers)'),
 'background validates, durably writes, then fans out compatibility');
-check(backgroundCompatibilitySource.includes('if (fsbMcpCompatibilityRefreshPromise) return fsbMcpCompatibilityRefreshPromise')
-  && backgroundCompatibilitySource.includes("return { clients, refreshOutcome: 'refreshed' }")
+check(backgroundCompatibilityRefreshSource.includes('if (fsbMcpCompatibilityRefreshPromise) return fsbMcpCompatibilityRefreshPromise')
+  && backgroundCompatibilityRefreshSource.includes("refreshOutcome: 'refreshed'")
+  && backgroundCompatibilityRefreshSource.includes('compatibilityExpiresAt: fsbReadMcpCompatibilityExpiryAt(providers, clients)')
+  && backgroundCompatibilityRefreshSource.includes('return await fsbReadStaleMcpClientFallback(providers)')
+  && backgroundCompatibilityCacheSource.includes('refreshOutcome,')
+  && backgroundCompatibilityCacheSource.includes("compatibilityExpiresAt: refreshOutcome === 'stale'")
+  && !backgroundCompatibilityCacheSource.includes('requestAdapterCompatibility')
+  && !backgroundCompatibilityCacheSource.includes('replaceCompatibility')
+  && backgroundCompatibilityStaleSource.includes("refreshOutcome: 'stale'")
+  && backgroundCompatibilityStaleSource.includes('compatibilityExpiresAt: null')
   && backgroundCompatibilitySource.includes("return cached ? 'stale' : 'unavailable'"),
 'cold/manual compatibility refresh coalesces and exposes only refreshed, stale, or unavailable');
 
