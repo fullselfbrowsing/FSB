@@ -12,6 +12,7 @@ provides:
   - Executable 17-task, four-requirement, eight-threat source/security contract preserving Phase 59–61 interfaces
   - Exactly three honest human-needed UAT scenarios deferred to the single milestone-end sweep
   - Phase 62-aware offline refresh seam in the legacy MCP client identity integration harness
+  - Guarded full-suite confirmation at the final Phase 62 production and test boundary
 affects: [milestone-end-uat, phase-62-audit, future-agent-adapters, root-ci]
 
 tech-stack:
@@ -28,17 +29,19 @@ key-files:
     - package.json
     - tests/delegation-phase-contract.test.js
     - tests/mcp-client-identity-integration.test.js
+    - tests/mcp-client-merged-view.test.js
+    - tests/lattice-provider-bridge-smoke.test.js
 
 key-decisions:
   - "Add the three Phase 62 commands directly and exactly once to the existing serial fail-fast root chain, preserving its single MCP build boundary and byte-identical prior command order."
   - "Pin the actual frozen Phase 59 reverse-channel error union present in production rather than replacing it with the contradictory parenthetical labels in the Plan 06 prose."
   - "Keep all installed-CLI, rendered-browser, keyboard, screen-reader, forced-color, reduced-motion, and genuine-capture checks human_needed with pending results and empty evidence."
-  - "Invoke the guarded full-suite wrapper once only; after its stale-harness failure, repair and verify the affected focused surface without presenting a second run or synthetic result as full-suite evidence."
+  - "Treat each guarded-suite stop as evidence, isolate it before changing code, and rerun the workspace-preserving wrapper only after the exact stale seam is proven and focused gates are green."
 
 patterns-established:
   - "Closure contract: exact task/requirement/threat ownership, closed cross-boundary schemas, preserved interfaces, and negative authority guards are executable in one source test."
   - "Honest UAT deferral: automation may enforce ledger shape and coverage but cannot check off or populate a human evidence row."
-  - "Guarded failure handling: preserve the single-run result, fix an identified blocking harness defect atomically, and distinguish post-fix focused evidence from repository-suite evidence."
+  - "Guarded failure handling: preserve each failure, fix only the proven stale seam atomically, require focused green evidence, then obtain an explicit exit-0 full-suite result at the final boundary."
 
 requirements-completed: [DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04]
 
@@ -52,18 +55,19 @@ completed: 2026-07-16
 
 ## Performance
 
-- **Duration:** 21 min
+- **Original plan duration:** 21 min (review/debug/integration closeout followed)
 - **Started:** 2026-07-16T19:20:09Z
 - **Completed:** 2026-07-16T19:41:25Z
-- **Tasks:** 3 planned tasks plus 1 blocking test-harness deviation
-- **Files modified:** 4
+- **Tasks:** 3 planned tasks plus 3 blocking test-harness/tripwire deviations
+- **Files modified:** 6 across plan execution and final integration closeout
 
 ## Accomplishments
 
 - Added the compatibility matrix, generalized production-parser drift smoke, and extension drift-reporter tests exactly once to the established serial root suite while retaining every prior command, one MCP build boundary, fail-fast ordering, and the exact direct CI drift command.
 - Expanded the existing delegation contract to map all 17 Phase 62 tasks, DRIFT-01–04, T62-01–08, critical file ownership, matrix/fixture/doctor/transport/storage/reporter/UI schemas, preserved Phase 59–61 interfaces, and negative authority/leakage guards.
 - Created exactly `UAT62-01` through `UAT62-03` as unchecked `human_needed` scenarios with pending results and empty evidence, explicitly deferred to one milestone-end sweep without running an installed CLI, browser, native host, accessibility session, or human UAT.
-- Repaired the legacy client-identity VM harness after the guarded suite showed that it had not been updated for Phase 62’s `fsbRefreshMcpCompatibility` dependency and additive compatibility row field.
+- Repaired the legacy client identity/merged-view VM seams and the historical service-worker import-count pins as the guarded suite exposed their drift from the final Phase 62 cache-only response and worker topology.
+- Completed the final guarded repository suite with exit 0 and the wrapper's explicit workspace-preservation PASS while retaining all protected generated-file hashes.
 
 ## Task Commits
 
@@ -77,18 +81,25 @@ Blocking deviation:
 
 - **Refresh the stale MCP client identity integration harness** — `f3ffcefe` (test)
 
+Post-plan integration closeout:
+
+- **Align the adjacent cached-client integration seams** — `f45453dd` (test)
+- **Advance the documented service-worker import-count pins** — `9c7e3b73` (test)
+
 ## Files Created/Modified
 
 - `package.json` — Three exact-once Phase 62 gates placed in their existing MCP/parser/background test neighborhoods.
 - `tests/delegation-phase-contract.test.js` — Complete Phase 62 ownership, requirement, threat, schema, root/CI, negative-authority, and UAT integrity contract.
 - `.planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-HUMAN-UAT.md` — Three pending milestone-end local/stream, rendered-layout, and accessibility/live-refresh scenarios.
-- `tests/mcp-client-identity-integration.test.js` — Faithful offline compatibility-refresh seam, bounded unavailable outcome, and fail-closed additive row-shape assertions.
+- `tests/mcp-client-identity-integration.test.js` — Current cache-only inventory seam, bounded unavailable outcome, and additive expiry-envelope assertions.
+- `tests/mcp-client-merged-view.test.js` — Current cache-reader dependency and exact `compatibilityExpiresAt` success envelope in the extracted-handler VM.
+- `tests/lattice-provider-bridge-smoke.test.js` — Historical worker import pins advanced for the one intentional Phase 62 drift-diagnostics module.
 
 ## Decisions Made
 
 - Retained the production Phase 59 reverse-channel error codes `agent_provider_offline`, `bridge_topology_changed`, `ext_unauthorized`, `invalid_ext_request`, and `ext_request_timeout`; changing production to match stale prose would have broken the preserved interface the contract was meant to protect.
 - Kept source/DOM/synthetic verification blocking while separating it from genuine environment and human judgment. Fixture provenance remains `schema-derived-contract` with `liveCapturePending: true` until milestone-end review.
-- Treated the guarded-suite failure as durable evidence: the wrapper was not rerun after the fix, and post-fix focused results are reported separately below.
+- Treated every guarded-suite failure as durable evidence, repaired only the deterministically reproduced stale test seam, and required focused green gates before the next guarded retry. The final retry is reported separately from the earlier failures below.
 
 ## TDD Evidence
 
@@ -119,26 +130,44 @@ Blocking deviation:
 **2. [Rule 3 — Blocking] Updated a stale extracted background-message harness**
 
 - **Found during:** The one separately guarded repository-suite run after Task 62-06-03.
-- **Issue:** Phase 62 Plan 03 changed `getMcpClients` to call `fsbRefreshMcpCompatibility`, but the older Phase 57 VM harness extracted only the handler/dispatcher and supplied no refresh dependency. Its exact-row assertion also omitted the additive bounded compatibility projection.
+- **Issue:** At that intermediate Phase 62 boundary, `getMcpClients` called `fsbRefreshMcpCompatibility`, but the older Phase 57 VM harness extracted only the handler/dispatcher and supplied no refresh dependency. Its exact-row assertion also omitted the additive bounded compatibility projection.
 - **Fix:** Added a faithful offline refresh seam using the real provider read/validator/merged-view methods, asserted the closed `unavailable` outcome and fail-closed `matrix_invalid` projection, and retained storage-rejection coverage.
 - **Files modified:** `tests/mcp-client-identity-integration.test.js`.
 - **Verification:** Focused integration reproduction, all six Phase 57 identity/provider tests, provider storage/merged view, bridge lifecycle/background dispatch, Providers logic, and accumulated Plan 06 gates pass.
 - **Committed in:** `f3ffcefe`.
 
+**3. [Rule 3 — Blocking] Aligned adjacent extracted-handler VMs with the final cache-only route**
+
+- **Found during:** The post-review guarded repository suite.
+- **Issue:** The merged-view and identity-integration VMs still injected the obsolete live-refresh symbol while production `getMcpClients` called `fsbReadCachedMcpClients`; the merged-view expectation also omitted `compatibilityExpiresAt`.
+- **Fix:** Injected the exact cache reader used by production and asserted the current bounded response envelope in both harnesses.
+- **Files modified:** `tests/mcp-client-merged-view.test.js`, `tests/mcp-client-identity-integration.test.js`.
+- **Verification:** Both focused integration suites pass; background dispatch passes 293/0; the phase contract passes 763/0.
+- **Committed in:** `f45453dd`.
+
+**4. [Rule 3 — Blocking] Advanced a stale legacy worker-count tripwire**
+
+- **Found during:** The next guarded repository-suite retry after the VM correction.
+- **Issue:** The Phase 6 Lattice smoke test still pinned Phase 61 service-worker totals and did not count the intentional Phase 62 protocol-drift diagnostics import.
+- **Fix:** Advanced only the two documented totals from 315/311 to 316/312 and recorded their Phase 62 provenance.
+- **Files modified:** `tests/lattice-provider-bridge-smoke.test.js`.
+- **Verification:** The focused legacy contract passes 110/0; Phase 62 drift and source contracts remain green.
+- **Committed in:** `9c7e3b73`.
+
 ---
 
-**Total deviations:** 2 auto-fixed (1 contract-correctness, 1 blocking harness repair).
-**Impact on plan:** Both changes preserve shipped behavior and improve regression coverage; production authority and runtime source were unchanged.
+**Total deviations:** 4 auto-fixed (1 contract-correctness, 3 blocking test-harness/tripwire repairs).
+**Impact on plan:** All changes preserve shipped behavior and improve regression coverage; the post-plan corrections are test-only and leave production authority unchanged.
 
 ## Issues Encountered
 
 - The approved validation table contains JavaScript `||` inside a Markdown cell. The contract extracts the command from its inline code span rather than splitting that command on table pipes.
-- The guarded full suite was invoked exactly once and exited 1 at `tests/mcp-client-identity-integration.test.js:395` before the stale harness was repaired. Per the one-run guard, it was not invoked again and no equivalent full-suite command was used. Therefore a post-fix full-suite result is not claimed.
+- Guarded runs exposed three successive obsolete test seams at different integration depths: the initial identity harness, the adjacent merged-view/cache-reader seam, and the Phase 61-era worker-count pin. Each was reproduced and corrected independently before the final guarded run passed.
 
 ## Known Pending Evidence
 
 - `UAT62-01`, `UAT62-02`, and `UAT62-03` remain unchecked with `status: human_needed`, `result: pending`, and empty evidence until the single milestone-end sweep.
-- A post-fix guarded repository-suite confirmation remains outstanding because the authorized wrapper had already consumed its one invocation. All affected and accumulated focused gates are green after the repair.
+- No automated, source, DOM, or synthetic evidence has been promoted into a human/live result.
 
 ## User Setup Required
 
@@ -150,21 +179,22 @@ None during autonomous implementation. Installed Claude Code, an unpacked browse
 - `node tests/delegation-phase-contract.test.js` — PASS, 763 assertions.
 - Plan 06 companion gates (`mcp-adapter-compatibility`, `mcp-reverse-channel-contract`, `providers-panel-logic`) — PASS.
 - Identity/provider/background post-fix focused suite — PASS, including `mcp-client-identity-integration`, provider storage/merged view, bridge lifecycle, and background dispatch (275 assertions).
-- `node scripts/run-phase60-full-tests.mjs` — invoked exactly once; FAILED before the focused harness repair at the stale `getMcpClients` VM dependency. Not rerun.
+- `node tests/lattice-provider-bridge-smoke.test.js` — PASS, 110 assertions.
+- `node scripts/run-phase60-full-tests.mjs` — final guarded run exited 0 with `[phase60-full-tests] PASS: full suite passed and workspace state was preserved`.
 - Protected `mcp/build/index.js` and the three pre-existing generated showcase files retain their exact required SHA-256 hashes; the staging index remains empty after each commit.
 - No human/live UAT was invoked.
 
 ## Next Phase Readiness
 
-- Phase 62’s focused automated gates, source/security contract, and pending UAT ledger are ready for milestone audit and the eventual single human sweep.
-- A future authorized repository-wide run should confirm the focused harness repair across the complete serial chain; this summary deliberately does not represent that confirmation as already obtained.
+- Phase 62’s focused gates, source/security contract, terminal reviews, verifier, guarded full suite, and pending UAT ledger are ready for phase closeout and Phase 63.
+- The only remaining Phase 62 evidence is the explicitly deferred milestone-end human sweep.
 
-## Self-Check: PASSED WITH RECORDED INTEGRATION LIMIT
+## Self-Check: PASSED
 
 - All four implementation/test artifacts and this summary exist.
 - Task commits `3c80a16f`, `ffc3c8c3`, `e747b1cd`, and deviation commit `f3ffcefe` are present.
-- Task-level, affected-surface, and accumulated focused gates pass after the final commit.
-- The single guarded failure, exact non-rerun decision, pending human evidence, and outstanding full-suite confirmation are recorded without promotion.
+- Task-level, affected-surface, accumulated focused, and guarded full-suite gates pass after the final test-only corrections.
+- Earlier guarded failures, their isolated root causes, the final full-suite pass, and the still-pending human evidence are recorded without promotion.
 
 ---
 *Phase: 62-ci-drift-smoke-gate-doctor-extensions*

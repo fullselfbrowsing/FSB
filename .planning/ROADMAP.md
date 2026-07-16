@@ -35,7 +35,7 @@
 - [x] **Phase 59: Reverse-Request Channel & Security Foundation** - **SECURITY-CRITICAL, load-bearing**. Additive `ext:*` frames on ws://localhost:7225, strict Origin allowlist + Host loopback + per-install rotating shared secret in `Sec-WebSocket-Protocol`, log redaction, hub-exit-mid-delegation topology tests, permanent CI grep gate against `--dangerously-skip-permissions` / `--yolo` / `--auto` — completed 2026-07-14; automated/source verification passed and four live checks are deferred to the milestone-end UAT gate
 - [x] **Phase 60: Adapter Contract & Claude Code MVP** - `AgentProviderAdapter` interface, `SpawnSupervisor` in the `serve` daemon with argv-only spawn / scrubbed env / SIGTERM-at-process-group / Windows `taskkill /T /F` / orphan scan on startup, Claude Code adapter with verified 2.1.177 flag set + shipped `fsb` agent definition + recorded stream-json JSONL fixture — completed 2026-07-14; automated/source verification passed and seven live checks are deferred to the milestone-end UAT gate
 - [x] **Phase 61: Delegation UX & SW-Eviction Persistence** - Fifth `EXECUTION_MODES` entry `delegated`, explicit first-use consent card, live per-tool-call streaming feed, default-background-tab + "Take control" affordance, kill switch that reclaims owned tabs, post-run usage summary, `chrome.storage.session` per-event persistence, 20 s WS heartbeat, "agent offline → `doctor`" deep-link, restart-is-clean semantics (completed 2026-07-15; automated/source verification passed and eight live checks are deferred to the milestone-end UAT gate)
-- [ ] **Phase 62: CI Drift-Smoke Gate & Doctor Extensions** - Per-adapter CI drift-smoke against canned fixtures (fail-loud on unknown event types / missing fields / version outside compat matrix), `fsb-mcp-server doctor` per-adapter section (binary path, version, auth, secret rotation age), machine-readable adapter compatibility matrix consumed by the extension
+- [x] **Phase 62: CI Drift-Smoke Gate & Doctor Extensions** - Per-adapter CI drift-smoke against canned fixtures (fail-loud on unknown event types / missing fields / version outside compat matrix), `fsb-mcp-server doctor` per-adapter section (binary path, version, auth, secret rotation age), machine-readable adapter compatibility matrix consumed by the extension (completed 2026-07-16; automated/source/full-suite verification passed and three live checks are deferred to the milestone-end UAT gate)
 - [ ] **Phase 63: Native-Messaging Host** - `install --native-host` writes the platform-appropriate manifest (mac/Linux/Windows), extension gains additive `nativeMessaging` permission, "Agent offline" state auto-attempts wake before the doctor deep-link; the native host only launches (or attaches to) `serve` — it NEVER spawns agent CLIs directly (all spawn authority stays inside the daemon behind Phase 59 CHAN gates)
 - [ ] **Phase 64: OpenCode Adapter** - Second adapter proves the contract accommodates server-mode + attach on top of cold spawn without any Phase 60 rewrite; pinned OpenCode agent definition + recorded JSONL fixture + drift-smoke coverage
 - [ ] **Phase 65: Codex Adapter** - Third adapter with `codex exec --json` on the verified 0.142.5 hermetic flag set (`--ephemeral` + `--ignore-user-config`, never the deprecated `--full-auto`), `detect()` surfacing ChatGPT OAuth / API key / unauthenticated so the Providers panel discloses which billing bucket a run will hit; `caps.chatMode: false` across all adapters (task-mode only for v0.9.91)
@@ -136,7 +136,7 @@
 - [x] 62-03: Carry the authenticated safe compatibility projection into background-owned durable, freshness-aware provider state.
 - [x] 62-04: Project sanitized protocol-drift detail and report it exactly once through a true per-adapter pre-throttle.
 - [x] 62-05: Render exact, accessible, non-mutating compatibility badges and selected-provider details.
-- [ ] 62-06: Wire root/source/security gates and preserve all genuine live evidence in the pending milestone-end UAT ledger.
+- [x] 62-06: Wire root/source/security gates and preserve all genuine live evidence in the pending milestone-end UAT ledger.
 
 ### Phase 63: Native-Messaging Host
 **Goal**: When the user has installed the optional native-messaging host, the "Agent offline" state auto-attempts to wake `fsb-mcp-server serve` before falling back to the Phase 61 doctor deep-link — closing the UX cliff introduced by the extension having no `nativeMessaging` permission through Phases 57-62. All spawn authority stays inside the serve daemon behind Phase 59's CHAN gates; the native host itself never spawns agent CLIs.
@@ -184,7 +184,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 59. Reverse-Request Channel & Security Foundation | 4/4 | Complete    | 2026-07-14 |
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
-| 62. CI Drift-Smoke Gate & Doctor Extensions | 5/6 | In Progress | — |
+| 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 0/0 | Not started | — |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |

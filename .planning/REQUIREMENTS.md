@@ -68,10 +68,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### DRIFT -- CI Drift-Smoke Gate & Doctor Extensions
 
-- [ ] **DRIFT-01**: A CI job runs each shipped adapter against a canned prompt fixture, asserts a known event-type sequence and the presence of required fields on `system/init` and `result`, and fails the build on unknown event types, missing fields, or a `--version` outside the compatibility matrix.
-- [ ] **DRIFT-02**: `fsb-mcp-server doctor` gains a per-adapter section reporting: binary path, version, auth state (parseable where the CLI exposes it), shared-secret presence, and the current spawn-secret rotation age.
-- [ ] **DRIFT-03**: The diagnostics ring buffer classifies drift events as `agent_protocol_drift` (with adapter id, expected vs observed) and rate-limits duplicate entries at the existing 1-per-10s bucket.
-- [ ] **DRIFT-04**: The `doctor` output includes a machine-readable adapter compatibility matrix that both CI and the extension can read to render "supported / degraded / unsupported" states without hardcoding versions in extension code.
+- [x] **DRIFT-01**: A CI job runs each shipped adapter against a canned prompt fixture, asserts a known event-type sequence and the presence of required fields on `system/init` and `result`, and fails the build on unknown event types, missing fields, or a `--version` outside the compatibility matrix.
+- [x] **DRIFT-02**: `fsb-mcp-server doctor` gains a per-adapter section reporting: binary path, version, auth state (parseable where the CLI exposes it), shared-secret presence, and the current spawn-secret rotation age.
+- [x] **DRIFT-03**: The diagnostics ring buffer classifies drift events as `agent_protocol_drift` (with adapter id, expected vs observed) and rate-limits duplicate entries at the existing 1-per-10s bucket.
+- [x] **DRIFT-04**: The `doctor` output includes a machine-readable adapter compatibility matrix that both CI and the extension can read to render "supported / degraded / unsupported" states without hardcoding versions in extension code.
 
 ### NATIVE -- Native-Messaging Host
 
@@ -167,10 +167,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | LIFE-02 | Phase 61 | Complete |
 | LIFE-03 | Phase 61 | Complete |
 | LIFE-04 | Phase 61 | Complete |
-| DRIFT-01 | Phase 62 | Pending |
-| DRIFT-02 | Phase 62 | Pending |
-| DRIFT-03 | Phase 62 | Pending |
-| DRIFT-04 | Phase 62 | Pending |
+| DRIFT-01 | Phase 62 | Complete |
+| DRIFT-02 | Phase 62 | Complete |
+| DRIFT-03 | Phase 62 | Complete |
+| DRIFT-04 | Phase 62 | Complete |
 | NATIVE-01 | Phase 63 | Pending |
 | NATIVE-02 | Phase 63 | Pending |
 | NATIVE-03 | Phase 63 | Pending |
@@ -200,4 +200,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-15 after Phase 61 Plan 08 completion (37/51 requirements complete; all live checks deferred to milestone end)*
+*Last updated: 2026-07-16 after Phase 62 completion (41/51 requirements complete; all live checks deferred to milestone end)*

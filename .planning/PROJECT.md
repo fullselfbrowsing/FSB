@@ -10,7 +10,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-59 are complete. Phase 59 passed CHAN-01..07, the full automated/source suite, and a clean security review; its four live pairing/lifecycle/accessibility checks join Phase 58's 12 Providers checks in the user-directed milestone-end UAT sweep. Phase 60 (Adapter Contract & Claude Code MVP) is next.
+**Active milestone progress:** Phases 57-62 are complete (41/51 requirements). Phase 62 passed 18/18 verifier must-haves, clean code/security/UI reviews, and the guarded full repository suite; its three live doctor/stream/layout/accessibility checks join the prior 31 scenarios in the user-directed milestone-end UAT sweep. Phase 63 (Native-Messaging Host) is next.
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
@@ -28,12 +28,15 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - **Agent identity capture (Phase 57 complete)** -- onboarding copy intent, MCP initialize `clientInfo`, and the 21-client installed inventory now converge into durable clicked/connected/installed evidence and one guarded `getMcpClients` view. The wire additions remain optional and legacy `agent:register` payloads stay byte-compatible.
 - **Providers panel (Phase 58 complete)** -- "API Configuration" is now "Providers"; explicit `api` vs `agent` kinds preserve BYOK settings; agent details report evidence and conditional billing truth; one advisory recommendation follows live > installed > copy-clicked > xAI. Live visual/interaction UAT is deferred to the milestone-end sweep.
 - **Reverse-request security foundation (Phase 59 complete)** -- additive `ext:*` frames now cross the existing loopback bridge behind exact Host/Origin/session authority, deterministic capable-relay routing, secret redaction, topology exact-once cleanup, and a permanent forbidden-flag prebuild gate. Four live pairing/lifecycle/accessibility checks remain pending for the milestone-end sweep.
-- **Side-panel delegation (Claude Code MVP)** -- new extension->hub reverse-request channel over the existing ws://localhost:7225 bridge; daemon spawns `claude -p` headless (stream-json output, strict permission defaults, hermetic `--strict-mcp-config`, shipped `fsb` agent definition instead of prompt stuffing); the spawned CLI connects back as its own FSB agent with tab ownership; live progress streamed into the side panel; kill switch; graceful "agent offline -> doctor" state.
-- **Multi-agent adapters** -- `AgentProviderAdapter` contract (detect / build / events / kill / caps); OpenCode -> Codex -> Gemini after Claude Code; task-mode vs chat-mode (`--resume`) where supported.
+- **Adapter contract + Claude Code MVP (Phase 60 complete)** -- the serve daemon owns the five-method adapter contract and safe spawn supervisor; Claude Code runs through the pinned task-mode profile, stdin-only prompt, recorded stream fixture, exact process-tree cleanup, and restart recovery. Seven genuine CLI/OS/browser checks remain in the milestone-end sweep.
+- **Delegation UX + persistence (Phase 61 complete)** -- the side panel has consent, live streaming progress, background-tab ownership, Take Control, Stop/reclaim, honest usage, 20-second liveness, and service-worker-eviction recovery. Eight genuine consent/theme/handoff/stream/endurance/POSIX/restart checks remain pending.
+- **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
+- **Native wake path (Phase 63 next)** -- add the optional native-messaging host that only starts or attaches to `serve`, then falls back to the established doctor path; it never spawns agent CLIs or relaxes Phase 59 channel authority.
+- **Multi-agent adapters** -- extend the stable `AgentProviderAdapter` contract to OpenCode and Codex; Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
 
 **Key context:**
 - The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
-- Daemon lifecycle constraint: the extension has NO nativeMessaging permission and cannot wake any process. Delegation requires a live MCP server process (`fsb-mcp-server serve` or an open agent session). MVP ships honest offline UX + `doctor` handoff; a native-messaging host is a deferred option.
+- Daemon lifecycle constraint through Phase 62: the extension has NO nativeMessaging permission and cannot wake any process. Phase 63 adds one optional wake host that starts or attaches only to `serve`; all agent spawn authority stays behind the existing daemon channel gates.
 - INV-01 carries forward: MCP wire contracts stay byte-stable -- all bridge message types and tools are additive.
 - Test suite has source-pin tripwires on extension files (token counts/substrings); extension-side wiring must run the suite from the first commit.
 - Delegation becomes the fifth `EXECUTION_MODES` entry in `extension/ai/engine-config.js` (autopilot, mcp-manual, mcp-agent, dashboard-remote, + delegated).
@@ -436,7 +439,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-59 are verified complete; Phase 60 Adapter Contract & Claude Code MVP is next. Remaining active requirements are ADAPT-01..05, CLAUDE-01..04, UX-01..06, LIFE-01..04, DRIFT-01..04, NATIVE-01..04, and MULTI-01..06.)
+(Milestone v0.9.91 MCP Clients as Providers -- Phases 57-62 are verified complete. Phase 63 Native-Messaging Host is next. Remaining active requirements are NATIVE-01..04 and MULTI-01..06; 41/51 requirements are complete.)
 
 ### Validated (v0.9.91)
 
@@ -458,6 +461,11 @@ Carry-forward backlog candidates:
 - [x] CHAN-05: Caller and diagnostic-sink redaction remove bridge-secret tokens and raw/interior-token tests remain green -- Phase 59.
 - [x] CHAN-06: Hub/relay/stale-socket churn settles reverse work exactly once, clears ownership maps, and never replays automatically -- Phase 59.
 - [x] CHAN-07: Every MCP build recursively rejects forbidden agent auto-approval flags before TypeScript compilation -- Phase 59.
+- [x] ADAPT-01..05: The serve-owned five-method adapter contract, shell-free supervisor, stdin-only prompt path, exact process-tree cancellation, and orphan recovery are enforced -- Phase 60.
+- [x] CLAUDE-01..04: Claude Code uses the pinned hermetic task-mode profile, production stream parser/fixture, closed compatibility classifier, and no session persistence -- Phase 60.
+- [x] UX-01..06: Consent, delegated routing, live feed, background ownership, Take Control/Stop, and honest usage/offline recovery are implemented without weakening BYOK behavior -- Phase 61.
+- [x] LIFE-01..04: Session-backed event persistence, exact recovery, active-only heartbeat, hold/resume, and daemon-restart classification survive MV3 worker eviction -- Phase 61.
+- [x] DRIFT-01..04: Registry-driven offline drift CI, safe doctor text/JSON, sanitized rate-limited runtime diagnostics, and one canonical browser-consumed compatibility matrix are enforced -- Phase 62.
 
 ### Validated (v0.9.99)
 
@@ -722,4 +730,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-14 -- Phase 59 security foundation complete; four live checks deferred to milestone end. Next: Phase 60 Adapter Contract & Claude Code MVP.*
+*Last updated: 2026-07-16 -- Phase 62 drift/doctor/compatibility work complete; 34 live scenarios remain deferred to milestone end. Next: Phase 63 Native-Messaging Host.*
