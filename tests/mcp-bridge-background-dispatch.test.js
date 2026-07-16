@@ -674,6 +674,108 @@ function buildDelegationCommandHarness(options = {}) {
   return { command: context.__delegationCommand, calls };
 }
 
+function extractDriftSettlementSource(backgroundSource) {
+  const startMarker = 'const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;';
+  const endMarker = '\nasync function fsbDelegationStartCommand(request) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('drift settlement extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function buildDriftSettlementHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDriftSettlementSource(backgroundSource);
+  const driftDiagnostics = require(path.join(
+    __dirname,
+    '..',
+    'extension',
+    'utils',
+    'agent-protocol-drift-diagnostics.js'
+  ));
+  const reporterCalls = [];
+  const settlementCalls = [];
+  const snapshots = new Map();
+  const profiles = new Map();
+  const controller = {
+    getSnapshot(delegationId) {
+      if (options.snapshotThrows === true) throw new Error('snapshot failed');
+      return snapshots.get(delegationId) || null;
+    },
+    async acceptEvent(input) {
+      settlementCalls.push(toPlainObject(input));
+      if (options.controllerThrows === true) throw new Error('controller rejected terminal');
+      const snapshot = snapshots.get(input.delegationId);
+      if (snapshot) snapshot.terminal = { code: input.context.terminalCode };
+      return { ok: true };
+    }
+  };
+  const diagnostics = options.missingDiagnostics === true ? undefined : {
+    validateAgentProtocolDriftDetail(detail) {
+      if (options.validatorThrows === true) throw new Error('validator failed');
+      return driftDiagnostics.validateAgentProtocolDriftDetail(detail);
+    },
+    reportAgentProtocolDrift(detail) {
+      reporterCalls.push(toPlainObject(detail));
+      if (options.reporterThrows === true) throw new Error('reporter failed');
+      return true;
+    }
+  };
+  const sandbox = {
+    FsbAgentProtocolDriftDiagnostics: diagnostics,
+    fsbDelegationControllerInstance: controller,
+    fsbDelegationProfiles: profiles,
+    Date: { now: () => 4242 },
+    Map,
+    Set,
+    Object,
+    Array,
+    Number,
+    Promise,
+    Error
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__settle = fsbSettleDelegationFromFinal;\n`
+      + 'this.__seen = fsbAgentProtocolDriftSeenDelegationIds;\n'
+      + 'this.__seenLimit = FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT;',
+    sandbox,
+    { filename: 'background.js#drift-settlement' }
+  );
+  return {
+    settle: sandbox.__settle,
+    seen: sandbox.__seen,
+    seenLimit: sandbox.__seenLimit,
+    reporterCalls,
+    settlementCalls,
+    profiles,
+    activate(delegationId, profileVersion = '2.1.177') {
+      snapshots.set(delegationId, { delegationId, terminal: null });
+      profiles.set(delegationId, profileVersion);
+    },
+    resetActive(delegationId, profileVersion = '2.1.177') {
+      snapshots.set(delegationId, { delegationId, terminal: null });
+      profiles.set(delegationId, profileVersion);
+    }
+  };
+}
+
+function driftFinal(detail = {
+  adapterId: 'claude-code',
+  expected: 'bounded_jsonl',
+  observed: 'invalid_json'
+}) {
+  return {
+    status: 'failed',
+    terminal: {
+      type: 'diagnostic',
+      code: 'agent_protocol_drift',
+      profileVersion: '2.1.177',
+      detail
+    }
+  };
+}
+
 function buildWrapperHarness(handlerImpl) {
   const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
   const wrapperSource = extractWrapperSource(backgroundSource);
@@ -701,6 +803,138 @@ function buildWrapperHarness(handlerImpl) {
   );
 
   return { dispatch: context.__wrapper, timers, handlerCalls };
+}
+
+async function runDriftSettlementCases() {
+  console.log('\n--- B0: authoritative drift finals report exactly once ---');
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const delegationId = 'delegation_drift_primary';
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+
+    assertEqual(harness.reporterCalls.length, 1,
+      'first authoritative valid drift final invokes the reporter once');
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'claude-code', expected: 'bounded_jsonl', observed: 'invalid_json'
+    }, 'reporter receives only the exact sanitized drift detail');
+    assert(!JSON.stringify(harness.reporterCalls).includes(delegationId),
+      'delegation id never enters diagnostic context');
+    assertEqual(harness.settlementCalls.length, 1,
+      'diagnostic reporting preserves one controller settlement');
+    assertDeepEqual(harness.settlementCalls[0], {
+      delegationId,
+      event: { type: 'terminal', sessionId: null, payload: {} },
+      context: {
+        timestamp: 4242,
+        terminalCode: 'agent_protocol_drift',
+        treeSettled: true,
+        client: { id: 'claude-code', label: 'Claude Code' },
+        profileVersion: '2.1.177',
+        billingKind: 'unknown'
+      }
+    }, 'controller terminal input remains byte-for-shape unchanged');
+    assertEqual(harness.profiles.has(delegationId), false,
+      'profile cleanup still occurs after drift settlement');
+
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.reporterCalls.length, 1,
+      'duplicate final against a terminal snapshot cannot multiply reporting');
+
+    harness.resetActive(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.reporterCalls.length, 1,
+      'replayed final against a refreshed active snapshot remains deduplicated');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    harness.activate('delegation_malformed');
+    await harness.settle('delegation_malformed', driftFinal({
+      adapterId: 'claude-code',
+      expected: 'bounded_jsonl',
+      observed: 'invalid_json',
+      providerOutput: 'prompt=session-token-/private/path'
+    }), null);
+    assertEqual(harness.reporterCalls.length, 0,
+      'malformed or secret-bearing drift detail never reaches the reporter');
+    assertEqual(harness.settlementCalls[0].context.terminalCode, 'agent_protocol_drift',
+      'malformed diagnostic detail cannot alter authoritative terminal settlement');
+
+    harness.activate('delegation_non_drift');
+    await harness.settle('delegation_non_drift', {
+      status: 'failed',
+      terminal: { type: 'diagnostic', code: 'agent_failed' }
+    }, null);
+    assertEqual(harness.reporterCalls.length, 0,
+      'non-drift final never invokes the drift reporter');
+    assertEqual(harness.settlementCalls.at(-1).context.terminalCode, 'agent_failed',
+      'non-drift final retains its existing controller code');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    for (const delegationId of ['delegation_distinct_a', 'delegation_distinct_b']) {
+      harness.activate(delegationId);
+      await harness.settle(delegationId, driftFinal(), null);
+    }
+    assertEqual(harness.reporterCalls.length, 2,
+      'different delegation ids independently invoke the reporter');
+    assertEqual(harness.seen.size, 2,
+      'exact-once state tracks distinct authoritative delegations');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    assertEqual(harness.seenLimit, 512, 'seen-id FIFO has the exact 512-entry bound');
+    const ids = Array.from({ length: 513 }, (_, index) => `delegation_fifo_${String(index).padStart(3, '0')}`);
+    for (const delegationId of ids) {
+      harness.activate(delegationId);
+      await harness.settle(delegationId, driftFinal(), null);
+    }
+    assertEqual(harness.seen.size, 512, 'seen-id state never exceeds 512 entries');
+    assertEqual(harness.seen.has(ids[0]), false, 'capacity evicts the oldest inserted delegation id');
+    assertEqual(harness.seen.has(ids[1]), true, 'capacity preserves the next-oldest delegation id');
+    assertEqual(harness.seen.has(ids[512]), true, 'capacity preserves the newest delegation id');
+  }
+
+  for (const [name, options] of [
+    ['missing diagnostics module', { missingDiagnostics: true }],
+    ['throwing validator', { validatorThrows: true }],
+    ['throwing reporter', { reporterThrows: true }]
+  ]) {
+    const harness = buildDriftSettlementHarness(options);
+    const delegationId = `delegation_isolation_${name.replace(/\s+/g, '_')}`;
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.settlementCalls.length, 1,
+      `${name} cannot prevent controller settlement`);
+    assertEqual(harness.settlementCalls[0].context.terminalCode, 'agent_protocol_drift',
+      `${name} cannot alter the controller terminal code`);
+  }
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const reportReferences = backgroundSource.match(/fsbReportAgentProtocolDriftOnce\s*\(/g) || [];
+  assertEqual(reportReferences.length, 2,
+    'report helper has one definition and one authoritative final-settlement call site');
+  const connectionObserver = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbObserveDelegationConnection(connection) {'
+  );
+  const snapshotCommand = extractNamedFunctionSource(
+    backgroundSource,
+    'async function fsbDelegationSnapshotCommand(request) {'
+  );
+  assert(!connectionObserver.includes('fsbReportAgentProtocolDriftOnce')
+      && !snapshotCommand.includes('fsbReportAgentProtocolDriftOnce'),
+    'reconnect and panel snapshot/reopen paths cannot report drift');
+
+  const redactorImport = backgroundSource.indexOf("importScripts('utils/redactForLog.js')");
+  const reporterImport = backgroundSource.indexOf("importScripts('utils/agent-protocol-drift-diagnostics.js')");
+  const webSocketImport = backgroundSource.indexOf("importScripts('ws/ws-client.js')");
+  assert(redactorImport >= 0 && redactorImport < reporterImport && reporterImport < webSocketImport,
+    'drift reporter loads after diagnostics/redaction and before final-capable runtime code');
 }
 
 async function runWrapperBehaviorCases() {
@@ -1865,6 +2099,7 @@ async function run() {
   await runSendMessageFallbackCase();
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
+  await runDriftSettlementCases();
   await runWrapperBehaviorCases();
   await runCompatibilityRefreshCases();
   await runAgentRegistryBootstrapFailureCase();

@@ -203,10 +203,11 @@ armMcpBridge('service-worker-evaluated');
 try { importScripts('lib/lz-string.min.js'); } catch (e) { console.error('[FSB] Failed to load lz-string.min.js:', e.message); }
 try { importScripts('ws/phantom-stream-protocol.js'); } catch (e) { console.error('[FSB] Failed to load phantom-stream-protocol.js:', e.message); }
 // Phase 211-03 diagnostic logging: load the ring buffer BEFORE redactForLog so
-// that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. Both load
-// BEFORE ws-client.js so the WebSocket layer can use the helpers.
+// that rateLimitedWarn sees globalThis.fsbDiagnostics on first call. The drift
+// pre-throttle then loads after both dependencies and before runtime consumers.
 try { importScripts('utils/diagnostics-ring-buffer.js'); } catch (e) { console.error('[FSB] Failed to load diagnostics-ring-buffer.js:', e.message); }
 try { importScripts('utils/redactForLog.js'); } catch (e) { console.error('[FSB] Failed to load redactForLog.js:', e.message); }
+try { importScripts('utils/agent-protocol-drift-diagnostics.js'); } catch (e) { console.error('[FSB] Failed to load agent-protocol-drift-diagnostics.js:', e.message); }
 try { importScripts('ws/ws-client.js'); } catch (e) { console.error('[FSB] Failed to load ws-client.js:', e.message); }
 
 // Phase 26 Plan 01 (v0.9.99 CAP-01/CAP-05): Native Capability Catalog Wall-1
@@ -1605,6 +1606,47 @@ async function fsbDelegationClearTrustCommand(request) {
     : fsbDelegationTrustFailure(result && result.code);
 }
 
+const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;
+const fsbAgentProtocolDriftSeenDelegationIds = new Set();
+
+function fsbReportAgentProtocolDriftOnce(delegationId, finalResult) {
+  try {
+    if (typeof delegationId !== 'string'
+        || delegationId.length === 0
+        || fsbAgentProtocolDriftSeenDelegationIds.has(delegationId)
+        || !finalResult
+        || typeof finalResult !== 'object'
+        || !finalResult.terminal
+        || typeof finalResult.terminal !== 'object'
+        || finalResult.terminal.code !== 'agent_protocol_drift') {
+      return false;
+    }
+
+    const diagnostics = globalThis.FsbAgentProtocolDriftDiagnostics;
+    const validate = diagnostics && diagnostics.validateAgentProtocolDriftDetail;
+    const report = diagnostics && diagnostics.reportAgentProtocolDrift;
+    if (typeof validate !== 'function' || typeof report !== 'function') return false;
+
+    const safeDetail = validate.call(diagnostics, finalResult.terminal.detail);
+    if (!safeDetail) return false;
+
+    if (fsbAgentProtocolDriftSeenDelegationIds.size >= FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT) {
+      const oldest = fsbAgentProtocolDriftSeenDelegationIds.values().next();
+      if (!oldest.done) fsbAgentProtocolDriftSeenDelegationIds.delete(oldest.value);
+    }
+    fsbAgentProtocolDriftSeenDelegationIds.add(delegationId);
+
+    try {
+      report.call(diagnostics, safeDetail);
+    } catch (_error) {
+      // Diagnostics are observational and cannot affect terminal settlement.
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function fsbDelegationTerminalCode(value) {
   if (value === 'ext_request_timeout' || value === 'bridge_topology_changed') {
     return 'route_lost';
@@ -1636,6 +1678,10 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
     code = fsbDelegationTerminalCode(finalResult.terminal.code);
   }
   if (!code) code = 'agent_failed';
+
+  if (code === 'agent_protocol_drift') {
+    fsbReportAgentProtocolDriftOnce(delegationId, finalResult);
+  }
 
   try {
     await controller.acceptEvent({
