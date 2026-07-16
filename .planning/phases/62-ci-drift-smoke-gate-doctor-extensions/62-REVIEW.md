@@ -1,6 +1,6 @@
 ---
 phase: 62-ci-drift-smoke-gate-doctor-extensions
-reviewed: 2026-07-16T20:37:08Z
+reviewed: 2026-07-16T21:12:40Z
 depth: standard
 files_reviewed: 34
 files_reviewed_list:
@@ -40,31 +40,28 @@ files_reviewed_list:
   - tests/providers-panel-ui.test.js
 findings:
   critical: 0
-  warning: 4
+  warning: 2
   info: 0
-  total: 4
+  total: 2
 status: issues_found
 ---
 
-# Phase 62 Code Review — Fix Re-review
+# Phase 62 Code Review — Final Fix Re-review
 
 ## Summary
 
-The original CR-01 and WR-01 through WR-04 defects are semantically resolved at `98727bf35f01bf0b713ddf3f930c6a0a5fc8054f`: cache reads and live refreshes no longer form an unbounded daemon/write loop, stale failure projections agree with their badges and copy, an open panel ages supported evidence at the exact boundary, doctor clocks are bounded to the ECMAScript Date domain, and compatibility has one shared live-region owner.
+Iteration two resolves the snapshot-only row defect and the stale executable-contract pins. It also makes the ordinary expiry transition compatibility-only and preserves a manual success when the causal storage event arrives before the live response settles. Two composition gaps remain: the manual-success preservation depends on that event ordering, and the new expiry request is not tracked against a concurrent manual live refresh. Both were reproduced in the existing provider VM harness with adversarial response ordering.
 
-The fix series introduces or leaves three narrower composition defects, and its executable security contract still encodes the pre-fix source shape. A successful manual refresh is immediately overwritten by its own queued cache hydration; the expiry timer re-enters the full provider-inventory/recommendation path; and compatibility snapshots are projected only when some unrelated provider-evidence map has already created the agent row. These are correctness and robustness warnings, so the phase is not code-review clean yet.
+The earlier CR-01 daemon/write recursion, stale badge/copy mismatch, missing exact-boundary expiry, doctor Date-range failure, and duplicate compatibility live-region owner remain resolved. This final standard review covered the original 34-file Phase 62 scope, the prior fix series, and iteration-two commits `79634d66`, `1cbafdcc`, `560db4ba`, `48983332`, and `d005d1eb` at HEAD `d005d1ebc1f27f8ce5812da85527aa9c75555649`.
 
-The review covered the original 34-file Phase 62 scope plus fix commits `3154bda4`, `de67907b`, `7b28ab5b`, `d77bf2ce`, `c7dee1c6`, and report commit `98727bf3`. Live UAT remains deferred to the milestone-end sweep as requested.
+## Iteration-Two Finding Disposition
 
-## Original Finding Disposition
-
-| Original finding | Disposition at HEAD |
+| Prior finding | Final disposition |
 |---|---|
-| CR-01 — recursive compatibility refresh | **Resolved as originally reported.** `getMcpClients` is cache-only, `refreshMcpCompatibility` is the exact explicit live route, and storage fan-out cannot start another daemon request or durable compatibility write. WR-01 below is a bounded post-refresh state/announcement regression, not the original unbounded feedback loop. |
-| WR-01 — stale outcome contradicts badge/copy | **Resolved.** Failed live refreshes project retained fresh support to `degraded/evidence_stale`; already degraded and unsupported states retain truthful closed projections and announcements. |
-| WR-02 — open panel never ages Supported | **Resolved as originally reported.** Fresh supported evidence schedules one cache-only boundary re-projection, and the freshness comparison now downgrades at `>= 15 minutes`. WR-02 below concerns the timer's unrelated side effects, not failure to age the badge. |
-| WR-03 — out-of-Date-domain clock crashes doctor | **Resolved.** `readNowMs()` accepts only `0..8_640_000_000_000_000`, so ISO formatting remains in range. |
-| WR-04 — duplicate compatibility live-region owner | **Resolved.** `#agentProviderDetails` is no longer live; compatibility feedback remains owned by `#providerEvidenceAnnouncement`, with the separate pairing status retaining its independent role. |
+| WR-01 — manual success erased by causal storage hydration | **Not fully resolved.** The new preservation path works when `fsbAgentProviders` changes while the live promise is still active, and the stock causal test covers that order. If the same cross-context notification is delivered after settlement, the generic debounce path still clears the announcement and changes `ready` to `stale`. |
+| WR-02 — expiry mutates unrelated evidence/recommendation | **Core side-effect resolved; concurrency regression remains.** Sequential expiry now merges compatibility only and preserves non-compatibility state. Its cache request is not registered as in flight, so an older expiry response can overwrite a newer manual refresh. |
+| WR-03 — snapshot-only compatibility has no agent rows | **Resolved.** A valid snapshot seeds exactly Claude Code, OpenCode, and Codex canonical rows with null clicked/installed/connected/live evidence; recommendation remains the API fallback and API rows are not manufactured. |
+| WR-04 — Phase 62 contract pins pre-fix source | **Resolved.** The pins now target the exact `>=` boundary and separated cache/live functions, and the complete contract passes 763/0 without dropping task, requirement, threat, authority, leakage, or deferred-UAT checks. |
 
 ## Critical Findings
 
@@ -72,51 +69,33 @@ None.
 
 ## Warning Findings
 
-### WR-01 — A successful manual refresh is erased by its own storage fan-out
+### WR-01 — Manual-success preservation depends on storage-event delivery order
 
 **Severity:** Warning
 
-**Files:** `extension/background.js:133-142`, `extension/background.js:244-260`, `extension/ui/options.js:1131-1195`, `extension/ui/options.js:1201-1208`, `extension/ui/options.js:1534-1545`, `tests/providers-panel-ui.test.js:2359-2401`
+**Files:** `extension/background.js:244-260`, `extension/ui/options.js:1209-1312`, `extension/ui/options.js:1626-1637`, `tests/providers-panel-ui.test.js:2423-2483`
 
-**Issue:** The live route awaits `replaceCompatibility()` and returns `refreshOutcome: 'refreshed'`. That durable write emits a local `fsbAgentProviders` change while the manual `refreshProviderEvidence({ announce: true })` promise is active, so `scheduleProviderEvidenceRefresh()` sets `providerEvidenceRefreshQueued`. The live call then writes the success announcement, but its `finally` block immediately starts a non-announcing cache hydration. Every valid cache read is labeled `stale`; the second call clears the shared live region at entry, replaces the ready state with stale, and rerenders all provider evidence. The new causal test proves one live request, one write, and one cache read, but it never asserts the final announcement, evidence status, or rendered stale markers after the queued call.
+**Issue:** `preserveSuccessfulRefresh` is passed only when `providerEvidenceRefreshQueued` was set before the live refresh's `finally` clears `providerEvidenceRefreshPromise`. The durable compatibility write and the Options `chrome.storage.onChanged` callback cross extension contexts, but the implementation carries no refresh generation or causal token across that boundary. If `fsbAgentProviders` is delivered after the live promise settles, `scheduleProviderEvidenceRefresh()` sees no active promise and starts its ordinary debounced hydration. That call enters with `preserveSuccessfulRefresh: false`, clears the shared announcement, and maps the valid cache response to global `stale`. The new stock test emits storage synchronously inside the runtime dispatcher before returning the live response, so it exercises only the favorable ordering.
 
-**Impact:** The user-triggered success is not announced once and retained. Assistive technology can miss it entirely, and the panel can show “Status may be stale” immediately after a successful authenticated refresh even though the compatibility snapshot was just durably written.
+**Reproduction:** A source-only VM composition completed a manual `refreshed` response first, then emitted its causal local storage notification. Final state was `announcement === ''` and `evidenceStatus === 'stale'` after one cache hydration.
 
-**Fix:** Tag or coalesce the storage notification produced by the in-flight compatibility replacement so it cannot start a second whole-view hydration, or make that queued hydration preserve the manual result/announcement and avoid downgrading a just-refreshed generation to the generic cache outcome. Extend the composed causal test through final settlement and assert exactly one retained polite announcement, `evidenceStatus === 'ready'`, no stale install/connection markers, one daemon request, and one durable write.
+**Impact:** Depending on cross-context scheduling, the same successful authenticated refresh can either retain its one polite result or immediately lose it and display stale evidence. The accessibility and visible outcome is nondeterministic.
 
-### WR-02 — The compatibility-expiry timer can mutate recommendation and unrelated evidence
+**Fix:** Carry an explicit manual-refresh generation through the next matching provider-storage hydration, independent of whether the notification arrives before or after promise settlement. Consume it only when the cache projection corresponds to the just-written or newer compatibility snapshot. Add both event-before-response and event-after-settlement cases, asserting one retained announcement, `ready`, no stale markers, one daemon request, and one durable write.
 
-**Severity:** Warning
-
-**Files:** `extension/background.js:113-118`, `extension/ui/options.js:1113-1128`, `extension/ui/options.js:1131-1151`, `tests/providers-panel-ui.test.js:2244-2304`
-
-**Issue:** The expiry callback correctly avoids the live daemon route, but it calls the generic `refreshProviderEvidence()`. That path rereads the complete durable provider envelope plus current live registry, replaces the entire client map, sets the global evidence state to loading/stale, and recomputes `providerPanelState.recommendation`. A timer whose sole purpose is to age compatibility can therefore change install/connection evidence and recommendation if those unrelated inputs differ from the previous projection. This violates the observational compatibility contract. The expiry test returns identical non-compatibility clients on both cache reads, so its identity snapshot cannot expose the defect.
-
-**Impact:** A compatibility status transition may alter recommendation or unrelated provider details without a corresponding provider-evidence interaction, despite the Phase 62 requirement that compatibility refresh/status changes leave recommendation and other evidence byte-for-byte unchanged.
-
-**Fix:** Make the expiry path compatibility-only: reproject or merge only each agent row's validated `.compatibility` field while preserving the current client rows, recommendation, evidence status, and form state. Add a fake-clock case whose second cache response deliberately changes clicked/installed/connected/live evidence and prove that only Supported becomes Degraded while recommendation and all non-compatibility state remain identical.
-
-### WR-03 — A compatibility snapshot is invisible until another evidence map creates the agent row
+### WR-02 — An untracked expiry read can overwrite a newer manual refresh
 
 **Severity:** Warning
 
-**Files:** `extension/utils/mcp-agent-providers.js:450-514`, `extension/background.js:175-189`, `tests/mcp-agent-providers-storage.test.js:499-527`
+**Files:** `extension/ui/options.js:1157-1206`, `extension/ui/options.js:1209-1233`, `tests/providers-panel-ui.test.js:2251-2361`
 
-**Issue:** `getMergedClients()` first creates rows only from `clicked`, `installed`, `connected`, or live registry records, then loops over `Object.keys(merged)` to attach compatibility. A valid compatibility snapshot does not itself create the canonical Claude Code, OpenCode, or Codex rows. With empty provider-evidence maps and no live records, a valid fresh supported Claude snapshot deterministically returns `{}`. The freshness deadline is also lost because `fsbReadMcpCompatibilityExpiryAt()` cannot find `clients['claude-code']`. Existing compatibility storage tests seed clicked rows for all three agents before asserting projection, so the snapshot-only case is absent.
+**Issue:** `refreshProviderCompatibilityProjection()` checks `providerEvidenceRefreshPromise` at entry but never registers its own cache request in shared in-flight or generation state. Once the expiry request has started, `refreshProviderEvidence({ announce: true })` can concurrently start a live compatibility refresh. If the live response returns fresh Supported evidence first and the older expiry response returns Degraded afterward, the expiry merge applies that older compatibility to the newly refreshed client map and wins final state. The stock expiry test is sequential and resolves the cache projection before any other refresh, so it cannot expose this ordering.
 
-**Impact:** During startup ordering races, partial inventory delivery, or recovery from a compatibility cache without the older evidence maps, a successful daemon snapshot can be persisted yet shown as the UI's default Unsupported state and never receive its open-panel expiry timer.
+**Reproduction:** A source-only VM composition held the expiry cache response, completed a manual live refresh to Supported, then released the older Degraded expiry response. Final visible compatibility was Degraded while the retained live region still said `Provider status refreshed.`
 
-**Fix:** Ensure the three canonical compatibility-agent rows exist before compatibility projection (without treating compatibility as recommendation, installation, connection, auth, or start evidence), then attach the closed projection only to those agent rows. Add a storage test with empty clicked/installed/connected/live inputs and a valid snapshot; assert Claude is Supported, OpenCode/Codex are Unsupported, API rows receive no compatibility object, recommendation remains unaffected, and the Claude expiry deadline is available.
+**Impact:** A user can successfully refresh compatibility and immediately see older stale evidence overwrite it, with the success announcement contradicting the final badge. The stale response also replaces the newer expiry schedule with its own null deadline.
 
-### WR-04 — The executable Phase 62 security contract still pins pre-fix compatibility source shapes
-
-**Severity:** Warning
-
-**File:** `tests/delegation-phase-contract.test.js:1083`
-
-**Issue:** The production freshness and cache/live split are correct, but the authoritative Phase 62 contract exits 1 with 760 passing and 3 failing assertions. It still expects `>` instead of the fixed exact-boundary `>=`, scans a broad compatibility section that now includes the cache-only reader before durable write/fan-out, and expects the obsolete pre-CR-01 response/fallback source shape without `compatibilityExpiresAt`. Since T62-05 names this executable contract as a mitigation, the security gate remains 7/8 even though focused production behavior is correct.
-
-**Fix:** Update only the stale contract assertions to pin the new exact-boundary comparison, the explicit live request → durable replacement → fan-out slice, and the separated cache/live response schema including `compatibilityExpiresAt`. Preserve all 17 task IDs, DRIFT-01..04, T62-01..08, and negative authority/leakage assertions, then require the full contract to pass.
+**Fix:** Serialize or generation-order compatibility projections without causing a manual request to coalesce into a cache-only expiry operation. A manual live generation should supersede any older expiry read, and late results must be ignored. Add a held-response test that completes manual Supported before releasing old Degraded and asserts the final Supported projection, matching announcement, and newer deadline remain intact.
 
 ## Informational Findings
 
@@ -124,13 +103,14 @@ None.
 
 ## Verification Context
 
-- Focused syntax checks passed for `extension/background.js`, `extension/ui/options.js`, and `extension/utils/mcp-agent-providers.js`.
-- Focused checks passed: `mcp-agent-providers-storage`, `mcp-bridge-background-dispatch` (293 assertions), and `providers-panel-ui`.
-- A read-only snapshot-only probe returned `{}` from `getMergedClients([], 100)` with empty clicked/installed/connected maps and a valid fresh supported Claude compatibility snapshot, confirming WR-03 independently of the existing seeded tests.
-- Source tracing confirmed the separated cache/live routes close the original CR-01 daemon/write recursion and that the retained stale projection, Date bound, exact expiry boundary, and single compatibility live-region fixes are present.
-- No full suite, live browser, installed CLI/native integration, network call, or human UAT was run. No MCP build/generated artifact was regenerated.
-- No implementation or test file was modified and no commit was created by this re-review. Existing unrelated workspace changes were preserved.
+- Syntax checks passed for the modified UI/storage sources and all three modified test files.
+- Focused stock checks passed: `providers-panel-ui`, `providers-panel-logic`, `mcp-agent-providers-storage`, `mcp-bridge-background-dispatch` (293/0), and `delegation-phase-contract` (763/0).
+- WR-03 was verified through the new snapshot-only test: exactly three neutral canonical agent rows, Claude Supported, OpenCode/Codex Unsupported, no API rows, no recommendation authority, and an available Claude expiry deadline.
+- WR-04 was verified against the updated exact-boundary and separated cache/live source pins; all 763 contract assertions passed.
+- Two read-only in-memory VM compositions reproduced WR-01's late-storage order and WR-02's expiry/manual response race. The temporary probe was removed; implementation and test files were not edited.
+- No full or guarded root suite, live browser, installed CLI/native integration, network operation, or human UAT was run. All UAT remains deferred to the milestone-end sweep.
+- No commit was created by this review. Existing unrelated workspace changes were preserved.
 
 ---
 
-**Review status:** Issues found — three warnings remain before Phase 62 is code-review clean.
+**Review status:** Issues found — two warnings remain before Phase 62 is code-review clean.
