@@ -95,6 +95,98 @@ importScripts('utils/overlay-state.js');
 // MCP bridge client for local MCP server connection
 try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }
 
+let fsbMcpCompatibilityRefreshPromise = null;
+let fsbMcpCompatibilityPairingStatus = null;
+
+function fsbGetMcpCompatibilityProviders() {
+  const providers = globalThis.FsbMcpAgentProviders;
+  if (!providers
+      || typeof providers.read !== 'function'
+      || typeof providers.validateCompatibilitySnapshot !== 'function'
+      || typeof providers.replaceCompatibility !== 'function'
+      || typeof providers.getMergedClients !== 'function') {
+    throw new Error('MCP client inventory helper unavailable');
+  }
+  return providers;
+}
+
+async function fsbReadMergedMcpClients(providers) {
+  const registry = globalThis.fsbAgentRegistryInstance;
+  const liveRecords = registry && typeof registry.listAgents === 'function'
+    ? await Promise.resolve(registry.listAgents())
+    : [];
+  return await providers.getMergedClients(liveRecords);
+}
+
+async function fsbReadMcpCompatibilityFallbackOutcome(providers) {
+  try {
+    const envelope = await providers.read();
+    const cached = envelope && Object.prototype.hasOwnProperty.call(envelope, 'compatibility')
+      ? providers.validateCompatibilitySnapshot(envelope.compatibility)
+      : null;
+    return cached ? 'stale' : 'unavailable';
+  } catch (_error) {
+    return 'unavailable';
+  }
+}
+
+function fsbMcpBridgeIsPaired() {
+  if (typeof mcpBridgeClient === 'undefined'
+      || !mcpBridgeClient
+      || typeof mcpBridgeClient.getState !== 'function'
+      || typeof mcpBridgeClient.requestAdapterCompatibility !== 'function') return false;
+  const state = mcpBridgeClient.getState();
+  return !!state && state.pairingStatus === 'paired';
+}
+
+function fsbRefreshMcpCompatibility() {
+  if (fsbMcpCompatibilityRefreshPromise) return fsbMcpCompatibilityRefreshPromise;
+
+  const run = async () => {
+    const providers = fsbGetMcpCompatibilityProviders();
+    if (fsbMcpBridgeIsPaired()) {
+      try {
+        const response = await mcpBridgeClient.requestAdapterCompatibility();
+        const validated = providers.validateCompatibilitySnapshot(response);
+        if (!validated) throw new Error('Invalid MCP adapter compatibility response');
+        await providers.replaceCompatibility(validated);
+        const clients = await fsbReadMergedMcpClients(providers);
+        return { clients, refreshOutcome: 'refreshed' };
+      } catch (_error) {
+        // Preserve and project only the last durable cache below.
+      }
+    }
+
+    const refreshOutcome = await fsbReadMcpCompatibilityFallbackOutcome(providers);
+    const clients = await fsbReadMergedMcpClients(providers);
+    return { clients, refreshOutcome };
+  };
+
+  let tracked;
+  tracked = run().finally(() => {
+    if (fsbMcpCompatibilityRefreshPromise === tracked) {
+      fsbMcpCompatibilityRefreshPromise = null;
+    }
+  });
+  fsbMcpCompatibilityRefreshPromise = tracked;
+  return tracked;
+}
+
+function fsbObserveMcpCompatibilityPairing(status) {
+  if (status === fsbMcpCompatibilityPairingStatus) return;
+  fsbMcpCompatibilityPairingStatus = status;
+  if (status !== 'paired') return;
+  fsbRefreshMcpCompatibility().catch(() => { /* silent best-effort cold refresh */ });
+}
+
+try {
+  if (typeof mcpBridgeClient !== 'undefined'
+      && mcpBridgeClient
+      && typeof mcpBridgeClient.addPairingStatusObserver === 'function') {
+    mcpBridgeClient.addPairingStatusObserver(fsbObserveMcpCompatibilityPairing);
+  }
+} catch (_error) { /* optional bridge dependency */ }
+
 function armMcpBridge(reason) {
   try {
     if (typeof mcpBridgeClient === 'undefined' || !mcpBridgeClient) return;
@@ -8536,16 +8628,12 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
     case 'getMcpClients': {
       (async () => {
         try {
-          const registry = globalThis.fsbAgentRegistryInstance;
-          const liveRecords = registry && typeof registry.listAgents === 'function'
-            ? await Promise.resolve(registry.listAgents())
-            : [];
-          const providers = globalThis.FsbMcpAgentProviders;
-          if (!providers || typeof providers.getMergedClients !== 'function') {
-            throw new Error('MCP client inventory helper unavailable');
-          }
-          const clients = await providers.getMergedClients(liveRecords);
-          sendResponse({ success: true, clients });
+          const result = await fsbRefreshMcpCompatibility();
+          sendResponse({
+            success: true,
+            clients: result.clients,
+            refreshOutcome: result.refreshOutcome
+          });
         } catch (_error) {
           sendResponse({ success: false, error: 'mcp_client_inventory_unavailable' });
         }

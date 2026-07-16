@@ -436,6 +436,145 @@ function extractDelegationCompositionSource(backgroundSource) {
   return backgroundSource.slice(start, end);
 }
 
+function extractCompatibilityCompositionSource(backgroundSource) {
+  const startMarker = 'let fsbMcpCompatibilityRefreshPromise = null;';
+  const endMarker = '\nfunction armMcpBridge(reason) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('compatibility composition extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function buildCompatibilityRefreshHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractCompatibilityCompositionSource(backgroundSource);
+  const calls = [];
+  let pairingStatus = options.pairingStatus || 'paired';
+  let pairingObserver = null;
+  let cachedSnapshot = Object.prototype.hasOwnProperty.call(options, 'cachedSnapshot')
+    ? options.cachedSnapshot
+    : {
+        schemaVersion: 1,
+        checkedAt: 100,
+        adapters: [{
+          adapterId: 'claude-code',
+          displayLabel: 'Claude Code',
+          status: 'supported',
+          reason: 'within_tested_range'
+        }]
+      };
+  const clients = options.clients || {
+    'claude-code': {
+      id: 'claude-code',
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+    }
+  };
+  const providers = {
+    validateCompatibilitySnapshot(value) {
+      calls.push(['validate', toPlainObject(value)]);
+      if (value === null || value === undefined || options.rejectValidation) return null;
+      return value;
+    },
+    async replaceCompatibility(value) {
+      calls.push(['replace:start', toPlainObject(value)]);
+      if (options.replaceGate) await options.replaceGate.promise;
+      if (options.rejectReplace) throw new Error('storage rejected');
+      cachedSnapshot = value;
+      calls.push(['replace:done']);
+      return { compatibility: value };
+    },
+    async read() {
+      calls.push(['read']);
+      return cachedSnapshot ? { compatibility: cachedSnapshot } : {};
+    },
+    async getMergedClients(liveRecords) {
+      calls.push(['merge', toPlainObject(liveRecords)]);
+      return clients;
+    }
+  };
+  const bridge = {
+    getState() { return { pairingStatus }; },
+    requestAdapterCompatibility() {
+      calls.push(['request']);
+      if (typeof options.requestCompatibility === 'function') {
+        return options.requestCompatibility();
+      }
+      if (options.rejectRequest) return Promise.reject(new Error('bridge unavailable'));
+      return Promise.resolve(options.response || {
+        schemaVersion: 1,
+        checkedAt: 200,
+        adapters: [{
+          adapterId: 'claude-code',
+          displayLabel: 'Claude Code',
+          status: 'supported',
+          reason: 'within_tested_range'
+        }]
+      });
+    },
+    addPairingStatusObserver(observer) {
+      calls.push(['observe-pairing']);
+      pairingObserver = observer;
+      return () => {};
+    }
+  };
+  const registry = {
+    listAgents() {
+      calls.push(['listAgents']);
+      return [{ agentId: 'agent_fixture', clientInfo: { name: 'Claude Code' } }];
+    }
+  };
+  const context = {
+    mcpBridgeClient: bridge,
+    FsbMcpAgentProviders: providers,
+    fsbAgentRegistryInstance: registry,
+    Promise,
+    Object,
+    Array,
+    Number,
+    Date,
+    Error,
+    console
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\nthis.__refreshCompatibility = fsbRefreshMcpCompatibility;`,
+    context,
+    { filename: 'background.js#compatibility-refresh' }
+  );
+  return {
+    refresh: context.__refreshCompatibility,
+    calls,
+    clients,
+    get pairingObserver() { return pairingObserver; },
+    setPairingStatus(value) { pairingStatus = value; }
+  };
+}
+
+function buildMcpClientsRuntimeHarness(refreshImpl) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
+  const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('runtime handler extraction markers missing');
+  const handlerSource = backgroundSource.slice(start, end);
+  const context = {
+    chrome: { runtime: { id: 'mcp-clients-runtime-extension' } },
+    armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
+    automationLogger: { logComm() {} },
+    fsbRefreshMcpCompatibility: refreshImpl,
+    Promise,
+    Object,
+    console
+  };
+  context.globalThis = context;
+  vm.runInNewContext(`${handlerSource}\nthis.__handler = fsbHandleRuntimeMessage;`, context, {
+    filename: 'background.js#getMcpClients'
+  });
+  return context.__handler;
+}
+
 function buildDelegationCommandHarness(options = {}) {
   const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
   const source = extractDelegationCompositionSource(backgroundSource);
@@ -651,6 +790,143 @@ async function runWrapperBehaviorCases() {
     const result = await harness.dispatch({ action: 'getMcpClients' });
     assertDeepEqual(result, { success: true, clients }, 'same-context inventory response passes through unchanged');
     assertEqual(harness.handlerCalls[0].sender.fsbInternal, 'mcp-bridge', 'inventory wrapper uses the synthetic MCP bridge sender');
+  }
+}
+
+async function runCompatibilityRefreshCases() {
+  console.log('\n--- B1: Phase 62 bounded compatibility refresh orchestration ---');
+
+  {
+    const replaceGate = deferred();
+    const harness = buildCompatibilityRefreshHarness({ replaceGate });
+    const pending = harness.refresh();
+    await flushMicrotasks();
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 1,
+      'fresh paired refresh issues one adapter compatibility request');
+    assertEqual(harness.calls.filter((call) => call[0] === 'validate').length, 1,
+      'daemon response is exact-validated once before replacement');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 1,
+      'validated response enters one durable replacement');
+    assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 0,
+      'merged rows cannot fan out while durable replacement is pending');
+    replaceGate.resolve();
+    const result = await pending;
+    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'refreshed' },
+      'durable success returns clients plus the exact refreshed outcome');
+    assert(harness.calls.findIndex((call) => call[0] === 'replace:done')
+        < harness.calls.findIndex((call) => call[0] === 'merge'),
+      'durable replacement completes before merged-client fan-out');
+  }
+
+  {
+    const requestGate = deferred();
+    const harness = buildCompatibilityRefreshHarness({
+      requestCompatibility() { return requestGate.promise; }
+    });
+    const first = harness.refresh();
+    const second = harness.refresh();
+    assertEqual(first, second, 'simultaneous manual/cold refresh callers share one promise');
+    await flushMicrotasks();
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 1,
+      'coalesced callers issue one live compatibility request');
+    requestGate.resolve({
+      schemaVersion: 1,
+      checkedAt: 300,
+      adapters: [{
+        adapterId: 'claude-code', displayLabel: 'Claude Code',
+        status: 'supported', reason: 'within_tested_range'
+      }]
+    });
+    await Promise.all([first, second]);
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ pairingStatus: 'configured' });
+    const result = await harness.refresh();
+    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
+      'unpaired/offline refresh returns validated cached rows as stale');
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
+      'unpaired refresh never enters reverse-channel transport');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectValidation: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'unavailable' },
+      'malformed response with no validated cache returns unavailable rows');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+      'malformed response never reaches durable replacement');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectReplace: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'stale' },
+      'storage rejection preserves the prior validated cache and reports stale');
+    assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 1,
+      'storage rejection still returns existing provider rows once');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({
+      cachedSnapshot: null,
+      rejectRequest: true
+    });
+    const result = await harness.refresh();
+    assertDeepEqual(result, { clients: harness.clients, refreshOutcome: 'unavailable' },
+      'transport failure with no cache returns existing rows as unavailable');
+  }
+
+  {
+    let requests = 0;
+    const harness = buildCompatibilityRefreshHarness({
+      requestCompatibility() {
+        requests++;
+        return Promise.resolve({
+          schemaVersion: 1,
+          checkedAt: 400 + requests,
+          adapters: [{
+            adapterId: 'claude-code', displayLabel: 'Claude Code',
+            status: 'supported', reason: 'within_tested_range'
+          }]
+        });
+      }
+    });
+    assertEqual(typeof harness.pairingObserver, 'function',
+      'background installs one pairing observer for silent cold refresh');
+    harness.pairingObserver('configured');
+    harness.pairingObserver('paired');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 1,
+      'duplicate paired notification cannot multiply a cold-boot request');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 1,
+      'settled duplicate paired notification remains idempotent');
+    harness.pairingObserver('configured');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 2,
+      'a genuine authenticated reconnect issues exactly one fresh request');
+  }
+
+  {
+    const clients = { cursor: { id: 'cursor' } };
+    const handler = buildMcpClientsRuntimeHarness(async () => ({
+      clients,
+      refreshOutcome: 'stale'
+    }));
+    const response = await new Promise((resolve) => {
+      const keepOpen = handler(
+        { action: 'getMcpClients' },
+        { id: 'mcp-clients-runtime-extension' },
+        resolve
+      );
+      assertEqual(keepOpen, true, 'manual compatibility refresh keeps its runtime channel open');
+    });
+    assertDeepEqual(response, { success: true, clients, refreshOutcome: 'stale' },
+      'manual getMcpClients returns rows plus one closed refresh outcome');
   }
 }
 
@@ -1332,6 +1608,24 @@ function runSourceContractCase() {
   assert(backgroundSource.includes("error: 'mcp_client_inventory_unavailable'"), 'getMcpClients carries the bounded failure code');
   assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]getMcpClients['"]/.test(backgroundSource),
     'background.js never self-sends getMcpClients');
+  const compatibilityComposition = extractCompatibilityCompositionSource(backgroundSource);
+  assertEqual((backgroundSource.match(/let fsbMcpCompatibilityRefreshPromise = null;/g) || []).length, 1,
+    'background owns one coalesced compatibility refresh promise');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addPairingStatusObserver\(/g) || []).length, 1,
+    'background installs exactly one paired cold-refresh observer');
+  assert(compatibilityComposition.includes('await providers.replaceCompatibility(validated)')
+      && compatibilityComposition.indexOf('await providers.replaceCompatibility(validated)')
+        < compatibilityComposition.indexOf('await fsbReadMergedMcpClients(providers)'),
+    'validated durable compatibility replacement precedes merged fan-out');
+  assert(!compatibilityComposition.includes('chrome.runtime.sendMessage'),
+    'cold compatibility hydration emits no explicit UI announcement');
+  for (const forbidden of [
+    'selectedProvider', 'selectedModel', 'apiKey', 'endpoint', 'doctor',
+    'nativeMessaging', 'child_process', 'delegate.status'
+  ]) {
+    assert(!compatibilityComposition.includes(forbidden),
+      `compatibility refresh orchestration does not touch ${forbidden}`);
+  }
   const sunsetListAgents = backgroundSource.indexOf("//     case 'listAgents':");
   assert(sunsetListAgents >= 0, 'sunset listAgents runtime case remains commented out');
   assert(backgroundSource.indexOf("case 'getMcpClients'") < sunsetListAgents,
@@ -1340,6 +1634,8 @@ function runSourceContractCase() {
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');
   assert(bridgeSource.includes('agent_management_deprecated'), 'mcp-bridge-client.js carries the agent deprecation errorCode');
+  assert(bridgeSource.includes("sendExtRequest('adapter.compatibility', {}, { timeout: ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS })"),
+    'bridge compatibility wrapper sends only the exact method, payload, and five-second timeout');
   assert(!bridgeSource.includes('fsb-mcp-internal'), 'dead fsb-mcp-internal CustomEvent scaffolding removed');
   assert(backgroundSource.includes("case 'reloadMcpBridgePairing':"), 'background.js includes the secret-free pairing reload action');
   assert(backgroundSource.includes('mcpBridgeClient.reloadPairingAndReconnect()'), 'background.js delegates pairing reload directly to the bridge client');
@@ -1570,6 +1866,7 @@ async function run() {
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
   await runWrapperBehaviorCases();
+  await runCompatibilityRefreshCases();
   await runAgentRegistryBootstrapFailureCase();
   await runDelegationBootQuarantineCase();
   await runDelegationBootReadinessCase();

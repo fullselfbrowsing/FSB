@@ -247,6 +247,7 @@ this.__phase198 = {
   DELEGATION_HEARTBEAT_INTERVAL_MS: typeof DELEGATION_HEARTBEAT_INTERVAL_MS !== 'undefined' ? DELEGATION_HEARTBEAT_INTERVAL_MS : undefined,
   DELEGATION_HEARTBEAT_MISS_LIMIT: typeof DELEGATION_HEARTBEAT_MISS_LIMIT !== 'undefined' ? DELEGATION_HEARTBEAT_MISS_LIMIT : undefined,
   DELEGATION_START_REQUEST_TIMEOUT_MS: typeof DELEGATION_START_REQUEST_TIMEOUT_MS !== 'undefined' ? DELEGATION_START_REQUEST_TIMEOUT_MS : undefined,
+  ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS: typeof ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS !== 'undefined' ? ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS : undefined,
   MCP_BRIDGE_PAIRING_KEY: typeof MCP_BRIDGE_PAIRING_KEY !== 'undefined' ? MCP_BRIDGE_PAIRING_KEY : undefined,
   FSB_EXT_PROTOCOL: typeof FSB_EXT_PROTOCOL !== 'undefined' ? FSB_EXT_PROTOCOL : undefined,
   lifecycleBus: typeof fsbAutomationLifecycleBus !== 'undefined' ? fsbAutomationLifecycleBus : null
@@ -897,6 +898,112 @@ async function runPairingProbeAndReloadCases() {
   }
 }
 
+async function runAdapterCompatibilityRequestCases() {
+  console.log('\n--- Phase 62 paired compatibility request lifecycle ---');
+
+  {
+    const harness = buildClientHarness();
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const sentBefore = socket.sent.length;
+    await client.requestAdapterCompatibility().then(
+      () => assert(false, 'unpaired compatibility request rejects instead of resolving'),
+      (error) => assertEqual(error.code, 'ext_unauthorized',
+        'compatibility request rejects before transport until pairing is authenticated')
+    );
+    assertEqual(socket.sent.length, sentBefore,
+      'unpaired compatibility request emits no reverse-channel frame');
+    assertEqual(client._extPending.size, 0,
+      'unpaired compatibility request allocates no pending correlation');
+  }
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    const pairingTransitions = [];
+    const removePairingObserver = client.addPairingStatusObserver((status) => {
+      pairingTransitions.push(status);
+    });
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const authProbe = JSON.parse(socket.sent[0]);
+    socket.receive({ id: authProbe.id, type: 'ext:response', payload: { authorized: true } });
+    await flushMicrotasks();
+    assertEqual(pairingTransitions.filter((status) => status === 'paired').length, 1,
+      'authenticated probe publishes one paired transition');
+
+    const pending = client.requestAdapterCompatibility();
+    const request = JSON.parse(socket.sent[1]);
+    assertDeepEqual(toPlainObject(request), {
+      id: request.id,
+      type: 'ext:request',
+      method: 'adapter.compatibility',
+      payload: {}
+    }, 'compatibility wrapper sends only the exact method and empty payload frame');
+    assertEqual(harness.exports.ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS, 5000,
+      'compatibility wrapper exports one exact five-second timeout');
+    const requestTimer = harness.timers.timeouts.find((timer) => (
+      timer.delay === 5000 && !timer.cleared
+    ));
+    assert(!!requestTimer, 'compatibility wrapper owns one live five-second pending timer');
+    assertEqual(client._extPending.size, 1,
+      'compatibility wrapper allocates exactly one pending correlation');
+
+    const safeSnapshot = {
+      schemaVersion: 1,
+      checkedAt: 123456789,
+      adapters: [{
+        adapterId: 'claude-code',
+        displayLabel: 'Claude Code',
+        status: 'supported',
+        reason: 'within_tested_range'
+      }]
+    };
+    socket.receive({ id: request.id, type: 'ext:response', payload: safeSnapshot });
+    assertDeepEqual(toPlainObject(await pending), safeSnapshot,
+      'compatibility wrapper returns the bounded daemon payload without interpretation');
+    assertEqual(requestTimer.cleared, true,
+      'compatibility final clears its five-second timer');
+    socket.receive({ id: authProbe.id, type: 'ext:response', payload: { authorized: true } });
+    await flushMicrotasks();
+    assertEqual(pairingTransitions.filter((status) => status === 'paired').length, 1,
+      'duplicate authenticated finals cannot publish another paired transition');
+    assertEqual(removePairingObserver(), true, 'pairing observer is removable once');
+    assertEqual(removePairingObserver(), false, 'pairing observer removal is idempotent');
+  }
+
+  {
+    const harness = buildClientHarness({
+      session: { fsbMcpBridgePairing: { pairingCode: VALID_PAIRING_CODE, storedAt: Date.now() } }
+    });
+    const client = harness.exports.mcpBridgeClient;
+    client.connect();
+    await flushMicrotasks();
+    const socket = harness.sockets[0];
+    socket.open();
+    const authProbe = JSON.parse(socket.sent[0]);
+    socket.receive({ id: authProbe.id, type: 'ext:response', payload: { authorized: true } });
+    await flushMicrotasks();
+    const timedOut = client.requestAdapterCompatibility();
+    const timeout = harness.timers.timeouts.find((timer) => timer.delay === 5000 && !timer.cleared);
+    timeout.fn();
+    await timedOut.then(
+      () => assert(false, 'compatibility timeout rejects instead of resolving'),
+      (error) => assertEqual(error.code, 'ext_request_timeout',
+        'compatibility timeout preserves the existing reverse-channel error union')
+    );
+    assertEqual(client._extPending.size, 0,
+      'compatibility timeout clears its only pending correlation');
+  }
+}
+
 async function runExtRequestLifecycleCases() {
   console.log('\n--- Phase 59 reverse request lifecycle ---');
 
@@ -1328,6 +1435,7 @@ async function run() {
   runBackgroundArmingSourceCase();
   await runPairingConstructionCases();
   await runPairingProbeAndReloadCases();
+  await runAdapterCompatibilityRequestCases();
   await runExtRequestLifecycleCases();
   await runAsyncExtObserverCases();
   runAsyncObserverSourceShapeCase();

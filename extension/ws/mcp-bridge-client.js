@@ -22,6 +22,7 @@ const MAX_EXT_REQUEST_TIMEOUT_MS = 120000;
 // two-minute cleanup window for the exact-id cancellation/final response.
 const DELEGATION_START_REQUEST_TIMEOUT_MS = (45 * 60 * 1000) + (2 * 60 * 1000);
 const AUTH_STATUS_TIMEOUT_MS = 5000;
+const ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS = 5000;
 const EXT_METHOD_PATTERN = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
 const MCP_RECONNECT_BASE_MS = 2000;
@@ -91,6 +92,7 @@ class MCPBridgeClient {
     this._pairingLoadPromise = null;
     this._pairingReloadPromise = null;
     this._pairingStatus = 'unpaired';
+    this._pairingStatusObservers = [];
     this._authProbePromise = null;
     this._extPending = new Map();
     this._extEventObservers = [];
@@ -274,7 +276,7 @@ class MCPBridgeClient {
       this._inFlightTasksReconciled = false;
       this._rejectAllExtPending();
       if (this._pairingStatus === 'paired') {
-        this._pairingStatus = this._pairingCode ? 'configured' : 'unpaired';
+        this._setPairingStatus(this._pairingCode ? 'configured' : 'unpaired');
       }
       this._persistState();
       this._stopPing();
@@ -362,8 +364,35 @@ class MCPBridgeClient {
 
   _setPairingStatus(status) {
     if (!['unpaired', 'configured', 'paired', 'expired'].includes(status)) return;
+    const changed = this._pairingStatus !== status;
     this._pairingStatus = status;
     this._persistState({ pairingStatus: status });
+    if (changed) this._notifyPairingStatusObservers(status);
+  }
+
+  addPairingStatusObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Pairing status observer must be a function');
+    }
+    this._pairingStatusObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._pairingStatusObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._pairingStatusObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _notifyPairingStatusObservers(status) {
+    for (const observer of [...this._pairingStatusObservers]) {
+      try {
+        const pending = observer(status);
+        if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+      } catch (_error) { /* observer isolation */ }
+    }
   }
 
   async _readPairingFromSession() {
@@ -380,7 +409,7 @@ class MCPBridgeClient {
 
     this._pairingCode = this._isValidPairingRecord(record) ? record.pairingCode : null;
     this._pairingLoaded = true;
-    this._pairingStatus = this._pairingCode ? 'configured' : 'unpaired';
+    this._setPairingStatus(this._pairingCode ? 'configured' : 'unpaired');
     return this._pairingCode;
   }
 
@@ -391,7 +420,7 @@ class MCPBridgeClient {
       .catch(() => {
         this._pairingCode = null;
         this._pairingLoaded = true;
-        this._pairingStatus = 'unpaired';
+        this._setPairingStatus('unpaired');
         return null;
       })
       .finally(() => {
@@ -653,6 +682,17 @@ class MCPBridgeClient {
         reject(this._makeExtError('Local bridge send failed', 'bridge_topology_changed', true));
       }
     });
+  }
+
+  requestAdapterCompatibility() {
+    if (this._pairingStatus !== 'paired') {
+      return Promise.reject(this._makeExtError(
+        'Extension pairing is not authenticated',
+        'ext_unauthorized',
+        false,
+      ));
+    }
+    return this.sendExtRequest('adapter.compatibility', {}, { timeout: ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS });
   }
 
   _handleExtFrame(msg) {

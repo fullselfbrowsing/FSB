@@ -100,6 +100,14 @@ function createRuntimeHarness(initial, options = {}) {
   if (Object.prototype.hasOwnProperty.call(options, 'registry')) {
     context.fsbAgentRegistryInstance = options.registry;
   }
+  context.fsbRefreshMcpCompatibility = async () => {
+    const registry = context.fsbAgentRegistryInstance;
+    const liveRecords = registry && typeof registry.listAgents === 'function'
+      ? await Promise.resolve(registry.listAgents())
+      : [];
+    const clients = await context.FsbMcpAgentProviders.getMergedClients(liveRecords);
+    return { clients, refreshOutcome: 'unavailable' };
+  };
   vm.runInNewContext(
     `${aliasesSource}\n${providersSource}\n${extractBackgroundRouter()}\n` +
       `const FSB_INTERNAL_DISPATCH_TIMEOUT_MS = 20000;\n${extractInternalDispatcher()}\n` +
@@ -434,6 +442,7 @@ async function main() {
   const crossContextResponse = plain(await crossContext.response);
   assert.deepEqual(crossContextResponse, {
     success: true,
+    refreshOutcome: 'unavailable',
     clients: {
       cursor: {
         id: 'cursor',
@@ -474,7 +483,11 @@ async function main() {
   });
   const emptyRegistryCall = callRuntimeHandler(emptyRegistryHarness, { id: 'mcp-client-test-extension' });
   assert.equal(emptyRegistryCall.keepOpen, true, 'missing registry still uses the async response path');
-  assert.deepEqual(plain(await emptyRegistryCall.response), { success: true, clients: {} },
+  assert.deepEqual(plain(await emptyRegistryCall.response), {
+    success: true,
+    clients: {},
+    refreshOutcome: 'unavailable'
+  },
     'missing registry is treated as an empty live clone set');
 
   emptyRegistryHarness.storage.setRejected(true);
