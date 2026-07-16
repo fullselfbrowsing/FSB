@@ -268,7 +268,11 @@ assert.strictEqual(refreshingState.pending.hidden, true);
 console.log('Providers panel UI: detail, empty, and disclosure contracts');
 
 assert.match(HTML, /id="apiProviderDetails"/);
-assert.match(HTML, /id="agentProviderDetails"[^>]*hidden[^>]*aria-live="polite"/);
+const agentDetailsOpeningTag = HTML.match(/<div id="agentProviderDetails"[^>]*>/);
+assert.ok(agentDetailsOpeningTag, 'agent provider details have one stable container');
+assert.match(agentDetailsOpeningTag[0], /\bhidden\b/);
+assert.doesNotMatch(agentDetailsOpeningTag[0], /\brole=|\baria-live=/,
+  'the changing details container is not a second compatibility live region');
 [
   'modelCombobox', 'modelDiscoveryStatus', 'refreshModelsBtn', 'xaiApiKeyGroup',
   'geminiApiKeyGroup', 'openaiApiKeyGroup', 'anthropicApiKeyGroup',
@@ -277,6 +281,24 @@ assert.match(HTML, /id="agentProviderDetails"[^>]*hidden[^>]*aria-live="polite"/
 ].forEach((id) => assert.match(extractElement(HTML, 'div', 'apiProviderDetails'), new RegExp('id="' + id + '"')));
 
 const agentDetails = extractElement(HTML, 'div', 'agentProviderDetails');
+const compatibilityAnnouncementTag = HTML.match(/<p id="providerEvidenceAnnouncement"[^>]*>/);
+assert.ok(compatibilityAnnouncementTag, 'compatibility refreshes have one shared announcement owner');
+const compatibilitySurfaceTags = [
+  compatibilityAnnouncementTag[0],
+  agentDetailsOpeningTag[0],
+  ...['agentCompatibilityStatus', 'agentCompatibilityHelp', 'agentCompatibilityChecked'].map((id) => {
+    const match = HTML.match(new RegExp('<(?:dd|p)[^>]*id="' + id + '"[^>]*>'));
+    assert.ok(match, 'finds compatibility surface #' + id);
+    return match[0];
+  }),
+  ...Array.from(providersSection.matchAll(/<span class="provider-row__compatibility"[^>]*>/g),
+    (match) => match[0])
+];
+assert.deepStrictEqual(
+  compatibilitySurfaceTags.filter((tag) => /\brole=|\baria-live=/.test(tag)),
+  [compatibilityAnnouncementTag[0]],
+  '#providerEvidenceAnnouncement is the sole live owner for compatibility changes'
+);
 ['Installation', 'Connection', 'Compatibility', 'Account/Auth', 'Setup', 'Usage', 'Tokens', 'Turns', 'Duration'].forEach((label) => {
   assert.ok(agentDetails.includes(label), 'agent details include ' + label);
 });
