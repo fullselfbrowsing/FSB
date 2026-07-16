@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed Phase 62 Plan 03; ready for Plan 04
-last_updated: "2026-07-16T18:32:20.000Z"
-last_activity: 2026-07-16 -- Phase 62 Plan 03 completed
+stopped_at: Completed Phase 62 Plan 04; ready for Plan 05
+last_updated: "2026-07-16T18:52:43.000Z"
+last_activity: 2026-07-16 -- Phase 62 Plan 04 completed
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 28
-  completed_plans: 25
+  completed_plans: 26
   percent: 56
 ---
 
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 62 — CI Drift-Smoke Gate & Doctor Extensions, Plan 03 complete; Plan 04 next
+**Current focus:** Phase 62 — CI Drift-Smoke Gate & Doctor Extensions, Plan 04 complete; Plan 05 next
 
 ## Current Position
 
 Phase: 62 (ci-drift-smoke-gate-doctor-extensions) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Executing Phase 62
-Last activity: 2026-07-16 -- Phase 62 Plan 03 completed
+Last activity: 2026-07-16 -- Phase 62 Plan 04 completed
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -47,7 +47,7 @@ Last activity: 2026-07-16 -- Phase 62 Plan 03 completed
 | 59 | Reverse-Request Channel & Security Foundation | CHAN-01, CHAN-02, CHAN-03, CHAN-04, CHAN-05, CHAN-06, CHAN-07 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
-| 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | In progress (3/6 plans complete) |
+| 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | In progress (4/6 plans complete) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Not started |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
@@ -145,11 +145,14 @@ v0.9.91-specific decisions so far:
 - [Phase 62 Plan 03]: Route compatibility through a separate authenticated exact-empty-payload read while leaving delegation and process authority unchanged.
 - [Phase 62 Plan 03]: Validate and durably replace one closed safe compatibility snapshot on the existing serialized provider mutation chain, with a one-way fifteen-minute freshness downgrade.
 - [Phase 62 Plan 03]: Coalesce paired compatibility refreshes behind one five-second request and persist before fan-out; failures expose only refreshed, stale, or unavailable cached outcomes.
+- [Phase 62 Plan 04]: Project every typed provider-protocol drift into one exact three-label terminal detail and collapse untyped drift to fixed adapter-contract labels.
+- [Phase 62 Plan 04]: Enforce the per-adapter ten-second admission window before invoking the ring-writing diagnostics sink, including exact-boundary and clock-rollback behavior.
+- [Phase 62 Plan 04]: Report only validated authoritative finals once per delegation through a private bounded FIFO, independently of controller settlement and cleanup.
 - [Milestone]: Defer every live/human UAT checklist to one milestone-end sweep; automated/source verification and clean review remain mandatory per phase, and no deferred item is silently marked passed.
 
 ### Pending Todos
 
-None. Phases 57-61 are automated/source complete; Phase 62 Plans 01-03 are complete and Plan 04 is next.
+None. Phases 57-61 are automated/source complete; Phase 62 Plans 01-04 are complete and Plan 05 is next.
 
 ### Blockers/Concerns
 
@@ -190,10 +193,10 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-16T18:32:20.000Z
-Stopped at: Completed Phase 62 Plan 03; ready for Plan 04
-Resume file: .planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-04-PLAN.md
+Last session: 2026-07-16T18:52:43.000Z
+Stopped at: Completed Phase 62 Plan 04; ready for Plan 05
+Resume file: .planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-05-PLAN.md
 
 ## Next Actions
 
-Execute the remaining three approved Phase 62 plans, then run automated review and verification. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute the remaining two approved Phase 62 plans, then run automated review and verification. Keep every accumulated live UAT item pending until the single milestone-end sweep.
