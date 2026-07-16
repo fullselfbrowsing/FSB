@@ -1,64 +1,69 @@
 ---
 phase: 62
-fixed_at: 2026-07-16T20:25:11Z
+fixed_at: 2026-07-16T20:58:20Z
 review_path: .planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-REVIEW.md
-iteration: 1
-findings_in_scope: 5
-fixed: 5
+iteration: 2
+findings_in_scope: 4
+fixed: 4
 skipped: 0
 status: all_fixed
 ---
 
 # Phase 62: Code Review Fix Report
 
-**Fixed at:** 2026-07-16T20:25:11Z
+**Fixed at:** 2026-07-16T20:58:20Z
 **Source review:** .planning/phases/62-ci-drift-smoke-gate-doctor-extensions/62-REVIEW.md
-**Iteration:** 1
+**Iteration:** 2
 
 **Summary:**
-- Findings in scope: 5
-- Fixed: 5
+- Findings in scope: 4
+- Fixed: 4
 - Skipped: 0
 
 ## Fixed Issues
 
-### CR-01: Compatibility persistence recursively starts another live compatibility refresh
+### WR-01: A successful manual refresh is erased by its own storage fan-out
 
 **Status:** fixed: requires human verification
-**Files modified:** `extension/background.js`, `extension/ui/options.js`, `tests/mcp-bridge-background-dispatch.test.js`, `tests/providers-panel-ui.test.js`
-**Commit:** 3154bda4
-**Applied fix:** Split cache-only client inventory from the exact-shape explicit live compatibility action. Storage fan-out now reprojects cache only, and the composed regression proves one manual refresh causes one daemon request, one durable write, and one cache hydration.
+**Files modified:** `extension/ui/options.js`, `tests/providers-panel-ui.test.js`
+**Commit:** 79634d66
+**Applied fix:** A queued cache hydration caused by the successful live refresh's own durable write now preserves the ready evidence generation and its one polite success announcement. The composed causal test proves exactly one daemon request, one durable write, one cache read, no stale markers, and a retained `Provider status refreshed.` announcement after final settlement.
 
-### WR-01: A stale refresh outcome can contradict the compatibility badge and announcement
-
-**Status:** fixed: requires human verification
-**Files modified:** `extension/background.js`, `extension/ui/options.js`, `tests/mcp-bridge-background-dispatch.test.js`, `tests/providers-panel-ui.test.js`
-**Commit:** de67907b
-**Applied fix:** Made stale refresh failures coherently degrade retained fresh support to `degraded/evidence_stale`, preserve already degraded or unsupported truth, and derive failure announcements from the selected compatibility model.
-
-### WR-02: An open panel never ages Supported evidence into Degraded
+### WR-02: The compatibility-expiry timer can mutate recommendation and unrelated evidence
 
 **Status:** fixed: requires human verification
-**Files modified:** `extension/background.js`, `extension/ui/options.js`, `extension/utils/mcp-agent-providers.js`, `tests/mcp-agent-providers-storage.test.js`, `tests/mcp-bridge-background-dispatch.test.js`, `tests/providers-panel-ui.test.js`
-**Commit:** 7b28ab5b
-**Applied fix:** Made the 15-minute boundary exclusive of Supported, returned an authoritative compatibility expiry deadline, and added one cancel-and-replace UI timer that performs a cache-only reprojection without daemon, storage, focus, selection, or form mutation.
+**Files modified:** `extension/ui/options.js`, `tests/providers-panel-ui.test.js`
+**Commit:** 1cbafdcc
+**Applied fix:** The expiry callback now uses a cache-only compatibility projection path that validates and merges only agent-row `.compatibility` fields. An adversarial fake-clock response changes clicked, installed, connected, and live evidence, while the regression proves only Supported becomes Degraded and all non-compatibility clients, recommendation, evidence status, focus, forms, dirty state, and writes remain identical.
 
-### WR-03: A safe-integer injected clock can still crash doctor timestamp formatting
-
-**Status:** fixed: requires human verification
-**Files modified:** `mcp/src/diagnostics.ts`, `tests/mcp-diagnostics-status.test.js`
-**Commit:** d77bf2ce
-**Applied fix:** Bounded injected clocks to the ECMAScript Date domain and added first-value-above-maximum coverage proving doctor returns the deterministic epoch snapshot without exception text.
-
-### WR-04: Selected details create a second compatibility live-region owner
+### WR-03: A compatibility snapshot is invisible until another evidence map creates the agent row
 
 **Status:** fixed: requires human verification
-**Files modified:** `extension/ui/control_panel.html`, `tests/providers-panel-ui.test.js`
-**Commit:** c7dee1c6
-**Applied fix:** Removed live behavior from the selected agent-details container, retained the independent pairing-status live region, and pinned `#providerEvidenceAnnouncement` as the sole compatibility announcement owner.
+**Files modified:** `extension/utils/mcp-agent-providers.js`, `tests/mcp-agent-providers-storage.test.js`
+**Commit:** 560db4ba
+**Applied fix:** A durably validated compatibility snapshot now seeds exactly the three canonical agent rows before projection without manufacturing clicked, installed, connected, or live evidence. Snapshot-only coverage proves Claude is Supported, OpenCode and Codex remain Unsupported, API rows are not created, recommendation remains the API fallback, and the Claude expiry deadline is available.
+
+### WR-04: The executable Phase 62 security contract still pins pre-fix compatibility source shapes
+
+**Status:** fixed
+**Files modified:** `tests/delegation-phase-contract.test.js`
+**Commit:** 48983332
+**Applied fix:** Updated only the three stale source-shape assertions to pin the exact `>=` freshness boundary, the explicit live request → validation → durable replacement → fan-out sequence, and separated cache/live response schemas including `compatibilityExpiresAt`. The complete contract now passes 763 assertions with all task, drift, mitigation, authority, leakage, and deferred-UAT guards retained.
+
+## Automated Verification
+
+- `node tests/providers-panel-ui.test.js` — passed
+- `node tests/providers-panel-logic.test.js` — passed
+- `node tests/mcp-agent-providers-storage.test.js` — passed
+- `node tests/mcp-bridge-background-dispatch.test.js` — 293 passed, 0 failed
+- `node tests/delegation-phase-contract.test.js` — 763 passed, 0 failed
+- Syntax checks for all modified JavaScript files — passed
+- `git diff --check f20ba83a..HEAD` — passed
+
+Human/browser/native/network UAT and the full or guarded root suite were not run. Per user direction, all UAT remains deferred to the single milestone-end sweep.
 
 ---
 
-_Fixed: 2026-07-16T20:25:11Z_
+_Fixed: 2026-07-16T20:58:20Z_
 _Fixer: the agent (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2_
