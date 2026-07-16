@@ -12,6 +12,7 @@ const VALIDATION_PATH = `${PHASE_DIR}/61-VALIDATION.md`;
 const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118cae72e0f0dfc758577f683';
 const PHASE62_DIR = '.planning/phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
+const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
 const PRE_PHASE62_ROOT_TEST_HASH = 'cc320c1dfb3fefb292ebb8edc789993ec5fcd42a2b2ec2a057a37d4c49281808';
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
@@ -1278,6 +1279,111 @@ check(phase62Context.includes('single milestone-end UAT sweep')
   && phase62Research.includes('liveCapturePending: true')
   && phase62UiSpec.includes('must not be marked passed'),
 'context, research, and UI contract all preserve the milestone-end human-evidence boundary');
+
+console.log('\n--- Phase 62 milestone-end human UAT ledger ---');
+
+check(exists(PHASE62_UAT_PATH), 'Phase 62 human UAT ledger exists');
+const phase62Uat = read(PHASE62_UAT_PATH);
+check(/^phase: 62$/m.test(phase62Uat)
+  && /^status: human_needed$/m.test(phase62Uat)
+  && /^deferred_until: milestone-end$/m.test(phase62Uat)
+  && /^results_recorded: false$/m.test(phase62Uat)
+  && /^live_checks: 3$/m.test(phase62Uat),
+  'Phase 62 ledger frontmatter remains an unexecuted three-check milestone-end queue');
+check(phase62Uat.includes('All three scenarios are deferred to one milestone-end sweep.')
+  && phase62Uat.includes('Automated, source, and DOM evidence cannot check off any heading'),
+  'the ledger prominently preserves the user-directed single milestone-end deferral');
+
+const phase62UatHeadings = Array.from(
+  phase62Uat.matchAll(/^### \[([^\]]*)\] (UAT62-\d{2})\b[^\n]*$/gm),
+  (match) => ({ marker: match[1], id: match[2] }),
+);
+equal(phase62UatHeadings, [
+  { marker: ' ', id: 'UAT62-01' },
+  { marker: ' ', id: 'UAT62-02' },
+  { marker: ' ', id: 'UAT62-03' },
+], 'Phase 62 ledger contains exactly three ordered unchecked UAT ids');
+
+const phase62UatBlocks = phase62Uat.split(/^### \[ \] /m).slice(1);
+check(phase62UatBlocks.length === 3, 'each Phase 62 UAT heading owns exactly one scenario block');
+for (const block of phase62UatBlocks) {
+  const id = (block.match(/^(UAT62-\d{2})\b/) || [null, 'unknown'])[1];
+  check(exactOccurrences(block, 'status: human_needed') === 1,
+    `${id} remains status: human_needed`);
+  check(exactOccurrences(block, 'result: pending') === 1,
+    `${id} remains result: pending`);
+  check(/^evidence:[ \t]*\n[ \t]*\nreferences:/m.test(block),
+    `${id} keeps its evidence field empty`);
+}
+check(exactOccurrences(phase62Uat, 'status: human_needed') === 4
+  && exactOccurrences(phase62Uat, 'result: pending') === 3
+  && exactOccurrences(phase62Uat, 'evidence:') === 3,
+  'ledger field counts are exact, including its human-needed frontmatter');
+check(!/^### \[[^ ]\] UAT62-/m.test(phase62Uat)
+  && !/^status:\s*(?:complete|green)\b/im.test(phase62Uat)
+  && !/^result:\s*(?!pending\s*$)\S+/im.test(phase62Uat)
+  && !/\b(?:pass|passed|approved|screenshots?)\b/i.test(phase62Uat),
+  'ledger contains no checked marker, completed field, or fabricated evidence claim');
+
+const [uat6201 = '', uat6202 = '', uat6203 = ''] = phase62UatBlocks;
+for (const token of [
+  'installed Claude Code',
+  'doctor text and JSON',
+  'bridge and browser offline and online',
+  'Supported',
+  'newer',
+  'Degraded',
+  'Unsupported',
+  'no secret, private auth, provider-native payload, prompt, or task data',
+  'one genuine sanitized Claude JSONL stream',
+  '`system/init`',
+  '`result`',
+  '`type`',
+  '`subtype`',
+  '`session_id`',
+  '`tools`',
+  '`mcp_servers`',
+  '`is_error`',
+  'provider-native sequence',
+  'normalized sequence',
+  '`schema-derived-contract`',
+  '`liveCapturePending: true`',
+]) {
+  check(uat6201.includes(token), `UAT62-01 retains genuine-stream/doctor coverage: ${token}`);
+}
+for (const token of [
+  'Supported, Degraded, and Unsupported',
+  'light and dark themes',
+  'desktop',
+  'compact',
+  '641–899 px',
+  'at most 640 px',
+  'selected-agent details',
+  'wrapping',
+  'dividers',
+  'horizontal overflow',
+  'API rows',
+]) {
+  check(uat6202.includes(token), `UAT62-02 retains rendered layout coverage: ${token}`);
+}
+for (const token of [
+  'keyboard',
+  'native radio group',
+  'screen reader names and descriptions',
+  'focus retention',
+  'one shared live region',
+  'success and failure',
+  'forced-colors',
+  'reduced-motion',
+  'fresh, stale, corrupt, absent, and failed evidence',
+  'selection, form, or recommendation state',
+]) {
+  check(uat6203.includes(token), `UAT62-03 retains accessibility/refresh coverage: ${token}`);
+}
+check(uat6201.includes('pending until a human reviews the comparison during the milestone-end sweep')
+  && fixtureManifest.provenance === 'schema-derived-contract'
+  && fixtureManifest.liveCapturePending === true,
+  'genuine capture comparison and schema-derived fixture provenance remain pending');
 
 console.log(`\n=== Phase 61-62 contract results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);
