@@ -373,11 +373,132 @@ assert.doesNotMatch(neutralBadgeRule[0], /\.provider-badge--status/,
 assert.doesNotMatch(providerCss,
   /\.provider-badge--neutral\s*,\s*\.provider-badge--status\s*\{/,
   'neutral colors are never grouped with the permanent status base class');
+
+const compatibilityGroupRule = providerCss.match(/\.provider-row__compatibility\s*\{[^}]*\}/);
+assert.ok(compatibilityGroupRule, 'compatibility has a dedicated inline group rule');
+assert.match(compatibilityGroupRule[0], /display:\s*flex/);
+assert.match(compatibilityGroupRule[0], /flex-wrap:\s*wrap/);
+assert.match(compatibilityGroupRule[0], /gap:\s*4px 8px/);
+assert.match(compatibilityGroupRule[0], /min-width:\s*0/);
+assert.match(compatibilityGroupRule[0], /max-width:\s*100%/);
+assert.match(compatibilityGroupRule[0], /padding-left:\s*16px/);
+assert.match(compatibilityGroupRule[0], /border-left:\s*1px solid var\(--border-color\)/);
+assert.match(compatibilityGroupRule[0], /overflow-wrap:\s*anywhere/);
+
+const compatibilityLabelRule = providerCss.match(/\.provider-row__compatibility-label\s*\{[^}]*\}/);
+assert.ok(compatibilityLabelRule, 'compatibility micro-label has an explicit typography rule');
+assert.match(compatibilityLabelRule[0], /font-size:\s*12px/);
+assert.match(compatibilityLabelRule[0], /font-weight:\s*400/);
+assert.match(compatibilityLabelRule[0], /line-height:\s*1\.5/);
+
+const compatibilityBadgeRule = providerCss.match(/\.compatibility-badge\s*\{[^}]*\}/);
+assert.ok(compatibilityBadgeRule, 'compatibility pill has an explicit base rule');
+assert.match(compatibilityBadgeRule[0], /display:\s*inline-flex/);
+assert.match(compatibilityBadgeRule[0], /padding:\s*4px 8px/);
+assert.match(compatibilityBadgeRule[0], /font-size:\s*12px/);
+assert.match(compatibilityBadgeRule[0], /font-weight:\s*600/);
+assert.match(compatibilityBadgeRule[0], /line-height:\s*1\.2/);
+assert.match(compatibilityBadgeRule[0], /overflow-wrap:\s*anywhere/);
+assert.doesNotMatch(compatibilityBadgeRule[0], /text-overflow|white-space:\s*nowrap/,
+  'compatibility labels wrap instead of truncating');
+
+[
+  ['supported', 'success', 'fa-circle-check'],
+  ['degraded', 'warning', 'fa-triangle-exclamation'],
+  ['unsupported', 'error', 'fa-circle-xmark']
+].forEach(([state, tone, icon]) => {
+  assert.match(providerCss, new RegExp(
+    '\\.compatibility-badge--' + state
+      + ',\\s*\\.provider-row__compatibility-icon\\.' + icon
+      + '\\s*\\{[^}]*color:\\s*var\\(--' + tone + '-color\\)'
+  ), state + ' text and icon use the exact semantic color token');
+  assert.match(providerCss, new RegExp(
+    '\\.compatibility-badge--' + state
+      + '\\s*\\{[^}]*background:\\s*var\\(--' + tone + '-light\\);'
+      + '[^}]*border-color:\\s*var\\(--' + tone + '-color\\)'
+  ), state + ' pill uses the exact semantic surface and border tokens');
+});
+const compatibilityToneSelectorHeaders = Array.from(
+  providerCss.matchAll(/([^{}]*\.compatibility-badge--(?:supported|degraded|unsupported)[^{}]*)\{/g),
+  (match) => match[1]
+);
+compatibilityToneSelectorHeaders.forEach((selector) => assert.doesNotMatch(selector,
+  /\.provider-row(?=\s*[,.:#\[]|\s*$)|\.provider-radio|\.provider-row__name|\.provider-badge--(?:recommended|status)/,
+  'compatibility tones never share a rule with provider selection, name, recommendation, or evidence'));
+
+assert.match(providerCss,
+  /\.agent-provider-details__fact #agentCompatibilityStatus\s*\{[^}]*font-size:\s*14px[^}]*overflow-wrap:\s*anywhere/s,
+  'selected compatibility status keeps body typography and wraps');
+assert.match(providerCss,
+  /\.agent-provider-details__fact #agentCompatibilityHelp,[\s\S]*?#agentCompatibilityChecked\s*\{[^}]*font-size:\s*12px[^}]*font-weight:\s*400[^}]*line-height:\s*1\.5/s,
+  'selected compatibility metadata follows the approved type scale');
+
+const compatibilityRules = Array.from(
+  providerCss.matchAll(/([^{}]*(?:compatibility|Compatibility)[^{}]*)\{([^{}]*)\}/g),
+  (match) => match[2]
+);
+assert.ok(compatibilityRules.length >= 9, 'compatibility CSS is source-pinned across states and layouts');
+compatibilityRules.forEach((body) => {
+  for (const declaration of body.matchAll(/(?:^|;)\s*((?:row-|column-)?gap|padding(?:-[a-z]+)?|margin(?:-[a-z]+)?)\s*:\s*([^;]+)/g)) {
+    const pixelValues = declaration[2].match(/\b\d+px\b/g) || [];
+    pixelValues.forEach((value) => assert.ok(
+      ['4px', '8px', '16px', '24px', '32px', '48px', '64px'].includes(value),
+      'compatibility ' + declaration[1] + ' uses approved spacing, received ' + value
+    ));
+  }
+});
+
 assert.match(providerCss, /var\(--fsb-focus-ring\)/);
-assert.match(providerCss, /@media \(min-width: 900px\)/);
-assert.match(providerCss, /@media \(max-width: 640px\)/);
-assert.match(providerCss, /@media \(prefers-reduced-motion: reduce\)/);
+const wideCompatibilityLayout = providerCss.match(/@media \(min-width: 900px\)\s*\{([\s\S]*?)\n\}/);
+assert.ok(wideCompatibilityLayout, 'wide provider layout has an explicit breakpoint');
+assert.match(wideCompatibilityLayout[1], /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+assert.match(wideCompatibilityLayout[1],
+  /\.provider-row__compatibility\s*\{[^}]*border-left:\s*1px solid var\(--border-color\)/s,
+  'wide compatibility stays inline behind a tokenized divider');
+
+const mediumCompatibilityLayout = providerCss.match(
+  /@media \(min-width: 641px\) and \(max-width: 899px\)\s*\{([\s\S]*?)\n\}/
+);
+assert.ok(mediumCompatibilityLayout, 'medium provider layout has an explicit closed range');
+assert.match(mediumCompatibilityLayout[1], /grid-template-columns:\s*minmax\(0, 1fr\)/);
+assert.match(mediumCompatibilityLayout[1],
+  /\.provider-row__compatibility\s*\{[^}]*border-left:\s*1px solid var\(--border-color\)/s,
+  'medium compatibility retains inline separation');
+
+const narrowCompatibilityLayout = providerCss.match(/@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/);
+assert.ok(narrowCompatibilityLayout, 'narrow provider layout has an explicit breakpoint');
+assert.match(narrowCompatibilityLayout[1], /\.provider-row\s*\{[^}]*flex-wrap:\s*wrap[^}]*max-width:\s*100%/s);
+assert.match(narrowCompatibilityLayout[1],
+  /\.provider-row__compatibility\s*\{[^}]*flex:\s*1 1 100%[^}]*width:\s*100%[^}]*max-width:\s*100%[^}]*padding-top:\s*8px[^}]*padding-left:\s*0[^}]*border-top:\s*1px solid var\(--border-color\)[^}]*border-left:\s*0[^}]*justify-content:\s*flex-start/s,
+  'narrow compatibility becomes a full-width, top-divided, left-aligned group');
+assert.match(narrowCompatibilityLayout[1],
+  /\.provider-row__content\s*\{[^}]*flex:\s*1 1 100%[^}]*max-width:\s*100%/s,
+  'narrow provider names and evidence stack without horizontal overflow');
+assert.doesNotMatch(narrowCompatibilityLayout[1], /\border\s*:/,
+  'responsive CSS preserves native trailing DOM order instead of visually reordering children');
+
+const forcedColorsCompatibility = providerCss.match(/@media \(forced-colors: active\)\s*\{([\s\S]*?)\n\}/);
+assert.ok(forcedColorsCompatibility, 'compatibility defines a forced-colors treatment');
+assert.match(forcedColorsCompatibility[1], /\.provider-row__compatibility-icon/);
+assert.match(forcedColorsCompatibility[1], /\.compatibility-badge/);
+assert.match(forcedColorsCompatibility[1], /color:\s*CanvasText/);
+assert.match(forcedColorsCompatibility[1], /background:\s*Canvas/);
+assert.match(forcedColorsCompatibility[1], /border-color:\s*currentColor/);
+assert.match(forcedColorsCompatibility[1], /border-style:\s*dashed/);
+assert.match(forcedColorsCompatibility[1], /border-style:\s*double/);
+
+const reducedMotionCompatibility = providerCss.match(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/);
+assert.ok(reducedMotionCompatibility, 'provider motion reduction remains explicit');
+assert.match(reducedMotionCompatibility[1], /\.provider-row__compatibility/);
+assert.match(reducedMotionCompatibility[1], /\.provider-row__compatibility-icon/);
+assert.match(reducedMotionCompatibility[1], /\.compatibility-badge/);
+assert.match(reducedMotionCompatibility[1], /animation:\s*none !important/);
+assert.match(reducedMotionCompatibility[1], /transform:\s*none !important/);
+assert.match(reducedMotionCompatibility[1], /transition:\s*none !important/);
 assert.match(providerCss, /\[data-theme="dark"\] \.provider-row/);
+assert.match(providerCss,
+  /\[data-theme="dark"\] \.provider-row__compatibility\s*\{[^}]*border-color:\s*var\(--border-color\)/,
+  'dark compatibility separation stays token-only');
 assert.match(providerCss, /\.provider-roster__announcement\[role="alert"\]/);
 assert.match(providerCss, /\.agent-provider-details__fact \.agent-provider-details__help/);
 assert.match(providerCss, /\.mcp-bridge-pairing__row\s*\{[^}]*display:\s*flex[^}]*gap:\s*12px/s);

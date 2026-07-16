@@ -5928,6 +5928,77 @@ textarea.form-input {
   border-color: var(--border-color);
 }
 
+.provider-row__compatibility {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding-left: 16px;
+  border-left: 1px solid var(--border-color);
+  overflow-wrap: anywhere;
+}
+
+.provider-row__compatibility-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.provider-row__compatibility-icon {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.compatibility-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--fsb-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.compatibility-badge--supported,
+.provider-row__compatibility-icon.fa-circle-check {
+  color: var(--success-color);
+}
+
+.compatibility-badge--supported {
+  background: var(--success-light);
+  border-color: var(--success-color);
+}
+
+.compatibility-badge--degraded,
+.provider-row__compatibility-icon.fa-triangle-exclamation {
+  color: var(--warning-color);
+}
+
+.compatibility-badge--degraded {
+  background: var(--warning-light);
+  border-color: var(--warning-color);
+}
+
+.compatibility-badge--unsupported,
+.provider-row__compatibility-icon.fa-circle-xmark {
+  color: var(--error-color);
+}
+
+.compatibility-badge--unsupported {
+  background: var(--error-light);
+  border-color: var(--error-color);
+}
+
 .provider-other-clients {
   margin-top: 24px;
   padding-top: 16px;
@@ -6036,6 +6107,21 @@ textarea.form-input {
   font-size: 12px;
   font-weight: 400;
   line-height: 1.5;
+}
+
+.agent-provider-details__fact #agentCompatibilityStatus {
+  max-width: 100%;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.agent-provider-details__fact #agentCompatibilityHelp,
+.agent-provider-details__fact #agentCompatibilityChecked {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .agent-provider-details__section {
@@ -6147,6 +6233,10 @@ textarea.form-input {
   border-color: var(--primary-color);
 }
 
+[data-theme="dark"] .provider-row__compatibility {
+  border-color: var(--border-color);
+}
+
 @supports selector(.provider-row:has(.provider-radio:checked)) {
   [data-theme="dark"] .provider-row:has(.provider-radio:checked) {
     background: var(--primary-light);
@@ -6158,13 +6248,54 @@ textarea.form-input {
   .provider-groups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .provider-row__compatibility {
+    padding-top: 0;
+    padding-left: 16px;
+    border-top: 0;
+    border-left: 1px solid var(--border-color);
+  }
+}
+
+@media (min-width: 641px) and (max-width: 899px) {
+  .provider-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provider-row__compatibility {
+    padding-top: 0;
+    padding-left: 16px;
+    border-top: 0;
+    border-left: 1px solid var(--border-color);
+  }
 }
 
 @media (max-width: 640px) {
+  .provider-row {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
   .provider-roster__toolbar,
   .provider-row__content {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .provider-row__content {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .provider-row__compatibility {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    padding-top: 8px;
+    padding-left: 0;
+    border-top: 1px solid var(--border-color);
+    border-left: 0;
+    justify-content: flex-start;
   }
 
   .provider-roster__refresh,
@@ -6195,8 +6326,40 @@ textarea.form-input {
   }
 }
 
+@media (forced-colors: active) {
+  .provider-row__compatibility {
+    border-color: CanvasText;
+  }
+
+  .provider-row__compatibility-icon,
+  .compatibility-badge {
+    forced-color-adjust: auto;
+    color: CanvasText;
+  }
+
+  .compatibility-badge {
+    background: Canvas;
+    border-color: currentColor;
+  }
+
+  .compatibility-badge--supported {
+    border-style: solid;
+  }
+
+  .compatibility-badge--degraded {
+    border-style: dashed;
+  }
+
+  .compatibility-badge--unsupported {
+    border-style: double;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .provider-row,
+  .provider-row__compatibility,
+  .provider-row__compatibility-icon,
+  .compatibility-badge,
   .provider-roster__refresh,
   .provider-roster__refresh-icon,
   .provider-roster__announcement,
