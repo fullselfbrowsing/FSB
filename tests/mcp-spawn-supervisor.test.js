@@ -20,6 +20,11 @@ const registryBuildPath = path.join(
   'agent-providers',
   'registry.js',
 );
+const claudeStreamBuildPath = path.join(
+  mcpBuildRoot,
+  'agent-providers',
+  'claude-stream.js',
+);
 
 function startRequest(payload, overrides = {}) {
   return {
@@ -1347,6 +1352,11 @@ async function runFailureBarrierTests(supervisorModule) {
     );
     assert.equal(result.status, 'failed');
     assert.equal(result.terminal.code, 'agent_protocol_drift');
+    assert.deepEqual(result.terminal.detail, {
+      adapterId: 'claude-code',
+      expected: 'adapter_contract',
+      observed: 'protocol_drift',
+    });
     assert.equal(harness.terminationCalls.length, 1);
   }
 
@@ -1364,6 +1374,11 @@ async function runFailureBarrierTests(supervisorModule) {
     );
     assert.equal(result.status, 'failed');
     assert.equal(result.terminal.code, 'agent_protocol_drift');
+    assert.deepEqual(result.terminal.detail, {
+      adapterId: 'claude-code',
+      expected: 'adapter_contract',
+      observed: 'protocol_drift',
+    });
     assert.equal(harness.emitted.filter((event) => event.payload.event?.type === 'result').length, 0);
   }
 
@@ -1380,6 +1395,11 @@ async function runFailureBarrierTests(supervisorModule) {
     );
     assert.equal(result.status, 'failed');
     assert.equal(result.terminal.code, 'agent_protocol_drift');
+    assert.deepEqual(result.terminal.detail, {
+      adapterId: 'claude-code',
+      expected: 'adapter_contract',
+      observed: 'protocol_drift',
+    });
     assert.equal(harness.terminationCalls.length, 1);
     assert.equal(harness.emitted.some((event) => event.payload.event?.type === 'result'), false);
   }
@@ -1397,6 +1417,105 @@ async function runFailureBarrierTests(supervisorModule) {
     assert.equal(harness.counters.detect, 0);
     assert.equal(harness.spawnCalls.length, 0);
   }
+}
+
+async function runTypedDriftDetailTests(supervisorModule, claudeStreamModule) {
+  const expectedByReason = Object.freeze({
+    configuration_surface: 'known_event_shape',
+    duplicate_init: 'single_init_session',
+    duplicate_result: 'single_terminal_result',
+    event_after_result: 'single_terminal_result',
+    event_before_init: 'single_init_session',
+    invalid_json: 'bounded_jsonl',
+    invalid_shape: 'known_event_shape',
+    invalid_utf8: 'bounded_jsonl',
+    line_too_large: 'bounded_jsonl',
+    missing_result: 'single_terminal_result',
+    session_mismatch: 'single_init_session',
+    unknown_event_type: 'known_event_shape',
+    unknown_stream_event: 'known_event_shape',
+    unknown_system_subtype: 'known_event_shape',
+  });
+  const forbiddenCanary = 'TOP_SECRET_DRIFT_CANARY_prompt_session_token_path_provider_output';
+
+  for (const [reason, expected] of Object.entries(expectedByReason)) {
+    const drift = new claudeStreamModule.AgentProtocolDriftError(
+      reason,
+      7,
+      [`message.content.${forbiddenCanary}`],
+    );
+    drift.message = forbiddenCanary;
+    drift.stack = forbiddenCanary;
+    drift.cause = { rawProviderOutput: forbiddenCanary };
+    drift.line = forbiddenCanary;
+    drift.task = forbiddenCanary;
+    drift.version = forbiddenCanary;
+    const harness = makeHarness(supervisorModule, {
+      parseEvents() {
+        return (async function* failWithTypedDrift() {
+          throw drift;
+        })();
+      },
+    });
+
+    const result = await harness.supervisor.handleExtRequest(
+      startRequest(
+        { adapterId: 'claude-code', task: `typed drift reason ${reason}` },
+        { id: `ext-typed-drift-${reason}` },
+      ),
+      harness.emit,
+    );
+
+    assert.equal(result.status, 'failed', `${reason} is terminal failure`);
+    assert.deepEqual(Object.keys(result.terminal).sort(), [
+      'code',
+      'detail',
+      'profileVersion',
+      'type',
+    ]);
+    assert.equal(result.terminal.type, 'diagnostic');
+    assert.equal(result.terminal.code, 'agent_protocol_drift');
+    assert.deepEqual(result.terminal.detail, {
+      adapterId: 'claude-code',
+      expected,
+      observed: reason,
+    });
+    assert.deepEqual(Object.keys(result.terminal.detail), [
+      'adapterId',
+      'expected',
+      'observed',
+    ]);
+    assert(Object.values(result.terminal.detail).every((label) => label.length <= 64));
+    assert.equal(JSON.stringify(result).includes(forbiddenCanary), false);
+    assert.equal(
+      harness.emitted.some((event) => event.payload?.event?.type === 'result'),
+      false,
+      `${reason} emits no success result`,
+    );
+    assert.equal(harness.terminationCalls.length, 1, `${reason} stops the child once`);
+    assert.equal(harness.counters.remove, 1, `${reason} removes runtime state once`);
+  }
+
+  assert.deepEqual(
+    Object.keys(expectedByReason).sort(),
+    [
+      'configuration_surface',
+      'duplicate_init',
+      'duplicate_result',
+      'event_after_result',
+      'event_before_init',
+      'invalid_json',
+      'invalid_shape',
+      'invalid_utf8',
+      'line_too_large',
+      'missing_result',
+      'session_mismatch',
+      'unknown_event_type',
+      'unknown_stream_event',
+      'unknown_system_subtype',
+    ],
+    'the typed reason table is exhaustive for the production parser',
+  );
 }
 
 async function runCancelAndShutdownTests(supervisorModule) {
@@ -1881,6 +2000,7 @@ async function runRouteLossStatusTests(supervisorModule) {
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
+  const claudeStreamModule = await import(pathToFileURL(claudeStreamBuildPath).href);
   assert.equal(supervisorModule.DELEGATION_TASK_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_STDERR_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_ACTIVE_STATUS_LIMIT, 64);
@@ -1894,6 +2014,7 @@ async function main() {
   await runStatusBoundsTest(supervisorModule);
   await runHappyPathTest(supervisorModule);
   await runFailureBarrierTests(supervisorModule);
+  await runTypedDriftDetailTests(supervisorModule, claudeStreamModule);
   await runCancelAndShutdownTests(supervisorModule);
   await runSetupCancellationRaceTests(supervisorModule);
   await runStdinLifecycleTests(supervisorModule);

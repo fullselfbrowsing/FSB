@@ -11,11 +11,13 @@ import { z } from 'zod';
 import type {
   AdapterDetection,
   AgentEvent,
+  AgentProviderId,
   AgentProviderAdapter,
   ChildExit,
   SupervisedChild,
 } from './adapter.js';
 import { CLAUDE_CODE_ADAPTER_ID } from './adapter.js';
+import { AgentProtocolDriftError } from './claude-stream.js';
 import type { AgentProviderRegistry } from './registry.js';
 import { createProductionAdapterRegistry } from './registry.js';
 import type {
@@ -68,6 +70,55 @@ const START_REQUEST_KEYS = Object.freeze(['id', 'method', 'payload', 'type']);
 const START_PAYLOAD_KEYS = Object.freeze(['adapterId', 'task']);
 const CANCEL_PAYLOAD_KEYS = Object.freeze(['delegationId']);
 const STATUS_PAYLOAD_KEYS = Object.freeze([]);
+
+type DriftExpected =
+  | 'bounded_jsonl'
+  | 'known_event_shape'
+  | 'single_init_session'
+  | 'single_terminal_result'
+  | 'adapter_contract';
+
+type ClaudeDriftReason =
+  | 'configuration_surface'
+  | 'duplicate_init'
+  | 'duplicate_result'
+  | 'event_after_result'
+  | 'event_before_init'
+  | 'invalid_json'
+  | 'invalid_shape'
+  | 'invalid_utf8'
+  | 'line_too_large'
+  | 'missing_result'
+  | 'session_mismatch'
+  | 'unknown_event_type'
+  | 'unknown_stream_event'
+  | 'unknown_system_subtype';
+
+type DriftObserved = ClaudeDriftReason | 'protocol_drift';
+
+interface DriftTerminalDetail {
+  readonly adapterId: typeof CLAUDE_CODE_ADAPTER_ID;
+  readonly expected: DriftExpected;
+  readonly observed: DriftObserved;
+}
+
+const DRIFT_LABEL_LIMIT = 64;
+const DRIFT_EXPECTED_BY_REASON = Object.freeze({
+  configuration_surface: 'known_event_shape',
+  duplicate_init: 'single_init_session',
+  duplicate_result: 'single_terminal_result',
+  event_after_result: 'single_terminal_result',
+  event_before_init: 'single_init_session',
+  invalid_json: 'bounded_jsonl',
+  invalid_shape: 'known_event_shape',
+  invalid_utf8: 'bounded_jsonl',
+  line_too_large: 'bounded_jsonl',
+  missing_result: 'single_terminal_result',
+  session_mismatch: 'single_init_session',
+  unknown_event_type: 'known_event_shape',
+  unknown_stream_event: 'known_event_shape',
+  unknown_system_subtype: 'known_event_shape',
+} satisfies Readonly<Record<ClaudeDriftReason, DriftExpected>>);
 
 const DelegateStartSchema = z.object({
   adapterId: z.literal(CLAUDE_CODE_ADAPTER_ID),
@@ -244,6 +295,7 @@ interface RunStreams {
 interface DelegationRun {
   readonly delegationId: string;
   readonly requestId: string;
+  readonly adapterId: AgentProviderId;
   readonly task: string;
   readonly emit: (event: ExtEvent) => void;
   readonly adapter: AgentProviderAdapter;
@@ -524,11 +576,59 @@ function parseStatusRequest(request: ExtRequest): void {
 function diagnosticTerminal(
   code: DelegationFailureCode | 'cancelled',
   profileVersion: string | null,
+  detail?: DriftTerminalDetail,
 ): Readonly<Record<string, unknown>> {
   return Object.freeze({
     type: 'diagnostic',
     code,
     ...(profileVersion ? { profileVersion } : {}),
+    ...(code === 'agent_protocol_drift'
+      ? { detail: detail ?? driftTerminalDetail(null, CLAUDE_CODE_ADAPTER_ID) }
+      : {}),
+  });
+}
+
+function isBoundedDriftLabel(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= DRIFT_LABEL_LIMIT;
+}
+
+function driftTerminalDetail(
+  error: unknown,
+  adapterId: unknown,
+): DriftTerminalDetail {
+  let expected: DriftExpected = 'adapter_contract';
+  let observed: DriftObserved = 'protocol_drift';
+
+  if (error instanceof AgentProtocolDriftError) {
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'reason');
+    const reason = descriptor && 'value' in descriptor ? descriptor.value : null;
+    if (
+      isBoundedDriftLabel(reason)
+      && Object.hasOwn(DRIFT_EXPECTED_BY_REASON, reason)
+    ) {
+      const typedReason = reason as ClaudeDriftReason;
+      expected = DRIFT_EXPECTED_BY_REASON[typedReason];
+      observed = typedReason;
+    }
+  }
+
+  const safeAdapterId = adapterId === CLAUDE_CODE_ADAPTER_ID
+    && isBoundedDriftLabel(adapterId)
+    ? adapterId
+    : CLAUDE_CODE_ADAPTER_ID;
+  if (
+    !isBoundedDriftLabel(expected)
+    || !isBoundedDriftLabel(observed)
+  ) {
+    expected = 'adapter_contract';
+    observed = 'protocol_drift';
+  }
+  return Object.freeze({
+    adapterId: safeAdapterId,
+    expected,
+    observed,
   });
 }
 
@@ -759,7 +859,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private async start(
     requestId: string,
     task: string,
-    adapterId: string,
+    adapterId: AgentProviderId,
     emit: (event: ExtEvent) => void,
     context?: ExtRequestContext,
   ): Promise<Record<string, unknown>> {
@@ -776,6 +876,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     const run: DelegationRun = {
       delegationId,
       requestId,
+      adapterId,
       task,
       emit,
       adapter,
@@ -836,7 +937,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
       run.runtimeOwned = true;
       const spec = await run.adapter.buildSpawn({ text: run.task }, {
-        adapterId: CLAUDE_CODE_ADAPTER_ID,
+        adapterId: run.adapterId,
         detection,
         delegationId: run.delegationId,
         runtimeFingerprint,
@@ -850,7 +951,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const createdAt = this.wallNow();
       const prepared = await this.dependencies.runtimeFiles.prepareRun({
         delegationId: run.delegationId,
-        adapterId: CLAUDE_CODE_ADAPTER_ID,
+        adapterId: run.adapterId,
         profileVersion,
         createdAt,
         binaryRealPath: spec.command,
@@ -933,6 +1034,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     } catch (error) {
       if (run.settled) return;
       if (run.stopRequested) return;
+      const driftDetail = driftTerminalDetail(error, run.adapterId);
       let code = this.failureCode(error);
       try {
         await this.terminateAndCleanup(run);
@@ -945,7 +1047,15 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (code === 'tree_unsettled' || code === 'runtime_cleanup_failed') {
         this.markDegraded(code);
       }
-      this.settleOnce(run, 'failed', diagnosticTerminal(code, profileVersion));
+      this.settleOnce(
+        run,
+        'failed',
+        diagnosticTerminal(
+          code,
+          profileVersion,
+          code === 'agent_protocol_drift' ? driftDetail : undefined,
+        ),
+      );
     } finally {
       run.resolveSetup();
     }

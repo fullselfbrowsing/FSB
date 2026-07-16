@@ -60,7 +60,16 @@ async function run() {
     payload: {
       delegationId: 'delegation_server_drift',
       status: 'failed',
-      terminal: { type: 'diagnostic', code: 'agent_protocol_drift' },
+      terminal: {
+        type: 'diagnostic',
+        code: 'agent_protocol_drift',
+        profileVersion: '2.1.177',
+        detail: {
+          adapterId: 'claude-code',
+          expected: 'known_event_shape',
+          observed: 'unknown_event_type',
+        },
+      },
     },
   };
   assert.deepStrictEqual(
@@ -70,6 +79,11 @@ async function run() {
   );
   assert.strictEqual(domainDriftResponse.error, undefined, 'agent protocol drift is not a transport error');
   assert(!EXT_ERROR_CODES.includes('agent_protocol_drift'), 'domain drift does not expand the exact-five transport union');
+  assert.deepStrictEqual(
+    Object.keys(domainDriftResponse.payload.terminal.detail),
+    ['adapterId', 'expected', 'observed'],
+    'domain drift detail has only the exact safe three-field projection',
+  );
 
   const adapterSource = fs.readFileSync(
     path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'adapter.ts'),
@@ -131,6 +145,20 @@ async function run() {
     path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts'),
     'utf8',
   );
+  assert(
+    supervisorSource.includes("import { AgentProtocolDriftError } from './claude-stream.js';"),
+    'the supervisor recognizes the production typed drift before generic error normalization',
+  );
+  for (const safeLabel of [
+    'bounded_jsonl',
+    'known_event_shape',
+    'single_init_session',
+    'single_terminal_result',
+    'adapter_contract',
+    'protocol_drift',
+  ]) {
+    assert(supervisorSource.includes(safeLabel), `supervisor pins closed drift label ${safeLabel}`);
+  }
   const runtimeFilesSource = fs.readFileSync(
     path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'runtime-files.ts'),
     'utf8',
