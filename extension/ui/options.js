@@ -136,6 +136,8 @@ let providerEvidenceRefreshQueued = false;
 let providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
 let providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
 let providerCompatibilityExpiryHandle = null;
+let providerCompatibilityProjectionPromise = null;
+let providerCompatibilityProjectionGeneration = 0;
 let providerManualRefreshGeneration = 0;
 let providerManualSuccess = null;
 const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
@@ -1199,6 +1201,11 @@ function clearProviderCompatibilityExpiryTimer() {
   providerCompatibilityExpiryHandle = null;
 }
 
+function beginProviderCompatibilityProjectionGeneration() {
+  providerCompatibilityProjectionGeneration += 1;
+  return providerCompatibilityProjectionGeneration;
+}
+
 function scheduleProviderCompatibilityExpiry(expiresAt) {
   clearProviderCompatibilityExpiryTimer();
   if (!Number.isSafeInteger(expiresAt) || expiresAt < 0) return;
@@ -1219,9 +1226,15 @@ function scheduleProviderCompatibilityExpiry(expiresAt) {
 
 function refreshProviderCompatibilityProjection() {
   if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
+  if (providerCompatibilityProjectionPromise) return providerCompatibilityProjectionPromise;
   const helper = getProviderPanelHelper();
-  return requestMcpClients(false)
+  const projectionGeneration = beginProviderCompatibilityProjectionGeneration();
+  let tracked;
+  tracked = requestMcpClients(false)
     .then((result) => {
+      if (projectionGeneration !== providerCompatibilityProjectionGeneration) {
+        return providerPanelState.clients;
+      }
       if (result.refreshOutcome === 'unavailable') {
         throw new Error('provider_compatibility_unavailable');
       }
@@ -1240,6 +1253,9 @@ function refreshProviderCompatibilityProjection() {
       return providerPanelState.clients;
     })
     .catch(() => {
+      if (projectionGeneration !== providerCompatibilityProjectionGeneration) {
+        return providerPanelState.clients;
+      }
       clearProviderCompatibilityExpiryTimer();
       providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
       renderProviderCompatibility();
@@ -1248,7 +1264,14 @@ function refreshProviderCompatibilityProjection() {
         renderSelectedAgentCompatibility(helper, providerPanelState.agentProviderId);
       }
       return providerPanelState.clients;
+    })
+    .finally(() => {
+      if (providerCompatibilityProjectionPromise === tracked) {
+        providerCompatibilityProjectionPromise = null;
+      }
     });
+  providerCompatibilityProjectionPromise = tracked;
+  return tracked;
 }
 
 function refreshProviderEvidence({
@@ -1266,7 +1289,11 @@ function refreshProviderEvidence({
   const manualGeneration = liveCompatibility === true
     ? ++providerManualRefreshGeneration
     : null;
-  if (manualGeneration !== null) providerManualSuccess = null;
+  if (manualGeneration !== null) {
+    providerManualSuccess = null;
+    beginProviderCompatibilityProjectionGeneration();
+    clearProviderCompatibilityExpiryTimer();
+  }
   setProviderStatusRefreshing(true);
   if (!preserveCurrentSuccess) {
     providerPanelState.evidenceStatus = 'loading';

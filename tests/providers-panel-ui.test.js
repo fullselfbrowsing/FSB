@@ -1291,6 +1291,9 @@ function createProviderHarness(initialStorage, harnessOptions) {
         timer.fn();
       });
     },
+    get pendingTimeoutDelays() {
+      return Array.from(heldTimeouts.values(), (timer) => timer.delay);
+    },
     setNow(value) { currentNowMs = value; },
     state() { return vm.runInContext('providerPanelState', context); },
     dashboardState() { return vm.runInContext('dashboardState', context); }
@@ -1634,6 +1637,22 @@ function nonCompatibilityClientSnapshot(harness) {
     providerId,
     Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'compatibility'))
   ]));
+}
+
+function providerEvidenceStateSnapshot(harness) {
+  return {
+    evidenceStatus: harness.state().evidenceStatus,
+    hasSuccessfulEvidence: harness.state().hasSuccessfulEvidence,
+    badges: harness.evidenceBadges.map((badge) => ({
+      providerId: badge.dataset.providerEvidence,
+      text: badge.textContent,
+      title: badge.getAttribute('title'),
+      stale: badge.getAttribute('data-stale')
+    })),
+    installation: harness.agentInstallationStatus.textContent,
+    connection: harness.agentConnectionStatus.textContent,
+    setup: harness.agentSetupStatus.textContent
+  };
 }
 
 function providerDescription(harness, providerId) {
@@ -2359,6 +2378,181 @@ async function runProviderEvidenceTests() {
   }, 'automatic expiry changes only the expiring Supported compatibility projection');
   assert.deepStrictEqual(compatibilityIdentitySnapshot(expiring), beforeAutomaticExpiry,
     'automatic expiry preserves focus, selection, row order, form values, dirty state, and storage');
+
+  const overlapNewCheckedAt = expiryAt - (5 * 60 * 1000);
+  const overlapNewExpiryAt = overlapNewCheckedAt + (15 * 60 * 1000);
+  const overlapNewDelay = overlapNewExpiryAt - expiryAt;
+  const overlapInitialClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: expiryCheckedAt
+  });
+  const overlapExpiredClients = compatibilityClients({
+    status: 'degraded', reason: 'evidence_stale', checkedAt: expiryCheckedAt
+  });
+  const overlapManualClients = compatibilityClients({
+    status: 'supported', reason: 'within_tested_range', checkedAt: overlapNewCheckedAt
+  });
+
+  for (const releaseOrder of ['manual-first', 'expiry-first']) {
+    const oldExpiryResponse = createDeferred();
+    const manualResponse = createDeferred();
+    let overlapCacheReads = 0;
+    let overlapDaemonRequests = 0;
+    let overlapDurableWrites = 0;
+    const overlap = createProviderHarness({}, {
+      nowMs: expiryCheckedAt,
+      heldTimerDelays: [5000, 15 * 60 * 1000, overlapNewDelay],
+      runtimeDispatch(message) {
+        if (message.action === 'getMcpClients') {
+          overlapCacheReads += 1;
+          if (overlapCacheReads === 1) {
+            return {
+              success: true,
+              refreshOutcome: 'stale',
+              compatibilityExpiresAt: expiryAt,
+              clients: overlapInitialClients
+            };
+          }
+          if (overlapCacheReads === 2) return oldExpiryResponse.promise;
+        }
+        if (message.action === 'refreshMcpCompatibility') {
+          overlapDaemonRequests += 1;
+          overlapDurableWrites += 1;
+          return manualResponse.promise;
+        }
+        throw new Error(`unexpected ${releaseOrder} overlap runtime action`);
+      }
+    });
+    overlap.context.setProviderSelection('agent', 'claude-code', { markDirty: false });
+    overlap.modelName.appendChild(makeOption('overlap-model', 'overlap-model'));
+    overlap.modelName.value = 'overlap-model';
+    overlap.anthropicApiKey.value = 'preserved-overlap-key';
+    overlap.dashboardState().hasUnsavedChanges = true;
+    overlap.refreshButton.focus();
+    await overlap.context.refreshProviderEvidence();
+    overlap.setNow(expiryAt);
+    const beforeOverlapIdentity = compatibilityIdentitySnapshot(overlap);
+    const beforeOverlapNonCompatibility = nonCompatibilityClientSnapshot(overlap);
+    let manualEvidence = null;
+
+    overlap.advanceTimersBy(15 * 60 * 1000);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepStrictEqual(overlap.runtimeCalls, [
+      { action: 'getMcpClients' },
+      { action: 'getMcpClients' }
+    ], `${releaseOrder}: the old expiry cache request is held before manual refresh`);
+
+    const overlappingManual = overlap.context.refreshProviderEvidence({ announce: true });
+    assert.deepStrictEqual(overlap.runtimeCalls, [
+      { action: 'getMcpClients' },
+      { action: 'getMcpClients' },
+      { action: 'refreshMcpCompatibility' }
+    ], `${releaseOrder}: manual refresh never coalesces into the older cache-only expiry request`);
+
+    if (releaseOrder === 'manual-first') {
+      manualResponse.resolve({
+        success: true,
+        refreshOutcome: 'refreshed',
+        compatibilityExpiresAt: overlapNewExpiryAt,
+        clients: overlapManualClients
+      });
+      await overlappingManual;
+      manualEvidence = providerEvidenceStateSnapshot(overlap);
+      assert.strictEqual(compatibilityStatus(overlap, 'claude-code').textContent, 'Supported');
+      assert.strictEqual(overlap.pendingTimeoutDelays.includes(overlapNewDelay), true,
+        'newer manual success owns the replacement compatibility deadline');
+      oldExpiryResponse.resolve({
+        success: true,
+        refreshOutcome: 'stale',
+        compatibilityExpiresAt: null,
+        clients: overlapExpiredClients
+      });
+      await flushHarness();
+      await flushHarness();
+    } else {
+      oldExpiryResponse.resolve({
+        success: true,
+        refreshOutcome: 'stale',
+        compatibilityExpiresAt: null,
+        clients: overlapExpiredClients
+      });
+      await flushHarness();
+      assert.strictEqual(compatibilityStatus(overlap, 'claude-code').textContent, 'Supported',
+        'an older expiry response is discarded as soon as a newer manual generation begins');
+      manualResponse.resolve({
+        success: true,
+        refreshOutcome: 'refreshed',
+        compatibilityExpiresAt: overlapNewExpiryAt,
+        clients: overlapManualClients
+      });
+      await overlappingManual;
+      manualEvidence = providerEvidenceStateSnapshot(overlap);
+    }
+
+    assert.strictEqual(compatibilityStatus(overlap, 'claude-code').textContent, 'Supported',
+      `${releaseOrder}: final row retains the newer manual compatibility projection`);
+    assert.strictEqual(overlap.agentCompatibilityStatus.textContent, 'Supported',
+      `${releaseOrder}: selected details retain the newer manual compatibility projection`);
+    assert.strictEqual(overlap.announcement.textContent, 'Provider status refreshed.',
+      `${releaseOrder}: final announcement agrees with the newer Supported projection`);
+    assert.strictEqual(overlap.state().evidenceStatus, 'ready');
+    assert.strictEqual(overlap.pendingTimeoutDelays.includes(overlapNewDelay), true,
+      `${releaseOrder}: the older response cannot cancel the newer expiry deadline`);
+    assert.deepStrictEqual(nonCompatibilityClientSnapshot(overlap), beforeOverlapNonCompatibility,
+      `${releaseOrder}: overlap preserves all non-compatibility client evidence`);
+    assert.deepStrictEqual(providerEvidenceStateSnapshot(overlap), manualEvidence,
+      `${releaseOrder}: older expiry work cannot alter the manual evidence projection`);
+    assert.deepStrictEqual(compatibilityIdentitySnapshot(overlap), beforeOverlapIdentity,
+      `${releaseOrder}: overlap preserves focus, selection, forms, recommendation, dirty state, and writes`);
+    assert.strictEqual(overlapCacheReads, 2);
+    assert.strictEqual(overlapDaemonRequests, 1);
+    assert.strictEqual(overlapDurableWrites, 1,
+      `${releaseOrder}: overlap performs one manual daemon/write generation only`);
+  }
+
+  const replacementManualResponse = createDeferred();
+  let replacementCacheReads = 0;
+  const replacingTimer = createProviderHarness({}, {
+    nowMs: expiryCheckedAt,
+    heldTimerDelays: [5000, 15 * 60 * 1000, overlapNewDelay],
+    runtimeDispatch(message) {
+      if (message.action === 'getMcpClients') {
+        replacementCacheReads += 1;
+        return {
+          success: true,
+          refreshOutcome: 'stale',
+          compatibilityExpiresAt: expiryAt,
+          clients: overlapInitialClients
+        };
+      }
+      if (message.action === 'refreshMcpCompatibility') return replacementManualResponse.promise;
+      throw new Error('unexpected timer-replacement runtime action');
+    }
+  });
+  await replacingTimer.context.refreshProviderEvidence();
+  replacingTimer.setNow(expiryAt);
+  assert.strictEqual(replacingTimer.pendingTimeoutDelays.includes(15 * 60 * 1000), true,
+    'the original compatibility deadline is armed before manual refresh');
+  const replacingManual = replacingTimer.context.refreshProviderEvidence({ announce: true });
+  assert.strictEqual(replacingTimer.pendingTimeoutDelays.includes(15 * 60 * 1000), false,
+    'manual refresh cancels the older compatibility timer as soon as it begins');
+  replacementManualResponse.resolve({
+    success: true,
+    refreshOutcome: 'refreshed',
+    compatibilityExpiresAt: overlapNewExpiryAt,
+    clients: overlapManualClients
+  });
+  await replacingManual;
+  assert.strictEqual(replacingTimer.pendingTimeoutDelays.includes(overlapNewDelay), true,
+    'manual success arms only its newer replacement deadline');
+  replacingTimer.advanceTimersBy(15 * 60 * 1000);
+  await flushHarness();
+  assert.strictEqual(replacementCacheReads, 1,
+    'advancing the cancelled older deadline cannot start a cache projection');
+  assert.deepStrictEqual(replacingTimer.runtimeCalls, [
+    { action: 'getMcpClients' },
+    { action: 'refreshMcpCompatibility' }
+  ], 'timer replacement performs one initial cache read and one explicit live request');
 
   console.log('Providers panel UI: coalescing, manual refresh, storage debounce, and section entry');
   const coalesced = createProviderHarness({}, { holdRuntime: true });
