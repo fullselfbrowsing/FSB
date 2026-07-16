@@ -181,6 +181,25 @@ function extractBetween(source, startMarker, endMarker) {
   return source.slice(start, end);
 }
 
+async function refreshMcpCompatibilityOffline(providers, registry) {
+  let refreshOutcome = 'unavailable';
+  try {
+    const envelope = await providers.read();
+    const cached = envelope && Object.prototype.hasOwnProperty.call(envelope, 'compatibility')
+      ? providers.validateCompatibilitySnapshot(envelope.compatibility)
+      : null;
+    refreshOutcome = cached ? 'stale' : 'unavailable';
+  } catch (_error) {
+    refreshOutcome = 'unavailable';
+  }
+
+  const liveRecords = registry && typeof registry.listAgents === 'function'
+    ? await Promise.resolve(registry.listAgents())
+    : [];
+  const clients = await providers.getMergedClients(liveRecords);
+  return { clients, refreshOutcome };
+}
+
 function loadRuntimeQueryHarness(providers, registry) {
   const source = fs.readFileSync(backgroundPath, 'utf8');
   const handler = extractBetween(
@@ -203,7 +222,8 @@ function loadRuntimeQueryHarness(providers, registry) {
     fsbHandleDelegationCommand() { return null; },
     automationLogger: { logComm() {} },
     FsbMcpAgentProviders: providers,
-    fsbAgentRegistryInstance: registry
+    fsbAgentRegistryInstance: registry,
+    fsbRefreshMcpCompatibility: () => refreshMcpCompatibilityOffline(providers, registry)
   };
   context.globalThis = context;
   vm.runInNewContext(
@@ -393,14 +413,21 @@ async function main() {
   const dispatchInventoryQuery = loadRuntimeQueryHarness(providers, rehydratedRegistry);
   const queryResponse = clone(await dispatchInventoryQuery({ action: 'getMcpClients' }));
   assert.equal(queryResponse.success, true, 'fresh same-context getMcpClients query succeeds');
+  assert.equal(queryResponse.refreshOutcome, 'unavailable',
+    'offline compatibility refresh reports the bounded unavailable outcome');
   const claude = queryResponse.clients['claude-code'];
   assert.equal(claude.clicked.source, 'fan');
   assert.equal(claude.installed.version, '2.1.178');
   assert.equal(claude.connected.version, '2.1.178');
   assert.equal(claude.live.agentId, reconnect.agentId);
+  assert.deepEqual(claude.compatibility, {
+    status: 'unsupported',
+    reason: 'matrix_invalid',
+    checkedAt: null
+  }, 'absent offline compatibility evidence remains an explicit fail-closed projection');
   assert.deepEqual(Object.keys(claude), [
-    'id', 'raw', 'displayName', 'clicked', 'installed', 'connected', 'live'
-  ], 'final canonical row preserves all four evidence objects and exact shape');
+    'id', 'raw', 'displayName', 'clicked', 'installed', 'connected', 'live', 'compatibility'
+  ], 'final canonical row preserves all bounded evidence objects and exact shape');
 
   const rawUnknown = queryResponse.clients['raw:futuremcp'];
   assert.equal(rawUnknown.raw, true, 'unknown client stays visible as raw evidence');
