@@ -31,6 +31,7 @@ importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
 try { importScripts('utils/delegation-preflight.js'); } catch (e) { console.error('[FSB] Failed to load delegation-preflight.js:', e.message); }
+try { importScripts('utils/native-host-wake.js'); } catch (e) { console.error('[FSB] Failed to load native-host-wake.js:', e.message); }
 try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
 try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
 try { importScripts('utils/delegation-controller.js'); } catch (e) { console.error('[FSB] Failed to load delegation-controller.js:', e.message); }
@@ -94,6 +95,16 @@ importScripts('utils/overlay-state.js');
 
 // MCP bridge client for local MCP server connection
 try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }
+
+// Native registration detection is advisory only. The helper installs its
+// native-port listeners synchronously, sends no message, and closes on its own
+// short timer. This promise is deliberately independent from SW bootstrap.
+try {
+  if (globalThis.FsbNativeHostWake
+      && typeof globalThis.FsbNativeHostWake.probePresence === 'function') {
+    Promise.resolve(globalThis.FsbNativeHostWake.probePresence()).catch(() => {});
+  }
+} catch (_error) { /* optional native host remains silent at boot */ }
 
 let fsbMcpCompatibilityRefreshPromise = null;
 let fsbMcpCompatibilityPairingStatus = null;
@@ -1581,6 +1592,36 @@ async function fsbDelegationPreflightResult() {
   return { config, result };
 }
 
+const FSB_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS = 5000;
+const FSB_NATIVE_WAKE_BRIDGE_POLL_MS = 50;
+let fsbNativeWakeBridgeAttempt = null;
+
+function fsbNativeWakeBridgeReady() {
+  const state = fsbDelegationBridgeState();
+  return !!state
+    && state.connected === true
+    && state.status === 'connected'
+    && !!state.delegationConnection
+    && state.delegationConnection.state === 'connected';
+}
+
+function fsbBroadcastNativeWakeChecking(attemptId, intentId) {
+  if (!FSB_NATIVE_WAKE_ID_PATTERN.test(attemptId)
+      || !FSB_NATIVE_WAKE_ID_PATTERN.test(intentId)) return false;
+  try {
+    const pending = chrome.runtime.sendMessage({
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: attemptId,
+      intentId: intentId
+    });
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 async function fsbDelegationTaskDigest(task) {
   if (typeof task !== 'string' || task.trim().length === 0 || task.length > 200000) {
     throw new Error('invalid delegation task');
@@ -1605,15 +1646,90 @@ function fsbDelegationTrustFailure(code) {
 }
 
 async function fsbDelegationPreflightCommand(request) {
-  if (!fsbDelegationHasExactKeys(request, ['task', 'type'])
+  const hasIntentId = !!request
+    && typeof request === 'object'
+    && Object.prototype.hasOwnProperty.call(request, 'intentId');
+  const expectedKeys = hasIntentId ? ['intentId', 'task', 'type'] : ['task', 'type'];
+  if (!fsbDelegationHasExactKeys(request, expectedKeys)
       || typeof request.task !== 'string'
-      || request.task.trim().length === 0) {
+      || request.task.trim().length === 0
+      || (hasIntentId && (typeof request.intentId !== 'string'
+        || !FSB_NATIVE_WAKE_ID_PATTERN.test(request.intentId)))) {
     return { ok: false, code: 'invalid_request' };
   }
+  let authority;
+  try {
+    authority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+  }
+  const originalResult = authority.result;
+  if (!originalResult
+      || originalResult.ok !== false
+      || authority.result.code !== 'agent_offline') return originalResult;
+
+  const wakeController = globalThis.FsbNativeHostWake;
+  if (!wakeController || typeof wakeController.ensureWake !== 'function') return originalResult;
+  let wakePromise;
+  try {
+    wakePromise = globalThis.FsbNativeHostWake.ensureWake();
+  } catch (_error) {
+    return originalResult;
+  }
+  if (!wakePromise
+      || typeof wakePromise.then !== 'function'
+      || typeof wakePromise.attemptId !== 'string'
+      || !FSB_NATIVE_WAKE_ID_PATTERN.test(wakePromise.attemptId)) return originalResult;
+
+  const intentId = hasIntentId ? request.intentId : null;
+  if (intentId) {
+    fsbBroadcastNativeWakeChecking(wakePromise.attemptId, intentId);
+  }
+
+  let wakeResult;
+  try {
+    wakeResult = await wakePromise;
+  } catch (_error) {
+    return originalResult;
+  }
+  if (!wakeResult
+      || wakeResult.ok !== true
+      || (wakeResult.outcome !== 'already_running' && wakeResult.outcome !== 'started')) {
+    return originalResult;
+  }
+
+  let bridgePromise;
+  if (fsbNativeWakeBridgeAttempt
+      && fsbNativeWakeBridgeAttempt.attemptId === wakePromise.attemptId) {
+    bridgePromise = fsbNativeWakeBridgeAttempt.promise;
+  } else {
+    bridgePromise = (async () => {
+      armMcpBridge('native-host-wake');
+      for (let elapsed = 0;
+        elapsed < FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS;
+        elapsed += FSB_NATIVE_WAKE_BRIDGE_POLL_MS) {
+        if (fsbNativeWakeBridgeReady()) return true;
+        await new Promise((resolve) => setTimeout(resolve, FSB_NATIVE_WAKE_BRIDGE_POLL_MS));
+      }
+      return fsbNativeWakeBridgeReady();
+    })();
+    fsbNativeWakeBridgeAttempt = Object.freeze({
+      attemptId: wakePromise.attemptId,
+      promise: bridgePromise
+    });
+  }
+
+  let bridgeReady;
+  try {
+    bridgeReady = await bridgePromise;
+  } catch (_error) {
+    return originalResult;
+  }
+  if (bridgeReady !== true) return originalResult;
   try {
     return (await fsbDelegationPreflightResult()).result;
   } catch (_error) {
-    return { ok: false, code: 'agent_offline', providerId: '', providerLabel: 'Selected provider' };
+    return originalResult;
   }
 }
 
