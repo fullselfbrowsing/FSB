@@ -515,10 +515,11 @@ async function testEntryLifetime() {
         return { outcome: 'already_running', reason: 'daemon_already_ready' };
       },
     });
+    stdin.on('error', () => {});
     stdin.write(frameObject(validRequest()));
     stdin.end();
-    stdin.emit('error', new Error('late stream error'));
     assert.equal(await running, 0);
+    stdin.emit('error', new Error('late stream error'));
     assert.equal(handlerCalls, 1);
     assert.equal(stdout.writes, 1);
     assert.equal(stderr.bytes().length, 0);
