@@ -9,6 +9,16 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { request as requestHttp } from 'node:http';
+import { fileURLToPath } from 'node:url';
+
+export type NativeHostReadable = NodeJS.ReadableStream & {
+  removeListener(event: string, listener: (...args: never[]) => void): unknown;
+};
+
+export type NativeHostWritable = NodeJS.WritableStream & {
+  once(event: string, listener: (...args: never[]) => void): unknown;
+  removeListener(event: string, listener: (...args: never[]) => void): unknown;
+};
 
 export type NativeHostHttpRequest = Readonly<{
   url: string;
@@ -58,6 +68,18 @@ export interface NativeHostDaemonDependencies {
     argv: readonly string[],
     options: NativeHostSpawnOptions,
   ): NativeHostSpawnHandle;
+}
+
+export interface NativeHostProductionEnvironment {
+  stdin: NativeHostReadable;
+  stdout: NativeHostWritable;
+  stderr: NativeHostWritable;
+  argv: readonly string[];
+  platform: NodeJS.Platform;
+  absoluteEntryPath: string;
+  absoluteNode: string;
+  daemonDependencies: NativeHostDaemonDependencies;
+  settleExitCode(status: 0 | 1): void;
 }
 
 function isMissing(error: unknown): boolean {
@@ -193,5 +215,25 @@ export function createNativeHostDaemonDependencies(
     ) => (
       spawnChild(command, [...argv], options) as unknown as NativeHostSpawnHandle
     ),
+  });
+}
+
+export function createNativeHostProductionEnvironment(
+  entryUrl: string,
+): NativeHostProductionEnvironment {
+  const daemonDependencies = createNativeHostDaemonDependencies();
+  return Object.freeze({
+    stdin: process.stdin,
+    stdout: process.stdout,
+    stderr: process.stderr,
+    argv: Object.freeze(process.argv.slice(2)),
+    platform: process.platform,
+    absoluteEntryPath: fileURLToPath(entryUrl),
+    absoluteNode: process.execPath,
+    daemonDependencies,
+    settleExitCode: (status: 0 | 1) => {
+      process.stdin.pause();
+      process.exitCode = status;
+    },
   });
 }

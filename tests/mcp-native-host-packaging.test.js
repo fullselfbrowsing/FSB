@@ -1038,8 +1038,12 @@ function writeBoundaryGraph(fixtureRoot, mode) {
   );
   mkdirSync(graphRoot, { recursive: true });
   writeFileSync(
+    path.join(graphRoot, `index.${extension}`),
+    "import { runProductionNativeHostEntry } from './entry.js';\nimport { productionEnvironment } from './platform.js';\nrunProductionNativeHostEntry(productionEnvironment);\n",
+  );
+  writeFileSync(
     path.join(graphRoot, `entry.${extension}`),
-    "import { protocolValue } from './protocol.js';\nexport const entryValue = protocolValue;\n",
+    "import { wakeServeDaemon } from './daemon.js';\nimport { protocolValue } from './protocol.js';\nimport { runtimeValue } from './runtime-layout.js';\nexport function runProductionNativeHostEntry(value) { return wakeServeDaemon(value, protocolValue, runtimeValue); }\n",
   );
   writeFileSync(
     path.join(graphRoot, `protocol.${extension}`),
@@ -1048,6 +1052,18 @@ function writeBoundaryGraph(fixtureRoot, mode) {
   writeFileSync(
     path.join(graphRoot, `constants.${extension}`),
     "export const constantValue = 'leaf';\n",
+  );
+  writeFileSync(
+    path.join(graphRoot, `daemon.${extension}`),
+    "import { join } from 'node:path';\nimport { constantValue } from './constants.js';\nconst runtime = { absoluteStableBuildIndex: join('/', constantValue), absoluteNode: '/node' };\nconst dependencies = { spawn() {} };\nconst argv = [runtime.absoluteStableBuildIndex, 'serve', '--host', '127.0.0.1', '--port', '7226'];\nconst options = { shell: false, detached: true, stdio: 'ignore', windowsHide: true };\nexport function wakeServeDaemon() { return dependencies.spawn(runtime.absoluteNode, argv, options); }\n",
+  );
+  writeFileSync(
+    path.join(graphRoot, `platform.${extension}`),
+    "import { spawn as spawnChild } from 'node:child_process';\nconst command = '/node';\nconst argv = [];\nconst options = {};\nexport const productionEnvironment = spawnChild(command, [...argv], options);\n",
+  );
+  writeFileSync(
+    path.join(graphRoot, `runtime-layout.${extension}`),
+    "import { posix } from 'node:path';\nimport { constantValue } from './constants.js';\nexport const runtimeValue = posix.join('/', constantValue);\n",
   );
   return graphRoot;
 }
@@ -1082,8 +1098,12 @@ function testNativeHostImportBoundary() {
   const packJson = JSON.parse(packResult.stdout);
   assert.equal(Array.isArray(packJson), true);
   const packedPaths = packJson.flatMap((entry) => entry.files || []).map((entry) => entry.path);
+  assert.equal(packedPaths.includes('build/native-host/index.js'), true);
   assert.equal(packedPaths.includes('build/native-host/entry.js'), true);
+  assert.equal(packedPaths.includes('build/native-host/daemon.js'), true);
+  assert.equal(packedPaths.includes('build/native-host/platform.js'), true);
   assert.equal(packedPaths.includes('build/native-host/protocol.js'), true);
+  assert.equal(packedPaths.includes('build/native-host/runtime-layout.js'), true);
   assert.equal(
     packedPaths.some((entry) => /com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp/iu.test(entry)),
     false,
@@ -1149,6 +1169,14 @@ function testNativeHostImportBoundary() {
       "import { spawn } from 'node:child_process';\nexport const protocolValue = spawn;\n",
     );
     assert.notEqual(invoke(['--source']).status, 0, 'production process spawn edge is forbidden');
+    writeBoundaryGraph(fixtureRoot, 'source');
+
+    const platformFixture = path.join(sourceRoot, 'platform.ts');
+    writeFileSync(
+      platformFixture,
+      `${readFileSync(platformFixture, 'utf8')}\nspawnChild('/other', [], {});\n`,
+    );
+    assert.notEqual(invoke(['--source']).status, 0, 'a second child-process edge is forbidden');
     writeBoundaryGraph(fixtureRoot, 'source');
 
     writeFileSync(

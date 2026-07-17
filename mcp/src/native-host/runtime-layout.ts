@@ -92,6 +92,20 @@ export interface NativeHostOwnerMarker {
   installToken: string;
 }
 
+export interface NativeHostWakeRuntimeLayoutInput {
+  platform: NativeHostPlatform;
+  absoluteEntryPath: string;
+  absoluteNode: string;
+}
+
+export interface NativeHostWakeRuntimeLayout {
+  platform: NativeHostPlatform;
+  markerPath: string;
+  stableRuntimeRoot: string;
+  absoluteNode: string;
+  absoluteStableBuildIndex: string;
+}
+
 export type NativeHostRuntimeLayoutValidation =
   | Readonly<{ ok: true }>
   | Readonly<{ ok: false; reason: string }>;
@@ -115,6 +129,37 @@ function boundedString(value: unknown): value is string {
     && !value.includes('\0')
     && !value.includes('\r')
     && !value.includes('\n');
+}
+
+function exactDataValues(
+  value: unknown,
+  expectedKeys: readonly string[],
+  code: string,
+): Readonly<Record<string, unknown>> {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) refuse(code);
+    if (Object.getPrototypeOf(value) !== Object.prototype) refuse(code);
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== expectedKeys.length) refuse(code);
+    const fields: Record<string, unknown> = Object.create(null);
+    for (let index = 0; index < expectedKeys.length; index += 1) {
+      const key = expectedKeys[index];
+      if (keys[index] !== key) refuse(code);
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        !descriptor
+        || !descriptor.enumerable
+        || !Object.hasOwn(descriptor, 'value')
+      ) {
+        refuse(code);
+      }
+      fields[key] = descriptor.value;
+    }
+    return fields;
+  } catch (error) {
+    if (error instanceof Error && error.message === code) throw error;
+    return refuse(code);
+  }
 }
 
 function pathApi(platform: NativeHostPlatform): typeof posix | typeof win32 {
@@ -479,5 +524,116 @@ export function createNativeHostOwnerMarker(
     launcherRelativePath: layout.launcherRelativePath,
     artifactSha256,
     installToken: layout.installToken,
+  });
+}
+
+export function resolveNativeHostWakeRuntimeLayout(
+  input: unknown,
+): NativeHostWakeRuntimeLayout {
+  const fields = exactDataValues(
+    input,
+    ['platform', 'absoluteEntryPath', 'absoluteNode'],
+    'FSBNH_WAKE_RUNTIME',
+  );
+  if (!['darwin', 'linux', 'win32'].includes(String(fields.platform))) {
+    refuse('FSBNH_WAKE_RUNTIME');
+  }
+  const platform = fields.platform as NativeHostPlatform;
+  const api = pathApi(platform);
+  const absoluteEntryPath = normalizedAbsolutePath(
+    fields.absoluteEntryPath,
+    platform,
+    'FSBNH_WAKE_RUNTIME',
+  );
+  const absoluteNode = normalizedAbsolutePath(
+    fields.absoluteNode,
+    platform,
+    'FSBNH_WAKE_RUNTIME',
+  );
+  const entryParts = NATIVE_HOST_ENTRY_RELATIVE_PATH.split('/');
+  let stableRuntimeRoot = absoluteEntryPath;
+  for (let index = 0; index < entryParts.length; index += 1) {
+    stableRuntimeRoot = api.dirname(stableRuntimeRoot);
+  }
+  if (
+    stableRuntimeRoot === api.parse(stableRuntimeRoot).root
+    || !pathsEqual(
+      absoluteEntryPath,
+      api.join(stableRuntimeRoot, ...entryParts),
+      platform,
+    )
+  ) {
+    refuse('FSBNH_WAKE_RUNTIME');
+  }
+  return Object.freeze({
+    platform,
+    markerPath: api.join(stableRuntimeRoot, 'owner.json'),
+    stableRuntimeRoot,
+    absoluteNode,
+    absoluteStableBuildIndex: api.join(
+      stableRuntimeRoot,
+      'runtime',
+      'package',
+      'build',
+      'index.js',
+    ),
+  });
+}
+
+export function parseNativeHostOwnerMarker(
+  value: unknown,
+  expectedPlatform: NativeHostPlatform,
+): NativeHostOwnerMarker {
+  if (!['darwin', 'linux', 'win32'].includes(expectedPlatform)) {
+    refuse('FSBNH_WAKE_OWNER_MARKER');
+  }
+  const fields = exactDataValues(
+    value,
+    [
+      'schema',
+      'owner',
+      'host',
+      'origin',
+      'platform',
+      'packageVersion',
+      'launcherRelativePath',
+      'artifactSha256',
+      'installToken',
+    ],
+    'FSBNH_WAKE_OWNER_MARKER',
+  );
+  const expectedLauncherRelativePath = expectedPlatform === 'win32'
+    ? NATIVE_HOST_WINDOWS_LAUNCHER_RELATIVE_PATH
+    : NATIVE_HOST_POSIX_LAUNCHER_RELATIVE_PATH;
+  if (
+    fields.schema !== NATIVE_HOST_OWNER_MARKER_SCHEMA
+    || fields.owner !== NATIVE_HOST_OWNER
+    || fields.host !== NATIVE_HOST_NAME
+    || fields.platform !== expectedPlatform
+    || typeof fields.origin !== 'string'
+    || !fields.origin.startsWith('chrome-extension://')
+    || !fields.origin.endsWith('/')
+    || !isNativeHostExtensionId(fields.origin.slice(19, -1))
+    || fields.origin !== nativeHostOrigin(fields.origin.slice(19, -1))
+    || typeof fields.packageVersion !== 'string'
+    || !PACKAGE_VERSION_PATTERN.test(fields.packageVersion)
+    || fields.launcherRelativePath !== expectedLauncherRelativePath
+    || typeof fields.artifactSha256 !== 'string'
+    || !SHA256_PATTERN.test(fields.artifactSha256)
+    || typeof fields.installToken !== 'string'
+    || !INSTALL_TOKEN_PATTERN.test(fields.installToken)
+  ) {
+    refuse('FSBNH_WAKE_OWNER_MARKER');
+  }
+  return Object.freeze({
+    schema: NATIVE_HOST_OWNER_MARKER_SCHEMA,
+    owner: NATIVE_HOST_OWNER,
+    host: NATIVE_HOST_NAME,
+    origin: fields.origin,
+    platform: expectedPlatform,
+    packageVersion: fields.packageVersion,
+    launcherRelativePath: expectedLauncherRelativePath,
+    artifactSha256: fields.artifactSha256,
+    installToken: fields.installToken,
   });
 }

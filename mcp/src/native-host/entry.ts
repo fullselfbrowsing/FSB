@@ -1,3 +1,9 @@
+import { wakeServeDaemon } from './daemon.js';
+import type {
+  NativeHostDaemonDependencies,
+  NativeHostReadable,
+  NativeHostWritable,
+} from './platform.js';
 import {
   encodeNativeWakeResponse,
   readNativeWakeRequest,
@@ -6,6 +12,10 @@ import {
   type NativeWakeRequest,
   type NativeWakeResponse,
 } from './protocol.js';
+import {
+  parseNativeHostOwnerMarker,
+  resolveNativeHostWakeRuntimeLayout,
+} from './runtime-layout.js';
 
 type NativeWakeHandlerResult = Readonly<{
   outcome: NativeWakeResponse['outcome'];
@@ -16,19 +26,10 @@ type NativeWakeHandler = (
   request: NativeWakeRequest,
 ) => Promise<NativeWakeHandlerResult> | NativeWakeHandlerResult;
 
-type NativeReadable = NodeJS.ReadableStream & {
-  removeListener(event: string, listener: (...args: never[]) => void): unknown;
-};
-
-type NativeWritable = NodeJS.WritableStream & {
-  once(event: string, listener: (...args: never[]) => void): unknown;
-  removeListener(event: string, listener: (...args: never[]) => void): unknown;
-};
-
 export type NativeHostEntryDependencies = Readonly<{
-  stdin: NativeReadable;
-  stdout: NativeWritable;
-  stderr: NativeWritable;
+  stdin: NativeHostReadable;
+  stdout: NativeHostWritable;
+  stderr: NativeHostWritable;
   argv: unknown;
   expectedOrigin: unknown;
   handleWake: NativeWakeHandler;
@@ -36,6 +37,45 @@ export type NativeHostEntryDependencies = Readonly<{
   setTimer?: typeof setTimeout;
   clearTimer?: typeof clearTimeout;
 }>;
+
+export type NativeHostProductionEntryDependencies = Readonly<{
+  stdin: NativeHostReadable;
+  stdout: NativeHostWritable;
+  stderr: NativeHostWritable;
+  argv: unknown;
+  platform: unknown;
+  absoluteEntryPath: unknown;
+  absoluteNode: unknown;
+  daemonDependencies: NativeHostDaemonDependencies;
+  settleMs?: number;
+  setTimer?: typeof setTimeout;
+  clearTimer?: typeof clearTimeout;
+}>;
+
+type NativeHostOneShotDependencies = Readonly<{
+  stdin: NativeHostReadable;
+  stdout: NativeHostWritable;
+  stderr: NativeHostWritable;
+  argv: unknown;
+  settleMs?: number;
+  setTimer?: typeof setTimeout;
+  clearTimer?: typeof clearTimeout;
+}>;
+
+type NativeWakeAuthority = Readonly<{
+  expectedOrigin: unknown;
+  handleWake: NativeWakeHandler;
+}>;
+
+type NativeWakeAuthorityLoader = () => Promise<NativeWakeAuthority> | NativeWakeAuthority;
+
+type NativeStableDiagnostic =
+  | 'FSBNH_INVALID_INVOCATION'
+  | 'FSBNH_NATIVE_PROTOCOL'
+  | 'FSBNH_RUNTIME_CONFIG'
+  | 'FSBNH_STDOUT_FAILURE';
+
+const OWNER_MARKER_MAX_BYTES = 4096;
 
 const INTERNAL_FAILURE = Object.freeze({
   outcome: 'failed',
@@ -69,7 +109,7 @@ function safeHandlerResult(value: unknown): NativeWakeHandlerResult | null {
   }
 }
 
-function writeBytes(stream: NativeWritable, bytes: Buffer): Promise<void> {
+function writeBytes(stream: NativeHostWritable, bytes: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
@@ -97,8 +137,8 @@ function writeBytes(stream: NativeWritable, bytes: Buffer): Promise<void> {
 }
 
 async function writeStableDiagnostic(
-  stderr: NativeWritable,
-  code: 'FSBNH_INVALID_INVOCATION' | 'FSBNH_NATIVE_PROTOCOL' | 'FSBNH_STDOUT_FAILURE',
+  stderr: NativeHostWritable,
+  code: NativeStableDiagnostic,
 ): Promise<void> {
   try {
     await writeBytes(stderr, Buffer.from(`${code}\n`, 'ascii'));
@@ -122,6 +162,21 @@ function encodeHandlerResult(
 export async function runNativeHostEntry(
   dependencies: NativeHostEntryDependencies,
 ): Promise<0 | 1> {
+  return runNativeHostEntryWithAuthority(
+    dependencies,
+    () => Object.freeze({
+      expectedOrigin: dependencies.expectedOrigin,
+      handleWake: dependencies.handleWake,
+    }),
+    'FSBNH_INVALID_INVOCATION',
+  );
+}
+
+async function runNativeHostEntryWithAuthority(
+  dependencies: NativeHostOneShotDependencies,
+  loadAuthority: NativeWakeAuthorityLoader,
+  authorityFailureCode: Extract<NativeStableDiagnostic, 'FSBNH_INVALID_INVOCATION' | 'FSBNH_RUNTIME_CONFIG'>,
+): Promise<0 | 1> {
   let request: NativeWakeRequest | null;
   try {
     request = await readNativeWakeRequest(dependencies.stdin, {
@@ -136,8 +191,16 @@ export async function runNativeHostEntry(
 
   if (request === null) return 0;
 
+  let authority: NativeWakeAuthority;
   try {
-    validateNativeInvocation(dependencies.argv, dependencies.expectedOrigin);
+    authority = await loadAuthority();
+  } catch (_error) {
+    await writeStableDiagnostic(dependencies.stderr, authorityFailureCode);
+    return 1;
+  }
+
+  try {
+    validateNativeInvocation(dependencies.argv, authority.expectedOrigin);
   } catch (_error) {
     await writeStableDiagnostic(dependencies.stderr, 'FSBNH_INVALID_INVOCATION');
     return 1;
@@ -145,7 +208,7 @@ export async function runNativeHostEntry(
 
   let encoded: Buffer;
   try {
-    const handled = safeHandlerResult(await dependencies.handleWake(request));
+    const handled = safeHandlerResult(await authority.handleWake(request));
     encoded = encodeHandlerResult(request, handled ?? INTERNAL_FAILURE);
   } catch (_error) {
     encoded = encodeHandlerResult(request, INTERNAL_FAILURE);
@@ -158,4 +221,47 @@ export async function runNativeHostEntry(
     return 1;
   }
   return 0;
+}
+
+export async function runProductionNativeHostEntry(
+  dependencies: NativeHostProductionEntryDependencies,
+): Promise<0 | 1> {
+  return runNativeHostEntryWithAuthority(
+    dependencies,
+    async () => {
+      const wakeLayout = resolveNativeHostWakeRuntimeLayout({
+        platform: dependencies.platform,
+        absoluteEntryPath: dependencies.absoluteEntryPath,
+        absoluteNode: dependencies.absoluteNode,
+      });
+      const markerText = await dependencies.daemonDependencies.readPrivateFile(
+        wakeLayout.markerPath,
+        OWNER_MARKER_MAX_BYTES,
+      );
+      if (
+        typeof markerText !== 'string'
+        || Buffer.byteLength(markerText, 'utf8') < 1
+        || Buffer.byteLength(markerText, 'utf8') > OWNER_MARKER_MAX_BYTES
+      ) {
+        throw new Error('runtime_config');
+      }
+      const marker = parseNativeHostOwnerMarker(
+        JSON.parse(markerText) as unknown,
+        wakeLayout.platform,
+      );
+      const runtime = Object.freeze({
+        stableRuntimeRoot: wakeLayout.stableRuntimeRoot,
+        absoluteNode: wakeLayout.absoluteNode,
+        absoluteStableBuildIndex: wakeLayout.absoluteStableBuildIndex,
+      });
+      return Object.freeze({
+        expectedOrigin: marker.origin,
+        handleWake: async () => wakeServeDaemon({
+          runtime,
+          dependencies: dependencies.daemonDependencies,
+        }),
+      });
+    },
+    'FSBNH_RUNTIME_CONFIG',
+  );
 }

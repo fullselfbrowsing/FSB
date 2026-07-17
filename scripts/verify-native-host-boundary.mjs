@@ -13,18 +13,51 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(__filename), '..');
 const MAX_SOURCE_BYTES = 256 * 1024;
-const ALLOWED_CORE_IMPORTS = new Set(['node:os']);
+const EXPECTED_SOURCE_GRAPH = Object.freeze([
+  'constants.ts',
+  'daemon.ts',
+  'entry.ts',
+  'index.ts',
+  'platform.ts',
+  'protocol.ts',
+  'runtime-layout.ts',
+]);
+const EXPECTED_COMPILED_GRAPH = Object.freeze(
+  EXPECTED_SOURCE_GRAPH.map((entry) => entry.replace(/\.ts$/u, '.js')),
+);
+const ALLOWED_CORE_IMPORTS = Object.freeze({
+  'daemon.ts': new Set(['node:path']),
+  'daemon.js': new Set(['node:path']),
+  'platform.ts': new Set([
+    'node:child_process',
+    'node:crypto',
+    'node:fs/promises',
+    'node:http',
+    'node:url',
+  ]),
+  'platform.js': new Set([
+    'node:child_process',
+    'node:crypto',
+    'node:fs/promises',
+    'node:http',
+    'node:url',
+  ]),
+  'protocol.ts': new Set(['node:os']),
+  'protocol.js': new Set(['node:os']),
+  'runtime-layout.ts': new Set(['node:path']),
+  'runtime-layout.js': new Set(['node:path']),
+});
 
 const GRAPH_CONFIG = Object.freeze({
   source: Object.freeze({
     root: resolve(REPOSITORY_ROOT, 'mcp/src/native-host'),
-    entry: resolve(REPOSITORY_ROOT, 'mcp/src/native-host/entry.ts'),
-    expected: Object.freeze(['constants.ts', 'entry.ts', 'protocol.ts']),
+    entry: resolve(REPOSITORY_ROOT, 'mcp/src/native-host/index.ts'),
+    expected: EXPECTED_SOURCE_GRAPH,
   }),
   compiled: Object.freeze({
     root: resolve(REPOSITORY_ROOT, 'mcp/build/native-host'),
-    entry: resolve(REPOSITORY_ROOT, 'mcp/build/native-host/entry.js'),
-    expected: Object.freeze(['constants.js', 'entry.js', 'protocol.js']),
+    entry: resolve(REPOSITORY_ROOT, 'mcp/build/native-host/index.js'),
+    expected: EXPECTED_COMPILED_GRAPH,
   }),
 });
 
@@ -33,12 +66,68 @@ const FORBIDDEN_TOKENS = Object.freeze([
   ['task or prompt authority', /(?:^|[^A-Za-z])(?:task|prompt|delegation)(?:[^A-Za-z]|$)/iu],
   ['browser or tab authority', /(?:^|[^A-Za-z])(?:browser|tabs?|tab-state)(?:[^A-Za-z]|$)/iu],
   ['bridge authentication authority', /bridge-auth|session-secret|session_secret/iu],
-  ['installer authority', /native-host-install|(?:^|[/_.-])install(?:[/_.-]|$)/iu],
+  ['installer authority', /native-host-install|(?:^|[/\\])install\.(?:ts|js)\b/iu],
   ['doctor or diagnostics authority', /(?:^|[/_.-])(?:doctor|diagnostics?)(?:[/_.-]|$)/iu],
   ['CLI router authority', /mcp[/\\](?:src|build)[/\\]index\.(?:ts|js)/iu],
-  ['process or shell authority', /node:child_process|(?<![.\w])(?:spawn|spawnSync|fork|exec|execSync|execFile|execFileSync)\s*\(|\bshell\s*:/u],
   ['historical native IPC authority', /com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp|ipc[-_ ]relay|echo[-_ ]mode/iu],
 ]);
+
+function countMatches(source, pattern) {
+  return [...source.matchAll(pattern)].length;
+}
+
+function verifyProductionAuthority(sources, diagnostics) {
+  const daemon = sources.get('daemon.ts') ?? sources.get('daemon.js') ?? '';
+  const platform = sources.get('platform.ts') ?? sources.get('platform.js') ?? '';
+  const entry = sources.get('entry.ts') ?? sources.get('entry.js') ?? '';
+  const executable = sources.get('index.ts') ?? sources.get('index.js') ?? '';
+
+  const exactTuple = /\[\s*runtime\.absoluteStableBuildIndex,\s*['"]serve['"],\s*['"]--host['"],\s*['"]127\.0\.0\.1['"],\s*['"]--port['"],\s*['"]7226['"],?\s*\]/gu;
+  if (countMatches(daemon, exactTuple) !== 1) {
+    diagnostics.push('daemon: exact serve argv tuple is not uniquely pinned');
+  }
+  if (
+    countMatches(
+      daemon,
+      /dependencies\.spawn\(\s*runtime\.absoluteNode,\s*argv,\s*options\s*\)/gu,
+    ) !== 1
+    || countMatches(daemon, /dependencies\.spawn\s*\(/gu) !== 1
+  ) {
+    diagnostics.push('daemon: exact absolute-Node spawn edge is not uniquely pinned');
+  }
+  for (const [label, pattern] of [
+    ['shell false', /\bshell:\s*false\b/gu],
+    ['detached true', /\bdetached:\s*true\b/gu],
+    ['ignored stdio', /\bstdio:\s*['"]ignore['"]/gu],
+    ['hidden Windows console', /\bwindowsHide:\s*true\b/gu],
+  ]) {
+    if (countMatches(daemon, pattern) !== 1) {
+      diagnostics.push(`daemon: ${label} is not uniquely pinned`);
+    }
+  }
+  if (
+    countMatches(platform, /\bspawnChild\(\s*command,\s*\[\.\.\.argv\],\s*options\s*\)/gu) !== 1
+    || countMatches(platform, /\bspawnChild\s*\(/gu) !== 1
+    || countMatches(
+      platform,
+      /import\s*\{\s*spawn\s+as\s+spawnChild\s*\}\s*from\s+['"]node:child_process['"]/gu,
+    ) !== 1
+    || /\b(?:fork|exec|execSync|execFile|execFileSync|spawnSync)\s*\(/u.test(platform)
+  ) {
+    diagnostics.push('platform: child-process authority is not the one injected spawn edge');
+  }
+  if (/\b(?:process\.kill|\.kill\s*\(|SIGTERM|SIGKILL|SIGINT)\b/u.test(`${daemon}\n${platform}`)) {
+    diagnostics.push('daemon: process signaling authority is forbidden');
+  }
+  if (countMatches(entry, /wakeServeDaemon\s*\(/gu) !== 1) {
+    diagnostics.push('entry: wakeServeDaemon must be invoked exactly once');
+  }
+  if (
+    countMatches(executable, /runProductionNativeHostEntry\s*\(\s*productionEnvironment\s*\)/gu) !== 1
+  ) {
+    diagnostics.push('index: production one-shot entry must be invoked exactly once');
+  }
+}
 
 function parseModes(argv) {
   if (argv.length === 0 || (argv.length === 1 && argv[0] === '--all')) {
@@ -123,6 +212,7 @@ function scanMode(mode) {
   const diagnostics = [];
   const pending = [config.entry];
   const visited = new Set();
+  const sources = new Map();
 
   while (pending.length > 0) {
     const pathname = pending.pop();
@@ -138,6 +228,7 @@ function scanMode(mode) {
     const rel = display(config.root, real);
     const source = readRegularFile(real, diagnostics, config.root);
     if (source === null) continue;
+    sources.set(rel, source);
 
     for (const [label, pattern] of FORBIDDEN_TOKENS) {
       if (pattern.test(`${rel}\n${source}`)) diagnostics.push(`${rel}: forbidden ${label}`);
@@ -149,7 +240,7 @@ function scanMode(mode) {
         if (resolved) pending.push(resolved);
         continue;
       }
-      if (!ALLOWED_CORE_IMPORTS.has(specifier)) {
+      if (!(ALLOWED_CORE_IMPORTS[rel]?.has(specifier))) {
         diagnostics.push(`${rel}: forbidden external import`);
       }
     }
@@ -161,6 +252,7 @@ function scanMode(mode) {
   if (JSON.stringify(actual) !== JSON.stringify(config.expected)) {
     diagnostics.push(`${mode}: native-host graph does not match the exact leaf roster`);
   }
+  verifyProductionAuthority(sources, diagnostics);
   return diagnostics;
 }
 
