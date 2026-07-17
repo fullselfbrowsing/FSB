@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 63 planned; 0/12 plans executed
-last_updated: "2026-07-16T21:53:31-05:00"
-last_activity: 2026-07-16 -- Phase 63 planning complete; 12 plans ready
+stopped_at: Phase 63 Plan 01 executing
+last_updated: "2026-07-16T21:58:18-05:00"
+last_activity: 2026-07-16 -- Phase 63 execution started
 progress:
   total_phases: 9
   completed_phases: 6
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 63 — Native-Messaging Host, planned and ready to execute
+**Current focus:** Phase 63 — Native-Messaging Host
 
 ## Current Position
 
-Phase: 63 (native-messaging-host) — PLANNED
-Plan: 0 of 12
-Status: Ready to execute
-Last activity: 2026-07-16 -- Phase 63 planning complete; 12 serialized plans approved
+Phase: 63 (Native-Messaging Host) — EXECUTING
+Plan: 1 of 12
+Status: Executing Phase 63
+Last activity: 2026-07-16 -- Phase 63 execution started
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
