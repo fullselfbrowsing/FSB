@@ -30,6 +30,7 @@ export interface ServeDelegationBridge {
 export interface ServeDelegationHttpServer {
   readonly endpoint: string;
   readonly healthEndpoint: string;
+  markServeReady(): void;
   close(): Promise<void>;
 }
 
@@ -268,6 +269,7 @@ export async function startServeDelegation(
     if (!recovery.spawnAvailable) throw new ServeDelegationStartupError();
     await bridge.connect();
     await dependencies.pushInventory(bridge);
+    httpServer.markServeReady();
   } catch {
     await closeStartupResources(supervisor, httpServer, bridge);
     throw new ServeDelegationStartupError();
