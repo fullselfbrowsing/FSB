@@ -109,6 +109,15 @@ function makeSnapshot(overrides = {}) {
       secretRotatedAt: 9000,
       secretRotationAgeMs: 1000,
     },
+    nativeHost: {
+      installState: 'installed',
+      expectedLocation: '/Users/test/Library/Application Support/Google/Chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
+      registration: 'valid',
+      allowlist: 'matches',
+      launcher: 'reachable',
+      daemon: 'reachable',
+      reason: 'ok',
+    },
     extensionConfig: {
       modelProvider: 'openai',
       modelName: 'gpt-5.4',
@@ -195,6 +204,20 @@ function makeDetection(overrides = {}) {
   };
 }
 
+function makeNativeHostInspection(overrides = {}) {
+  return {
+    platform: 'supported',
+    expectedLocation: '/Users/test/Library/Application Support/Google/Chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
+    registration: 'valid',
+    registrationShadow: 'clear',
+    allowlist: 'matches',
+    runtime: 'valid',
+    launcher: 'reachable',
+    daemon: 'reachable',
+    ...overrides,
+  };
+}
+
 async function run() {
   const diagnosticsUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'diagnostics.js')).href;
   const indexUrl = pathToFileURL(path.join(repoRoot, 'mcp', 'build', 'index.js')).href;
@@ -204,6 +227,221 @@ async function run() {
     path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'compatibility.js'),
   ).href;
   const compatibility = await import(compatibilityUrl);
+
+  console.log('\n--- native host snapshot and browser-safe projection ---');
+  const nativeReasonCases = [
+    ['ok', {}, 'installed'],
+    ['platform_unsupported', { platform: 'unsupported' }, 'unavailable'],
+    ['inspection_unavailable', { daemon: 'unavailable' }, 'unavailable'],
+    ['not_installed', {
+      registration: 'missing',
+      registrationShadow: 'not_reported',
+      allowlist: 'not_reported',
+      runtime: 'missing',
+      launcher: 'missing',
+      daemon: 'offline',
+    }, 'not_installed'],
+    ['registration_missing', {
+      registration: 'missing',
+      allowlist: 'not_reported',
+      runtime: 'invalid',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['registration_invalid', {
+      registration: 'invalid',
+      allowlist: 'mismatch',
+      runtime: 'invalid',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['registration_shadowed', {
+      registrationShadow: 'shadowed',
+      allowlist: 'mismatch',
+      runtime: 'invalid',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['allowlist_mismatch', {
+      allowlist: 'mismatch',
+      runtime: 'invalid',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['runtime_missing', {
+      runtime: 'missing',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['runtime_invalid', {
+      runtime: 'invalid',
+      launcher: 'invalid',
+      daemon: 'offline',
+    }, 'invalid'],
+    ['launcher_missing', {
+      launcher: 'missing',
+      daemon: 'identity_mismatch',
+    }, 'invalid'],
+    ['launcher_invalid', {
+      launcher: 'invalid',
+      daemon: 'identity_mismatch',
+    }, 'invalid'],
+    ['daemon_identity_mismatch', { daemon: 'identity_mismatch' }, 'installed'],
+    ['daemon_protocol_mismatch', { daemon: 'protocol_mismatch' }, 'installed'],
+    ['daemon_offline', { daemon: 'offline' }, 'installed'],
+  ];
+  for (const [expectedReason, overrides, expectedInstallState] of nativeReasonCases) {
+    let inspectorCalls = 0;
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+        readBridgeAuthState: () => null,
+        inspectNativeHost: async () => {
+          inspectorCalls++;
+          return makeNativeHostInspection(overrides);
+        },
+        now: () => 10_000,
+      },
+    );
+    assertEqual(inspectorCalls, 1, `${expectedReason} calls the native inspector exactly once`);
+    assertEqual(snapshot.nativeHost?.reason, expectedReason,
+      `${expectedReason} follows the frozen first-failure precedence`);
+    assertEqual(snapshot.nativeHost?.installState, expectedInstallState,
+      `${expectedReason} derives the bounded install state`);
+    assertEqual(snapshot.diagnosticLayer, 'bridge',
+      `${expectedReason} does not alter the historical doctor layer`);
+  }
+
+  let nativeInspectorCalls = 0;
+  let mutationCalls = 0;
+  const collectionOrder = [];
+  const nativeSentinels = [
+    'NATIVE_MANIFEST_CONTENTS_SENTINEL',
+    'NATIVE_REGISTRY_VALUE_SENTINEL',
+    'NATIVE_REGISTRY_VIEW_SENTINEL',
+    'NATIVE_LAUNCHER_PATH_SENTINEL',
+    'NATIVE_RAW_ERROR_SENTINEL',
+    'NATIVE_USERNAME_SENTINEL',
+    'NATIVE_ENVIRONMENT_SENTINEL',
+    'NATIVE_SECRET_SENTINEL',
+    'NATIVE_SESSION_SENTINEL',
+    'NATIVE_CHILD_OUTPUT_SENTINEL',
+    'NATIVE_TASK_SENTINEL',
+  ];
+  const mutationSpy = async () => { mutationCalls++; };
+  const safeExpectedLocation = '/Users/test/Library/Application Support/Google/Chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
+  const nativeSnapshot = await diagnostics.collectBridgeDiagnostics(
+    { waitForExtensionMs: 0, includeConfig: true, includeTabs: true },
+    {
+      bridgeFactory: () => {
+        const bridge = makeOfflineBridge();
+        return {
+          ...bridge,
+          async connect() {
+            collectionOrder.push('bridge');
+            return bridge.connect();
+          },
+        };
+      },
+      adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+      readBridgeAuthState: () => null,
+      inspectNativeHost: async () => {
+        nativeInspectorCalls++;
+        collectionOrder.push('native');
+        return makeNativeHostInspection({
+          manifestContents: nativeSentinels[0],
+          registryValue: nativeSentinels[1],
+          registryView: nativeSentinels[2],
+          launcherPath: nativeSentinels[3],
+          rawError: nativeSentinels[4],
+          username: nativeSentinels[5],
+          environment: nativeSentinels[6],
+          secret: nativeSentinels[7],
+          session: nativeSentinels[8],
+          childOutput: nativeSentinels[9],
+          task: nativeSentinels[10],
+        });
+      },
+      installNativeHost: mutationSpy,
+      uninstallNativeHost: mutationSpy,
+      wakeNativeHost: mutationSpy,
+      startNativeHost: mutationSpy,
+      repairNativeHost: mutationSpy,
+      pairNativeHost: mutationSpy,
+      rotateBridgeSessionSecret: mutationSpy,
+      spawn: mutationSpy,
+      now: () => 10_000,
+    },
+  );
+  assertEqual(nativeInspectorCalls, 1, 'collector calls the native inspector once for one snapshot');
+  assertEqual(mutationCalls, 0, 'doctor never calls any injected mutation, wake, pair, rotation, or spawn spy');
+  assertDeepEqual(collectionOrder, ['native', 'bridge'], 'native inspection runs once before bridge probes');
+  assert(Object.isFrozen(nativeSnapshot.nativeHost), 'native-host local snapshot is immutable');
+  assertDeepEqual(
+    Object.keys(nativeSnapshot.nativeHost || {}),
+    ['installState', 'expectedLocation', 'registration', 'allowlist', 'launcher', 'daemon', 'reason'],
+    'native-host local snapshot has exactly seven ordered keys',
+  );
+  assertEqual(nativeSnapshot.nativeHost?.expectedLocation, safeExpectedLocation,
+    'local JSON retains only the bounded expected repair location');
+  const projectNativeHostBrowserStatus = diagnostics.projectNativeHostBrowserStatus;
+  assertEqual(typeof projectNativeHostBrowserStatus, 'function',
+    'diagnostics exports an explicit browser-safe native-host projector');
+  const browserNativeHost = typeof projectNativeHostBrowserStatus === 'function'
+    ? projectNativeHostBrowserStatus(nativeSnapshot.nativeHost)
+    : null;
+  assertDeepEqual(
+    Object.keys(browserNativeHost || {}),
+    ['installState', 'registration', 'allowlist', 'launcher', 'daemon'],
+    'browser-safe native projection reconstructs exactly five ordered enum keys',
+  );
+  assert(Object.isFrozen(browserNativeHost), 'browser-safe native projection is immutable');
+  const serializedNativeSnapshot = JSON.stringify(nativeSnapshot);
+  const serializedBrowserNativeHost = JSON.stringify(browserNativeHost);
+  const formattedNativeSnapshot = indexModule.formatDoctor(nativeSnapshot);
+  assert(!serializedBrowserNativeHost.includes(safeExpectedLocation),
+    'browser-safe native projection omits the expected local location');
+  assert(!serializedBrowserNativeHost.includes('reason'),
+    'browser-safe native projection omits the local stable reason');
+  for (const sentinel of nativeSentinels) {
+    assert(!serializedNativeSnapshot.includes(sentinel), `local JSON omits raw native sentinel ${sentinel}`);
+    assert(!formattedNativeSnapshot.includes(sentinel), `doctor text omits raw native sentinel ${sentinel}`);
+    assert(!serializedBrowserNativeHost.includes(sentinel), `browser projection omits raw native sentinel ${sentinel}`);
+  }
+
+  const malformedNativeCases = [
+    ['prototype', Object.assign(Object.create({ inherited: 'NATIVE_INHERITED_SENTINEL' }), makeNativeHostInspection())],
+    ['overlong location', makeNativeHostInspection({ expectedLocation: `/${'x'.repeat(4097)}` })],
+    ['unknown enum', makeNativeHostInspection({ launcher: 'NATIVE_UNKNOWN_LAUNCHER_SENTINEL' })],
+    ['contradictory facts', makeNativeHostInspection({ registration: 'valid', allowlist: 'not_reported' })],
+  ];
+  for (const [label, inspection] of malformedNativeCases) {
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+        readBridgeAuthState: () => null,
+        inspectNativeHost: async () => inspection,
+        now: () => 10_000,
+      },
+    );
+    assertDeepEqual(
+      snapshot.nativeHost,
+      {
+        installState: 'unavailable',
+        expectedLocation: 'Not reported',
+        registration: 'unavailable',
+        allowlist: 'not_reported',
+        launcher: 'unavailable',
+        daemon: 'unavailable',
+        reason: 'inspection_unavailable',
+      },
+      `${label} native inspection fails closed to one bounded unavailable snapshot`,
+    );
+  }
 
   const cases = [
     ['package', makeSnapshot({ versionParityOk: false, packageVersion: '0.5.2', serverJsonVersion: '0.5.2' }), 'package'],
