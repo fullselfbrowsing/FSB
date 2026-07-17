@@ -168,7 +168,7 @@
 - [x] 63-06: Add explicit native-host CLI install/uninstall routes without widening existing installer behavior.
 
 **Wave 7** *(blocked on Wave 6 completion)*
-- [ ] 63-07: Add bounded read-only native-host diagnostics with safe local and browser projections.
+- [x] 63-07: Add bounded read-only native-host diagnostics with safe local and browser projections.
 
 **Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 63-08: Add the single manifest permission and background-owned probe/offline-wake controller.
@@ -221,7 +221,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
-| 63. Native-Messaging Host | 6/12 | In Progress|  |
+| 63. Native-Messaging Host | 7/12 | In Progress|  |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
