@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 63-05-PLAN.md
-last_updated: "2026-07-17T06:07:02.707Z"
+stopped_at: Completed 63-06-PLAN.md
+last_updated: "2026-07-17T06:38:07.636Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 40
-  completed_plans: 33
-  percent: 67
+  completed_plans: 34
+  percent: 68
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 63 (Native-Messaging Host) — EXECUTING
-Plan: 6 of 12
+Plan: 7 of 12
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -48,7 +48,7 @@ Last activity: 2026-07-17
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 5/12 complete |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 6/12 complete |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
@@ -173,16 +173,19 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Publish only an exact package runtime whose lock-bound bundled production closure survives empty-cache offline reinstallation and full artifact revalidation. — Native registration must never point at the invoking checkout, npm cache, incomplete tarball, or an online fallback.
 - [Phase 63]: Install only from both-absent state or accept both-exact-current as zero-write idempotence; refuse split, older, foreign, invalid, symlinked, unavailable, or shadowed state. — Persistent code-execution registration cannot be implicitly repaired or upgraded.
 - [Phase 63]: Remove registration first and then only an internally exact marker-proved runtime, including an intact older owned version. — Uninstall authority follows proven ownership rather than the current invoker version and never reaches adjacent hosts or broad Chrome roots.
+- [Phase 63]: Route native CLI work by exact own-key presence before list, all, client, or Claude expansion, then validate the complete flag record. — A malformed or mixed explicit target must fail before any native or legacy mutation.
+- [Phase 63]: Reconstruct terminal receipts from exactly five ordinary own data fields with closed reasons, origins, and bounded control-free locations. — Prototype data, raw errors, and receipt extras must never become optimistic or sensitive output.
+- [Phase 63]: Keep unresolved production dependency composition outside the CLI router and fail closed as unavailable. — Plan 05 has no safe production filesystem/process/registry composer or persisted receipt layer, and Plan 06 must not invent that architecture while claiming live operability.
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-05 are complete and 7 approved serialized plans remain.
+None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-06 are complete and 6 approved serialized plans remain.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's genuine POSIX ownership, Windows HKCU/WOW64/PE, Chrome discovery, and installed native execution evidence remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source evidence is green through Phase 63 Plan 05, and no live pass is inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's genuine POSIX ownership, Windows HKCU/WOW64/PE, Chrome discovery, installed native execution, and CLI operability evidence remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source evidence is green through Phase 63 Plan 06, unresolved production composition fails closed, and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -196,7 +199,7 @@ Items acknowledged and carried forward from previous milestone closes (Chrome MV
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| uat_gap | Phase 63 Plan 05 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, installed launcher/native execution) | deferred to v0.9.91 milestone end; human_needed | Phase 63 Plan 05 |
+| uat_gap | Phase 63 Plans 05-06 (real POSIX ownership/modes, Windows HKCU/WOW64/PE/bootstrap behavior, Chrome discovery, production CLI composition, installed launcher/native execution) | deferred to v0.9.91 milestone end; human_needed | Phase 63 Plan 06 |
 | uat_gap | Phase 62 / 62-HUMAN-UAT.md (installed doctor/genuine stream, compatibility layout, keyboard/accessibility/live refresh) | deferred to v0.9.91 milestone end; 3 scenarios | Phase 62 Plan 06 |
 | uat_gap | Phase 61 / 61-HUMAN-UAT.md (consent/theme/handoff, authenticated stream, worker eviction, 45-minute endurance, POSIX lifecycle, daemon restart classification) | deferred to v0.9.91 milestone end; 8 scenarios | Phase 61 Plan 08 |
 | uat_gap | Phase 60 / 60-HUMAN-UAT.md (authenticated isolation, genuine JSONL provenance, live MCP read, POSIX/Windows tree kill, crash recovery, browser ownership/vault/consent) | deferred to v0.9.91 milestone end; 7 scenarios | Phase 60 Plan 04 |
@@ -219,13 +222,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-17T06:07:02.696Z
-Stopped at: Completed 63-05-PLAN.md
+Last session: 2026-07-17T06:38:07.629Z
+Stopped at: Completed 63-06-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 63 Plan 06 by exposing explicit native-host install/uninstall CLI routes over the closed typed transaction without widening ordinary installer behavior. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute Phase 63 Plan 07 by adding one bounded read-only native-host diagnostic snapshot with safe local and browser projections. Keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -236,3 +239,4 @@ Execute Phase 63 Plan 06 by exposing explicit native-host install/uninstall CLI 
 | Phase 63 P03 | 16 min | 3 tasks | 6 files |
 | Phase 63 P04 | 27 min | 2 tasks | 10 files |
 | Phase 63 P05 | 36 min | 3 tasks | 6 files |
+| Phase 63 P06 | 24 min | 2 tasks | 4 files |
