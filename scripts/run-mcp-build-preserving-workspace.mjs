@@ -392,14 +392,15 @@ let unrelatedFingerprintBefore;
 try {
   const commands = parseCommands(process.argv.slice(2));
   assertInsideRepository(buildRoot, 'MCP build root');
-  workspaceBefore = captureWorkspaceState('initial');
-  buildBefore = captureTree(buildRoot);
-  buildFingerprintBefore = treeFingerprint(buildBefore);
   indexPath = resolveIndexPath();
   indexBefore = captureEntry(indexPath, 'Git index');
   if (indexBefore.kind !== 'file') {
     throw new Error('Git index must be an existing regular file');
   }
+  workspaceBefore = captureWorkspaceState('initial');
+  restoreSingleEntry(indexPath, indexBefore);
+  buildBefore = captureTree(buildRoot);
+  buildFingerprintBefore = treeFingerprint(buildBefore);
   unrelatedBefore = snapshotUnrelatedDirtyEntries(workspaceBefore.dirtyPaths);
   unrelatedFingerprintBefore = unrelatedDirtyFingerprint(unrelatedBefore);
 
@@ -501,16 +502,6 @@ try {
     }
   }
 
-  if (indexBefore && indexPath) {
-    try {
-      if (entryFingerprint(captureEntry(indexPath, 'Git index')) !== entryFingerprint(indexBefore)) {
-        failures.push('Git index identity differs after restoration');
-      }
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : 'Git index verification failed');
-    }
-  }
-
   if (unrelatedBefore) {
     try {
       const unrelatedAfter = captureCurrentUnrelatedDirtyEntries(unrelatedBefore);
@@ -530,6 +521,17 @@ try {
       }
     } catch (error) {
       failures.push(error instanceof Error ? error.message : 'final workspace comparison failed');
+    }
+  }
+
+  if (indexBefore && indexPath) {
+    try {
+      restoreSingleEntry(indexPath, indexBefore);
+      if (entryFingerprint(captureEntry(indexPath, 'Git index')) !== entryFingerprint(indexBefore)) {
+        failures.push('Git index identity differs after restoration');
+      }
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : 'Git index verification failed');
     }
   }
 }
