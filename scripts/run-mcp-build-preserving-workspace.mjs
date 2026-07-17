@@ -8,13 +8,14 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   rmSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MAX_GIT_OUTPUT_BYTES = 32 * 1024 * 1024;
@@ -321,6 +322,32 @@ function parseCommands(argv) {
   return Object.freeze(parsed.map((command) => Object.freeze([...command])));
 }
 
+function resolveNpmCliPath() {
+  const explicit = process.env.FSB_MCP_BUILD_PRESERVING_NPM_CLI;
+  const pathDirectories = (process.env.PATH || '').split(delimiter).filter(Boolean);
+  const candidates = [
+    explicit,
+    process.env.npm_execpath,
+    join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
+    join(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js'),
+    ...pathDirectories.flatMap((directory) => [
+      join(directory, 'node_modules/npm/bin/npm-cli.js'),
+      join(directory, '../lib/node_modules/npm/bin/npm-cli.js'),
+    ]),
+  ].filter((candidate) => typeof candidate === 'string' && candidate.length > 0);
+  for (const candidate of candidates) {
+    try {
+      if (explicit && candidate === explicit && !isAbsolute(candidate)) continue;
+      const realPath = realpathSync(resolve(candidate));
+      const stat = lstatSync(realPath);
+      if (stat.isFile()) return realPath;
+    } catch {
+      // Continue through the bounded local installation candidates.
+    }
+  }
+  throw new Error('could not resolve the npm CLI entry');
+}
+
 let activeChild = null;
 let receivedSignal = null;
 
@@ -404,9 +431,9 @@ try {
   unrelatedBefore = snapshotUnrelatedDirtyEntries(workspaceBefore.dirtyPaths);
   unrelatedFingerprintBefore = unrelatedDirtyFingerprint(unrelatedBefore);
 
-  const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const npmCliPath = resolveNpmCliPath();
   const buildResult = await runArgv(
-    [npmExecutable, '--prefix', 'mcp', 'run', 'build'],
+    [process.execPath, npmCliPath, '--prefix', 'mcp', 'run', 'build'],
     'MCP build',
   );
   const buildFailure = resultFailure(buildResult);

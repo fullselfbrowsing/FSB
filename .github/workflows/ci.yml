@@ -52,6 +52,73 @@ jobs:
       - name: MCP lifecycle + tools smoke
         run: npm run test:mcp-smoke
 
+  native-host-windows:
+    name: native host (Windows PE + pack)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP dependencies
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build x64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch x64
+      - name: Build arm64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch arm64
+      - name: Verify both PE artifacts and write package metadata
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch all --verify-only --metadata-out mcp/native-host/windows-artifacts.json
+      - name: Execute the x64 bootstrap harness
+        run: node tests/mcp-native-host-packaging.test.js --section windows-bootstrap
+      - name: Inspect the staged npm package
+        working-directory: mcp
+        run: npm pack --dry-run --ignore-scripts --json
+      - name: Read package version
+        id: package-version
+        shell: pwsh
+        run: |
+          node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./mcp/package.json').version + String.fromCharCode(10))"
+      - name: Upload version-bound Windows bootstrap artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsb-native-host-${{ steps.package-version.outputs.version }}
+          if-no-files-found: error
+          path: |
+            mcp/native-host/bin/win32-x64/fsb-native-host.exe
+            mcp/native-host/bin/win32-arm64/fsb-native-host.exe
+            mcp/native-host/windows-artifacts.json
+
+  runtime-payload:
+    name: native runtime payload (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP dependencies from the committed lock
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build the package payload
+        run: npm --prefix mcp run build
+      - name: Prove complete offline payload and negative cases
+        run: node tests/mcp-native-host-packaging.test.js --section workflow-and-pack
+
   website:
     name: showcase (build + crawler smoke)
     runs-on: ubuntu-latest
@@ -84,7 +151,7 @@ jobs:
 
   all-green:
     name: all-green
-    needs: [extension, mcp-smoke, website]
+    needs: [extension, mcp-smoke, website, native-host-windows, runtime-payload]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All required CI checks passed."

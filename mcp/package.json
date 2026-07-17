@@ -33,6 +33,7 @@
     "build/",
     "ai/",
     "data/",
+    "native-host/",
     "README.md",
     "server.json"
   ],

@@ -173,7 +173,8 @@ function createFixture({ buildInitiallyAbsent = false } = {}) {
 
   const bin = path.join(root, 'fixture-bin');
   mkdirSync(bin);
-  writeExecutable(path.join(bin, 'npm'), `#!/usr/bin/env node
+  const fixtureNpmCliPath = path.join(bin, 'npm-cli.js');
+  writeExecutable(fixtureNpmCliPath, `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
 const root = process.env.FSB_MCP_BUILD_PRESERVING_REPOSITORY_ROOT;
@@ -186,7 +187,7 @@ fs.symlinkSync('../index.js', path.join(build, 'fresh/generated-link'));
 if (process.env.FSB_FIXTURE_BUILD_FAILURE === '1') process.exit(27);
 `);
 
-  return Object.freeze({ root, bin, before: snapshotFixture(root) });
+  return Object.freeze({ root, bin, fixtureNpmCliPath, before: snapshotFixture(root) });
 }
 
 function wrapperEnv(fixture, extra = {}) {
@@ -194,6 +195,7 @@ function wrapperEnv(fixture, extra = {}) {
     ...process.env,
     ...extra,
     FSB_MCP_BUILD_PRESERVING_REPOSITORY_ROOT: fixture.root,
+    FSB_MCP_BUILD_PRESERVING_NPM_CLI: fixture.fixtureNpmCliPath,
     PATH: `${fixture.bin}${path.delimiter}${process.env.PATH || ''}`,
   };
 }
@@ -290,6 +292,8 @@ async function testWorkspacePreservingWrapper() {
   assert.doesNotMatch(wrapperSource, /git\s+(?:add|checkout|restore|reset|stash|clean)\b/);
   assert.match(wrapperSource, /--commands-json/);
   assert.match(wrapperSource, /rev-parse', '--git-path', 'index/);
+  assert.match(wrapperSource, /process\.execPath, npmCliPath/);
+  assert.doesNotMatch(wrapperSource, /npm\.cmd/);
   assert.ok(
     wrapperSource.lastIndexOf('restoreSingleEntry(indexPath, indexBefore)')
       > wrapperSource.lastIndexOf("captureWorkspaceState('final')"),
@@ -328,8 +332,10 @@ async function testWorkspacePreservingWrapper() {
     stderrPattern: /pre-existing unrelated dirty or untracked bytes changed/,
   });
   testRawIndexStabilityAcrossWrapperGitReads();
-  await testSignalSettlement('SIGINT');
-  await testSignalSettlement('SIGTERM');
+  if (process.platform !== 'win32') {
+    await testSignalSettlement('SIGINT');
+    await testSignalSettlement('SIGTERM');
+  }
 }
 
 function sha256(bytes) {
@@ -773,6 +779,410 @@ async function testRuntimeLayoutAndPackageContract() {
   await testOfflineBundledTarball(productionClosure);
 }
 
+function createSyntheticPe(machine, version) {
+  const versionBytes = Buffer.from(`${version}\0`, 'utf16le');
+  const bytes = Buffer.alloc(0x100 + versionBytes.length, 0);
+  bytes.write('MZ', 0, 'ascii');
+  bytes.writeUInt32LE(0x80, 0x3c);
+  bytes.write('PE\0\0', 0x80, 'ascii');
+  bytes.writeUInt16LE(machine, 0x84);
+  versionBytes.copy(bytes, 0x100);
+  return bytes;
+}
+
+function readPeMachine(bytes) {
+  assert.ok(bytes.length >= 0x86, 'PE artifact is too short');
+  assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
+  const peOffset = bytes.readUInt32LE(0x3c);
+  assert.equal(bytes.toString('ascii', peOffset, peOffset + 4), 'PE\0\0');
+  return bytes.readUInt16LE(peOffset + 4);
+}
+
+function writeSyntheticWindowsArtifacts(packageRoot) {
+  const packageManifest = readJson(path.join(packageRoot, 'package.json'));
+  const artifacts = [
+    { architecture: 'x64', machine: 0x8664 },
+    { architecture: 'arm64', machine: 0xaa64 },
+  ].map(({ architecture, machine }) => {
+    const relativePath = `native-host/bin/win32-${architecture}/fsb-native-host.exe`;
+    const artifactPath = path.join(packageRoot, ...relativePath.split('/'));
+    mkdirSync(path.dirname(artifactPath), { recursive: true });
+    const bytes = createSyntheticPe(machine, packageManifest.version);
+    writeFileSync(artifactPath, bytes);
+    return {
+      architecture,
+      path: relativePath,
+      bytes: bytes.length,
+      peMachine: `0x${machine.toString(16)}`,
+      sha256: sha256(bytes),
+    };
+  });
+  writeFileSync(
+    path.join(packageRoot, 'native-host/windows-artifacts.json'),
+    `${JSON.stringify({
+      schema: 1,
+      package: packageManifest.name,
+      version: packageManifest.version,
+      artifacts,
+    }, null, 2)}\n`,
+  );
+}
+
+function verifyWindowsArtifactSet(packageRoot) {
+  const packageManifest = readJson(path.join(packageRoot, 'package.json'));
+  const metadata = readJson(path.join(packageRoot, 'native-host/windows-artifacts.json'));
+  assert.deepEqual(
+    { schema: metadata.schema, package: metadata.package, version: metadata.version },
+    { schema: 1, package: packageManifest.name, version: packageManifest.version },
+  );
+  assert.deepEqual(
+    metadata.artifacts.map((artifact) => artifact.architecture),
+    ['x64', 'arm64'],
+  );
+  const machineByArchitecture = { x64: 0x8664, arm64: 0xaa64 };
+  for (const artifact of metadata.artifacts) {
+    const expectedPath = `native-host/bin/win32-${artifact.architecture}/fsb-native-host.exe`;
+    assert.equal(artifact.path, expectedPath);
+    const artifactPath = path.join(packageRoot, ...artifact.path.split('/'));
+    const bytes = readFileSync(artifactPath);
+    assert.equal(readPeMachine(bytes), machineByArchitecture[artifact.architecture]);
+    assert.notEqual(
+      bytes.indexOf(Buffer.from(`${packageManifest.version}\0`, 'utf16le')),
+      -1,
+      `${artifact.architecture} artifact is not version-bound`,
+    );
+    assert.equal(artifact.bytes, bytes.length);
+    assert.equal(artifact.sha256, sha256(bytes));
+  }
+  return metadata;
+}
+
+function expectedRuntimeIntegrityReceipt(packageManifest, lockBytes, productionClosure) {
+  return {
+    schema: 1,
+    packageName: packageManifest.name,
+    packageVersion: packageManifest.version,
+    lockSha256: sha256(lockBytes),
+    directDependencies: bundledProductionDependencies.map((name) => ({
+      name,
+      version: exactProductionDependencies[name],
+    })),
+    bundleDependencies: [...bundledProductionDependencies],
+    productionPackages: productionClosure,
+  };
+}
+
+function recursivelyListFiles(root) {
+  const files = [];
+  function visit(directory, relativeDirectory) {
+    for (const name of readdirSync(directory).sort()) {
+      const pathname = path.join(directory, name);
+      const relativePath = relativeDirectory ? `${relativeDirectory}/${name}` : name;
+      const stat = lstatSync(pathname);
+      if (stat.isDirectory()) visit(pathname, relativePath);
+      else files.push(relativePath);
+    }
+  }
+  visit(root, '');
+  return files;
+}
+
+function verifyExtractedRuntimePayload(packageRoot, lockBytes, productionClosure) {
+  const packageManifest = readJson(path.join(packageRoot, 'package.json'));
+  assert.equal(packageManifest.name, 'fsb-mcp-server');
+  assert.deepEqual(packageManifest.dependencies, exactProductionDependencies);
+  assert.deepEqual(packageManifest.bundleDependencies, bundledProductionDependencies);
+  assert.deepEqual(
+    readJson(path.join(packageRoot, 'native-host/runtime-integrity.json')),
+    expectedRuntimeIntegrityReceipt(packageManifest, lockBytes, productionClosure),
+  );
+  for (const dependency of productionClosure) {
+    const bundledManifest = readJson(path.join(
+      packageRoot,
+      ...dependency.path.split('/'),
+      'package.json',
+    ));
+    assert.equal(bundledManifest.name, dependency.name, dependency.path);
+    assert.equal(bundledManifest.version, dependency.version, dependency.path);
+  }
+  for (const requiredPath of [
+    'native-host/windows/fsb-native-host-bootstrap.c',
+    'native-host/windows/fsb-native-host-bootstrap-version.rc.in',
+    'native-host/posix/fsb-native-host-launcher.mjs.in',
+    'native-host/runtime-integrity.json',
+    'native-host/windows-artifacts.json',
+    'native-host/bin/win32-x64/fsb-native-host.exe',
+    'native-host/bin/win32-arm64/fsb-native-host.exe',
+  ]) {
+    assert.equal(existsSync(path.join(packageRoot, ...requiredPath.split('/'))), true, requiredPath);
+  }
+  const packedFiles = recursivelyListFiles(packageRoot);
+  assert.equal(
+    packedFiles.some((relativePath) => /(?:^|\/)(?:[^/]+\.(?:bat|cmd)|native-host-shim|com\.fsb\.mcp|sea-config)(?:$|\/)/iu.test(relativePath)),
+    false,
+    'packed payload contains a forbidden launcher or historical shim',
+  );
+  verifyWindowsArtifactSet(packageRoot);
+}
+
+function poisonedOfflineEnvironment(sentinelUrl) {
+  return {
+    ...process.env,
+    HTTP_PROXY: sentinelUrl,
+    HTTPS_PROXY: sentinelUrl,
+    ALL_PROXY: sentinelUrl,
+    NO_PROXY: '',
+    http_proxy: sentinelUrl,
+    https_proxy: sentinelUrl,
+    all_proxy: sentinelUrl,
+    no_proxy: '',
+    CI: 'true',
+    npm_config_audit: 'false',
+    npm_config_fund: 'false',
+    npm_config_offline: 'true',
+    npm_config_update_notifier: 'false',
+  };
+}
+
+async function installTarballOffline(tarballPath, destinationRoot) {
+  const installRoot = path.join(destinationRoot, 'prefix');
+  const cacheRoot = path.join(destinationRoot, 'new-empty-cache');
+  mkdirSync(installRoot, { recursive: true });
+  mkdirSync(cacheRoot);
+  assert.equal(readdirSync(cacheRoot).length, 0);
+  const npmCliPath = findNpmCliPath();
+  const sentinel = await listenOnLoopbackSentinel();
+  try {
+    const result = await runAsync(process.execPath, [
+      npmCliPath,
+      'install',
+      '--offline',
+      '--ignore-scripts',
+      '--omit=dev',
+      '--no-audit',
+      '--no-fund',
+      '--package-lock=false',
+      '--cache',
+      cacheRoot,
+      '--registry',
+      sentinel.url,
+      tarballPath,
+    ], {
+      cwd: installRoot,
+      env: poisonedOfflineEnvironment(sentinel.url),
+    });
+    return {
+      ...result,
+      installRoot,
+      registryConnections: sentinel.connectionCount(),
+    };
+  } finally {
+    await sentinel.close();
+  }
+}
+
+function testWorkflowContracts() {
+  const packageManifest = readJson(path.join(repositoryRoot, 'mcp/package.json'));
+  assert.equal(packageManifest.files.includes('native-host/'), true);
+  assert.equal(packageManifest.engines.node, '>=18.20.0');
+  const ciSource = readFileSync(path.join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8');
+  const publishSource = readFileSync(
+    path.join(repositoryRoot, '.github/workflows/npm-publish.yml'),
+    'utf8',
+  );
+
+  for (const pattern of [
+    /native-host-windows:/,
+    /runs-on: windows-latest/,
+    /VsDevCmd\.bat.*-arch=x64/,
+    /VsDevCmd\.bat.*-arch=arm64/,
+    /build-native-host-windows\.mjs --arch x64/,
+    /build-native-host-windows\.mjs --arch arm64/,
+    /mcp-native-host-packaging\.test\.js --section windows-bootstrap/,
+    /npm pack --dry-run --ignore-scripts --json/,
+    /actions\/upload-artifact@v4/,
+    /runtime-payload:/,
+    /ubuntu-latest, macos-latest/,
+    /mcp-native-host-packaging\.test\.js --section workflow-and-pack/,
+    /needs: \[extension, mcp-smoke, website, native-host-windows, runtime-payload\]/,
+  ]) {
+    assert.match(ciSource, pattern);
+  }
+
+  for (const pattern of [
+    /windows-bootstrap:/,
+    /runs-on: windows-latest/,
+    /actions\/upload-artifact@v4/,
+    /publish:\s+needs: windows-bootstrap/s,
+    /actions\/download-artifact@v4/,
+    /FSB_REQUIRE_REAL_WINDOWS_ARTIFACTS: '1'/,
+    /mcp-native-host-packaging\.test\.js --section workflow-and-pack/,
+    /npm publish "\$\{\{ steps\.pack\.outputs\.tarball \}\}" --access public/,
+    /lockSha256/,
+    /integrityReceiptSha256/,
+    /tarballSha512/,
+    /peArtifacts/,
+  ]) {
+    assert.match(publishSource, pattern);
+  }
+  assert.doesNotMatch(publishSource, /npm publish --access public/);
+}
+
+async function testWorkflowAndPackedArtifactContract() {
+  if (process.platform === 'win32') {
+    testWorkflowContracts();
+    return;
+  }
+  testWorkflowContracts();
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb-native-workflow-pack-'));
+  const sourceCopy = path.join(fixtureRoot, 'invoking-source');
+  const tarballDirectory = path.join(fixtureRoot, 'tarball');
+  const packCache = path.join(fixtureRoot, 'pack-cache');
+  const unpacked = path.join(fixtureRoot, 'unpacked');
+  const lockBytes = readFileSync(path.join(repositoryRoot, 'mcp/package-lock.json'));
+  const productionClosure = deriveProductionClosure(JSON.parse(lockBytes));
+  const npmCliPath = findNpmCliPath();
+  try {
+    if (process.env.FSB_PACKED_TARBALL) {
+      assert.equal(path.isAbsolute(process.env.FSB_PACKED_TARBALL), true);
+      const finalTarballRoot = path.join(fixtureRoot, 'final-release-tarball');
+      mkdirSync(finalTarballRoot);
+      const finalExtracted = run('tar', [
+        '-xzf',
+        process.env.FSB_PACKED_TARBALL,
+        '-C',
+        finalTarballRoot,
+      ]);
+      assert.equal(finalExtracted.status, 0, finalExtracted.stderr);
+      verifyExtractedRuntimePayload(
+        path.join(finalTarballRoot, 'package'),
+        lockBytes,
+        productionClosure,
+      );
+    }
+    cpSync(path.join(repositoryRoot, 'mcp'), sourceCopy, { recursive: true });
+    const requireRealArtifacts = process.env.FSB_REQUIRE_REAL_WINDOWS_ARTIFACTS === '1';
+    if (requireRealArtifacts) verifyWindowsArtifactSet(sourceCopy);
+    else writeSyntheticWindowsArtifacts(sourceCopy);
+
+    mkdirSync(tarballDirectory);
+    mkdirSync(packCache);
+    const packed = run(process.execPath, [
+      npmCliPath,
+      'pack',
+      '.',
+      '--ignore-scripts',
+      '--json',
+      '--pack-destination',
+      tarballDirectory,
+      '--cache',
+      packCache,
+    ], { cwd: sourceCopy });
+    assert.equal(packed.status, 0, packed.stderr);
+    const packReceipt = JSON.parse(packed.stdout)[0];
+    assert.deepEqual(
+      [...packReceipt.bundled].sort(),
+      [...new Set(productionClosure.map((dependency) => dependency.name))].sort(),
+    );
+    const tarballPath = path.join(tarballDirectory, packReceipt.filename);
+    mkdirSync(unpacked);
+    const extracted = run('tar', ['-xzf', tarballPath, '-C', unpacked]);
+    assert.equal(extracted.status, 0, extracted.stderr);
+    const extractedPackageRoot = path.join(unpacked, 'package');
+    verifyExtractedRuntimePayload(extractedPackageRoot, lockBytes, productionClosure);
+
+    const receiptPath = path.join(extractedPackageRoot, 'native-host/runtime-integrity.json');
+    const receiptBytes = readFileSync(receiptPath);
+    const alteredReceipt = JSON.parse(receiptBytes);
+    alteredReceipt.lockSha256 = '0'.repeat(64);
+    writeFileSync(receiptPath, `${JSON.stringify(alteredReceipt, null, 2)}\n`);
+    assert.throws(
+      () => verifyExtractedRuntimePayload(extractedPackageRoot, lockBytes, productionClosure),
+      /Expected values to be strictly deep-equal/,
+    );
+    writeFileSync(receiptPath, receiptBytes);
+
+    rmSync(sourceCopy, { recursive: true, force: true });
+    rmSync(packCache, { recursive: true, force: true });
+    const positiveInstall = await installTarballOffline(
+      process.env.FSB_PACKED_TARBALL || tarballPath,
+      path.join(fixtureRoot, 'positive-install'),
+    );
+    assert.equal(positiveInstall.status, 0, positiveInstall.stderr);
+    assert.equal(positiveInstall.registryConnections, 0);
+    assert.equal(existsSync(sourceCopy), false);
+    assert.equal(existsSync(packCache), false);
+    verifyExtractedRuntimePayload(
+      path.join(positiveInstall.installRoot, 'node_modules/fsb-mcp-server'),
+      lockBytes,
+      productionClosure,
+    );
+
+    rmSync(path.join(extractedPackageRoot, 'node_modules/zod'), { recursive: true, force: true });
+    assert.throws(
+      () => verifyExtractedRuntimePayload(extractedPackageRoot, lockBytes, productionClosure),
+      /ENOENT/,
+    );
+    const missingBundleTarball = path.join(fixtureRoot, 'missing-bundle.tgz');
+    const repacked = run('tar', [
+      '-czf',
+      missingBundleTarball,
+      '-C',
+      unpacked,
+      'package',
+    ]);
+    assert.equal(repacked.status, 0, repacked.stderr);
+    const missingBundleInstall = await installTarballOffline(
+      missingBundleTarball,
+      path.join(fixtureRoot, 'missing-bundle-install'),
+    );
+    assert.equal(missingBundleInstall.registryConnections, 0);
+    if (missingBundleInstall.status === 0) {
+      assert.throws(
+        () => verifyExtractedRuntimePayload(
+          path.join(missingBundleInstall.installRoot, 'node_modules/fsb-mcp-server'),
+          lockBytes,
+          productionClosure,
+        ),
+        /ENOENT/,
+        'post-install validation accepted a missing bundled package',
+      );
+    }
+
+    const plainSource = path.join(fixtureRoot, 'plain-source');
+    const plainTarballDirectory = path.join(fixtureRoot, 'plain-tarball');
+    mkdirSync(plainSource);
+    mkdirSync(plainTarballDirectory);
+    writeFileSync(path.join(plainSource, 'package.json'), `${JSON.stringify({
+      name: 'fsb-registry-needed-fixture',
+      version: '1.0.0',
+      dependencies: { zod: exactProductionDependencies.zod },
+    }, null, 2)}\n`);
+    const plainPacked = run(process.execPath, [
+      npmCliPath,
+      'pack',
+      '.',
+      '--ignore-scripts',
+      '--json',
+      '--pack-destination',
+      plainTarballDirectory,
+    ], { cwd: plainSource });
+    assert.equal(plainPacked.status, 0, plainPacked.stderr);
+    const plainTarballPath = path.join(
+      plainTarballDirectory,
+      JSON.parse(plainPacked.stdout)[0].filename,
+    );
+    const plainInstall = await installTarballOffline(
+      plainTarballPath,
+      path.join(fixtureRoot, 'plain-install'),
+    );
+    assert.notEqual(plainInstall.status, 0, 'registry-needed tarball unexpectedly installed offline');
+    assert.equal(plainInstall.registryConnections, 0);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
 function testWindowsBootstrapSources() {
   const cPath = path.join(repositoryRoot, 'mcp/native-host/windows/fsb-native-host-bootstrap.c');
   const resourcePath = path.join(
@@ -941,6 +1351,10 @@ async function main() {
     }
     if (section === 'runtime-layout') {
       await testRuntimeLayoutAndPackageContract();
+      continue;
+    }
+    if (section === 'workflow-and-pack') {
+      await testWorkflowAndPackedArtifactContract();
       continue;
     }
     throw new Error(`section ${section} has not been implemented yet`);
