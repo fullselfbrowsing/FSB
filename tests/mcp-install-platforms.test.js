@@ -24,6 +24,8 @@ function assertEqual(actual, expected, msg) {
 
 const repoRoot = path.resolve(__dirname, '..');
 const cliPath = path.join(repoRoot, 'mcp', 'build', 'index.js');
+const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
+const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
 function runCli(args, fixture) {
   return spawnSync('node', [cliPath, ...args], {
@@ -246,6 +248,8 @@ function run() {
 
   console.log('\n--- native target isolation ---');
   withTempHome('mcp-native-target-isolation', (fixture) => {
+    const helpResult = runCli(['--help'], fixture);
+    const helpOutput = `${helpResult.stdout}${helpResult.stderr}`;
     const installResult = runCli(['install', '--native-host', '--dry-run'], fixture);
     const installOutput = `${installResult.stdout}${installResult.stderr}`;
     const uninstallResult = runCli(
@@ -253,6 +257,28 @@ function run() {
       fixture,
     );
     const uninstallOutput = `${uninstallResult.stdout}${uninstallResult.stderr}`;
+
+    assertEqual(helpResult.status, 0, 'help with native syntax exits cleanly');
+    assertIncludes(
+      helpOutput,
+      'fsb-mcp-server install --native-host [--extension-id <id>] Install the Chrome native messaging host',
+      'help names the exact optional native install syntax',
+    );
+    assertIncludes(
+      helpOutput,
+      'fsb-mcp-server uninstall --native-host Remove the Chrome native messaging host',
+      'help names the exact native uninstall syntax',
+    );
+    assertIncludes(
+      helpOutput,
+      'fsb-mcp-server install             Install FSB to an MCP client config (21 platforms)',
+      'help preserves the legacy install line byte-for-byte',
+    );
+    assertIncludes(
+      helpOutput,
+      'fsb-mcp-server uninstall           Remove FSB from an MCP client config',
+      'help preserves the legacy uninstall line byte-for-byte',
+    );
 
     assertEqual(installResult.status, 1, 'native install rejects legacy dry-run mixing');
     assertIncludes(
@@ -279,6 +305,63 @@ function run() {
       )),
       'invalid native syntax creates no Chrome registration directory',
     );
+
+    const unavailableInstall = runCli(['install', '--native-host'], fixture);
+    const unavailableInstallOutput = `${unavailableInstall.stdout}${unavailableInstall.stderr}`;
+    const unavailableUninstall = runCli(['uninstall', '--native-host'], fixture);
+    const unavailableUninstallOutput = `${unavailableUninstall.stdout}${unavailableUninstall.stderr}`;
+    assertEqual(unavailableInstall.status, 1, 'unresolved production native install fails closed');
+    assertIncludes(
+      unavailableInstallOutput,
+      'Native messaging host was not changed: unavailable',
+      'unresolved production native install reports only bounded unavailable',
+    );
+    assertIncludes(
+      unavailableInstallOutput,
+      'Run fsb-mcp-server doctor for repair details.',
+      'unresolved production native install gives exact doctor guidance',
+    );
+    assertEqual(unavailableUninstall.status, 1, 'unresolved production native uninstall fails closed');
+    assertIncludes(
+      unavailableUninstallOutput,
+      'Native messaging host was not changed: unavailable',
+      'unresolved production native uninstall reports only bounded unavailable',
+    );
+
+    const duplicateId = runCli([
+      'install',
+      '--native-host',
+      '--extension-id', DEVELOPMENT_EXTENSION_ID,
+      '--extension-id', EXTENSION_ID,
+    ], fixture);
+    const duplicateTarget = runCli([
+      'uninstall',
+      '--native-host',
+      '--native-host',
+    ], fixture);
+    const extraPositional = runCli([
+      'install',
+      'unexpected-positional',
+      '--native-host',
+    ], fixture);
+    const unknownShort = runCli([
+      'install',
+      '-x',
+      '--native-host',
+    ], fixture);
+    for (const [result, label] of [
+      [duplicateId, 'duplicate extension id'],
+      [duplicateTarget, 'duplicate native target'],
+      [extraPositional, 'extra positional'],
+      [unknownShort, 'unknown short flag'],
+    ]) {
+      assertEqual(result.status, 1, `${label} is rejected before native mutation`);
+      assertIncludes(
+        `${result.stdout}${result.stderr}`,
+        'Usage: fsb-mcp-server',
+        `${label} prints stable bounded usage`,
+      );
+    }
   });
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

@@ -19,6 +19,7 @@ const knownSections = new Set([
   'runtime-transaction',
   'install-transaction',
   'cli-routing',
+  'cli-output',
 ]);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
@@ -1813,6 +1814,159 @@ async function runCliRouting() {
   equal(Object.keys(platforms.PLATFORMS).length, 21, 'native host does not change the 21-client platform registry');
 }
 
+async function runCliOutput() {
+  const cli = await importBuild('install.js');
+  const location = '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json';
+
+  function operationsWith(installResult, uninstallResult = null) {
+    return Object.freeze({
+      install: async () => Object.freeze(installResult),
+      uninstall: async () => Object.freeze(uninstallResult || installResult),
+    });
+  }
+
+  const installed = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true },
+    operationsWith({
+      status: 'installed',
+      reason: 'installed',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(installed.exitCode, 0, 'installed native result exits cleanly');
+  equal(
+    installed.stdout,
+    `Native messaging host installed.\nExpected location: ${location}\nAllowed origin: ${ORIGIN}\n`,
+    'installed native result prints only factual location and sole origin',
+  );
+  equal(installed.stderr, '', 'installed native result writes no error output');
+
+  const alreadyInstalled = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true },
+    operationsWith({
+      status: 'already-installed',
+      reason: 'exact',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(alreadyInstalled.exitCode, 0, 'already-installed native result exits cleanly');
+  equal(
+    alreadyInstalled.stdout,
+    `Native messaging host is already installed.\nExpected location: ${location}\nAllowed origin: ${ORIGIN}\n`,
+    'already-installed native result remains factual',
+  );
+
+  const removed = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true },
+    operationsWith(null, {
+      status: 'removed',
+      reason: 'removed',
+      location,
+      origin: ORIGIN,
+      packageVersion: PACKAGE_VERSION,
+    }),
+  ));
+  equal(removed.exitCode, 0, 'removed native result exits cleanly');
+  equal(
+    removed.stdout,
+    `Native messaging host removed.\nRemoved: 1\nExpected location: ${location}\n`,
+    'removed native result reports one exact host removal and location',
+  );
+
+  const notInstalled = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true },
+    operationsWith(null, {
+      status: 'not-installed',
+      reason: 'absent',
+      location,
+      origin: null,
+      packageVersion: null,
+    }),
+  ));
+  equal(notInstalled.exitCode, 0, 'not-installed native result exits cleanly');
+  equal(
+    notInstalled.stdout,
+    `Native messaging host is not installed.\nRemoved: 0\nExpected location: ${location}\n`,
+    'not-installed native result reports zero removals and location',
+  );
+
+  const stableRefusals = [
+    'foreign-state',
+    'split-state',
+    'invalid-state',
+    'registry-shadow',
+    'unavailable',
+  ];
+  for (const reason of stableRefusals) {
+    const refused = await captureCliAction(() => cli.runInstall(
+      { 'native-host': true },
+      operationsWith({
+        status: 'refused',
+        reason,
+        location,
+        origin: null,
+        packageVersion: null,
+      }),
+    ));
+    equal(refused.exitCode, 1, `${reason} native refusal exits nonzero`);
+    equal(refused.stdout, '', `${reason} native refusal emits no optimistic stdout`);
+    equal(
+      refused.stderr,
+      `Native messaging host was not changed: ${reason}\nExpected location: ${location}\nRun fsb-mcp-server doctor for repair details.\n`,
+      `${reason} native refusal prints only stable reason, location, and doctor guidance`,
+    );
+  }
+
+  const sensitive = 'SENSITIVE_USERNAME_ENV_SECRET_CHILD_TASK';
+  const taintedResult = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true },
+    operationsWith({
+      status: 'refused',
+      reason: sensitive,
+      location: `/home/${sensitive}\nmanifest.json`,
+      origin: `chrome-extension://${sensitive}/`,
+      packageVersion: sensitive,
+      manifest: sensitive,
+      registryValue: sensitive,
+      childOutput: sensitive,
+      task: sensitive,
+    }),
+  ));
+  equal(taintedResult.exitCode, 1, 'unknown tainted refusal exits nonzero');
+  check(!`${taintedResult.stdout}${taintedResult.stderr}`.includes(sensitive), 'tainted receipt fields never reach terminal output');
+  check(taintedResult.stderr.includes('not changed: unavailable'), 'unknown refusal reason collapses to unavailable');
+  check(taintedResult.stderr.includes('Expected location: Unavailable'), 'invalid location collapses to bounded unavailable');
+
+  const thrown = await captureCliAction(() => cli.runUninstall(
+    { 'native-host': true },
+    Object.freeze({
+      install: async () => { throw new Error(sensitive); },
+      uninstall: async () => { throw new Error(sensitive); },
+    }),
+  ));
+  equal(thrown.exitCode, 1, 'native adapter exception becomes a refusal without throwing');
+  check(!`${thrown.stdout}${thrown.stderr}`.includes(sensitive), 'native adapter exception text is never serialized');
+  check(thrown.stderr.includes('not changed: unavailable'), 'native adapter exception collapses to unavailable');
+  check(thrown.stderr.includes('Run fsb-mcp-server doctor for repair details.'), 'native adapter exception retains exact doctor guidance');
+
+  for (const result of [installed, alreadyInstalled, removed, notInstalled]) {
+    const output = `${result.stdout}${result.stderr}`.toLowerCase();
+    for (const optimistic of ['paired', 'provider', 'delegation', 'agent started']) {
+      check(!output.includes(optimistic), `successful native output never claims ${optimistic}`);
+    }
+  }
+
+  const indexSource = readFileSync(path.join(repositoryRoot, 'mcp/src/index.ts'), 'utf8');
+  const beforeInstallCase = indexSource.slice(0, indexSource.indexOf("case 'install':"));
+  check(!/case 'serve':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'serve router never calls installer code');
+  check(!/case 'doctor':[\s\S]*runInstall\(/u.test(beforeInstallCase), 'doctor router never calls installer code');
+  check(/let command = 'stdio'/u.test(indexSource), 'no-argument startup remains the stdio server route');
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -1829,6 +1983,10 @@ async function main() {
   if (!requestedSection || requestedSection === 'cli-routing') {
     console.log('\n=== Native CLI routing ===');
     await runCliRouting();
+  }
+  if (!requestedSection || requestedSection === 'cli-output') {
+    console.log('\n=== Native CLI output ===');
+    await runCliOutput();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }
