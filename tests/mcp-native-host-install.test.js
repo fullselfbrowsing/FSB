@@ -101,17 +101,22 @@ function fileFact(pathname, value) {
 }
 
 function fakePlatformDependencies(options = {}) {
-  const trace = [];
+  const trace = options.trace || [];
   const manifestFacts = new Map(options.manifestFacts || []);
   const registryFacts = new Map(options.registryFacts || []);
+  let keyInspectionCount = 0;
+  function step(entry) {
+    trace.push(entry);
+    if (options.failAt === entry) throw new Error(`sensitive:${entry}:must-not-leak`);
+  }
   const dependencies = {
     files: {
       inspectFile: async (pathname, maxBytes) => {
-        trace.push(`file:read:${pathname}:${maxBytes}`);
+        step(`file:read:${pathname}:${maxBytes}`);
         return manifestFacts.get(pathname) || Object.freeze({ status: 'absent' });
       },
       writePrivateFileAtomic: async (pathname, contents, mode) => {
-        trace.push(`file:write:${pathname}:${mode.toString(8)}`);
+        step(`file:write:${pathname}:${mode.toString(8)}`);
         manifestFacts.set(pathname, Object.freeze({
           status: 'file',
           path: pathname,
@@ -120,29 +125,36 @@ function fakePlatformDependencies(options = {}) {
         }));
       },
       removeFile: async (pathname) => {
-        trace.push(`file:delete:${pathname}`);
+        step(`file:delete:${pathname}`);
         manifestFacts.delete(pathname);
       },
     },
     registry: {
       readDefault: async (view, key) => {
-        trace.push(`registry:read:${view}:${key}`);
+        step(`registry:read:${view}:${key}`);
         return registryFacts.get(view) || Object.freeze({ status: 'absent' });
       },
       writeDefault: async (view, key, value) => {
-        trace.push(`registry:write:${view}:${key}:${value.type}`);
+        step(`registry:write:${view}:${key}:${value.type}`);
         registryFacts.set(view, Object.freeze({ status: 'value', ...value }));
       },
       deleteDefault: async (view, key) => {
-        trace.push(`registry:delete:${view}:${key}`);
+        step(`registry:delete:${view}:${key}`);
         registryFacts.delete(view);
       },
       inspectKey: async (view, key) => {
-        trace.push(`registry:key:${view}:${key}`);
-        return Object.freeze({ status: 'empty' });
+        step(`registry:key:${view}:${key}`);
+        const configured = Array.isArray(options.keyFacts)
+          ? options.keyFacts[Math.min(keyInspectionCount, options.keyFacts.length - 1)]
+          : options.keyFact;
+        keyInspectionCount += 1;
+        if (configured) return Object.freeze(configured);
+        return registryFacts.has(view)
+          ? Object.freeze({ status: 'exact-default-only' })
+          : Object.freeze({ status: 'empty' });
       },
       deleteEmptyKey: async (view, key) => {
-        trace.push(`registry:key-delete:${view}:${key}`);
+        step(`registry:key-delete:${view}:${key}`);
       },
     },
   };
@@ -396,6 +408,213 @@ function fakeRuntimeDependencies(layout, options = {}) {
     originalCacheAvailable: () => originalCacheAvailable,
     launcherReachable: () => launcherReachable,
     priorRuntimeUntouched: () => priorRuntimeUntouched,
+  };
+}
+
+function runtimeReceipt(layout, marker) {
+  return Object.freeze({
+    schema: 1,
+    platform: layout.platform,
+    packageName: 'fsb-mcp-server',
+    packageVersion: marker.packageVersion,
+    stableRoot: layout.stableRoot,
+    launcherPath: layout.launcherPath,
+    packageRoot: layout.packageRoot,
+    markerPath: layout.markerPath,
+    origin: marker.origin,
+    installToken: marker.installToken,
+    tarballIntegrity: TARBALL_SHA512,
+    artifactSha256: marker.artifactSha256,
+    marker,
+  });
+}
+
+function extensionIdFromOrigin(origin) {
+  return origin.slice('chrome-extension://'.length, -1);
+}
+
+function fakeInstallTransaction(platformModule, platformLayout, runtimeLayout, options = {}) {
+  const trace = [];
+  const adjacentPath = platformLayout.platform === 'win32'
+    ? `${platformLayout.stableRoot}\\adjacent-owned-by-user.txt`
+    : `${path.posix.dirname(platformLayout.manifestPath)}/adjacent.host.json`;
+  let runtimeState = options.runtimeState || 'absent';
+  let runtimeVersion = options.runtimeVersion || PACKAGE_VERSION;
+  let runtimeOrigin = options.runtimeOrigin || runtimeLayout.origin;
+  let currentMarker = null;
+  let currentReceipt = null;
+  let activePublishers = 0;
+  let maximumActivePublishers = 0;
+  let publishCount = 0;
+
+  function rebuildExactRuntime() {
+    currentMarker = expectedMarker(platformLayout.platform, {
+      origin: runtimeOrigin,
+      packageVersion: runtimeVersion,
+      installToken: options.runtimeInstallToken || INSTALL_TOKEN,
+      artifactSha256: options.runtimeArtifactSha256 || ARTIFACT_SHA256,
+    });
+    currentReceipt = runtimeReceipt(runtimeLayout, currentMarker);
+  }
+  if (runtimeState === 'exact') rebuildExactRuntime();
+
+  const registrationState = options.registrationState
+    || (runtimeState === 'exact' ? 'exact' : 'absent');
+  const manifestFacts = new Map([[adjacentPath, Object.freeze({
+    status: 'file',
+    path: adjacentPath,
+    realPath: adjacentPath,
+    contents: 'adjacent-user-content',
+  })]]);
+  const registryFacts = new Map();
+  if (registrationState !== 'absent') {
+    const registrationOrigin = options.registrationOrigin || runtimeOrigin;
+    const extensionId = extensionIdFromOrigin(registrationOrigin);
+    let manifest = expectedManifest(platformLayout.launcherPath, extensionId);
+    if (registrationState === 'foreign') manifest = { ...manifest, name: 'foreign.host' };
+    manifestFacts.set(
+      platformLayout.manifestPath,
+      registrationState === 'unavailable'
+        ? Object.freeze({ status: 'unavailable' })
+        : fileFact(platformLayout.manifestPath, manifest),
+    );
+    if (platformLayout.platform === 'win32') {
+      registryFacts.set('user/32', registrationState === 'unavailable'
+        ? Object.freeze({ status: 'unavailable' })
+        : Object.freeze({
+          status: 'value',
+          type: registrationState === 'invalid' ? 'REG_BINARY' : 'REG_SZ',
+          value: registrationState === 'mismatched'
+            ? 'C:\\foreign\\manifest.json'
+            : platformLayout.manifestPath,
+        }));
+    }
+  }
+  if (registrationState === 'shadow' && platformLayout.platform === 'win32') {
+    registryFacts.set('user/32', Object.freeze({
+      status: 'value',
+      type: 'REG_SZ',
+      value: platformLayout.manifestPath,
+    }));
+    registryFacts.set('user/64', Object.freeze({
+      status: 'value',
+      type: 'REG_SZ',
+      value: platformLayout.manifestPath,
+    }));
+  } else if (platformLayout.platform === 'win32') {
+    registryFacts.set('user/64', Object.freeze({ status: 'absent' }));
+  }
+
+  const platformHarness = fakePlatformDependencies({
+    trace,
+    manifestFacts,
+    registryFacts,
+    failAt: options.failAt,
+    keyFact: options.keyFact,
+    keyFacts: options.keyFacts,
+  });
+  const platformAdapter = platformModule.createNativeHostPlatformAdapter(
+    platformLayout,
+    platformHarness.dependencies,
+  );
+
+  function runtimeStep(entry) {
+    trace.push(entry);
+    if (options.failAt === entry) throw new Error(`sensitive:${entry}:must-not-leak`);
+  }
+
+  const runtimeAdapter = Object.freeze({
+    layout: runtimeLayout,
+    inspectRuntime: async () => {
+      runtimeStep('runtime:inspect');
+      if (runtimeState === 'absent') {
+        return Object.freeze({
+          state: 'absent',
+          reason: 'absent',
+          markerFact: Object.freeze({ status: 'absent' }),
+          marker: null,
+          receipt: null,
+        });
+      }
+      if (runtimeState === 'exact') {
+        return Object.freeze({
+          state: 'exact',
+          reason: 'exact',
+          markerFact: fileFact(platformLayout.markerPath, currentMarker),
+          marker: Object.freeze({ ...currentMarker }),
+          receipt: currentReceipt,
+        });
+      }
+      return Object.freeze({
+        state: runtimeState,
+        reason: `runtime-${runtimeState}`,
+        markerFact: options.runtimeMarkerFact || Object.freeze({
+          status: runtimeState === 'unavailable' ? 'unavailable' : 'symlink',
+        }),
+        marker: null,
+        receipt: null,
+      });
+    },
+    publishRuntime: async () => {
+      runtimeStep('runtime:publish');
+      publishCount += 1;
+      activePublishers += 1;
+      maximumActivePublishers = Math.max(maximumActivePublishers, activePublishers);
+      try {
+        if (options.publishGate) await options.publishGate;
+        if (options.publishResult) return Object.freeze(options.publishResult);
+        runtimeState = 'exact';
+        runtimeVersion = PACKAGE_VERSION;
+        runtimeOrigin = runtimeLayout.origin;
+        rebuildExactRuntime();
+        return Object.freeze({
+          status: 'published',
+          reason: 'published',
+          receipt: currentReceipt,
+          trace: Object.freeze({
+            pack: Object.freeze({}),
+            install: Object.freeze({}),
+          }),
+        });
+      } finally {
+        activePublishers -= 1;
+      }
+    },
+    recheckPublicationBoundary: async (receipt) => {
+      runtimeStep('runtime:recheck-publication');
+      return options.publicationBoundaryExact !== false
+        && runtimeState === 'exact'
+        && receipt === currentReceipt;
+    },
+    recheckExactRuntime: async (receipt) => {
+      runtimeStep('runtime:recheck-exact');
+      return options.runtimeBoundaryExact !== false
+        && runtimeState === 'exact'
+        && receipt === currentReceipt;
+    },
+    removeExactRuntime: async (receipt) => {
+      runtimeStep('runtime:remove');
+      if (runtimeState !== 'exact' || receipt !== currentReceipt) {
+        throw new Error('sensitive:runtime-ownership-mismatch');
+      }
+      runtimeState = 'absent';
+      currentMarker = null;
+      currentReceipt = null;
+      if (platformLayout.platform === 'win32') {
+        manifestFacts.delete(platformLayout.manifestPath);
+      }
+    },
+  });
+
+  return {
+    dependencies: Object.freeze({ platform: platformAdapter, runtime: runtimeAdapter }),
+    trace,
+    manifestFacts,
+    registryFacts,
+    adjacentPath,
+    runtimeState: () => runtimeState,
+    publishCount: () => publishCount,
+    maximumActivePublishers: () => maximumActivePublishers,
   };
 }
 
@@ -1002,6 +1221,448 @@ async function runRuntimeTransaction() {
   }
 }
 
+function transactionMutations(trace) {
+  return trace.filter((entry) => (
+    entry.startsWith('file:write:')
+    || entry.startsWith('file:delete:')
+    || entry.startsWith('registry:write:')
+    || entry.startsWith('registry:delete:')
+    || entry.startsWith('registry:key-delete:')
+    || entry === 'runtime:publish'
+    || entry === 'runtime:remove'
+  ));
+}
+
+async function runInstallTransaction() {
+  const installer = await importBuild('native-host-install/index.js');
+  const platform = await importBuild('native-host-install/platform.js');
+  const runtimeLayout = await importBuild('native-host/runtime-layout.js');
+
+  function layouts(platformName) {
+    const input = runtimeLayoutInput(platformName);
+    return {
+      platformLayout: platform.resolveNativeHostPlatformLayout({
+        platform: platformName,
+        homeDirectory: input.homeDirectory,
+        localAppData: input.localAppData,
+      }),
+      runtimeLayout: runtimeLayout.resolveNativeHostRuntimeLayout(input),
+    };
+  }
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const resolved = layouts(platformName);
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+    );
+    const installed = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(installed.status, 'installed', `${platformName} absent exact state installs`);
+    equal(installed.reason, 'installed', `${platformName} install result is stable and content-free`);
+    equal(installed.location, resolved.platformLayout.manifestPath, `${platformName} result names the bounded expected location`);
+    equal(installed.origin, ORIGIN, `${platformName} result records the sole exact origin`);
+    equal(installed.packageVersion, PACKAGE_VERSION, `${platformName} result records the installed package version`);
+    equal(harness.runtimeState(), 'exact', `${platformName} runtime is exact after install`);
+    equal(harness.publishCount(), 1, `${platformName} runtime is materialized exactly once`);
+
+    const runtimePublish = harness.trace.indexOf('runtime:publish');
+    const runtimeRecheck = harness.trace.indexOf('runtime:recheck-publication');
+    const registrationWrite = harness.trace.findIndex((entry) => (
+      platformName === 'win32'
+        ? entry.startsWith('registry:write:user/32:')
+        : entry.startsWith(`file:write:${resolved.platformLayout.manifestPath}:`)
+    ));
+    check(runtimePublish >= 0 && runtimePublish < runtimeRecheck, `${platformName} validates runtime before publication recheck`);
+    check(runtimeRecheck < registrationWrite, `${platformName} publishes Chrome registration last`);
+    if (platformName === 'win32') {
+      const manifestWrite = harness.trace.findIndex((entry) => (
+        entry === `file:write:${resolved.platformLayout.manifestPath}:600`
+      ));
+      check(manifestWrite < registrationWrite, 'Windows writes the exact manifest before canonical HKCU publication');
+      check(
+        harness.trace.every((entry) => !entry.startsWith('registry:write:user/64:')),
+        'Windows install never mutates the 64-bit shadow view',
+      );
+    }
+
+    const mutationCount = transactionMutations(harness.trace).length;
+    const already = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(already.status, 'already-installed', `${platformName} exact current state is idempotent`);
+    equal(already.reason, 'exact', `${platformName} idempotent result reports exact state`);
+    equal(transactionMutations(harness.trace).length, mutationCount, `${platformName} repeat install performs zero writes or deletes`);
+    equal(harness.publishCount(), 1, `${platformName} repeat install never rematerializes runtime`);
+  }
+
+  {
+    const resolved = layouts('linux');
+    let releasePublish;
+    const publishGate = new Promise((resolve) => { releasePublish = resolve; });
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { publishGate },
+    );
+    const first = installer.installNativeHost({ extensionId: EXTENSION_ID }, harness.dependencies);
+    await new Promise((resolve) => setImmediate(resolve));
+    const second = installer.installNativeHost({ extensionId: EXTENSION_ID }, harness.dependencies);
+    await new Promise((resolve) => setImmediate(resolve));
+    equal(
+      harness.trace.filter((entry) => entry === 'runtime:inspect').length,
+      1,
+      'same-root concurrent install waits behind the active transaction before inspection',
+    );
+    releasePublish();
+    const results = await Promise.all([first, second]);
+    deepEqual(
+      results.map((result) => result.status),
+      ['installed', 'already-installed'],
+      'same-root concurrent calls serialize to one install and one idempotent receipt',
+    );
+    equal(harness.publishCount(), 1, 'same-root serialization publishes one runtime');
+    equal(harness.maximumActivePublishers(), 1, 'same-root serialization never overlaps runtime publishers');
+  }
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const resolved = layouts(platformName);
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        runtimeVersion: '0.9.0',
+        registrationState: 'exact',
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', `${platformName} exact older install is not an implicit upgrade`);
+    equal(result.reason, 'version-mismatch', `${platformName} old-version refusal is stable`);
+    equal(transactionMutations(harness.trace).length, 0, `${platformName} old-version install refusal performs zero mutation`);
+  }
+
+  const refusalMatrix = [
+    { runtimeState: 'absent', registrationState: 'exact', reason: 'split-state' },
+    { runtimeState: 'exact', registrationState: 'absent', reason: 'split-state' },
+    { runtimeState: 'foreign', registrationState: 'foreign', reason: 'foreign-state' },
+    { runtimeState: 'invalid', registrationState: 'exact', reason: 'invalid-state' },
+    { runtimeState: 'unavailable', registrationState: 'unavailable', reason: 'unavailable' },
+  ];
+  for (const fixture of refusalMatrix) {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      fixture,
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'split, foreign, invalid, or unavailable install state is refused');
+    equal(result.reason, fixture.reason, 'install refusal uses a stable ownership reason');
+    equal(transactionMutations(harness.trace).length, 0, 'install ownership refusal performs zero writes or deletes');
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { runtimeState: 'exact', registrationState: 'shadow' },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'Windows 64-bit shadow blocks install');
+    equal(result.reason, 'registry-shadow', 'Windows shadow refusal is explicit and content-free');
+    equal(transactionMutations(harness.trace).length, 0, 'Windows shadow refusal performs zero mutation in either view');
+  }
+
+  for (const invalidExtensionId of ['', 'a'.repeat(31), 'q'.repeat(32), '../profile']) {
+    const resolved = layouts('darwin');
+    const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout);
+    const result = await installer.installNativeHost(
+      { extensionId: invalidExtensionId },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'malformed install extension id is refused');
+    equal(result.reason, 'invalid-request', 'malformed extension id has one stable refusal');
+    equal(harness.trace.length, 0, 'malformed extension id causes zero inspection or mutation');
+  }
+
+  {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        publishResult: { status: 'refused', reason: 'pack-failed', receipt: null },
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'runtime publication refusal blocks registration');
+    equal(result.reason, 'pack-failed', 'runtime refusal reason remains stable');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('file:write:') && !entry.startsWith('registry:write:')),
+      'runtime publication refusal performs zero registration write',
+    );
+  }
+
+  {
+    const resolved = layouts('darwin');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { publicationBoundaryExact: false },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'changed parent/runtime boundary blocks registration publication');
+    equal(result.reason, 'boundary-changed', 'publication recheck failure is stable');
+    check(harness.trace.includes('runtime:remove'), 'boundary-change rollback removes only the just-published exact runtime');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('file:write:')),
+      'boundary-change rollback happens before registration publication',
+    );
+  }
+
+  for (const platformName of ['darwin', 'win32']) {
+    const resolved = layouts(platformName);
+    const failAt = platformName === 'win32'
+      ? `registry:write:user/32:${resolved.platformLayout.registration.key}:REG_SZ`
+      : `file:write:${resolved.platformLayout.manifestPath}:600`;
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { failAt },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', `${platformName} registration publication failure is contained`);
+    equal(result.reason, 'registration-publish-failed', `${platformName} registration error content is collapsed`);
+    check(harness.trace.includes('runtime:remove'), `${platformName} publication failure rolls back the exact new runtime`);
+    equal(harness.runtimeState(), 'absent', `${platformName} publication failure leaves no runtime split`);
+    check(!harness.manifestFacts.has(resolved.platformLayout.manifestPath), `${platformName} publication failure leaves no owned manifest`);
+    check(!harness.registryFacts.has('user/32'), `${platformName} publication failure leaves no canonical registry value`);
+    check(!JSON.stringify(result).includes('sensitive:'), `${platformName} publication failure never exposes raw error content`);
+  }
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const resolved = layouts(platformName);
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { runtimeState: 'exact', registrationState: 'exact' },
+    );
+    const removed = await installer.uninstallNativeHost(harness.dependencies);
+    equal(removed.status, 'removed', `${platformName} exact current owned install uninstalls`);
+    equal(removed.reason, 'removed', `${platformName} uninstall result is stable`);
+    equal(removed.origin, ORIGIN, `${platformName} uninstall receipt retains the exact removed origin`);
+    equal(removed.packageVersion, PACKAGE_VERSION, `${platformName} uninstall receipt retains the removed version`);
+    const registrationDelete = harness.trace.findIndex((entry) => (
+      platformName === 'win32'
+        ? entry.startsWith('registry:delete:user/32:')
+        : entry === `file:delete:${resolved.platformLayout.manifestPath}`
+    ));
+    const runtimeDelete = harness.trace.indexOf('runtime:remove');
+    check(registrationDelete >= 0 && registrationDelete < runtimeDelete, `${platformName} uninstall removes registration before runtime`);
+    check(harness.manifestFacts.has(harness.adjacentPath), `${platformName} uninstall preserves adjacent user/host files`);
+    equal(harness.runtimeState(), 'absent', `${platformName} uninstall removes only the exact owned runtime`);
+    if (platformName === 'win32') {
+      const keyDelete = harness.trace.findIndex((entry) => entry.startsWith('registry:key-delete:user/32:'));
+      check(registrationDelete < keyDelete && keyDelete < runtimeDelete, 'Windows removes only the proved-empty exact host subkey before runtime');
+      check(
+        harness.trace.every((entry) => !entry.startsWith('registry:delete:user/64:') && !entry.startsWith('registry:key-delete:user/64:')),
+        'Windows uninstall never mutates the 64-bit shadow view',
+      );
+    }
+
+    const repeatMutationCount = transactionMutations(harness.trace).length;
+    const repeated = await installer.uninstallNativeHost(harness.dependencies);
+    equal(repeated.status, 'not-installed', `${platformName} repeat uninstall is idempotent`);
+    equal(repeated.reason, 'absent', `${platformName} absent uninstall result is stable`);
+    equal(transactionMutations(harness.trace).length, repeatMutationCount, `${platformName} repeat uninstall performs zero deletes`);
+  }
+
+  for (const platformName of ['darwin', 'linux', 'win32']) {
+    const resolved = layouts(platformName);
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        runtimeVersion: '0.8.7',
+        registrationState: 'exact',
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'removed', `${platformName} internally consistent older owned runtime remains removable`);
+    equal(result.packageVersion, '0.8.7', `${platformName} older uninstall reports the installed version, not invoking version`);
+    equal(harness.runtimeState(), 'absent', `${platformName} older exact runtime is removed safely`);
+  }
+
+  const uninstallRefusals = [
+    { runtimeState: 'absent', registrationState: 'exact', reason: 'split-state' },
+    { runtimeState: 'exact', registrationState: 'absent', reason: 'split-state' },
+    { runtimeState: 'foreign', registrationState: 'foreign', reason: 'foreign-state' },
+    { runtimeState: 'invalid', registrationState: 'exact', reason: 'invalid-state' },
+    { runtimeState: 'unavailable', registrationState: 'unavailable', reason: 'unavailable' },
+  ];
+  for (const fixture of uninstallRefusals) {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      fixture,
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'uninstall refuses split, foreign, symlink, or unavailable ownership');
+    equal(result.reason, fixture.reason, 'uninstall ownership refusal is stable');
+    equal(transactionMutations(harness.trace).length, 0, 'uninstall ownership refusal performs zero deletes');
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      { runtimeState: 'exact', registrationState: 'shadow' },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'Windows shadow blocks uninstall without deleting either view');
+    equal(result.reason, 'registry-shadow', 'Windows shadow uninstall refusal is stable');
+    equal(transactionMutations(harness.trace).length, 0, 'Windows shadow uninstall refusal performs zero deletes');
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        keyFact: { status: 'nonempty' },
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'Windows extra value/subkey blocks uninstall before canonical deletion');
+    equal(result.reason, 'registry-key-not-exact', 'Windows nonempty subkey refusal is stable');
+    equal(transactionMutations(harness.trace).length, 0, 'Windows nonempty key causes zero deletion');
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        keyFacts: [{ status: 'exact-default-only' }, { status: 'nonempty' }],
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'Windows key change after default deletion stops broad cleanup');
+    equal(result.reason, 'registry-key-cleanup-failed', 'Windows changed-key refusal is stable');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('registry:key-delete:')),
+      'Windows changed key is never deleted',
+    );
+    check(!harness.trace.includes('runtime:remove'), 'Windows changed key preserves runtime for doctor evidence');
+  }
+
+  {
+    const resolved = layouts('darwin');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        runtimeBoundaryExact: false,
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'runtime ownership change blocks uninstall before registration removal');
+    equal(result.reason, 'boundary-changed', 'uninstall recheck failure is stable');
+    equal(transactionMutations(harness.trace).length, 0, 'uninstall recheck failure performs zero deletion');
+  }
+
+  for (const fixture of [
+    { failAtFactory: (layout) => `file:delete:${layout.manifestPath}`, reason: 'registration-remove-failed', runtimeRemoved: false },
+    { failAtFactory: () => 'runtime:remove', reason: 'runtime-remove-failed', runtimeRemoved: false },
+  ]) {
+    const resolved = layouts('linux');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        failAt: fixture.failAtFactory(resolved.platformLayout),
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'uninstall operation failure is contained');
+    equal(result.reason, fixture.reason, 'uninstall operation failure is content-free');
+    equal(harness.runtimeState(), 'exact', 'failed uninstall never broad-deletes the runtime');
+    check(!JSON.stringify(result).includes('sensitive:'), 'uninstall never serializes raw adapter errors');
+  }
+
+  const source = [
+    readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/index.ts'), 'utf8'),
+    readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/types.ts'), 'utf8'),
+  ].join('\n').toLowerCase();
+  for (const forbidden of [
+    'hkey_local_machine',
+    'hklm',
+    'microsoft\\edge',
+    'bravesoftware',
+    'profile 1',
+    'rm -rf',
+    'rmsync',
+    'recursive: true',
+    'shell: true',
+    'implicit repair',
+    'implicit upgrade',
+  ]) {
+    check(!source.includes(forbidden), `closed install transaction excludes broad or implicit authority token ${forbidden}`);
+  }
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -1012,7 +1673,8 @@ async function main() {
     await runRuntimeTransaction();
   }
   if (!requestedSection || requestedSection === 'install-transaction') {
-    if (requestedSection) throw new Error('install-transaction section is not implemented yet');
+    console.log('\n=== Install and uninstall transaction ===');
+    await runInstallTransaction();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }
