@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 63-07-PLAN.md
-last_updated: "2026-07-17T18:44:36.975Z"
+stopped_at: Completed 63-08-PLAN.md
+last_updated: "2026-07-17T19:22:03.391Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 18
   completed_phases: 6
   total_plans: 40
-  completed_plans: 37
+  completed_plans: 38
   percent: 33
 ---
 
@@ -29,12 +29,12 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 63 — Native-Messaging Host
+**Current focus:** Phase 63 — native-messaging-host
 
 ## Current Position
 
-Phase: 63 (Native-Messaging Host) — EXECUTING
-Plan: 8 of 12
+Phase: 63 (native-messaging-host) — EXECUTING
+Plan: 9 of 12
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -52,7 +52,7 @@ Last activity: 2026-07-17
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 44/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
+Coverage: 51/51 v0.9.91 requirements mapped, 45/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -176,6 +176,10 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Route native CLI work by exact own-key presence before list, all, client, or Claude expansion, then validate the complete flag record. — A malformed or mixed explicit target must fail before any native or legacy mutation.
 - [Phase 63]: Reconstruct terminal receipts from exactly five ordinary own data fields with closed reasons, origins, and bounded control-free locations. — Prototype data, raw errors, and receipt extras must never become optimistic or sensitive output.
 - [Phase 63]: Keep unresolved production dependency composition outside the CLI router and fail closed as unavailable. — Plan 05 has no safe production filesystem/process/registry composer or persisted receipt layer, and Plan 06 must not invent that architecture while claiming live operability.
+- [Phase 63]: Keep Chrome native APIs inside one background helper with memory-only advisory presence and cooldown. — UI and persisted state cannot acquire native lifecycle authority.
+- [Phase 63]: Allow actual wake only after the existing pure preflight returns exact agent_offline. — Native reachability cannot override provider, pairing, consent, or start authority.
+- [Phase 63]: Treat exact native success as reachability only, then wait for the ordinary bridge and rerun pure preflight directly once. — Every failure preserves the original offline result and no user intent is replayed.
+- [Phase 63]: Protect the sole nativeMessaging manifest addition with an exact prior-byte hash and extension-wide authority scan. — No other permission or extension module silently gains native authority.
 
 ### Pending Todos
 
@@ -222,8 +226,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-17T18:44:36.971Z
-Stopped at: Completed 63-07-PLAN.md
+Last session: 2026-07-17T19:21:15.848Z
+Stopped at: Completed 63-08-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -241,3 +245,4 @@ Execute Phase 63 Plan 07 by adding one bounded read-only native-host diagnostic 
 | Phase 63 P05 | 36 min | 3 tasks | 6 files |
 | Phase 63 P06 | 24 min | 2 tasks | 4 files |
 | Phase 63 P07 | 14 min | 2 tasks | 4 files |
+| Phase 63 P08 | 28 min | 3 tasks | 5 files |
