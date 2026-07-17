@@ -18,6 +18,7 @@ const knownSections = new Set([
   'platform-and-registration',
   'runtime-transaction',
   'install-transaction',
+  'cli-routing',
 ]);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
@@ -58,6 +59,29 @@ function deepEqual(actual, expected, message) {
 async function importBuild(relativePath) {
   const href = pathToFileURL(path.join(repositoryRoot, 'mcp', 'build', relativePath)).href;
   return import(`${href}?phase63install=${Date.now()}-${Math.random()}`);
+}
+
+async function captureCliAction(action) {
+  const stdout = [];
+  const stderr = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalExitCode = process.exitCode;
+  console.log = (...values) => stdout.push(values.join(' '));
+  console.error = (...values) => stderr.push(values.join(' '));
+  process.exitCode = 0;
+  try {
+    await action();
+    return Object.freeze({
+      stdout: `${stdout.join('\n')}${stdout.length > 0 ? '\n' : ''}`,
+      stderr: `${stderr.join('\n')}${stderr.length > 0 ? '\n' : ''}`,
+      exitCode: process.exitCode ?? 0,
+    });
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.exitCode = originalExitCode;
+  }
 }
 
 function ordinaryClone(value) {
@@ -1667,6 +1691,128 @@ async function runInstallTransaction() {
   }
 }
 
+async function runCliRouting() {
+  const cli = await importBuild('install.js');
+  const platforms = await importBuild('platforms.js');
+  const calls = [];
+  const operations = Object.freeze({
+    install: async (request) => {
+      calls.push(Object.freeze({ operation: 'install', request: { ...request } }));
+      const extensionId = request.extensionId || EXTENSION_ID;
+      return Object.freeze({
+        status: 'installed',
+        reason: 'installed',
+        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
+        origin: `chrome-extension://${extensionId}/`,
+        packageVersion: PACKAGE_VERSION,
+      });
+    },
+    uninstall: async () => {
+      calls.push(Object.freeze({ operation: 'uninstall' }));
+      return Object.freeze({
+        status: 'removed',
+        reason: 'removed',
+        location: '/home/fsb/.config/google-chrome/NativeMessagingHosts/io.github.fullselfbrowsing.fsb_native_host.json',
+        origin: ORIGIN,
+        packageVersion: PACKAGE_VERSION,
+      });
+    },
+  });
+
+  await captureCliAction(() => cli.runInstall({ 'native-host': true }, operations));
+  equal(calls.length, 1, 'exact native install calls the injected install operation once');
+  deepEqual(calls[0], { operation: 'install', request: {} }, 'default native install passes no extension override');
+
+  await captureCliAction(() => cli.runInstall({
+    'native-host': true,
+    'extension-id': DEVELOPMENT_EXTENSION_ID,
+  }, operations));
+  equal(calls.length, 2, 'development native install calls the injected install operation once');
+  deepEqual(
+    calls[1],
+    { operation: 'install', request: { extensionId: DEVELOPMENT_EXTENSION_ID } },
+    'development native install passes only the validated exact extension id',
+  );
+
+  await captureCliAction(() => cli.runUninstall({ 'native-host': true }, operations));
+  equal(calls.length, 3, 'exact native uninstall calls the injected uninstall operation once');
+  deepEqual(calls[2], { operation: 'uninstall' }, 'native uninstall passes no extra authority');
+
+  const invalidInstallFlags = [
+    { 'native-host': false },
+    { 'native-host': 'true' },
+    { 'native-host': [] },
+    { 'native-host': true, 'extension-id': true },
+    { 'native-host': true, 'extension-id': [DEVELOPMENT_EXTENSION_ID] },
+    { 'native-host': true, 'extension-id': 'abcdefghijklmnop' },
+    { 'native-host': true, 'extension-id': `${DEVELOPMENT_EXTENSION_ID}a` },
+    { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID.toUpperCase() },
+    { 'native-host': true, all: true },
+    { 'native-host': true, list: true },
+    { 'native-host': true, 'dry-run': true },
+    { 'native-host': true, unknown: true },
+  ];
+  for (const flags of invalidInstallFlags) {
+    const before = calls.length;
+    const result = await captureCliAction(() => cli.runInstall(flags, operations));
+    equal(result.exitCode, 1, 'invalid native install syntax exits nonzero');
+    equal(calls.length, before, 'invalid native install syntax performs zero native mutation');
+    check(
+      result.stderr.includes('fsb-mcp-server install --native-host'),
+      'invalid native install prints stable native usage',
+    );
+  }
+
+  const invalidUninstallFlags = [
+    { 'native-host': false },
+    { 'native-host': 'true' },
+    { 'native-host': [] },
+    { 'native-host': true, 'extension-id': DEVELOPMENT_EXTENSION_ID },
+    { 'native-host': true, all: true },
+    { 'native-host': true, list: true },
+    { 'native-host': true, 'dry-run': true },
+    { 'native-host': true, unknown: true },
+  ];
+  for (const flags of invalidUninstallFlags) {
+    const before = calls.length;
+    const result = await captureCliAction(() => cli.runUninstall(flags, operations));
+    equal(result.exitCode, 1, 'invalid native uninstall syntax exits nonzero');
+    equal(calls.length, before, 'invalid native uninstall syntax performs zero native mutation');
+    check(
+      result.stderr.includes('fsb-mcp-server uninstall --native-host'),
+      'invalid native uninstall prints stable native usage',
+    );
+  }
+
+  for (const key of Object.keys(platforms.PLATFORMS)) {
+    const before = calls.length;
+    await captureCliAction(() => cli.runInstall({ [key]: true, 'dry-run': true }, operations));
+    await captureCliAction(() => cli.runUninstall({ [key]: true, 'dry-run': true }, operations));
+    equal(calls.length, before, `${key} legacy install/uninstall never calls native operations`);
+
+    const mixedInstall = await captureCliAction(() => cli.runInstall({
+      'native-host': true,
+      [key]: true,
+    }, operations));
+    const mixedUninstall = await captureCliAction(() => cli.runUninstall({
+      'native-host': true,
+      [key]: true,
+    }, operations));
+    equal(mixedInstall.exitCode, 1, `${key} mixed native install is rejected`);
+    equal(mixedUninstall.exitCode, 1, `${key} mixed native uninstall is rejected`);
+    equal(calls.length, before, `${key} mixed native/client syntax performs zero native mutation`);
+  }
+
+  const beforeOrdinary = calls.length;
+  await captureCliAction(() => cli.runInstall({}, operations));
+  await captureCliAction(() => cli.runUninstall({}, operations));
+  await captureCliAction(() => cli.runInstall({ list: true }, operations));
+  await captureCliAction(() => cli.runInstall({ all: true, 'dry-run': true }, operations));
+  await captureCliAction(() => cli.runUninstall({ all: true, 'dry-run': true }, operations));
+  equal(calls.length, beforeOrdinary, 'ordinary/list/all routes never call native operations');
+  equal(Object.keys(platforms.PLATFORMS).length, 21, 'native host does not change the 21-client platform registry');
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
@@ -1679,6 +1825,10 @@ async function main() {
   if (!requestedSection || requestedSection === 'install-transaction') {
     console.log('\n=== Install and uninstall transaction ===');
     await runInstallTransaction();
+  }
+  if (!requestedSection || requestedSection === 'cli-routing') {
+    console.log('\n=== Native CLI routing ===');
+    await runCliRouting();
   }
   console.log(`\nNative host install tests: ${passed} passed, 0 failed`);
 }

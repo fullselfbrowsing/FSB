@@ -114,6 +114,8 @@ function run() {
       '.codeium/windsurf/mcp_config.json',
       'dry-run shows the Windsurf app config path',
     );
+    assertNotIncludes(output, 'Native messaging host', 'install --all excludes the native messaging host');
+    assertNotIncludes(output, 'native-host', 'install --all output does not widen to the native target');
   });
 
   console.log('\n--- codex install + uninstall round trip ---');
@@ -239,6 +241,43 @@ function run() {
       config,
       '"fsb"',
       'windsurf plugin-path install updates the JetBrains/Cascade config when that is the only Windsurf config surface',
+    );
+  });
+
+  console.log('\n--- native target isolation ---');
+  withTempHome('mcp-native-target-isolation', (fixture) => {
+    const installResult = runCli(['install', '--native-host', '--dry-run'], fixture);
+    const installOutput = `${installResult.stdout}${installResult.stderr}`;
+    const uninstallResult = runCli(
+      ['uninstall', '--native-host', '--codex', '--dry-run'],
+      fixture,
+    );
+    const uninstallOutput = `${uninstallResult.stdout}${uninstallResult.stderr}`;
+
+    assertEqual(installResult.status, 1, 'native install rejects legacy dry-run mixing');
+    assertIncludes(
+      installOutput,
+      'fsb-mcp-server install --native-host',
+      'native install mixing prints only the stable native usage',
+    );
+    assertEqual(uninstallResult.status, 1, 'native uninstall rejects client/dry-run mixing');
+    assertIncludes(
+      uninstallOutput,
+      'fsb-mcp-server uninstall --native-host',
+      'native uninstall mixing prints only the stable native usage',
+    );
+    assert(
+      !fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
+      'invalid native syntax creates no owned runtime',
+    );
+    assert(
+      !fs.existsSync(path.join(
+        fixture.home,
+        '.config',
+        'google-chrome',
+        'NativeMessagingHosts',
+      )),
+      'invalid native syntax creates no Chrome registration directory',
     );
   });
 
