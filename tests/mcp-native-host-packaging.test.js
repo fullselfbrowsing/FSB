@@ -317,9 +317,134 @@ function testWindowsBootstrapSources() {
   assert.doesNotMatch(buildSource, /exec(?:Sync)?\s*\(|shell:\s*true|\.bat\b|\.cmd\b|single-executable|sea-config/i);
 }
 
+function encodeBootstrapConfig(nodePath, entryPath, origin) {
+  const fields = [nodePath, entryPath, origin].map((value) => Buffer.from(value, 'utf8'));
+  const header = Buffer.alloc(24);
+  header.write('FSBNH01\0', 0, 'ascii');
+  header.writeUInt32LE(1, 8);
+  header.writeUInt32LE(fields[0].length, 12);
+  header.writeUInt32LE(fields[1].length, 16);
+  header.writeUInt32LE(fields[2].length, 20);
+  return Buffer.concat([header, ...fields]);
+}
+
+function assertBoundedBootstrapFailure(result, expectedIdentifier) {
+  assert.notEqual(result.status, 0, 'invalid bootstrap invocation unexpectedly succeeded');
+  assert.equal(result.signal, null);
+  assert.equal(result.stdout.length, 0, 'bootstrap failure wrote protocol-corrupting stdout');
+  const stderr = result.stderr.toString('utf8');
+  assert.equal(stderr, `${expectedIdentifier}\n`);
+  assert.ok(stderr.length < 64, 'bootstrap error identifier is not bounded');
+  assert.doesNotMatch(stderr, /[A-Z]:\\|Users|AppData|Program Files|node\.exe/i);
+}
+
+function testWindowsExecutableHarness() {
+  if (process.platform !== 'win32') return;
+  const buildScriptPath = path.join(repositoryRoot, 'scripts/build-native-host-windows.mjs');
+  const x64Directory = path.join(repositoryRoot, 'mcp/native-host/bin/win32-x64');
+  const x64Executable = path.join(x64Directory, 'fsb-native-host.exe');
+  const arm64Executable = path.join(
+    repositoryRoot,
+    'mcp/native-host/bin/win32-arm64/fsb-native-host.exe',
+  );
+  assert.equal(existsSync(x64Executable), true, 'x64 bootstrap artifact is missing');
+  assert.equal(existsSync(arm64Executable), true, 'arm64 bootstrap artifact is missing');
+
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb native bootstrap '));
+  const metadataPath = path.join(fixtureRoot, 'metadata.json');
+  const configPath = path.join(x64Directory, 'fsb-native-host-bootstrap.bin');
+  const origin = 'chrome-extension://badgafnfchcihdfnjneklogedcdkmjfk/';
+  const parentWindow = '--parent-window=123456';
+  const childPath = path.join(fixtureRoot, 'fixture child.js');
+  const payload = Buffer.from([8, 0, 0, 0, 0x7b, 0x22, 0x76, 0x22, 0x3a, 0x31, 0x7d, 0x0a]);
+  try {
+    const verify = run(process.execPath, [
+      buildScriptPath,
+      '--arch',
+      'all',
+      '--verify-only',
+      '--metadata-out',
+      metadataPath,
+    ]);
+    assert.equal(verify.status, 0, verify.stderr);
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    assert.equal(metadata.schema, 1);
+    assert.equal(metadata.package, 'fsb-mcp-server');
+    assert.equal(metadata.version, require('../mcp/package.json').version);
+    assert.deepEqual(metadata.artifacts.map((artifact) => artifact.architecture), ['x64', 'arm64']);
+    for (const artifact of metadata.artifacts) {
+      assert.match(artifact.sha256, /^[a-f0-9]{64}$/);
+      assert.ok(artifact.bytes > 0);
+    }
+
+    writeFileSync(childPath, `
+const expected = ${JSON.stringify([origin, parentWindow])};
+if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(expected)) process.exit(91);
+const chunks = [];
+process.stdin.on('data', (chunk) => chunks.push(chunk));
+process.stdin.on('end', () => {
+  process.stdout.write(Buffer.concat(chunks), () => process.exit(37));
+});
+`);
+    writeFileSync(configPath, encodeBootstrapConfig(process.execPath, childPath, origin));
+    const success = spawnSync(x64Executable, [origin, parentWindow], {
+      input: payload,
+      encoding: null,
+      maxBuffer: 1024 * 1024,
+      shell: false,
+      windowsHide: true,
+    });
+    assert.equal(success.status, 37, success.stderr.toString('utf8'));
+    assert.deepEqual(success.stdout, payload);
+    assert.equal(success.stderr.length, 0);
+
+    const wrongOrigin = spawnSync(
+      x64Executable,
+      ['chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/'],
+      { encoding: null, shell: false, windowsHide: true },
+    );
+    assertBoundedBootstrapFailure(wrongOrigin, 'FSBNH_E_ORIGIN');
+
+    const extraArgument = spawnSync(x64Executable, [origin, '--unexpected'], {
+      encoding: null,
+      shell: false,
+      windowsHide: true,
+    });
+    assertBoundedBootstrapFailure(extraArgument, 'FSBNH_E_ARGS');
+
+    for (const invalidConfig of [
+      Buffer.from('invalid'),
+      Buffer.alloc(65537),
+      encodeBootstrapConfig('relative-node.exe', childPath, origin),
+      encodeBootstrapConfig(process.execPath, childPath, 'chrome-extension://invalid/'),
+      Buffer.concat([encodeBootstrapConfig(process.execPath, childPath, origin), Buffer.from([0])]),
+    ]) {
+      writeFileSync(configPath, invalidConfig);
+      const failure = spawnSync(x64Executable, [origin], {
+        encoding: null,
+        shell: false,
+        windowsHide: true,
+      });
+      assertBoundedBootstrapFailure(failure, 'FSBNH_E_CONFIG');
+    }
+
+    writeFileSync(configPath, encodeBootstrapConfig(childPath, childPath, origin));
+    const createFailure = spawnSync(x64Executable, [origin], {
+      encoding: null,
+      shell: false,
+      windowsHide: true,
+    });
+    assertBoundedBootstrapFailure(createFailure, 'FSBNH_E_CREATE_PROCESS');
+  } finally {
+    rmSync(configPath, { force: true });
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
 async function runWindowsBootstrapSection() {
   await testWorkspacePreservingWrapper();
   testWindowsBootstrapSources();
+  testWindowsExecutableHarness();
 }
 
 async function main() {
