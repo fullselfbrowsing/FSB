@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 63-03-PLAN.md
-last_updated: "2026-07-17T04:47:46.815Z"
+stopped_at: Completed 63-04-PLAN.md
+last_updated: "2026-07-17T05:22:51.278Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 40
-  completed_plans: 31
+  completed_plans: 32
   percent: 67
 ---
 
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 63 (Native-Messaging Host) — EXECUTING
-Plan: 4 of 12
+Plan: 5 of 12
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -48,7 +48,7 @@ Last activity: 2026-07-17
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 3/12 complete |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 4/12 complete |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
@@ -166,10 +166,13 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Treat zero-byte EOF as a silent boot-presence probe before invocation validation; it produces no handler call or stdout frame. — Chrome must be able to probe native-host installation without manufacturing a wake request or causing daemon work.
 - [Phase 63]: Permit only the exact entry/constants/protocol native leaf graph plus node:os at this wave, with source and compiled graphs judged separately. — The positive graph prevents authority drift now while allowing Plan 04 to extend the verifier deliberately when its frozen runtime leaves exist.
 - [Phase 63]: Reconstruct every native response through the closed outcome/reason table and await at most one framed stdout write. — Closed reconstruction and one-shot settlement keep stdout protocol-pure and prevent handler objects or raw errors from widening the native boundary.
+- [Phase 63]: Let only exact ready FSB v1 health bypass or complete wake authority; incompatible responders are closed unavailable facts. — A generic, malformed, oversized, partially ready, or protocol-incompatible loopback listener must never be overwritten or mistaken for the owned daemon.
+- [Phase 63]: Coalesce native wake with an atomic token-only directory lock, health-rechecked stale quarantine, and exact-token release. — Concurrent hosts may create at most one serve child, and no process identifier or signaling authority is needed for recovery or timeout settlement.
+- [Phase 63]: Keep the stable native-host index as a one-shot composition root over only constants, protocol, runtime-layout, platform, daemon, and entry leaves. — The exact positive graph and unique absolute-Node serve edge prevent installer, router, agent, task, browser, auth, shell, or extra child-process authority from entering the host.
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-02 are complete and 10 approved serialized plans remain.
+None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-04 are complete and 8 approved serialized plans remain.
 
 ### Blockers/Concerns
 
@@ -211,13 +214,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-17T04:47:46.810Z
-Stopped at: Completed 63-03-PLAN.md
+Last session: 2026-07-17T05:22:51.238Z
+Stopped at: Completed 63-04-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 63 Plan 04 against the closed protocol, one-shot lifetime, staged native authority gate, and prior readiness/bind-ownership contracts. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute Phase 63 Plan 05 against the closed stable runtime, owner-marker, one-shot wake, and exact serve-only authority contracts. Keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -226,3 +229,4 @@ Execute Phase 63 Plan 04 against the closed protocol, one-shot lifetime, staged 
 | Phase 63 P01 | 58 min | 3 tasks | 13 files |
 | Phase 63 P02 | 18 min | 2 tasks | 5 files |
 | Phase 63 P03 | 16 min | 3 tasks | 6 files |
+| Phase 63 P04 | 27 min | 2 tasks | 10 files |
