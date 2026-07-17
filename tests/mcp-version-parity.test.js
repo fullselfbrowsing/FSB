@@ -290,6 +290,80 @@ async function run() {
     'bridge-auth doctor projection neither spreads nor names forbidden private fields',
   );
 
+  console.log('\n--- Phase 63 native doctor projection boundary ---');
+  const formatDoctorBlock = indexSource.match(
+    /export function formatDoctor[\s\S]*?\n\}\n\nfunction buildCursorDeeplink/,
+  );
+  const formatDoctorSource = formatDoctorBlock ? formatDoctorBlock[0] : '';
+  assert(
+    formatDoctorBlock !== null
+      && formatDoctorSource.indexOf("lines.push('Bridge auth:');")
+        < formatDoctorSource.indexOf("lines.push('Native messaging host:');")
+      && formatDoctorSource.indexOf("lines.push('Native messaging host:');")
+        < formatDoctorSource.indexOf("lines.push('Install paths:');"),
+    'doctor source pins Native messaging host after Bridge auth and before Install paths',
+  );
+  for (const label of [
+    'Install state',
+    'Expected location',
+    'Manifest/registry',
+    'Chrome allowlist',
+    'Launcher',
+    'Daemon',
+    'Reason',
+  ]) {
+    assert(
+      formatDoctorSource.includes(`lines.push(\`  ${label}:`),
+      `doctor formatter retains the approved native label: ${label}`,
+    );
+  }
+
+  const nativeProjectorBlock = diagnosticsSource.match(
+    /export function projectNativeHostBrowserStatus[\s\S]*?\n\}\n\nfunction readOwnCallable/,
+  );
+  const nativeProjectorSource = nativeProjectorBlock ? nativeProjectorBlock[0] : '';
+  assert(
+    nativeProjectorBlock !== null
+      && nativeProjectorSource.includes(
+        'return Object.freeze({ installState, registration, allowlist, launcher, daemon });',
+      ),
+    'browser-safe native projector explicitly reconstructs the exact five approved keys',
+  );
+  assert(
+    !/expectedLocation|reason|registry|path|manifest|error|username|environment|secret|session|child|task|\.\.\./i
+      .test(nativeProjectorSource),
+    'browser-safe native projector cannot name or spread local, registry, or private detail',
+  );
+  assert(
+    runDoctorSource.includes('JSON.stringify(diagnostics, null, 2)')
+      && runDoctorSource.includes('formatDoctor(diagnostics)')
+      && !/installNativeHost|uninstallNativeHost|wakeNativeHost|repairNativeHost|rotateBridgeSessionSecret|resetBridgePairing|startServeDelegation/.test(runDoctorSource),
+    'the one doctor route projects one snapshot without native mutation, wake, pairing, or serve authority',
+  );
+
+  const nativeCollectionIndex = diagnosticsSource.indexOf(
+    'const nativeHost = await collectNativeHostDoctor(inspectNativeHost);',
+  );
+  const bridgeCreationIndex = diagnosticsSource.indexOf('const bridge = bridgeFactory();');
+  assert(
+    nativeCollectionIndex >= 0
+      && bridgeCreationIndex >= 0
+      && nativeCollectionIndex < bridgeCreationIndex,
+    'native diagnostics are collected once before bridge probes',
+  );
+  assertEqual(
+    (diagnosticsSource.match(/const nativeHost = await collectNativeHostDoctor\(inspectNativeHost\);/g) || []).length,
+    1,
+    'the diagnostics collector has one native inspection collection site',
+  );
+  const doctorLayerBlock = diagnosticsSource.match(
+    /export function classifyDoctorLayer[\s\S]*?\n\}\n\nexport function applyDiagnosticClassification/,
+  );
+  assert(
+    doctorLayerBlock !== null && !doctorLayerBlock[0].includes('nativeHost'),
+    'optional native-host state cannot change historical doctor-layer classification',
+  );
+
   console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');
   assertEqual(manifest.manifest_version, 3, 'extension remains on Manifest V3');
   assertEqual(manifest.minimum_chrome_version, '116', 'extension minimum Chrome version is exactly string 116');

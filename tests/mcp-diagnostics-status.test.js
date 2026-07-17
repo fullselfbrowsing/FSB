@@ -148,6 +148,13 @@ function assertOrdered(text, labels, msg) {
   }
 }
 
+function extractSection(text, heading, nextHeading) {
+  const start = text.indexOf(heading);
+  const end = text.indexOf(nextHeading, start + heading.length);
+  if (start < 0 || end < 0) return '';
+  return text.slice(start, end).trimEnd();
+}
+
 function makeOfflineTopology() {
   return {
     instanceId: 'doctor-offline-test',
@@ -520,14 +527,118 @@ async function run() {
     '  Shared secret: Present',
     '  Secret rotated at: 1970-01-01T00:00:09.000Z',
     `  Secret rotation age: ${formattedJson.bridgeAuthMetadata.secretRotationAgeMs} ms`,
+    'Native messaging host:',
+    '  Install state: Installed',
+    `  Expected location: ${formattedJson.nativeHost.expectedLocation}`,
+    '  Manifest/registry: Valid',
+    '  Chrome allowlist: Matches',
+    '  Launcher: Reachable',
+    '  Daemon: Reachable',
+    '  Reason: ok',
   ];
   for (const fact of expectedDoctorFacts) {
     assert(formattedDoctor.includes(fact), `doctor text derives JSON snapshot fact: ${fact}`);
   }
   assertOrdered(
     formattedDoctor,
-    ['Detected:', 'Mode:', 'Adapter compatibility', 'Bridge auth:', 'Install paths:'],
+    [
+      'Detected:',
+      'Mode:',
+      'Adapter compatibility',
+      'Bridge auth:',
+      'Native messaging host:',
+      'Install paths:',
+    ],
     'doctor preserves existing diagnostics before additive local facts',
+  );
+  assertEqual(
+    extractSection(formattedDoctor, 'Native messaging host:', 'Install paths:'),
+    [
+      'Native messaging host:',
+      '  Install state: Installed',
+      `  Expected location: ${formattedJson.nativeHost.expectedLocation}`,
+      '  Manifest/registry: Valid',
+      '  Chrome allowlist: Matches',
+      '  Launcher: Reachable',
+      '  Daemon: Reachable',
+      '  Reason: ok',
+    ].join('\n'),
+    'doctor renders the exact approved seven-line native-host fact block',
+  );
+
+  const nativeLabelCases = [
+    [{
+      installState: 'not_installed',
+      expectedLocation: 'Not reported',
+      registration: 'missing',
+      allowlist: 'not_reported',
+      launcher: 'missing',
+      daemon: 'offline',
+      reason: 'not_installed',
+    }, [
+      '  Install state: Not installed',
+      '  Manifest/registry: Missing',
+      '  Chrome allowlist: Not reported',
+      '  Launcher: Missing',
+      '  Daemon: Offline',
+    ]],
+    [{
+      installState: 'invalid',
+      expectedLocation: '/bounded/invalid/location',
+      registration: 'invalid',
+      allowlist: 'mismatch',
+      launcher: 'invalid',
+      daemon: 'unavailable',
+      reason: 'registration_invalid',
+    }, [
+      '  Install state: Invalid',
+      '  Manifest/registry: Invalid',
+      '  Chrome allowlist: Mismatch',
+      '  Launcher: Invalid',
+      '  Daemon: Unavailable',
+    ]],
+    [{
+      installState: 'unavailable',
+      expectedLocation: 'Not reported',
+      registration: 'unavailable',
+      allowlist: 'not_reported',
+      launcher: 'unavailable',
+      daemon: 'unavailable',
+      reason: 'inspection_unavailable',
+    }, [
+      '  Install state: Unavailable',
+      '  Manifest/registry: Unavailable',
+      '  Chrome allowlist: Not reported',
+      '  Launcher: Unavailable',
+      '  Daemon: Unavailable',
+    ]],
+  ];
+  for (const [nativeHost, expectedLabels] of nativeLabelCases) {
+    const doctorText = indexModule.formatDoctor(makeSnapshot({ nativeHost }));
+    for (const label of expectedLabels) {
+      assert(doctorText.includes(label), `doctor title-cases closed native value: ${label}`);
+    }
+    assert(doctorText.includes(`  Expected location: ${nativeHost.expectedLocation}`),
+      'doctor prints only the normalized local expected location');
+    assert(doctorText.includes(`  Reason: ${nativeHost.reason}`),
+      'doctor prints the stable normalized reason code unchanged');
+  }
+
+  const healthyWithoutNativeHost = makeSnapshot({
+    nativeHost: {
+      installState: 'not_installed',
+      expectedLocation: 'Not reported',
+      registration: 'missing',
+      allowlist: 'not_reported',
+      launcher: 'missing',
+      daemon: 'offline',
+      reason: 'not_installed',
+    },
+  });
+  assertEqual(
+    diagnostics.classifyDoctorLayer(healthyWithoutNativeHost),
+    'healthy',
+    'optional native-host absence leaves a historically healthy doctor snapshot healthy',
   );
 
   const unavailableDoctor = indexModule.formatDoctor(makeSnapshot({
