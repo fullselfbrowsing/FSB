@@ -2015,6 +2015,24 @@ function runSourceContractCase() {
   assert(orderedImports.every((index) => index >= 0), 'background loads all four delegation modules');
   assert(orderedImports.every((index, position) => position === 0 || orderedImports[position - 1] < index),
     'delegation modules load once in dependency order');
+  const nativeWakeImport = "importScripts('utils/native-host-wake.js')";
+  const nativeWakeImportIndex = backgroundSource.indexOf(nativeWakeImport);
+  const bridgeImportIndex = backgroundSource.indexOf("importScripts('ws/mcp-bridge-client.js')");
+  const nativeProbeIndex = backgroundSource.indexOf('FsbNativeHostWake.probePresence()');
+  assertEqual((backgroundSource.match(/importScripts\('utils\/native-host-wake\.js'\)/g) || []).length, 1,
+    'background loads the native wake helper exactly once');
+  assert(nativeWakeImportIndex > orderedImports[0] && nativeWakeImportIndex < bridgeImportIndex,
+    'native wake helper loads after pure preflight and before bridge composition');
+  assert(nativeProbeIndex > bridgeImportIndex,
+    'silent native presence probe starts only after background dependencies exist');
+  assertEqual((backgroundSource.match(/FsbNativeHostWake\.probePresence\(\)/g) || []).length, 1,
+    'service-worker boot starts exactly one advisory presence probe');
+  assertEqual((backgroundSource.match(/FsbNativeHostWake\.ensureWake\(\)/g) || []).length, 1,
+    'offline preflight owns the sole actual wake join');
+  assert(backgroundSource.includes("type: 'FSB_NATIVE_WAKE_CHECKING'")
+      && backgroundSource.includes('attemptId: wakePromise.attemptId')
+      && backgroundSource.includes('intentId: intentId'),
+    'checking fanout carries only the exact attempt and current intent ids');
   assertEqual((backgroundSource.match(/mcpBridgeClient\.addEventObserver\(/g) || []).length, 1,
     'background installs exactly one awaited delegation bridge observer');
   assertEqual((backgroundSource.match(/mcpBridgeClient\.addDelegationConnectionObserver\(/g) || []).length, 1,
@@ -2043,6 +2061,19 @@ function runSourceContractCase() {
     'controller receives one id-keyed heartbeat retain callback');
   assertEqual((delegationComposition.match(/releaseDelegationHeartbeat\(delegationId\)/g) || []).length, 1,
     'controller receives one id-keyed heartbeat release callback');
+  const nativePreflight = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationPreflightCommand(request) {'),
+    delegationComposition.indexOf('async function fsbDelegationConsentCommand(request) {')
+  );
+  assert(nativePreflight.includes("authority.result.code !== 'agent_offline'")
+      && nativePreflight.includes('await fsbDelegationPreflightResult()'),
+    'only exact offline authority may wake and successful reachability reruns pure preflight directly');
+  assert(nativePreflight.includes("armMcpBridge('native-host-wake')")
+      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS')
+      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_POLL_MS'),
+    'native continuation uses one bounded ordinary bridge readiness wait');
+  assert(!/(?:delegate\.start|FSB_DELEGATION_START|consumeChallenge|issueChallenge|activeSessions|chrome\.tabs)/.test(nativePreflight),
+    'native preflight continuation cannot replay, consent, create sessions, or touch tabs');
 
   const bootSource = delegationComposition.slice(
     delegationComposition.indexOf('async function bootstrapDelegationController() {')
@@ -2220,6 +2251,23 @@ function runSourceContractCase() {
     assertEqual((backgroundSource.match(new RegExp(`'${method.replace('.', '\\.')}'`, 'g')) || []).length, 1,
       `${method} transport exists only as an injected controller callback`);
   }
+
+  const nativeWakeSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'native-host-wake.js'),
+    'utf8'
+  );
+  const preflightSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'delegation-preflight.js'),
+    'utf8'
+  );
+  assertEqual((nativeWakeSource.match(/\.connectNative\(/g) || []).length, 1,
+    'background helper owns one silent native presence API edge');
+  assertEqual((nativeWakeSource.match(/\.sendNativeMessage\(/g) || []).length, 1,
+    'background helper owns one actual native wake API edge');
+  assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(bridgeSource),
+    'bridge client remains native-free');
+  assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(preflightSource),
+    'pure preflight utility remains native-free');
 }
 
 // ---------------------------------------------------------------------------

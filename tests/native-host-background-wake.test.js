@@ -37,6 +37,16 @@ async function flushMicrotasks() {
   for (let index = 0; index < 20; index += 1) await Promise.resolve();
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function createEvent() {
   const listeners = [];
   return {
@@ -199,6 +209,181 @@ function validResponse(call, overrides = {}) {
   };
 }
 
+function extractNamedFunctionSource(source, anchor) {
+  const start = source.indexOf(anchor);
+  if (start === -1) throw new Error(`${anchor} not found`);
+  let depth = 0;
+  for (let index = start + anchor.length - 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  throw new Error(`Unbalanced braces while extracting ${anchor}`);
+}
+
+function extractNativePreflightComposition(backgroundSource) {
+  const exactKeys = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbDelegationHasExactKeys(value, expected) {'
+  );
+  const startMarker = 'async function fsbReadAuthoritativeProviderConfig() {';
+  const endMarker = '\nasync function fsbDelegationConsentCommand(request) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start === -1 || end <= start) throw new Error('native preflight composition markers missing');
+  return `${exactKeys}\n${backgroundSource.slice(start, end)}`;
+}
+
+function buildBackgroundPreflightHarness(options = {}) {
+  const backgroundPath = path.join(__dirname, '..', 'extension', 'background.js');
+  const backgroundSource = fs.readFileSync(backgroundPath, 'utf8');
+  const composition = extractNativePreflightComposition(backgroundSource);
+  const preflight = require(path.join(
+    __dirname,
+    '..',
+    'extension',
+    'utils',
+    'delegation-preflight.js'
+  ));
+  const wakeGate = deferred();
+  Object.defineProperty(wakeGate.promise, 'attemptId', {
+    value: 'attempt_native_wake_0001',
+    enumerable: false
+  });
+  const calls = {
+    arm: [],
+    controller: 0,
+    consent: 0,
+    events: [],
+    localGets: 0,
+    sessionWrites: 0,
+    startRequests: 0,
+    tabCalls: 0,
+    timers: 0,
+    wake: 0
+  };
+  let providerConfig = {
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'xai',
+    ...(options.providerConfig || {})
+  };
+  let bridgeState = {
+    connected: false,
+    status: 'disconnected',
+    pairingStatus: 'unpaired',
+    delegationConnection: { state: 'disconnected' },
+    ...(options.bridgeState || {})
+  };
+  const chrome = {
+    storage: {
+      local: {
+        async get() {
+          calls.localGets += 1;
+          if (options.rejectConfigReadAt === calls.localGets) throw new Error('config read failed');
+          return { ...providerConfig };
+        }
+      },
+      session: {
+        async set() {
+          calls.sessionWrites += 1;
+        }
+      }
+    },
+    runtime: {
+      sendMessage(event) {
+        calls.events.push(toPlain(event));
+        return Promise.resolve();
+      }
+    },
+    tabs: {
+      async query() {
+        calls.tabCalls += 1;
+        return [];
+      }
+    }
+  };
+  const bridge = {
+    getState() {
+      return bridgeState;
+    },
+    sendExtRequest(method) {
+      if (method === 'delegate.start') calls.startRequests += 1;
+      throw new Error('transport authority must not run during preflight wake');
+    }
+  };
+  const context = {
+    chrome,
+    FsbDelegationPreflight: preflight,
+    FsbNativeHostWake: {
+      ensureWake() {
+        calls.wake += 1;
+        return wakeGate.promise;
+      }
+    },
+    FsbDelegationConsent: {
+      getTrusted() {
+        calls.consent += 1;
+        throw new Error('consent authority must not run during preflight wake');
+      }
+    },
+    FsbDelegationController: {
+      create() {
+        calls.controller += 1;
+        throw new Error('controller authority must not run during preflight wake');
+      }
+    },
+    mcpBridgeClient: bridge,
+    armMcpBridge(reason) {
+      calls.arm.push(reason);
+    },
+    setTimeout(callback, delay) {
+      calls.timers += 1;
+      if (typeof options.onBridgePoll === 'function') {
+        options.onBridgePoll({ calls, delay, setBridgeState });
+      }
+      callback();
+      return calls.timers;
+    },
+    clearTimeout() {},
+    Promise,
+    Object,
+    Array,
+    Number,
+    String,
+    RegExp,
+    Set,
+    Map,
+    Error,
+    console
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${composition}\nthis.__preflightCommand = fsbDelegationPreflightCommand;`,
+    context,
+    { filename: 'background.js#native-wake-preflight' }
+  );
+
+  function setBridgeState(next) {
+    bridgeState = { ...next };
+  }
+
+  return {
+    backgroundSource,
+    calls,
+    command: context.__preflightCommand,
+    rejectWake: wakeGate.reject,
+    resolveWake: wakeGate.resolve,
+    setBridgeState,
+    setProviderConfig(next) {
+      providerConfig = { ...next };
+    }
+  };
+}
+
 async function testSilentPresenceProbe() {
   console.log('\n--- controller: silent advisory presence probe ---');
   const harness = buildControllerHarness();
@@ -353,6 +538,235 @@ function testControllerAuthoritySource() {
   assert(!/chrome\.tabs|chrome\.windows|chrome\.sidePanel/.test(harness.source), 'controller cannot mutate browser or UI authority');
 }
 
+async function testBootCompositionIsProbeOnly() {
+  console.log('\n--- background-integration: boot probe composition ---');
+  const harness = buildBackgroundPreflightHarness();
+  const helperImport = "importScripts('utils/native-host-wake.js')";
+  const helperImportIndex = harness.backgroundSource.indexOf(helperImport);
+  const bridgeImportIndex = harness.backgroundSource.indexOf("importScripts('ws/mcp-bridge-client.js')");
+  const probeIndex = harness.backgroundSource.indexOf('FsbNativeHostWake.probePresence()');
+
+  assert(helperImportIndex !== -1, 'background loads the native wake helper');
+  assert(bridgeImportIndex !== -1 && probeIndex > bridgeImportIndex, 'boot probe starts only after the bridge dependency is loaded');
+  const bootSlice = probeIndex === -1 ? '' : harness.backgroundSource.slice(probeIndex, probeIndex + 300);
+  assert(!bootSlice.includes('ensureWake'), 'boot composition never calls actual wake');
+  assert(!bootSlice.includes('sendMessage'), 'boot composition emits no UI event');
+  assert(!/^\s*await\s+globalThis\.FsbNativeHostWake\.probePresence/m.test(harness.backgroundSource), 'boot does not await advisory probing for bootstrap');
+}
+
+async function testNonOfflinePreflightNeverWakes() {
+  console.log('\n--- background-integration: non-offline paths never wake ---');
+  const cases = [
+    {
+      name: 'API provider',
+      providerConfig: { providerKind: 'api', agentProviderId: 'claude-code', modelProvider: 'xai' },
+      bridgeState: {},
+      expected: { ok: true, kind: 'api', providerId: 'xai', agentProviderId: '' }
+    },
+    {
+      name: 'ready agent',
+      bridgeState: {
+        connected: true,
+        status: 'connected',
+        pairingStatus: 'paired',
+        delegationConnection: { state: 'connected' }
+      },
+      expected: { ok: true, kind: 'agent', providerId: 'claude-code', providerLabel: 'Claude Code' }
+    },
+    {
+      name: 'reachable unpaired agent',
+      bridgeState: {
+        connected: true,
+        status: 'connected',
+        pairingStatus: 'unpaired',
+        delegationConnection: { state: 'connected' }
+      },
+      expected: { ok: false, code: 'agent_unpaired', providerId: 'claude-code', providerLabel: 'Claude Code' }
+    },
+    {
+      name: 'unsupported agent',
+      providerConfig: { providerKind: 'agent', agentProviderId: 'opencode', modelProvider: 'xai' },
+      bridgeState: {},
+      expected: { ok: false, code: 'unsupported_provider', providerId: 'opencode', providerLabel: 'opencode' }
+    }
+  ];
+
+  for (const scenario of cases) {
+    const harness = buildBackgroundPreflightHarness(scenario);
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Keep this intent unsent',
+      intentId: 'intent_native_wake_0001'
+    });
+    assertDeepEqual(result, scenario.expected, `${scenario.name} returns the unchanged preflight shape`);
+    assertEqual(harness.calls.wake, 0, `${scenario.name} issues zero native wake calls`);
+    assertEqual(harness.calls.events.length, 0, `${scenario.name} emits zero checking events`);
+    assertEqual(harness.calls.localGets, 1, `${scenario.name} evaluates preflight exactly once`);
+  }
+}
+
+async function testConcurrentOfflineIntentsShareContinuation() {
+  console.log('\n--- background-integration: concurrent offline intents ---');
+  const harness = buildBackgroundPreflightHarness();
+  let firstSettled = false;
+  let secondSettled = false;
+  const first = harness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'First unsent intent',
+    intentId: 'intent_native_wake_0001'
+  }).then((value) => {
+    firstSettled = true;
+    return value;
+  });
+  const second = harness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Second unsent intent',
+    intentId: 'intent_native_wake_0002'
+  }).then((value) => {
+    secondSettled = true;
+    return value;
+  });
+  await flushMicrotasks();
+
+  assertEqual(harness.calls.wake, 2, 'each offline caller joins the helper-owned shared promise');
+  assertEqual(harness.calls.events.length, 2, 'each current intent receives one checking event');
+  assertDeepEqual(harness.calls.events[0], {
+    type: 'FSB_NATIVE_WAKE_CHECKING',
+    attemptId: 'attempt_native_wake_0001',
+    intentId: 'intent_native_wake_0001'
+  }, 'first checking event has the exact closed attempt/intent shape');
+  assertDeepEqual(harness.calls.events[1], {
+    type: 'FSB_NATIVE_WAKE_CHECKING',
+    attemptId: 'attempt_native_wake_0001',
+    intentId: 'intent_native_wake_0002'
+  }, 'joining intent receives the same attempt id and its own intent id');
+  assertEqual(firstSettled, false, 'first command promise stays open while native wake is pending');
+  assertEqual(secondSettled, false, 'joining command promise stays open while native wake is pending');
+
+  harness.setBridgeState({
+    connected: true,
+    status: 'connected',
+    pairingStatus: 'paired',
+    delegationConnection: { state: 'connected' }
+  });
+  harness.resolveWake({ ok: true, outcome: 'started', reason: 'daemon_started_ready' });
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  const expected = { ok: true, kind: 'agent', providerId: 'claude-code', providerLabel: 'Claude Code' };
+  assertDeepEqual(firstResult, expected, 'first caller returns the exact existing ready result');
+  assertDeepEqual(secondResult, expected, 'joining caller returns the exact existing ready result');
+  assertEqual(harness.calls.arm.length, 1, 'concurrent callers share one bridge readiness wait');
+  assertEqual(harness.calls.localGets, 4, 'each caller evaluates preflight once initially and once after readiness');
+  assertEqual(harness.calls.startRequests, 0, 'positive wake never replays delegate.start');
+  assertEqual(harness.calls.consent, 0, 'positive wake never creates consent authority');
+  assertEqual(harness.calls.controller, 0, 'positive wake never creates controller/session authority');
+  assertEqual(harness.calls.tabCalls, 0, 'positive wake never allocates or queries tab authority');
+  assertEqual(harness.calls.sessionWrites, 0, 'positive wake never persists optimistic state');
+}
+
+async function testWakeFailureReturnsOriginalOffline() {
+  console.log('\n--- background-integration: failure preserves exact offline result ---');
+  const harness = buildBackgroundPreflightHarness();
+  const pending = harness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Still unsent',
+    intentId: 'intent_native_wake_0003'
+  });
+  await flushMicrotasks();
+  harness.resolveWake({ ok: false });
+  assertDeepEqual(await pending, {
+    ok: false,
+    code: 'agent_offline',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  }, 'native failure returns the original exact offline result');
+  assertEqual(harness.calls.localGets, 1, 'native failure does not rerun preflight');
+  assertEqual(harness.calls.arm.length, 0, 'native failure does not wait for bridge readiness');
+  assertEqual(harness.calls.startRequests, 0, 'native failure cannot replay start');
+}
+
+async function testBridgeAndRerunConvergence() {
+  console.log('\n--- background-integration: bridge and rerun convergence ---');
+  const timeoutHarness = buildBackgroundPreflightHarness();
+  const timedOut = timeoutHarness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Bridge remains offline',
+    intentId: 'intent_native_wake_0004'
+  });
+  await flushMicrotasks();
+  timeoutHarness.resolveWake({ ok: true, outcome: 'already_running', reason: 'daemon_already_ready' });
+  assertDeepEqual(await timedOut, {
+    ok: false,
+    code: 'agent_offline',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  }, 'bridge readiness timeout preserves the original offline result');
+  assertEqual(timeoutHarness.calls.timers, 100, 'bridge wait is bounded to five seconds in 50 ms slices');
+  assertEqual(timeoutHarness.calls.localGets, 1, 'readiness timeout performs no optimistic rerun');
+
+  const unpairedHarness = buildBackgroundPreflightHarness({
+    onBridgePoll({ calls, setBridgeState }) {
+      if (calls.timers === 1) {
+        setBridgeState({
+          connected: true,
+          status: 'connected',
+          pairingStatus: 'unpaired',
+          delegationConnection: { state: 'connected' }
+        });
+      }
+    }
+  });
+  const unpaired = unpairedHarness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Reachable but unpaired',
+    intentId: 'intent_native_wake_0005'
+  });
+  await flushMicrotasks();
+  unpairedHarness.resolveWake({ ok: true, outcome: 'started', reason: 'daemon_started_ready' });
+  assertDeepEqual(await unpaired, {
+    ok: false,
+    code: 'agent_unpaired',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  }, 'reachable unpaired rerun returns the existing exact unpaired result');
+  assertEqual(unpairedHarness.calls.localGets, 2, 'unpaired convergence reruns preflight exactly once');
+
+  const rerunFailure = buildBackgroundPreflightHarness({ rejectConfigReadAt: 2 });
+  const rerunPending = rerunFailure.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Rerun read fails',
+    intentId: 'intent_native_wake_0006'
+  });
+  await flushMicrotasks();
+  rerunFailure.setBridgeState({
+    connected: true,
+    status: 'connected',
+    pairingStatus: 'paired',
+    delegationConnection: { state: 'connected' }
+  });
+  rerunFailure.resolveWake({ ok: true, outcome: 'started', reason: 'daemon_started_ready' });
+  assertDeepEqual(await rerunPending, {
+    ok: false,
+    code: 'agent_offline',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code'
+  }, 'rerun exception returns the captured original offline result');
+  assertEqual(rerunFailure.calls.localGets, 2, 'rerun failure still attempts at most one rerun');
+}
+
+async function testInvalidIntentFailsBeforeNativeAuthority() {
+  console.log('\n--- background-integration: exact optional intent validation ---');
+  const harness = buildBackgroundPreflightHarness();
+  const result = await harness.command({
+    type: 'FSB_DELEGATION_PREFLIGHT',
+    task: 'Invalid caller id',
+    intentId: 'bad'
+  });
+  assertDeepEqual(result, { ok: false, code: 'invalid_request' }, 'malformed explicit intent id fails closed');
+  assertEqual(harness.calls.localGets, 0, 'invalid intent fails before provider reads');
+  assertEqual(harness.calls.wake, 0, 'invalid intent fails before native authority');
+  assertEqual(harness.calls.events.length, 0, 'invalid intent emits no checking event');
+}
+
 async function runControllerSection() {
   await testSilentPresenceProbe();
   await testOneFlightPositiveWake();
@@ -361,11 +775,25 @@ async function runControllerSection() {
   testControllerAuthoritySource();
 }
 
+async function runBackgroundIntegrationSection() {
+  await testBootCompositionIsProbeOnly();
+  await testNonOfflinePreflightNeverWakes();
+  await testConcurrentOfflineIntentsShareContinuation();
+  await testWakeFailureReturnsOriginalOffline();
+  await testBridgeAndRerunConvergence();
+  await testInvalidIntentFailsBeforeNativeAuthority();
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex === -1 ? null : process.argv[sectionIndex + 1];
   if (section === null || section === 'controller') await runControllerSection();
-  else throw new Error(`Unknown section: ${section}`);
+  if (section === null || section === 'background-integration') {
+    await runBackgroundIntegrationSection();
+  }
+  if (section !== null && section !== 'controller' && section !== 'background-integration') {
+    throw new Error(`Unknown section: ${section}`);
+  }
 
   console.log(`\nNative host background wake tests: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exitCode = 1;
