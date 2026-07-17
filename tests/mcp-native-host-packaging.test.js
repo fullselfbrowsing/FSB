@@ -5,19 +5,23 @@ const { spawn, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const {
   chmodSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } = require('node:fs');
+const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const repositoryRoot = path.resolve(__dirname, '..');
 const wrapperPath = path.join(repositoryRoot, 'scripts/run-mcp-build-preserving-workspace.mjs');
@@ -35,6 +39,24 @@ const knownSections = new Set([
   'workspace-preserving-build',
   'import-boundary',
 ]);
+
+const bundledProductionDependencies = Object.freeze([
+  '@modelcontextprotocol/sdk',
+  'smol-toml',
+  'strip-json-comments',
+  'ws',
+  'yaml',
+  'zod',
+]);
+
+const exactProductionDependencies = Object.freeze({
+  '@modelcontextprotocol/sdk': '1.29.0',
+  'smol-toml': '1.6.1',
+  'strip-json-comments': '5.0.3',
+  ws: '8.19.0',
+  yaml: '2.8.3',
+  zod: '3.25.76',
+});
 
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
@@ -203,6 +225,22 @@ function testWrapperSettlement(label, commands, options = {}) {
   }
 }
 
+function testRawIndexStabilityAcrossWrapperGitReads() {
+  const fixture = createFixture();
+  try {
+    const indexPath = path.join(fixture.root, '.git/index');
+    const indexBytesBefore = readFileSync(indexPath);
+    const indexModeBefore = lstatSync(indexPath).mode & 0o7777;
+    writeFileSync(path.join(fixture.root, 'protected.txt'), 'tracked-dirty\n');
+    const result = runWrapper(fixture, [[process.execPath, '-e', 'process.exit(0)']]);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.deepEqual(readFileSync(indexPath), indexBytesBefore);
+    assert.equal(lstatSync(indexPath).mode & 0o7777, indexModeBefore);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
 async function testSignalSettlement(signal) {
   const fixture = createFixture();
   const readyPath = path.join(fixture.root, 'mcp/build/signal-ready');
@@ -252,6 +290,11 @@ async function testWorkspacePreservingWrapper() {
   assert.doesNotMatch(wrapperSource, /git\s+(?:add|checkout|restore|reset|stash|clean)\b/);
   assert.match(wrapperSource, /--commands-json/);
   assert.match(wrapperSource, /rev-parse', '--git-path', 'index/);
+  assert.ok(
+    wrapperSource.lastIndexOf('restoreSingleEntry(indexPath, indexBefore)')
+      > wrapperSource.lastIndexOf("captureWorkspaceState('final')"),
+    'the wrapper must restore raw index bytes after its final Git reads',
+  );
 
   testWrapperSettlement('success settlement', [[process.execPath, '-e', 'process.exit(0)']], {
     expectedSuccess: true,
@@ -284,8 +327,396 @@ async function testWorkspacePreservingWrapper() {
   ]], {
     stderrPattern: /pre-existing unrelated dirty or untracked bytes changed/,
   });
+  testRawIndexStabilityAcrossWrapperGitReads();
   await testSignalSettlement('SIGINT');
   await testSignalSettlement('SIGTERM');
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function readJson(pathname) {
+  return JSON.parse(readFileSync(pathname, 'utf8'));
+}
+
+function dependencyNameFromLockPath(lockPath) {
+  const match = lockPath.match(/(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+  assert.ok(match, `cannot derive package name from lock path: ${lockPath}`);
+  return match[1];
+}
+
+function resolveLockedDependencyPath(lock, fromPackagePath, dependencyName) {
+  let current = fromPackagePath;
+  while (true) {
+    const candidate = current
+      ? `${current}/node_modules/${dependencyName}`
+      : `node_modules/${dependencyName}`;
+    if (lock.packages[candidate]) return candidate;
+    if (!current) break;
+    const parentNodeModules = current.lastIndexOf('/node_modules/');
+    current = parentNodeModules === -1 ? '' : current.slice(0, parentNodeModules);
+  }
+  throw new Error(`lock does not resolve ${dependencyName} from ${fromPackagePath || '<root>'}`);
+}
+
+function deriveProductionClosure(lock) {
+  const root = lock.packages[''];
+  const queue = Object.keys(root.dependencies || {})
+    .sort()
+    .map((name) => resolveLockedDependencyPath(lock, '', name));
+  const seen = new Set();
+
+  while (queue.length > 0) {
+    const lockPath = queue.shift();
+    if (seen.has(lockPath)) continue;
+    seen.add(lockPath);
+    const entry = lock.packages[lockPath];
+    assert.notEqual(entry.dev, true, `dev-only package entered production closure: ${lockPath}`);
+    const dependencies = new Set([
+      ...Object.keys(entry.dependencies || {}),
+      ...Object.keys(entry.optionalDependencies || {}),
+    ]);
+    for (const name of [...dependencies].sort()) {
+      queue.push(resolveLockedDependencyPath(lock, lockPath, name));
+    }
+  }
+
+  return [...seen].sort().map((lockPath) => {
+    const entry = lock.packages[lockPath];
+    assert.match(entry.version, /^\d+\.\d+\.\d+(?:[-+].+)?$/);
+    assert.match(entry.integrity, /^sha512-/);
+    return Object.freeze({
+      path: lockPath,
+      name: dependencyNameFromLockPath(lockPath),
+      version: entry.version,
+      integrity: entry.integrity,
+    });
+  });
+}
+
+function findNpmCliPath() {
+  const result = run('npm', ['root', '--global']);
+  assert.equal(result.status, 0, result.stderr);
+  const candidate = path.join(result.stdout.trim(), 'npm/bin/npm-cli.js');
+  assert.equal(existsSync(candidate), true, `npm-cli.js is missing at ${candidate}`);
+  return realpathSync(candidate);
+}
+
+function runAsync(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd || repositoryRoot,
+      env: options.env || process.env,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on('data', (chunk) => stdout.push(chunk));
+    child.stderr.on('data', (chunk) => stderr.push(chunk));
+    child.once('error', reject);
+    child.once('close', (status, signal) => {
+      resolve({
+        status,
+        signal,
+        stdout: Buffer.concat(stdout).toString('utf8'),
+        stderr: Buffer.concat(stderr).toString('utf8'),
+      });
+    });
+  });
+}
+
+async function listenOnLoopbackSentinel() {
+  let connections = 0;
+  const server = net.createServer((socket) => {
+    connections += 1;
+    socket.destroy();
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  assert.equal(typeof address, 'object');
+  return Object.freeze({
+    url: `http://127.0.0.1:${address.port}`,
+    connectionCount: () => connections,
+    close: () => new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    }),
+  });
+}
+
+async function testOfflineBundledTarball(productionClosure) {
+  if (process.platform === 'win32') return;
+
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb-native-runtime-pack-'));
+  const sourceCopy = path.join(fixtureRoot, 'invoking-source');
+  const tarballDirectory = path.join(fixtureRoot, 'tarball');
+  const packCache = path.join(fixtureRoot, 'pack-cache');
+  const installCache = path.join(fixtureRoot, 'new-empty-install-cache');
+  const installRoot = path.join(fixtureRoot, 'installed');
+  const npmCliPath = findNpmCliPath();
+  let sentinel;
+  try {
+    cpSync(path.join(repositoryRoot, 'mcp'), sourceCopy, { recursive: true });
+    mkdirSync(tarballDirectory);
+    mkdirSync(packCache);
+    const packed = run(process.execPath, [
+      npmCliPath,
+      'pack',
+      sourceCopy,
+      '--ignore-scripts',
+      '--json',
+      '--pack-destination',
+      tarballDirectory,
+      '--cache',
+      packCache,
+    ]);
+    assert.equal(packed.status, 0, packed.stderr);
+    const packReceipt = JSON.parse(packed.stdout);
+    assert.equal(packReceipt.length, 1);
+    assert.match(packReceipt[0].filename, /^fsb-mcp-server-\d+\.\d+\.\d+\.tgz$/);
+    assert.match(packReceipt[0].integrity, /^sha512-/);
+    const tarballPath = path.resolve(tarballDirectory, packReceipt[0].filename);
+    assert.equal(existsSync(tarballPath), true);
+
+    const listing = run('tar', ['-tzf', tarballPath]);
+    assert.equal(listing.status, 0, listing.stderr);
+    const tarEntries = new Set(listing.stdout.trim().split('\n'));
+    for (const dependency of productionClosure) {
+      assert.equal(
+        tarEntries.has(`package/${dependency.path}/package.json`),
+        true,
+        `packed production dependency is missing: ${dependency.path}`,
+      );
+    }
+
+    rmSync(sourceCopy, { recursive: true, force: true });
+    rmSync(packCache, { recursive: true, force: true });
+    mkdirSync(installRoot);
+    mkdirSync(installCache);
+    assert.equal(readdirSync(installCache).length, 0, 'offline install cache did not start empty');
+
+    sentinel = await listenOnLoopbackSentinel();
+    const poisonedEnvironment = {
+      ...process.env,
+      HTTP_PROXY: sentinel.url,
+      HTTPS_PROXY: sentinel.url,
+      ALL_PROXY: sentinel.url,
+      NO_PROXY: '',
+      http_proxy: sentinel.url,
+      https_proxy: sentinel.url,
+      all_proxy: sentinel.url,
+      no_proxy: '',
+    };
+    const installed = await runAsync(process.execPath, [
+      npmCliPath,
+      'install',
+      '--offline',
+      '--ignore-scripts',
+      '--omit=dev',
+      '--no-audit',
+      '--no-fund',
+      '--package-lock=false',
+      '--cache',
+      installCache,
+      '--registry',
+      sentinel.url,
+      tarballPath,
+    ], { cwd: installRoot, env: poisonedEnvironment });
+    assert.equal(installed.status, 0, `${installed.stdout}\n${installed.stderr}`);
+    assert.equal(installed.signal, null);
+    assert.equal(sentinel.connectionCount(), 0, 'offline install attempted a registry/proxy connection');
+    assert.equal(existsSync(sourceCopy), false, 'offline install retained invoking source');
+    assert.equal(existsSync(packCache), false, 'offline install retained the original cache');
+
+    const installedManifest = readJson(
+      path.join(installRoot, 'node_modules/fsb-mcp-server/package.json'),
+    );
+    assert.equal(installedManifest.name, 'fsb-mcp-server');
+    assert.deepEqual(installedManifest.dependencies, exactProductionDependencies);
+    assert.deepEqual(installedManifest.bundleDependencies, bundledProductionDependencies);
+  } finally {
+    if (sentinel) await sentinel.close();
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+async function testRuntimeLayoutAndPackageContract() {
+  const packagePath = path.join(repositoryRoot, 'mcp/package.json');
+  const lockPath = path.join(repositoryRoot, 'mcp/package-lock.json');
+  const integrityPath = path.join(repositoryRoot, 'mcp/native-host/runtime-integrity.json');
+  const launcherTemplatePath = path.join(
+    repositoryRoot,
+    'mcp/native-host/posix/fsb-native-host-launcher.mjs.in',
+  );
+  const runtimeLayoutSourcePath = path.join(repositoryRoot, 'mcp/src/native-host/runtime-layout.ts');
+  const builtRuntimeLayoutPath = path.join(repositoryRoot, 'mcp/build/native-host/runtime-layout.js');
+
+  for (const pathname of [
+    integrityPath,
+    launcherTemplatePath,
+    runtimeLayoutSourcePath,
+    path.join(repositoryRoot, 'mcp/src/native-host/constants.ts'),
+    builtRuntimeLayoutPath,
+  ]) {
+    assert.equal(existsSync(pathname), true, `missing runtime contract artifact: ${pathname}`);
+  }
+
+  const packageManifest = readJson(packagePath);
+  const lockBytes = readFileSync(lockPath);
+  const lock = JSON.parse(lockBytes.toString('utf8'));
+  assert.equal(packageManifest.engines.node, '>=18.20.0');
+  assert.deepEqual(packageManifest.dependencies, exactProductionDependencies);
+  assert.deepEqual(packageManifest.bundleDependencies, bundledProductionDependencies);
+  assert.deepEqual(lock.packages[''].dependencies, exactProductionDependencies);
+  assert.deepEqual(lock.packages[''].bundleDependencies, bundledProductionDependencies);
+  assert.equal(lock.packages[''].engines.node, '>=18.20.0');
+
+  const productionClosure = deriveProductionClosure(lock);
+  const expectedIntegrityReceipt = {
+    schema: 1,
+    packageName: packageManifest.name,
+    packageVersion: packageManifest.version,
+    lockSha256: sha256(lockBytes),
+    directDependencies: bundledProductionDependencies.map((name) => ({
+      name,
+      version: exactProductionDependencies[name],
+    })),
+    bundleDependencies: [...bundledProductionDependencies],
+    productionPackages: productionClosure,
+  };
+  assert.deepEqual(readJson(integrityPath), expectedIntegrityReceipt);
+
+  const launcherTemplate = readFileSync(launcherTemplatePath, 'utf8');
+  assert.equal(
+    launcherTemplate,
+    '#!__FSB_ABSOLUTE_NODE__\nimport \'../runtime/package/build/native-host/index.js\';\n',
+  );
+  assert.doesNotMatch(launcherTemplate, /(?:\/bin\/sh|cmd\.exe|powershell|spawn|exec|shell)/i);
+
+  const runtimeLayoutSource = readFileSync(runtimeLayoutSourcePath, 'utf8');
+  assert.doesNotMatch(
+    runtimeLayoutSource,
+    /node:(?:fs|child_process|http|https|net|tls)|(?:spawn|exec|writeFile|mkdir|rename|registry)/,
+  );
+  const runtimeLayout = await import(`${pathToFileURL(builtRuntimeLayoutPath).href}?t=${Date.now()}`);
+  const common = {
+    packageVersion: packageManifest.version,
+    extensionId: 'badgafnfchcihdfnjneklogedcdkmjfk',
+    installToken: '0123456789abcdef0123456789abcdef',
+    nodePath: '/opt/homebrew/bin/node',
+    nodeRealPath: '/opt/homebrew/bin/node',
+    npmCliPath: '/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js',
+    npmCliRealPath: '/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js',
+    invokingPackageRoot: '/private/tmp/npm-cache/_npx/token/node_modules/fsb-mcp-server',
+  };
+  const darwin = runtimeLayout.resolveNativeHostRuntimeLayout({
+    ...common,
+    platform: 'darwin',
+    homeDirectory: '/Users/fsb',
+  });
+  assert.equal(darwin.stableRoot, '/Users/fsb/.fsb/native-host');
+  assert.equal(darwin.launcherPath, '/Users/fsb/.fsb/native-host/bin/fsb-native-host-launcher.mjs');
+  assert.equal(darwin.packageRoot, '/Users/fsb/.fsb/native-host/runtime/package');
+  assert.equal(darwin.markerPath, '/Users/fsb/.fsb/native-host/owner.json');
+  assert.equal(darwin.launcherMode, 0o700);
+  assert.equal(darwin.markerMode, 0o600);
+  assert.deepEqual(runtimeLayout.validateNativeHostRuntimeLayout(darwin), { ok: true });
+
+  const linux = runtimeLayout.resolveNativeHostRuntimeLayout({
+    ...common,
+    platform: 'linux',
+    homeDirectory: '/home/fsb',
+    nodePath: '/usr/bin/node',
+    nodeRealPath: '/usr/bin/node',
+    npmCliPath: '/usr/lib/node_modules/npm/bin/npm-cli.js',
+    npmCliRealPath: '/usr/lib/node_modules/npm/bin/npm-cli.js',
+  });
+  assert.equal(linux.stableRoot, '/home/fsb/.fsb/native-host');
+  assert.equal(linux.launcherRelativePath, 'bin/fsb-native-host-launcher.mjs');
+
+  const win32 = runtimeLayout.resolveNativeHostRuntimeLayout({
+    ...common,
+    platform: 'win32',
+    homeDirectory: 'C:\\Users\\fsb',
+    localAppData: 'C:\\Users\\fsb\\AppData\\Local',
+    nodePath: 'C:\\Program Files\\nodejs\\node.exe',
+    nodeRealPath: 'C:\\Program Files\\nodejs\\node.exe',
+    npmCliPath: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+    npmCliRealPath: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+    invokingPackageRoot: 'C:\\Temp\\npm-cache\\_npx\\token\\node_modules\\fsb-mcp-server',
+  });
+  assert.equal(win32.stableRoot, 'C:\\Users\\fsb\\AppData\\Local\\FSB\\NativeMessagingHost');
+  assert.equal(win32.launcherRelativePath, 'bin\\fsb-native-host.exe');
+  assert.equal(win32.bootstrapConfigRelativePath, 'bin\\fsb-native-host-bootstrap.bin');
+
+  const marker = runtimeLayout.createNativeHostOwnerMarker(
+    darwin,
+    'a'.repeat(64),
+  );
+  assert.deepEqual(Object.keys(marker), [
+    'schema',
+    'owner',
+    'host',
+    'origin',
+    'platform',
+    'packageVersion',
+    'launcherRelativePath',
+    'artifactSha256',
+    'installToken',
+  ]);
+  assert.equal(marker.schema, 1);
+  assert.equal(marker.owner, 'io.github.fullselfbrowsing.fsb');
+  assert.equal(marker.host, 'io.github.fullselfbrowsing.fsb_native_host');
+
+  assert.equal(
+    runtimeLayout.renderPosixNativeHostLauncher('/usr/bin/node', '/usr/bin/node'),
+    "#!/usr/bin/node\nimport '../runtime/package/build/native-host/index.js';\n",
+  );
+  for (const [nodePath, realNodePath] of [
+    ['relative/node', 'relative/node'],
+    ['/path with spaces/node', '/path with spaces/node'],
+    ['/usr/bin/node\nmalicious', '/usr/bin/node\nmalicious'],
+    ['/usr/bin/node', '/different/node'],
+  ]) {
+    assert.throws(
+      () => runtimeLayout.renderPosixNativeHostLauncher(nodePath, realNodePath),
+      /FSBNH_LAYOUT_UNSAFE_NODE/,
+    );
+  }
+
+  const completeEvidence = {
+    npmCli: true,
+    runtimeIntegrity: true,
+    bundleComplete: true,
+    launcherArtifact: true,
+  };
+  assert.deepEqual(
+    runtimeLayout.validateNativeHostRuntimeLayout(darwin, completeEvidence),
+    { ok: true },
+  );
+  for (const field of Object.keys(completeEvidence)) {
+    assert.deepEqual(
+      runtimeLayout.validateNativeHostRuntimeLayout(darwin, {
+        ...completeEvidence,
+        [field]: false,
+      }),
+      { ok: false, reason: `missing-${field.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}` },
+    );
+  }
+  assert.throws(
+    () => runtimeLayout.resolveNativeHostRuntimeLayout({ ...common, platform: 'darwin', homeDirectory: '/private/tmp/npm-cache/_npx/token' }),
+    /FSBNH_LAYOUT_TRANSIENT_ROOT/,
+  );
+  assert.throws(
+    () => runtimeLayout.resolveNativeHostRuntimeLayout({ ...common, platform: 'darwin', homeDirectory: '/Users/fsb', extensionId: 'invalid' }),
+    /FSBNH_LAYOUT_EXTENSION_ID/,
+  );
+
+  await testOfflineBundledTarball(productionClosure);
 }
 
 function testWindowsBootstrapSources() {
@@ -452,6 +883,10 @@ async function main() {
   for (const section of sections) {
     if (section === 'windows-bootstrap' || section === 'workspace-preserving-build') {
       await runWindowsBootstrapSection();
+      continue;
+    }
+    if (section === 'runtime-layout') {
+      await testRuntimeLayoutAndPackageContract();
       continue;
     }
     throw new Error(`section ${section} has not been implemented yet`);
