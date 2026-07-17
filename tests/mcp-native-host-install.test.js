@@ -102,8 +102,12 @@ function fileFact(pathname, value) {
 
 function fakePlatformDependencies(options = {}) {
   const trace = options.trace || [];
-  const manifestFacts = new Map(options.manifestFacts || []);
-  const registryFacts = new Map(options.registryFacts || []);
+  const manifestFacts = options.manifestFacts instanceof Map
+    ? options.manifestFacts
+    : new Map(options.manifestFacts || []);
+  const registryFacts = options.registryFacts instanceof Map
+    ? options.registryFacts
+    : new Map(options.registryFacts || []);
   let keyInspectionCount = 0;
   function step(entry) {
     trace.push(entry);

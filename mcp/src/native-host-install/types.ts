@@ -40,6 +40,7 @@ export type NativeHostRegistryValueFact =
 export type NativeHostRegistryKeyFact =
   | Readonly<{ status: 'absent' }>
   | Readonly<{ status: 'empty' }>
+  | Readonly<{ status: 'exact-default-only' }>
   | Readonly<{ status: 'nonempty' }>
   | Readonly<{ status: 'unavailable' }>;
 
@@ -317,6 +318,54 @@ export interface NativeHostRuntimePackageSnapshot {
     }>>;
   }> | null;
 }
+
+export interface NativeHostRuntimeOwnedInspection {
+  state: NativeHostOwnedState;
+  reason: string;
+  markerFact: NativeHostFileFact;
+  marker: NativeHostOwnerMarker | null;
+  receipt: Readonly<NativeHostRuntimeReceipt> | null;
+}
+
+export interface NativeHostInstallRuntimeAdapter {
+  readonly layout: import('../native-host/runtime-layout.js').NativeHostRuntimeLayout;
+  inspectRuntime(): Promise<Readonly<NativeHostRuntimeOwnedInspection>>;
+  publishRuntime(): Promise<NativeHostRuntimePublishResult>;
+  recheckPublicationBoundary(
+    receipt: Readonly<NativeHostRuntimeReceipt>,
+  ): Promise<boolean>;
+  recheckExactRuntime(
+    receipt: Readonly<NativeHostRuntimeReceipt>,
+  ): Promise<boolean>;
+  removeExactRuntime(
+    receipt: Readonly<NativeHostRuntimeReceipt>,
+  ): Promise<void>;
+}
+
+export interface NativeHostInstallTransactionDependencies {
+  platform: NativeHostInstallPlatformAdapter;
+  runtime: NativeHostInstallRuntimeAdapter;
+}
+
+export interface NativeHostInstallRequest {
+  extensionId?: string;
+}
+
+export type NativeHostInstallResult = Readonly<{
+  status: 'installed' | 'already-installed' | 'refused';
+  reason: string;
+  location: string;
+  origin: string | null;
+  packageVersion: string | null;
+}>;
+
+export type NativeHostUninstallResult = Readonly<{
+  status: 'removed' | 'not-installed' | 'refused';
+  reason: string;
+  location: string;
+  origin: string | null;
+  packageVersion: string | null;
+}>;
 
 export function nativeHostProcessInvocationFromRecipe(
   recipe: NativeHostCommandRecipe,
