@@ -156,7 +156,7 @@
 - [x] 63-02: Fix pre-bind secret rotation and make product-specific serve readiness authoritative.
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 63-03: Implement the closed native-messaging framing, validation, one-shot entry, and authority boundary.
+- [x] 63-03: Implement the closed native-messaging framing, validation, one-shot entry, and authority boundary.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 63-04: Implement exact readiness probing, tokened wake coalescing, and one shell-free serve handoff.
@@ -221,7 +221,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
-| 63. Native-Messaging Host | 2/12 | In Progress|  |
+| 63. Native-Messaging Host | 3/12 | In Progress|  |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
