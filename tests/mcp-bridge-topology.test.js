@@ -277,6 +277,7 @@ function makeLifecycleFakes(overrides = {}) {
     handlerCalls: 0,
     compatibilityRegistryCalls: 0,
     compatibilityDetectCalls: 0,
+    prepareCalls: 0,
     readyCalls: 0,
     serveReady: false,
     onDegraded: null,
@@ -406,6 +407,11 @@ function makeLifecycleFakes(overrides = {}) {
     now() {
       return 123_456_789;
     },
+    async prepareBridgeAuth() {
+      state.prepareCalls++;
+      order.push('bridge.auth.prepare');
+      if (overrides.prepareError) throw overrides.prepareError;
+    },
     async pushInventory() {
       state.inventoryCalls++;
       order.push('inventory.push');
@@ -430,9 +436,9 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     dependencies: success.dependencies,
   });
   assertEqual(
-    success.order.slice(0, 8).join(' > '),
-    'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push > http.ready',
-    'serve binds HTTP, recovers, connects, advertises, then marks readiness',
+    success.order.slice(0, 9).join(' > '),
+    'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.auth.prepare > bridge.connect > inventory.push > http.ready',
+    'serve binds HTTP, recovers, prepares auth, connects, advertises, then marks readiness',
   );
   assertEqual(
     JSON.stringify(success.state.bridgeOptions.capabilities),
@@ -442,6 +448,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assertEqual(typeof success.state.bridgeOptions.handleExtRequest, 'function', 'serve bridge receives the supervisor handler closure');
   assert(success.state.httpOptions.bridge === success.bridge, 'HTTP receives the same not-yet-connected capable bridge');
   assertEqual(success.state.connectCalls, 1, 'capable bridge connects exactly once after recovery');
+  assertEqual(success.state.prepareCalls, 1, 'bridge auth is prepared exactly once after recovery');
   assertEqual(success.state.inventoryCalls, 1, 'inventory advertises exactly once after capable connect');
   assertEqual(success.state.readyCalls, 1, 'serve readiness is marked exactly once after inventory');
   assertEqual(success.state.serveReady, true, 'serve is ready only after the complete startup barrier');
@@ -598,8 +605,9 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   for (const [name, overrides, expectedPrefix] of [
     ['HTTP bind', { httpError: new Error('bind') }, 'bridge.construct > queue.construct > http.bind'],
     ['recovery ambiguity', { spawnAvailable: false }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover'],
-    ['bridge connect', { connectError: new Error('connect') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect'],
-    ['inventory push', { inventoryError: new Error('inventory') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push'],
+    ['bridge auth preparation', { prepareError: new Error('auth') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.auth.prepare'],
+    ['bridge connect', { connectError: new Error('connect') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.auth.prepare > bridge.connect'],
+    ['inventory push', { inventoryError: new Error('inventory') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.auth.prepare > bridge.connect > inventory.push'],
   ]) {
     const failure = makeLifecycleFakes(overrides);
     let error = null;
@@ -614,6 +622,13 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     }
     assert(error instanceof lifecycleModule.ServeDelegationStartupError, `${name} failure is a typed startup failure`);
     assertEqual(failure.order.slice(0, expectedPrefix.split(' > ').length).join(' > '), expectedPrefix, `${name} failure preserves startup order`);
+    assertEqual(
+      failure.state.prepareCalls,
+      ['bridge auth preparation', 'bridge connect', 'inventory push'].includes(name) ? 1 : 0,
+      ['bridge auth preparation', 'bridge connect', 'inventory push'].includes(name)
+        ? `${name} reaches one post-recovery auth preparation`
+        : `${name} failure never prepares bridge auth`,
+    );
     assertEqual(
       failure.state.connectCalls,
       name === 'bridge connect' || name === 'inventory push' ? 1 : 0,
@@ -639,6 +654,15 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(stdioSource), 'stdio source contains no supervisor, handler, or spawn capability');
   assert(!/SpawnSupervisor|handleExtRequest|agent-spawn|startServeDelegation/.test(runtimeSource), 'shared MCP runtime contains no supervisor, handler, or spawn capability');
   assertEqual((source.match(/startServeDelegation\(/g) || []).length, 1, 'only serve mode starts the delegation lifecycle');
+  const serveModeSource = source.slice(source.indexOf('async function runHttpMode'), source.indexOf('export function runPair'));
+  assert(
+    /prepareBridgeAuth[\s\S]*rotateBridgeSessionSecret/.test(serveModeSource),
+    'serve composes bridge secret rotation solely through the lifecycle auth hook',
+  );
+  assert(
+    !/rotateBridgeSessionSecret\(\);\s*const lifecycle/.test(serveModeSource),
+    'serve never rotates bridge auth before lifecycle bind ownership',
+  );
 }
 
 async function createBridgePair(WebSocketBridge) {
