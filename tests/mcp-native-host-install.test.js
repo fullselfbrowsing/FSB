@@ -31,6 +31,9 @@ const ORIGIN = `chrome-extension://${EXTENSION_ID}/`;
 const PACKAGE_VERSION = '0.10.0';
 const INSTALL_TOKEN = '0123456789abcdef0123456789abcdef';
 const ARTIFACT_SHA256 = 'a'.repeat(64);
+const BUILD_ENTRY_SHA256 = 'b'.repeat(64);
+const TARBALL_SHA512 = `sha512-${Buffer.alloc(64, 7).toString('base64')}`;
+const MAX_PROCESS_OUTPUT_BYTES = 64 * 1024;
 
 let passed = 0;
 
@@ -144,6 +147,256 @@ function fakePlatformDependencies(options = {}) {
     },
   };
   return { dependencies, manifestFacts, registryFacts, trace };
+}
+
+function platformPath(platform) {
+  return platform === 'win32' ? path.win32 : path.posix;
+}
+
+function readRuntimeContract() {
+  return {
+    manifest: JSON.parse(readFileSync(path.join(repositoryRoot, 'mcp/package.json'), 'utf8')),
+    integrity: JSON.parse(readFileSync(
+      path.join(repositoryRoot, 'mcp/native-host/runtime-integrity.json'),
+      'utf8',
+    )),
+  };
+}
+
+function runtimePackageSnapshot(layout, packageRoot, overrides = {}) {
+  const { manifest, integrity } = readRuntimeContract();
+  const api = platformPath(layout.platform);
+  const productionPackages = integrity.productionPackages.map((entry) => ({
+    ...entry,
+    dev: false,
+  }));
+  const windowsArtifacts = {
+    schema: 1,
+    package: manifest.name,
+    version: manifest.version,
+    artifacts: [
+      {
+        architecture: 'x64',
+        path: 'native-host/bin/win32-x64/fsb-native-host.exe',
+        bytes: 8192,
+        peMachine: '0x8664',
+        sha256: ARTIFACT_SHA256,
+        packageVersion: manifest.version,
+      },
+      {
+        architecture: 'arm64',
+        path: 'native-host/bin/win32-arm64/fsb-native-host.exe',
+        bytes: 8192,
+        peMachine: '0xaa64',
+        sha256: 'c'.repeat(64),
+        packageVersion: manifest.version,
+      },
+    ],
+  };
+  return {
+    schema: 1,
+    packageRoot,
+    packageRealPath: packageRoot,
+    packageName: manifest.name,
+    packageVersion: manifest.version,
+    dependencies: ordinaryClone(manifest.dependencies),
+    bundleDependencies: [...manifest.bundleDependencies],
+    integrityReceipt: ordinaryClone(integrity),
+    productionPackages,
+    buildEntry: {
+      status: 'file',
+      path: api.join(packageRoot, 'build', 'native-host', 'index.js'),
+      realPath: api.join(packageRoot, 'build', 'native-host', 'index.js'),
+      sha256: BUILD_ENTRY_SHA256,
+      bytes: 4096,
+    },
+    posixLauncherTemplate: layout.platform === 'win32' ? null : {
+      status: 'file',
+      path: api.join(packageRoot, 'native-host', 'posix', 'fsb-native-host-launcher.mjs.in'),
+      realPath: api.join(packageRoot, 'native-host', 'posix', 'fsb-native-host-launcher.mjs.in'),
+      contents: "#!__FSB_ABSOLUTE_NODE__\nimport '../runtime/package/build/native-host/index.js';\n",
+      sha256: 'd'.repeat(64),
+      bytes: 93,
+    },
+    windowsArtifacts: layout.platform === 'win32' ? windowsArtifacts : null,
+    ...overrides,
+  };
+}
+
+function runtimeLayoutInput(platform) {
+  const common = {
+    packageVersion: PACKAGE_VERSION,
+    extensionId: EXTENSION_ID,
+    installToken: INSTALL_TOKEN,
+  };
+  if (platform === 'win32') {
+    return {
+      ...common,
+      platform,
+      homeDirectory: 'C:\\Users\\fsb',
+      localAppData: 'C:\\Users\\fsb\\AppData\\Local',
+      nodePath: 'C:\\Program Files\\nodejs\\node.exe',
+      nodeRealPath: 'C:\\Program Files\\nodejs\\node.exe',
+      npmCliPath: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      npmCliRealPath: 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      invokingPackageRoot: 'C:\\Temp\\npm-cache\\_npx\\token\\node_modules\\fsb-mcp-server',
+    };
+  }
+  const homeDirectory = platform === 'darwin' ? '/Users/fsb' : '/home/fsb';
+  return {
+    ...common,
+    platform,
+    homeDirectory,
+    nodePath: platform === 'darwin' ? '/opt/homebrew/bin/node' : '/usr/bin/node',
+    nodeRealPath: platform === 'darwin' ? '/opt/homebrew/bin/node' : '/usr/bin/node',
+    npmCliPath: platform === 'darwin'
+      ? '/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js'
+      : '/usr/lib/node_modules/npm/bin/npm-cli.js',
+    npmCliRealPath: platform === 'darwin'
+      ? '/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js'
+      : '/usr/lib/node_modules/npm/bin/npm-cli.js',
+    invokingPackageRoot: `${homeDirectory}/.npm/_npx/token/node_modules/fsb-mcp-server`,
+  };
+}
+
+function fakeRuntimeDependencies(layout, options = {}) {
+  const trace = [];
+  const api = platformPath(layout.platform);
+  const materializedPackageRoot = api.join(
+    layout.install.cwd,
+    'node_modules',
+    'fsb-mcp-server',
+  );
+  const stagedPackageRoot = api.join(layout.stageRoot, 'runtime', 'package');
+  const sourceSnapshot = runtimePackageSnapshot(
+    layout,
+    layout.invokingPackageRoot,
+    options.sourceSnapshotOverrides,
+  );
+  const installedSnapshot = runtimePackageSnapshot(
+    layout,
+    materializedPackageRoot,
+    options.installedSnapshotOverrides,
+  );
+  let sourceAvailable = true;
+  let originalCacheAvailable = true;
+  let launcherReachable = false;
+  let priorRuntimeUntouched = true;
+
+  function step(entry) {
+    trace.push(entry);
+    if (options.failAt === entry) throw new Error(`sensitive:${entry}:must-not-leak`);
+  }
+
+  const files = {
+    inspectSecurePath: async (pathname, expectedKind) => {
+      step(`inspect:${pathname}:${expectedKind}`);
+      if (pathname === layout.stableRoot) {
+        return options.stableRootFact || Object.freeze({ status: 'absent' });
+      }
+      return Object.freeze({
+        status: expectedKind,
+        path: pathname,
+        realPath: pathname,
+        mode: expectedKind === 'file' ? 0o700 : 0o700,
+      });
+    },
+    readPackageSnapshot: async (packageRoot) => {
+      step(`snapshot:${packageRoot}`);
+      if (packageRoot === layout.invokingPackageRoot) return sourceSnapshot;
+      if (packageRoot === materializedPackageRoot) return installedSnapshot;
+      if (packageRoot === stagedPackageRoot) {
+        return runtimePackageSnapshot(layout, stagedPackageRoot, options.installedSnapshotOverrides);
+      }
+      throw new Error('unexpected-package-root');
+    },
+    createDirectoryExclusive: async (pathname, mode) => {
+      step(`mkdir-exclusive:${pathname}:${mode.toString(8)}`);
+    },
+    createDirectory: async (pathname, mode) => {
+      step(`mkdir:${pathname}:${mode.toString(8)}`);
+    },
+    assertEmptyDirectory: async (pathname) => {
+      step(`empty:${pathname}`);
+    },
+    hashFile: async (pathname, algorithm) => {
+      step(`hash:${pathname}:${algorithm}`);
+      if (algorithm === 'sha512') return TARBALL_SHA512;
+      if (pathname.endsWith('fsb-native-host.exe')) return ARTIFACT_SHA256;
+      return BUILD_ENTRY_SHA256;
+    },
+    moveDirectoryExact: async (source, destination) => {
+      step(`move:${source}:${destination}`);
+    },
+    writeFileExclusiveNoFollow: async (pathname, contents, mode) => {
+      step(`write:${pathname}:${mode.toString(8)}`);
+      check(Buffer.byteLength(contents) <= 65536, 'runtime writes only bounded launcher/config/marker content');
+    },
+    copyFileExclusiveNoFollow: async (source, destination, mode) => {
+      step(`copy:${source}:${destination}:${mode.toString(8)}`);
+    },
+    restrictOwnedTree: async (pathname, directoryMode, fileMode) => {
+      step(`restrict:${pathname}:${directoryMode.toString(8)}:${fileMode.toString(8)}`);
+    },
+    fsyncFile: async (pathname) => {
+      step(`fsync-file:${pathname}`);
+    },
+    fsyncDirectory: async (pathname) => {
+      step(`fsync-dir:${pathname}`);
+    },
+    renameDirectoryAtomic: async (source, destination) => {
+      step(`rename:${source}:${destination}`);
+      launcherReachable = true;
+    },
+    removeStage: async (pathname) => {
+      trace.push(`cleanup:${pathname}`);
+    },
+  };
+
+  const processMaterializer = {
+    run: async (invocation) => {
+      const operation = invocation.argv.includes('pack') ? 'pack' : 'install';
+      step(`process:${operation}`);
+      if (operation === 'pack') {
+        sourceAvailable = false;
+        originalCacheAvailable = false;
+        const bundled = [...new Set(
+          sourceSnapshot.integrityReceipt.productionPackages.map((entry) => entry.name),
+        )].sort();
+        return Object.freeze({
+          status: options.packStatus ?? 0,
+          stdout: options.packStdout ?? JSON.stringify([{
+            name: 'fsb-mcp-server',
+            version: PACKAGE_VERSION,
+            filename: api.basename(layout.tarballPath),
+            integrity: TARBALL_SHA512,
+            bundled,
+          }]),
+          stderr: options.packStderr ?? '',
+          networkRequests: options.packNetworkRequests ?? 0,
+        });
+      }
+      check(!sourceAvailable, 'offline install fixture removes access to the invoking source after pack');
+      check(!originalCacheAvailable, 'offline install fixture removes access to the original cache after pack');
+      return Object.freeze({
+        status: options.installStatus ?? 0,
+        stdout: options.installStdout ?? '',
+        stderr: options.installStderr ?? '',
+        networkRequests: options.installNetworkRequests ?? 0,
+      });
+    },
+  };
+
+  return {
+    dependencies: { files, process: processMaterializer },
+    trace,
+    materializedPackageRoot,
+    stagedPackageRoot,
+    sourceAvailable: () => sourceAvailable,
+    originalCacheAvailable: () => originalCacheAvailable,
+    launcherReachable: () => launcherReachable,
+    priorRuntimeUntouched: () => priorRuntimeUntouched,
+  };
 }
 
 async function runPlatformAndRegistration() {
@@ -501,13 +754,262 @@ async function runPlatformAndRegistration() {
   check(source.includes("'user/64'"), 'typed installer boundary names the Windows shadow view');
 }
 
+async function runRuntimeTransaction() {
+  const runtime = await importBuild('native-host-install/runtime.js');
+  const runtimeLayout = await importBuild('native-host/runtime-layout.js');
+
+  for (const platformName of ['darwin', 'linux']) {
+    const layout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput(platformName));
+    const harness = fakeRuntimeDependencies(layout);
+    const result = await runtime.publishNativeHostRuntime(layout, harness.dependencies);
+    equal(result.status, 'published', `${platformName} exact runtime publishes from one tokened stage`);
+    equal(result.reason, 'published', `${platformName} runtime success uses a stable content-free reason`);
+    equal(result.receipt.stableRoot, layout.stableRoot, `${platformName} receipt names only the stable owned root`);
+    equal(result.receipt.launcherPath, layout.launcherPath, `${platformName} receipt keeps the stable launcher path`);
+    equal(result.receipt.tarballIntegrity, TARBALL_SHA512, `${platformName} receipt records the verified tarball SHA-512`);
+    equal(result.receipt.artifactSha256, BUILD_ENTRY_SHA256, `${platformName} POSIX launcher binds the installed build entry checksum`);
+    check(Object.isFrozen(result), `${platformName} publication result is immutable`);
+    check(Object.isFrozen(result.receipt), `${platformName} runtime receipt is immutable`);
+
+    const packInvocation = result.trace.pack;
+    equal(packInvocation.executable, layout.nodePath, `${platformName} pack uses the exact absolute Node executable`);
+    deepEqual(packInvocation.argv.slice(0, 3), [layout.npmCliPath, 'pack', '.'], `${platformName} packs only the invoking package root`);
+    equal(packInvocation.cwd, layout.invokingPackageRoot, `${platformName} pack cwd is the exact invoking package`);
+    equal(packInvocation.shell, false, `${platformName} pack never uses a shell`);
+    equal(packInvocation.maxOutputBytes, MAX_PROCESS_OUTPUT_BYTES, `${platformName} pack output is bounded`);
+
+    const installInvocation = result.trace.install;
+    equal(installInvocation.executable, layout.nodePath, `${platformName} offline install uses the exact absolute Node`);
+    equal(installInvocation.cwd, layout.install.cwd, `${platformName} install is isolated to the staged materializer prefix`);
+    equal(installInvocation.shell, false, `${platformName} offline install never uses a shell`);
+    equal(installInvocation.maxOutputBytes, MAX_PROCESS_OUTPUT_BYTES, `${platformName} install output is bounded`);
+    for (const required of [
+      '--offline',
+      '--ignore-scripts',
+      '--omit=dev',
+      '--no-audit',
+      '--no-fund',
+      '--package-lock=false',
+      '--cache',
+      '--registry',
+    ]) {
+      check(installInvocation.argv.includes(required), `${platformName} offline install pins ${required}`);
+    }
+    equal(installInvocation.argv.at(-1), layout.tarballPath, `${platformName} installs only the absolute staged tarball`);
+    equal(installInvocation.environment.npm_config_offline, 'true', `${platformName} environment forces npm offline mode`);
+    equal(installInvocation.environment.NO_PROXY, '', `${platformName} environment disables proxy bypass`);
+    check(
+      installInvocation.environment.HTTP_PROXY.startsWith('http://127.0.0.1:'),
+      `${platformName} HTTP proxy is poisoned with an unreachable loopback sentinel`,
+    );
+    check(
+      installInvocation.environment.HTTPS_PROXY.startsWith('http://127.0.0.1:'),
+      `${platformName} HTTPS proxy is poisoned with an unreachable loopback sentinel`,
+    );
+    check(!harness.sourceAvailable(), `${platformName} stable runtime survives invoking source removal`);
+    check(!harness.originalCacheAvailable(), `${platformName} stable runtime survives original cache removal`);
+    check(harness.launcherReachable(), `${platformName} launcher remains reachable after atomic publication`);
+
+    const stageIndex = harness.trace.indexOf(`mkdir-exclusive:${layout.stageRoot}:700`);
+    const packIndex = harness.trace.indexOf('process:pack');
+    const installIndex = harness.trace.indexOf('process:install');
+    const validationIndex = harness.trace.indexOf(`snapshot:${harness.materializedPackageRoot}`);
+    const markerIndex = harness.trace.indexOf(`write:${platformPath(platformName).join(layout.stageRoot, 'owner.json')}:600`);
+    const renameIndex = harness.trace.indexOf(`rename:${layout.stageRoot}:${layout.stableRoot}`);
+    check(stageIndex >= 0 && stageIndex < packIndex, `${platformName} creates the tokened stage before package materialization`);
+    check(packIndex < installIndex, `${platformName} completes exact pack before offline install`);
+    check(installIndex < validationIndex, `${platformName} validates the materialized package only after install`);
+    check(validationIndex < markerIndex, `${platformName} validates package closure before writing the owner marker`);
+    check(markerIndex < renameIndex, `${platformName} writes and syncs ownership before atomic rename`);
+    equal(renameIndex, harness.trace.length - 1, `${platformName} atomic rename is the final runtime mutation`);
+    check(
+      harness.trace.includes(`restrict:${harness.stagedPackageRoot}:700:600`),
+      `${platformName} restricts only the owned staged package tree`,
+    );
+    check(
+      harness.trace.includes(`write:${platformPath(platformName).join(layout.stageRoot, ...layout.launcherRelativePath.split('/'))}:700`),
+      `${platformName} writes the absolute-Node launcher with mode 0700`,
+    );
+    check(
+      harness.trace.every((entry) => !entry.includes('NativeMessagingHosts')),
+      `${platformName} runtime publisher has no registration mutation authority`,
+    );
+    equal(
+      harness.trace.filter((entry) => entry.startsWith('process:')).length,
+      2,
+      `${platformName} has no online retry or package-manager fallback`,
+    );
+  }
+
+  const windowsLayout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('win32'));
+  const windowsHarness = fakeRuntimeDependencies(windowsLayout);
+  const windowsResult = await runtime.publishNativeHostRuntime(
+    windowsLayout,
+    windowsHarness.dependencies,
+    { architecture: 'x64' },
+  );
+  equal(windowsResult.status, 'published', 'Windows selects and publishes one version-bound PE artifact');
+  equal(windowsResult.receipt.artifactSha256, ARTIFACT_SHA256, 'Windows receipt binds the selected PE checksum');
+  check(
+    windowsHarness.trace.some((entry) => entry.includes('native-host\\bin\\win32-x64\\fsb-native-host.exe')),
+    'Windows copies only the x64 artifact for an x64 install',
+  );
+  check(
+    windowsHarness.trace.some((entry) => entry === `write:${windowsLayout.bootstrapConfigPath.replace(windowsLayout.stableRoot, windowsLayout.stageRoot)}:600`),
+    'Windows writes one bounded sibling bootstrap config with private mode',
+  );
+  check(
+    windowsHarness.trace.every((entry) => !entry.includes('win32-arm64') || entry.startsWith('snapshot:')),
+    'Windows never publishes the unselected arm64 executable',
+  );
+
+  for (const architecture of ['ia32', 'universal', '../x64']) {
+    const harness = fakeRuntimeDependencies(windowsLayout);
+    const result = await runtime.publishNativeHostRuntime(
+      windowsLayout,
+      harness.dependencies,
+      { architecture },
+    );
+    equal(result.status, 'refused', 'unsupported Windows architecture is refused');
+    equal(result.reason, 'unsupported-architecture', 'architecture refusal is stable and content-free');
+    equal(harness.trace.length, 0, 'unsupported Windows architecture causes zero filesystem/process mutation');
+  }
+
+  const sourceMismatchCases = [
+    { packageName: 'foreign-package' },
+    { packageVersion: '9.9.9' },
+    { dependencies: { ws: '8.19.0' } },
+    { bundleDependencies: ['ws'] },
+    { integrityReceipt: { ...readRuntimeContract().integrity, lockSha256: '0'.repeat(64) } },
+    {
+      productionPackages: readRuntimeContract().integrity.productionPackages.slice(1).map((entry) => ({
+        ...entry,
+        dev: false,
+      })),
+    },
+    { buildEntry: { status: 'symlink' } },
+    { posixLauncherTemplate: { status: 'file', contents: '#!/bin/sh\n' } },
+  ];
+  for (const sourceSnapshotOverrides of sourceMismatchCases) {
+    const layout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('linux'));
+    const harness = fakeRuntimeDependencies(layout, { sourceSnapshotOverrides });
+    const result = await runtime.publishNativeHostRuntime(layout, harness.dependencies);
+    equal(result.status, 'refused', 'invalid source package contract is refused before staging');
+    equal(result.reason, 'invalid-source-package', 'source package refusal does not expose package content');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('mkdir') && !entry.startsWith('process:')),
+      'invalid source package causes zero staging or process execution',
+    );
+  }
+
+  const installedMismatchCases = [
+    { packageName: 'foreign-package' },
+    { packageVersion: '9.9.9' },
+    { bundleDependencies: ['ws'] },
+    {
+      productionPackages: readRuntimeContract().integrity.productionPackages.slice(0, -1).map((entry) => ({
+        ...entry,
+        dev: false,
+      })),
+    },
+    {
+      productionPackages: readRuntimeContract().integrity.productionPackages.map((entry, index) => ({
+        ...entry,
+        dev: index === 0,
+      })),
+    },
+    { buildEntry: { status: 'symlink' } },
+  ];
+  for (const installedSnapshotOverrides of installedMismatchCases) {
+    const layout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('darwin'));
+    const harness = fakeRuntimeDependencies(layout, { installedSnapshotOverrides });
+    const result = await runtime.publishNativeHostRuntime(layout, harness.dependencies);
+    equal(result.status, 'refused', 'missing, extra, dev, or altered materialized package is refused');
+    equal(result.reason, 'invalid-materialized-package', 'materialized package refusal is stable and content-free');
+    check(harness.trace.includes(`cleanup:${layout.stageRoot}`), 'invalid materialization removes only its tokened stage');
+    check(!harness.trace.some((entry) => entry.startsWith('rename:')), 'invalid materialization never publishes the stage');
+    check(harness.priorRuntimeUntouched(), 'invalid materialization leaves any prior runtime untouched');
+  }
+
+  const processFailures = [
+    [{ packStatus: 1, packStderr: 'secret-pack-error' }, 'pack-failed'],
+    [{ packNetworkRequests: 1 }, 'network-attempted'],
+    [{ packStdout: 'x'.repeat(MAX_PROCESS_OUTPUT_BYTES + 1) }, 'process-output-exceeded'],
+    [{ installStatus: 1, installStderr: 'secret-install-error' }, 'install-failed'],
+    [{ installNetworkRequests: 1 }, 'network-attempted'],
+    [{ installStderr: 'x'.repeat(MAX_PROCESS_OUTPUT_BYTES + 1) }, 'process-output-exceeded'],
+  ];
+  for (const [options, expectedReason] of processFailures) {
+    const layout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('linux'));
+    const harness = fakeRuntimeDependencies(layout, options);
+    const result = await runtime.publishNativeHostRuntime(layout, harness.dependencies);
+    equal(result.status, 'refused', 'package-manager failure returns a refusal');
+    equal(result.reason, expectedReason, 'package-manager refusal collapses to a stable content-free reason');
+    check(!JSON.stringify(result).includes('secret-'), 'package-manager output is never forwarded or serialized');
+    check(harness.trace.includes(`cleanup:${layout.stageRoot}`), 'package-manager failure removes only its tokened stage');
+    check(!harness.trace.some((entry) => entry.startsWith('rename:')), 'package-manager failure cannot publish runtime');
+  }
+
+  for (const failAtFactory of [
+    (layout) => `move:${platformPath(layout.platform).join(layout.install.cwd, 'node_modules', 'fsb-mcp-server')}:${platformPath(layout.platform).join(layout.stageRoot, 'runtime', 'package')}`,
+    (layout) => `write:${platformPath(layout.platform).join(layout.stageRoot, 'owner.json')}:600`,
+    (layout) => `fsync-dir:${layout.stageRoot}`,
+    (layout) => `rename:${layout.stageRoot}:${layout.stableRoot}`,
+  ]) {
+    const layout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('darwin'));
+    const failAt = failAtFactory(layout);
+    const harness = fakeRuntimeDependencies(layout, { failAt });
+    const result = await runtime.publishNativeHostRuntime(layout, harness.dependencies);
+    equal(result.status, 'refused', 'operation-boundary failure is collapsed to a runtime refusal');
+    equal(result.reason, 'publication-failed', 'operation-boundary error content never escapes');
+    check(harness.trace.includes(`cleanup:${layout.stageRoot}`), 'operation-boundary failure removes the exact stage');
+    check(harness.priorRuntimeUntouched(), 'operation-boundary failure leaves prior runtime and registration untouched');
+  }
+
+  const occupiedLayout = runtimeLayout.resolveNativeHostRuntimeLayout(runtimeLayoutInput('linux'));
+  for (const stableRootFact of [
+    { status: 'directory', path: occupiedLayout.stableRoot, realPath: occupiedLayout.stableRoot },
+    { status: 'symlink' },
+    { status: 'unavailable' },
+  ]) {
+    const harness = fakeRuntimeDependencies(occupiedLayout, { stableRootFact });
+    const result = await runtime.publishNativeHostRuntime(occupiedLayout, harness.dependencies);
+    equal(result.status, 'refused', 'publisher never replaces occupied, symlink, or unavailable stable state');
+    equal(result.reason, 'stable-root-not-absent', 'occupied stable root uses one stable refusal');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('mkdir') && !entry.startsWith('process:')),
+      'occupied stable root is read-only and mutation-free',
+    );
+  }
+
+  const source = [
+    readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/runtime.ts'), 'utf8'),
+    readFileSync(path.join(repositoryRoot, 'mcp/src/native-host-install/types.ts'), 'utf8'),
+  ].join('\n').toLowerCase();
+  for (const forbidden of [
+    'shell: true',
+    'execsync',
+    'spawnsync',
+    'npm install -g',
+    '--prefer-online',
+    '--force',
+    'cp -r',
+    'copyfilesync',
+    'npx ',
+    'nativeMessagingHosts'.toLowerCase(),
+  ]) {
+    check(!source.includes(forbidden), `runtime publisher excludes unsafe fallback or registration token ${forbidden}`);
+  }
+}
+
 async function main() {
   if (!requestedSection || requestedSection === 'platform-and-registration') {
     console.log('\n=== Platform and registration ===');
     await runPlatformAndRegistration();
   }
   if (!requestedSection || requestedSection === 'runtime-transaction') {
-    if (requestedSection) throw new Error('runtime-transaction section is not implemented yet');
+    console.log('\n=== Runtime transaction ===');
+    await runRuntimeTransaction();
   }
   if (!requestedSection || requestedSection === 'install-transaction') {
     if (requestedSection) throw new Error('install-transaction section is not implemented yet');
