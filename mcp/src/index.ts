@@ -141,6 +141,54 @@ const DOCTOR_COMPATIBILITY_LABELS: Record<
   unsupported: 'Unsupported',
 };
 
+const DOCTOR_NATIVE_INSTALL_LABELS: Record<
+  DiagnosticsSnapshot['nativeHost']['installState'],
+  string
+> = {
+  installed: 'Installed',
+  not_installed: 'Not installed',
+  invalid: 'Invalid',
+  unavailable: 'Unavailable',
+};
+
+const DOCTOR_NATIVE_REGISTRATION_LABELS: Record<
+  DiagnosticsSnapshot['nativeHost']['registration'],
+  string
+> = {
+  valid: 'Valid',
+  missing: 'Missing',
+  invalid: 'Invalid',
+  unavailable: 'Unavailable',
+};
+
+const DOCTOR_NATIVE_ALLOWLIST_LABELS: Record<
+  DiagnosticsSnapshot['nativeHost']['allowlist'],
+  string
+> = {
+  matches: 'Matches',
+  mismatch: 'Mismatch',
+  not_reported: 'Not reported',
+};
+
+const DOCTOR_NATIVE_LAUNCHER_LABELS: Record<
+  DiagnosticsSnapshot['nativeHost']['launcher'],
+  string
+> = {
+  reachable: 'Reachable',
+  missing: 'Missing',
+  invalid: 'Invalid',
+  unavailable: 'Unavailable',
+};
+
+const DOCTOR_NATIVE_DAEMON_LABELS: Record<
+  DiagnosticsSnapshot['nativeHost']['daemon'],
+  string
+> = {
+  reachable: 'Reachable',
+  offline: 'Offline',
+  unavailable: 'Unavailable',
+};
+
 function formatDoctorTimestamp(timestamp: number | null): string {
   if (timestamp === null) return 'Not reported';
   const date = new Date(timestamp);
@@ -271,6 +319,17 @@ export function formatDoctor(diagnostics: DiagnosticsSnapshot): string {
   lines.push(`  Shared secret: ${auth.sharedSecretPresent ? 'Present' : 'Not present'}`);
   lines.push(`  Secret rotated at: ${formatDoctorTimestamp(auth.secretRotatedAt)}`);
   lines.push(`  Secret rotation age: ${auth.secretRotationAgeMs === null ? 'Not reported' : `${auth.secretRotationAgeMs} ms`}`);
+
+  const nativeHost = diagnostics.nativeHost;
+  lines.push('');
+  lines.push('Native messaging host:');
+  lines.push(`  Install state: ${DOCTOR_NATIVE_INSTALL_LABELS[nativeHost.installState]}`);
+  lines.push(`  Expected location: ${nativeHost.expectedLocation}`);
+  lines.push(`  Manifest/registry: ${DOCTOR_NATIVE_REGISTRATION_LABELS[nativeHost.registration]}`);
+  lines.push(`  Chrome allowlist: ${DOCTOR_NATIVE_ALLOWLIST_LABELS[nativeHost.allowlist]}`);
+  lines.push(`  Launcher: ${DOCTOR_NATIVE_LAUNCHER_LABELS[nativeHost.launcher]}`);
+  lines.push(`  Daemon: ${DOCTOR_NATIVE_DAEMON_LABELS[nativeHost.daemon]}`);
+  lines.push(`  Reason: ${nativeHost.reason}`);
 
   lines.push('');
   lines.push('Install paths:');
