@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const nodeCrypto = require('crypto');
 const path = require('path');
 const util = require('util');
 const vm = require('vm');
@@ -538,6 +539,91 @@ function testControllerAuthoritySource() {
   assert(!/chrome\.tabs|chrome\.windows|chrome\.sidePanel/.test(harness.source), 'controller cannot mutate browser or UI authority');
 }
 
+function collectJavaScriptFiles(directory) {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...collectJavaScriptFiles(absolutePath));
+    else if (entry.isFile() && entry.name.endsWith('.js')) files.push(absolutePath);
+  }
+  return files.sort();
+}
+
+function testManifestAndBackgroundAuthority() {
+  console.log('\n--- manifest-and-authority: exact additive permission ---');
+  const extensionRoot = path.join(__dirname, '..', 'extension');
+  const manifestPath = path.join(extensionRoot, 'manifest.json');
+  const manifestSource = fs.readFileSync(manifestPath, 'utf8');
+  const manifest = JSON.parse(manifestSource);
+
+  assertDeepEqual(manifest.permissions, [
+    'activeTab',
+    'scripting',
+    'storage',
+    'unlimitedStorage',
+    'tabs',
+    'windows',
+    'sidePanel',
+    'debugger',
+    'webNavigation',
+    'alarms',
+    'clipboardWrite',
+    'offscreen',
+    'nativeMessaging',
+    'system.memory'
+  ], 'manifest adds nativeMessaging once without changing permission order');
+  assertEqual(
+    manifest.permissions.filter((permission) => permission === 'nativeMessaging').length,
+    1,
+    'manifest contains exactly one nativeMessaging permission'
+  );
+  const withoutNativePermission = manifestSource.replace('    "nativeMessaging",\n', '');
+  const baselineHash = nodeCrypto
+    .createHash('sha256')
+    .update(withoutNativePermission)
+    .digest('hex');
+  assertEqual(
+    baselineHash,
+    '838c12927d31d5595e827d137feed455ac4f1d6d8866915b9bb219c3379c0476',
+    'every other manifest byte remains unchanged'
+  );
+
+  console.log('\n--- manifest-and-authority: background-only native surface ---');
+  const nativePrimitivePattern = /connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host/;
+  const nativeFiles = collectJavaScriptFiles(extensionRoot)
+    .filter((file) => nativePrimitivePattern.test(fs.readFileSync(file, 'utf8')))
+    .map((file) => path.relative(extensionRoot, file).split(path.sep).join('/'));
+  assertDeepEqual(
+    nativeFiles,
+    ['utils/native-host-wake.js'],
+    'native APIs and the host name exist only in the approved background helper'
+  );
+
+  const backgroundSource = fs.readFileSync(path.join(extensionRoot, 'background.js'), 'utf8');
+  const wakeCalls = backgroundSource.match(/FsbNativeHostWake\.ensureWake\(\)/g) || [];
+  const commandStart = backgroundSource.indexOf('async function fsbDelegationPreflightCommand(request) {');
+  const commandEnd = backgroundSource.indexOf('\nasync function fsbDelegationConsentCommand(request) {', commandStart);
+  const wakeCall = backgroundSource.indexOf('FsbNativeHostWake.ensureWake()');
+  assertEqual(wakeCalls.length, 1, 'background contains one actual wake join');
+  assert(
+    commandStart !== -1 && commandEnd > commandStart && wakeCall > commandStart && wakeCall < commandEnd,
+    'the sole wake join is confined to delegation preflight'
+  );
+  const commandSource = backgroundSource.slice(commandStart, commandEnd);
+  assert(
+    commandSource.indexOf("authority.result.code !== 'agent_offline'") < commandSource.indexOf('FsbNativeHostWake.ensureWake()'),
+    'authoritative agent_offline gating precedes the sole wake join'
+  );
+  assertDeepEqual(
+    collectJavaScriptFiles(extensionRoot)
+      .filter((file) => file !== path.join(extensionRoot, 'background.js'))
+      .filter((file) => /FsbNativeHostWake\.ensureWake\(\)/.test(fs.readFileSync(file, 'utf8')))
+      .map((file) => path.relative(extensionRoot, file).split(path.sep).join('/')),
+    [],
+    'boot, refresh, setup, doctor-copy, tab, and UI modules cannot call actual wake'
+  );
+}
+
 async function testBootCompositionIsProbeOnly() {
   console.log('\n--- background-integration: boot probe composition ---');
   const harness = buildBackgroundPreflightHarness();
@@ -784,6 +870,10 @@ async function runBackgroundIntegrationSection() {
   await testInvalidIntentFailsBeforeNativeAuthority();
 }
 
+function runManifestAndAuthoritySection() {
+  testManifestAndBackgroundAuthority();
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex === -1 ? null : process.argv[sectionIndex + 1];
@@ -791,7 +881,13 @@ async function main() {
   if (section === null || section === 'background-integration') {
     await runBackgroundIntegrationSection();
   }
-  if (section !== null && section !== 'controller' && section !== 'background-integration') {
+  if (section === null || section === 'manifest-and-authority') {
+    runManifestAndAuthoritySection();
+  }
+  if (section !== null
+      && section !== 'controller'
+      && section !== 'background-integration'
+      && section !== 'manifest-and-authority') {
     throw new Error(`Unknown section: ${section}`);
   }
 

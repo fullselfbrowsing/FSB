@@ -18,6 +18,7 @@
     "alarms",
     "clipboardWrite",
     "offscreen",
+    "nativeMessaging",
     "system.memory"
   ],
   "host_permissions": [
