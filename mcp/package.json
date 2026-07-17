@@ -41,16 +41,16 @@
     "node": ">=18.20.0"
   },
   "scripts": {
-    "prebuild": "node ../scripts/verify-agent-provider-flags.mjs",
+    "prebuild": "node ../scripts/verify-agent-provider-flags.mjs && node ../scripts/verify-native-host-boundary.mjs --source",
     "clean": "node -e \"try{require('fs').unlinkSync('build/test-config-engine.js')}catch{}\"",
-    "build": "npm run clean && tsc && cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs",
+    "build": "npm run clean && tsc && node ../scripts/verify-native-host-boundary.mjs --compiled && cp ../extension/ai/tool-definitions.js ai/tool-definitions.cjs",
     "dev": "tsx src/index.ts",
     "doctor": "node build/index.js doctor",
     "serve": "node build/index.js serve",
     "setup": "node build/index.js setup",
     "status": "node build/index.js status",
     "wait-for-extension": "node build/index.js wait-for-extension",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && node ../scripts/verify-native-host-boundary.mjs --all"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",

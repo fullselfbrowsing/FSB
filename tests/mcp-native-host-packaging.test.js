@@ -1028,6 +1028,139 @@ function testWorkflowContracts() {
   assert.doesNotMatch(publishSource, /npm publish --access public/);
 }
 
+function writeBoundaryGraph(fixtureRoot, mode) {
+  const extension = mode === 'source' ? 'ts' : 'js';
+  const graphRoot = path.join(
+    fixtureRoot,
+    'mcp',
+    mode === 'source' ? 'src' : 'build',
+    'native-host',
+  );
+  mkdirSync(graphRoot, { recursive: true });
+  writeFileSync(
+    path.join(graphRoot, `entry.${extension}`),
+    "import { protocolValue } from './protocol.js';\nexport const entryValue = protocolValue;\n",
+  );
+  writeFileSync(
+    path.join(graphRoot, `protocol.${extension}`),
+    "import { endianness } from 'node:os';\nimport { constantValue } from './constants.js';\nexport const protocolValue = `${endianness()}:${constantValue}`;\n",
+  );
+  writeFileSync(
+    path.join(graphRoot, `constants.${extension}`),
+    "export const constantValue = 'leaf';\n",
+  );
+  return graphRoot;
+}
+
+function testNativeHostImportBoundary() {
+  const verifierPath = path.join(repositoryRoot, 'scripts/verify-native-host-boundary.mjs');
+  const packageRoot = path.join(repositoryRoot, 'mcp');
+  const packageManifest = readJson(path.join(packageRoot, 'package.json'));
+
+  for (const args of [['--source'], ['--compiled'], ['--all'], []]) {
+    const result = run(process.execPath, [verifierPath, ...args]);
+    assert.equal(result.status, 0, `${args.join(' ')}\n${result.stderr}`);
+  }
+  assert.match(packageManifest.scripts.prebuild, /verify-agent-provider-flags\.mjs/);
+  assert.match(packageManifest.scripts.prebuild, /verify-native-host-boundary\.mjs --source/);
+  assert.match(
+    packageManifest.scripts.build,
+    /tsc && node \.\.\/scripts\/verify-native-host-boundary\.mjs --compiled && cp/,
+  );
+  assert.match(packageManifest.scripts.prepublishOnly, /npm run build/);
+  assert.match(packageManifest.scripts.prepublishOnly, /verify-native-host-boundary\.mjs --all/);
+
+  const packResult = run(process.execPath, [
+    findNpmCliPath(),
+    'pack',
+    '--dry-run',
+    '--ignore-scripts',
+    '--json',
+    '.',
+  ], { cwd: packageRoot });
+  assert.equal(packResult.status, 0, packResult.stderr);
+  const packJson = JSON.parse(packResult.stdout);
+  assert.equal(Array.isArray(packJson), true);
+  const packedPaths = packJson.flatMap((entry) => entry.files || []).map((entry) => entry.path);
+  assert.equal(packedPaths.includes('build/native-host/entry.js'), true);
+  assert.equal(packedPaths.includes('build/native-host/protocol.js'), true);
+  assert.equal(
+    packedPaths.some((entry) => /com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp/iu.test(entry)),
+    false,
+  );
+
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb-native-boundary-'));
+  try {
+    const fixtureScriptDirectory = path.join(fixtureRoot, 'scripts');
+    mkdirSync(fixtureScriptDirectory, { recursive: true });
+    const fixtureVerifier = path.join(fixtureScriptDirectory, 'verify-native-host-boundary.mjs');
+    cpSync(verifierPath, fixtureVerifier);
+    const sourceRoot = writeBoundaryGraph(fixtureRoot, 'source');
+    const compiledRoot = writeBoundaryGraph(fixtureRoot, 'compiled');
+    const invoke = (args) => run(process.execPath, [fixtureVerifier, ...args], { cwd: fixtureRoot });
+
+    assert.equal(invoke(['--source']).status, 0);
+    assert.equal(invoke(['--compiled']).status, 0);
+    assert.equal(invoke([]).status, 0);
+    assert.equal(invoke(['--all']).status, 0);
+    assert.notEqual(invoke(['source']).status, 0);
+
+    writeFileSync(
+      path.join(compiledRoot, 'entry.js'),
+      "import '../../agent-providers/spawn-supervisor.js';\n",
+    );
+    assert.equal(invoke(['--source']).status, 0, 'stale compiled output cannot block prebuild');
+    assert.notEqual(invoke(['--compiled']).status, 0);
+    assert.notEqual(invoke([]).status, 0, 'no argument aliases --all');
+    assert.notEqual(invoke(['--all']).status, 0);
+    writeBoundaryGraph(fixtureRoot, 'compiled');
+
+    for (const specifier of [
+      '../../agent-providers/spawn-supervisor.js',
+      '../../delegation-task.js',
+      '../../browser-tab-state.js',
+      '../../bridge-auth.js',
+      '../../native-host-install.js',
+      '../../diagnostics.js',
+      '../../index.js',
+    ]) {
+      writeFileSync(path.join(sourceRoot, 'entry.ts'), `import '${specifier}';\n`);
+      assert.notEqual(invoke(['--source']).status, 0, specifier);
+    }
+    writeBoundaryGraph(fixtureRoot, 'source');
+    assert.equal(invoke(['--compiled']).status, 0, 'source drift cannot satisfy compiled mode');
+
+    writeFileSync(
+      path.join(sourceRoot, 'entry.ts'),
+      "export const load = () => import('./protocol.js');\n",
+    );
+    assert.notEqual(invoke(['--source']).status, 0, 'dynamic local import fails closed');
+    writeBoundaryGraph(fixtureRoot, 'source');
+
+    writeFileSync(
+      path.join(sourceRoot, 'entry.ts'),
+      "import './missing.js';\n",
+    );
+    assert.notEqual(invoke(['--source']).status, 0, 'unresolved local import fails closed');
+    writeBoundaryGraph(fixtureRoot, 'source');
+
+    writeFileSync(
+      path.join(sourceRoot, 'protocol.ts'),
+      "import { spawn } from 'node:child_process';\nexport const protocolValue = spawn;\n",
+    );
+    assert.notEqual(invoke(['--source']).status, 0, 'production process spawn edge is forbidden');
+    writeBoundaryGraph(fixtureRoot, 'source');
+
+    writeFileSync(
+      path.join(sourceRoot, 'constants.ts'),
+      "export const historical = 'com.fsb.mcp/native-host-shim/mcp-to-ext/ext-to-mcp';\n",
+    );
+    assert.notEqual(invoke(['--source']).status, 0, 'historical IPC names are forbidden');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
 async function testWorkflowAndPackedArtifactContract() {
   if (process.platform === 'win32') {
     testWorkflowContracts();
@@ -1355,6 +1488,10 @@ async function main() {
     }
     if (section === 'workflow-and-pack') {
       await testWorkflowAndPackedArtifactContract();
+      continue;
+    }
+    if (section === 'import-boundary') {
+      testNativeHostImportBoundary();
       continue;
     }
     throw new Error(`section ${section} has not been implemented yet`);
