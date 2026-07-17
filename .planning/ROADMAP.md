@@ -147,7 +147,43 @@
   2. The extension's manifest gains a single additive `nativeMessaging` permission entry (no other permission changes); at boot the extension detects native-host presence, and when the host is installed, an "Agent offline" state auto-attempts a wake before showing the doctor deep-link — a user with the host installed sees the delegation come alive on demand instead of the manual `serve` prompt.
   3. The native host itself does NOT spawn agents; it only starts `fsb-mcp-server serve` (or attaches to a running one) and exits after handoff — all spawn authority remains inside the serve daemon behind the Phase 59 CHAN gates (Origin allowlist, shared secret, flag allowlist, argv-only) and no CHAN requirement is relaxed to accommodate the wake path.
   4. `fsb-mcp-server uninstall --native-host` cleanly removes the manifest, and `doctor` reports native-host install state including manifest path, allowlist mismatches, and host-binary reachability so an operator can debug wake failures without shell-level inspection.
-**Plans**: TBD
+**Plans**: 12 plans
+
+**Wave 1**
+- [ ] 63-01: Establish the workspace-safe build guard, release-built Windows bootstrap, and durable bundled runtime contract.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 63-02: Fix pre-bind secret rotation and make product-specific serve readiness authoritative.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 63-03: Implement the closed native-messaging framing, validation, one-shot entry, and authority boundary.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 63-04: Implement exact readiness probing, tokened wake coalescing, and one shell-free serve handoff.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 63-05: Implement exact-owned atomic registration, runtime materialization, install, and uninstall across three OS families.
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 63-06: Add explicit native-host CLI install/uninstall routes without widening existing installer behavior.
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 63-07: Add bounded read-only native-host diagnostics with safe local and browser projections.
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 63-08: Add the single manifest permission and background-owned probe/offline-wake controller.
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 63-09: Render the approved intent-fenced checking state in the existing delegation card.
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 63-10: Wire deterministic focused/root/CI contracts and create the still-pending milestone-end UAT ledger.
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 63-11: Run independent blocking code, security, and UI source-review gates.
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [ ] 63-12: Run the reviewed focused matrix and workspace-preserving repository-wide regression gate.
 
 ### Phase 64: OpenCode Adapter
 **Goal**: The `AgentProviderAdapter` contract proves it accommodates a second CLI family — one that supports both cold spawn AND attach-to-running-server (`opencode serve` + `opencode run --attach`) — without any Phase 60 rewrite; OpenCode joins the Providers panel with a pinned agent definition and CI-covered event schema so the drift gate covers it from day one.
@@ -185,7 +221,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
-| 63. Native-Messaging Host | 0/0 | Not started | — |
+| 63. Native-Messaging Host | 0/12 | Planned | — |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 

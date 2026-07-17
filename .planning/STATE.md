@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: planning
-stopped_at: Phase 63 UI-SPEC approved; technical research next
-last_updated: "2026-07-16T22:58:16.432Z"
-last_activity: 2026-07-16 -- Phase 63 context and UI-SPEC approved; technical research next
+status: executing
+stopped_at: Phase 63 planned; 0/12 plans executed
+last_updated: "2026-07-16T21:53:31-05:00"
+last_activity: 2026-07-16 -- Phase 63 planning complete; 12 plans ready
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 28
+  total_plans: 40
   completed_plans: 28
   percent: 67
 ---
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 63 — Native-Messaging Host, ready for technical research and planning
+**Current focus:** Phase 63 — Native-Messaging Host, planned and ready to execute
 
 ## Current Position
 
-Phase: 63 (native-messaging-host) — CONTEXT + UI-SPEC COMPLETE
-Plan: 0 of TBD
-Status: Ready for technical research and planning
-Last activity: 2026-07-16 -- Phase 63 context and UI-SPEC approved; technical research next
+Phase: 63 (native-messaging-host) — PLANNED
+Plan: 0 of 12
+Status: Ready to execute
+Last activity: 2026-07-16 -- Phase 63 planning complete; 12 serialized plans approved
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -48,7 +48,7 @@ Last activity: 2026-07-16 -- Phase 63 context and UI-SPEC approved; technical re
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Next — ready for discussion/planning |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Planned — 0/12 complete |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
@@ -158,7 +158,7 @@ v0.9.91-specific decisions so far:
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 discussion and planning are next.
+None. Phases 57-62 are automated/source complete; Phase 63 has 12 approved serialized plans ready to execute.
 
 ### Blockers/Concerns
 

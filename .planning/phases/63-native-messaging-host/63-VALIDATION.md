@@ -1,10 +1,13 @@
 ---
 phase: 63
 slug: native-messaging-host
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-16
+reviewed: 2026-07-16
+plan_count: 12
+validation_tasks: 30
 ---
 
 # Phase 63 — Validation Strategy
@@ -39,21 +42,40 @@ The guarded full-suite wrapper is mandatory because the workspace contains unrel
 
 ## Per-Task Verification Map
 
-The rows below define the required validation slices. Final numeric task ids and plan/wave columns must be reconciled immediately after the planner writes the PLAN files; no implementation task may lack one of these automated slices.
+Every planned implementation/review/gate task maps to one exact row and has a deterministic automated command. A missing harness is an explicit Wave 0 dependency, not permission to omit verification.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 63-TBD-01 | TBD | 1 | NATIVE-01, NATIVE-03 | T63-01, T63-02 | Closed 4096-byte one-frame protocol validates exact origin/argv before all health or process side effects and writes only framed stdout | unit/protocol | `npm --prefix mcp run build && node tests/mcp-native-host-protocol.test.js` | ❌ W0 | ⬜ pending |
-| 63-TBD-02 | TBD | 1 | NATIVE-03 | T63-03, T63-04 | Product-specific bounded readiness and post-bind auth preparation prevent wrong-port attachment and bind-loser secret rotation | unit/lifecycle | `npm --prefix mcp run build && node tests/mcp-native-host-daemon.test.js && node tests/mcp-bridge-topology.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-03 | TBD | 1 | NATIVE-03 | T63-02, T63-05 | Tokened wake coalescing launches one exact shell-free `serve` tuple, never kills an independent process, and exits after one response | unit/concurrency | `npm --prefix mcp run build && node tests/mcp-native-host-daemon.test.js && node scripts/verify-native-host-boundary.mjs` | ❌ W0 | ⬜ pending |
-| 63-TBD-04 | TBD | 2 | NATIVE-01 | T63-06, T63-07 | Stable package-owned launchers and runtime materialization survive source/cache removal; package inspection proves POSIX and Windows artifacts | artifact/contract | `npm --prefix mcp run build && node tests/mcp-native-host-install.test.js && node tests/mcp-version-parity.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-05 | TBD | 2 | NATIVE-01, NATIVE-04 | T63-06, T63-08 | macOS/Linux/Windows adapters publish one exact-origin user registration atomically, refuse symlink/foreign/shadow state, and are idempotent | unit/platform | `npm --prefix mcp run build && node tests/mcp-native-host-install.test.js && node tests/mcp-install-platforms.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-06 | TBD | 2 | NATIVE-04 | T63-08 | Uninstall removes only an exact owned registration/runtime and preserves every adjacent or mismatched artifact | unit/platform | `npm --prefix mcp run build && node tests/mcp-native-host-install.test.js && node tests/mcp-install-platforms.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-07 | TBD | 2 | NATIVE-04 | T63-09 | One read-only doctor snapshot reports bounded local facts, preserves overall semantics, and omits raw local/secret data from browser-safe projections | CLI/security | `npm --prefix mcp run build && node tests/mcp-diagnostics-status.test.js && node tests/mcp-version-parity.test.js` | ✅ extend | ⬜ pending |
-| 63-TBD-08 | TBD | 3 | NATIVE-02 | T63-10, T63-11 | Boot probe sends no frame and renders nothing; authoritative offline preflight alone starts one timed/coalesced wake and reruns preflight once | VM/background | `node tests/native-host-background-wake.test.js && node tests/mcp-bridge-background-dispatch.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-09 | TBD | 3 | NATIVE-02, NATIVE-03 | T63-10, T63-12 | Native lifecycle facts never assert pairing/provider/task success and never replay messages, start requests, gestures, sessions, feeds, or tab state | VM/source contract | `node tests/native-host-background-wake.test.js && node tests/delegation-phase-contract.test.js` | ❌ W0/✅ extend | ⬜ pending |
-| 63-TBD-10 | TBD | 3 | NATIVE-02 | T63-11, T63-12 | One truthful checking card preserves composer/focus, invalidates edited intent, and converges on exact ready/unpaired/offline states with reduced-motion/forced-color rules | DOM/accessibility contract | `node tests/delegation-sidepanel-ui.test.js && node tests/native-host-background-wake.test.js` | ✅ extend/❌ W0 | ⬜ pending |
-| 63-TBD-11 | TBD | 4 | NATIVE-01–04 | T63-01–T63-12 | Root/package/phase contracts include every focused gate once, preserve Phase 59–62 authority, and keep all genuine UAT pending | integration/artifact | `node tests/delegation-phase-contract.test.js && node tests/mcp-version-parity.test.js && node scripts/verify-native-host-boundary.mjs` | ✅ extend/❌ W0 | ⬜ pending |
+| 63-01-01 | 01 | 1 | NATIVE-01, NATIVE-03 | T63-02, T63-07 | Reviewable C17 bootstrap uses exact `CreateProcessW` authority, inherited native stdio, bounded sibling config, and no command-interpreter fallback | Windows artifact/source | `node tests/mcp-native-host-packaging.test.js --section windows-bootstrap` | ❌ W0 | ⬜ pending |
+| 63-01-02 | 01 | 1 | NATIVE-01, NATIVE-03 | T63-06 | Exact-pinned bundled production closure, lock receipt, and stable-runtime contract reject registry/cache/worktree dependence while the build wrapper restores protected output/index state | unit/package | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-packaging.test.js","--section","runtime-layout"]]'` | ❌ W0 | ⬜ pending |
+| 63-01-03 | 01 | 1 | NATIVE-01, NATIVE-03 | T63-06, T63-07 | Required Windows CI/publish dependency version-binds both PE artifacts and blocks unsafe/incomplete tarballs | workflow/artifact | `node tests/mcp-native-host-packaging.test.js --section workflow-and-pack` | ❌ W0 | ⬜ pending |
+| 63-02-01 | 02 | 2 | NATIVE-03 | T63-03 | `/health` exposes exact product/protocol/version identity and false-by-default serve readiness on the existing loopback port | unit/lifecycle | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-daemon.test.js","--section","health"],["node","tests/mcp-bridge-topology.test.js"]]'` | ❌ W0/✅ extend | ⬜ pending |
+| 63-02-02 | 02 | 2 | NATIVE-03 | T63-04 | Auth rotates only after successful bind/recovery; a bind loser cannot rotate, connect, push inventory, or advertise ready | concurrency/regression | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-daemon.test.js","--section","bind-race"],["node","tests/mcp-bridge-topology.test.js"]]'` | ❌ W0/✅ extend | ⬜ pending |
+| 63-03-01 | 03 | 3 | NATIVE-01, NATIVE-03 | T63-01 | Exact native-endian 4096-byte one-frame protocol validates bytes/schema/origin/argv before all side effects | unit/protocol | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-protocol.test.js","--section","framing-and-schema"]]'` | ❌ W0 | ⬜ pending |
+| 63-03-02 | 03 | 3 | NATIVE-01, NATIVE-03 | T63-01, T63-02 | One-shot entry treats no-frame EOF as a no-op, writes at most one framed response, and never widens host authority | stream/lifecycle | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-protocol.test.js","--section","entry-lifetime"]]'` | ❌ W0 | ⬜ pending |
+| 63-03-03 | 03 | 3 | NATIVE-01, NATIVE-03 | T63-02 | Source/compiled transitive graph gates reject agent/task/shell/auth/install/doctor/router and historical-shim imports | source/package | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/verify-native-host-boundary.mjs","--all"],["node","tests/mcp-native-host-packaging.test.js","--section","import-boundary"]]'` | ❌ W0 | ⬜ pending |
+| 63-04-01 | 04 | 4 | NATIVE-01, NATIVE-03 | T63-02, T63-03, T63-05 | Exact health classification, tokened lock, bounded stale recovery, and one shell-free `serve` spawn cannot kill unrelated work | unit/concurrency | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-daemon.test.js"]]'` | ❌ W0 | ⬜ pending |
+| 63-04-02 | 04 | 4 | NATIVE-01, NATIVE-03 | T63-01, T63-02, T63-12 | Production host composes validated protocol and reachability only, responds once, and exits without delegation authority | integration/boundary | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-protocol.test.js"],["node","tests/mcp-native-host-daemon.test.js"],["node","scripts/verify-native-host-boundary.mjs","--all"]]'` | ❌ W0 | ⬜ pending |
+| 63-05-01 | 05 | 5 | NATIVE-01, NATIVE-04 | T63-07, T63-08 | Pure macOS/Linux/Windows registration facts validate exact paths/origin and detect typed Windows view shadowing without HKLM | unit/platform | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-install.test.js","--section","platform-and-registration"]]'` | ❌ W0 | ⬜ pending |
+| 63-05-02 | 05 | 5 | NATIVE-01, NATIVE-04 | T63-06, T63-07 | Tokened exact bundled-package materialization proves clean-cache offline/no-network closure and publishes a stable owned runtime atomically | unit/transaction | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-install.test.js","--section","runtime-transaction"]]'` | ❌ W0 | ⬜ pending |
+| 63-05-03 | 05 | 5 | NATIVE-01, NATIVE-04 | T63-08 | Idempotent install and exact-owned uninstall refuse split/foreign/symlink state and preserve adjacent artifacts | unit/platform | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-native-host-install.test.js"]]'` | ❌ W0 | ⬜ pending |
+| 63-06-01 | 06 | 6 | NATIVE-01, NATIVE-04 | T63-08 | Native CLI target routes before list/all/client expansion and rejects mixed/unknown flags with zero mutation | CLI/contract | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-install-platforms.test.js"],["node","tests/mcp-native-host-install.test.js","--section","cli-routing"]]'` | ✅ extend/❌ W0 | ⬜ pending |
+| 63-06-02 | 06 | 6 | NATIVE-01, NATIVE-04 | T63-06, T63-07, T63-08, T63-09 | Help/result/refusal output is bounded and factual while ordinary install/uninstall remains byte-compatible | CLI/security | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-install-platforms.test.js"],["node","tests/mcp-native-host-install.test.js","--section","cli-output"]]'` | ✅ extend/❌ W0 | ⬜ pending |
+| 63-07-01 | 07 | 7 | NATIVE-04 | T63-03, T63-09 | One read-only snapshot reports closed native facts; browser projection reconstructs only safe enums without local paths/reasons | diagnostics/security | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-diagnostics-status.test.js","--section","native-host-snapshot"]]'` | ✅ extend | ⬜ pending |
+| 63-07-02 | 07 | 7 | NATIVE-04 | T63-09 | Human and JSON doctor projections share one snapshot/section order and preserve historical layer/exit semantics | CLI/contract | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-diagnostics-status.test.js"],["node","tests/mcp-version-parity.test.js"]]'` | ✅ extend | ⬜ pending |
+| 63-08-01 | 08 | 8 | NATIVE-02, NATIVE-03 | T63-10, T63-11, T63-12 | Background-only controller performs silent no-message probe and one correlated/coalesced bounded wake with late-result fencing | VM/unit | `node tests/native-host-background-wake.test.js --section controller` | ❌ W0 | ⬜ pending |
+| 63-08-02 | 08 | 8 | NATIVE-02, NATIVE-03 | T63-10, T63-11, T63-12 | Only exact offline preflight may wake; bridge readiness leads to one unchanged preflight rerun and no replay | VM/integration | `node tests/native-host-background-wake.test.js && node tests/mcp-bridge-background-dispatch.test.js` | ❌ W0/✅ extend | ⬜ pending |
+| 63-08-03 | 08 | 8 | NATIVE-02, NATIVE-03 | T63-10 | Manifest adds only `nativeMessaging`; native API/host-name authority stays in background/helper only | manifest/source | `node tests/native-host-background-wake.test.js --section manifest-and-authority && node tests/mcp-bridge-background-dispatch.test.js` | ❌ W0/✅ extend | ⬜ pending |
+| 63-09-01 | 09 | 9 | NATIVE-02 | T63-11, T63-12 | One attempt-scoped checking card preserves raw composer/focus and permanently invalidates an edited pending intent | DOM/accessibility | `node tests/delegation-sidepanel-ui.test.js --section native-wake-checking` | ✅ extend | ⬜ pending |
+| 63-09-02 | 09 | 9 | NATIVE-02 | T63-09, T63-11, T63-12 | UI converges through existing ready/unpaired/offline branches with exact copy/tokens/narrow/forced-color/reduced-motion rules | DOM/source | `node tests/delegation-sidepanel-ui.test.js && node tests/native-host-background-wake.test.js` | ✅ extend/❌ W0 | ⬜ pending |
+| 63-10-01 | 10 | 10 | NATIVE-01–04 | T63-12 | One ledger keeps every genuine OS/Chrome/accessibility scenario unchecked, human_needed, pending, and evidence-empty | artifact/contract | `node tests/delegation-phase-contract.test.js --section phase63-uat-ledger` | ❌ task creates/✅ extend | ⬜ pending |
+| 63-10-02 | 10 | 10 | NATIVE-01–04 | T63-01–T63-12 | Focused/root/CI/package/boundary gates run exactly once in protected serial order without dropping prior contracts | integration/source | `node scripts/run-phase63-focused-tests.mjs` | ❌ task creates | ⬜ pending |
+| 63-10-03 | 10 | 10 | NATIVE-01–04 | T63-01–T63-12 | Mechanical contract maps all 30 tasks, four requirements, 25 decisions, 12 threats, ASVS themes, key links, and forbidden patterns against fresh compiled output while restoring the complete generated graph/index | artifact/contract | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/delegation-phase-contract.test.js"],["node","tests/mcp-version-parity.test.js"]]'` | ✅ extend | ⬜ pending |
+| 63-11-01 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | Independent code review covers final diff/regressions and cannot pass with unresolved HIGH/CRITICAL findings | code review/artifact | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs --kind code` | ❌ task creates | ⬜ pending |
+| 63-11-02 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | ASVS L1 security review dispositions every threat, then validates compiled boundary/protocol/install evidence inside one restoring build lifecycle | security review | `node scripts/verify-phase63-review-artifacts.mjs --kind security && node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/verify-native-host-boundary.mjs"],["node","tests/mcp-native-host-protocol.test.js"],["node","tests/mcp-native-host-install.test.js"]]'` | ❌ task creates | ⬜ pending |
+| 63-11-03 | 11 | 11 | NATIVE-01–04 | T63-09–T63-12 | Six-pillar UI review proves source/DOM contract while leaving rendered/accessibility UAT pending | UI review/artifact | `node tests/delegation-sidepanel-ui.test.js && node tests/native-host-background-wake.test.js && node scripts/verify-phase63-review-artifacts.mjs --kind ui` | ❌ task creates | ⬜ pending |
+| 63-12-01 | 12 | 12 | NATIVE-01–04 | T63-01–T63-12 | Final focused/package/boundary/review gates pass once against the exact reviewed diff with protected workspace/index unchanged | final integration | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs` | ❌ task creates | ⬜ pending |
+| 63-12-02 | 12 | 12 | NATIVE-01–04 | T63-01–T63-12 | Wrapper negative fixtures pass, then the existing guarded repository suite runs inside complete `mcp/build/**` and raw-index snapshot/restore without promoting human evidence | full regression | `node tests/mcp-native-host-packaging.test.js --section workspace-preserving-build && node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/run-phase60-full-tests.mjs"]]'` | ✅ existing/❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -108,13 +130,13 @@ Every row remains `human_needed`; automated/source evidence must not be represen
 
 ## Validation Sign-Off
 
-- [ ] Final PLAN task ids match the per-task map.
-- [ ] All tasks have an automated verify command or explicit Wave 0 dependency.
-- [ ] Sampling continuity has no three consecutive tasks without automated verification.
-- [ ] Wave 0 covers every missing focused fixture and boundary script.
-- [ ] No watch-mode, real browser/native registration, live registry, live daemon, or retry-to-green command is used as automated evidence.
-- [ ] Guarded full-suite execution preserves unrelated dirty/staged state and protected hashes.
-- [ ] Manual checks remain pending at the milestone-end gate and are never fabricated.
-- [ ] `nyquist_compliant: true` is set only after independent plan-checker approval.
+- [x] Final PLAN task ids match the per-task map.
+- [x] All tasks have an automated verify command or explicit Wave 0 dependency.
+- [x] Sampling continuity has no three consecutive tasks without automated verification.
+- [x] Wave 0 covers every missing focused fixture and boundary script.
+- [x] No watch-mode, real browser/native registration, live registry, live daemon, or retry-to-green command is used as automated evidence.
+- [x] Guarded full-suite execution preserves unrelated dirty/staged state and protected hashes.
+- [x] Manual checks remain pending at the milestone-end gate and are never fabricated.
+- [x] `nyquist_compliant: true` is set only after independent plan-checker approval.
 
-**Approval:** pending plan generation and independent plan-checker review
+**Approval:** approved 2026-07-16 after independent plan-checker PASS (12 plans, 30 tasks, 12 serialized waves, 0 blockers, 0 warnings)
