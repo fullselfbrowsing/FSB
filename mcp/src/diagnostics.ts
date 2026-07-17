@@ -28,6 +28,7 @@ const CONTENT_SCRIPT_STALE_MS = 10_000;
 const MAX_DOCTOR_ADAPTERS = 16;
 const MAX_DOCTOR_FIELD_LENGTH = 64;
 const MAX_DOCTOR_PATH_LENGTH = 4096;
+const NATIVE_HOST_LOCATION_NOT_REPORTED = 'Not reported';
 const MAX_DATE_EPOCH_MS = 8_640_000_000_000_000;
 const VERSION_FILES = {
   packageJson: new URL('../package.json', import.meta.url),
@@ -85,6 +86,41 @@ export type BridgeAuthDoctorMetadata = Readonly<{
   secretRotationAgeMs: number | null;
 }>;
 
+export type NativeHostDoctorReason =
+  | 'ok'
+  | 'platform_unsupported'
+  | 'inspection_unavailable'
+  | 'not_installed'
+  | 'registration_missing'
+  | 'registration_invalid'
+  | 'registration_shadowed'
+  | 'allowlist_mismatch'
+  | 'runtime_missing'
+  | 'runtime_invalid'
+  | 'launcher_missing'
+  | 'launcher_invalid'
+  | 'daemon_identity_mismatch'
+  | 'daemon_protocol_mismatch'
+  | 'daemon_offline';
+
+export type NativeHostDoctor = Readonly<{
+  installState: 'installed' | 'not_installed' | 'invalid' | 'unavailable';
+  expectedLocation: string;
+  registration: 'valid' | 'missing' | 'invalid' | 'unavailable';
+  allowlist: 'matches' | 'mismatch' | 'not_reported';
+  launcher: 'reachable' | 'missing' | 'invalid' | 'unavailable';
+  daemon: 'reachable' | 'offline' | 'unavailable';
+  reason: NativeHostDoctorReason;
+}>;
+
+export type NativeHostBrowserStatus = Readonly<{
+  installState: NativeHostDoctor['installState'];
+  registration: NativeHostDoctor['registration'];
+  allowlist: NativeHostDoctor['allowlist'];
+  launcher: NativeHostDoctor['launcher'];
+  daemon: NativeHostDoctor['daemon'];
+}>;
+
 export type BridgeDiagnostics = {
   checkedAt: string;
   bridgeUrl: string;
@@ -104,6 +140,7 @@ export type BridgeDiagnostics = {
   compatibilityMatrix: AdapterCompatibilityMatrix;
   adapterDiagnostics: readonly AdapterDoctorRow[];
   bridgeAuthMetadata: BridgeAuthDoctorMetadata;
+  nativeHost: NativeHostDoctor;
   bridgeClient?: Record<string, unknown> | null;
   extensionConfig?: Record<string, unknown> | null;
   tabsSummary?: { totalTabs: number; activeTabId: number | null };
@@ -123,6 +160,7 @@ export interface BridgeDiagnosticsDependencies {
   readonly bridgeFactory?: () => DiagnosticsBridge;
   readonly adapterRegistry?: AgentProviderRegistry;
   readonly readBridgeAuthState?: () => unknown;
+  readonly inspectNativeHost?: () => unknown | Promise<unknown>;
   readonly now?: () => number;
 }
 
@@ -172,6 +210,259 @@ function boundedDoctorString(value: unknown, maximumLength: number): value is st
     && value.length > 0
     && value.length <= maximumLength
     && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+type NativeHostInspectionPlatform = 'supported' | 'unsupported';
+type NativeHostInspectionRegistration = NativeHostDoctor['registration'];
+type NativeHostInspectionShadow = 'clear' | 'shadowed' | 'not_reported' | 'unavailable';
+type NativeHostInspectionRuntime = 'valid' | 'missing' | 'invalid' | 'unavailable';
+type NativeHostInspectionDaemon =
+  | 'reachable'
+  | 'offline'
+  | 'identity_mismatch'
+  | 'protocol_mismatch'
+  | 'unavailable';
+
+const NATIVE_HOST_INSPECTION_PLATFORMS = new Set<NativeHostInspectionPlatform>([
+  'supported',
+  'unsupported',
+]);
+const NATIVE_HOST_INSPECTION_REGISTRATIONS = new Set<NativeHostInspectionRegistration>([
+  'valid',
+  'missing',
+  'invalid',
+  'unavailable',
+]);
+const NATIVE_HOST_INSPECTION_SHADOWS = new Set<NativeHostInspectionShadow>([
+  'clear',
+  'shadowed',
+  'not_reported',
+  'unavailable',
+]);
+const NATIVE_HOST_INSPECTION_ALLOWLISTS = new Set<NativeHostDoctor['allowlist']>([
+  'matches',
+  'mismatch',
+  'not_reported',
+]);
+const NATIVE_HOST_INSPECTION_RUNTIMES = new Set<NativeHostInspectionRuntime>([
+  'valid',
+  'missing',
+  'invalid',
+  'unavailable',
+]);
+const NATIVE_HOST_INSPECTION_LAUNCHERS = new Set<NativeHostDoctor['launcher']>([
+  'reachable',
+  'missing',
+  'invalid',
+  'unavailable',
+]);
+const NATIVE_HOST_INSPECTION_DAEMONS = new Set<NativeHostInspectionDaemon>([
+  'reachable',
+  'offline',
+  'identity_mismatch',
+  'protocol_mismatch',
+  'unavailable',
+]);
+const NATIVE_HOST_INSTALL_STATES = new Set<NativeHostDoctor['installState']>([
+  'installed',
+  'not_installed',
+  'invalid',
+  'unavailable',
+]);
+const NATIVE_HOST_BROWSER_DAEMONS = new Set<NativeHostDoctor['daemon']>([
+  'reachable',
+  'offline',
+  'unavailable',
+]);
+
+function closedEnum<T extends string>(value: unknown, values: ReadonlySet<T>): T | null {
+  return typeof value === 'string' && values.has(value as T) ? value as T : null;
+}
+
+function boundedNativeHostLocation(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= MAX_DOCTOR_PATH_LENGTH
+    && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function unavailableNativeHostDoctor(
+  reason: 'platform_unsupported' | 'inspection_unavailable' = 'inspection_unavailable',
+): NativeHostDoctor {
+  return Object.freeze({
+    installState: 'unavailable',
+    expectedLocation: NATIVE_HOST_LOCATION_NOT_REPORTED,
+    registration: 'unavailable',
+    allowlist: 'not_reported',
+    launcher: 'unavailable',
+    daemon: 'unavailable',
+    reason,
+  });
+}
+
+function nativeHostRegistrationProjection(
+  registration: NativeHostInspectionRegistration,
+  shadow: NativeHostInspectionShadow,
+): NativeHostDoctor['registration'] {
+  if (registration === 'unavailable' || shadow === 'unavailable') return 'unavailable';
+  if (shadow === 'shadowed') return 'invalid';
+  return registration;
+}
+
+function nativeHostDaemonProjection(
+  daemon: NativeHostInspectionDaemon,
+): NativeHostDoctor['daemon'] {
+  if (daemon === 'reachable' || daemon === 'offline') return daemon;
+  return 'unavailable';
+}
+
+function normalizeNativeHostInspection(value: unknown): NativeHostDoctor {
+  const inspection = ownDataRecord(value);
+  if (!inspection) return unavailableNativeHostDoctor();
+
+  const platform = closedEnum(
+    inspection.platform,
+    NATIVE_HOST_INSPECTION_PLATFORMS,
+  );
+  if (!platform) return unavailableNativeHostDoctor();
+  if (platform === 'unsupported') return unavailableNativeHostDoctor('platform_unsupported');
+
+  const expectedLocation = boundedNativeHostLocation(inspection.expectedLocation)
+    ? inspection.expectedLocation
+    : null;
+  const registration = closedEnum(
+    inspection.registration,
+    NATIVE_HOST_INSPECTION_REGISTRATIONS,
+  );
+  const registrationShadow = closedEnum(
+    inspection.registrationShadow,
+    NATIVE_HOST_INSPECTION_SHADOWS,
+  );
+  const allowlist = closedEnum(
+    inspection.allowlist,
+    NATIVE_HOST_INSPECTION_ALLOWLISTS,
+  );
+  const runtime = closedEnum(
+    inspection.runtime,
+    NATIVE_HOST_INSPECTION_RUNTIMES,
+  );
+  const launcher = closedEnum(
+    inspection.launcher,
+    NATIVE_HOST_INSPECTION_LAUNCHERS,
+  );
+  const daemon = closedEnum(
+    inspection.daemon,
+    NATIVE_HOST_INSPECTION_DAEMONS,
+  );
+  if (
+    !expectedLocation
+    || !registration
+    || !registrationShadow
+    || !allowlist
+    || !runtime
+    || !launcher
+    || !daemon
+  ) {
+    return unavailableNativeHostDoctor();
+  }
+
+  if (registration === 'valid' && allowlist === 'not_reported') {
+    return unavailableNativeHostDoctor();
+  }
+
+  const registrationProjection = nativeHostRegistrationProjection(
+    registration,
+    registrationShadow,
+  );
+  const daemonProjection = nativeHostDaemonProjection(daemon);
+  if (
+    registration === 'unavailable'
+    || registrationShadow === 'unavailable'
+    || runtime === 'unavailable'
+    || launcher === 'unavailable'
+    || daemon === 'unavailable'
+  ) {
+    return Object.freeze({
+      installState: 'unavailable',
+      expectedLocation,
+      registration: registrationProjection,
+      allowlist,
+      launcher,
+      daemon: daemonProjection,
+      reason: 'inspection_unavailable',
+    });
+  }
+
+  const completeAbsence = registration === 'missing'
+    && (registrationShadow === 'clear' || registrationShadow === 'not_reported')
+    && allowlist === 'not_reported'
+    && runtime === 'missing'
+    && launcher === 'missing';
+  let reason: NativeHostDoctorReason;
+  if (completeAbsence) reason = 'not_installed';
+  else if (registration === 'missing') reason = 'registration_missing';
+  else if (registration === 'invalid') reason = 'registration_invalid';
+  else if (registrationShadow === 'shadowed') reason = 'registration_shadowed';
+  else if (allowlist === 'mismatch') reason = 'allowlist_mismatch';
+  else if (runtime === 'missing') reason = 'runtime_missing';
+  else if (runtime === 'invalid') reason = 'runtime_invalid';
+  else if (launcher === 'missing') reason = 'launcher_missing';
+  else if (launcher === 'invalid') reason = 'launcher_invalid';
+  else if (daemon === 'identity_mismatch') reason = 'daemon_identity_mismatch';
+  else if (daemon === 'protocol_mismatch') reason = 'daemon_protocol_mismatch';
+  else if (daemon === 'offline') reason = 'daemon_offline';
+  else reason = 'ok';
+
+  const installState: NativeHostDoctor['installState'] = completeAbsence
+    ? 'not_installed'
+    : registration !== 'valid'
+      || registrationShadow === 'shadowed'
+      || allowlist !== 'matches'
+      || runtime !== 'valid'
+      || launcher !== 'reachable'
+      ? 'invalid'
+      : 'installed';
+  return Object.freeze({
+    installState,
+    expectedLocation,
+    registration: registrationProjection,
+    allowlist,
+    launcher,
+    daemon: daemonProjection,
+    reason,
+  });
+}
+
+async function collectNativeHostDoctor(
+  inspectNativeHost: () => unknown | Promise<unknown>,
+): Promise<NativeHostDoctor> {
+  try {
+    return normalizeNativeHostInspection(await inspectNativeHost());
+  } catch {
+    return unavailableNativeHostDoctor();
+  }
+}
+
+export function projectNativeHostBrowserStatus(value: unknown): NativeHostBrowserStatus {
+  const nativeHost = ownDataRecord(value);
+  const installState = closedEnum(nativeHost?.installState, NATIVE_HOST_INSTALL_STATES);
+  const registration = closedEnum(
+    nativeHost?.registration,
+    NATIVE_HOST_INSPECTION_REGISTRATIONS,
+  );
+  const allowlist = closedEnum(nativeHost?.allowlist, NATIVE_HOST_INSPECTION_ALLOWLISTS);
+  const launcher = closedEnum(nativeHost?.launcher, NATIVE_HOST_INSPECTION_LAUNCHERS);
+  const daemon = closedEnum(nativeHost?.daemon, NATIVE_HOST_BROWSER_DAEMONS);
+  if (!installState || !registration || !allowlist || !launcher || !daemon) {
+    return Object.freeze({
+      installState: 'unavailable',
+      registration: 'unavailable',
+      allowlist: 'not_reported',
+      launcher: 'unavailable',
+      daemon: 'unavailable',
+    });
+  }
+  return Object.freeze({ installState, registration, allowlist, launcher, daemon });
 }
 
 function readOwnCallable(
@@ -680,6 +971,9 @@ export async function collectBridgeDiagnostics(options: {
   const authReader = typeof dependencyRecord?.readBridgeAuthState === 'function'
     ? dependencyRecord.readBridgeAuthState as () => unknown
     : readPrivateBridgeAuthState;
+  const inspectNativeHost = typeof dependencyRecord?.inspectNativeHost === 'function'
+    ? dependencyRecord.inspectNativeHost as () => unknown | Promise<unknown>
+    : () => null;
   const now = typeof dependencyRecord?.now === 'function'
     ? dependencyRecord.now as () => number
     : Date.now;
@@ -687,6 +981,7 @@ export async function collectBridgeDiagnostics(options: {
   const checkedAt = new Date(nowMs).toISOString();
   const adapterDiagnostics = await collectAdapterDoctorRows(adapterRegistry);
   const bridgeAuthMetadata = projectBridgeAuthMetadata(authReader, nowMs);
+  const nativeHost = await collectNativeHostDoctor(inspectNativeHost);
   const bridge = bridgeFactory();
   const waitForExtensionMs = options.waitForExtensionMs ?? 1500;
   const versionMetadata = await readVersionMetadata();
@@ -710,6 +1005,7 @@ export async function collectBridgeDiagnostics(options: {
     compatibilityMatrix: ADAPTER_COMPATIBILITY_MATRIX,
     adapterDiagnostics,
     bridgeAuthMetadata,
+    nativeHost,
     extensionConfig: undefined,
     bridgeClient: null,
     tabsSummary: undefined,
