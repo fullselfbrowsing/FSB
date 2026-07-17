@@ -2,8 +2,10 @@
 
 const { EventEmitter } = require('node:events');
 const { readFileSync } = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
+const { Readable, Writable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -69,6 +71,36 @@ function readyHealth(overrides = {}) {
       serveReady: true,
       ...overrides,
     })),
+  };
+}
+
+function nativeFrame(value) {
+  const body = Buffer.from(JSON.stringify(value), 'utf8');
+  const header = Buffer.alloc(4);
+  if (os.endianness() === 'LE') header.writeUInt32LE(body.length, 0);
+  else header.writeUInt32BE(body.length, 0);
+  return Buffer.concat([header, body]);
+}
+
+function decodeNativeFrame(value) {
+  const length = os.endianness() === 'LE'
+    ? value.readUInt32LE(0)
+    : value.readUInt32BE(0);
+  assertEqual(value.length, 4 + length, 'production entry emits exactly one complete frame');
+  return JSON.parse(value.subarray(4).toString('utf8'));
+}
+
+function ownerMarker() {
+  return {
+    schema: 1,
+    owner: 'io.github.fullselfbrowsing.fsb',
+    host: 'io.github.fullselfbrowsing.fsb_native_host',
+    origin: 'chrome-extension://badgafnfchcihdfnjneklogedcdkmjfk/',
+    platform: 'darwin',
+    packageVersion: '0.10.0',
+    launcherRelativePath: 'bin/fsb-native-host-launcher.mjs',
+    artifactSha256: 'a'.repeat(64),
+    installToken: '0123456789abcdef0123456789abcdef',
   };
 }
 
@@ -703,6 +735,123 @@ async function runWakeDaemonSection() {
   assert(!/\bpid\b/iu.test(`${platformSource}\n${daemonSource}`), 'wake authority never relies on process identifiers');
 }
 
+async function runProductionEntrySection() {
+  const entry = await importBuild('native-host/entry.js');
+  assertEqual(typeof entry.runProductionNativeHostEntry, 'function', 'production entry composition is exported for deterministic injection');
+
+  const cases = [
+    {
+      name: 'already ready',
+      harness: () => createWakeHarness(),
+      outcome: 'already_running',
+      reason: 'daemon_already_ready',
+      spawns: 0,
+    },
+    {
+      name: 'offline winner',
+      harness: () => createWakeHarness({
+        health: async (state) => (
+          state.calls.health.length === 1 ? new Error('offline') : readyHealth()
+        ),
+      }),
+      outcome: 'started',
+      reason: 'daemon_started_ready',
+      spawns: 1,
+    },
+    {
+      name: 'wrong product',
+      harness: () => createWakeHarness({
+        health: async () => readyHealth({ service: 'not-fsb' }),
+      }),
+      outcome: 'unavailable',
+      reason: 'daemon_identity_mismatch',
+      spawns: 0,
+    },
+    {
+      name: 'lock timeout',
+      harness: () => createWakeHarness({
+        initialLock: {
+          schema: 1,
+          token: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          createdAt: 0,
+        },
+        health: async () => new Error('offline'),
+      }),
+      outcome: 'failed',
+      reason: 'wake_lock_timeout',
+      spawns: 0,
+    },
+    {
+      name: 'spawn error',
+      harness: () => createWakeHarness({
+        spawnError: true,
+        health: async () => new Error('offline'),
+      }),
+      outcome: 'failed',
+      reason: 'serve_spawn_failed',
+      spawns: 1,
+    },
+    {
+      name: 'readiness timeout',
+      harness: () => createWakeHarness({ health: async () => new Error('offline') }),
+      outcome: 'failed',
+      reason: 'serve_readiness_timeout',
+      spawns: 1,
+    },
+  ];
+
+  for (const scenario of cases) {
+    const harness = scenario.harness();
+    const chunks = [];
+    let writes = 0;
+    const stdout = new Writable({
+      write(chunk, _encoding, callback) {
+        writes += 1;
+        chunks.push(Buffer.from(chunk));
+        callback();
+      },
+    });
+    const stderrChunks = [];
+    const stderr = new Writable({
+      write(chunk, _encoding, callback) {
+        stderrChunks.push(Buffer.from(chunk));
+        callback();
+      },
+    });
+    const markerPath = `${harness.runtime.stableRuntimeRoot}/owner.json`;
+    const daemonDependencies = {
+      ...harness.dependencies,
+      readPrivateFile: async (pathname, maxBytes) => {
+        if (pathname === markerPath) return JSON.stringify(ownerMarker());
+        return harness.dependencies.readPrivateFile(pathname, maxBytes);
+      },
+    };
+    const status = await entry.runProductionNativeHostEntry({
+      stdin: Readable.from([nativeFrame({
+        v: 1,
+        action: 'wake',
+        correlationId: 'NativeWake_123456',
+      })]),
+      stdout,
+      stderr,
+      argv: ['chrome-extension://badgafnfchcihdfnjneklogedcdkmjfk/'],
+      platform: 'darwin',
+      absoluteEntryPath: `${harness.runtime.stableRuntimeRoot}/runtime/package/build/native-host/index.js`,
+      absoluteNode: harness.runtime.absoluteNode,
+      daemonDependencies,
+    });
+    const response = decodeNativeFrame(Buffer.concat(chunks));
+    assertEqual(status, 0, `${scenario.name} exits after its response`);
+    assertEqual(writes, 1, `${scenario.name} writes one response`);
+    assertEqual(stderrChunks.length, 0, `${scenario.name} emits no diagnostic`);
+    assertEqual(response.correlationId, 'NativeWake_123456', `${scenario.name} preserves correlation`);
+    assertEqual(response.outcome, scenario.outcome, `${scenario.name} preserves the daemon outcome`);
+    assertEqual(response.reason, scenario.reason, `${scenario.name} preserves the daemon reason`);
+    assertEqual(Object.keys(response).join(','), 'v,correlationId,outcome,reason', `${scenario.name} returns only the closed response fact`);
+    assertEqual(harness.state.calls.spawn.length, scenario.spawns, `${scenario.name} retains exact spawn authority`);
+  }
+}
+
 async function runCase(name, callback) {
   console.log(`\n${name}`);
   try {
@@ -716,7 +865,7 @@ async function runCase(name, callback) {
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
-  const knownSections = new Set(['health', 'bind-race', 'wake-daemon']);
+  const knownSections = new Set(['health', 'bind-race', 'wake-daemon', 'production-entry']);
   if (section && !knownSections.has(section)) {
     throw new Error(`Unknown section: ${section}`);
   }
@@ -729,6 +878,9 @@ async function main() {
   }
   if (!section || section === 'wake-daemon') {
     await runCase('bounded native wake daemon', runWakeDaemonSection);
+  }
+  if (!section || section === 'production-entry') {
+    await runCase('production one-shot native entry', runProductionEntrySection);
   }
 
   console.log(`\nMCP native host daemon tests: ${passed} passed, ${failed} failed`);

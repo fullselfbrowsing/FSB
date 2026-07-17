@@ -15,7 +15,7 @@ const requestedSection = (() => {
   if (index + 1 >= process.argv.length) throw new Error('--section requires a value');
   return process.argv[index + 1];
 })();
-const knownSections = new Set(['framing-and-schema', 'entry-lifetime']);
+const knownSections = new Set(['framing-and-schema', 'entry-lifetime', 'production-entry']);
 if (requestedSection && !knownSections.has(requestedSection)) {
   throw new Error(`unknown section: ${requestedSection}`);
 }
@@ -23,6 +23,10 @@ if (requestedSection && !knownSections.has(requestedSection)) {
 const ORIGIN = 'chrome-extension://badgafnfchcihdfnjneklogedcdkmjfk/';
 const CORRELATION_ID = 'NativeWake_123456';
 const MAX_FRAME_BYTES = 4096;
+const STABLE_ROOT = '/Users/fsb/.fsb/native-host';
+const STABLE_ENTRY = `${STABLE_ROOT}/runtime/package/build/native-host/index.js`;
+const STABLE_BUILD_INDEX = `${STABLE_ROOT}/runtime/package/build/index.js`;
+const OWNER_MARKER_PATH = `${STABLE_ROOT}/owner.json`;
 
 function nativeHeader(length) {
   const header = Buffer.alloc(4);
@@ -56,6 +60,71 @@ function validResponse(overrides = {}) {
     outcome: 'started',
     reason: 'daemon_started_ready',
     ...overrides,
+  };
+}
+
+function validOwnerMarker(overrides = {}) {
+  return {
+    schema: 1,
+    owner: 'io.github.fullselfbrowsing.fsb',
+    host: 'io.github.fullselfbrowsing.fsb_native_host',
+    origin: ORIGIN,
+    platform: 'darwin',
+    packageVersion: '0.10.0',
+    launcherRelativePath: 'bin/fsb-native-host-launcher.mjs',
+    artifactSha256: 'a'.repeat(64),
+    installToken: '0123456789abcdef0123456789abcdef',
+    ...overrides,
+  };
+}
+
+function productionDependencies(options = {}) {
+  const marker = options.marker ?? validOwnerMarker();
+  const calls = { health: 0, marker: 0, spawn: 0 };
+  const daemonDependencies = {
+    environment: Object.freeze({ PATH: '/usr/bin:/bin' }),
+    now: () => 0,
+    wait: async () => {},
+    randomToken: () => '11111111111111111111111111111111',
+    requestHealth: async () => {
+      calls.health += 1;
+      return options.health ?? {
+        statusCode: 200,
+        body: Buffer.from(JSON.stringify({
+          ok: true,
+          service: 'fsb-mcp-server',
+          version: '0.10.0',
+          nativeHostProtocol: 1,
+          serveReady: true,
+        })),
+      };
+    },
+    createDirectory: async () => { throw new Error('unexpected lock'); },
+    writePrivateFile: async () => { throw new Error('unexpected lock write'); },
+    readPrivateFile: async (pathname) => {
+      if (pathname !== OWNER_MARKER_PATH) throw new Error('unexpected private read');
+      calls.marker += 1;
+      return typeof marker === 'string' ? marker : JSON.stringify(marker);
+    },
+    renameDirectory: async () => { throw new Error('unexpected lock rename'); },
+    removeDirectory: async () => { throw new Error('unexpected lock remove'); },
+    spawn: () => {
+      calls.spawn += 1;
+      throw new Error('unexpected spawn');
+    },
+  };
+  return {
+    value: {
+      stdin: options.stdin ?? Readable.from([frameObject(validRequest())]),
+      stdout: options.stdout,
+      stderr: options.stderr,
+      argv: options.argv ?? [ORIGIN],
+      platform: options.platform ?? 'darwin',
+      absoluteEntryPath: options.absoluteEntryPath ?? STABLE_ENTRY,
+      absoluteNode: options.absoluteNode ?? '/usr/bin/node',
+      daemonDependencies,
+    },
+    calls,
   };
 }
 
@@ -526,6 +595,91 @@ async function testEntryLifetime() {
   }
 }
 
+async function testProductionEntry() {
+  const { runProductionNativeHostEntry } = await importEntry();
+  assert.equal(typeof runProductionNativeHostEntry, 'function');
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      stdin: Readable.from([]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 0);
+    assert.equal(harness.calls.marker, 0, 'no-frame boot EOF does not read runtime ownership');
+    assert.equal(harness.calls.health, 0, 'no-frame boot EOF does not probe health');
+    assert.equal(harness.calls.spawn, 0, 'no-frame boot EOF does not spawn');
+    assert.equal(stdout.writes, 0);
+    assert.equal(stderr.bytes().length, 0);
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({ stdout: stdout.stream, stderr: stderr.stream });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 0);
+    assert.equal(harness.calls.marker, 1);
+    assert.equal(harness.calls.health, 1);
+    assert.equal(harness.calls.spawn, 0);
+    assert.equal(stdout.writes, 1);
+    assert.equal(stderr.bytes().length, 0);
+    const response = decodeResponseFrame(stdout.bytes());
+    assert.deepEqual(response, validResponse({
+      outcome: 'already_running',
+      reason: 'daemon_already_ready',
+    }));
+    assert.deepEqual(Object.keys(response), ['v', 'correlationId', 'outcome', 'reason']);
+    assert.doesNotMatch(
+      JSON.stringify(response),
+      /paired|provider|task|agent|browser|session|secret|marker|path|child/iu,
+    );
+  }
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: ['chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/'],
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 1);
+    assert.equal(harness.calls.marker, 1);
+    assert.equal(harness.calls.health, 0, 'origin mismatch settles before daemon work');
+    assert.equal(stdout.writes, 0);
+    assert.equal(stderr.bytes().toString('utf8'), 'FSBNH_INVALID_INVOCATION\n');
+  }
+
+  for (const marker of [
+    { ...validOwnerMarker(), unexpected: true },
+    { ...validOwnerMarker(), owner: 'foreign.owner' },
+    { ...validOwnerMarker(), platform: 'linux' },
+    '{malformed-json',
+  ]) {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const harness = productionDependencies({
+      marker,
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+    });
+    const status = await runProductionNativeHostEntry(harness.value);
+    assert.equal(status, 1);
+    assert.equal(harness.calls.health, 0, 'invalid runtime ownership settles before daemon work');
+    assert.equal(harness.calls.spawn, 0);
+    assert.equal(stdout.writes, 0);
+    assert.equal(stderr.bytes().toString('utf8'), 'FSBNH_RUNTIME_CONFIG\n');
+    assert.doesNotMatch(stderr.bytes().toString('utf8'), /foreign|owner|Users|native-host/iu);
+  }
+
+  assert.equal(STABLE_BUILD_INDEX.endsWith('/runtime/package/build/index.js'), true);
+}
+
 async function main() {
   const sections = requestedSection ? [requestedSection] : [...knownSections];
   for (const section of sections) {
@@ -535,6 +689,10 @@ async function main() {
     }
     if (section === 'entry-lifetime') {
       await testEntryLifetime();
+      continue;
+    }
+    if (section === 'production-entry') {
+      await testProductionEntry();
       continue;
     }
     throw new Error(`section ${section} has not been implemented yet`);
