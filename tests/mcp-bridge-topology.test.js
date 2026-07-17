@@ -277,6 +277,8 @@ function makeLifecycleFakes(overrides = {}) {
     handlerCalls: 0,
     compatibilityRegistryCalls: 0,
     compatibilityDetectCalls: 0,
+    readyCalls: 0,
+    serveReady: false,
     onDegraded: null,
   };
   const bridge = {
@@ -302,8 +304,14 @@ function makeLifecycleFakes(overrides = {}) {
   const httpServer = {
     endpoint: 'http://127.0.0.1:6015/mcp',
     healthEndpoint: 'http://127.0.0.1:6015/health',
+    markServeReady() {
+      state.readyCalls++;
+      state.serveReady = true;
+      order.push('http.ready');
+    },
     async close() {
       state.httpCloseCalls++;
+      state.serveReady = false;
       order.push('http.close');
       if (overrides.httpCloseError) throw overrides.httpCloseError;
     },
@@ -422,9 +430,9 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     dependencies: success.dependencies,
   });
   assertEqual(
-    success.order.slice(0, 7).join(' > '),
-    'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push',
-    'serve binds HTTP, constructs and recovers supervisor, then connects and advertises',
+    success.order.slice(0, 8).join(' > '),
+    'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push > http.ready',
+    'serve binds HTTP, recovers, connects, advertises, then marks readiness',
   );
   assertEqual(
     JSON.stringify(success.state.bridgeOptions.capabilities),
@@ -435,6 +443,8 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   assert(success.state.httpOptions.bridge === success.bridge, 'HTTP receives the same not-yet-connected capable bridge');
   assertEqual(success.state.connectCalls, 1, 'capable bridge connects exactly once after recovery');
   assertEqual(success.state.inventoryCalls, 1, 'inventory advertises exactly once after capable connect');
+  assertEqual(success.state.readyCalls, 1, 'serve readiness is marked exactly once after inventory');
+  assertEqual(success.state.serveReady, true, 'serve is ready only after the complete startup barrier');
 
   const routedEvents = [];
   const routed = await success.state.bridgeOptions.handleExtRequest(
@@ -538,6 +548,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   );
   assertEqual(success.state.supervisorCloseCalls, 1, 'repeated signals close the supervisor once');
   assertEqual(success.state.httpCloseCalls, 1, 'repeated signals close HTTP once');
+  assertEqual(success.state.serveReady, false, 'shutdown clears the readiness projection');
   assertEqual(success.state.disconnectCalls, 1, 'repeated signals disconnect the bridge once');
   assertEqual(success.exits.length, 1, 'repeated signals request process exit once');
 
@@ -588,6 +599,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     ['HTTP bind', { httpError: new Error('bind') }, 'bridge.construct > queue.construct > http.bind'],
     ['recovery ambiguity', { spawnAvailable: false }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover'],
     ['bridge connect', { connectError: new Error('connect') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect'],
+    ['inventory push', { inventoryError: new Error('inventory') }, 'bridge.construct > queue.construct > http.bind > supervisor.construct:http://127.0.0.1:6015/mcp > supervisor.recover > bridge.connect > inventory.push'],
   ]) {
     const failure = makeLifecycleFakes(overrides);
     let error = null;
@@ -602,10 +614,22 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     }
     assert(error instanceof lifecycleModule.ServeDelegationStartupError, `${name} failure is a typed startup failure`);
     assertEqual(failure.order.slice(0, expectedPrefix.split(' > ').length).join(' > '), expectedPrefix, `${name} failure preserves startup order`);
-    if (name !== 'bridge connect') {
-      assertEqual(failure.state.connectCalls, 0, `${name} failure never connects a capable bridge`);
-    }
-    assertEqual(failure.state.inventoryCalls, 0, `${name} failure never advertises inventory`);
+    assertEqual(
+      failure.state.connectCalls,
+      name === 'bridge connect' || name === 'inventory push' ? 1 : 0,
+      name === 'bridge connect' || name === 'inventory push'
+        ? `${name} reaches one capable bridge connect attempt`
+        : `${name} failure never connects a capable bridge`,
+    );
+    assertEqual(
+      failure.state.inventoryCalls,
+      name === 'inventory push' ? 1 : 0,
+      name === 'inventory push'
+        ? `${name} is attempted exactly once`
+        : `${name} failure never advertises inventory`,
+    );
+    assertEqual(failure.state.readyCalls, 0, `${name} failure never advertises serve readiness`);
+    assertEqual(failure.state.serveReady, false, `${name} failure remains false-by-default`);
     assertEqual(failure.exits.length, 0, `${name} startup cleanup never exits the process`);
   }
 
