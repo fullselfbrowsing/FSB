@@ -440,7 +440,7 @@ async function runPlatformAndRegistration() {
     );
     if (table.platform === 'win32') {
       deepEqual(
-        readTrace.filter((entry) => entry.startsWith('registry:read:')).map((entry) => entry.split(':').slice(2, 4).join('/')),
+        readTrace.filter((entry) => entry.startsWith('registry:read:')).map((entry) => entry.split(':')[2]),
         ['user/32', 'user/64'],
         'Windows adapter reads the canonical 32-bit view before the 64-bit shadow view',
       );
