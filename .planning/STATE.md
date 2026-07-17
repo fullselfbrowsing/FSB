@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 63-01-PLAN.md
-last_updated: "2026-07-17T04:04:25.363Z"
+stopped_at: Completed 63-02-PLAN.md
+last_updated: "2026-07-17T04:22:53.651Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 40
-  completed_plans: 29
+  completed_plans: 30
   percent: 67
 ---
 
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 63 (Native-Messaging Host) — EXECUTING
-Plan: 2 of 12
+Plan: 3 of 12
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -48,7 +48,7 @@ Last activity: 2026-07-17
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 1/12 complete |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 2/12 complete |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
@@ -160,10 +160,13 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Exact-pin and bundle all six direct production dependencies, with every lock-reachable production package bound into a deterministic integrity receipt. — The installed host runtime must materialize from a new empty cache without registry access or silent online fallback.
 - [Phase 63]: Run npm pack from the exact absolute package cwd with a constant dot argument. — npm 11 omits bundled dependencies when the same relocated package is passed as a directory spec, while the exact cwd form preserves the complete bundled tree.
 - [Phase 63]: Pack once for publication, verify that exact tarball offline, and bind its SHA-512 with the lock, receipt, version, and both PE checksums. — The release dependency graph must not publish a tarball different from the artifact that passed the complete closure and platform gates.
+- [Phase 63]: Use exact service identity, numeric native-host protocol 1, and false-by-default serve readiness. — A generic or partially initialized loopback listener must never count as the ready FSB daemon.
+- [Phase 63]: Prepare bridge auth only after successful bind and recovery, before bridge connect. — A losing concurrent serve process must be unable to invalidate the active daemon session.
+- [Phase 63]: Publish serve readiness only after initial inventory push. — Reachability becomes true only after the complete startup barrier has settled.
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 Plan 01 is complete and 11 approved serialized plans remain.
+None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-02 are complete and 10 approved serialized plans remain.
 
 ### Blockers/Concerns
 
@@ -205,16 +208,17 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-17T04:02:09.475Z
-Stopped at: Completed 63-01-PLAN.md
+Last session: 2026-07-17T04:22:53.642Z
+Stopped at: Completed 63-02-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 63 Plan 02, preserving the Plan 01 build guard and package/runtime contracts. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute Phase 63 Plan 03, preserving the Plan 01 build guard/package-runtime contracts and the Plan 02 readiness/bind-ownership contracts. Keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
 | Phase | Plan | Duration | Notes |
 |-------|------|----------|-------|
 | Phase 63 P01 | 58 min | 3 tasks | 13 files |
+| Phase 63 P02 | 18 min | 2 tasks | 5 files |
