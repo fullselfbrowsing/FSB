@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
-const { PassThrough, Readable } = require('node:stream');
+const { PassThrough, Readable, Writable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repositoryRoot = path.resolve(__dirname, '..');
@@ -79,6 +79,51 @@ async function importProtocol() {
     'mcp/build/native-host/protocol.js',
   )).href;
   return await import(`${href}?phase63=${Date.now()}`);
+}
+
+async function importEntry() {
+  const href = pathToFileURL(path.join(
+    repositoryRoot,
+    'mcp/build/native-host/entry.js',
+  )).href;
+  return await import(`${href}?phase63=${Date.now()}`);
+}
+
+function captureWritable(options = {}) {
+  const chunks = [];
+  const callbacks = [];
+  let writes = 0;
+  const stream = new Writable({
+    write(chunk, _encoding, callback) {
+      writes += 1;
+      chunks.push(Buffer.from(chunk));
+      if (options.hold) callbacks.push(callback);
+      else if (options.fail) callback(new Error('SENTINEL_STDOUT_DETAIL'));
+      else callback();
+    },
+  });
+  return {
+    stream,
+    bytes() {
+      return Buffer.concat(chunks);
+    },
+    get writes() {
+      return writes;
+    },
+    release() {
+      const callback = callbacks.shift();
+      if (callback) callback();
+    },
+  };
+}
+
+function decodeResponseFrame(encoded) {
+  assert.ok(encoded.length >= 4);
+  const length = os.endianness() === 'LE'
+    ? encoded.readUInt32LE(0)
+    : encoded.readUInt32BE(0);
+  assert.equal(encoded.length, length + 4);
+  return JSON.parse(encoded.subarray(4).toString('utf8'));
 }
 
 async function testFramingAndSchema() {
@@ -306,11 +351,189 @@ async function testFramingAndSchema() {
   );
 }
 
+async function testEntryLifetime() {
+  const { runNativeHostEntry } = await importEntry();
+  assert.equal(typeof runNativeHostEntry, 'function');
+
+  {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    let handlerCalls = 0;
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async () => {
+        handlerCalls += 1;
+        return { outcome: 'started', reason: 'daemon_started_ready' };
+      },
+    });
+    assert.equal(status, 0);
+    assert.equal(handlerCalls, 0);
+    assert.equal(stdout.bytes().length, 0);
+    assert.equal(stderr.bytes().length, 0);
+  }
+
+  {
+    const stdout = captureWritable({ hold: true });
+    const stderr = captureWritable();
+    let handlerCalls = 0;
+    const running = runNativeHostEntry({
+      stdin: Readable.from([frameObject(validRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN, '--parent-window=42'],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async (request) => {
+        handlerCalls += 1;
+        assert.deepEqual(request, validRequest());
+        return { outcome: 'started', reason: 'daemon_started_ready' };
+      },
+    });
+    let settled = false;
+    void running.then(() => { settled = true; });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.equal(handlerCalls, 1);
+    assert.equal(stdout.writes, 1);
+    assert.equal(settled, false, 'entry waits for stdout write completion');
+    stdout.release();
+    assert.equal(await running, 0);
+    assert.equal(settled, true);
+    assert.equal(stderr.bytes().length, 0);
+    assert.deepEqual(decodeResponseFrame(stdout.bytes()), validResponse());
+  }
+
+  for (const invalid of [
+    {
+      stdin: Readable.from([frameObject(validRequest())]),
+      argv: ['chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/'],
+      stderr: 'FSBNH_INVALID_INVOCATION\n',
+    },
+    {
+      stdin: Readable.from([Buffer.concat([
+        frameObject(validRequest()),
+        frameObject(validRequest()),
+      ])]),
+      argv: [ORIGIN],
+      stderr: 'FSBNH_NATIVE_PROTOCOL\n',
+    },
+    {
+      stdin: Readable.from([frameBody('{bad-json')]),
+      argv: [ORIGIN],
+      stderr: 'FSBNH_NATIVE_PROTOCOL\n',
+    },
+  ]) {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    let handlerCalls = 0;
+    const status = await runNativeHostEntry({
+      stdin: invalid.stdin,
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: invalid.argv,
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async () => {
+        handlerCalls += 1;
+        return { outcome: 'started', reason: 'daemon_started_ready' };
+      },
+    });
+    assert.equal(status, 1);
+    assert.equal(handlerCalls, 0);
+    assert.equal(stdout.bytes().length, 0);
+    assert.equal(stderr.bytes().toString('utf8'), invalid.stderr);
+  }
+
+  for (const handleWake of [
+    async () => {
+      throw new Error('SENTINEL_HANDLER_SECRET');
+    },
+    async () => ({ outcome: 'started', reason: 'internal_failure' }),
+  ]) {
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([frameObject(validRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake,
+    });
+    assert.equal(status, 0);
+    assert.equal(stdout.writes, 1);
+    assert.deepEqual(decodeResponseFrame(stdout.bytes()), validResponse({
+      outcome: 'failed',
+      reason: 'internal_failure',
+    }));
+    const combined = Buffer.concat([stdout.bytes(), stderr.bytes()]).toString('utf8');
+    assert.doesNotMatch(combined, /SENTINEL_HANDLER_SECRET/);
+  }
+
+  {
+    const stdout = captureWritable({ fail: true });
+    const stderr = captureWritable();
+    let handlerCalls = 0;
+    const status = await runNativeHostEntry({
+      stdin: Readable.from([frameObject(validRequest())]),
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 2,
+      handleWake: async () => {
+        handlerCalls += 1;
+        return { outcome: 'already_running', reason: 'daemon_already_ready' };
+      },
+    });
+    assert.equal(status, 1);
+    assert.equal(handlerCalls, 1);
+    assert.equal(stdout.writes, 1);
+    assert.equal(stderr.bytes().toString('utf8'), 'FSBNH_STDOUT_FAILURE\n');
+    assert.doesNotMatch(stderr.bytes().toString('utf8'), /SENTINEL_STDOUT_DETAIL/);
+  }
+
+  {
+    const stdin = new PassThrough();
+    const stdout = captureWritable();
+    const stderr = captureWritable();
+    let handlerCalls = 0;
+    const running = runNativeHostEntry({
+      stdin,
+      stdout: stdout.stream,
+      stderr: stderr.stream,
+      argv: [ORIGIN],
+      expectedOrigin: ORIGIN,
+      settleMs: 20,
+      handleWake: async () => {
+        handlerCalls += 1;
+        return { outcome: 'already_running', reason: 'daemon_already_ready' };
+      },
+    });
+    stdin.write(frameObject(validRequest()));
+    stdin.end();
+    stdin.emit('error', new Error('late stream error'));
+    assert.equal(await running, 0);
+    assert.equal(handlerCalls, 1);
+    assert.equal(stdout.writes, 1);
+    assert.equal(stderr.bytes().length, 0);
+  }
+}
+
 async function main() {
   const sections = requestedSection ? [requestedSection] : [...knownSections];
   for (const section of sections) {
     if (section === 'framing-and-schema') {
       await testFramingAndSchema();
+      continue;
+    }
+    if (section === 'entry-lifetime') {
+      await testEntryLifetime();
       continue;
     }
     throw new Error(`section ${section} has not been implemented yet`);
