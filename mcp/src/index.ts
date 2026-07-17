@@ -314,8 +314,15 @@ async function runStdioServer(): Promise<void> {
 async function runHttpMode(flags: Record<string, FlagValue>): Promise<void> {
   const host = readStringFlag(flags, 'host', DEFAULT_HTTP_HOST);
   const port = readNumberFlag(flags, 'port', DEFAULT_HTTP_PORT);
-  rotateBridgeSessionSecret();
-  const lifecycle = await startServeDelegation({ host, port });
+  const lifecycle = await startServeDelegation({
+    host,
+    port,
+    dependencies: {
+      prepareBridgeAuth: () => {
+        rotateBridgeSessionSecret();
+      },
+    },
+  });
 
   console.error(`[FSB MCP] Streamable HTTP server started at ${lifecycle.endpoint}`);
   console.error(`[FSB MCP] Health endpoint: ${lifecycle.healthEndpoint}`);

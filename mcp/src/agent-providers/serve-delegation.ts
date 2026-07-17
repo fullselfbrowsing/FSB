@@ -63,6 +63,7 @@ export interface ServeDelegationDependencies {
   ) => SpawnSupervisor;
   readonly createCompatibilityRegistry?: () => AgentProviderRegistry;
   readonly now?: () => number;
+  readonly prepareBridgeAuth?: () => void | Promise<void>;
   readonly pushInventory?: (bridge: ServeDelegationBridge) => Promise<void>;
   readonly registerSignal?: (
     signal: 'SIGTERM' | 'SIGINT',
@@ -121,6 +122,7 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       },
     }),
     now: () => Date.now(),
+    prepareBridgeAuth: () => undefined,
     pushInventory: async (bridge) => pushMcpClientInventory(bridge as WebSocketBridge),
     registerSignal: (signal, handler) => process.on(signal, handler),
     exit: (code) => process.exit(code),
@@ -267,6 +269,7 @@ export async function startServeDelegation(
     });
     const recovery = await supervisor.recover();
     if (!recovery.spawnAvailable) throw new ServeDelegationStartupError();
+    await dependencies.prepareBridgeAuth();
     await bridge.connect();
     await dependencies.pushInventory(bridge);
     httpServer.markServeReady();
