@@ -51,6 +51,34 @@ const NATIVE_HOST_INSTALL_USAGE =
   'Usage: fsb-mcp-server install --native-host [--extension-id <32 lowercase a-p chars>]';
 const NATIVE_HOST_UNINSTALL_USAGE =
   'Usage: fsb-mcp-server uninstall --native-host';
+const NATIVE_HOST_REFUSAL_REASONS = new Set([
+  'boundary-changed',
+  'foreign-state',
+  'install-failed',
+  'invalid-materialized-package',
+  'invalid-pack-receipt',
+  'invalid-request',
+  'invalid-source-package',
+  'invalid-state',
+  'network-attempted',
+  'ownership-mismatch',
+  'pack-failed',
+  'process-output-exceeded',
+  'publication-failed',
+  'registration-publish-failed',
+  'registration-remove-failed',
+  'registry-key-cleanup-failed',
+  'registry-key-not-exact',
+  'registry-shadow',
+  'runtime-remove-failed',
+  'split-state',
+  'stable-root-not-absent',
+  'stage-failed',
+  'tarball-integrity-mismatch',
+  'unavailable',
+  'unsupported-architecture',
+  'version-mismatch',
+]);
 
 function expectedNativeHostLocation(): string {
   if (!['darwin', 'linux', 'win32'].includes(process.platform)) return 'Unavailable';
@@ -151,6 +179,85 @@ function validNativeUninstallFlags(flags: InstallFlags): boolean {
 function rejectNativeUsage(usage: string): void {
   console.error(usage);
   process.exitCode = 1;
+}
+
+function boundedNativeLocation(value: unknown): string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= 4096
+    && !/[\u0000-\u001f\u007f-\u009f]/u.test(value)
+    ? value
+    : 'Unavailable';
+}
+
+function exactNativeOrigin(value: unknown): string | null {
+  if (
+    typeof value !== 'string'
+    || !value.startsWith('chrome-extension://')
+    || !value.endsWith('/')
+  ) {
+    return null;
+  }
+  const extensionId = value.slice('chrome-extension://'.length, -1);
+  return isNativeHostExtensionId(extensionId) ? value : null;
+}
+
+function stableNativeRefusalReason(value: unknown): string {
+  return typeof value === 'string' && NATIVE_HOST_REFUSAL_REASONS.has(value)
+    ? value
+    : 'unavailable';
+}
+
+function printNativeHostRefusal(reasonValue: unknown, locationValue: unknown): void {
+  console.error(`Native messaging host was not changed: ${stableNativeRefusalReason(reasonValue)}`);
+  console.error(`Expected location: ${boundedNativeLocation(locationValue)}`);
+  console.error('Run fsb-mcp-server doctor for repair details.');
+  process.exitCode = 1;
+}
+
+function printNativeInstallResult(result: NativeHostInstallResult): void {
+  const location = boundedNativeLocation(result?.location);
+  const origin = exactNativeOrigin(result?.origin);
+  if (result?.status === 'refused') {
+    printNativeHostRefusal(result.reason, result.location);
+    return;
+  }
+  if (
+    location === 'Unavailable'
+    || !origin
+    || (result.status !== 'installed' && result.status !== 'already-installed')
+  ) {
+    printNativeHostRefusal('unavailable', location);
+    return;
+  }
+  console.log(result.status === 'installed'
+    ? 'Native messaging host installed.'
+    : 'Native messaging host is already installed.');
+  console.log(`Expected location: ${location}`);
+  console.log(`Allowed origin: ${origin}`);
+}
+
+function printNativeUninstallResult(result: NativeHostUninstallResult): void {
+  const location = boundedNativeLocation(result?.location);
+  if (result?.status === 'refused') {
+    printNativeHostRefusal(result.reason, result.location);
+    return;
+  }
+  if (
+    location === 'Unavailable'
+    || (result.status !== 'removed' && result.status !== 'not-installed')
+  ) {
+    printNativeHostRefusal('unavailable', location);
+    return;
+  }
+  if (result.status === 'removed') {
+    console.log('Native messaging host removed.');
+    console.log('Removed: 1');
+  } else {
+    console.log('Native messaging host is not installed.');
+    console.log('Removed: 0');
+  }
+  console.log(`Expected location: ${location}`);
 }
 
 export function getClaudeCodeInstallCommand(): string {
@@ -792,7 +899,11 @@ export async function runInstall(
       rejectNativeUsage(NATIVE_HOST_INSTALL_USAGE);
       return;
     }
-    await nativeHostOperations.install(request);
+    try {
+      printNativeInstallResult(await nativeHostOperations.install(request));
+    } catch {
+      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+    }
     return;
   }
 
@@ -916,7 +1027,11 @@ export async function runUninstall(
       rejectNativeUsage(NATIVE_HOST_UNINSTALL_USAGE);
       return;
     }
-    await nativeHostOperations.uninstall();
+    try {
+      printNativeUninstallResult(await nativeHostOperations.uninstall());
+    } catch {
+      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+    }
     return;
   }
 

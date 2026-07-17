@@ -339,6 +339,11 @@ function run() {
       '--native-host',
       '--native-host',
     ], fixture);
+    const extraInlineValue = runCli([
+      'install',
+      '--native-host',
+      `--extension-id=${DEVELOPMENT_EXTENSION_ID}=extra`,
+    ], fixture);
     const extraPositional = runCli([
       'install',
       'unexpected-positional',
@@ -352,6 +357,7 @@ function run() {
     for (const [result, label] of [
       [duplicateId, 'duplicate extension id'],
       [duplicateTarget, 'duplicate native target'],
+      [extraInlineValue, 'extra inline extension-id value'],
       [extraPositional, 'extra positional'],
       [unknownShort, 'unknown short flag'],
     ]) {

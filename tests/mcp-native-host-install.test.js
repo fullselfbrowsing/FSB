@@ -1927,7 +1927,7 @@ async function runCliOutput() {
     operationsWith({
       status: 'refused',
       reason: sensitive,
-      location: `/home/${sensitive}\nmanifest.json`,
+      location: `/home/${sensitive}\u001b[31m/manifest.json`,
       origin: `chrome-extension://${sensitive}/`,
       packageVersion: sensitive,
       manifest: sensitive,

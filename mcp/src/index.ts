@@ -31,6 +31,8 @@ type FlagValue = boolean | string;
 
 function parseArgs(argv: string[]): { command: string; flags: Record<string, FlagValue> } {
   const flags: Record<string, FlagValue> = {};
+  const seenLongFlags = new Set<string>();
+  let nativeSyntaxInvalid = false;
   let command = 'stdio';
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -38,7 +40,13 @@ function parseArgs(argv: string[]): { command: string; flags: Record<string, Fla
 
     if (arg.startsWith('--')) {
       const trimmed = arg.slice(2);
-      const [key, inlineValue] = trimmed.split('=', 2);
+      const separatorIndex = trimmed.indexOf('=');
+      const key = separatorIndex === -1 ? trimmed : trimmed.slice(0, separatorIndex);
+      const inlineValue = separatorIndex === -1
+        ? undefined
+        : trimmed.slice(separatorIndex + 1);
+      if (seenLongFlags.has(key)) nativeSyntaxInvalid = true;
+      seenLongFlags.add(key);
       if (inlineValue !== undefined) {
         flags[key] = inlineValue;
       } else if (argv[index + 1] && !argv[index + 1].startsWith('-')) {
@@ -52,16 +60,24 @@ function parseArgs(argv: string[]): { command: string; flags: Record<string, Fla
 
     if (arg.startsWith('-')) {
       if (arg === '-h') flags.help = true;
-      if (arg === '-j') flags.json = true;
+      else if (arg === '-j') flags.json = true;
+      else nativeSyntaxInvalid = true;
       continue;
     }
 
     if (command === 'stdio') {
       command = arg;
+    } else {
+      nativeSyntaxInvalid = true;
     }
   }
 
-  if (flags.help === true) {
+  const nativeSubcommand = (command === 'install' || command === 'uninstall')
+    && Object.hasOwn(flags, 'native-host');
+  if (nativeSubcommand && nativeSyntaxInvalid) {
+    flags['native-cli-invalid'] = true;
+  }
+  if (flags.help === true && !nativeSubcommand) {
     command = 'help';
   }
 
@@ -101,6 +117,8 @@ Usage:
   fsb-mcp-server install             Install FSB to an MCP client config (21 platforms)
   fsb-mcp-server install --list      Show all platforms with detection status
   fsb-mcp-server uninstall           Remove FSB from an MCP client config
+  fsb-mcp-server install --native-host [--extension-id <id>] Install the Chrome native messaging host
+  fsb-mcp-server uninstall --native-host Remove the Chrome native messaging host
 
 Options:
   --host <host>       HTTP listen host for \`serve\` (default: ${DEFAULT_HTTP_HOST})
