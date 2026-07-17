@@ -466,31 +466,43 @@ async function testOfflineBundledTarball(productionClosure) {
     const packed = run(process.execPath, [
       npmCliPath,
       'pack',
-      sourceCopy,
+      '.',
       '--ignore-scripts',
       '--json',
       '--pack-destination',
       tarballDirectory,
       '--cache',
       packCache,
-    ]);
+    ], { cwd: sourceCopy });
     assert.equal(packed.status, 0, packed.stderr);
     const packReceipt = JSON.parse(packed.stdout);
     assert.equal(packReceipt.length, 1);
     assert.match(packReceipt[0].filename, /^fsb-mcp-server-\d+\.\d+\.\d+\.tgz$/);
     assert.match(packReceipt[0].integrity, /^sha512-/);
+    assert.deepEqual(
+      [...packReceipt[0].bundled].sort(),
+      [...new Set(productionClosure.map((dependency) => dependency.name))].sort(),
+      'packed bundle contains missing, extra, or dev-only packages',
+    );
     const tarballPath = path.resolve(tarballDirectory, packReceipt[0].filename);
     assert.equal(existsSync(tarballPath), true);
 
-    const listing = run('tar', ['-tzf', tarballPath]);
-    assert.equal(listing.status, 0, listing.stderr);
-    const tarEntries = new Set(listing.stdout.trim().split('\n'));
+    const unpackedTarball = path.join(fixtureRoot, 'unpacked-tarball');
+    mkdirSync(unpackedTarball);
+    const extracted = run('tar', ['-xzf', tarballPath, '-C', unpackedTarball]);
+    assert.equal(extracted.status, 0, extracted.stderr);
     for (const dependency of productionClosure) {
-      assert.equal(
-        tarEntries.has(`package/${dependency.path}/package.json`),
-        true,
-        `packed production dependency is missing: ${dependency.path}`,
+      const bundledManifestPath = path.join(
+        unpackedTarball,
+        'package',
+        ...dependency.path.split('/'),
+        'package.json',
       );
+      assert.equal(existsSync(bundledManifestPath), true,
+        `packed production dependency is missing: ${dependency.path}`);
+      const bundledManifest = readJson(bundledManifestPath);
+      assert.equal(bundledManifest.name, dependency.name, dependency.path);
+      assert.equal(bundledManifest.version, dependency.version, dependency.path);
     }
 
     rmSync(sourceCopy, { recursive: true, force: true });
@@ -510,6 +522,11 @@ async function testOfflineBundledTarball(productionClosure) {
       https_proxy: sentinel.url,
       all_proxy: sentinel.url,
       no_proxy: '',
+      CI: 'true',
+      npm_config_audit: 'false',
+      npm_config_fund: 'false',
+      npm_config_offline: 'true',
+      npm_config_update_notifier: 'false',
     };
     const installed = await runAsync(process.execPath, [
       npmCliPath,
@@ -554,6 +571,7 @@ async function testRuntimeLayoutAndPackageContract() {
   );
   const runtimeLayoutSourcePath = path.join(repositoryRoot, 'mcp/src/native-host/runtime-layout.ts');
   const builtRuntimeLayoutPath = path.join(repositoryRoot, 'mcp/build/native-host/runtime-layout.js');
+  const builtConstantsPath = path.join(repositoryRoot, 'mcp/build/native-host/constants.js');
 
   for (const pathname of [
     integrityPath,
@@ -561,6 +579,7 @@ async function testRuntimeLayoutAndPackageContract() {
     runtimeLayoutSourcePath,
     path.join(repositoryRoot, 'mcp/src/native-host/constants.ts'),
     builtRuntimeLayoutPath,
+    builtConstantsPath,
   ]) {
     assert.equal(existsSync(pathname), true, `missing runtime contract artifact: ${pathname}`);
   }
@@ -600,9 +619,17 @@ async function testRuntimeLayoutAndPackageContract() {
   const runtimeLayoutSource = readFileSync(runtimeLayoutSourcePath, 'utf8');
   assert.doesNotMatch(
     runtimeLayoutSource,
-    /node:(?:fs|child_process|http|https|net|tls)|(?:spawn|exec|writeFile|mkdir|rename|registry)/,
+    /from\s+['"]node:(?:fs|child_process|http|https|net|tls)|from\s+['"][^'"]*(?:registry|install)|\b(?:spawn|exec|writeFile|mkdir|rename)\w*\s*\(/,
   );
   const runtimeLayout = await import(`${pathToFileURL(builtRuntimeLayoutPath).href}?t=${Date.now()}`);
+  const constants = await import(`${pathToFileURL(builtConstantsPath).href}?t=${Date.now()}`);
+  assert.equal(constants.NATIVE_HOST_NAME, 'io.github.fullselfbrowsing.fsb_native_host');
+  assert.equal(constants.NATIVE_HOST_DEFAULT_EXTENSION_ID, 'badgafnfchcihdfnjneklogedcdkmjfk');
+  assert.equal(constants.NATIVE_HOST_PROTOCOL_VERSION, 1);
+  assert.equal(constants.NATIVE_HOST_MAX_FRAME_BYTES, 4096);
+  assert.equal(constants.NATIVE_HOST_HEALTH_PRODUCT, 'fsb-mcp-server');
+  assert.equal(constants.NATIVE_HOST_HEALTH_PROTOCOL, 'fsb-native-host-health-v1');
+  assert.equal(constants.NATIVE_HOST_OWNER_MARKER_SCHEMA, 1);
   const common = {
     packageVersion: packageManifest.version,
     extensionId: 'badgafnfchcihdfnjneklogedcdkmjfk',
@@ -625,6 +652,26 @@ async function testRuntimeLayoutAndPackageContract() {
   assert.equal(darwin.launcherMode, 0o700);
   assert.equal(darwin.markerMode, 0o600);
   assert.deepEqual(runtimeLayout.validateNativeHostRuntimeLayout(darwin), { ok: true });
+  assert.equal(darwin.pack.executable, common.nodePath);
+  assert.equal(darwin.pack.cwd, common.invokingPackageRoot);
+  assert.deepEqual(darwin.pack.argv.slice(0, 3), [common.npmCliPath, 'pack', '.']);
+  assert.equal(darwin.pack.shell, false);
+  assert.equal(darwin.install.executable, common.nodePath);
+  assert.equal(darwin.install.shell, false);
+  for (const requiredArgument of [
+    '--offline',
+    '--ignore-scripts',
+    '--omit=dev',
+    '--no-audit',
+    '--no-fund',
+    '--package-lock=false',
+    '--cache',
+    '--registry',
+  ]) {
+    assert.equal(darwin.install.argv.includes(requiredArgument), true, requiredArgument);
+  }
+  assert.equal(darwin.install.argv.at(-1), darwin.tarballPath);
+  assert.equal(darwin.install.environment.npm_config_offline, 'true');
 
   const linux = runtimeLayout.resolveNativeHostRuntimeLayout({
     ...common,
@@ -714,6 +761,13 @@ async function testRuntimeLayoutAndPackageContract() {
   assert.throws(
     () => runtimeLayout.resolveNativeHostRuntimeLayout({ ...common, platform: 'darwin', homeDirectory: '/Users/fsb', extensionId: 'invalid' }),
     /FSBNH_LAYOUT_EXTENSION_ID/,
+  );
+  assert.deepEqual(
+    runtimeLayout.validateNativeHostRuntimeLayout({
+      ...darwin,
+      launcherPath: path.join(common.invokingPackageRoot, 'launcher'),
+    }),
+    { ok: false, reason: 'invalid-layout' },
   );
 
   await testOfflineBundledTarball(productionClosure);
