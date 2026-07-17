@@ -150,7 +150,7 @@
 **Plans**: 12 plans
 
 **Wave 1**
-- [ ] 63-01: Establish the workspace-safe build guard, release-built Windows bootstrap, and durable bundled runtime contract.
+- [x] 63-01: Establish the workspace-safe build guard, release-built Windows bootstrap, and durable bundled runtime contract.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 63-02: Fix pre-bind secret rotation and make product-specific serve readiness authoritative.
@@ -221,7 +221,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
-| 63. Native-Messaging Host | 0/12 | Planned | — |
+| 63. Native-Messaging Host | 1/12 | In Progress|  |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 

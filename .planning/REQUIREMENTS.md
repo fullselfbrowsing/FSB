@@ -75,9 +75,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### NATIVE -- Native-Messaging Host
 
-- [ ] **NATIVE-01**: `fsb-mcp-server install --native-host` writes the platform-appropriate native-messaging host manifest (macOS `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`, Linux `~/.config/google-chrome/NativeMessagingHosts/`, Windows registry `HKCU\Software\Google\Chrome\NativeMessagingHosts\`), allowing the FSB extension id as the sole caller, and installs a host binary that wakes the daemon on demand.
+- [x] **NATIVE-01**: `fsb-mcp-server install --native-host` writes the platform-appropriate native-messaging host manifest (macOS `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`, Linux `~/.config/google-chrome/NativeMessagingHosts/`, Windows registry `HKCU\Software\Google\Chrome\NativeMessagingHosts\`), allowing the FSB extension id as the sole caller, and installs a host binary that wakes the daemon on demand.
 - [ ] **NATIVE-02**: The extension's manifest gains a `nativeMessaging` permission entry (additive, no other permission changes), and the extension detects native-host presence at boot; when present, an "Agent offline" state auto-attempts a wake before showing the doctor deep-link.
-- [ ] **NATIVE-03**: The native host itself does not spawn agents; it only starts `fsb-mcp-server serve` (or attaches to a running one) and exits after handoff. All spawn authority remains inside the `serve` daemon behind the CHAN gates.
+- [x] **NATIVE-03**: The native host itself does not spawn agents; it only starts `fsb-mcp-server serve` (or attaches to a running one) and exits after handoff. All spawn authority remains inside the `serve` daemon behind the CHAN gates.
 - [ ] **NATIVE-04**: `fsb-mcp-server uninstall --native-host` removes the manifest, and `doctor` reports native-host install state including manifest path and any Chrome allowlist mismatch.
 
 ### MULTI -- Additional Adapters
@@ -171,9 +171,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DRIFT-02 | Phase 62 | Complete |
 | DRIFT-03 | Phase 62 | Complete |
 | DRIFT-04 | Phase 62 | Complete |
-| NATIVE-01 | Phase 63 | Pending |
+| NATIVE-01 | Phase 63 | Complete |
 | NATIVE-02 | Phase 63 | Pending |
-| NATIVE-03 | Phase 63 | Pending |
+| NATIVE-03 | Phase 63 | Complete |
 | NATIVE-04 | Phase 63 | Pending |
 | MULTI-01 | Phase 64 | Pending |
 | MULTI-02 | Phase 64 | Pending |
