@@ -173,7 +173,11 @@ function createWakeHarness(options = {}) {
       calls.renameDirectory.push({ source, destination });
       trace.push(`rename:${source}->${destination}`);
       if (!directories.has(source) || directories.has(destination)) return false;
-      directories.set(destination, directories.get(source));
+      const movedFiles = new Map();
+      for (const [pathname, contents] of directories.get(source)) {
+        movedFiles.set(`${destination}${pathname.slice(source.length)}`, contents);
+      }
+      directories.set(destination, movedFiles);
       directories.delete(source);
       return true;
     },
@@ -694,9 +698,9 @@ async function runWakeDaemonSection() {
 
   const platformSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/platform.ts'), 'utf8');
   const daemonSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/daemon.ts'), 'utf8');
-  assert.doesNotMatch(platformSource, /\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u);
-  assert.doesNotMatch(daemonSource, /\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u);
-  assert.doesNotMatch(`${platformSource}\n${daemonSource}`, /\bpid\b/iu);
+  assert(!/\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u.test(platformSource), 'platform exposes no kill or signal authority');
+  assert(!/\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u.test(daemonSource), 'daemon exposes no kill or signal authority');
+  assert(!/\bpid\b/iu.test(`${platformSource}\n${daemonSource}`), 'wake authority never relies on process identifiers');
 }
 
 async function runCase(name, callback) {
