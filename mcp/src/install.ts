@@ -215,42 +215,83 @@ function printNativeHostRefusal(reasonValue: unknown, locationValue: unknown): v
   process.exitCode = 1;
 }
 
-function printNativeInstallResult(result: NativeHostInstallResult): void {
-  const location = boundedNativeLocation(result?.location);
-  const origin = exactNativeOrigin(result?.origin);
-  if (result?.status === 'refused') {
-    printNativeHostRefusal(result.reason, result.location);
+function exactNativeReceipt(value: unknown): Readonly<Record<string, unknown>> | null {
+  const expectedKeys = ['location', 'origin', 'packageVersion', 'reason', 'status'];
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length
+      || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+    ) {
+      return null;
+    }
+    const fields: Record<string, unknown> = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        typeof key !== 'string'
+        || !descriptor
+        || !descriptor.enumerable
+        || !Object.hasOwn(descriptor, 'value')
+      ) {
+        return null;
+      }
+      fields[key] = descriptor.value;
+    }
+    return fields;
+  } catch {
+    return null;
+  }
+}
+
+function printNativeInstallResult(result: unknown): void {
+  const receipt = exactNativeReceipt(result);
+  if (!receipt) {
+    printNativeHostRefusal('unavailable', 'Unavailable');
+    return;
+  }
+  const location = boundedNativeLocation(receipt.location);
+  const origin = exactNativeOrigin(receipt.origin);
+  if (receipt.status === 'refused') {
+    printNativeHostRefusal(receipt.reason, receipt.location);
     return;
   }
   if (
     location === 'Unavailable'
     || !origin
-    || (result.status !== 'installed' && result.status !== 'already-installed')
+    || (receipt.status !== 'installed' && receipt.status !== 'already-installed')
   ) {
     printNativeHostRefusal('unavailable', location);
     return;
   }
-  console.log(result.status === 'installed'
+  console.log(receipt.status === 'installed'
     ? 'Native messaging host installed.'
     : 'Native messaging host is already installed.');
   console.log(`Expected location: ${location}`);
   console.log(`Allowed origin: ${origin}`);
 }
 
-function printNativeUninstallResult(result: NativeHostUninstallResult): void {
-  const location = boundedNativeLocation(result?.location);
-  if (result?.status === 'refused') {
-    printNativeHostRefusal(result.reason, result.location);
+function printNativeUninstallResult(result: unknown): void {
+  const receipt = exactNativeReceipt(result);
+  if (!receipt) {
+    printNativeHostRefusal('unavailable', 'Unavailable');
+    return;
+  }
+  const location = boundedNativeLocation(receipt.location);
+  if (receipt.status === 'refused') {
+    printNativeHostRefusal(receipt.reason, receipt.location);
     return;
   }
   if (
     location === 'Unavailable'
-    || (result.status !== 'removed' && result.status !== 'not-installed')
+    || (receipt.status !== 'removed' && receipt.status !== 'not-installed')
   ) {
     printNativeHostRefusal('unavailable', location);
     return;
   }
-  if (result.status === 'removed') {
+  if (receipt.status === 'removed') {
     console.log('Native messaging host removed.');
     console.log('Removed: 1');
   } else {
