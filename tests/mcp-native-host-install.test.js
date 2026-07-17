@@ -1941,6 +1941,21 @@ async function runCliOutput() {
   check(taintedResult.stderr.includes('not changed: unavailable'), 'unknown refusal reason collapses to unavailable');
   check(taintedResult.stderr.includes('Expected location: Unavailable'), 'invalid location collapses to bounded unavailable');
 
+  const inheritedReceipt = Object.create({
+    status: 'installed',
+    reason: 'installed',
+    location: `/home/${sensitive}/manifest.json`,
+    origin: ORIGIN,
+    packageVersion: PACKAGE_VERSION,
+  });
+  const inherited = await captureCliAction(() => cli.runInstall(
+    { 'native-host': true },
+    operationsWith(inheritedReceipt),
+  ));
+  equal(inherited.exitCode, 1, 'prototype-backed native receipt fails closed');
+  check(!`${inherited.stdout}${inherited.stderr}`.includes(sensitive), 'prototype-backed receipt fields never reach output');
+  check(inherited.stderr.includes('not changed: unavailable'), 'prototype-backed native receipt collapses to unavailable');
+
   const thrown = await captureCliAction(() => cli.runUninstall(
     { 'native-host': true },
     Object.freeze({
