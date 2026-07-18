@@ -177,7 +177,7 @@
 - [x] 63-09: Render the approved intent-fenced checking state in the existing delegation card.
 
 **Wave 10** *(blocked on Wave 9 completion)*
-- [ ] 63-10: Wire deterministic focused/root/CI contracts and create the still-pending milestone-end UAT ledger.
+- [x] 63-10: Wire deterministic focused/root/CI contracts and create the still-pending milestone-end UAT ledger.
 
 **Wave 11** *(blocked on Wave 10 completion)*
 - [ ] 63-11: Run independent blocking code, security, and UI source-review gates.
@@ -221,7 +221,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 60. Adapter Contract & Claude Code MVP | 4/4 | Complete | 2026-07-14 |
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
-| 63. Native-Messaging Host | 9/12 | In Progress|  |
+| 63. Native-Messaging Host | 10/12 | In Progress|  |
 | 64. OpenCode Adapter | 0/0 | Not started | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
