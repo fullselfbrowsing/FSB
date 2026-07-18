@@ -55,6 +55,40 @@ function captureGitBuffer(args, label) {
   return Buffer.from(result.stdout);
 }
 
+function resolveGitIndexPath() {
+  const rawPath = captureGitBuffer(
+    ['rev-parse', '--git-path', 'index'],
+    'Git index path capture',
+  ).toString('utf8').trim();
+  if (!rawPath || rawPath.includes('\0') || rawPath.includes('\n') || rawPath.includes('\r')) {
+    throw new Error('Git returned an invalid index path');
+  }
+  return isAbsolute(rawPath) ? resolve(rawPath) : resolve(repositoryRoot, rawPath);
+}
+
+function captureGitIndex(indexPath) {
+  const stat = lstatIfPresent(indexPath);
+  if (!stat) return Object.freeze({ kind: 'missing' });
+  if (stat.isSymbolicLink()) return Object.freeze({ kind: 'symlink' });
+  if (stat.isDirectory()) return Object.freeze({ kind: 'directory' });
+  if (!stat.isFile()) return Object.freeze({ kind: 'other' });
+  return Object.freeze({
+    kind: 'file',
+    mode: stat.mode & 0o7777,
+    bytes: Buffer.from(readFileSync(indexPath)),
+  });
+}
+
+function restoreGitIndex(indexPath, snapshot) {
+  const current = captureGitIndex(indexPath);
+  if (current.kind !== 'file') {
+    throw new Error('raw Git index is not a regular file');
+  }
+  unlinkSync(indexPath);
+  writeFileSync(indexPath, snapshot.bytes, { flag: 'wx', mode: snapshot.mode });
+  chmodSync(indexPath, snapshot.mode);
+}
+
 function nulPaths(value) {
   return value.toString('utf8').split('\0').filter((entry) => entry.length > 0);
 }
@@ -230,8 +264,16 @@ let createdDirectory = false;
 let createdLink = false;
 let workspaceBefore;
 let trackedDirtySnapshots;
+let indexPath;
+let indexBefore;
+let indexEntriesUnchanged = false;
 
 try {
+  indexPath = resolveGitIndexPath();
+  indexBefore = captureGitIndex(indexPath);
+  if (indexBefore.kind !== 'file') {
+    throw new Error('raw Git index must be an existing regular file');
+  }
   workspaceBefore = captureWorkspaceState('initial');
   trackedDirtySnapshots = Object.freeze(
     workspaceBefore.worktreeDirtyPaths.map(snapshotWorkspacePath),
@@ -315,7 +357,8 @@ try {
   if (workspaceBefore !== undefined) {
     try {
       const workspaceAfter = captureWorkspaceState('final');
-      if (workspaceAfter.indexEntries !== workspaceBefore.indexEntries) {
+      indexEntriesUnchanged = workspaceAfter.indexEntries === workspaceBefore.indexEntries;
+      if (!indexEntriesUnchanged) {
         failures.push('staged index bytes changed during the full-suite run');
       }
       if (workspaceAfter.trackedPaths !== workspaceBefore.trackedPaths) {
@@ -335,6 +378,35 @@ try {
       }
     } catch (error) {
       failures.push(error instanceof Error ? error.message : 'workspace preservation check failed');
+    }
+  }
+
+  if (indexBefore !== undefined && indexPath !== undefined) {
+    try {
+      const indexAfter = captureGitIndex(indexPath);
+      if (indexAfter.kind === 'missing') {
+        failures.push('raw Git index is missing after the full-suite run');
+      } else if (indexAfter.kind !== 'file') {
+        failures.push('raw Git index is not a regular file after the full-suite run');
+      } else if (indexAfter.mode !== indexBefore.mode) {
+        failures.push('raw Git index mode changed during the full-suite run');
+      } else if (indexEntriesUnchanged) {
+        if (!indexAfter.bytes.equals(indexBefore.bytes)) {
+          restoreGitIndex(indexPath, indexBefore);
+        }
+        const restoredIndex = captureGitIndex(indexPath);
+        if (
+          restoredIndex.kind !== 'file'
+          || restoredIndex.mode !== indexBefore.mode
+          || !restoredIndex.bytes.equals(indexBefore.bytes)
+        ) {
+          failures.push('raw Git index identity differs after restoration');
+        }
+      }
+    } catch (error) {
+      failures.push(error instanceof Error
+        ? `raw Git index preservation failed: ${error.message}`
+        : 'raw Git index preservation failed');
     }
   }
 }
