@@ -169,3 +169,11 @@ None during autonomous implementation.
 - Six implementation/test commits are present.
 - Four planned source/test files exist and are committed.
 - Summary truthfully distinguishes deterministic contract evidence from deferred live operability.
+
+## Review Remediation Addendum — 2026-07-18
+
+- Finding `F63-CODE-01` is closed by RED commit `fecc98d3` and GREEN commit `c52f8a21`.
+- Production `install-native-host` and `uninstall-native-host` now receive concrete operations from the narrow `mcp/src/native-host-production.ts` composition root. The composition uses no-follow bounded filesystem reads, private staged/tombstoned writes, sanitized `shell:false` subprocesses, an offline npm materialization recipe, persisted bounded install receipts, and direct `reg.exe` HKCU operations with the frozen Windows view rules.
+- The production-composition test performs a real temporary-home install, idempotent reinstall, and uninstall without injecting fake `NativeHostCliOperations`; the prior production-refusal expectation is gone. The GREEN gate passed all 789 installer assertions, all 75 then-current platform assertions, `workflow-and-pack`, source and compiled native-boundary verification, and workspace identity restoration.
+- The final `node scripts/run-phase63-focused-tests.mjs` matrix passed the expanded 96-assertion platform/production-composition suite, the complete installer and packaging gates, and the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
+- This addendum supersedes the earlier unresolved production-composer scope-boundary statements. Genuine macOS/Linux/Windows browser integration and live registry/native-host behavior remain `human_needed` and unclaimed.

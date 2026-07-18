@@ -192,3 +192,12 @@ None during autonomous implementation.
 ---
 *Phase: 63-native-messaging-host*
 *Completed: 2026-07-17*
+
+## Review Remediation Addendum — 2026-07-18
+
+- Finding `F63-CODE-03` is closed by RED commit `be068375` and GREEN commit `531b8b4d`.
+- Wake ownership is now written inside `wake.lock.pending-<token>` before a non-replacing canonical rename. A failed metadata write or lost publication race cleans only that exact attempt path and token.
+- Empty or malformed canonical locks are rechecked against daemon health, atomically moved to a tokened quarantine, preserved without recursive deletion, and replaced through the same staged publication path. Valid stale and release quarantines are removable only when their path token, exact owner metadata token, and owner-only directory roster all agree.
+- The workspace-preserving GREEN gate passed source and compiled native-boundary verification, all 209 daemon/entry assertions, the complete native protocol suite, and all 111 background-wake assertions. Real-filesystem coverage also proves non-replacement of an existing empty lock, mismatched-token refusal, and preservation of foreign roster entries.
+- The final `node scripts/run-phase63-focused-tests.mjs` matrix also passed, including the 209-assertion daemon suite and the 1,014-assertion Phase 61–63 contract gate, with complete workspace identity preserved.
+- No live daemon, browser, registry, native host, or human UAT was run or claimed; the existing milestone-end live-evidence deferral remains unchanged.

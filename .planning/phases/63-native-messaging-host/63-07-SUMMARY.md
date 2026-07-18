@@ -141,3 +141,12 @@ None during autonomous implementation.
 - Four RED/GREEN commits are present.
 - All four planned source/test files exist and are committed.
 - The summary explicitly distinguishes deterministic contract evidence from unresolved production composition and deferred live operability.
+
+## Review Remediation Addendum — 2026-07-18
+
+- Finding `F63-CODE-02` is closed by RED commit `3b65834c` and GREEN commit `7fb88f42`.
+- Production doctor, status, and watch now compose the real read-only native-host inspector. It reuses the exact platform registration facts, persisted runtime/owner validation, launcher validation, and exported daemon health classifier, then passes only those raw facts through the existing closed diagnostics normalizer and five-key browser projector.
+- Compiled production-composition coverage proves missing (`not_installed`), changed allowlist (`allowlist_mismatch`), corrupt launcher (`runtime_invalid`), daemon-offline, and exact ready-loopback behavior without injecting a synthetic diagnostics inspector. Mutation spies and before/after filesystem snapshots remain unchanged, and the historical doctor health layer is byte-for-byte stable.
+- The GREEN gate passed all 96 platform assertions, all 229 diagnostics assertions, all 172 then-current daemon assertions, source and compiled native-boundary verification, and workspace identity restoration.
+- The final `node scripts/run-phase63-focused-tests.mjs` matrix passed the 229-assertion diagnostics suite, expanded 209-assertion daemon suite, 96-assertion production platform suite, and 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
+- This addendum supersedes the earlier unresolved production-inspector statements. Live installed-host/browser/platform evidence remains `human_needed` and unclaimed.
