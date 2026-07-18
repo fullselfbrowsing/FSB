@@ -117,11 +117,16 @@ function createWakeHarness(options = {}) {
   const lockPath = `${stableRuntimeRoot}/wake.lock`;
   const metadataPath = `${lockPath}/owner.json`;
   const directories = new Map();
+  const directoryIds = new Map();
   const calls = {
     health: [],
     createDirectory: [],
     writePrivateFile: [],
     readPrivateFile: [],
+    inspectLockDirectory: [],
+    claimLockDirectory: [],
+    acquireStartLease: [],
+    releaseStartLease: 0,
     renameDirectory: [],
     removeAttemptDirectory: [],
     removeOwnedDirectory: [],
@@ -138,6 +143,52 @@ function createWakeHarness(options = {}) {
   ])];
   let now = options.now ?? 0;
   let tokenIndex = 0;
+  let directoryId = 0;
+  let startLeaseHeld = false;
+
+  function setDirectory(pathname, files, identity = `directory-${directoryId += 1}`) {
+    directories.set(pathname, files);
+    directoryIds.set(pathname, identity);
+  }
+
+  function deleteDirectory(pathname) {
+    directories.delete(pathname);
+    directoryIds.delete(pathname);
+  }
+
+  function moveDirectory(source, destination) {
+    const movedFiles = new Map();
+    for (const [pathname, contents] of directories.get(source)) {
+      movedFiles.set(`${destination}${pathname.slice(source.length)}`, contents);
+    }
+    setDirectory(destination, movedFiles, directoryIds.get(source));
+    deleteDirectory(source);
+  }
+
+  function inspectDirectory(pathname) {
+    const directory = directories.get(pathname);
+    const identity = directoryIds.get(pathname);
+    if (!directory || !identity) return null;
+    const roster = [...directory.keys()]
+      .map((entry) => `file:${entry.slice(pathname.length + 1)}`)
+      .sort();
+    return Object.freeze({
+      directoryId: identity,
+      ownerContents: directory.get(`${pathname}/owner.json`) ?? null,
+      roster: Object.freeze(roster),
+    });
+  }
+
+  function identitiesEqual(left, right) {
+    return Boolean(
+      left
+      && right
+      && left.directoryId === right.directoryId
+      && left.ownerContents === right.ownerContents
+      && left.roster.length === right.roster.length
+      && left.roster.every((entry, index) => entry === right.roster[index]),
+    );
+  }
 
   if (Object.hasOwn(options, 'initialLockContents')) {
     const files = new Map();
@@ -147,9 +198,9 @@ function createWakeHarness(options = {}) {
     for (const [relativePath, contents] of options.initialLockFiles || []) {
       files.set(`${lockPath}/${relativePath}`, contents);
     }
-    directories.set(lockPath, files);
+    setDirectory(lockPath, files);
   } else if (options.initialLock) {
-    directories.set(lockPath, new Map([
+    setDirectory(lockPath, new Map([
       [metadataPath, JSON.stringify(options.initialLock)],
     ]));
   }
@@ -166,6 +217,10 @@ function createWakeHarness(options = {}) {
     setLockMetadata(value) {
       const directory = directories.get(lockPath);
       if (directory) directory.set(metadataPath, JSON.stringify(value));
+    },
+    inspectDirectory,
+    get startLeaseHeld() {
+      return startLeaseHeld;
     },
   };
 
@@ -204,7 +259,7 @@ function createWakeHarness(options = {}) {
       calls.createDirectory.push({ pathname, mode });
       trace.push(`mkdir:${pathname}`);
       if (directories.has(pathname)) return false;
-      directories.set(pathname, new Map());
+      setDirectory(pathname, new Map());
       return true;
     },
     writePrivateFile: async (pathname, contents, mode) => {
@@ -222,16 +277,42 @@ function createWakeHarness(options = {}) {
       trace.push(`read:${pathname}`);
       return directories.get(path.dirname(pathname))?.get(pathname) ?? null;
     },
+    inspectLockDirectory: async (pathname) => {
+      calls.inspectLockDirectory.push({ pathname });
+      trace.push(`inspect-lock:${pathname}`);
+      return inspectDirectory(pathname);
+    },
+    claimLockDirectory: async (source, destination, expected) => {
+      calls.claimLockDirectory.push({ source, destination, expected });
+      trace.push(`claim-lock:${source}->${destination}`);
+      if (!identitiesEqual(inspectDirectory(source), expected)) return 'changed';
+      if (directories.has(destination)) return 'changed';
+      moveDirectory(source, destination);
+      return identitiesEqual(inspectDirectory(destination), expected)
+        ? 'claimed'
+        : 'unavailable';
+    },
+    acquireStartLease: async () => {
+      calls.acquireStartLease.push({ host: '127.0.0.1', port: 7227 });
+      trace.push('lease:acquire');
+      if (startLeaseHeld) return null;
+      startLeaseHeld = true;
+      let released = false;
+      return Object.freeze({
+        release: async () => {
+          if (released) return;
+          released = true;
+          calls.releaseStartLease += 1;
+          trace.push('lease:release');
+          startLeaseHeld = false;
+        },
+      });
+    },
     renameDirectory: async (source, destination) => {
       calls.renameDirectory.push({ source, destination });
       trace.push(`rename:${source}->${destination}`);
       if (!directories.has(source) || directories.has(destination)) return false;
-      const movedFiles = new Map();
-      for (const [pathname, contents] of directories.get(source)) {
-        movedFiles.set(`${destination}${pathname.slice(source.length)}`, contents);
-      }
-      directories.set(destination, movedFiles);
-      directories.delete(source);
+      moveDirectory(source, destination);
       return true;
     },
     removeAttemptDirectory: async (pathname, token) => {
@@ -240,7 +321,7 @@ function createWakeHarness(options = {}) {
       const directory = directories.get(pathname);
       if (!pathname.endsWith(`.pending-${token}`) || !directory) return false;
       if ([...directory.keys()].some((entry) => entry !== `${pathname}/owner.json`)) return false;
-      directories.delete(pathname);
+      deleteDirectory(pathname);
       return true;
     },
     removeOwnedDirectory: async (pathname, kind, directoryToken, ownerToken) => {
@@ -256,7 +337,7 @@ function createWakeHarness(options = {}) {
       } catch (_error) {
         return false;
       }
-      directories.delete(pathname);
+      deleteDirectory(pathname);
       return true;
     },
     spawn: (command, argv, spawnOptions) => {
@@ -705,6 +786,148 @@ async function runWakeDaemonSection() {
   }
 
   {
+    const staleToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const harness = createWakeHarness({
+      now: 30_001,
+      initialLock: { schema: 1, token: staleToken, createdAt: 0 },
+      tokens: [
+        '11111111111111111111111111111111',
+        '22222222222222222222222222222222',
+        '33333333333333333333333333333333',
+        '44444444444444444444444444444444',
+        '55555555555555555555555555555555',
+        '66666666666666666666666666666666',
+      ],
+    });
+    let resolveBObserved;
+    let resumeB;
+    let resolveASpawned;
+    let resolveBTakeover;
+    let allowAReady;
+    const bObserved = new Promise((resolve) => { resolveBObserved = resolve; });
+    const bResume = new Promise((resolve) => { resumeB = resolve; });
+    const aSpawned = new Promise((resolve) => { resolveASpawned = resolve; });
+    const bTakeover = new Promise((resolve) => { resolveBTakeover = resolve; });
+    const aReady = new Promise((resolve) => { allowAReady = resolve; });
+    let bObservationPaused = false;
+    let bMayObserveReady = false;
+    let aHasSpawned = false;
+
+    const pauseBWithObservedStale = async (value) => {
+      if (!bObservationPaused) {
+        bObservationPaused = true;
+        resolveBObserved(value);
+        await bResume;
+      }
+      return value;
+    };
+    const bDependencies = {
+      ...harness.dependencies,
+      requestHealth: async () => {
+        if (!bMayObserveReady) throw new Error('offline');
+        return readyHealth();
+      },
+      readPrivateFile: async (pathname, maxBytes) => {
+        const value = await harness.dependencies.readPrivateFile(pathname, maxBytes);
+        return pathname === harness.state.metadataPath
+          ? pauseBWithObservedStale(value)
+          : value;
+      },
+      inspectLockDirectory: async (pathname) => {
+        const value = await harness.dependencies.inspectLockDirectory(pathname);
+        return pathname === harness.state.lockPath
+          ? pauseBWithObservedStale(value)
+          : value;
+      },
+      acquireStartLease: async () => {
+        const lease = await harness.dependencies.acquireStartLease();
+        if (!lease) {
+          bMayObserveReady = true;
+          resolveBTakeover('lease-contender');
+        }
+        return lease;
+      },
+      claimLockDirectory: async (source, destination, expected) => {
+        const result = await harness.dependencies.claimLockDirectory(
+          source,
+          destination,
+          expected,
+        );
+        bMayObserveReady = true;
+        resolveBTakeover(result);
+        return result;
+      },
+      spawn: (command, argv, options) => {
+        bMayObserveReady = true;
+        resolveBTakeover('spawned');
+        return harness.dependencies.spawn(command, argv, options);
+      },
+    };
+    const aDependencies = {
+      ...harness.dependencies,
+      requestHealth: async () => {
+        if (!aHasSpawned) throw new Error('offline');
+        await aReady;
+        return readyHealth();
+      },
+      spawn: (command, argv, options) => {
+        const child = harness.dependencies.spawn(command, argv, options);
+        aHasSpawned = true;
+        resolveASpawned();
+        return child;
+      },
+    };
+
+    const bResultPromise = daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: bDependencies,
+    });
+    const observedByB = await bObserved;
+    assert(
+      typeof observedByB === 'string'
+        ? JSON.parse(observedByB).token === staleToken
+        : JSON.parse(observedByB.ownerContents).token === staleToken,
+      'contender B snapshots the original stale owner S before pausing',
+    );
+
+    const aResultPromise = daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: aDependencies,
+    });
+    await aSpawned;
+    const freshA = harness.state.inspectDirectory(harness.state.lockPath);
+    const freshAToken = JSON.parse(freshA.ownerContents).token;
+    assert(freshAToken !== staleToken, 'contender A replaces S and publishes fresh owner A');
+    resumeB();
+    const bTakeoverResult = await bTakeover;
+    const afterB = harness.state.inspectDirectory(harness.state.lockPath);
+    assertEqual(bTakeoverResult, 'lease-contender', 'B cannot enter takeover while A holds the OS lease');
+    assertEqual(afterB?.directoryId, freshA?.directoryId, 'B leaves fresh canonical owner A in place');
+    assertEqual(
+      JSON.parse(afterB?.ownerContents || '{}').token,
+      freshAToken,
+      'B never substitutes or quarantines A after observing stale S',
+    );
+    assertEqual(harness.state.calls.spawn.length, 1, 'A/B stale interleaving creates only A child');
+    assertEqual(
+      [...harness.state.directories.entries()].some(([pathname, files]) => (
+        pathname.includes('.quarantine-')
+        && [...files.values()].some((contents) => (
+          typeof contents === 'string' && contents.includes(freshAToken)
+        ))
+      )),
+      false,
+      'B leaves no quarantine containing fresh owner A',
+    );
+    assertEqual(harness.state.startLeaseHeld, true, 'A holds the crash-released lease through readiness');
+    allowAReady();
+    const [aResult, bResult] = await Promise.all([aResultPromise, bResultPromise]);
+    assertEqual(aResult.outcome, 'started', 'A settles as the sole start owner');
+    assertEqual(bResult.outcome, 'already_running', 'B settles from shared readiness without spawning');
+    assertEqual(harness.state.startLeaseHeld, false, 'A releases the OS lease after canonical cleanup');
+  }
+
+  {
     const harness = createWakeHarness({
       initialLockContents: null,
       health: async (state) => (
@@ -874,6 +1097,7 @@ async function runWakeDaemonSection() {
   assertEqual(nativeConstants.NATIVE_HOST_DAEMON_START_TIMEOUT_MS, 10_000, 'the readiness window stays 10 seconds');
   assertEqual(nativeConstants.NATIVE_HOST_START_POLL_INTERVAL_MS, 100, 'the readiness poll stays 100 ms');
   assertEqual(nativeConstants.NATIVE_HOST_START_LOCK_STALE_MS, 30_000, 'the stale-lock TTL stays 30 seconds');
+  assertEqual(nativeConstants.NATIVE_HOST_START_LEASE_PORT, 7227, 'the one-flight lease pins one loopback-only port');
 
   const platformSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/platform.ts'), 'utf8');
   const daemonSource = readFileSync(path.join(repoRoot, 'mcp/src/native-host/daemon.ts'), 'utf8');
@@ -885,6 +1109,21 @@ async function runWakeDaemonSection() {
   const cleanupRoot = await mkdtemp(path.join(os.tmpdir(), 'fsb-wake-cleanup-'));
   try {
     const dependencies = platform.createNativeHostDaemonDependencies({});
+    assertEqual(
+      typeof dependencies.acquireStartLease,
+      'function',
+      'production daemon dependencies expose the OS-backed one-flight lease',
+    );
+    if (typeof dependencies.acquireStartLease === 'function') {
+      const firstLease = await dependencies.acquireStartLease();
+      const blockedLease = await dependencies.acquireStartLease();
+      assert(Boolean(firstLease), 'production acquires one exclusive loopback lease');
+      assertEqual(blockedLease, null, 'a concurrent production contender cannot share the lease');
+      await firstLease?.release();
+      const reacquiredLease = await dependencies.acquireStartLease();
+      assert(Boolean(reacquiredLease), 'released production lease is immediately reacquirable');
+      await reacquiredLease?.release();
+    }
     const ownerToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const publishToken = 'dddddddddddddddddddddddddddddddd';
     const publishSource = path.join(cleanupRoot, `wake.lock.pending-${publishToken}`);
