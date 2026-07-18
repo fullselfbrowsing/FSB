@@ -22,6 +22,12 @@ function runGit(repository, args) {
   return result.stdout;
 }
 
+function resolveGitIndex(repository) {
+  const rawPath = runGit(repository, ['rev-parse', '--git-path', 'index']).trim();
+  assert.equal(rawPath.length > 0, true, 'fixture Git index path is non-empty');
+  return path.isAbsolute(rawPath) ? path.resolve(rawPath) : path.resolve(repository, rawPath);
+}
+
 function write(repository, relativePath, value) {
   const target = path.join(repository, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -68,11 +74,13 @@ function main() {
     );
     runGit(repository, ['add', '--', 'staged.txt']);
 
-    function runHarness(childSource) {
+    function runHarness(childSource, options = {}) {
+      const testRepository = options.repositoryRoot || repository;
       const environment = {
         ...process.env,
+        ...(options.environment || {}),
         FSB_PHASE60_INJECT_FAILURE: '',
-        FSB_PHASE60_TEST_REPOSITORY_ROOT: repository,
+        FSB_PHASE60_TEST_REPOSITORY_ROOT: testRepository,
         FSB_PHASE60_TEST_COMMAND_JSON: JSON.stringify([
           process.execPath,
           '-e',
@@ -123,17 +131,25 @@ function main() {
       'date-sensitive generated dirty bytes are restored exactly',
     );
 
-    const indexPath = path.join(repository, '.git/index');
+    const indexPath = resolveGitIndex(repository);
     const indexBytesBeforeStatRefresh = fs.readFileSync(indexPath);
     const indexModeBeforeStatRefresh = fs.lstatSync(indexPath).mode & 0o7777;
     const statRefreshSource = [
       "const { spawnSync } = require('node:child_process');",
       "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      "const resolved = spawnSync('git', ['rev-parse', '--git-path', 'index'], { encoding: 'utf8', env: environment, shell: false });",
+      "if (resolved.status !== 0 || !resolved.stdout.trim()) process.exit(92);",
+      "const indexPath = path.resolve(resolved.stdout.trim());",
+      "const indexBefore = fs.readFileSync(indexPath);",
       "const target = 'stat-cache-clean.txt';",
       "const before = fs.statSync(target);",
       "fs.utimesSync(target, before.atime, new Date(before.mtimeMs + 2000));",
-      "const refreshed = spawnSync('git', ['status', '--short', '--', target], { shell: false });",
-      "if (refreshed.status !== 0) process.exit(92);",
+      "const refreshed = spawnSync('git', ['status', '--short', '--', target], { env: environment, shell: false });",
+      "if (refreshed.status !== 0) process.exit(93);",
+      "if (fs.readFileSync(indexPath).equals(indexBefore)) process.exit(94);",
     ].join('\n');
     const statRefresh = runHarness(statRefreshSource);
     assert.equal(
@@ -152,6 +168,27 @@ function main() {
       indexModeBeforeStatRefresh,
       'harness preserves raw index mode after a child-only Git stat-cache refresh',
     );
+
+    const lockContentionSource = [
+      statRefreshSource,
+      "fs.writeFileSync(indexPath + '.lock', 'foreign git lock\\n');",
+    ].join('\n');
+    const lockContention = runHarness(lockContentionSource);
+    assert.equal(lockContention.status, 1, 'an existing Git index lock blocks raw restoration');
+    assert.match(lockContention.stderr, /raw Git index lock is already held/);
+    assert.equal(
+      fs.readFileSync(`${indexPath}.lock`, 'utf8'),
+      'foreign git lock\n',
+      'harness never clobbers an existing Git index lock',
+    );
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBytesBeforeStatRefresh,
+      'lock contention leaves the concurrently refreshed index untouched',
+    );
+    fs.unlinkSync(`${indexPath}.lock`);
+    fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
 
     const assumeUnchangedMutationSource = [
       "const { spawnSync } = require('node:child_process');",
@@ -201,21 +238,34 @@ function main() {
     runGit(repository, ['update-index', '--no-skip-worktree', '--', 'stat-cache-clean.txt']);
     write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
 
-    const differentIndexMode = indexModeBeforeStatRefresh ^ 0o100;
-    const indexModeMutation = runHarness([
-      "const fs = require('node:fs');",
-      `fs.chmodSync('.git/index', ${differentIndexMode});`,
-    ].join('\n'));
-    assert.equal(indexModeMutation.status, 1, 'raw index mode mutation fails closed');
-    assert.match(indexModeMutation.stderr, /raw Git index mode changed/);
-    assert.equal(
-      fs.lstatSync(indexPath).mode & 0o7777,
-      differentIndexMode,
-      'harness detects but does not overwrite a changed raw index mode',
-    );
-    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+    if (process.platform !== 'win32') {
+      const differentIndexMode = indexModeBeforeStatRefresh ^ 0o100;
+      const indexModeMutation = runHarness([
+        "const { spawnSync } = require('node:child_process');",
+        "const fs = require('node:fs');",
+        "const path = require('node:path');",
+        "const resolved = spawnSync('git', ['rev-parse', '--git-path', 'index'], { encoding: 'utf8', shell: false });",
+        "if (resolved.status !== 0 || !resolved.stdout.trim()) process.exit(95);",
+        `fs.chmodSync(path.resolve(resolved.stdout.trim()), ${differentIndexMode});`,
+      ].join('\n'));
+      assert.equal(indexModeMutation.status, 1, 'raw index mode mutation fails closed');
+      assert.match(indexModeMutation.stderr, /raw Git index mode changed/);
+      assert.equal(
+        fs.lstatSync(indexPath).mode & 0o7777,
+        differentIndexMode,
+        'harness detects but does not overwrite a changed raw index mode',
+      );
+      fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+    }
 
-    const missingIndex = runHarness("require('node:fs').unlinkSync('.git/index');");
+    const missingIndex = runHarness([
+      "const { spawnSync } = require('node:child_process');",
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const resolved = spawnSync('git', ['rev-parse', '--git-path', 'index'], { encoding: 'utf8', shell: false });",
+      "if (resolved.status !== 0 || !resolved.stdout.trim()) process.exit(96);",
+      "fs.unlinkSync(path.resolve(resolved.stdout.trim()));",
+    ].join('\n'));
     assert.equal(missingIndex.status, 1, 'missing raw index fails closed');
     assert.match(missingIndex.stderr, /raw Git index is missing|workspace preservation check failed/);
     assert.equal(fs.existsSync(indexPath), false, 'harness does not recreate a removed raw index');
@@ -223,9 +273,14 @@ function main() {
     fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
 
     const directoryIndex = runHarness([
+      "const { spawnSync } = require('node:child_process');",
       "const fs = require('node:fs');",
-      "fs.unlinkSync('.git/index');",
-      "fs.mkdirSync('.git/index');",
+      "const path = require('node:path');",
+      "const resolved = spawnSync('git', ['rev-parse', '--git-path', 'index'], { encoding: 'utf8', shell: false });",
+      "if (resolved.status !== 0 || !resolved.stdout.trim()) process.exit(97);",
+      "const indexPath = path.resolve(resolved.stdout.trim());",
+      "fs.unlinkSync(indexPath);",
+      "fs.mkdirSync(indexPath);",
     ].join('\n'));
     assert.equal(directoryIndex.status, 1, 'non-file raw index fails closed');
     assert.match(directoryIndex.stderr, /raw Git index is not a regular file|workspace preservation check failed/);
@@ -233,6 +288,44 @@ function main() {
     fs.rmSync(indexPath, { recursive: true, force: true });
     fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
     fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    const linkedWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-phase60-linked-'));
+    fs.rmSync(linkedWorktree, { recursive: true, force: true });
+    runGit(repository, ['worktree', 'add', '--detach', linkedWorktree, 'HEAD']);
+    try {
+      assert.equal(
+        fs.lstatSync(path.join(linkedWorktree, '.git')).isFile(),
+        true,
+        'linked fixture uses a .git file rather than a repository-local index directory',
+      );
+      const linkedIndexPath = resolveGitIndex(linkedWorktree);
+      assert.equal(
+        path.relative(linkedWorktree, linkedIndexPath).startsWith('..'),
+        true,
+        'linked fixture resolves its index from the worktree administration directory',
+      );
+      const linkedIndexBefore = fs.readFileSync(linkedIndexPath);
+      const linkedIndexModeBefore = fs.lstatSync(linkedIndexPath).mode & 0o7777;
+      const linkedRefresh = runHarness(statRefreshSource, { repositoryRoot: linkedWorktree });
+      assert.equal(
+        linkedRefresh.status,
+        0,
+        `linked-worktree stat-cache refresh is restored: ${linkedRefresh.stderr}`,
+      );
+      assert.deepEqual(
+        fs.readFileSync(linkedIndexPath),
+        linkedIndexBefore,
+        'linked-worktree raw index bytes are restored at the resolved administration path',
+      );
+      assert.equal(
+        fs.lstatSync(linkedIndexPath).mode & 0o7777,
+        linkedIndexModeBefore,
+        'linked-worktree raw index mode is preserved',
+      );
+    } finally {
+      runGit(repository, ['worktree', 'remove', '--force', linkedWorktree]);
+      fs.rmSync(linkedWorktree, { recursive: true, force: true });
+    }
 
     const unexpectedSource = [
       restoredDirtySource,
