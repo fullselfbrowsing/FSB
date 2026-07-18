@@ -14,6 +14,8 @@ const PHASE62_DIR = '.planning/phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
 const PRE_PHASE62_ROOT_TEST_HASH = 'cc320c1dfb3fefb292ebb8edc789993ec5fcd42a2b2ec2a057a37d4c49281808';
+const PHASE63_DIR = '.planning/phases/63-native-messaging-host';
+const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
@@ -157,6 +159,112 @@ function checkEvidence(label, rows) {
 function decodeXml(value) {
   return value.replace(/&amp;/g, '&').trim();
 }
+
+function runPhase63UatLedgerContract() {
+  console.log('\n--- Phase 63 milestone-end human UAT ledger ---');
+
+  check(exists(PHASE63_UAT_PATH), 'Phase 63 human UAT ledger exists');
+  if (!exists(PHASE63_UAT_PATH)) return;
+
+  const phase63Uat = read(PHASE63_UAT_PATH);
+  check(/^phase: 63$/m.test(phase63Uat)
+    && /^status: human_needed$/m.test(phase63Uat)
+    && /^deferred_until: milestone-end$/m.test(phase63Uat)
+    && /^deferred_by: user$/m.test(phase63Uat)
+    && /^results_recorded: false$/m.test(phase63Uat)
+    && /^live_checks: 8$/m.test(phase63Uat),
+  'Phase 63 ledger frontmatter remains an unexecuted eight-check milestone-end queue');
+  check(phase63Uat.includes('single v0.9.91 milestone-end sweep')
+    && phase63Uat.includes('none is live UAT')
+    && phase63Uat.includes('none may check off a heading or populate a result or evidence field'),
+  'the ledger explicitly preserves the user-directed single v0.9.91 deferral');
+  for (const nonLiveEvidence of [
+    'Source inspection',
+    'synthetic DOM tests',
+    'mocked native framing',
+    'platform-adapter tests',
+    'packed-artifact checks',
+  ]) {
+    check(phase63Uat.includes(nonLiveEvidence),
+      `ledger refuses to treat ${nonLiveEvidence} as live UAT`);
+  }
+
+  const headings = Array.from(
+    phase63Uat.matchAll(/^### \[([^\]]*)\] (UAT63-\d{2})\b[^\n]*$/gm),
+    (match) => ({ marker: match[1], id: match[2] }),
+  );
+  equal(headings, Array.from({ length: 8 }, (_, index) => ({
+    marker: ' ',
+    id: `UAT63-${String(index + 1).padStart(2, '0')}`,
+  })), 'Phase 63 ledger contains exactly eight ordered unchecked UAT ids');
+
+  const blocks = phase63Uat.split(/^### \[ \] /m).slice(1);
+  check(blocks.length === 8, 'each Phase 63 UAT heading owns exactly one scenario block');
+  for (const block of blocks) {
+    const id = (block.match(/^(UAT63-\d{2})\b/) || [null, 'unknown'])[1];
+    check(exactOccurrences(block, 'status: human_needed') === 1,
+      `${id} remains status: human_needed`);
+    check(exactOccurrences(block, 'result: pending') === 1,
+      `${id} remains result: pending`);
+    check(/^evidence:[ \t]*\n[ \t]*\nreferences:/m.test(block),
+      `${id} keeps its evidence field empty`);
+    check(/^prerequisites:\s+\S+/m.test(block)
+      && /^steps:\s*$/m.test(block)
+      && /^expected:\s+\S+/m.test(block),
+    `${id} retains prerequisites, steps, and an expected result`);
+  }
+  check(exactOccurrences(phase63Uat, 'status: human_needed') === 9
+    && exactOccurrences(phase63Uat, 'result: pending') === 8
+    && exactOccurrences(phase63Uat, 'evidence:') === 8,
+  'ledger field counts are exact, including its human-needed frontmatter');
+  check(!/^### \[[^ ]\] UAT63-/m.test(phase63Uat)
+    && !/^status:\s*(?:complete|green)\b/im.test(phase63Uat)
+    && !/^result:\s*(?!pending\s*$)\S+/im.test(phase63Uat)
+    && !/^evidence:[ \t]+\S+/m.test(phase63Uat)
+    && !/^evidence:[ \t]*\n(?![ \t]*\nreferences:)/m.test(phase63Uat),
+  'ledger contains no checked marker, completed field, nonpending result, or populated evidence');
+
+  const scenarioTokens = [
+    ['UAT63-01', ['macOS published-id', 'silent boot probe', 'daemon already running', 'text and JSON doctor', 'uninstall']],
+    ['UAT63-02', ['macOS unpacked explicit id', 'known explicit extension id', 'allowlist mismatch', 'refused']],
+    ['UAT63-03', ['Linux Google Chrome', 'user-scope native host', 'offline delegation', 'already running', 'exact-owned cleanup']],
+    ['UAT63-04', ['Windows x64', 'HKCU 64-bit-view shadow', '32-bit view', 'packaged `.exe`', 'never use HKLM']],
+    ['UAT63-05', ['Windows arm64', 'packaged arm64', 'parent-window', 'inherited native streams', 'exit propagation']],
+    ['UAT63-06', ['Published and unpacked Chrome', 'host missing', 'malformed reply', 'timeout', 'wrong-product', 'ready', 'unpaired', 'never replay']],
+    ['UAT63-07', ['light and dark themes', '`<=350px`', 'browser zoom', 'forced-colors', 'reduced motion']],
+    ['UAT63-08', ['Keyboard focus', 'screen reader', 'shared live region', 'causal order', 'cold hydration remains silent']],
+  ];
+  for (let index = 0; index < scenarioTokens.length; index += 1) {
+    const [id, tokens] = scenarioTokens[index];
+    const block = blocks[index] || '';
+    for (const token of tokens) {
+      check(block.toLowerCase().includes(token.toLowerCase()),
+        `${id} retains genuine scenario coverage: ${token}`);
+    }
+  }
+
+  const phase63Plans = fs.readdirSync(path.join(ROOT, PHASE63_DIR))
+    .filter((name) => /^63-\d{2}-PLAN\.md$/.test(name))
+    .map((name) => read(`${PHASE63_DIR}/${name}`));
+  check(phase63Plans.length === 12
+    && phase63Plans.every((plan) => !/<task\s+type=["']checkpoint/.test(plan)),
+  'all twelve Phase 63 plans remain free of blocking checkpoints');
+}
+
+const sectionArgs = process.argv.slice(2);
+if (sectionArgs.length > 0) {
+  if (sectionArgs.length !== 2
+      || sectionArgs[0] !== '--section'
+      || sectionArgs[1] !== 'phase63-uat-ledger') {
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger]');
+    process.exit(2);
+  }
+  runPhase63UatLedgerContract();
+  console.log(`\n=== Phase 63 UAT ledger results: ${passed} passed, ${failed} failed ===`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+runPhase63UatLedgerContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.
@@ -1413,5 +1521,5 @@ check(uat6201.includes('pending until a human reviews the comparison during the 
   && fixtureManifest.liveCapturePending === true,
   'genuine capture comparison and schema-derived fixture provenance remain pending');
 
-console.log(`\n=== Phase 61-62 contract results: ${passed} passed, ${failed} failed ===`);
+console.log(`\n=== Phase 61-63 contract results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);
