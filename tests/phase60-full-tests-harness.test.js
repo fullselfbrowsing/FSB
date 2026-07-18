@@ -153,6 +153,54 @@ function main() {
       'harness preserves raw index mode after a child-only Git stat-cache refresh',
     );
 
+    const assumeUnchangedMutationSource = [
+      "const { spawnSync } = require('node:child_process');",
+      "const fs = require('node:fs');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      "const marked = spawnSync('git', ['update-index', '--assume-unchanged', '--', 'stat-cache-clean.txt'], { env: environment, shell: false });",
+      "if (marked.status !== 0) process.exit(93);",
+      "fs.writeFileSync('stat-cache-clean.txt', 'assume-unchanged hid this mutation\\n');",
+    ].join('\n');
+    const assumeUnchangedMutation = runHarness(assumeUnchangedMutationSource);
+    assert.equal(
+      assumeUnchangedMutation.status,
+      1,
+      'assume-unchanged index intent cannot hide a tracked worktree mutation',
+    );
+    assert.match(assumeUnchangedMutation.stderr, /index semantic identity changed/);
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'stat-cache-clean.txt'), 'utf8'),
+      'assume-unchanged hid this mutation\n',
+      'harness detects but does not overwrite the hidden worktree mutation',
+    );
+    runGit(repository, ['update-index', '--no-assume-unchanged', '--', 'stat-cache-clean.txt']);
+    write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
+
+    const skipWorktreeMutationSource = [
+      "const { spawnSync } = require('node:child_process');",
+      "const fs = require('node:fs');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      "const marked = spawnSync('git', ['update-index', '--skip-worktree', '--', 'stat-cache-clean.txt'], { env: environment, shell: false });",
+      "if (marked.status !== 0) process.exit(94);",
+      "fs.writeFileSync('stat-cache-clean.txt', 'skip-worktree hid this mutation\\n');",
+    ].join('\n');
+    const skipWorktreeMutation = runHarness(skipWorktreeMutationSource);
+    assert.equal(
+      skipWorktreeMutation.status,
+      1,
+      'skip-worktree index intent cannot hide a tracked worktree mutation',
+    );
+    assert.match(skipWorktreeMutation.stderr, /index semantic identity changed/);
+    assert.equal(
+      fs.readFileSync(path.join(repository, 'stat-cache-clean.txt'), 'utf8'),
+      'skip-worktree hid this mutation\n',
+      'harness detects but does not overwrite the skip-worktree mutation',
+    );
+    runGit(repository, ['update-index', '--no-skip-worktree', '--', 'stat-cache-clean.txt']);
+    write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
+
     const differentIndexMode = indexModeBeforeStatRefresh ^ 0o100;
     const indexModeMutation = runHarness([
       "const fs = require('node:fs');",
