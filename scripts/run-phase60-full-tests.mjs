@@ -98,22 +98,43 @@ function sameGitIndex(left, right) {
 
 class GitIndexPreservationError extends Error {}
 
+function sameOwnedLockIdentity(stat, identity) {
+  return (
+    stat.isFile()
+    && !stat.isSymbolicLink()
+    && stat.dev === identity.dev
+    && stat.ino === identity.ino
+    && (stat.mode & 0o7777) === (identity.mode & 0o7777)
+  );
+}
+
 function removeOwnedIndexLock(lockPath, lockIdentity) {
   if (!lockIdentity) return;
   try {
     const stat = lstatSync(lockPath);
-    if (
-      stat.isFile()
-      && !stat.isSymbolicLink()
-      && stat.dev === lockIdentity.dev
-      && stat.ino === lockIdentity.ino
-    ) {
+    if (sameOwnedLockIdentity(stat, lockIdentity)) {
       unlinkSync(lockPath);
     }
   } catch (error) {
     if (!error || error.code !== 'ENOENT') {
       throw new GitIndexPreservationError('raw Git index lock cleanup failed');
     }
+  }
+}
+
+function assertOwnedIndexLock(lockPath, lockIdentity, snapshot) {
+  let stat;
+  try {
+    stat = lstatSync(lockPath);
+  } catch {
+    throw new GitIndexPreservationError('raw Git index lock identity changed');
+  }
+  if (
+    !sameOwnedLockIdentity(stat, lockIdentity)
+    || stat.size !== snapshot.bytes.length
+    || !sameGitIndex(captureGitIndex(lockPath), snapshot)
+  ) {
+    throw new GitIndexPreservationError('raw Git index lock identity changed');
   }
 }
 
@@ -138,6 +159,14 @@ function restoreGitIndexAtomically(
   expectedCurrent,
   expectedSemanticIdentity,
 ) {
+  /*
+   * Threat boundary: Git-compliant writers exclusively create index.lock and
+   * never replace a lock owned by another writer. Node does not expose
+   * unlinkat/renameat-by-file-descriptor, so a process deliberately violating
+   * that protocol could still race a pathname operation. We revalidate our
+   * lock's inode, type, mode, size, and bytes immediately before rename and
+   * verify the installed index afterward; any observed violation fails closed.
+   */
   const lockPath = `${indexPath}.lock`;
   let lockFd;
   let lockIdentity;
@@ -167,6 +196,14 @@ function restoreGitIndexAtomically(
     fchmodSync(lockFd, snapshot.mode);
     writeFileSync(lockFd, snapshot.bytes);
     fsyncSync(lockFd);
+    lockIdentity = fstatSync(lockFd);
+    if (
+      !lockIdentity.isFile()
+      || (lockIdentity.mode & 0o7777) !== snapshot.mode
+      || lockIdentity.size !== snapshot.bytes.length
+    ) {
+      throw new GitIndexPreservationError('raw Git index lock identity changed');
+    }
     closeSync(lockFd);
     lockFd = undefined;
 
@@ -174,6 +211,7 @@ function restoreGitIndexAtomically(
       throw new GitIndexPreservationError('raw Git index changed during restoration');
     }
 
+    assertOwnedIndexLock(lockPath, lockIdentity, snapshot);
     renameSync(lockPath, indexPath);
     committed = true;
     fsyncIndexDirectory(indexPath);
@@ -204,6 +242,84 @@ function restoreGitIndexAtomically(
 
 function nulPaths(value) {
   return value.toString('utf8').split('\0').filter((entry) => entry.length > 0);
+}
+
+function splitNulRecords(value) {
+  if (value.length === 0) return [];
+  if (value[value.length - 1] !== 0) {
+    throw new GitIndexPreservationError('index debug identity format is unsupported');
+  }
+  const records = [];
+  let start = 0;
+  for (let offset = 0; offset < value.length; offset += 1) {
+    if (value[offset] !== 0) continue;
+    if (offset === start) {
+      throw new GitIndexPreservationError('index debug identity format is unsupported');
+    }
+    records.push(value.subarray(start, offset));
+    start = offset + 1;
+  }
+  return records;
+}
+
+function findMetadataEnd(value, start) {
+  let lineCount = 0;
+  const maximumMetadataBytes = 1024;
+  for (let offset = start; offset < value.length; offset += 1) {
+    if (offset - start > maximumMetadataBytes) break;
+    if (value[offset] === 0x0a) {
+      lineCount += 1;
+      if (lineCount === 5) return offset + 1;
+    }
+  }
+  throw new GitIndexPreservationError('index debug identity format is unsupported');
+}
+
+function captureIntentToAddIdentity(label) {
+  const cached = captureGitBuffer(
+    ['ls-files', '--cached', '-z'],
+    label + ' cached index path capture',
+  );
+  const debug = captureGitBuffer(
+    ['ls-files', '--cached', '--debug', '-z'],
+    label + ' intent-to-add identity capture',
+  );
+  const cachedPaths = splitNulRecords(cached);
+  const hash = createHash('sha256');
+  updateField(hash, 'phase60-intent-to-add-v1');
+  let cursor = 0;
+
+  for (const cachedPath of cachedPaths) {
+    const pathEnd = cursor + cachedPath.length;
+    if (
+      pathEnd >= debug.length
+      || !debug.subarray(cursor, pathEnd).equals(cachedPath)
+      || debug[pathEnd] !== 0
+    ) {
+      throw new GitIndexPreservationError('index debug identity format is unsupported');
+    }
+    cursor = pathEnd + 1;
+    const metadataEnd = findMetadataEnd(debug, cursor);
+    const metadata = debug.subarray(cursor, metadataEnd).toString('ascii');
+    const match = /^  ctime: \d+:\d+\n  mtime: \d+:\d+\n  dev: \d+\tino: \d+\n  uid: \d+\tgid: \d+\n  size: \d+\tflags: ([0-9a-f]+)\n$/.exec(metadata);
+    if (!match) {
+      throw new GitIndexPreservationError('index debug identity format is unsupported');
+    }
+    let parsedFlags;
+    try {
+      // Git prints this field in hexadecimal even when it contains digits only.
+      parsedFlags = BigInt('0x' + match[1]);
+    } catch {
+      throw new GitIndexPreservationError('index debug identity format is unsupported');
+    }
+    updateField(hash, cachedPath);
+    updateField(hash, (parsedFlags & 0x20000000n) !== 0n ? 'intent-to-add' : 'ordinary');
+    cursor = metadataEnd;
+  }
+  if (cursor !== debug.length) {
+    throw new GitIndexPreservationError('index debug identity format is unsupported');
+  }
+  return hash.digest();
 }
 
 function updateField(hash, value) {
@@ -312,11 +428,13 @@ function captureIndexSemanticIdentity(label) {
    * This identity excludes only representation/performance data that Git may
    * regenerate without changing user intent: stat tuples, fsmonitor-valid
    * bits/FSMN, cache-tree/TREE, untracked-cache/UNTR, split-index/LINK, and
-   * EOIE/IEOT offsets. The three porcelain projections below retain the
+   * EOIE/IEOT offsets. The four projections below retain the
    * complete staged contract instead:
    * - --stage: mode, object id, conflict stage, path, sparse-directory entry,
-   *   and intent-to-add's zero object id.
+   *   including duplicate-path conflict stages.
    * - -v: assume-unchanged casing plus skip-worktree/sparse status.
+   * - --debug: only CE_INTENT_TO_ADD (0x20000000), extracted through a
+   *   fail-closed NUL-safe parser; all diagnostic stat/cache fields are ignored.
    * - --resolve-undo: REUC conflict-resolution records.
    */
   const staged = captureGitBuffer(
@@ -327,14 +445,16 @@ function captureIndexSemanticIdentity(label) {
     ['ls-files', '--cached', '-v', '-z'],
     `${label} index flag identity capture`,
   );
+  const intentToAdd = captureIntentToAddIdentity(label);
   const resolveUndo = captureGitBuffer(
     ['ls-files', '--resolve-undo', '-z'],
     `${label} resolve-undo identity capture`,
   );
   const hash = createHash('sha256');
-  updateField(hash, 'phase60-index-semantic-v2');
+  updateField(hash, 'phase60-index-semantic-v3');
   updateField(hash, staged);
   updateField(hash, flags);
+  updateField(hash, intentToAdd);
   updateField(hash, resolveUndo);
   return hash.digest('hex');
 }
@@ -583,7 +703,13 @@ try {
   ) {
     try {
       const finalIndex = captureGitIndex(indexPath);
-      if (finalIndex.kind === 'file' && finalIndex.mode === indexBefore.mode) {
+      if (finalIndex.kind === 'missing') {
+        failures.push('final raw Git index is missing after restoration');
+      } else if (finalIndex.kind !== 'file') {
+        failures.push('final raw Git index is not a regular file after restoration');
+      } else if (finalIndex.mode !== indexBefore.mode) {
+        failures.push('final raw Git index mode differs after restoration');
+      } else {
         if (!finalIndex.bytes.equals(indexBefore.bytes)) {
           restoreGitIndexAtomically(
             indexPath,
