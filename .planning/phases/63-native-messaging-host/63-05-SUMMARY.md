@@ -187,3 +187,12 @@ None during autonomous implementation.
 ---
 *Phase: 63-native-messaging-host*
 *Completed: 2026-07-17*
+
+## Review Remediation Addendum — 2026-07-18 (`F63-CODE-05`)
+
+- Finding `F63-CODE-05` is closed by RED commit `688846ea` and GREEN commit `566887c7`.
+- Windows registration classification now requires an explicit `absent` fact from the HKCU user/64 shadow view before it can classify registration as absent or exact. Missing or unavailable shadow evidence is unavailable, never a clear-shadow fact.
+- Install and uninstall recheck that explicit shadow absence at each publication or removal boundary. Only the canonical HKCU user/32 view is writable; the user/64 view remains inspection-only, and canonical empty-key cleanup follows exact owned-value removal.
+- The GREEN gate passed all 125 platform/registration assertions and all 229 transaction assertions, including initial state, idempotence, both publication boundaries, rollback after canonical write, uninstall rechecks, exact removal, and empty-key cleanup. Source and compiled native-boundary verification and workspace preservation also passed.
+- The final focused matrix passed the complete installer, diagnostics, platform, and Phase 63 seams plus the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
+- Genuine Windows HKCU/WOW64 behavior remains `human_needed`; no registry, browser, native host, or human UAT was run or claimed.

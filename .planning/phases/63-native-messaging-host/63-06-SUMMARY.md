@@ -177,3 +177,12 @@ None during autonomous implementation.
 - The production-composition test performs a real temporary-home install, idempotent reinstall, and uninstall without injecting fake `NativeHostCliOperations`; the prior production-refusal expectation is gone. The GREEN gate passed all 789 installer assertions, all 75 then-current platform assertions, `workflow-and-pack`, source and compiled native-boundary verification, and workspace identity restoration.
 - The final `node scripts/run-phase63-focused-tests.mjs` matrix passed the expanded 96-assertion platform/production-composition suite, the complete installer and packaging gates, and the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
 - This addendum supersedes the earlier unresolved production-composer scope-boundary statements. Genuine macOS/Linux/Windows browser integration and live registry/native-host behavior remain `human_needed` and unclaimed.
+
+## Review Remediation Addendum — 2026-07-18 (`F63-CODE-04`)
+
+- Finding `F63-CODE-04` is closed by RED commit `512b5e03` and GREEN commit `3d9cdd70`.
+- Production install now resolves npm only from a closed set of validated `npm/bin/npm-cli.js` candidates rooted beneath the real executing Node prefix or the invoking package's global `node_modules` root. It ignores `npm_execpath`, performs no `PATH` search, retains `shell:false`, and keeps the materialization recipe offline.
+- Production uninstall now composes only the stable layout, persisted receipt inspection, and exact removal adapters. It has no npm CLI, Node executable, package-manifest, materializer, or install-token dependency.
+- Direct installed-bin tests with `npm_execpath` absent prove install, idempotent reinstall, and uninstall. A malicious absolute inherited npm candidate is never executed, and invalid inherited npm state does not affect trusted resolution or uninstall.
+- The GREEN gate passed all 101 platform/production CLI assertions, the 193-assertion install transaction section, all 152 CLI-routing assertions, all 54 bounded-output assertions, source and compiled native-boundary verification, and workspace preservation. The final focused matrix passed the complete Phase 63 seams and the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
+- Genuine installed-bin behavior on supported macOS, Linux, and Windows remains `human_needed`; no browser, native host, platform installer, or human UAT was run or claimed.

@@ -201,3 +201,12 @@ None during autonomous implementation.
 - The workspace-preserving GREEN gate passed source and compiled native-boundary verification, all 209 daemon/entry assertions, the complete native protocol suite, and all 111 background-wake assertions. Real-filesystem coverage also proves non-replacement of an existing empty lock, mismatched-token refusal, and preservation of foreign roster entries.
 - The final `node scripts/run-phase63-focused-tests.mjs` matrix also passed, including the 209-assertion daemon suite and the 1,014-assertion Phase 61–63 contract gate, with complete workspace identity preserved.
 - No live daemon, browser, registry, native host, or human UAT was run or claimed; the existing milestone-end live-evidence deferral remains unchanged.
+
+## Review Remediation Addendum — 2026-07-18 (`F63-CODE-06`)
+
+- Finding `F63-CODE-06` is closed by RED commit `e91a2d76` and GREEN commit `cf02002a`.
+- Every canonical wake-lock publication and stale recovery now runs under one OS-backed exclusive loopback lease. The owner retains that lease through child spawn, factual readiness, identity-bound canonical release, and cleanup; acquisition failure is a contender fact, and process exit releases the listener without PID, signal, or kill authority.
+- Stale recovery and release additionally bind each claim to the exact directory identity, sorted bounded roster, and raw owner bytes observed under the lease. A changed, unavailable, empty, malformed, or foreign directory never broadens cleanup authority.
+- The RED schedule deterministically paused contender B after it observed stale owner S, allowed A to replace S and publish fresh owner A, then resumed B; the pre-fix implementation quarantined A and produced seven failures. The GREEN schedule proves B and a third contender cannot enter publication while A holds the lease, fresh A remains canonical, and exactly one child is spawned.
+- The workspace-preserving GREEN gate passed source and compiled native-boundary verification, all 229 daemon/entry assertions, and all 111 background-wake assertions. The final focused matrix passed the complete Phase 63 seams and the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
+- No live daemon, browser, native host, or human UAT was run or claimed; the existing milestone-end live-evidence deferral remains unchanged.
