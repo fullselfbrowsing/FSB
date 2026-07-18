@@ -351,8 +351,9 @@ function installDomStub(idMap) {
 
   // 4.3 sidepanel.js carries the runtime gate inside handleSendMessage
   const handleSendBodyMatch = sidepanelSrcForP4.match(/async function handleSendMessage\(\)\s*\{[\s\S]*?^\}/m);
-  ok(handleSendBodyMatch && /if \(await _isActiveTabForeignOwned\(\)\) return;/.test(handleSendBodyMatch[0]),
-     'Part 4.3 -- handleSendMessage body contains _isActiveTabForeignOwned runtime gate');
+  ok(handleSendBodyMatch
+      && /if \(await _isActiveTabForeignOwned\(\)\)\s*\{[\s\S]*?_clearDelegationPreflightIntent\(intentId\);[\s\S]*?updateSendButtonState\(\);[\s\S]*?return;[\s\S]*?\}/.test(handleSendBodyMatch[0]),
+     'Part 4.3 -- handleSendMessage foreign-owner gate clears the reserved intent before returning');
 
   // 4.4 sidepanel.css carries .fsb-foreign-owned-disabled rule
   ok(/\.fsb-foreign-owned-disabled\s*\{[^}]*opacity:\s*0\.45[^}]*pointer-events:\s*none/s.test(sidepanelCssSrc),
