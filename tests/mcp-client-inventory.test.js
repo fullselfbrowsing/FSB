@@ -268,7 +268,11 @@ async function main() {
       /await runtime\.bridge\.connect\(\);\s*void pushMcpClientInventory\(runtime\.bridge\);/,
       'stdio pushes inventory immediately after bridge connect',
     );
-    assert.match(indexSource, /await startServeDelegation\(\{ host, port \}\);/);
+    assert.match(
+      indexSource,
+      /const lifecycle = await startServeDelegation\(\{\s*host,\s*port,\s*dependencies:\s*\{\s*prepareBridgeAuth: \(\) => \{\s*rotateBridgeSessionSecret\(\);\s*\},\s*\},\s*\}\);/,
+      'serve mode composes inventory startup with post-bind bridge-auth rotation',
+    );
     const serveLifecycleSource = fs.readFileSync(
       path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'serve-delegation.ts'),
       'utf8',
