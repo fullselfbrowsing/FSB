@@ -116,6 +116,8 @@ function createWakeHarness(options = {}) {
     readPrivateFile: [],
     renameDirectory: [],
     removeDirectory: [],
+    removeAttemptDirectory: [],
+    removeOwnedDirectory: [],
     spawn: [],
     unref: 0,
     wait: [],
@@ -130,7 +132,16 @@ function createWakeHarness(options = {}) {
   let now = options.now ?? 0;
   let tokenIndex = 0;
 
-  if (options.initialLock) {
+  if (Object.hasOwn(options, 'initialLockContents')) {
+    const files = new Map();
+    if (typeof options.initialLockContents === 'string') {
+      files.set(metadataPath, options.initialLockContents);
+    }
+    for (const [relativePath, contents] of options.initialLockFiles || []) {
+      files.set(`${lockPath}/${relativePath}`, contents);
+    }
+    directories.set(lockPath, files);
+  } else if (options.initialLock) {
     directories.set(lockPath, new Map([
       [metadataPath, JSON.stringify(options.initialLock)],
     ]));
@@ -192,6 +203,9 @@ function createWakeHarness(options = {}) {
     writePrivateFile: async (pathname, contents, mode) => {
       calls.writePrivateFile.push({ pathname, contents, mode });
       trace.push(`write:${pathname}`);
+      if (options.failWrite === true || options.failWrite?.({ pathname, contents, mode, state })) {
+        throw new Error('fake_write_refused');
+      }
       const directory = directories.get(path.dirname(pathname));
       if (!directory || directory.has(pathname)) throw new Error('fake_write_refused');
       directory.set(pathname, contents);
@@ -217,6 +231,31 @@ function createWakeHarness(options = {}) {
       calls.removeDirectory.push(pathname);
       trace.push(`remove:${pathname}`);
       directories.delete(pathname);
+    },
+    removeAttemptDirectory: async (pathname, token) => {
+      calls.removeAttemptDirectory.push({ pathname, token });
+      trace.push(`remove-attempt:${pathname}:${token}`);
+      const directory = directories.get(pathname);
+      if (!pathname.endsWith(`.pending-${token}`) || !directory) return false;
+      if ([...directory.keys()].some((entry) => entry !== `${pathname}/owner.json`)) return false;
+      directories.delete(pathname);
+      return true;
+    },
+    removeOwnedDirectory: async (pathname, directoryToken, ownerToken) => {
+      calls.removeOwnedDirectory.push({ pathname, directoryToken, ownerToken });
+      trace.push(`remove-owned:${pathname}:${directoryToken}:${ownerToken}`);
+      const directory = directories.get(pathname);
+      if (!pathname.endsWith(`-${directoryToken}`) || !directory || directory.size !== 1) return false;
+      const rawMetadata = directory.get(`${pathname}/owner.json`);
+      if (typeof rawMetadata !== 'string') return false;
+      try {
+        const metadata = JSON.parse(rawMetadata);
+        if (metadata.token !== ownerToken) return false;
+      } catch (_error) {
+        return false;
+      }
+      directories.delete(pathname);
+      return true;
     },
     spawn: (command, argv, spawnOptions) => {
       calls.spawn.push({ command, argv, options: spawnOptions });
@@ -586,13 +625,55 @@ async function runWakeDaemonSection() {
     assertEqual(Object.hasOwn(invocation.options.env, 'OMIT_UNDEFINED'), false, 'spawn omits undefined environment values');
     assertEqual(harness.state.calls.unref, 1, 'spawn is unrefed only after its spawn event');
     assertEqual(harness.state.directories.has(harness.state.lockPath), false, 'owner releases its exact lock');
-    const metadata = JSON.parse(harness.state.calls.writePrivateFile[0].contents);
+    const ownerWrite = harness.state.calls.writePrivateFile[0];
+    const metadata = JSON.parse(ownerWrite.contents);
     assertEqual(
       JSON.stringify(Object.keys(metadata)),
       JSON.stringify(['schema', 'token', 'createdAt']),
       'wake lock metadata has only schema, token, and createdAt',
     );
     assertEqual(Object.hasOwn(metadata, 'pid'), false, 'wake lock never records a PID');
+    const publish = harness.state.calls.renameDirectory.find(({ destination }) => (
+      destination === harness.state.lockPath
+    ));
+    assert(
+      publish?.source === `${harness.state.lockPath}.pending-${metadata.token}`,
+      'owner metadata is written in its exact tokened staging directory before canonical publication',
+    );
+    assertEqual(
+      ownerWrite.pathname,
+      `${publish?.source}/owner.json`,
+      'the atomically published directory already contains its owner metadata',
+    );
+    assert(
+      harness.state.trace.indexOf(`write:${ownerWrite.pathname}`)
+        < harness.state.trace.indexOf(`rename:${publish?.source}->${publish?.destination}`),
+      'owner metadata publication precedes the canonical rename',
+    );
+  }
+
+  {
+    const harness = createWakeHarness({
+      failWrite: true,
+      health: async () => new Error('offline'),
+    });
+    const result = await daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: harness.dependencies,
+    });
+    assertEqual(result.outcome, 'failed', 'owner metadata publication failure is closed');
+    assertEqual(result.reason, 'internal_failure', 'owner metadata publication failure uses the frozen internal reason');
+    assertEqual(harness.state.calls.spawn.length, 0, 'failed owner publication never starts a child');
+    assertEqual(harness.state.directories.has(harness.state.lockPath), false, 'failed owner publication leaves no canonical lock');
+    assertEqual(harness.state.directories.size, 0, 'failed owner publication removes its exact attempt directory');
+    assertEqual(harness.state.calls.removeAttemptDirectory.length, 1, 'failed owner publication invokes one attempt-scoped cleanup');
+    const cleanup = harness.state.calls.removeAttemptDirectory[0];
+    assertEqual(
+      cleanup?.pathname,
+      `${harness.state.lockPath}.pending-${cleanup?.token}`,
+      'attempt cleanup is bound to the same unguessable directory token',
+    );
+    assertEqual(harness.state.calls.removeOwnedDirectory.length, 0, 'failed publication cannot claim an owned canonical lock');
   }
 
   {
@@ -617,6 +698,63 @@ async function runWakeDaemonSection() {
       [first.reason, second.reason].sort().join(','),
       'daemon_already_ready,daemon_started_ready',
       'concurrent settlements remain closed lifecycle facts',
+    );
+  }
+
+  {
+    const harness = createWakeHarness({
+      initialLockContents: null,
+      health: async (state) => (
+        state.calls.spawn.length > 0 ? readyHealth() : new Error('offline')
+      ),
+    });
+    const result = await daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: harness.dependencies,
+    });
+    assertEqual(result.outcome, 'started', 'an empty abandoned lock is quarantined and recovered');
+    assertEqual(harness.state.calls.spawn.length, 1, 'empty-lock recovery starts at most one child');
+    const quarantine = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
+    assert(Boolean(quarantine), 'the empty lock is moved aside atomically before a new owner is published');
+    assertEqual(
+      harness.state.directories.has(quarantine?.destination),
+      true,
+      'an unowned empty quarantine is preserved instead of recursively deleted',
+    );
+    assertEqual(
+      harness.state.calls.removeOwnedDirectory.some(({ pathname }) => pathname === quarantine?.destination),
+      false,
+      'empty quarantine contents are never claimed by owned-lock cleanup',
+    );
+  }
+
+  {
+    const harness = createWakeHarness({
+      initialLockContents: '{',
+      initialLockFiles: [['foreign.txt', 'do not delete']],
+      health: async (state) => (
+        state.calls.spawn.length > 0 ? readyHealth() : new Error('offline')
+      ),
+    });
+    const result = await daemon.wakeServeDaemon({
+      runtime: harness.runtime,
+      dependencies: harness.dependencies,
+    });
+    assertEqual(result.outcome, 'started', 'a malformed abandoned lock is quarantined and recovered');
+    assertEqual(harness.state.calls.spawn.length, 1, 'malformed-lock recovery starts at most one child');
+    const quarantine = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
+    const quarantinedFiles = harness.state.directories.get(quarantine?.destination);
+    assert(Boolean(quarantine), 'the malformed lock is moved aside atomically before replacement');
+    assertEqual(quarantinedFiles?.size, 2, 'malformed and foreign quarantine entries are preserved');
+    assertEqual(
+      quarantinedFiles?.get(`${quarantine?.destination}/foreign.txt`),
+      'do not delete',
+      'foreign quarantine contents are untouched',
+    );
+    assertEqual(
+      harness.state.calls.removeOwnedDirectory.some(({ pathname }) => pathname === quarantine?.destination),
+      false,
+      'malformed quarantine contents are never claimed by owned-lock cleanup',
     );
   }
 
