@@ -611,6 +611,33 @@ assert(panelSource.includes('intentId: intentId')
     && panelSource.includes('pendingEditRevision')
     && panelSource.includes('_delegationComposerEditRevision += 1'),
   'Send snapshots exact composer bytes plus a monotonic edit revision and carries a safe intent id');
+const nativeWakeRenderSource = extractNamedFunction(
+  panelSource, '_renderDelegationNativeWakeChecking'
+);
+const nativeWakeRuntimeSource = extractNamedFunction(
+  panelSource, '_handleDelegationNativeWakeChecking'
+);
+assert(!/connectNative|sendNativeMessage|nativeMessaging|child_process|\bexec\s*\(|\bspawn\s*\(|process\.platform/i.test(
+  nativeWakeRenderSource + '\n' + nativeWakeRuntimeSource
+), 'side-panel checking has no native, process, shell, or platform authority');
+assert(!/message\.(?:reason|detail|path|platform|manifest|registry|binary|secret|task)\b/.test(
+  nativeWakeRuntimeSource
+), 'checking parses only attempt and intent identity, never native detail');
+assert(!/_delegationAction|createElement\(['"]button|success|toast/i.test(nativeWakeRenderSource),
+  'checking creates no action, optimistic success, or toast surface');
+assert(!htmlSource.includes('nativeWake') && !htmlSource.includes('native-wake'),
+  'checking adds no static card or live region to sidepanel.html');
+
+assert(/\.delegation-state-card\[data-delegation-state="native-wake-checking"\][^{]*\{[^}]*border-left-color:\s*var\(--fsb-info\)/s.test(cssSource),
+  'checking card spends only the existing info token');
+assert(/\.delegation-native-wake-spinner\s*\{[^}]*color:\s*var\(--fsb-info\)[^}]*animation:\s*delegation-native-wake-spin/s.test(cssSource),
+  'checking spinner uses the info token and one named motion cue');
+assert(/@media \(max-width: 350px\)[\s\S]*?\.delegation-native-wake-heading[\s\S]*?overflow-wrap:\s*anywhere[\s\S]*?\.delegation-native-wake-body/s.test(cssSource),
+  'checking heading and body wrap at the approved narrow breakpoint');
+assert(/@media \(forced-colors: active\)[\s\S]*?native-wake-checking[\s\S]*?CanvasText[\s\S]*?delegation-native-wake-spinner/s.test(cssSource),
+  'forced-colors retains a card and spinner cue');
+assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wake-spinner[\s\S]*?animation:\s*none !important[\s\S]*?transition:\s*none !important[\s\S]*?transform:\s*none !important/s.test(cssSource),
+  'reduced-motion removes all spinner motion');
 
 (async function runInteractionContract() {
   {
@@ -860,6 +887,359 @@ assert(panelSource.includes('intentId: intentId')
     assert.equal(consentCalls, 0, 'byte mismatch fences continuation even without a delivered input event');
     assert.equal(startCalls, 0);
     assert.equal(state.pendingPreflight, false);
+  }
+
+  {
+    const run = new TestNode('section');
+    const stateCard = new TestNode('div');
+    const feed = new TestNode('div');
+    const control = new TestNode('div');
+    run.appendChild(stateCard);
+    run.appendChild(feed);
+    const headers = [];
+    const composerLocks = [];
+    const context = {
+      document: globalThis.document,
+      _delegationUiState: { mode: 'ready', errorCode: null },
+      _delegationRunStopControls: [],
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+      _clearDelegationElapsedTimer() {},
+      _restoreLegacyStopControl() {},
+      _copyDelegationDoctorCommand() {},
+      _openDelegationProviderSetup() {},
+      _backToDelegationMessage() {},
+      _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); },
+      _setDelegationComposerLocked(value) { composerLocks.push(value); }
+    };
+    vm.createContext(context);
+    [
+      '_clearDelegationNode',
+      '_delegationElement',
+      '_delegationSemanticIcon',
+      '_delegationSemanticHeading',
+      '_delegationAction',
+      '_renderDelegationPreflightFailure'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'agent_offline',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    assert.equal(run.getAttribute('aria-busy'), 'false');
+    assert.equal(stateCard.getAttribute('role'), 'alert');
+    assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
+      'offline convergence preserves the existing focused alert heading');
+    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Agent offline');
+    assert(stateCard.textContent.includes(
+      'FSB cannot reach the local agent service. Run the doctor command, then try this message again.'
+    ));
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Copy doctor command', 'Open provider setup'
+    ]);
+    assert.equal(findAll(stateCard, 'code')[0].textContent, 'fsb-mcp-server doctor');
+    assert.deepEqual(headers[0], { label: 'Agent offline', tone: 'error' });
+    assert.equal(composerLocks[0], false);
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'agent_unpaired',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    assert.equal(stateCard.getAttribute('role'), null,
+      'unpaired convergence retains its non-alert existing pairing state');
+    assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
+      'unpaired convergence preserves the existing focused heading');
+    assert.equal(findAll(stateCard, 'h2')[0].textContent,
+      'Pair this browser before starting Claude Code');
+    assert(stateCard.textContent.includes(
+      'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.'
+    ));
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Open provider setup'
+    ]);
+    assert.equal(findAll(stateCard, 'code').length, 0);
+    assert.deepEqual(headers[1], { label: 'Ready', tone: '' });
+    assert.equal(composerLocks[1], false);
+  }
+
+  {
+    async function runSettlementScenario(preflight, consent) {
+      const commands = [];
+      const failures = [];
+      const consentRenders = [];
+      const starts = [];
+      let legacyCalls = 0;
+      let readyRenders = 0;
+      let announcementCalls = 0;
+      const chatInput = new TestNode('div');
+      const sendBtn = new TestNode('button');
+      chatInput.textContent = '  Keep this task unsent  ';
+      const state = {
+        mode: 'ready',
+        task: null,
+        providerId: null,
+        providerLabel: null,
+        challengeId: null,
+        challengeExpiresAt: null,
+        errorCode: null,
+        composerLocked: false,
+        pendingPreflight: false,
+        pendingContinuation: false,
+        pendingIntentId: null,
+        pendingAttemptId: null,
+        pendingTask: null,
+        pendingRawText: null,
+        pendingEditRevision: null,
+        checkingIntentId: null,
+        pendingStart: false
+      };
+      const context = {
+        DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+        _delegationComposerEditRevision: 0,
+        _delegationUiState: state,
+        chatInput,
+        sendBtn,
+        isRunning: false,
+        _chatLockedByOwnerChip: false,
+        _createDelegationIntentId: () => 'intent_native_wake_table',
+        async _isActiveTabForeignOwned() { return false; },
+        async _sendDelegationCommand(message) {
+          commands.push(clone(message));
+          return message.type === 'FSB_DELEGATION_PREFLIGHT' ? preflight : consent;
+        },
+        async _handleLegacySendMessage() { legacyCalls += 1; },
+        _renderDelegationPreflightFailure(result) { failures.push(clone(result)); },
+        _renderDelegationConsent(options) { consentRenders.push(clone(options)); },
+        async _beginDelegationStart(challengeId) { starts.push(challengeId); },
+        _renderDelegationReadyState() {
+          readyRenders += 1;
+          state.mode = 'ready';
+        },
+        _announceDelegationLifecycleKey() { announcementCalls += 1; },
+        updateSendButtonState() {}
+      };
+      vm.createContext(context);
+      [
+        '_delegationHasExactKeys',
+        '_delegationValidPreflightResponse',
+        '_delegationValidConsentResponse',
+        '_beginDelegationPreflightIntent',
+        '_delegationIntentIsCurrent',
+        '_delegationPreflightIntentIsCurrent',
+        '_delegationContinuationIntentIsCurrent',
+        '_clearDelegationPreflightIntent',
+        '_continueDelegationPreflightIntent',
+        'handleSendMessage'
+      ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+      await context.handleSendMessage();
+      return {
+        commands,
+        failures,
+        consentRenders,
+        starts,
+        legacyCalls,
+        readyRenders,
+        announcementCalls,
+        state,
+        chatInput
+      };
+    }
+
+    const ready = {
+      ok: true,
+      kind: 'agent',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    };
+    const trusted = await runSettlementScenario(ready, {
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    });
+    assert.deepEqual(trusted.starts, [null],
+      'unchanged ready/trusted convergence enters the existing start path once');
+    assert.deepEqual(trusted.consentRenders, []);
+    assert.deepEqual(trusted.failures, []);
+    assert.equal(trusted.legacyCalls, 0);
+    assert.equal(trusted.announcementCalls, 0, 'native success adds no announcement');
+    assert.equal(trusted.readyRenders, 0, 'native success adds no success or ready card');
+    assert.equal(trusted.chatInput.focusCount, 0, 'native success adds no focus stop');
+    assert.deepEqual(trusted.commands, [{
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Keep this task unsent',
+      intentId: 'intent_native_wake_table'
+    }, {
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Keep this task unsent'
+    }]);
+
+    const needsConsent = await runSettlementScenario(ready, {
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: false,
+      challengeId: 'challenge_native_wake',
+      expiresAt: 12345
+    });
+    assert.deepEqual(needsConsent.starts, []);
+    assert.deepEqual(needsConsent.consentRenders, [{ focusHeading: true }],
+      'unchanged ready/untrusted convergence enters the existing consent presentation');
+    assert.equal(needsConsent.state.challengeId, 'challenge_native_wake');
+    assert.equal(needsConsent.state.challengeExpiresAt, 12345);
+    assert.equal(needsConsent.announcementCalls, 0);
+
+    const failureCases = [
+      {
+        name: 'wake/offline/readiness timeout',
+        response: {
+          ok: false,
+          code: 'agent_offline',
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        },
+        expected: {
+          ok: false,
+          code: 'agent_offline',
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        }
+      },
+      {
+        name: 'runtime unavailable',
+        response: {
+          ok: false,
+          code: 'runtime_unavailable',
+          providerId: '',
+          providerLabel: 'Selected provider'
+        },
+        expected: {
+          ok: false,
+          code: 'runtime_unavailable',
+          providerId: '',
+          providerLabel: 'Selected provider'
+        }
+      },
+      {
+        name: 'reachable unpaired',
+        response: {
+          ok: false,
+          code: 'agent_unpaired',
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        },
+        expected: {
+          ok: false,
+          code: 'agent_unpaired',
+          providerId: 'claude-code',
+          providerLabel: 'Claude Code'
+        }
+      },
+      {
+        name: 'malformed rerun result',
+        response: { ok: true, nativeReason: 'must not render' },
+        expected: {
+          ok: false,
+          code: 'agent_offline',
+          providerId: '',
+          providerLabel: 'Selected provider'
+        }
+      }
+    ];
+    for (const scenario of failureCases) {
+      const result = await runSettlementScenario(scenario.response, null);
+      assert.deepEqual(result.failures, [scenario.expected],
+        scenario.name + ' converges through the existing preflight failure renderer');
+      assert.deepEqual(result.starts, [], scenario.name + ' cannot start');
+      assert.deepEqual(result.consentRenders, [], scenario.name + ' cannot create consent');
+      assert.equal(result.announcementCalls, 0, scenario.name + ' adds no native announcement');
+      assert.equal(result.state.pendingPreflight, false);
+      assert.equal(result.state.pendingIntentId, null);
+    }
+  }
+
+  {
+    let resolveConsent;
+    let startCalls = 0;
+    let consentRenders = 0;
+    const chatInput = new TestNode('div');
+    chatInput.textContent = 'Do not start edited bytes';
+    const state = {
+      mode: 'ready',
+      composerLocked: false,
+      pendingPreflight: false,
+      pendingContinuation: false,
+      pendingIntentId: null,
+      pendingAttemptId: null,
+      pendingTask: null,
+      pendingRawText: null,
+      pendingEditRevision: null,
+      checkingIntentId: null,
+      pendingStart: false
+    };
+    const context = {
+      DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+      _delegationComposerEditRevision: 0,
+      _delegationUiState: state,
+      chatInput,
+      isRunning: false,
+      _createDelegationIntentId: () => 'intent_native_wake_consent',
+      async _isActiveTabForeignOwned() { return false; },
+      _sendDelegationCommand(message) {
+        if (message.type === 'FSB_DELEGATION_PREFLIGHT') {
+          return Promise.resolve({
+            ok: true,
+            kind: 'agent',
+            providerId: 'claude-code',
+            providerLabel: 'Claude Code'
+          });
+        }
+        return new Promise((resolve) => { resolveConsent = resolve; });
+      },
+      _handleLegacySendMessage() {},
+      _renderDelegationPreflightFailure() {},
+      _renderDelegationConsent() { consentRenders += 1; },
+      _beginDelegationStart() { startCalls += 1; },
+      _renderDelegationReadyState() { state.mode = 'ready'; },
+      updateSendButtonState() {},
+      debouncedSaveTask() {}
+    };
+    vm.createContext(context);
+    [
+      '_delegationHasExactKeys',
+      '_delegationValidPreflightResponse',
+      '_delegationValidConsentResponse',
+      '_beginDelegationPreflightIntent',
+      '_delegationIntentIsCurrent',
+      '_delegationPreflightIntentIsCurrent',
+      '_delegationContinuationIntentIsCurrent',
+      '_clearDelegationPreflightIntent',
+      '_continueDelegationPreflightIntent',
+      '_handleDelegationComposerInput',
+      'handleSendMessage'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+    const pending = context.handleSendMessage();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(state.pendingContinuation, true, 'ready preflight remains fenced through consent lookup');
+    chatInput.textContent = 'Do not start edited bytes!';
+    context._handleDelegationComposerInput();
+    resolveConsent({
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    });
+    await pending;
+    assert.equal(startCalls, 0, 'edit during trusted consent lookup cannot start');
+    assert.equal(consentRenders, 0, 'edit during consent lookup cannot render stale consent');
+    assert.equal(state.pendingIntentId, null);
   }
 
   {
