@@ -648,6 +648,7 @@ assert(panelSource.includes('intentId: intentId')
       },
       chatInput,
       _ensureDelegationMount: () => ({ run, state: stateCard, feed, control, announcer }),
+      _clearDelegationElapsedTimer() {},
       _restoreLegacyStopControl() { restoredStops += 1; },
       _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); }
     };
@@ -658,6 +659,7 @@ assert(panelSource.includes('intentId: intentId')
       '_delegationElement',
       '_delegationOneShotTransition',
       '_announceDelegationLifecycleKey',
+      '_delegationIntentIsCurrent',
       '_delegationPreflightIntentIsCurrent',
       '_renderDelegationNativeWakeChecking',
       '_handleDelegationNativeWakeChecking'
@@ -793,19 +795,23 @@ assert(panelSource.includes('intentId: intentId')
       '_delegationHasExactKeys',
       '_delegationValidPreflightResponse',
       '_beginDelegationPreflightIntent',
+      '_delegationIntentIsCurrent',
       '_delegationPreflightIntentIsCurrent',
+      '_delegationContinuationIntentIsCurrent',
       '_clearDelegationPreflightIntent',
+      '_continueDelegationPreflightIntent',
       '_handleDelegationComposerInput',
       'handleSendMessage'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
 
     const editedAttempt = context.handleSendMessage();
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(preflightCommands, [{
       type: 'FSB_DELEGATION_PREFLIGHT',
       task: 'first line\nsecond line',
       intentId: 'intent_native_wake_1001'
-    }], 'preflight adds only a safe intent id to the existing trimmed task contract');
+    }], 'preflight adds only a safe intent id to the existing trimmed task contract: '
+      + JSON.stringify(preflightCommands));
     assert.equal(state.pendingRawText, rawText, 'pending intent snapshots raw bytes verbatim');
     assert.equal(state.pendingTask, 'first line\nsecond line');
     assert.equal(state.pendingEditRevision, 4);
@@ -841,7 +847,7 @@ assert(panelSource.includes('intentId: intentId')
     assert.equal(saveCalls, 2, 'the pre-existing composer persistence path still sees both real edits');
 
     const rawMismatchAttempt = context.handleSendMessage();
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(preflightCommands.length, 2, 'only a fresh Send creates another intent');
     chatInput.textContent = rawText + '\n';
     preflightResolvers[1]({

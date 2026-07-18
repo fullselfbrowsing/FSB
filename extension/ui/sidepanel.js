@@ -535,6 +535,7 @@ var DELEGATION_CONVERSATION_CAP = 50;
 var DELEGATION_UNBOUND_CLEANUP_CAP = 8;
 var DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 var DELEGATION_CONVERSATION_ID_PATTERN = /^conv_[A-Za-z0-9_-]{1,250}$/;
+var DELEGATION_NATIVE_WAKE_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 var _delegationConversationEnvelope = { v: 1, byConversation: {}, lru: [] };
 var _delegationBindingWriteChain = Promise.resolve();
 // Binding failures cannot be written to session storage by definition. Keep
@@ -544,6 +545,8 @@ var _delegationUnboundCleanupByOrigin = new Map();
 var _delegationHydrationGeneration = 0;
 var _delegationRunStopControls = [];
 var _delegationElapsedInterval = null;
+var _delegationComposerEditRevision = 0;
+var _delegationIntentFallbackCounter = 0;
 
 // Phase 61 delegated-run presentation state. This object tracks only which
 // canonical background snapshot belongs to the selected conversation and
@@ -562,6 +565,13 @@ var _delegationUiState = {
   challengeExpiresAt: null,
   errorCode: null,
   pendingPreflight: false,
+  pendingContinuation: false,
+  pendingIntentId: null,
+  pendingAttemptId: null,
+  pendingTask: null,
+  pendingRawText: null,
+  pendingEditRevision: null,
+  checkingIntentId: null,
   pendingStart: false,
   pendingTrust: false,
   pendingTake: false,
@@ -605,6 +615,91 @@ function _delegationValidPreflightResponse(value) {
     && typeof value.code === 'string'
     && typeof value.providerId === 'string'
     && typeof value.providerLabel === 'string';
+}
+
+function _createDelegationIntentId() {
+  var cryptoApi = typeof globalThis !== 'undefined' ? globalThis.crypto : null;
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+    var uuidIntentId = 'intent_' + cryptoApi.randomUUID().replace(/-/g, '');
+    if (DELEGATION_NATIVE_WAKE_ID_PATTERN.test(uuidIntentId)) return uuidIntentId;
+  }
+  _delegationIntentFallbackCounter += 1;
+  var fallbackIntentId = 'intent_fallback_'
+    + Date.now().toString(36)
+    + '_'
+    + _delegationIntentFallbackCounter.toString(36);
+  return DELEGATION_NATIVE_WAKE_ID_PATTERN.test(fallbackIntentId)
+    ? fallbackIntentId
+    : null;
+}
+
+function _beginDelegationPreflightIntent(intentId, task, rawText, editRevision) {
+  if (typeof intentId !== 'string'
+      || !DELEGATION_NATIVE_WAKE_ID_PATTERN.test(intentId)
+      || typeof task !== 'string'
+      || task.length === 0
+      || typeof rawText !== 'string'
+      || rawText.trim() !== task
+      || !Number.isSafeInteger(editRevision)
+      || editRevision < 0) return false;
+  _delegationUiState.pendingPreflight = true;
+  _delegationUiState.pendingContinuation = false;
+  _delegationUiState.pendingIntentId = intentId;
+  _delegationUiState.pendingAttemptId = null;
+  _delegationUiState.pendingTask = task;
+  _delegationUiState.pendingRawText = rawText;
+  _delegationUiState.pendingEditRevision = editRevision;
+  _delegationUiState.checkingIntentId = null;
+  return true;
+}
+
+function _delegationIntentIsCurrent(intentId) {
+  return typeof intentId === 'string'
+    && DELEGATION_NATIVE_WAKE_ID_PATTERN.test(intentId)
+    && _delegationUiState.pendingIntentId === intentId
+    && typeof _delegationUiState.pendingRawText === 'string'
+    && typeof _delegationUiState.pendingTask === 'string'
+    && _delegationUiState.pendingRawText.trim() === _delegationUiState.pendingTask
+    && _delegationUiState.pendingEditRevision === _delegationComposerEditRevision
+    && chatInput.textContent === _delegationUiState.pendingRawText;
+}
+
+function _delegationPreflightIntentIsCurrent(intentId) {
+  return _delegationUiState.pendingPreflight === true
+    && _delegationIntentIsCurrent(intentId);
+}
+
+function _delegationContinuationIntentIsCurrent(intentId) {
+  return _delegationUiState.pendingContinuation === true
+    && _delegationIntentIsCurrent(intentId);
+}
+
+function _clearDelegationPreflightIntent(intentId) {
+  if (_delegationUiState.pendingIntentId !== intentId) return false;
+  var clearChecking = _delegationUiState.checkingIntentId === intentId
+    && _delegationUiState.mode === 'native-wake-checking';
+  _delegationUiState.pendingPreflight = false;
+  _delegationUiState.pendingContinuation = false;
+  _delegationUiState.pendingIntentId = null;
+  _delegationUiState.pendingAttemptId = null;
+  _delegationUiState.pendingTask = null;
+  _delegationUiState.pendingRawText = null;
+  _delegationUiState.pendingEditRevision = null;
+  _delegationUiState.checkingIntentId = null;
+  if (clearChecking) _renderDelegationReadyState();
+  return true;
+}
+
+function _continueDelegationPreflightIntent(intentId) {
+  if (!_delegationPreflightIntentIsCurrent(intentId)) return false;
+  var clearChecking = _delegationUiState.checkingIntentId === intentId
+    && _delegationUiState.mode === 'native-wake-checking';
+  _delegationUiState.pendingPreflight = false;
+  _delegationUiState.pendingContinuation = true;
+  _delegationUiState.pendingAttemptId = null;
+  _delegationUiState.checkingIntentId = null;
+  if (clearChecking) _renderDelegationReadyState();
+  return true;
 }
 
 function _delegationValidConsentResponse(value) {
@@ -1181,6 +1276,13 @@ function _resetDelegationSelection(selectedConversationId) {
   _delegationUiState.challengeExpiresAt = null;
   _delegationUiState.errorCode = null;
   _delegationUiState.pendingPreflight = false;
+  _delegationUiState.pendingContinuation = false;
+  _delegationUiState.pendingIntentId = null;
+  _delegationUiState.pendingAttemptId = null;
+  _delegationUiState.pendingTask = null;
+  _delegationUiState.pendingRawText = null;
+  _delegationUiState.pendingEditRevision = null;
+  _delegationUiState.checkingIntentId = null;
   _delegationUiState.pendingStart = false;
   _delegationUiState.pendingTrust = false;
   _delegationUiState.pendingTake = false;
@@ -1389,6 +1491,62 @@ async function _copyDelegationDoctorCommand() {
       if (mount.announcer) mount.announcer.textContent = 'Doctor command copied';
     }
   } catch (_error) { /* clipboard failure leaves the visible literal available */ }
+}
+
+function _renderDelegationNativeWakeChecking(intentId, attemptId) {
+  if (!_delegationPreflightIntentIsCurrent(intentId)
+      || typeof attemptId !== 'string'
+      || !DELEGATION_NATIVE_WAKE_ID_PATTERN.test(attemptId)
+      || _delegationUiState.pendingAttemptId !== null) return false;
+  var mount = _ensureDelegationMount();
+  if (!mount.run || !mount.state || !mount.feed) return false;
+
+  _clearDelegationElapsedTimer();
+  _delegationUiState.pendingAttemptId = attemptId;
+  _delegationUiState.checkingIntentId = intentId;
+  _delegationUiState.mode = 'native-wake-checking';
+  mount.run.classList.remove('hidden');
+  mount.run.setAttribute('aria-busy', 'true');
+  _clearDelegationNode(mount.state);
+  _clearDelegationNode(mount.feed);
+  mount.state.className = 'delegation-state-card delegation-tone-info';
+  mount.state.setAttribute('data-delegation-state', 'native-wake-checking');
+  mount.state.setAttribute('data-delegation-tone', 'info');
+  mount.state.removeAttribute('role');
+  mount.state.removeAttribute('aria-live');
+  _delegationRunStopControls = [];
+  _restoreLegacyStopControl();
+
+  var heading = _delegationElement(
+    'h2',
+    'delegation-state-heading delegation-semantic-heading delegation-native-wake-heading'
+  );
+  heading.id = 'delegationRunHeading';
+  var spinner = _delegationElement(
+    'i',
+    'fa fa-spinner delegation-semantic-icon delegation-native-wake-spinner'
+  );
+  spinner.setAttribute('aria-hidden', 'true');
+  heading.appendChild(spinner);
+  heading.appendChild(_delegationElement(
+    'span', 'delegation-heading-copy', 'Checking local agent service'
+  ));
+  mount.state.appendChild(heading);
+  mount.state.appendChild(_delegationElement(
+    'p',
+    'delegation-state-body delegation-native-wake-body',
+    'FSB is trying to make the local agent service available. Your message has not been sent.'
+  ));
+  if (mount.control) {
+    _clearDelegationNode(mount.control);
+    mount.control.classList.add('hidden');
+  }
+  _setDelegationHeaderStatus('Checking agent service', '');
+  _announceDelegationLifecycleKey(
+    'native-wake-checking:' + intentId,
+    'Checking local agent service. Your message has not been sent.'
+  );
+  return true;
 }
 
 function _renderDelegationPreflightFailure(result) {
@@ -2154,6 +2312,17 @@ function _renderDelegationSnapshot(snapshot, options) {
   return true;
 }
 
+function _handleDelegationNativeWakeChecking(message) {
+  if (!_delegationHasExactKeys(message, ['attemptId', 'intentId', 'type'])
+      || message.type !== 'FSB_NATIVE_WAKE_CHECKING'
+      || typeof message.attemptId !== 'string'
+      || !DELEGATION_NATIVE_WAKE_ID_PATTERN.test(message.attemptId)
+      || typeof message.intentId !== 'string'
+      || !DELEGATION_NATIVE_WAKE_ID_PATTERN.test(message.intentId)
+      || !_delegationPreflightIntentIsCurrent(message.intentId)) return false;
+  return _renderDelegationNativeWakeChecking(message.intentId, message.attemptId);
+}
+
 function _handleDelegationRuntimeUpdate(message) {
   if (!_delegationUiState.subscribed
       || !_delegationHasExactKeys(message, ['announceSequence', 'snapshot', 'type'])
@@ -2568,6 +2737,7 @@ async function _refreshSelectedDelegationSnapshot(options) {
 
 try {
   chrome.runtime.onMessage.addListener(function(message) {
+    if (_handleDelegationNativeWakeChecking(message)) return;
     _handleDelegationRuntimeUpdate(message);
   });
 } catch (_error) { /* delegated updates are best-effort until panel boot */ }
@@ -3523,11 +3693,17 @@ function debouncedSaveTask() {
   }, 500);
 }
 
-// Chat input event handlers
-chatInput.addEventListener('input', () => {
+function _handleDelegationComposerInput() {
+  _delegationComposerEditRevision += 1;
+  if (_delegationUiState.pendingIntentId !== null) {
+    _clearDelegationPreflightIntent(_delegationUiState.pendingIntentId);
+  }
   updateSendButtonState();
   debouncedSaveTask();
-});
+}
+
+// Chat input event handlers
+chatInput.addEventListener('input', _handleDelegationComposerInput);
 
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -3556,40 +3732,65 @@ function updateSendButtonState() {
     || _chatLockedByOwnerChip
     || _delegationUiState.composerLocked
     || _delegationUiState.pendingPreflight
+    || _delegationUiState.pendingContinuation
     || _delegationUiState.pendingStart;
 }
 
 // Handle sending a message
 async function handleSendMessage() {
-  const message = chatInput.textContent.trim();
+  const rawMessage = chatInput.textContent;
+  const message = rawMessage.trim();
 
   if (!message
       || isRunning
       || _delegationUiState.composerLocked
       || _delegationUiState.pendingPreflight
+      || _delegationUiState.pendingContinuation
       || _delegationUiState.pendingStart) {
     return;
   }
+
+  var intentId = _createDelegationIntentId();
+  if (!_beginDelegationPreflightIntent(
+    intentId,
+    message,
+    rawMessage,
+    _delegationComposerEditRevision
+  )) return;
+  _delegationUiState.errorCode = null;
+  updateSendButtonState();
 
   // Phase 11 FINT-20 -- defense-in-depth runtime gate. The sendBtn
   // disabled attribute (set by applyInputLockout via refreshOwnerChip) is
   // the primary defense; this gate guards against a stale UI state where
   // the button was cleared by a sibling refresh racing with tab
   // activation. Fail-open: storage errors do NOT block sends.
-  if (await _isActiveTabForeignOwned()) return;
+  if (await _isActiveTabForeignOwned()) {
+    _clearDelegationPreflightIntent(intentId);
+    updateSendButtonState();
+    return;
+  }
+  if (!_delegationPreflightIntentIsCurrent(intentId)) {
+    _clearDelegationPreflightIntent(intentId);
+    updateSendButtonState();
+    return;
+  }
 
-  _delegationUiState.pendingPreflight = true;
-  _delegationUiState.errorCode = null;
-  updateSendButtonState();
   var preflight = await _sendDelegationCommand({
     type: 'FSB_DELEGATION_PREFLIGHT',
-    task: message
+    task: message,
+    intentId: intentId
   });
-  _delegationUiState.pendingPreflight = false;
+  if (!_delegationPreflightIntentIsCurrent(intentId)) {
+    _clearDelegationPreflightIntent(intentId);
+    updateSendButtonState();
+    return;
+  }
 
   if (_delegationValidPreflightResponse(preflight)
       && preflight.ok === true
       && preflight.kind === 'api') {
+    _clearDelegationPreflightIntent(intentId);
     updateSendButtonState();
     await _handleLegacySendMessage(message);
     return;
@@ -3609,6 +3810,7 @@ async function handleSendMessage() {
         providerId: '',
         providerLabel: 'Selected provider'
       };
+    _clearDelegationPreflightIntent(intentId);
     _delegationUiState.task = message;
     _delegationUiState.errorCode = safePreflightFailure.code;
     _renderDelegationPreflightFailure(safePreflightFailure);
@@ -3619,10 +3821,22 @@ async function handleSendMessage() {
   _delegationUiState.task = message;
   _delegationUiState.providerId = 'claude-code';
   _delegationUiState.providerLabel = 'Claude Code';
+  if (!_continueDelegationPreflightIntent(intentId)) {
+    _clearDelegationPreflightIntent(intentId);
+    updateSendButtonState();
+    return;
+  }
+  updateSendButtonState();
   var consent = await _sendDelegationCommand({
     type: 'FSB_DELEGATION_CONSENT',
     task: message
   });
+  if (!_delegationContinuationIntentIsCurrent(intentId)) {
+    _clearDelegationPreflightIntent(intentId);
+    updateSendButtonState();
+    return;
+  }
+  _clearDelegationPreflightIntent(intentId);
   if (!_delegationValidConsentResponse(consent)) {
     _delegationUiState.errorCode = 'consent_required';
     _renderDelegationPreflightFailure({ code: 'consent_required' });
