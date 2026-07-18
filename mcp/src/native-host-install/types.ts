@@ -327,13 +327,19 @@ export interface NativeHostRuntimeOwnedInspection {
   receipt: Readonly<NativeHostRuntimeReceipt> | null;
 }
 
-export interface NativeHostInstallRuntimeAdapter {
-  readonly layout: import('../native-host/runtime-layout.js').NativeHostRuntimeLayout;
+export interface NativeHostRuntimeInspectionLayout {
+  platform: NativeHostPlatform;
+  stableRoot: string;
+  markerPath: string;
+  launcherPath: string;
+  packageRoot: string;
+  packageEntryPath: string;
+  integrityReceiptPath: string;
+}
+
+export interface NativeHostUninstallRuntimeAdapter {
+  readonly layout: NativeHostRuntimeInspectionLayout;
   inspectRuntime(): Promise<Readonly<NativeHostRuntimeOwnedInspection>>;
-  publishRuntime(): Promise<NativeHostRuntimePublishResult>;
-  recheckPublicationBoundary(
-    receipt: Readonly<NativeHostRuntimeReceipt>,
-  ): Promise<boolean>;
   recheckExactRuntime(
     receipt: Readonly<NativeHostRuntimeReceipt>,
   ): Promise<boolean>;
@@ -342,9 +348,22 @@ export interface NativeHostInstallRuntimeAdapter {
   ): Promise<void>;
 }
 
+export interface NativeHostInstallRuntimeAdapter extends NativeHostUninstallRuntimeAdapter {
+  readonly layout: import('../native-host/runtime-layout.js').NativeHostRuntimeLayout;
+  publishRuntime(): Promise<NativeHostRuntimePublishResult>;
+  recheckPublicationBoundary(
+    receipt: Readonly<NativeHostRuntimeReceipt>,
+  ): Promise<boolean>;
+}
+
 export interface NativeHostInstallTransactionDependencies {
   platform: NativeHostInstallPlatformAdapter;
   runtime: NativeHostInstallRuntimeAdapter;
+}
+
+export interface NativeHostUninstallTransactionDependencies {
+  platform: NativeHostInstallPlatformAdapter;
+  runtime: NativeHostUninstallRuntimeAdapter;
 }
 
 export interface NativeHostInstallRequest {

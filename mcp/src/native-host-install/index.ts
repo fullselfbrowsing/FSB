@@ -18,6 +18,7 @@ import type {
   NativeHostRegistrationReadFacts,
   NativeHostRuntimeOwnedInspection,
   NativeHostRuntimeReceipt,
+  NativeHostUninstallTransactionDependencies,
   NativeHostUninstallResult,
 } from './types.js';
 
@@ -45,7 +46,7 @@ function ordinaryRequest(value: unknown): NativeHostInstallRequest | null {
 }
 
 function dependencyLayoutsMatch(
-  dependencies: NativeHostInstallTransactionDependencies,
+  dependencies: NativeHostUninstallTransactionDependencies,
 ): boolean {
   const platform = dependencies?.platform?.layout;
   const runtime = dependencies?.runtime?.layout;
@@ -96,7 +97,7 @@ function installResult(
 }
 
 function uninstallResult(
-  dependencies: NativeHostInstallTransactionDependencies,
+  dependencies: NativeHostUninstallTransactionDependencies,
   status: NativeHostUninstallResult['status'],
   reason: string,
   origin: string | null,
@@ -159,7 +160,7 @@ function receiptsEqual(
 
 function exactRuntimeReceipt(
   inspection: NativeHostRuntimeOwnedInspection,
-  dependencies: NativeHostInstallTransactionDependencies,
+  dependencies: NativeHostUninstallTransactionDependencies,
 ): Readonly<NativeHostRuntimeReceipt> | null {
   if (
     inspection.state !== 'exact'
@@ -227,7 +228,7 @@ function ownershipReason(
 }
 
 async function inspectTransactionState(
-  dependencies: NativeHostInstallTransactionDependencies,
+  dependencies: NativeHostUninstallTransactionDependencies,
   extensionId: string,
 ): Promise<Readonly<{
   runtime: Readonly<NativeHostRuntimeOwnedInspection>;
@@ -464,7 +465,7 @@ export async function installNativeHost(
 }
 
 export async function uninstallNativeHost(
-  dependencies: NativeHostInstallTransactionDependencies,
+  dependencies: NativeHostUninstallTransactionDependencies,
 ): Promise<NativeHostUninstallResult> {
   if (!dependencyLayoutsMatch(dependencies)) {
     return uninstallResult(dependencies, 'refused', 'invalid-request', null, null);

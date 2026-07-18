@@ -30,6 +30,7 @@ import {
   NATIVE_HOST_ENTRY_RELATIVE_PATH,
   NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH,
   NATIVE_HOST_INTEGRITY_RELATIVE_PATH,
+  NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_PACKAGE_RELATIVE_PATH,
   isNativeHostExtensionId,
   nativeHostOrigin,
@@ -63,9 +64,12 @@ import type {
   NativeHostRegistryView,
   NativeHostRegistryValueFact,
   NativeHostRuntimeFileAdapter,
+  NativeHostRuntimeInspectionLayout,
   NativeHostRuntimeOwnedInspection,
   NativeHostRuntimeReceipt,
   NativeHostSecurePathFact,
+  NativeHostUninstallRuntimeAdapter,
+  NativeHostUninstallTransactionDependencies,
 } from './native-host-install/types.js';
 import type { NativeHostCliOperations } from './install.js';
 
@@ -104,6 +108,12 @@ function sameKeys(value: Record<string, unknown>, expected: readonly string[]): 
 function inside(candidate: string, root: string): boolean {
   const rel = relative(root, candidate);
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+}
+
+function pathsEqual(left: string, right: string): boolean {
+  return process.platform === 'win32'
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
 }
 
 async function readBoundedRegular(pathname: string, maxBytes: number): Promise<Buffer> {
@@ -594,18 +604,8 @@ function receiptsEqual(
   return Boolean(left && JSON.stringify(left) === JSON.stringify(right));
 }
 
-type RuntimeInspectionLayout = Readonly<{
-  platform: 'darwin' | 'linux' | 'win32';
-  stableRoot: string;
-  markerPath: string;
-  launcherPath: string;
-  packageRoot: string;
-  packageEntryPath: string;
-  integrityReceiptPath: string;
-}>;
-
 async function inspectOwnedRuntime(
-  layout: RuntimeInspectionLayout,
+  layout: NativeHostRuntimeInspectionLayout,
 ): Promise<Readonly<NativeHostRuntimeOwnedInspection>> {
   const receiptPath = join(layout.stableRoot, NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH);
   const root = await inspectSecurePath(layout.stableRoot, 'directory');
@@ -668,27 +668,15 @@ async function inspectOwnedRuntime(
   }
 }
 
-function createRuntimeAdapter(
-  layout: ReturnType<typeof resolveNativeHostRuntimeLayout>,
-): NativeHostInstallRuntimeAdapter {
-  const files = createRuntimeFiles(layout.stageRoot, process.platform);
+function createUninstallRuntimeAdapter(
+  layout: NativeHostRuntimeInspectionLayout,
+): NativeHostUninstallRuntimeAdapter {
   const inspectRuntime = (): Promise<Readonly<NativeHostRuntimeOwnedInspection>> => (
     inspectOwnedRuntime(layout)
   );
   return Object.freeze({
     layout,
     inspectRuntime,
-    publishRuntime: () => publishNativeHostRuntime(
-      layout,
-      Object.freeze({ files, process: Object.freeze({ run: runProcess }) }),
-      Object.freeze({ architecture: process.arch }),
-    ),
-    recheckPublicationBoundary: async (
-      receipt: Readonly<NativeHostRuntimeReceipt>,
-    ): Promise<boolean> => {
-      const inspected = await inspectRuntime();
-      return inspected.state === 'exact' && receiptsEqual(inspected.receipt, receipt);
-    },
     recheckExactRuntime: async (receipt: Readonly<NativeHostRuntimeReceipt>): Promise<boolean> => {
       const inspected = await inspectRuntime();
       return inspected.state === 'exact' && receiptsEqual(inspected.receipt, receipt);
@@ -705,35 +693,159 @@ function createRuntimeAdapter(
   });
 }
 
-async function resolveNpmCliPath(): Promise<string> {
-  const candidate = process.env.npm_execpath;
-  if (!candidate || !isAbsolute(candidate) || basename(candidate).toLowerCase() !== 'npm-cli.js') {
-    throw new Error('npm-cli-unavailable');
-  }
-  const resolved = await realpath(candidate);
-  if (basename(resolved).toLowerCase() !== 'npm-cli.js') throw new Error('npm-cli-unavailable');
-  return resolved;
+function createRuntimeAdapter(
+  layout: ReturnType<typeof resolveNativeHostRuntimeLayout>,
+): NativeHostInstallRuntimeAdapter {
+  const uninstall = createUninstallRuntimeAdapter(layout);
+  const files = createRuntimeFiles(layout.stageRoot, process.platform);
+  return Object.freeze({
+    layout,
+    inspectRuntime: uninstall.inspectRuntime,
+    publishRuntime: () => publishNativeHostRuntime(
+      layout,
+      Object.freeze({ files, process: Object.freeze({ run: runProcess }) }),
+      Object.freeze({ architecture: process.arch }),
+    ),
+    recheckPublicationBoundary: async (
+      receipt: Readonly<NativeHostRuntimeReceipt>,
+    ): Promise<boolean> => {
+      const inspected = await uninstall.inspectRuntime();
+      return inspected.state === 'exact' && receiptsEqual(inspected.receipt, receipt);
+    },
+    recheckExactRuntime: uninstall.recheckExactRuntime,
+    removeExactRuntime: uninstall.removeExactRuntime,
+  });
 }
 
-async function productionDependencies(
-  extensionId = NATIVE_HOST_DEFAULT_EXTENSION_ID,
-): Promise<NativeHostInstallTransactionDependencies> {
-  if (!['darwin', 'linux', 'win32'].includes(process.platform)) throw new Error('unsupported-platform');
+async function validatedNpmCliCandidate(npmPackageRoot: string): Promise<string | null> {
+  try {
+    const expectedRoot = resolve(npmPackageRoot);
+    const rootFact = await lstat(expectedRoot);
+    if (!rootFact.isDirectory() || rootFact.isSymbolicLink()) return null;
+    const resolvedRoot = await realpath(expectedRoot);
+    if (!pathsEqual(resolvedRoot, expectedRoot) || basename(resolvedRoot).toLowerCase() !== 'npm') {
+      return null;
+    }
+    const parent = dirname(resolvedRoot);
+    if (basename(parent).toLowerCase() !== 'node_modules') return null;
+
+    const manifest = ordinaryRecord(await readJson(join(resolvedRoot, 'package.json'), 128 * 1024));
+    if (manifest?.name !== 'npm' || typeof manifest.version !== 'string') return null;
+
+    const expectedCli = join(resolvedRoot, 'bin', 'npm-cli.js');
+    const cliFact = await lstat(expectedCli);
+    if (!cliFact.isFile() || cliFact.isSymbolicLink()) return null;
+    const resolvedCli = await realpath(expectedCli);
+    const resolvedFact = await lstat(resolvedCli);
+    if (
+      !resolvedFact.isFile()
+      || resolvedFact.isSymbolicLink()
+      || !pathsEqual(resolvedCli, expectedCli)
+      || basename(resolvedCli).toLowerCase() !== 'npm-cli.js'
+      || !inside(resolvedCli, resolvedRoot)
+    ) {
+      return null;
+    }
+    return resolvedCli;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveNpmCliPath(
+  nodeRealPath: string,
+  invokingPackageRoot: string,
+): Promise<string> {
+  const nodeDirectory = dirname(nodeRealPath);
+  const nodePrefix = dirname(nodeDirectory);
+  const candidates = [
+    join(nodeDirectory, 'node_modules', 'npm'),
+    join(nodePrefix, 'lib', 'node_modules', 'npm'),
+    join(nodePrefix, 'node_modules', 'npm'),
+  ];
+  const invokingModulesRoot = dirname(invokingPackageRoot);
+  if (basename(invokingModulesRoot).toLowerCase() === 'node_modules') {
+    candidates.push(join(invokingModulesRoot, 'npm'));
+  }
+  for (const candidate of new Set(candidates)) {
+    const npmCliPath = await validatedNpmCliCandidate(candidate);
+    if (npmCliPath) return npmCliPath;
+  }
+  throw new Error('npm-cli-unavailable');
+}
+
+type ProductionPlatformComposition = Readonly<{
+  platform: 'darwin' | 'linux' | 'win32';
+  homeDirectory: string;
+  localAppData?: string;
+  layout: ReturnType<typeof resolveNativeHostPlatformLayout>;
+  adapter: ReturnType<typeof createNativeHostPlatformAdapter>;
+}>;
+
+async function productionPlatformComposition(): Promise<ProductionPlatformComposition> {
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) {
+    throw new Error('unsupported-platform');
+  }
   const platform = process.platform as 'darwin' | 'linux' | 'win32';
-  const invokingPackageRoot = await realpath(dirname(dirname(fileURLToPath(import.meta.url))));
-  const manifest = ordinaryRecord(await readJson(join(invokingPackageRoot, 'package.json')));
-  if (!manifest || typeof manifest.version !== 'string') throw new Error('invalid-package');
-  const nodePath = await realpath(process.execPath);
-  const npmCliPath = await resolveNpmCliPath();
   const homeDirectory = await realpath(homedir());
   const input = {
     platform,
     homeDirectory,
     ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
   };
-  const platformLayout = resolveNativeHostPlatformLayout(input);
-  const runtimeLayout = resolveNativeHostRuntimeLayout({
+  const layout = resolveNativeHostPlatformLayout(input);
+  return Object.freeze({
     ...input,
+    layout,
+    adapter: createNativeHostPlatformAdapter(layout, Object.freeze({
+      files: createInstallFileAdapter(),
+      ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
+    })),
+  });
+}
+
+function runtimeInspectionLayout(
+  platformLayout: ReturnType<typeof resolveNativeHostPlatformLayout>,
+): NativeHostRuntimeInspectionLayout {
+  return Object.freeze({
+    platform: platformLayout.platform,
+    stableRoot: platformLayout.stableRoot,
+    markerPath: platformLayout.markerPath,
+    launcherPath: platformLayout.launcherPath,
+    packageRoot: join(
+      platformLayout.stableRoot,
+      ...NATIVE_HOST_PACKAGE_RELATIVE_PATH.split('/'),
+    ),
+    packageEntryPath: join(
+      platformLayout.stableRoot,
+      ...NATIVE_HOST_ENTRY_RELATIVE_PATH.split('/'),
+    ),
+    integrityReceiptPath: join(
+      platformLayout.stableRoot,
+      ...NATIVE_HOST_INTEGRITY_RELATIVE_PATH.split('/'),
+    ),
+  });
+}
+
+async function productionInstallDependencies(
+  extensionId = NATIVE_HOST_DEFAULT_EXTENSION_ID,
+): Promise<NativeHostInstallTransactionDependencies> {
+  const composition = await productionPlatformComposition();
+  const invokingPackageRoot = await realpath(dirname(dirname(fileURLToPath(import.meta.url))));
+  const manifest = ordinaryRecord(await readJson(join(invokingPackageRoot, 'package.json')));
+  if (
+    !manifest
+    || manifest.name !== NATIVE_HOST_PACKAGE_NAME
+    || typeof manifest.version !== 'string'
+  ) {
+    throw new Error('invalid-package');
+  }
+  const nodePath = await realpath(process.execPath);
+  const npmCliPath = await resolveNpmCliPath(nodePath, invokingPackageRoot);
+  const runtimeLayout = resolveNativeHostRuntimeLayout({
+    platform: composition.platform,
+    homeDirectory: composition.homeDirectory,
+    ...(composition.localAppData ? { localAppData: composition.localAppData } : {}),
     packageVersion: manifest.version,
     extensionId,
     installToken: randomBytes(16).toString('hex'),
@@ -744,11 +856,17 @@ async function productionDependencies(
     invokingPackageRoot,
   });
   return Object.freeze({
-    platform: createNativeHostPlatformAdapter(platformLayout, Object.freeze({
-      files: createInstallFileAdapter(),
-      ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
-    })),
+    platform: composition.adapter,
     runtime: createRuntimeAdapter(runtimeLayout),
+  });
+}
+
+async function productionUninstallDependencies(
+): Promise<NativeHostUninstallTransactionDependencies> {
+  const composition = await productionPlatformComposition();
+  return Object.freeze({
+    platform: composition.adapter,
+    runtime: createUninstallRuntimeAdapter(runtimeInspectionLayout(composition.layout)),
   });
 }
 
@@ -867,24 +985,7 @@ export async function inspectProductionNativeHost(): Promise<unknown> {
       ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
     });
     expectedLocation = platformLayout.manifestPath;
-    const runtimeLayout: RuntimeInspectionLayout = Object.freeze({
-      platform,
-      stableRoot: platformLayout.stableRoot,
-      markerPath: platformLayout.markerPath,
-      launcherPath: platformLayout.launcherPath,
-      packageRoot: join(
-        platformLayout.stableRoot,
-        ...NATIVE_HOST_PACKAGE_RELATIVE_PATH.split('/'),
-      ),
-      packageEntryPath: join(
-        platformLayout.stableRoot,
-        ...NATIVE_HOST_ENTRY_RELATIVE_PATH.split('/'),
-      ),
-      integrityReceiptPath: join(
-        platformLayout.stableRoot,
-        ...NATIVE_HOST_INTEGRITY_RELATIVE_PATH.split('/'),
-      ),
-    });
+    const runtimeLayout = runtimeInspectionLayout(platformLayout);
     const platformAdapter = createNativeHostPlatformAdapter(platformLayout, Object.freeze({
       files: createInstallFileAdapter(),
       ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
@@ -952,7 +1053,9 @@ export function createProductionNativeHostCliOperations(): NativeHostCliOperatio
       try {
         return await installNativeHost(
           request,
-          await productionDependencies(request.extensionId ?? NATIVE_HOST_DEFAULT_EXTENSION_ID),
+          await productionInstallDependencies(
+            request.extensionId ?? NATIVE_HOST_DEFAULT_EXTENSION_ID,
+          ),
         );
       } catch {
         return Object.freeze({
@@ -963,7 +1066,7 @@ export function createProductionNativeHostCliOperations(): NativeHostCliOperatio
     },
     uninstall: async () => {
       try {
-        return await uninstallNativeHost(await productionDependencies());
+        return await uninstallNativeHost(await productionUninstallDependencies());
       } catch {
         return Object.freeze({
           status: 'refused', reason: 'unavailable', location: unavailableLocation(),
