@@ -88,7 +88,9 @@ function main() {
       '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
     );
     runGit(repository, ['add', '--', 'staged.txt']);
-    const intentToAddPath = 'intent space\nline.txt';
+    const intentToAddPath = process.platform === 'win32'
+      ? 'intent space line.txt'
+      : 'intent space\nline.txt';
     write(repository, intentToAddPath, '');
     runGit(repository, ['add', '-N', '--', intentToAddPath]);
 
