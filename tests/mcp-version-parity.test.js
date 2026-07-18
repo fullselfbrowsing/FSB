@@ -45,6 +45,11 @@ const prePhase61ExtensionPermissions = [
   'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
   'offscreen', 'system.memory',
 ];
+const phase63ExtensionPermissions = [
+  'activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs', 'windows',
+  'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
+  'offscreen', 'nativeMessaging', 'system.memory',
+];
 const prePhase61ContentScripts = [
   {
     matches: ['<all_urls>'],
@@ -364,7 +369,7 @@ async function run() {
     'optional native-host state cannot change historical doctor-layer classification',
   );
 
-  console.log('\n--- Phase 61 Chrome 116 and no-native boundary ---');
+  console.log('\n--- Phase 61 Chrome 116 and Phase 63 native permission boundary ---');
   assertEqual(manifest.manifest_version, 3, 'extension remains on Manifest V3');
   assertEqual(manifest.minimum_chrome_version, '116', 'extension minimum Chrome version is exactly string 116');
   assertEqual(rootPackageJson.engines.chrome, '>=116.0.0', 'root engine metadata requires Chrome 116');
@@ -380,8 +385,8 @@ async function run() {
     'setup metadata normalizes to the manifest Chrome floor',
   );
   assert(
-    JSON.stringify(manifest.permissions) === JSON.stringify(prePhase61ExtensionPermissions),
-    'Chrome 116 pin leaves the established permission roster byte-for-byte ordered',
+    JSON.stringify(manifest.permissions) === JSON.stringify(phase63ExtensionPermissions),
+    'Phase 63 permission roster is the established ordered roster plus nativeMessaging',
   );
   assert(
     JSON.stringify(manifest.host_permissions) === JSON.stringify(['<all_urls>']),
@@ -395,9 +400,12 @@ async function run() {
     JSON.stringify(manifest.content_scripts) === JSON.stringify(prePhase61ContentScripts),
     'content-script declarations remain unchanged',
   );
-  for (const permission of ['nativeMessaging', 'downloads']) {
-    assert(!manifest.permissions.includes(permission), `${permission} permission remains absent`);
-  }
+  assertEqual(
+    manifest.permissions.filter((permission) => permission === 'nativeMessaging').length,
+    1,
+    'nativeMessaging permission appears exactly once',
+  );
+  assert(!manifest.permissions.includes('downloads'), 'downloads permission remains absent');
   for (const manifestKey of ['optional_permissions', 'optional_host_permissions', 'externally_connectable']) {
     assert(!Object.prototype.hasOwnProperty.call(manifest, manifestKey), `${manifestKey} authority remains absent`);
   }
