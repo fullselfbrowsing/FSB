@@ -18,6 +18,7 @@ import {
   FSB_MCP_VERSION,
 } from './version.js';
 import { getSetupSections, runInstall, runUninstall } from './install.js';
+import { createProductionNativeHostCliOperations } from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
 import {
   FSB_EXT_PROTOCOL,
@@ -28,6 +29,8 @@ import {
 } from './bridge-auth.js';
 
 type FlagValue = boolean | string;
+
+const productionNativeHostCliOperations = createProductionNativeHostCliOperations();
 
 function parseArgs(argv: string[]): { command: string; flags: Record<string, FlagValue> } {
   const flags: Record<string, FlagValue> = {};
@@ -550,10 +553,10 @@ async function main(): Promise<void> {
       printHelp();
       return;
     case 'install':
-      await runInstall(flags);
+      await runInstall(flags, productionNativeHostCliOperations);
       return;
     case 'uninstall':
-      await runUninstall(flags);
+      await runUninstall(flags, productionNativeHostCliOperations);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

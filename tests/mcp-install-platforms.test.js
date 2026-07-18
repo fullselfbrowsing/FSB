@@ -55,7 +55,7 @@ function runCli(args, fixture) {
 }
 
 function withTempHome(label, callback) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), `fsb-${label}-`));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `fsb-${label}-`)));
   const fixture = {
     root,
     home: path.join(root, 'home'),
@@ -329,13 +329,23 @@ function run() {
       'production CLI reports the bounded real install receipt',
     );
     const stableRoot = path.join(fixture.home, '.fsb', 'native-host');
-    const manifestPath = path.join(
-      fixture.home,
-      '.config',
-      'google-chrome',
-      'NativeMessagingHosts',
-      'io.github.fullselfbrowsing.fsb_native_host.json',
-    );
+    const manifestPath = process.platform === 'darwin'
+      ? path.join(
+        fixture.home,
+        'Library',
+        'Application Support',
+        'Google',
+        'Chrome',
+        'NativeMessagingHosts',
+        'io.github.fullselfbrowsing.fsb_native_host.json',
+      )
+      : path.join(
+        fixture.home,
+        '.config',
+        'google-chrome',
+        'NativeMessagingHosts',
+        'io.github.fullselfbrowsing.fsb_native_host.json',
+      );
     assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
     assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
 

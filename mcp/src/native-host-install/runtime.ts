@@ -1,5 +1,6 @@
 import { posix, win32 } from 'node:path';
 import {
+  NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH,
   NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_PRIVATE_FILE_MODE,
 } from '../native-host/constants.js';
@@ -673,6 +674,10 @@ export async function publishNativeHostRuntime(
     const stagedPackageRoot = api.join(stagedRuntimeRoot, 'package');
     const stagedBinRoot = api.join(layout.stageRoot, 'bin');
     const stagedMarkerPath = api.join(layout.stageRoot, 'owner.json');
+    const stagedReceiptPath = api.join(
+      layout.stageRoot,
+      NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH,
+    );
     const stagedLauncherPath = stagePath(layout, layout.launcherPath);
     const stagedEntryPath = stagePath(layout, layout.packageEntryPath);
     const stagedIntegrityPath = stagePath(layout, layout.integrityReceiptPath);
@@ -793,27 +798,7 @@ export async function publishNativeHostRuntime(
     }
 
     const marker = createNativeHostOwnerMarker(layout, artifactSha256);
-    await files.writeFileExclusiveNoFollow(
-      stagedMarkerPath,
-      `${JSON.stringify(marker)}\n`,
-      layout.markerMode,
-    );
-    for (const pathname of [
-      stagedEntryPath,
-      stagedIntegrityPath,
-      stagedLauncherPath,
-      ...(stagedBootstrapConfigPath ? [stagedBootstrapConfigPath] : []),
-      stagedMarkerPath,
-    ]) {
-      await files.fsyncFile(pathname);
-    }
-    for (const pathname of [stagedPackageRoot, stagedRuntimeRoot, stagedBinRoot, layout.stageRoot]) {
-      await files.fsyncDirectory(pathname);
-    }
-    await files.renameDirectoryAtomic(layout.stageRoot, layout.stableRoot);
-    stageTouched = false;
-
-    return published({
+    const receipt: NativeHostRuntimeReceipt = {
       schema: 1,
       platform: layout.platform,
       packageName: NATIVE_HOST_PACKAGE_NAME,
@@ -827,7 +812,34 @@ export async function publishNativeHostRuntime(
       tarballIntegrity,
       artifactSha256,
       marker,
-    }, pack, install);
+    };
+    await files.writeFileExclusiveNoFollow(
+      stagedReceiptPath,
+      `${JSON.stringify(receipt)}\n`,
+      layout.markerMode,
+    );
+    await files.writeFileExclusiveNoFollow(
+      stagedMarkerPath,
+      `${JSON.stringify(marker)}\n`,
+      layout.markerMode,
+    );
+    for (const pathname of [
+      stagedEntryPath,
+      stagedIntegrityPath,
+      stagedLauncherPath,
+      ...(stagedBootstrapConfigPath ? [stagedBootstrapConfigPath] : []),
+      stagedMarkerPath,
+      stagedReceiptPath,
+    ]) {
+      await files.fsyncFile(pathname);
+    }
+    for (const pathname of [stagedPackageRoot, stagedRuntimeRoot, stagedBinRoot, layout.stageRoot]) {
+      await files.fsyncDirectory(pathname);
+    }
+    await files.renameDirectoryAtomic(layout.stageRoot, layout.stableRoot);
+    stageTouched = false;
+
+    return published(receipt, pack, install);
   } catch (error) {
     if (error instanceof RuntimeRefusal) return refused(error.reason);
     return refused(publicationStarted ? 'publication-failed' : 'invalid-source-package');

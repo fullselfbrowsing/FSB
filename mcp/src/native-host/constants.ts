@@ -35,6 +35,7 @@ export const NATIVE_HOST_ENTRY_RELATIVE_PATH =
   'runtime/package/build/native-host/index.js';
 export const NATIVE_HOST_INTEGRITY_RELATIVE_PATH =
   'runtime/package/native-host/runtime-integrity.json';
+export const NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH = 'install-receipt.json';
 
 export function isNativeHostExtensionId(value: string): boolean {
   return NATIVE_HOST_EXTENSION_ID_PATTERN.test(value);
