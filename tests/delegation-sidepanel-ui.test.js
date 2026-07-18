@@ -594,7 +594,268 @@ assert(doctorSource.includes("var command = 'fsb-mcp-server doctor'")
 assert(!/sendMessage|nativeMessaging|exec\s*\(|restart/i.test(doctorSource + '\n' + setupSource),
   'doctor/setup actions cannot execute or restart a daemon, native host, or shell');
 
+console.log('\n--- Phase 63 native wake checking contract ---');
+
+[
+  'Checking local agent service',
+  'FSB is trying to make the local agent service available. Your message has not been sent.',
+  'Checking local agent service. Your message has not been sent.',
+  'Checking agent service'
+].forEach((copy) => assert(panelSource.includes(copy),
+  'native wake checking pins approved fixed copy: ' + copy));
+assert(panelSource.includes("message.type !== 'FSB_NATIVE_WAKE_CHECKING'")
+    && panelSource.includes("_delegationHasExactKeys(message, ['attemptId', 'intentId', 'type'])"),
+  'checking runtime input is exact and closed');
+assert(panelSource.includes('intentId: intentId')
+    && panelSource.includes('pendingRawText')
+    && panelSource.includes('pendingEditRevision')
+    && panelSource.includes('_delegationComposerEditRevision += 1'),
+  'Send snapshots exact composer bytes plus a monotonic edit revision and carries a safe intent id');
+
 (async function runInteractionContract() {
+  {
+    const intentId = 'intent_native_wake_0001';
+    const rawText = '  Preserve\nthese bytes\u00a0 ';
+    const run = new TestNode('section');
+    const stateCard = new TestNode('div');
+    const feed = new TestNode('div');
+    const control = new TestNode('div');
+    const announcer = new TestNode('div');
+    const chatInput = new TestNode('div');
+    run.appendChild(stateCard);
+    run.appendChild(feed);
+    run.classList.add('hidden');
+    feed.appendChild(new TestNode('article', 'stale feed row'));
+    control.appendChild(new TestNode('button', 'stale action'));
+    chatInput.textContent = rawText;
+    const headers = [];
+    let restoredStops = 0;
+    const context = {
+      document: globalThis.document,
+      DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+      _delegationComposerEditRevision: 12,
+      _delegationRunStopControls: [new TestNode('button')],
+      _delegationUiState: {
+        mode: 'ready',
+        pendingPreflight: true,
+        pendingIntentId: intentId,
+        pendingAttemptId: null,
+        pendingTask: 'Preserve\nthese bytes',
+        pendingRawText: rawText,
+        pendingEditRevision: 12,
+        checkingIntentId: null,
+        announcedTransitions: Object.create(null)
+      },
+      chatInput,
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control, announcer }),
+      _restoreLegacyStopControl() { restoredStops += 1; },
+      _setDelegationHeaderStatus(label, tone) { headers.push({ label, tone }); }
+    };
+    vm.createContext(context);
+    [
+      '_delegationHasExactKeys',
+      '_clearDelegationNode',
+      '_delegationElement',
+      '_delegationOneShotTransition',
+      '_announceDelegationLifecycleKey',
+      '_delegationPreflightIntentIsCurrent',
+      '_renderDelegationNativeWakeChecking',
+      '_handleDelegationNativeWakeChecking'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+    assert.equal(context._handleDelegationNativeWakeChecking({
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: 'attempt_native_wake_9999',
+      intentId: 'intent_native_wake_wrong'
+    }), false, 'wrong-intent event renders nothing');
+    assert.equal(context._handleDelegationNativeWakeChecking({
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: 'attempt_native_wake_9999',
+      intentId,
+      extra: true
+    }), false, 'extra checking fields are rejected');
+    assert.equal(stateCard.textContent, '');
+    assert.equal(announcer.textContent, '');
+
+    const checkingEvent = {
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: 'attempt_native_wake_0001',
+      intentId
+    };
+    assert.equal(context._handleDelegationNativeWakeChecking(checkingEvent), true);
+    assert.equal(run.classList.contains('hidden'), false);
+    assert.equal(run.getAttribute('aria-busy'), 'true');
+    assert.equal(stateCard.getAttribute('data-delegation-state'), 'native-wake-checking');
+    assert.equal(stateCard.getAttribute('data-delegation-tone'), 'info');
+    assert(stateCard.className.includes('delegation-tone-info'));
+    assert.equal(findAll(run, 'h2').length, 1, 'checking reuses the one state-card h2');
+    assert.equal(findByClass(run, 'delegation-native-wake-spinner').length, 1,
+      'checking renders one decorative spinner');
+    assert.equal(findByClass(run, 'delegation-native-wake-spinner')[0].getAttribute('aria-hidden'), 'true');
+    assert.equal(stateCard.textContent,
+      'Checking local agent service'
+        + 'FSB is trying to make the local agent service available. Your message has not been sent.');
+    assert.equal(findAll(stateCard, 'button').length, 0, 'checking adds no action row');
+    assert.equal(stateCard.getAttribute('role'), null, 'checking is not an alert');
+    assert.equal(stateCard.getAttribute('aria-live'), null, 'the card is not a second live region');
+    assert.equal(findAll(feed, 'article').length, 0, 'checking empties the existing feed');
+    assert.equal(control.children.length, 0, 'checking empties the existing control bar');
+    assert.equal(control.classList.contains('hidden'), true);
+    assert.equal(chatInput.textContent, rawText, 'checking preserves exact composer bytes');
+    assert.equal(chatInput.focusCount, 0, 'checking never moves composer focus');
+    assert.deepEqual(headers, [{ label: 'Checking agent service', tone: '' }]);
+    assert.equal(restoredStops, 1);
+    assert.equal(announcer.textContent,
+      'Checking local agent service. Your message has not been sent.');
+    assert.equal(Object.keys(context._delegationUiState.announcedTransitions).length, 1,
+      'one existing polite announcer delivery is keyed to the intent');
+    assert.equal(context._handleDelegationNativeWakeChecking(checkingEvent), false,
+      'duplicate attempt delivery is inert');
+    assert.equal(Object.keys(context._delegationUiState.announcedTransitions).length, 1);
+
+    context._delegationUiState.pendingPreflight = false;
+    context._delegationUiState.pendingIntentId = null;
+    assert.equal(context._handleDelegationNativeWakeChecking({
+      ...checkingEvent,
+      attemptId: 'attempt_native_wake_late'
+    }), false, 'post-settlement event is inert');
+    assert.equal(context._handleDelegationNativeWakeChecking({
+      type: 'FSB_NATIVE_WAKE_CHECKING',
+      attemptId: 'attempt_native_wake_boot',
+      intentId: 'intent_native_wake_boot'
+    }), false, 'boot/restored panel without a pending Send renders nothing');
+  }
+
+  {
+    const rawText = '\u00a0  first line\nsecond line  ';
+    const intentIds = ['intent_native_wake_1001', 'intent_native_wake_1002'];
+    const chatInput = new TestNode('div');
+    const sendBtn = new TestNode('button');
+    chatInput.textContent = rawText;
+    const preflightCommands = [];
+    const preflightResolvers = [];
+    let consentCalls = 0;
+    let startCalls = 0;
+    let legacyCalls = 0;
+    let failureCalls = 0;
+    let readyRenders = 0;
+    let saveCalls = 0;
+    const state = {
+      mode: 'ready',
+      task: null,
+      challengeId: null,
+      challengeExpiresAt: null,
+      errorCode: null,
+      composerLocked: false,
+      pendingPreflight: false,
+      pendingIntentId: null,
+      pendingAttemptId: null,
+      pendingTask: null,
+      pendingRawText: null,
+      pendingEditRevision: null,
+      checkingIntentId: null,
+      pendingStart: false
+    };
+    const context = {
+      DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+      _delegationComposerEditRevision: 4,
+      _delegationUiState: state,
+      chatInput,
+      sendBtn,
+      isRunning: false,
+      _chatLockedByOwnerChip: false,
+      _createDelegationIntentId: () => intentIds.shift(),
+      async _isActiveTabForeignOwned() { return false; },
+      _sendDelegationCommand(message) {
+        if (message.type === 'FSB_DELEGATION_PREFLIGHT') {
+          preflightCommands.push(clone(message));
+          return new Promise((resolve) => preflightResolvers.push(resolve));
+        }
+        if (message.type === 'FSB_DELEGATION_CONSENT') consentCalls += 1;
+        return Promise.resolve({ ok: false });
+      },
+      _handleLegacySendMessage() { legacyCalls += 1; },
+      _renderDelegationPreflightFailure() { failureCalls += 1; },
+      _delegationValidConsentResponse: () => false,
+      _beginDelegationStart() { startCalls += 1; },
+      _renderDelegationConsent() {},
+      _renderDelegationReadyState() {
+        readyRenders += 1;
+        state.mode = 'ready';
+      },
+      updateSendButtonState() {
+        sendBtn.disabled = state.pendingPreflight || chatInput.textContent.trim().length === 0;
+      },
+      debouncedSaveTask() { saveCalls += 1; }
+    };
+    vm.createContext(context);
+    [
+      '_delegationHasExactKeys',
+      '_delegationValidPreflightResponse',
+      '_beginDelegationPreflightIntent',
+      '_delegationPreflightIntentIsCurrent',
+      '_clearDelegationPreflightIntent',
+      '_handleDelegationComposerInput',
+      'handleSendMessage'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+    const editedAttempt = context.handleSendMessage();
+    await Promise.resolve();
+    assert.deepEqual(preflightCommands, [{
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'first line\nsecond line',
+      intentId: 'intent_native_wake_1001'
+    }], 'preflight adds only a safe intent id to the existing trimmed task contract');
+    assert.equal(state.pendingRawText, rawText, 'pending intent snapshots raw bytes verbatim');
+    assert.equal(state.pendingTask, 'first line\nsecond line');
+    assert.equal(state.pendingEditRevision, 4);
+    assert.equal(sendBtn.disabled, true, 'pending Send suppresses duplicate Send without locking the composer');
+
+    state.mode = 'native-wake-checking';
+    state.checkingIntentId = 'intent_native_wake_1001';
+    chatInput.textContent = rawText + 'edited';
+    context._handleDelegationComposerInput();
+    chatInput.textContent = rawText;
+    context._handleDelegationComposerInput();
+    assert.equal(context._delegationComposerEditRevision, 6,
+      'every input event advances the monotonic edit revision');
+    assert.equal(state.pendingPreflight, false, 'first edit clears the pending intent immediately');
+    assert.equal(state.pendingIntentId, null);
+    assert.equal(state.mode, 'ready', 'first edit clears the checking presentation');
+    assert.equal(sendBtn.disabled, false, 'restored bytes still require and allow a fresh explicit Send');
+    preflightResolvers[0]({
+      ok: true,
+      kind: 'agent',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    await editedAttempt;
+    assert.equal(consentCalls, 0, 'edited captured task never reaches consent');
+    assert.equal(startCalls, 0, 'edited captured task never starts');
+    assert.equal(legacyCalls, 0);
+    assert.equal(failureCalls, 0);
+    assert.equal(state.challengeId, null);
+    assert.equal(state.challengeExpiresAt, null);
+    assert.equal(chatInput.textContent, rawText, 'edit-then-revert cannot revive captured bytes');
+    assert.equal(readyRenders, 1);
+    assert.equal(saveCalls, 2, 'the pre-existing composer persistence path still sees both real edits');
+
+    const rawMismatchAttempt = context.handleSendMessage();
+    await Promise.resolve();
+    assert.equal(preflightCommands.length, 2, 'only a fresh Send creates another intent');
+    chatInput.textContent = rawText + '\n';
+    preflightResolvers[1]({
+      ok: true,
+      kind: 'agent',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    });
+    await rawMismatchAttempt;
+    assert.equal(consentCalls, 0, 'byte mismatch fences continuation even without a delivered input event');
+    assert.equal(startCalls, 0);
+    assert.equal(state.pendingPreflight, false);
+  }
+
   {
     const context = { _activeTabIdSnapshot: 42 };
     vm.createContext(context);
