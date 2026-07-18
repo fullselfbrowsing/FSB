@@ -10,7 +10,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const harnessPath = path.join(repoRoot, 'scripts', 'run-phase60-full-tests.mjs');
 
 function runGit(repository, args) {
-  const environment = { ...process.env };
+  const environment = { ...process.env, GIT_OPTIONAL_LOCKS: '0' };
   for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete environment[name];
   const result = spawnSync('git', args, {
     cwd: repository,
@@ -57,6 +57,7 @@ function main() {
     write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
     write(repository, 'dirty.txt', 'committed dirty baseline\n');
     write(repository, 'staged.txt', 'committed staged baseline\n');
+    write(repository, 'conflict.txt', 'committed conflict baseline\n');
     write(
       repository,
       'showcase/angular/public/llms.txt',
@@ -73,6 +74,9 @@ function main() {
       '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
     );
     runGit(repository, ['add', '--', 'staged.txt']);
+    const intentToAddPath = 'intent space\nline.txt';
+    write(repository, intentToAddPath, '');
+    runGit(repository, ['add', '-N', '--', intentToAddPath]);
 
     function runHarness(childSource, options = {}) {
       const testRepository = options.repositoryRoot || repository;
@@ -190,6 +194,106 @@ function main() {
     fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
     fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
 
+    const intentToAddDebug = runGit(
+      repository,
+      ['ls-files', '--cached', '--debug', '--', intentToAddPath],
+    );
+    const intentToAddFlagMatch = /\tflags: ([0-9a-f]+)\n?$/.exec(intentToAddDebug);
+    assert.notEqual(intentToAddFlagMatch, null, 'fixture exposes Git debug flags as hexadecimal');
+    assert.notEqual(
+      BigInt(`0x${intentToAddFlagMatch[1]}`) & 0x20000000n,
+      0n,
+      'fixture starts with CE_INTENT_TO_ADD set',
+    );
+    const indexBeforeIntentConversion = fs.readFileSync(indexPath);
+    const intentConversion = runHarness([
+      "const { spawnSync } = require('node:child_process');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      `const added = spawnSync('git', ['add', '--', ${JSON.stringify(intentToAddPath)}], { env: environment, shell: false });`,
+      "if (added.status !== 0) process.exit(98);",
+    ].join('\n'));
+    assert.equal(intentConversion.status, 1, 'intent-to-add conversion fails closed');
+    assert.match(intentConversion.stderr, /index semantic identity changed/);
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBeforeIntentConversion,
+      'harness detects but does not overwrite the converted intent-to-add entry',
+    );
+    const ordinaryEmptyDebug = runGit(
+      repository,
+      ['ls-files', '--cached', '--debug', '--', intentToAddPath],
+    );
+    const ordinaryEmptyFlagMatch = /\tflags: ([0-9a-f]+)\n?$/.exec(ordinaryEmptyDebug);
+    assert.notEqual(ordinaryEmptyFlagMatch, null, 'converted entry still exposes debug flags');
+    assert.equal(
+      BigInt(`0x${ordinaryEmptyFlagMatch[1]}`) & 0x20000000n,
+      0n,
+      'ordinary staged empty blob clears CE_INTENT_TO_ADD',
+    );
+    fs.writeFileSync(indexPath, indexBeforeIntentConversion);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    const baseConflictObject = runGit(repository, ['rev-parse', 'HEAD:conflict.txt']).trim();
+    const oursConflictObject = runGit(repository, ['rev-parse', 'HEAD:clean.txt']).trim();
+    const theirsConflictObject = runGit(repository, ['rev-parse', 'HEAD:dirty.txt']).trim();
+    const zeroObject = '0'.repeat(baseConflictObject.length);
+    const conflictIndexInfo = [
+      `0 ${zeroObject}\tconflict.txt`,
+      `100644 ${baseConflictObject} 1\tconflict.txt`,
+      `100644 ${oursConflictObject} 2\tconflict.txt`,
+      `100644 ${theirsConflictObject} 3\tconflict.txt`,
+      '',
+    ].join('\n');
+    const indexBeforeConflictStages = fs.readFileSync(indexPath);
+    const conflictStages = runHarness([
+      "const { spawnSync } = require('node:child_process');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      `const updated = spawnSync('git', ['update-index', '--index-info'], { env: environment, input: ${JSON.stringify(conflictIndexInfo)}, shell: false });`,
+      "if (updated.status !== 0) process.exit(99);",
+    ].join('\n'));
+    assert.equal(conflictStages.status, 1, 'multi-stage conflict entries fail closed');
+    assert.match(conflictStages.stderr, /index semantic identity changed/);
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBeforeConflictStages,
+      'harness detects but does not overwrite multi-stage conflict entries',
+    );
+    assert.equal(
+      runGit(repository, ['ls-files', '--unmerged', '--', 'conflict.txt'])
+        .trim().split('\n').length,
+      3,
+      'all three duplicate-path conflict stages remain present',
+    );
+    fs.writeFileSync(indexPath, indexBeforeConflictStages);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    const indexBeforeResolveUndo = fs.readFileSync(indexPath);
+    const resolveUndoMutation = runHarness([
+      "const { spawnSync } = require('node:child_process');",
+      "const environment = { ...process.env };",
+      "delete environment.GIT_OPTIONAL_LOCKS;",
+      `const conflicted = spawnSync('git', ['update-index', '--index-info'], { env: environment, input: ${JSON.stringify(conflictIndexInfo)}, shell: false });`,
+      "if (conflicted.status !== 0) process.exit(100);",
+      "const resolved = spawnSync('git', ['add', '--', 'conflict.txt'], { env: environment, shell: false });",
+      "if (resolved.status !== 0) process.exit(101);",
+    ].join('\n'));
+    assert.equal(resolveUndoMutation.status, 1, 'resolve-undo mutation fails closed');
+    assert.match(resolveUndoMutation.stderr, /index semantic identity changed/);
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBeforeResolveUndo,
+      'harness detects but does not overwrite resolve-undo metadata',
+    );
+    assert.notEqual(
+      runGit(repository, ['ls-files', '--resolve-undo', '--', 'conflict.txt']).length,
+      0,
+      'resolve-undo metadata remains present after the rejected mutation',
+    );
+    fs.writeFileSync(indexPath, indexBeforeResolveUndo);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
     const assumeUnchangedMutationSource = [
       "const { spawnSync } = require('node:child_process');",
       "const fs = require('node:fs');",
@@ -199,6 +303,7 @@ function main() {
       "if (marked.status !== 0) process.exit(93);",
       "fs.writeFileSync('stat-cache-clean.txt', 'assume-unchanged hid this mutation\\n');",
     ].join('\n');
+    const indexBeforeAssumeUnchanged = fs.readFileSync(indexPath);
     const assumeUnchangedMutation = runHarness(assumeUnchangedMutationSource);
     assert.equal(
       assumeUnchangedMutation.status,
@@ -210,6 +315,16 @@ function main() {
       fs.readFileSync(path.join(repository, 'stat-cache-clean.txt'), 'utf8'),
       'assume-unchanged hid this mutation\n',
       'harness detects but does not overwrite the hidden worktree mutation',
+    );
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBeforeAssumeUnchanged,
+      'harness does not overwrite the assume-unchanged index mutation',
+    );
+    assert.match(
+      runGit(repository, ['ls-files', '-v', '--', 'stat-cache-clean.txt']),
+      /^[a-z] /,
+      'assume-unchanged remains set until explicit fixture cleanup',
     );
     runGit(repository, ['update-index', '--no-assume-unchanged', '--', 'stat-cache-clean.txt']);
     write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
@@ -223,6 +338,7 @@ function main() {
       "if (marked.status !== 0) process.exit(94);",
       "fs.writeFileSync('stat-cache-clean.txt', 'skip-worktree hid this mutation\\n');",
     ].join('\n');
+    const indexBeforeSkipWorktree = fs.readFileSync(indexPath);
     const skipWorktreeMutation = runHarness(skipWorktreeMutationSource);
     assert.equal(
       skipWorktreeMutation.status,
@@ -234,6 +350,16 @@ function main() {
       fs.readFileSync(path.join(repository, 'stat-cache-clean.txt'), 'utf8'),
       'skip-worktree hid this mutation\n',
       'harness detects but does not overwrite the skip-worktree mutation',
+    );
+    assert.notDeepEqual(
+      fs.readFileSync(indexPath),
+      indexBeforeSkipWorktree,
+      'harness does not overwrite the skip-worktree index mutation',
+    );
+    assert.match(
+      runGit(repository, ['ls-files', '-v', '--', 'stat-cache-clean.txt']),
+      /^S /,
+      'skip-worktree remains set until explicit fixture cleanup',
     );
     runGit(repository, ['update-index', '--no-skip-worktree', '--', 'stat-cache-clean.txt']);
     write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
