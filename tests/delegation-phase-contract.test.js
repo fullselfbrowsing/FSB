@@ -403,7 +403,7 @@ const decisionEvidence = Object.freeze({
   'D-23': [['mcp/src/agent-providers/runtime-files.ts', /recoveryRequired/]],
   'D-24': [['tests/delegation-controller.test.js', /without replay|no replay/i]],
   'D-25': [['.planning/phases/61-delegation-ux-sw-eviction-persistence/61-HUMAN-UAT.md', /service-worker eviction/]],
-  'D-26': [['tests/mcp-version-parity.test.js', /Phase 61 Chrome 116 and no-native boundary/]],
+  'D-26': [['tests/mcp-version-parity.test.js', /Phase 61 Chrome 116 and Phase 63 native permission boundary/]],
   'D-27': [['.planning/phases/61-delegation-ux-sw-eviction-persistence/61-VALIDATION.md', /After every task commit/]],
   'D-28': [[UAT_PATH, /Every case above remains `human_needed` and pending/]],
 });
@@ -425,7 +425,7 @@ const threatEvidence = Object.freeze({
   'T61-09': [['tests/mcp-agent-orphan-recovery.test.js', /daemon_restart_lost_run/]],
   'T61-10': [['tests/mcp-bridge-client-lifecycle.test.js', /three consecutive/]],
   'T61-11': [['tests/delegation-sidepanel-ui.test.js', /no held state before authority replies/]],
-  'T61-12': [['tests/mcp-version-parity.test.js', /\['nativeMessaging', 'downloads'\]/]],
+  'T61-12': [['tests/mcp-version-parity.test.js', /nativeMessaging permission appears exactly once/]],
   'T61-13': [['tests/delegation-controller.test.js', /forced module reload hydrates/]],
   'T61-14': [['tests/delegation-sidepanel-ui.test.js', /hostile metadata remains inert text/]],
 });
