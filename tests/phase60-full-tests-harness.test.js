@@ -48,6 +48,7 @@ function main() {
       'archived compatibility bytes\n',
     );
     write(repository, 'clean.txt', 'committed clean baseline\n');
+    write(repository, 'stat-cache-clean.txt', 'committed stat-cache baseline\n');
     write(repository, 'dirty.txt', 'committed dirty baseline\n');
     write(repository, 'staged.txt', 'committed staged baseline\n');
     write(
@@ -120,6 +121,36 @@ function main() {
       fs.readFileSync(path.join(repository, 'showcase/angular/public/llms.txt'), 'utf8'),
       '<!-- generated 2026-07-14 by build-crawler-files.mjs -->\n',
       'date-sensitive generated dirty bytes are restored exactly',
+    );
+
+    const indexPath = path.join(repository, '.git/index');
+    const indexBytesBeforeStatRefresh = fs.readFileSync(indexPath);
+    const indexModeBeforeStatRefresh = fs.lstatSync(indexPath).mode & 0o7777;
+    const statRefreshSource = [
+      "const { spawnSync } = require('node:child_process');",
+      "const fs = require('node:fs');",
+      "const target = 'stat-cache-clean.txt';",
+      "const before = fs.statSync(target);",
+      "fs.utimesSync(target, before.atime, new Date(before.mtimeMs + 2000));",
+      "const refreshed = spawnSync('git', ['status', '--short', '--', target], { shell: false });",
+      "if (refreshed.status !== 0) process.exit(92);",
+    ].join('\n');
+    const statRefresh = runHarness(statRefreshSource);
+    assert.equal(
+      statRefresh.status,
+      0,
+      `stat-cache-only index refresh remains a successful preserved run: ${statRefresh.stderr}`,
+    );
+    assert.match(statRefresh.stdout, /PASS: full suite passed and workspace state was preserved/);
+    assert.deepEqual(
+      fs.readFileSync(indexPath),
+      indexBytesBeforeStatRefresh,
+      'harness restores raw index bytes after a child-only Git stat-cache refresh',
+    );
+    assert.equal(
+      fs.lstatSync(indexPath).mode & 0o7777,
+      indexModeBeforeStatRefresh,
+      'harness preserves raw index mode after a child-only Git stat-cache refresh',
     );
 
     const unexpectedSource = [
