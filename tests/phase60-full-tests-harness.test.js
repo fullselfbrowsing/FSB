@@ -106,7 +106,7 @@ function main() {
     assert.equal(restored.status, 0,
       `pre-existing dirty worktree mutation is restored: ${restored.stderr}`);
     assert.match(restored.stdout, /PASS: full suite passed and workspace state was preserved/);
-    assert.doesNotMatch(restored.stderr, /staged index bytes changed/);
+    assert.doesNotMatch(restored.stderr, /index semantic identity changed/);
     assert.doesNotMatch(restored.stderr, /pre-existing tracked dirty bytes changed/);
     assert.equal(fs.existsSync(compatibilityPath), false, 'harness removes only its compatibility symlink');
     assert.equal(fs.existsSync(compatibilityDirectory), false, 'harness removes its newly-created compatibility directory');
@@ -335,7 +335,7 @@ function main() {
     const unexpected = runHarness(unexpectedSource);
     assert.equal(unexpected.status, 1,
       'new clean-tracked and untracked mutations still make the harness fail closed');
-    assert.doesNotMatch(unexpected.stderr, /staged index bytes changed/);
+    assert.doesNotMatch(unexpected.stderr, /index semantic identity changed/);
     assert.match(unexpected.stderr, /pre-existing tracked dirty bytes changed/);
     assert.match(unexpected.stderr, /untracked workspace entries changed/);
     assert.match(unexpected.stderr, /workspace path\/status set changed/);
@@ -371,7 +371,7 @@ function main() {
     const stagedMutation = runHarness(stagedMutationSource);
     assert.equal(stagedMutation.status, 1,
       'staged index mutations still make the harness fail closed');
-    assert.match(stagedMutation.stderr, /staged index bytes changed/);
+    assert.match(stagedMutation.stderr, /index semantic identity changed/);
     assert.match(stagedMutation.stderr, /pre-existing tracked dirty bytes changed/);
     assert.doesNotMatch(stagedMutation.stderr, /untracked workspace entries changed/);
     assert.equal(

@@ -3,12 +3,18 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
   chmodSync,
+  fchmodSync,
+  fstatSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readlinkSync,
   readdirSync,
+  renameSync,
   rmSync,
   rmdirSync,
   symlinkSync,
@@ -67,26 +73,133 @@ function resolveGitIndexPath() {
 }
 
 function captureGitIndex(indexPath) {
-  const stat = lstatIfPresent(indexPath);
-  if (!stat) return Object.freeze({ kind: 'missing' });
-  if (stat.isSymbolicLink()) return Object.freeze({ kind: 'symlink' });
-  if (stat.isDirectory()) return Object.freeze({ kind: 'directory' });
-  if (!stat.isFile()) return Object.freeze({ kind: 'other' });
-  return Object.freeze({
-    kind: 'file',
-    mode: stat.mode & 0o7777,
-    bytes: Buffer.from(readFileSync(indexPath)),
-  });
+  try {
+    const stat = lstatIfPresent(indexPath);
+    if (!stat) return Object.freeze({ kind: 'missing' });
+    if (stat.isSymbolicLink()) return Object.freeze({ kind: 'symlink' });
+    if (stat.isDirectory()) return Object.freeze({ kind: 'directory' });
+    if (!stat.isFile()) return Object.freeze({ kind: 'other' });
+    return Object.freeze({
+      kind: 'file',
+      mode: stat.mode & 0o7777,
+      bytes: Buffer.from(readFileSync(indexPath)),
+    });
+  } catch {
+    throw new GitIndexPreservationError('raw Git index inspection failed');
+  }
 }
 
-function restoreGitIndex(indexPath, snapshot) {
-  const current = captureGitIndex(indexPath);
-  if (current.kind !== 'file') {
-    throw new Error('raw Git index is not a regular file');
+function sameGitIndex(left, right) {
+  return left.kind === 'file'
+    && right.kind === 'file'
+    && left.mode === right.mode
+    && left.bytes.equals(right.bytes);
+}
+
+class GitIndexPreservationError extends Error {}
+
+function removeOwnedIndexLock(lockPath, lockIdentity) {
+  if (!lockIdentity) return;
+  try {
+    const stat = lstatSync(lockPath);
+    if (
+      stat.isFile()
+      && !stat.isSymbolicLink()
+      && stat.dev === lockIdentity.dev
+      && stat.ino === lockIdentity.ino
+    ) {
+      unlinkSync(lockPath);
+    }
+  } catch (error) {
+    if (!error || error.code !== 'ENOENT') {
+      throw new GitIndexPreservationError('raw Git index lock cleanup failed');
+    }
   }
-  unlinkSync(indexPath);
-  writeFileSync(indexPath, snapshot.bytes, { flag: 'wx', mode: snapshot.mode });
-  chmodSync(indexPath, snapshot.mode);
+}
+
+function fsyncIndexDirectory(indexPath) {
+  if (process.platform === 'win32') return;
+  let directoryFd;
+  try {
+    directoryFd = openSync(dirname(indexPath), 'r');
+    fsyncSync(directoryFd);
+  } catch (error) {
+    if (!error || !['EINVAL', 'ENOTSUP', 'EOPNOTSUPP'].includes(error.code)) {
+      throw new GitIndexPreservationError('raw Git index directory sync failed');
+    }
+  } finally {
+    if (directoryFd !== undefined) closeSync(directoryFd);
+  }
+}
+
+function restoreGitIndexAtomically(
+  indexPath,
+  snapshot,
+  expectedCurrent,
+  expectedSemanticIdentity,
+) {
+  const lockPath = `${indexPath}.lock`;
+  let lockFd;
+  let lockIdentity;
+  let committed = false;
+
+  try {
+    try {
+      lockFd = openSync(lockPath, 'wx', snapshot.mode);
+    } catch (error) {
+      if (error && error.code === 'EEXIST') {
+        throw new GitIndexPreservationError('raw Git index lock is already held');
+      }
+      throw new GitIndexPreservationError('raw Git index lock acquisition failed');
+    }
+    lockIdentity = fstatSync(lockFd);
+
+    if (
+      captureIndexSemanticIdentity('locked pre-restoration')
+      !== expectedSemanticIdentity
+    ) {
+      throw new GitIndexPreservationError('index semantic identity changed before restoration');
+    }
+    if (!sameGitIndex(captureGitIndex(indexPath), expectedCurrent)) {
+      throw new GitIndexPreservationError('raw Git index changed before restoration');
+    }
+
+    fchmodSync(lockFd, snapshot.mode);
+    writeFileSync(lockFd, snapshot.bytes);
+    fsyncSync(lockFd);
+    closeSync(lockFd);
+    lockFd = undefined;
+
+    if (!sameGitIndex(captureGitIndex(indexPath), expectedCurrent)) {
+      throw new GitIndexPreservationError('raw Git index changed during restoration');
+    }
+
+    renameSync(lockPath, indexPath);
+    committed = true;
+    fsyncIndexDirectory(indexPath);
+
+    if (!sameGitIndex(captureGitIndex(indexPath), snapshot)) {
+      throw new GitIndexPreservationError('raw Git index identity differs after restoration');
+    }
+  } catch (error) {
+    if (lockFd !== undefined) {
+      try {
+        closeSync(lockFd);
+      } catch {
+        // The stable preservation error below remains authoritative.
+      }
+    }
+    if (!committed) {
+      try {
+        removeOwnedIndexLock(lockPath, lockIdentity);
+      } catch (cleanupError) {
+        if (cleanupError instanceof GitIndexPreservationError) throw cleanupError;
+        throw new GitIndexPreservationError('raw Git index lock cleanup failed');
+      }
+    }
+    if (error instanceof GitIndexPreservationError) throw error;
+    throw new GitIndexPreservationError('atomic raw Git index restoration failed');
+  }
 }
 
 function nulPaths(value) {
@@ -194,6 +307,38 @@ function restoreWorkspacePaths(snapshots) {
   }
 }
 
+function captureIndexSemanticIdentity(label) {
+  /*
+   * This identity excludes only representation/performance data that Git may
+   * regenerate without changing user intent: stat tuples, fsmonitor-valid
+   * bits/FSMN, cache-tree/TREE, untracked-cache/UNTR, split-index/LINK, and
+   * EOIE/IEOT offsets. The three porcelain projections below retain the
+   * complete staged contract instead:
+   * - --stage: mode, object id, conflict stage, path, sparse-directory entry,
+   *   and intent-to-add's zero object id.
+   * - -v: assume-unchanged casing plus skip-worktree/sparse status.
+   * - --resolve-undo: REUC conflict-resolution records.
+   */
+  const staged = captureGitBuffer(
+    ['ls-files', '--stage', '-z'],
+    `${label} staged index identity capture`,
+  );
+  const flags = captureGitBuffer(
+    ['ls-files', '--cached', '-v', '-z'],
+    `${label} index flag identity capture`,
+  );
+  const resolveUndo = captureGitBuffer(
+    ['ls-files', '--resolve-undo', '-z'],
+    `${label} resolve-undo identity capture`,
+  );
+  const hash = createHash('sha256');
+  updateField(hash, 'phase60-index-semantic-v2');
+  updateField(hash, staged);
+  updateField(hash, flags);
+  updateField(hash, resolveUndo);
+  return hash.digest('hex');
+}
+
 function captureWorkspaceState(label) {
   const unstagedPaths = nulPaths(captureGitBuffer(
     ['diff', '--name-only', '-z', '--no-ext-diff', '--no-textconv'],
@@ -215,10 +360,7 @@ function captureWorkspaceState(label) {
       ['status', '--short', '-z', '--untracked-files=all'],
       `${label} dirty-state capture`,
     )).digest('hex'),
-    indexEntries: createHash('sha256').update(captureGitBuffer(
-      ['ls-files', '--stage', '-z'],
-      `${label} index-entry capture`,
-    )).digest('hex'),
+    indexSemanticIdentity: captureIndexSemanticIdentity(label),
     trackedPaths: fingerprintPaths(trackedDirtyPaths),
     trackedDirtyPaths: Object.freeze(trackedDirtyPaths),
     worktreeDirtyPaths: Object.freeze(worktreeDirtyPaths),
@@ -266,7 +408,7 @@ let workspaceBefore;
 let trackedDirtySnapshots;
 let indexPath;
 let indexBefore;
-let indexEntriesUnchanged = false;
+let indexSemanticUnchanged = false;
 
 try {
   indexPath = resolveGitIndexPath();
@@ -357,9 +499,11 @@ try {
   if (workspaceBefore !== undefined) {
     try {
       const workspaceAfter = captureWorkspaceState('final');
-      indexEntriesUnchanged = workspaceAfter.indexEntries === workspaceBefore.indexEntries;
-      if (!indexEntriesUnchanged) {
-        failures.push('staged index bytes changed during the full-suite run');
+      indexSemanticUnchanged = (
+        workspaceAfter.indexSemanticIdentity === workspaceBefore.indexSemanticIdentity
+      );
+      if (!indexSemanticUnchanged) {
+        failures.push('index semantic identity changed during the full-suite run');
       }
       if (workspaceAfter.trackedPaths !== workspaceBefore.trackedPaths) {
         failures.push('pre-existing tracked dirty bytes changed during the full-suite run');
@@ -390,23 +534,72 @@ try {
         failures.push('raw Git index is not a regular file after the full-suite run');
       } else if (indexAfter.mode !== indexBefore.mode) {
         failures.push('raw Git index mode changed during the full-suite run');
-      } else if (indexEntriesUnchanged) {
+      } else if (indexSemanticUnchanged) {
         if (!indexAfter.bytes.equals(indexBefore.bytes)) {
-          restoreGitIndex(indexPath, indexBefore);
+          restoreGitIndexAtomically(
+            indexPath,
+            indexBefore,
+            indexAfter,
+            workspaceBefore.indexSemanticIdentity,
+          );
         }
         const restoredIndex = captureGitIndex(indexPath);
-        if (
-          restoredIndex.kind !== 'file'
-          || restoredIndex.mode !== indexBefore.mode
-          || !restoredIndex.bytes.equals(indexBefore.bytes)
-        ) {
+        if (!sameGitIndex(restoredIndex, indexBefore)) {
           failures.push('raw Git index identity differs after restoration');
         }
       }
     } catch (error) {
-      failures.push(error instanceof Error
+      failures.push(error instanceof GitIndexPreservationError
         ? `raw Git index preservation failed: ${error.message}`
         : 'raw Git index preservation failed');
+    }
+  }
+
+  if (workspaceBefore !== undefined) {
+    try {
+      const postRestoration = captureWorkspaceState('post-restoration');
+      if (
+        postRestoration.status !== workspaceBefore.status
+        || postRestoration.indexSemanticIdentity !== workspaceBefore.indexSemanticIdentity
+        || postRestoration.trackedPaths !== workspaceBefore.trackedPaths
+        || postRestoration.untrackedListing !== workspaceBefore.untrackedListing
+        || postRestoration.untrackedPaths !== workspaceBefore.untrackedPaths
+      ) {
+        failures.push('workspace identity differs after raw index restoration');
+      }
+      if (lstatIfPresent(compatibilityPath) !== null) {
+        failures.push('temporary compatibility path remains after raw index restoration');
+      }
+    } catch {
+      failures.push('post-restoration workspace check failed');
+    }
+  }
+
+  if (
+    indexBefore !== undefined
+    && indexPath !== undefined
+    && workspaceBefore !== undefined
+    && indexSemanticUnchanged
+  ) {
+    try {
+      const finalIndex = captureGitIndex(indexPath);
+      if (finalIndex.kind === 'file' && finalIndex.mode === indexBefore.mode) {
+        if (!finalIndex.bytes.equals(indexBefore.bytes)) {
+          restoreGitIndexAtomically(
+            indexPath,
+            indexBefore,
+            finalIndex,
+            workspaceBefore.indexSemanticIdentity,
+          );
+        }
+        if (!sameGitIndex(captureGitIndex(indexPath), indexBefore)) {
+          failures.push('final raw Git index identity differs after restoration');
+        }
+      }
+    } catch (error) {
+      failures.push(error instanceof GitIndexPreservationError
+        ? `final raw Git index preservation failed: ${error.message}`
+        : 'final raw Git index preservation failed');
     }
   }
 }
