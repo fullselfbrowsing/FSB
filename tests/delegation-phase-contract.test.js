@@ -491,9 +491,15 @@ function runPhase63FinalContract() {
     'constants.ts', 'daemon.ts', 'entry.ts', 'index.ts',
     'platform.ts', 'protocol.ts', 'runtime-layout.ts',
   ], 'native source authority remains the exact seven-file leaf graph');
-  check(nativeSourceRoster.every((name) =>
-    exists(`mcp/build/native-host/${name.replace(/\.ts$/, '.js')}`)),
-  'the same fresh build lifecycle supplies every compiled native leaf');
+  const mcpTsconfig63 = JSON.parse(read('mcp/tsconfig.json'));
+  const mcpBuildScript63 = JSON.parse(read('mcp/package.json')).scripts?.build || '';
+  check(mcpTsconfig63.compilerOptions?.rootDir === 'src'
+      && mcpTsconfig63.compilerOptions?.outDir === 'build'
+      && Array.isArray(mcpTsconfig63.include)
+      && mcpTsconfig63.include.length === 1
+      && mcpTsconfig63.include[0] === 'src/**/*.ts'
+      && /(?:^|&&\s*)tsc(?:\s|&&|$)/.test(mcpBuildScript63),
+  'the fresh build contract maps every native source leaf into mcp/build');
   const nativeIndex63 = read('mcp/src/native-host/index.ts');
   const nativeEntry63 = read('mcp/src/native-host/entry.ts');
   const installRouter63 = read('mcp/src/install.ts');
