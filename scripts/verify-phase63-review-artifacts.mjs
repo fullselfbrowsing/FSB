@@ -9,17 +9,17 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PHASE = '63-native-messaging-host';
 const IMPLEMENTATION_BASE = '27bddf00517738c87fcc6ca4b27940e8121f2124';
-const IMPLEMENTATION_END = 'd8fced58776cc7ce6caff59906b78486ca927138';
-const COMPATIBILITY_COMMIT = 'd8fced58776cc7ce6caff59906b78486ca927138';
-const IMPLEMENTATION_PATCH_BYTES = 826923;
+const IMPLEMENTATION_END = '6d868ee1348219f95fd0cc0e5f5f3f9cf9fc6887';
+const COMPATIBILITY_COMMIT = '6d868ee1348219f95fd0cc0e5f5f3f9cf9fc6887';
+const IMPLEMENTATION_PATCH_BYTES = 887858;
 const IMPLEMENTATION_PATCH_SHA256 =
-  'b72df228562fcd6b0dfecf5f938b73e545bbd46a0b52899238ac7cbeeb3e13ac';
+  '24072007a6af1754e496804471c3b21e9afd01f20bcdec9bcfaa9c694e5e46d6';
 const IMPLEMENTATION_MANIFEST_SHA256 =
-  '6821141e31e08ed675d92baf099d711ca5d91246aabba250cd2e694318d84ba3';
+  '5135dbf243f0f123f60217584cd2ae8ab6865c78c85fcdae20464a539b27dcc7';
 const IMPLEMENTATION_INDEX_SHA256 =
-  '66933b2f78b0f451d918990d02b0aecd9429caa791a06b84034c46b189d45719';
+  'ab66af77cbb8989a3d76425afa36cc10a75db80530f70800c3f443f047077c23';
 const IMPLEMENTATION_WORKTREE_INDEX_SHA256 =
-  'c27a484743912eb8c651c75e9b87bea1aa603f534173a900543f1ff692a59c21';
+  '3120d40b00f57e0a29cbd774baaaaac798147ab131b37114b8781a63d801ae47';
 const UNRELATED_WORKTREE_DIFF_SHA256 =
   'b1ccbbcd93a1a121f8d6b77c2c3ca2dda0690e87816a5bae71610c2013426e91';
 const HUMAN_UAT_SHA256 =
@@ -39,6 +39,8 @@ const IMPLEMENTATION_FILES = Object.freeze([
   'mcp/native-host/runtime-integrity.json',
   'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
   'mcp/native-host/windows/fsb-native-host-bootstrap.c',
+  'mcp/native-host/windows/fsb-native-host-registry-version.rc.in',
+  'mcp/native-host/windows/fsb-native-host-registry.c',
   'mcp/package-lock.json',
   'mcp/package.json',
   'mcp/src/agent-providers/serve-delegation.ts',
@@ -52,6 +54,7 @@ const IMPLEMENTATION_FILES = Object.freeze([
   'mcp/src/native-host-install/types.ts',
   'mcp/src/native-host-production.ts',
   'mcp/src/native-host-registration.ts',
+  'mcp/src/native-host-registry-helper.ts',
   'mcp/src/native-host/constants.ts',
   'mcp/src/native-host/daemon.ts',
   'mcp/src/native-host/entry.ts',
@@ -76,6 +79,7 @@ const IMPLEMENTATION_FILES = Object.freeze([
   'tests/mcp-native-host-install.test.js',
   'tests/mcp-native-host-packaging.test.js',
   'tests/mcp-native-host-protocol.test.js',
+  'tests/mcp-native-host-registry-helper.test.js',
   'tests/mcp-reverse-channel-contract.test.js',
   'tests/mcp-version-parity.test.js',
   'tests/native-host-background-wake.test.js',
@@ -132,11 +136,12 @@ const KIND_CONFIG = Object.freeze({
       'Requirement Coverage',
       'Decision Coverage',
       'Remediation Verification',
+      'Registry Helper Review',
       'Precomputed Plan 10 Evidence',
       'Findings',
       'Residual Human Evidence Boundary',
     ]),
-    minimumCitations: 36,
+    minimumCitations: 44,
   }),
   security: Object.freeze({
     reviewer: 'gsd-security-auditor',
@@ -162,12 +167,13 @@ const KIND_CONFIG = Object.freeze({
       'Native Authority Trace',
       'Threat Dispositions',
       'ASVS L1 Themes',
+      'Security Remediation Verification',
       'Explicit Attack Checks',
       'Precomputed Plan 10 Evidence',
       'Findings',
       'Residual Human Evidence Boundary',
     ]),
-    minimumCitations: 44,
+    minimumCitations: 56,
   }),
   ui: Object.freeze({
     reviewer: 'gsd-ui-auditor',
@@ -289,7 +295,10 @@ function verifyReviewOutputScope(kinds) {
     fail('63-HUMAN-UAT.md changed or was falsely promoted during review');
   }
 
-  const allowedOutputs = new Set(kinds.map((kind) => KIND_CONFIG[kind].output));
+  const allowedOutputs = new Set([
+    REVIEW_VERIFIER,
+    ...kinds.map((kind) => KIND_CONFIG[kind].output),
+  ]);
   const reviewDiffs = splitNul(gitBytes([
     'diff', '--name-only', '-z', 'HEAD', '--', ...REVIEW_INFRASTRUCTURE,
   ]));
@@ -516,8 +525,11 @@ function validateFindings(text, fields, kind, label) {
       seen.add(id);
       if (!SEVERITIES.includes(severity)) fail(`${label}: unknown severity ${severity}`);
       counts[severity] += 1;
-      if (severity === 'CRITICAL' || severity === 'HIGH') {
-        fail(`${label}: blocking ${severity} finding ${id} cannot pass the frozen review`);
+      if (
+        (severity === 'CRITICAL' || severity === 'HIGH')
+        && status !== 'resolved'
+      ) {
+        fail(`${label}: blocking ${severity} finding ${id} must be resolved before the frozen review can pass`);
       }
     }
     if (!SEVERITIES.includes(severity)) fail(`${label}: unknown severity ${severity}`);
@@ -645,6 +657,10 @@ function validateCommon(kind, text, config, label) {
     '229 daemon/entry assertions',
     '111 background-wake assertions',
     '1,014-assertion Phase 61–63 contract gate',
+    '15-assertion adversarial registry-helper suite',
+    '294 runtime transaction assertions',
+    '1,016-assertion compatibility rerun',
+    'local MSVC execution not claimed',
   ], 'precomputed evidence', label);
 
   const residual = sectionBody(text, 'Residual Human Evidence Boundary', label);
@@ -711,6 +727,12 @@ function validateCode(text, label) {
     'identity claim/rollback',
     'spawn/readiness/release ordering',
     'malformed/foreign lock preservation',
+    'separate registry helper C/TS',
+    'schema-2 four-artifact role metadata',
+    'runtime helper copy/receipt/inspection',
+    'isolated process execution',
+    'registry-helper CI/publish flow',
+    'registry-helper test strength',
   ], 'code review scope', label);
 
   const remediation = sectionBody(text, 'Remediation Verification', label);
@@ -721,6 +743,7 @@ function validateCode(text, label) {
     'F63-CODE-04',
     'F63-CODE-05',
     'F63-CODE-06',
+    'F63-CODE-07',
     'resolved',
     'mcp/src/native-host-production.ts',
     'mcp/src/native-host/daemon.ts',
@@ -729,10 +752,31 @@ function validateCode(text, label) {
     'tests/mcp-install-platforms.test.js',
     'tests/mcp-native-host-install.test.js',
     'tests/mcp-native-host-daemon.test.js',
+    'tests/delegation-phase-contract.test.js',
     'wake.lock.pending-',
     'user/64',
     'one-flight lease',
+    'PHASE63_NEW_TEST_COMMANDS',
+    'six Phase 63 root gates',
   ], 'review remediation verification', label);
+
+  const registryHelper = sectionBody(text, 'Registry Helper Review', label);
+  requireMarkers(registryHelper, [
+    'mcp/native-host/windows/fsb-native-host-registry.c',
+    'mcp/src/native-host-registry-helper.ts',
+    'mcp/native-host/windows/fsb-native-host-registry-version.rc.in',
+    'schema-2',
+    'four artifacts',
+    'runtime copy',
+    'receipt',
+    'installed-state inspection',
+    'empty environment',
+    'shell:false',
+    '.github/workflows/ci.yml',
+    '.github/workflows/npm-publish.yml',
+    'tests/mcp-native-host-registry-helper.test.js',
+    'tests/mcp-native-host-packaging.test.js',
+  ], 'registry helper review', label);
 }
 
 const THREAT_SEVERITY = Object.freeze({
@@ -807,6 +851,28 @@ function validateSecurity(text, label) {
     label,
   );
 
+  const remediation = sectionBody(text, 'Security Remediation Verification', label);
+  requireMarkers(remediation, [
+    'F63-SECURITY-01',
+    'F63-SECURITY-02',
+    'resolved',
+    'no reg.exe authority',
+    'no SystemRoot authority',
+    'no PATH executable authority',
+    'locale-independent structured protocol',
+    'fixed key/operation/view C API',
+    'user/64 read-only',
+    'path/hash/role/PE-machine/version/reparse provenance',
+    'schema-2 four-artifact metadata',
+    'runtime copy/receipt/inspection',
+    'input/output caps',
+    'no bootstrap authority expansion',
+    'MSVC build/harness workflow source',
+    'mcp/native-host/windows/fsb-native-host-registry.c',
+    'mcp/src/native-host-registry-helper.ts',
+    'tests/mcp-native-host-registry-helper.test.js',
+  ], 'security remediation verification', label);
+
   const checks = sectionBody(text, 'Explicit Attack Checks', label);
   requireMarkers(checks, [
     'SEC-CHECK-FRAMING',
@@ -842,6 +908,15 @@ function validateSecurity(text, label) {
       'SEC-CHECK-CLAIM-IDENTITY',
       'SEC-CHECK-CLAIM-CLEANUP',
       'SEC-CHECK-AGENT-AUTHORITY',
+      'SEC-CHECK-REG-HELPER-STRUCTURED',
+      'SEC-CHECK-REG-FIXED-API',
+      'SEC-CHECK-REG-USER64-READONLY',
+      'SEC-CHECK-REG-HELPER-PROVENANCE',
+      'SEC-CHECK-REG-HELPER-CAPS',
+      'SEC-CHECK-SCHEMA2-FOUR-ARTIFACT',
+      'SEC-CHECK-RUNTIME-HELPER-RECEIPT',
+      'SEC-CHECK-BOOTSTRAP-SEPARATION',
+      'SEC-CHECK-MSVC-HARNESS',
     ], 'explicit security checks', label);
 }
 
@@ -977,7 +1052,7 @@ function codeFixtureSections() {
   return [
     '## Review Scope',
     '',
-    'correctness; race/lifecycle; framing/size limits; platform/registry; atomic ownership; bundled-offline closure; workspace preservation; one-flight/no-replay; error normalization; test strength; root/CI ordering; compatibility; maintainability; direct/global bin operation without npm environment; validated npm candidate provenance; npm-independent uninstall receipt reconstruction; Windows user/64 missing or unavailable at every mutation boundary; OS loopback one-flight lease; port collision; crash release; A/B/C scheduling; identity claim/rollback; spawn/readiness/release ordering; malformed/foreign lock preservation.',
+    'correctness; race/lifecycle; framing/size limits; platform/registry; atomic ownership; bundled-offline closure; workspace preservation; one-flight/no-replay; error normalization; test strength; root/CI ordering; compatibility; maintainability; direct/global bin operation without npm environment; validated npm candidate provenance; npm-independent uninstall receipt reconstruction; Windows user/64 missing or unavailable at every mutation boundary; OS loopback one-flight lease; port collision; crash release; A/B/C scheduling; identity claim/rollback; spawn/readiness/release ordering; malformed/foreign lock preservation; separate registry helper C/TS; schema-2 four-artifact role metadata; runtime helper copy/receipt/inspection; isolated process execution; registry-helper CI/publish flow; registry-helper test strength.',
     '',
     '## Requirement Coverage',
     '',
@@ -999,6 +1074,11 @@ function codeFixtureSections() {
     '- F63-CODE-04 resolved: validated npm provenance and npm-independent uninstall in mcp/src/native-host-production.ts:4 are exercised by tests/mcp-install-platforms.test.js:4.',
     '- F63-CODE-05 resolved: user/64 missing or unavailable evidence fails closed at every mutation boundary in mcp/src/native-host-install/index.ts:5 and mcp/src/native-host-install/platform.ts:5, exercised by tests/mcp-native-host-install.test.js:5.',
     '- F63-CODE-06 resolved: the OS loopback one-flight lease and claim identity preserve malformed/foreign lock state in mcp/src/native-host/daemon.ts:6, exercised by tests/mcp-native-host-daemon.test.js:6.',
+    '- F63-CODE-07 resolved: PHASE63_NEW_TEST_COMMANDS now tracks all six Phase 63 root gates in tests/delegation-phase-contract.test.js:40 and preserves prior-chain reconstruction.',
+    '',
+    '## Registry Helper Review',
+    '',
+    'The separate helper boundary in mcp/native-host/windows/fsb-native-host-registry.c:10 and mcp/src/native-host-registry-helper.ts:10 retains fixed numeric operations. Its version resource is mcp/native-host/windows/fsb-native-host-registry-version.rc.in:1. The schema-2 metadata binds four artifacts; runtime copy, receipt, and installed-state inspection are revalidated in mcp/src/native-host-install/runtime.ts:10. Every helper uses shell:false with an empty environment. Required registry-helper CI/publish flow remains in .github/workflows/ci.yml:10 and .github/workflows/npm-publish.yml:10. Test strength is covered by tests/mcp-native-host-registry-helper.test.js:10 and tests/mcp-native-host-packaging.test.js:10.',
     '',
   ];
 }
@@ -1028,6 +1108,10 @@ function securityFixtureSections() {
     '- V12: file and package controls evidence mcp/src/native-host-install/runtime.ts:6.',
     '- V13: health identity evidence mcp/src/native-host/daemon.ts:7.',
     '- V14: launcher configuration evidence mcp/native-host/windows/fsb-native-host-bootstrap.c:8.',
+    '',
+    '## Security Remediation Verification',
+    '',
+    'F63-SECURITY-01 and F63-SECURITY-02 are resolved. The locale-independent structured protocol in mcp/src/native-host-registry-helper.ts:10 drives the fixed key/operation/view C API in mcp/native-host/windows/fsb-native-host-registry.c:10 with user/64 read-only. There is no reg.exe authority, no SystemRoot authority, and no PATH executable authority. The path/hash/role/PE-machine/version/reparse provenance, schema-2 four-artifact metadata, and runtime copy/receipt/inspection are revalidated in mcp/src/native-host-install/runtime.ts:10. The input/output caps and no bootstrap authority expansion are pinned by tests/mcp-native-host-registry-helper.test.js:10; MSVC build/harness workflow source remains in .github/workflows/ci.yml:10.',
     '',
     '## Explicit Attack Checks',
     '',
@@ -1065,6 +1149,15 @@ function securityFixtureSections() {
       'SEC-CHECK-CLAIM-IDENTITY',
       'SEC-CHECK-CLAIM-CLEANUP',
       'SEC-CHECK-AGENT-AUTHORITY',
+      'SEC-CHECK-REG-HELPER-STRUCTURED',
+      'SEC-CHECK-REG-FIXED-API',
+      'SEC-CHECK-REG-USER64-READONLY',
+      'SEC-CHECK-REG-HELPER-PROVENANCE',
+      'SEC-CHECK-REG-HELPER-CAPS',
+      'SEC-CHECK-SCHEMA2-FOUR-ARTIFACT',
+      'SEC-CHECK-RUNTIME-HELPER-RECEIPT',
+      'SEC-CHECK-BOOTSTRAP-SEPARATION',
+      'SEC-CHECK-MSVC-HARNESS',
     ].map((marker, index) => `- ${marker}: closed by mcp/src/native-host/daemon.ts:${index + 20} and tests/mcp-native-host-daemon.test.js:${index + 20}.`),
     '',
   ];
@@ -1123,7 +1216,7 @@ function makeFixtureArtifact(kind) {
     ...kindSections,
     '## Precomputed Plan 10 Evidence',
     '',
-    `The precomputed Plan 10 evidence in scripts/run-phase63-focused-tests.mjs records 87/87, 200/200, 1015/1015, and 142/142. The precomputed remediation evidence records 101 platform/production CLI assertions, 125 platform/registration assertions, 229 install transaction assertions, 152 CLI-routing assertions, 54 bounded-output assertions, 229 diagnostics assertions, 229 daemon/entry assertions, 111 background-wake assertions, and the 1,014-assertion Phase 61–63 contract gate. This reviewer ran no commands; citations ${citations.join(', ')}.`,
+    `The precomputed Plan 10 evidence in scripts/run-phase63-focused-tests.mjs records 87/87, 200/200, 1015/1015, and 142/142. The precomputed remediation evidence records 101 platform/production CLI assertions, 125 platform/registration assertions, 229 install transaction assertions, 152 CLI-routing assertions, 54 bounded-output assertions, 229 diagnostics assertions, 229 daemon/entry assertions, 111 background-wake assertions, the 1,014-assertion Phase 61–63 contract gate, the 15-assertion adversarial registry-helper suite, 294 runtime transaction assertions, and the 1,016-assertion compatibility rerun; local MSVC execution not claimed. This reviewer ran no commands; citations ${citations.join(', ')}.`,
     '',
     '## Findings',
     '',
