@@ -263,6 +263,68 @@ function scanMode(mode) {
   return diagnostics;
 }
 
+function verifyRegistryHelperBoundary(mode) {
+  const diagnostics = [];
+  const packageManifest = resolve(REPOSITORY_ROOT, 'mcp/package.json');
+  try {
+    if (!lstatSync(packageManifest).isFile()) return diagnostics;
+  } catch (_error) {
+    return diagnostics;
+  }
+  const extension = mode === 'source' ? 'ts' : 'js';
+  const helperPath = resolve(
+    REPOSITORY_ROOT,
+    'mcp',
+    mode === 'source' ? 'src' : 'build',
+    `native-host-registry-helper.${extension}`,
+  );
+  const productionPath = resolve(
+    REPOSITORY_ROOT,
+    'mcp',
+    mode === 'source' ? 'src' : 'build',
+    `native-host-production.${extension}`,
+  );
+  const cPath = resolve(
+    REPOSITORY_ROOT,
+    'mcp/native-host/windows/fsb-native-host-registry.c',
+  );
+  const helper = readRegularFile(helperPath, diagnostics, REPOSITORY_ROOT) ?? '';
+  const production = readRegularFile(productionPath, diagnostics, REPOSITORY_ROOT) ?? '';
+  const cSource = readRegularFile(cPath, diagnostics, REPOSITORY_ROOT) ?? '';
+  if (!/createNativeHostRegistryHelperAdapter/u.test(`${helper}\n${production}`)) {
+    diagnostics.push(`${mode}: production registry helper adapter is not wired`);
+  }
+  for (const [label, pattern] of [
+    ['isolated helper environment', /isolatedEnvironment:\s*true/u],
+    ['closed helper protocol', /fsb-native-host-registry-v1/u],
+    ['helper artifact hash', /createHash\(['"]sha256['"]\)/u],
+    ['helper PE validation', /PE\\0\\0/u],
+    ['helper role validation', /NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER/u],
+  ]) {
+    if (!pattern.test(helper)) diagnostics.push(`${mode}: missing ${label}`);
+  }
+  if (/reg\.exe|\brunRegistry\b/iu.test(`${helper}\n${production}\n${cSource}`)) {
+    diagnostics.push(`${mode}: locale-dependent registry executable authority is forbidden`);
+  }
+  for (const pattern of [
+    /RegQueryValueExW/u,
+    /RegSetValueExW/u,
+    /RegDeleteValueW/u,
+    /RegDeleteKeyExW/u,
+    /KEY_WOW64_32KEY/u,
+    /Software\\\\Google\\\\Chrome\\\\NativeMessagingHosts/u,
+  ]) {
+    if (!pattern.test(cSource)) diagnostics.push(`${mode}: registry helper Win32 boundary is incomplete`);
+  }
+  if (countMatches(cSource, /KEY_WOW64_64KEY/gu) !== 1) {
+    diagnostics.push(`${mode}: 64-bit registry view must have exactly one read-only dispatch edge`);
+  }
+  if (/\b(?:system|_popen|ShellExecuteW?)\s*\(/u.test(cSource)) {
+    diagnostics.push(`${mode}: registry helper shell authority is forbidden`);
+  }
+  return diagnostics;
+}
+
 let modes;
 try {
   modes = parseModes(process.argv.slice(2));
@@ -271,7 +333,10 @@ try {
   process.exit(1);
 }
 
-const diagnostics = modes.flatMap((mode) => scanMode(mode));
+const diagnostics = modes.flatMap((mode) => [
+  ...scanMode(mode),
+  ...verifyRegistryHelperBoundary(mode),
+]);
 if (diagnostics.length > 0) {
   console.error('verify-native-host-boundary: FAIL');
   for (const diagnostic of diagnostics) console.error(diagnostic);

@@ -17,14 +17,22 @@ import { fileURLToPath } from 'node:url';
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = resolve(dirname(scriptPath), '..');
 const packageJsonPath = resolve(repositoryRoot, 'mcp/package.json');
-const sourcePath = resolve(
-  repositoryRoot,
-  'mcp/native-host/windows/fsb-native-host-bootstrap.c',
-);
-const resourceTemplatePath = resolve(
-  repositoryRoot,
-  'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
-);
+const artifactByRole = Object.freeze({
+  bootstrap: Object.freeze({
+    source: 'mcp/native-host/windows/fsb-native-host-bootstrap.c',
+    resource: 'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
+    filename: 'fsb-native-host.exe',
+    roleMarker: 'fsb-native-host-bootstrap-v1',
+    libraries: Object.freeze([]),
+  }),
+  'registry-helper': Object.freeze({
+    source: 'mcp/native-host/windows/fsb-native-host-registry.c',
+    resource: 'mcp/native-host/windows/fsb-native-host-registry-version.rc.in',
+    filename: 'fsb-native-host-registry.exe',
+    roleMarker: 'fsb-native-host-registry-helper-v1',
+    libraries: Object.freeze(['Advapi32.lib']),
+  }),
+});
 const machineByArchitecture = Object.freeze({
   x64: 0x8664,
   arm64: 0xaa64,
@@ -105,43 +113,52 @@ function readPeMachine(bytes) {
   return bytes.readUInt16LE(peOffset + 4);
 }
 
-function verifyArtifact(architecture, version) {
+function verifyArtifact(architecture, role, version) {
+  const specification = artifactByRole[role];
   const outputPath = resolve(
     repositoryRoot,
     outputDirectoryByArchitecture[architecture],
-    'fsb-native-host.exe',
+    specification.filename,
   );
-  if (!existsSync(outputPath)) throw new Error(`missing ${architecture} bootstrap artifact`);
+  if (!existsSync(outputPath)) throw new Error(`missing ${architecture} ${role} artifact`);
   const bytes = readFileSync(outputPath);
   const machine = readPeMachine(bytes);
   if (machine !== machineByArchitecture[architecture]) {
-    throw new Error(`${architecture} bootstrap has PE machine 0x${machine.toString(16)}`);
+    throw new Error(`${architecture} ${role} has PE machine 0x${machine.toString(16)}`);
   }
   const encodedVersion = Buffer.from(`${version}\0`, 'utf16le');
   if (bytes.indexOf(encodedVersion) === -1) {
-    throw new Error(`${architecture} bootstrap is missing embedded package version`);
+    throw new Error(`${architecture} ${role} is missing embedded package version`);
+  }
+  const encodedRole = Buffer.from(`${specification.roleMarker}\0`, 'utf16le');
+  if (bytes.indexOf(encodedRole) === -1) {
+    throw new Error(`${architecture} ${role} is missing embedded role marker`);
   }
   return Object.freeze({
     architecture,
+    role,
     path: relative(resolve(repositoryRoot, 'mcp'), outputPath).replaceAll('\\', '/'),
     bytes: bytes.length,
     peMachine: `0x${machine.toString(16)}`,
     sha256: sha256(bytes),
+    packageVersion: version,
+    roleMarker: specification.roleMarker,
   });
 }
 
-function buildArtifact(architecture, version) {
+function buildArtifact(architecture, role, version) {
+  const specification = artifactByRole[role];
   const temporaryDirectory = mkdtempSync(resolve(tmpdir(), `fsb-native-host-${architecture}-`));
   try {
     const outputDirectory = resolve(
       repositoryRoot,
       outputDirectoryByArchitecture[architecture],
     );
-    const outputPath = resolve(outputDirectory, 'fsb-native-host.exe');
-    const resourcePath = resolve(temporaryDirectory, 'fsb-native-host-version.rc');
-    const resourceOutput = resolve(temporaryDirectory, 'fsb-native-host-version.res');
-    const objectOutput = resolve(temporaryDirectory, 'fsb-native-host-bootstrap.obj');
-    const template = readFileSync(resourceTemplatePath, 'utf8');
+    const outputPath = resolve(outputDirectory, specification.filename);
+    const resourcePath = resolve(temporaryDirectory, `${role}-version.rc`);
+    const resourceOutput = resolve(temporaryDirectory, `${role}-version.res`);
+    const objectOutput = resolve(temporaryDirectory, `${role}.obj`);
+    const template = readFileSync(resolve(repositoryRoot, specification.resource), 'utf8');
     const parts = versionParts(version);
     const resourceSource = template
       .replace('@FSB_VERSION_COMMA@', parts.join(','))
@@ -155,17 +172,22 @@ function buildArtifact(architecture, version) {
       '/W4',
       '/WX',
       '/O2',
+      '/MT',
+      '/guard:cf',
       '/DUNICODE',
       '/D_UNICODE',
       '/utf-8',
       `/Fo${objectOutput}`,
-      sourcePath,
+      resolve(repositoryRoot, specification.source),
       resourceOutput,
+      ...specification.libraries,
       `/Fe:${outputPath}`,
       '/link',
       '/SUBSYSTEM:CONSOLE',
       '/DYNAMICBASE',
       '/NXCOMPAT',
+      '/HIGHENTROPYVA',
+      '/INCREMENTAL:NO',
     ]);
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
@@ -181,11 +203,13 @@ function main() {
   const version = packageJson.version;
   const artifacts = [];
   for (const architecture of options.architectures) {
-    if (!options.verifyOnly) buildArtifact(architecture, version);
-    artifacts.push(verifyArtifact(architecture, version));
+    for (const role of Object.keys(artifactByRole)) {
+      if (!options.verifyOnly) buildArtifact(architecture, role, version);
+      artifacts.push(verifyArtifact(architecture, role, version));
+    }
   }
   const metadata = Object.freeze({
-    schema: 1,
+    schema: 2,
     package: packageJson.name,
     version,
     artifacts,

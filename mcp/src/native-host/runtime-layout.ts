@@ -14,6 +14,7 @@ import {
   NATIVE_HOST_RUNTIME_DIRECTORY_MODE,
   NATIVE_HOST_WINDOWS_CONFIG_RELATIVE_PATH,
   NATIVE_HOST_WINDOWS_LAUNCHER_RELATIVE_PATH,
+  NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH,
   isNativeHostExtensionId,
   nativeHostOrigin,
 } from './constants.js';
@@ -68,6 +69,8 @@ export interface NativeHostRuntimeLayout {
   launcherRelativePath: string;
   bootstrapConfigPath: string | null;
   bootstrapConfigRelativePath: string | null;
+  registryHelperPath: string | null;
+  registryHelperRelativePath: string | null;
   invokingPackageRoot: string;
   nodePath: string;
   npmCliPath: string;
@@ -333,6 +336,12 @@ export function resolveNativeHostRuntimeLayout(
   const bootstrapConfigPath = bootstrapConfigRelativePath
     ? api.join(stableRoot, ...bootstrapConfigRelativePath.split('\\'))
     : null;
+  const registryHelperRelativePath = platform === 'win32'
+    ? NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH
+    : null;
+  const registryHelperPath = registryHelperRelativePath
+    ? api.join(stableRoot, ...registryHelperRelativePath.split('\\'))
+    : null;
   const markerPath = api.join(stableRoot, 'owner.json');
   const tarballDirectory = api.join(stageRoot, 'pack');
   const tarballPath = api.join(
@@ -414,6 +423,8 @@ export function resolveNativeHostRuntimeLayout(
     launcherRelativePath,
     bootstrapConfigPath,
     bootstrapConfigRelativePath,
+    registryHelperPath,
+    registryHelperRelativePath,
     invokingPackageRoot,
     nodePath,
     npmCliPath,
@@ -476,10 +487,18 @@ export function validateNativeHostRuntimeLayout(
     layout.stableRoot,
     ...expectedLauncherRelativePath.split(/[\\/]/u),
   );
+  const expectedRegistryHelperRelativePath = platform === 'win32'
+    ? NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH
+    : null;
+  const expectedRegistryHelperPath = expectedRegistryHelperRelativePath
+    ? api.join(layout.stableRoot, ...expectedRegistryHelperRelativePath.split('\\'))
+    : null;
   if (
     layout.packageRoot !== expectedPackageRoot
     || layout.launcherRelativePath !== expectedLauncherRelativePath
     || layout.launcherPath !== expectedLauncherPath
+    || layout.registryHelperRelativePath !== expectedRegistryHelperRelativePath
+    || layout.registryHelperPath !== expectedRegistryHelperPath
     || !isSameOrInside(layout.packageRoot, layout.stableRoot, platform)
     || isSameOrInside(layout.launcherPath, layout.invokingPackageRoot, platform)
     || layout.launcherMode !== NATIVE_HOST_LAUNCHER_MODE

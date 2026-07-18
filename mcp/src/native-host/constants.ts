@@ -31,6 +31,14 @@ export const NATIVE_HOST_WINDOWS_LAUNCHER_RELATIVE_PATH =
   'bin\\fsb-native-host.exe';
 export const NATIVE_HOST_WINDOWS_CONFIG_RELATIVE_PATH =
   'bin\\fsb-native-host-bootstrap.bin';
+export const NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH =
+  'bin\\fsb-native-host-registry.exe';
+export const NATIVE_HOST_WINDOWS_REGISTRY_KEY =
+  `Software\\Google\\Chrome\\NativeMessagingHosts\\${NATIVE_HOST_NAME}`;
+export const NATIVE_HOST_WINDOWS_BOOTSTRAP_ROLE_MARKER =
+  'fsb-native-host-bootstrap-v1';
+export const NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER =
+  'fsb-native-host-registry-helper-v1';
 export const NATIVE_HOST_PACKAGE_RELATIVE_PATH = 'runtime/package';
 export const NATIVE_HOST_ENTRY_RELATIVE_PATH =
   'runtime/package/build/native-host/index.js';

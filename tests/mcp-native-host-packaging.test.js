@@ -779,14 +779,18 @@ async function testRuntimeLayoutAndPackageContract() {
   await testOfflineBundledTarball(productionClosure);
 }
 
-function createSyntheticPe(machine, version) {
-  const versionBytes = Buffer.from(`${version}\0`, 'utf16le');
-  const bytes = Buffer.alloc(0x100 + versionBytes.length, 0);
+function createSyntheticPe(machine, version, roleMarker) {
+  const embedded = [version, roleMarker].map((value) => Buffer.from(`${value}\0`, 'utf16le'));
+  const bytes = Buffer.alloc(0x100 + embedded.reduce((sum, value) => sum + value.length, 0), 0);
   bytes.write('MZ', 0, 'ascii');
   bytes.writeUInt32LE(0x80, 0x3c);
   bytes.write('PE\0\0', 0x80, 'ascii');
   bytes.writeUInt16LE(machine, 0x84);
-  versionBytes.copy(bytes, 0x100);
+  let offset = 0x100;
+  for (const value of embedded) {
+    value.copy(bytes, offset);
+    offset += value.length;
+  }
   return bytes;
 }
 
@@ -801,26 +805,37 @@ function readPeMachine(bytes) {
 function writeSyntheticWindowsArtifacts(packageRoot) {
   const packageManifest = readJson(path.join(packageRoot, 'package.json'));
   const artifacts = [
-    { architecture: 'x64', machine: 0x8664 },
-    { architecture: 'arm64', machine: 0xaa64 },
-  ].map(({ architecture, machine }) => {
-    const relativePath = `native-host/bin/win32-${architecture}/fsb-native-host.exe`;
+    { architecture: 'x64', machine: 0x8664, role: 'bootstrap' },
+    { architecture: 'x64', machine: 0x8664, role: 'registry-helper' },
+    { architecture: 'arm64', machine: 0xaa64, role: 'bootstrap' },
+    { architecture: 'arm64', machine: 0xaa64, role: 'registry-helper' },
+  ].map(({ architecture, machine, role }) => {
+    const filename = role === 'bootstrap'
+      ? 'fsb-native-host.exe'
+      : 'fsb-native-host-registry.exe';
+    const roleMarker = role === 'bootstrap'
+      ? 'fsb-native-host-bootstrap-v1'
+      : 'fsb-native-host-registry-helper-v1';
+    const relativePath = `native-host/bin/win32-${architecture}/${filename}`;
     const artifactPath = path.join(packageRoot, ...relativePath.split('/'));
     mkdirSync(path.dirname(artifactPath), { recursive: true });
-    const bytes = createSyntheticPe(machine, packageManifest.version);
+    const bytes = createSyntheticPe(machine, packageManifest.version, roleMarker);
     writeFileSync(artifactPath, bytes);
     return {
       architecture,
+      role,
       path: relativePath,
       bytes: bytes.length,
       peMachine: `0x${machine.toString(16)}`,
       sha256: sha256(bytes),
+      packageVersion: packageManifest.version,
+      roleMarker,
     };
   });
   writeFileSync(
     path.join(packageRoot, 'native-host/windows-artifacts.json'),
     `${JSON.stringify({
-      schema: 1,
+      schema: 2,
       package: packageManifest.name,
       version: packageManifest.version,
       artifacts,
@@ -833,15 +848,21 @@ function verifyWindowsArtifactSet(packageRoot) {
   const metadata = readJson(path.join(packageRoot, 'native-host/windows-artifacts.json'));
   assert.deepEqual(
     { schema: metadata.schema, package: metadata.package, version: metadata.version },
-    { schema: 1, package: packageManifest.name, version: packageManifest.version },
+    { schema: 2, package: packageManifest.name, version: packageManifest.version },
   );
   assert.deepEqual(
-    metadata.artifacts.map((artifact) => artifact.architecture),
-    ['x64', 'arm64'],
+    metadata.artifacts.map((artifact) => `${artifact.architecture}/${artifact.role}`),
+    ['x64/bootstrap', 'x64/registry-helper', 'arm64/bootstrap', 'arm64/registry-helper'],
   );
   const machineByArchitecture = { x64: 0x8664, arm64: 0xaa64 };
   for (const artifact of metadata.artifacts) {
-    const expectedPath = `native-host/bin/win32-${artifact.architecture}/fsb-native-host.exe`;
+    const filename = artifact.role === 'bootstrap'
+      ? 'fsb-native-host.exe'
+      : 'fsb-native-host-registry.exe';
+    const expectedRoleMarker = artifact.role === 'bootstrap'
+      ? 'fsb-native-host-bootstrap-v1'
+      : 'fsb-native-host-registry-helper-v1';
+    const expectedPath = `native-host/bin/win32-${artifact.architecture}/${filename}`;
     assert.equal(artifact.path, expectedPath);
     const artifactPath = path.join(packageRoot, ...artifact.path.split('/'));
     const bytes = readFileSync(artifactPath);
@@ -851,6 +872,13 @@ function verifyWindowsArtifactSet(packageRoot) {
       -1,
       `${artifact.architecture} artifact is not version-bound`,
     );
+    assert.notEqual(
+      bytes.indexOf(Buffer.from(`${expectedRoleMarker}\0`, 'utf16le')),
+      -1,
+      `${artifact.architecture}/${artifact.role} artifact is not role-bound`,
+    );
+    assert.equal(artifact.packageVersion, packageManifest.version);
+    assert.equal(artifact.roleMarker, expectedRoleMarker);
     assert.equal(artifact.bytes, bytes.length);
     assert.equal(artifact.sha256, sha256(bytes));
   }
@@ -908,11 +936,15 @@ function verifyExtractedRuntimePayload(packageRoot, lockBytes, productionClosure
   for (const requiredPath of [
     'native-host/windows/fsb-native-host-bootstrap.c',
     'native-host/windows/fsb-native-host-bootstrap-version.rc.in',
+    'native-host/windows/fsb-native-host-registry.c',
+    'native-host/windows/fsb-native-host-registry-version.rc.in',
     'native-host/posix/fsb-native-host-launcher.mjs.in',
     'native-host/runtime-integrity.json',
     'native-host/windows-artifacts.json',
     'native-host/bin/win32-x64/fsb-native-host.exe',
+    'native-host/bin/win32-x64/fsb-native-host-registry.exe',
     'native-host/bin/win32-arm64/fsb-native-host.exe',
+    'native-host/bin/win32-arm64/fsb-native-host-registry.exe',
   ]) {
     assert.equal(existsSync(path.join(packageRoot, ...requiredPath.split('/'))), true, requiredPath);
   }
@@ -1351,12 +1383,24 @@ function testWindowsBootstrapSources() {
     'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
   );
   const buildScriptPath = path.join(repositoryRoot, 'scripts/build-native-host-windows.mjs');
-  for (const pathname of [cPath, resourcePath, buildScriptPath]) {
+  const registryCPath = path.join(
+    repositoryRoot,
+    'mcp/native-host/windows/fsb-native-host-registry.c',
+  );
+  const registryResourcePath = path.join(
+    repositoryRoot,
+    'mcp/native-host/windows/fsb-native-host-registry-version.rc.in',
+  );
+  for (const pathname of [
+    cPath, resourcePath, registryCPath, registryResourcePath, buildScriptPath,
+  ]) {
     assert.equal(existsSync(pathname), true, `missing Windows bootstrap artifact: ${pathname}`);
   }
   const cSource = readFileSync(cPath, 'utf8');
   const resourceSource = readFileSync(resourcePath, 'utf8');
   const buildSource = readFileSync(buildScriptPath, 'utf8');
+  const registrySource = readFileSync(registryCPath, 'utf8');
+  const registryResource = readFileSync(registryResourcePath, 'utf8');
   assert.match(cSource, /CreateProcessW/);
   assert.match(cSource, /STARTF_USESTDHANDLES/);
   assert.match(cSource, /FSBNH01/);
@@ -1365,10 +1409,28 @@ function testWindowsBootstrapSources() {
   assert.doesNotMatch(cSource, /\b(?:system|_popen|ShellExecuteW?)\s*\(/);
   assert.doesNotMatch(cSource, /cmd\.exe|powershell|\.bat\b|\.cmd\b|com\.fsb\.mcp|native-host-shim/i);
   assert.match(resourceSource, /FSB_MCP_VERSION/);
+  assert.match(resourceSource, /fsb-native-host-bootstrap-v1/);
+  assert.match(registrySource, /RegQueryValueExW/);
+  assert.match(registrySource, /RegSetValueExW/);
+  assert.match(registrySource, /RegDeleteValueW/);
+  assert.match(registrySource, /RegDeleteKeyExW/);
+  assert.match(registrySource, /KEY_WOW64_32KEY/);
+  assert.match(registrySource, /KEY_WOW64_64KEY/);
+  assert.match(registrySource, /fsb-native-host-registry-v1/);
+  assert.match(registrySource, /Software\\\\Google\\\\Chrome\\\\NativeMessagingHosts/);
+  assert.doesNotMatch(registrySource, /reg\.exe|SystemRoot|SYSTEMROOT|\b(?:system|_popen|ShellExecuteW?)\s*\(/i);
+  assert.equal(
+    (registrySource.match(/KEY_WOW64_64KEY/g) || []).length,
+    1,
+    '64-bit registry view appears only in the read-only query dispatch',
+  );
+  assert.match(registryResource, /fsb-native-host-registry-helper-v1/);
   assert.match(buildSource, /\bcl\.exe\b/);
   assert.match(buildSource, /\brc\.exe\b/);
   assert.match(buildSource, /win32-x64/);
   assert.match(buildSource, /win32-arm64/);
+  assert.match(buildSource, /registry-helper/);
+  assert.match(buildSource, /schema:\s*2/);
   assert.match(buildSource, /shell:\s*false/);
   assert.doesNotMatch(buildSource, /exec(?:Sync)?\s*\(|shell:\s*true|\.bat\b|\.cmd\b|single-executable|sea-config/i);
 }
@@ -1403,8 +1465,18 @@ function testWindowsExecutableHarness() {
     repositoryRoot,
     'mcp/native-host/bin/win32-arm64/fsb-native-host.exe',
   );
+  const x64RegistryHelper = path.join(
+    x64Directory,
+    'fsb-native-host-registry.exe',
+  );
+  const arm64RegistryHelper = path.join(
+    repositoryRoot,
+    'mcp/native-host/bin/win32-arm64/fsb-native-host-registry.exe',
+  );
   assert.equal(existsSync(x64Executable), true, 'x64 bootstrap artifact is missing');
   assert.equal(existsSync(arm64Executable), true, 'arm64 bootstrap artifact is missing');
+  assert.equal(existsSync(x64RegistryHelper), true, 'x64 registry helper artifact is missing');
+  assert.equal(existsSync(arm64RegistryHelper), true, 'arm64 registry helper artifact is missing');
 
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'fsb native bootstrap '));
   const metadataPath = path.join(fixtureRoot, 'metadata.json');
@@ -1424,14 +1496,51 @@ function testWindowsExecutableHarness() {
     ]);
     assert.equal(verify.status, 0, verify.stderr);
     const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
-    assert.equal(metadata.schema, 1);
+    assert.equal(metadata.schema, 2);
     assert.equal(metadata.package, 'fsb-mcp-server');
     assert.equal(metadata.version, require('../mcp/package.json').version);
-    assert.deepEqual(metadata.artifacts.map((artifact) => artifact.architecture), ['x64', 'arm64']);
+    assert.deepEqual(
+      metadata.artifacts.map((artifact) => `${artifact.architecture}/${artifact.role}`),
+      ['x64/bootstrap', 'x64/registry-helper', 'arm64/bootstrap', 'arm64/registry-helper'],
+    );
     for (const artifact of metadata.artifacts) {
       assert.match(artifact.sha256, /^[a-f0-9]{64}$/);
       assert.ok(artifact.bytes > 0);
     }
+
+    for (const operation of ['1', '2']) {
+      const query = spawnSync(
+        x64RegistryHelper,
+        ['fsb-native-host-registry-v1', operation],
+        { encoding: 'utf8', shell: false, windowsHide: true, maxBuffer: 32 * 1024 },
+      );
+      assert.equal(query.status, 0, query.stderr);
+      assert.equal(query.stderr, '');
+      const fact = JSON.parse(query.stdout);
+      assert.deepEqual(Object.keys(fact).sort(), [
+        'operation', 'registryType', 'schema', 'status', 'valueUtf8Hex',
+      ]);
+      assert.equal(fact.schema, 1);
+      assert.equal(fact.operation, Number(operation));
+      assert.ok(fact.status === 1 || fact.status === 2);
+      assert.match(fact.valueUtf8Hex, /^(?:[0-9a-f]{2})*$/);
+    }
+    const closedCommand = spawnSync(
+      x64RegistryHelper,
+      ['fsb-native-host-registry-v1', '7'],
+      { encoding: 'utf8', shell: false, windowsHide: true },
+    );
+    assert.notEqual(closedCommand.status, 0);
+    assert.equal(closedCommand.stdout, '');
+    assert.equal(closedCommand.stderr, 'FSBRG_E_ARGS\n');
+    const rejectedWrite = spawnSync(
+      x64RegistryHelper,
+      ['fsb-native-host-registry-v1', '4'],
+      { input: Buffer.from('invalid'), encoding: 'utf8', shell: false, windowsHide: true },
+    );
+    assert.notEqual(rejectedWrite.status, 0);
+    assert.equal(rejectedWrite.stdout, '');
+    assert.equal(rejectedWrite.stderr, 'FSBRG_E_INPUT\n');
 
     writeFileSync(childPath, `
 const expected = ${JSON.stringify([origin, parentWindow])};

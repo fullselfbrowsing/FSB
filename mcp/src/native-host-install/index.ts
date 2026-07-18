@@ -187,7 +187,7 @@ function exactRuntimeReceipt(
     || !markersEqual(marker, receiptMarker)
     || inspection.markerFact.path !== platformLayout.markerPath
     || inspection.markerFact.realPath !== platformLayout.markerPath
-    || receipt.schema !== 1
+    || receipt.schema !== 2
     || receipt.platform !== platformLayout.platform
     || receipt.packageName !== NATIVE_HOST_PACKAGE_NAME
     || receipt.packageVersion !== marker.packageVersion
@@ -196,6 +196,16 @@ function exactRuntimeReceipt(
     || receipt.artifactSha256 !== marker.artifactSha256
     || !SHA256_PATTERN.test(receipt.artifactSha256)
     || !SHA512_INTEGRITY_PATTERN.test(receipt.tarballIntegrity)
+    || (platformLayout.platform === 'win32'
+      ? !receipt.registryHelperPath
+        || !receipt.registryHelperSha256
+        || !SHA256_PATTERN.test(receipt.registryHelperSha256)
+        || !pathsEqual(
+          platformLayout.platform,
+          receipt.registryHelperPath,
+          runtimeLayout.registryHelperPath ?? '',
+        )
+      : receipt.registryHelperPath !== null || receipt.registryHelperSha256 !== null)
     || !pathsEqual(platformLayout.platform, receipt.stableRoot, platformLayout.stableRoot)
     || !pathsEqual(platformLayout.platform, receipt.launcherPath, platformLayout.launcherPath)
     || !pathsEqual(platformLayout.platform, receipt.markerPath, platformLayout.markerPath)

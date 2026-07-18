@@ -610,6 +610,8 @@ async function run() {
     'mcp/native-host/runtime-integrity.json',
     'mcp/native-host/windows/fsb-native-host-bootstrap.c',
     'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
+    'mcp/native-host/windows/fsb-native-host-registry.c',
+    'mcp/native-host/windows/fsb-native-host-registry-version.rc.in',
   ]) {
     assert(fs.existsSync(path.join(repoRoot, artifactPath)), `required native package source exists: ${artifactPath}`);
   }
@@ -618,7 +620,9 @@ async function run() {
     'node scripts/build-native-host-windows.mjs --arch x64',
     'node scripts/build-native-host-windows.mjs --arch arm64',
     'mcp/native-host/bin/win32-x64/fsb-native-host.exe',
+    'mcp/native-host/bin/win32-x64/fsb-native-host-registry.exe',
     'mcp/native-host/bin/win32-arm64/fsb-native-host.exe',
+    'mcp/native-host/bin/win32-arm64/fsb-native-host-registry.exe',
     'mcp/native-host/windows-artifacts.json',
     'runtime-payload:',
     'node tests/mcp-native-host-packaging.test.js --section workflow-and-pack',
@@ -627,7 +631,9 @@ async function run() {
   }
   for (const packedArtifactToken of [
     'native-host/bin/win32-x64/fsb-native-host.exe',
+    'native-host/bin/win32-x64/fsb-native-host-registry.exe',
     'native-host/bin/win32-arm64/fsb-native-host.exe',
+    'native-host/bin/win32-arm64/fsb-native-host-registry.exe',
     'native-host/windows-artifacts.json',
     'native-host/posix/fsb-native-host-launcher.mjs.in',
     'native-host/runtime-integrity.json',

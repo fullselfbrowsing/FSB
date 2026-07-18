@@ -201,6 +201,110 @@ async function testClosedMutationSurface(helper) {
   });
 }
 
+async function testExactOperations(helper) {
+  await withFixture(async ({ packageRoot }) => {
+    const invocations = [];
+    const adapter = helper.createNativeHostRegistryHelperAdapter({
+      packageRoot,
+      packageVersion: PACKAGE_VERSION,
+      architecture: 'arm64',
+      process: {
+        run: async (invocation) => {
+          invocations.push(invocation);
+          const operation = Number(invocation.argv[1]);
+          const status = operation === 3 ? 4 : 6;
+          return {
+            status: 0,
+            stdout: response(operation, status),
+            stderr: '',
+            networkRequests: 0,
+          };
+        },
+      },
+    });
+    assert.deepEqual(await adapter.inspectKey('user/32', HOST_KEY), {
+      status: 'exact-default-only',
+    });
+    await adapter.writeDefault('user/32', HOST_KEY, {
+      type: 'REG_SZ', value: 'C:\\FSB\\manifest.json',
+    });
+    await adapter.deleteDefault('user/32', HOST_KEY);
+    await adapter.deleteEmptyKey('user/32', HOST_KEY);
+    assert.deepEqual(invocations.map((entry) => Number(entry.argv[1])), [3, 4, 5, 6]);
+    assert.equal(
+      invocations.every((entry) => entry.executable.includes('win32-arm64')),
+      true,
+    );
+    const write = invocations[1];
+    assert.equal(write.argv.length, 2, 'manifest path escaped the closed argv protocol');
+    assert.equal(JSON.stringify(write.environment).includes('manifest.json'), false);
+    const stdin = Buffer.from(write.stdin);
+    assert.equal(stdin.subarray(0, 8).toString('ascii'), 'FSBRGI1\0');
+    assert.equal(stdin.readUInt32LE(8), 1);
+    assert.equal(stdin.readUInt32LE(12), Buffer.byteLength('C:\\FSB\\manifest.json'));
+    pass('only exact user/32 mutations use the selected architecture and framed stdin');
+  });
+}
+
+async function testMalformedShadowBlocksMutation(helper, platform) {
+  for (const malformed of [
+    '    (Par defaut)    REG_SZ    C:\\host.json\r\n',
+    '{"schema":1',
+    'x'.repeat(16 * 1024 + 1),
+  ]) {
+    await withFixture(async ({ packageRoot }) => {
+      const operations = [];
+      let fileWrites = 0;
+      const registry = helper.createNativeHostRegistryHelperAdapter({
+        packageRoot,
+        packageVersion: PACKAGE_VERSION,
+        architecture: 'x64',
+        process: {
+          run: async (invocation) => {
+            operations.push(Number(invocation.argv[1]));
+            return { status: 0, stdout: malformed, stderr: '', networkRequests: 0 };
+          },
+        },
+      });
+      const layout = platform.resolveNativeHostPlatformLayout({
+        platform: 'win32',
+        homeDirectory: 'C:\\Users\\fsb',
+        localAppData: 'C:\\Users\\fsb\\AppData\\Local',
+      });
+      const adapter = platform.createNativeHostPlatformAdapter(layout, {
+        files: {
+          inspectFile: async () => ({ status: 'absent' }),
+          writePrivateFileAtomic: async () => { fileWrites += 1; },
+          removeFile: async () => undefined,
+        },
+        registry,
+      });
+      await assert.rejects(adapter.publishRegistration('{}'), /FSBNH_INSTALL_PLATFORM/);
+      assert.deepEqual(operations, [2]);
+      assert.equal(fileWrites, 0);
+    });
+  }
+  pass('malformed, truncated, and oversized shadow facts block all registration mutation');
+}
+
+async function testProcessFailuresAreContentFree(helper) {
+  await withFixture(async ({ packageRoot }) => {
+    const sensitive = 'C:\\Users\\victim\\secret-manifest.json';
+    const adapter = helper.createNativeHostRegistryHelperAdapter({
+      packageRoot,
+      packageVersion: PACKAGE_VERSION,
+      architecture: 'x64',
+      process: { run: async () => { throw new Error(sensitive); } },
+    });
+    assert.deepEqual(await adapter.readDefault('user/64', HOST_KEY), { status: 'unavailable' });
+    await assert.rejects(
+      adapter.writeDefault('user/32', HOST_KEY, { type: 'REG_SZ', value: sensitive }),
+      (error) => error.message === 'registry-helper-failed' && !error.message.includes(sensitive),
+    );
+    pass('process failures collapse to bounded content-free facts and errors');
+  });
+}
+
 async function testTamperAndHostileEnvironment(helper) {
   const originalPath = process.env.PATH;
   const originalRoot = process.env.SystemRoot;
@@ -259,8 +363,15 @@ async function testTamperAndHostileEnvironment(helper) {
 
 async function main() {
   const helper = await importHelper();
+  const platform = await import(`${pathToFileURL(path.join(
+    repositoryRoot,
+    'mcp/build/native-host-install/platform.js',
+  )).href}?security63platform=${Date.now()}`);
   await testStructuredFacts(helper);
   await testClosedMutationSurface(helper);
+  await testExactOperations(helper);
+  await testMalformedShadowBlocksMutation(helper, platform);
+  await testProcessFailuresAreContentFree(helper);
   await testTamperAndHostileEnvironment(helper);
   console.log(`mcp-native-host-registry-helper: ${passed} assertions passed`);
 }

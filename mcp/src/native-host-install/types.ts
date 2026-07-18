@@ -136,6 +136,8 @@ export interface NativeHostProcessInvocation {
   argv: readonly string[];
   cwd: string;
   environment: Readonly<Record<string, string>>;
+  stdin?: Uint8Array;
+  isolatedEnvironment?: true;
   shell: false;
   maxOutputBytes: number;
 }
@@ -226,7 +228,7 @@ export type NativeHostRuntimeRefusalReason =
   | 'publication-failed';
 
 export interface NativeHostRuntimeReceipt {
-  schema: 1;
+  schema: 2;
   platform: NativeHostPlatform;
   packageName: 'fsb-mcp-server';
   packageVersion: string;
@@ -238,6 +240,8 @@ export interface NativeHostRuntimeReceipt {
   installToken: string;
   tarballIntegrity: string;
   artifactSha256: string;
+  registryHelperPath: string | null;
+  registryHelperSha256: string | null;
   marker: NativeHostOwnerMarker;
 }
 
@@ -305,16 +309,18 @@ export interface NativeHostRuntimePackageSnapshot {
     bytes: number;
   }> | null;
   windowsArtifacts: Readonly<{
-    schema: 1;
+    schema: 2;
     package: 'fsb-mcp-server';
     version: string;
     artifacts: ReadonlyArray<Readonly<{
       architecture: NativeHostWindowsArchitecture;
+      role: 'bootstrap' | 'registry-helper';
       path: string;
       bytes: number;
       peMachine: '0x8664' | '0xaa64';
       sha256: string;
       packageVersion: string;
+      roleMarker: string;
     }>>;
   }> | null;
 }
@@ -335,6 +341,7 @@ export interface NativeHostRuntimeInspectionLayout {
   packageRoot: string;
   packageEntryPath: string;
   integrityReceiptPath: string;
+  registryHelperPath: string | null;
 }
 
 export interface NativeHostUninstallRuntimeAdapter {

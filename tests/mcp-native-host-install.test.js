@@ -33,6 +33,7 @@ const ORIGIN = `chrome-extension://${EXTENSION_ID}/`;
 const PACKAGE_VERSION = '0.10.0';
 const INSTALL_TOKEN = '0123456789abcdef0123456789abcdef';
 const ARTIFACT_SHA256 = 'a'.repeat(64);
+const REGISTRY_HELPER_SHA256 = 'e'.repeat(64);
 const BUILD_ENTRY_SHA256 = 'b'.repeat(64);
 const TARBALL_SHA512 = `sha512-${Buffer.alloc(64, 7).toString('base64')}`;
 const MAX_PROCESS_OUTPUT_BYTES = 64 * 1024;
@@ -223,25 +224,49 @@ function runtimePackageSnapshot(layout, packageRoot, overrides = {}) {
     dev: false,
   }));
   const windowsArtifacts = {
-    schema: 1,
+    schema: 2,
     package: manifest.name,
     version: manifest.version,
     artifacts: [
       {
         architecture: 'x64',
+        role: 'bootstrap',
         path: 'native-host/bin/win32-x64/fsb-native-host.exe',
         bytes: 8192,
         peMachine: '0x8664',
         sha256: ARTIFACT_SHA256,
         packageVersion: manifest.version,
+        roleMarker: 'fsb-native-host-bootstrap-v1',
+      },
+      {
+        architecture: 'x64',
+        role: 'registry-helper',
+        path: 'native-host/bin/win32-x64/fsb-native-host-registry.exe',
+        bytes: 8192,
+        peMachine: '0x8664',
+        sha256: REGISTRY_HELPER_SHA256,
+        packageVersion: manifest.version,
+        roleMarker: 'fsb-native-host-registry-helper-v1',
       },
       {
         architecture: 'arm64',
+        role: 'bootstrap',
         path: 'native-host/bin/win32-arm64/fsb-native-host.exe',
         bytes: 8192,
         peMachine: '0xaa64',
         sha256: 'c'.repeat(64),
         packageVersion: manifest.version,
+        roleMarker: 'fsb-native-host-bootstrap-v1',
+      },
+      {
+        architecture: 'arm64',
+        role: 'registry-helper',
+        path: 'native-host/bin/win32-arm64/fsb-native-host-registry.exe',
+        bytes: 8192,
+        peMachine: '0xaa64',
+        sha256: 'f'.repeat(64),
+        packageVersion: manifest.version,
+        roleMarker: 'fsb-native-host-registry-helper-v1',
       },
     ],
   };
@@ -375,6 +400,9 @@ function fakeRuntimeDependencies(layout, options = {}) {
       step(`hash:${pathname}:${algorithm}`);
       if (algorithm === 'sha512') return TARBALL_SHA512;
       if (pathname.endsWith('fsb-native-host.exe')) return ARTIFACT_SHA256;
+      if (pathname.endsWith('fsb-native-host-registry.exe')) {
+        return options.registryHelperHash ?? REGISTRY_HELPER_SHA256;
+      }
       return BUILD_ENTRY_SHA256;
     },
     moveDirectoryExact: async (source, destination) => {
@@ -453,7 +481,7 @@ function fakeRuntimeDependencies(layout, options = {}) {
 
 function runtimeReceipt(layout, marker) {
   return Object.freeze({
-    schema: 1,
+    schema: 2,
     platform: layout.platform,
     packageName: 'fsb-mcp-server',
     packageVersion: marker.packageVersion,
@@ -465,6 +493,8 @@ function runtimeReceipt(layout, marker) {
     installToken: marker.installToken,
     tarballIntegrity: TARBALL_SHA512,
     artifactSha256: marker.artifactSha256,
+    registryHelperPath: layout.registryHelperPath,
+    registryHelperSha256: layout.platform === 'win32' ? REGISTRY_HELPER_SHA256 : null,
     marker,
   });
 }
@@ -1128,9 +1158,25 @@ async function runRuntimeTransaction() {
   );
   equal(windowsResult.status, 'published', 'Windows selects and publishes one version-bound PE artifact');
   equal(windowsResult.receipt.artifactSha256, ARTIFACT_SHA256, 'Windows receipt binds the selected PE checksum');
+  equal(
+    windowsResult.receipt.registryHelperPath,
+    windowsLayout.registryHelperPath,
+    'Windows receipt binds the stable registry helper path',
+  );
+  equal(
+    windowsResult.receipt.registryHelperSha256,
+    REGISTRY_HELPER_SHA256,
+    'Windows receipt binds the selected registry helper checksum',
+  );
   check(
     windowsHarness.trace.some((entry) => entry.includes('native-host\\bin\\win32-x64\\fsb-native-host.exe')),
     'Windows copies only the x64 artifact for an x64 install',
+  );
+  check(
+    windowsHarness.trace.some((entry) => entry.includes(
+      'native-host\\bin\\win32-x64\\fsb-native-host-registry.exe',
+    )),
+    'Windows copies the exact-architecture registry helper beside the bootstrap',
   );
   check(
     windowsHarness.trace.some((entry) => entry === `write:${windowsLayout.bootstrapConfigPath.replace(windowsLayout.stableRoot, windowsLayout.stageRoot)}:600`),
@@ -1138,7 +1184,7 @@ async function runRuntimeTransaction() {
   );
   check(
     windowsHarness.trace.every((entry) => !entry.includes('win32-arm64') || entry.startsWith('snapshot:')),
-    'Windows never publishes the unselected arm64 executable',
+    'Windows never publishes unselected arm64 executables',
   );
 
   for (const architecture of ['ia32', 'universal', '../x64']) {
@@ -1152,6 +1198,52 @@ async function runRuntimeTransaction() {
     equal(result.reason, 'unsupported-architecture', 'architecture refusal is stable and content-free');
     equal(harness.trace.length, 0, 'unsupported Windows architecture causes zero filesystem/process mutation');
   }
+
+  const exactWindowsArtifacts = runtimePackageSnapshot(
+    windowsLayout,
+    windowsLayout.invokingPackageRoot,
+  ).windowsArtifacts;
+  const windowsMetadataTamperCases = [
+    (value) => { value.schema = 1; },
+    (value) => { value.artifacts[1].path = value.artifacts[0].path; },
+    (value) => { value.artifacts[1].role = 'bootstrap'; },
+    (value) => { value.artifacts[1].peMachine = '0xaa64'; },
+    (value) => { value.artifacts[1].packageVersion = '9.9.9'; },
+    (value) => { value.artifacts[1].roleMarker = 'fsb-native-host-bootstrap-v1'; },
+  ];
+  for (const tamper of windowsMetadataTamperCases) {
+    const windowsArtifacts = ordinaryClone(exactWindowsArtifacts);
+    tamper(windowsArtifacts);
+    const harness = fakeRuntimeDependencies(windowsLayout, {
+      sourceSnapshotOverrides: { windowsArtifacts },
+    });
+    const result = await runtime.publishNativeHostRuntime(
+      windowsLayout,
+      harness.dependencies,
+      { architecture: 'x64' },
+    );
+    equal(result.status, 'refused', 'tampered Windows helper metadata is refused');
+    equal(result.reason, 'invalid-source-package', 'helper metadata refusal is content-free');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('mkdir') && !entry.startsWith('process:')),
+      'helper metadata tamper causes zero staging or process execution',
+    );
+  }
+
+  const helperHashHarness = fakeRuntimeDependencies(windowsLayout, {
+    registryHelperHash: '0'.repeat(64),
+  });
+  const helperHashResult = await runtime.publishNativeHostRuntime(
+    windowsLayout,
+    helperHashHarness.dependencies,
+    { architecture: 'x64' },
+  );
+  equal(helperHashResult.status, 'refused', 'copied registry helper hash mismatch is refused');
+  equal(helperHashResult.reason, 'publication-failed', 'helper hash refusal is content-free');
+  check(
+    helperHashHarness.trace.every((entry) => !entry.startsWith('rename:')),
+    'helper hash mismatch never publishes the stage',
+  );
 
   const sourceMismatchCases = [
     { packageName: 'foreign-package' },

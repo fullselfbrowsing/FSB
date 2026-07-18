@@ -32,6 +32,7 @@ import {
   NATIVE_HOST_INTEGRITY_RELATIVE_PATH,
   NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_PACKAGE_RELATIVE_PATH,
+  NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH,
   isNativeHostExtensionId,
   nativeHostOrigin,
 } from './native-host/constants.js';
@@ -42,6 +43,7 @@ import {
 } from './native-host-registration.js';
 import { inspectNativeHostDaemonHealth } from './native-host/daemon.js';
 import { createNativeHostDaemonDependencies } from './native-host/platform.js';
+import { createNativeHostRegistryHelperAdapter } from './native-host-registry-helper.js';
 import {
   installNativeHost,
   uninstallNativeHost,
@@ -55,14 +57,10 @@ import type {
   NativeHostFileFact,
   NativeHostInstallFileAdapter,
   NativeHostInstallRequest,
-  NativeHostInstallRegistryAdapter,
   NativeHostInstallRuntimeAdapter,
   NativeHostInstallTransactionDependencies,
   NativeHostProcessInvocation,
   NativeHostProcessResult,
-  NativeHostRegistryKeyFact,
-  NativeHostRegistryView,
-  NativeHostRegistryValueFact,
   NativeHostRuntimeFileAdapter,
   NativeHostRuntimeInspectionLayout,
   NativeHostRuntimeOwnedInspection,
@@ -88,6 +86,8 @@ const RECEIPT_KEYS = Object.freeze([
   'installToken',
   'tarballIntegrity',
   'artifactSha256',
+  'registryHelperPath',
+  'registryHelperSha256',
   'marker',
 ]);
 
@@ -229,14 +229,19 @@ function createInstallFileAdapter(): NativeHostInstallFileAdapter {
   });
 }
 
-function sanitizedEnvironment(extra: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
+function sanitizedEnvironment(
+  extra: Readonly<Record<string, string>>,
+  isolated: boolean,
+): NodeJS.ProcessEnv {
   const allowed = [
     'PATH', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'SystemRoot', 'SYSTEMROOT',
     'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL',
   ];
   const environment: NodeJS.ProcessEnv = Object.create(null);
-  for (const key of allowed) {
-    if (typeof process.env[key] === 'string') environment[key] = process.env[key];
+  if (!isolated) {
+    for (const key of allowed) {
+      if (typeof process.env[key] === 'string') environment[key] = process.env[key];
+    }
   }
   for (const [key, value] of Object.entries(extra)) environment[key] = value;
   return environment;
@@ -252,11 +257,18 @@ async function runProcess(invocation: NativeHostProcessInvocation): Promise<Nati
     const rawOutputLimit = projectsPackReceipt ? 8 * 1024 * 1024 : invocation.maxOutputBytes;
     const child = spawn(invocation.executable, [...invocation.argv], {
       cwd: invocation.cwd,
-      env: sanitizedEnvironment(invocation.environment),
+      env: sanitizedEnvironment(
+        invocation.environment,
+        invocation.isolatedEnvironment === true,
+      ),
       shell: false,
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [invocation.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
+    if (invocation.stdin && child.stdin) {
+      child.stdin.on('error', () => undefined);
+      child.stdin.end(Buffer.from(invocation.stdin));
+    }
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let outputBytes = 0;
@@ -269,8 +281,8 @@ async function runProcess(invocation: NativeHostProcessInvocation): Promise<Nati
         child.kill();
       }
     };
-    child.stdout.on('data', collect(stdout));
-    child.stderr.on('data', collect(stderr));
+    child.stdout?.on('data', collect(stdout));
+    child.stderr?.on('data', collect(stderr));
     const timer = setTimeout(() => child.kill(), MAX_PROCESS_MS);
     child.once('error', (error) => {
       clearTimeout(timer);
@@ -308,82 +320,6 @@ async function runProcess(invocation: NativeHostProcessInvocation): Promise<Nati
         networkRequests: 0,
       }));
     });
-  });
-}
-
-async function runRegistry(args: readonly string[]): Promise<Readonly<{
-  status: number;
-  stdout: string;
-}>> {
-  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT;
-  if (!systemRoot || !isAbsolute(systemRoot)) throw new Error('registry-unavailable');
-  const executable = join(systemRoot, 'System32', 'reg.exe');
-  const result = await runProcess(Object.freeze({
-    executable,
-    argv: Object.freeze([...args]),
-    cwd: systemRoot,
-    environment: Object.freeze({}),
-    shell: false,
-    maxOutputBytes: 32 * 1024,
-  }));
-  return Object.freeze({ status: result.status, stdout: result.stdout });
-}
-
-function registryView(view: 'user/32' | 'user/64'): '/reg:32' | '/reg:64' {
-  return view === 'user/32' ? '/reg:32' : '/reg:64';
-}
-
-function createRegistryAdapter(): NativeHostInstallRegistryAdapter {
-  const fullKey = (key: string): string => `HKCU\\${key}`;
-  return Object.freeze({
-    readDefault: async (view: NativeHostRegistryView, key: string): Promise<NativeHostRegistryValueFact> => {
-      try {
-        const result = await runRegistry(['QUERY', fullKey(key), '/ve', registryView(view)]);
-        if (result.status === 1) return Object.freeze({ status: 'absent' });
-        if (result.status !== 0) return Object.freeze({ status: 'unavailable' });
-        const match = result.stdout.match(/^\s+\(Default\)\s+(REG_[A-Z0-9_]+)\s+([^\r\n]+)$/mu);
-        return match
-          ? Object.freeze({ status: 'value', type: match[1], value: match[2].trim() })
-          : Object.freeze({ status: 'absent' });
-      } catch {
-        return Object.freeze({ status: 'unavailable' });
-      }
-    },
-    writeDefault: async (
-      view: NativeHostRegistryView,
-      key: string,
-      value: Readonly<{ type: 'REG_SZ'; value: string }>,
-    ): Promise<void> => {
-      if (view !== 'user/32' || value.type !== 'REG_SZ') throw new Error('unsafe-registry-write');
-      const result = await runRegistry([
-        'ADD', fullKey(key), '/ve', '/t', 'REG_SZ', '/d', value.value, '/f', '/reg:32',
-      ]);
-      if (result.status !== 0) throw new Error('registry-write-failed');
-    },
-    deleteDefault: async (view: NativeHostRegistryView, key: string): Promise<void> => {
-      if (view !== 'user/32') throw new Error('unsafe-registry-delete');
-      const result = await runRegistry(['DELETE', fullKey(key), '/ve', '/f', '/reg:32']);
-      if (result.status !== 0) throw new Error('registry-delete-failed');
-    },
-    inspectKey: async (view: NativeHostRegistryView, key: string): Promise<NativeHostRegistryKeyFact> => {
-      try {
-        const result = await runRegistry(['QUERY', fullKey(key), registryView(view)]);
-        if (result.status === 1) return Object.freeze({ status: 'absent' });
-        if (result.status !== 0) return Object.freeze({ status: 'unavailable' });
-        const values = result.stdout.match(/^\s+[^\r\n]+\s+REG_[A-Z0-9_]+\s+[^\r\n]+$/gmu) ?? [];
-        if (values.length === 0) return Object.freeze({ status: 'empty' });
-        return values.length === 1 && /\(Default\)/u.test(values[0])
-          ? Object.freeze({ status: 'exact-default-only' })
-          : Object.freeze({ status: 'nonempty' });
-      } catch {
-        return Object.freeze({ status: 'unavailable' });
-      }
-    },
-    deleteEmptyKey: async (view: NativeHostRegistryView, key: string): Promise<void> => {
-      if (view !== 'user/32') throw new Error('unsafe-registry-delete');
-      const result = await runRegistry(['DELETE', fullKey(key), '/f', '/reg:32']);
-      if (result.status !== 0) throw new Error('registry-delete-failed');
-    },
   });
 }
 
@@ -593,7 +529,17 @@ Readonly<NativeHostRuntimeReceipt> | null {
   const marker = typeof origin === 'string'
     ? validateNativeHostMarker(markerFields, { platform, origin })
     : null;
-  if (!fields || !sameKeys(fields, RECEIPT_KEYS) || !marker) return null;
+  if (
+    !fields
+    || !sameKeys(fields, RECEIPT_KEYS)
+    || fields.schema !== 2
+    || !marker
+    || (platform === 'win32'
+      ? typeof fields.registryHelperPath !== 'string'
+        || typeof fields.registryHelperSha256 !== 'string'
+        || !/^[a-f0-9]{64}$/u.test(fields.registryHelperSha256)
+      : fields.registryHelperPath !== null || fields.registryHelperSha256 !== null)
+  ) return null;
   return fields as unknown as Readonly<NativeHostRuntimeReceipt>;
 }
 
@@ -646,6 +592,7 @@ async function inspectOwnedRuntime(
       || receipt.launcherPath !== layout.launcherPath
       || receipt.packageRoot !== layout.packageRoot
       || receipt.platform !== layout.platform
+      || receipt.registryHelperPath !== layout.registryHelperPath
     ) {
       return Object.freeze({
         state: 'mismatched', reason: 'runtime-layout-mismatch', markerFact, marker, receipt,
@@ -654,9 +601,19 @@ async function inspectOwnedRuntime(
     const launcher = await inspectSecurePath(layout.launcherPath, 'file');
     const entry = await inspectSecurePath(layout.packageEntryPath, 'file');
     const integrity = await inspectSecurePath(layout.integrityReceiptPath, 'file');
+    const registryHelper = layout.registryHelperPath
+      ? await inspectSecurePath(layout.registryHelperPath, 'file')
+      : null;
     if (
       launcher.status !== 'file' || entry.status !== 'file' || integrity.status !== 'file'
       || await hashFile(layout.launcherPath, 'sha256') !== receipt.artifactSha256
+      || (layout.platform === 'win32' && (
+        !registryHelper
+        || registryHelper.status !== 'file'
+        || !receipt.registryHelperSha256
+        || await hashFile(layout.registryHelperPath as string, 'sha256')
+          !== receipt.registryHelperSha256
+      ))
     ) {
       throw new Error('invalid-runtime');
     }
@@ -774,6 +731,26 @@ async function resolveNpmCliPath(
   throw new Error('npm-cli-unavailable');
 }
 
+async function productionRegistryAdapter(): Promise<
+ReturnType<typeof createNativeHostRegistryHelperAdapter>
+> {
+  const packageRoot = await realpath(dirname(dirname(fileURLToPath(import.meta.url))));
+  const manifest = ordinaryRecord(await readJson(join(packageRoot, 'package.json')));
+  if (
+    !manifest
+    || manifest.name !== NATIVE_HOST_PACKAGE_NAME
+    || typeof manifest.version !== 'string'
+  ) {
+    throw new Error('registry-helper-unavailable');
+  }
+  return createNativeHostRegistryHelperAdapter(Object.freeze({
+    packageRoot,
+    packageVersion: manifest.version,
+    architecture: process.arch,
+    process: Object.freeze({ run: runProcess }),
+  }));
+}
+
 type ProductionPlatformComposition = Readonly<{
   platform: 'darwin' | 'linux' | 'win32';
   homeDirectory: string;
@@ -794,12 +771,13 @@ async function productionPlatformComposition(): Promise<ProductionPlatformCompos
     ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
   };
   const layout = resolveNativeHostPlatformLayout(input);
+  const registry = platform === 'win32' ? await productionRegistryAdapter() : undefined;
   return Object.freeze({
     ...input,
     layout,
     adapter: createNativeHostPlatformAdapter(layout, Object.freeze({
       files: createInstallFileAdapter(),
-      ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
+      ...(registry ? { registry } : {}),
     })),
   });
 }
@@ -824,6 +802,12 @@ function runtimeInspectionLayout(
       platformLayout.stableRoot,
       ...NATIVE_HOST_INTEGRITY_RELATIVE_PATH.split('/'),
     ),
+    registryHelperPath: platformLayout.platform === 'win32'
+      ? join(
+        platformLayout.stableRoot,
+        ...NATIVE_HOST_WINDOWS_REGISTRY_HELPER_RELATIVE_PATH.split('\\'),
+      )
+      : null,
   });
 }
 
@@ -986,9 +970,10 @@ export async function inspectProductionNativeHost(): Promise<unknown> {
     });
     expectedLocation = platformLayout.manifestPath;
     const runtimeLayout = runtimeInspectionLayout(platformLayout);
+    const registry = platform === 'win32' ? await productionRegistryAdapter() : undefined;
     const platformAdapter = createNativeHostPlatformAdapter(platformLayout, Object.freeze({
       files: createInstallFileAdapter(),
-      ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
+      ...(registry ? { registry } : {}),
     }));
     const runtimeInspection = await inspectOwnedRuntime(runtimeLayout);
     const expectedExtensionId = extensionIdFromOrigin(runtimeInspection.marker?.origin)

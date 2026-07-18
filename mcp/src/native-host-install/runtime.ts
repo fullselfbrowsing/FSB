@@ -3,6 +3,8 @@ import {
   NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH,
   NATIVE_HOST_PACKAGE_NAME,
   NATIVE_HOST_PRIVATE_FILE_MODE,
+  NATIVE_HOST_WINDOWS_BOOTSTRAP_ROLE_MARKER,
+  NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER,
 } from '../native-host/constants.js';
 import {
   createNativeHostOwnerMarker,
@@ -289,43 +291,66 @@ function parseWindowsArtifacts(
   if (
     !fields
     || !exactOwnKeys(fields, ['schema', 'package', 'version', 'artifacts'])
-    || fields.schema !== 1
+    || fields.schema !== 2
     || fields.package !== NATIVE_HOST_PACKAGE_NAME
     || fields.version !== packageVersion
     || !Array.isArray(fields.artifacts)
-    || fields.artifacts.length !== 2
+    || fields.artifacts.length !== 4
   ) {
     return null;
   }
-  const expected = Object.freeze({
-    x64: Object.freeze({
+  const expected = Object.freeze([
+    Object.freeze({
+      architecture: 'x64' as const,
+      role: 'bootstrap' as const,
       path: 'native-host/bin/win32-x64/fsb-native-host.exe',
       peMachine: '0x8664' as const,
+      roleMarker: NATIVE_HOST_WINDOWS_BOOTSTRAP_ROLE_MARKER,
     }),
-    arm64: Object.freeze({
+    Object.freeze({
+      architecture: 'x64' as const,
+      role: 'registry-helper' as const,
+      path: 'native-host/bin/win32-x64/fsb-native-host-registry.exe',
+      peMachine: '0x8664' as const,
+      roleMarker: NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER,
+    }),
+    Object.freeze({
+      architecture: 'arm64' as const,
+      role: 'bootstrap' as const,
       path: 'native-host/bin/win32-arm64/fsb-native-host.exe',
       peMachine: '0xaa64' as const,
+      roleMarker: NATIVE_HOST_WINDOWS_BOOTSTRAP_ROLE_MARKER,
     }),
-  });
+    Object.freeze({
+      architecture: 'arm64' as const,
+      role: 'registry-helper' as const,
+      path: 'native-host/bin/win32-arm64/fsb-native-host-registry.exe',
+      peMachine: '0xaa64' as const,
+      roleMarker: NATIVE_HOST_WINDOWS_REGISTRY_HELPER_ROLE_MARKER,
+    }),
+  ]);
   const artifacts: NonNullable<NativeHostRuntimePackageSnapshot['windowsArtifacts']>['artifacts'][number][] = [];
   for (let index = 0; index < fields.artifacts.length; index += 1) {
     const artifact = ordinaryDataRecord(fields.artifacts[index]);
-    const architecture = index === 0 ? 'x64' : 'arm64';
-    const expectation = expected[architecture];
+    const expectation = expected[index];
     if (
       !artifact
       || !exactOwnKeys(artifact, [
         'architecture',
+        'role',
         'path',
         'bytes',
         'peMachine',
         'sha256',
         'packageVersion',
+        'roleMarker',
       ])
-      || artifact.architecture !== architecture
+      || artifact.architecture !== expectation.architecture
+      || artifact.role !== expectation.role
       || artifact.path !== expectation.path
       || artifact.peMachine !== expectation.peMachine
       || artifact.packageVersion !== packageVersion
+      || artifact.roleMarker !== expectation.roleMarker
       || !Number.isSafeInteger(artifact.bytes)
       || Number(artifact.bytes) < 64
       || Number(artifact.bytes) > 16 * 1024 * 1024
@@ -335,16 +360,18 @@ function parseWindowsArtifacts(
       return null;
     }
     artifacts.push(Object.freeze({
-      architecture,
+      architecture: expectation.architecture,
+      role: expectation.role,
       path: expectation.path,
       bytes: Number(artifact.bytes),
       peMachine: expectation.peMachine,
       sha256: artifact.sha256,
       packageVersion,
+      roleMarker: expectation.roleMarker,
     }));
   }
   return Object.freeze({
-    schema: 1,
+    schema: 2,
     package: NATIVE_HOST_PACKAGE_NAME,
     version: packageVersion,
     artifacts: Object.freeze(artifacts),
@@ -684,6 +711,9 @@ export async function publishNativeHostRuntime(
     const stagedBootstrapConfigPath = layout.bootstrapConfigPath
       ? stagePath(layout, layout.bootstrapConfigPath)
       : null;
+    const stagedRegistryHelperPath = layout.registryHelperPath
+      ? stagePath(layout, layout.registryHelperPath)
+      : null;
     if (!boundedString(packCacheRoot) || !packCacheRoot.startsWith(layout.stageRoot)) {
       return refused('invalid-source-package');
     }
@@ -765,23 +795,45 @@ export async function publishNativeHostRuntime(
     );
 
     let artifactSha256: string;
+    let registryHelperSha256: string | null = null;
     if (layout.platform === 'win32') {
       const selectedArchitecture = architecture as NativeHostWindowsArchitecture;
-      const selected = stagedSnapshot.windowsArtifacts?.artifacts.find(
-        (artifact) => artifact.architecture === selectedArchitecture,
+      const selectedBootstrap = stagedSnapshot.windowsArtifacts?.artifacts.find(
+        (artifact) => artifact.architecture === selectedArchitecture
+          && artifact.role === 'bootstrap',
       );
-      if (!selected || !stagedBootstrapConfigPath) refuse('publication-failed');
-      const selectedSource = api.join(
+      const selectedHelper = stagedSnapshot.windowsArtifacts?.artifacts.find(
+        (artifact) => artifact.architecture === selectedArchitecture
+          && artifact.role === 'registry-helper',
+      );
+      if (
+        !selectedBootstrap
+        || !selectedHelper
+        || !stagedBootstrapConfigPath
+        || !stagedRegistryHelperPath
+      ) refuse('publication-failed');
+      const selectedBootstrapSource = api.join(
         stagedPackageRoot,
-        ...selected.path.split('/'),
+        ...selectedBootstrap.path.split('/'),
       );
       await files.copyFileExclusiveNoFollow(
-        selectedSource,
+        selectedBootstrapSource,
         stagedLauncherPath,
         layout.launcherMode,
       );
       artifactSha256 = await files.hashFile(stagedLauncherPath, 'sha256');
-      if (artifactSha256 !== selected.sha256) refuse('publication-failed');
+      if (artifactSha256 !== selectedBootstrap.sha256) refuse('publication-failed');
+      const selectedHelperSource = api.join(
+        stagedPackageRoot,
+        ...selectedHelper.path.split('/'),
+      );
+      await files.copyFileExclusiveNoFollow(
+        selectedHelperSource,
+        stagedRegistryHelperPath,
+        layout.launcherMode,
+      );
+      registryHelperSha256 = await files.hashFile(stagedRegistryHelperPath, 'sha256');
+      if (registryHelperSha256 !== selectedHelper.sha256) refuse('publication-failed');
       await files.writeFileExclusiveNoFollow(
         stagedBootstrapConfigPath,
         renderWindowsBootstrapConfig(layout),
@@ -799,7 +851,7 @@ export async function publishNativeHostRuntime(
 
     const marker = createNativeHostOwnerMarker(layout, artifactSha256);
     const receipt: NativeHostRuntimeReceipt = {
-      schema: 1,
+      schema: 2,
       platform: layout.platform,
       packageName: NATIVE_HOST_PACKAGE_NAME,
       packageVersion: layout.packageVersion,
@@ -811,6 +863,8 @@ export async function publishNativeHostRuntime(
       installToken: layout.installToken,
       tarballIntegrity,
       artifactSha256,
+      registryHelperPath: layout.registryHelperPath,
+      registryHelperSha256,
       marker,
     };
     await files.writeFileExclusiveNoFollow(
@@ -828,6 +882,7 @@ export async function publishNativeHostRuntime(
       stagedIntegrityPath,
       stagedLauncherPath,
       ...(stagedBootstrapConfigPath ? [stagedBootstrapConfigPath] : []),
+      ...(stagedRegistryHelperPath ? [stagedRegistryHelperPath] : []),
       stagedMarkerPath,
       stagedReceiptPath,
     ]) {

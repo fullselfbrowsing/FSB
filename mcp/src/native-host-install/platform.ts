@@ -4,6 +4,7 @@ import {
   NATIVE_HOST_POSIX_LAUNCHER_RELATIVE_PATH,
   NATIVE_HOST_PRIVATE_FILE_MODE,
   NATIVE_HOST_WINDOWS_LAUNCHER_RELATIVE_PATH,
+  NATIVE_HOST_WINDOWS_REGISTRY_KEY,
 } from '../native-host/constants.js';
 import type { NativeHostPlatform } from '../native-host/runtime-layout.js';
 import type {
@@ -17,9 +18,6 @@ import type {
 } from './types.js';
 
 const MAX_MANIFEST_BYTES = 16 * 1024;
-const WINDOWS_REGISTRY_KEY =
-  `Software\\Google\\Chrome\\NativeMessagingHosts\\${NATIVE_HOST_NAME}`;
-
 export interface NativeHostPlatformLayoutInput {
   platform: NativeHostPlatform;
   homeDirectory: string;
@@ -92,7 +90,7 @@ export function resolveNativeHostPlatformLayout(
   const registration = platform === 'win32'
     ? Object.freeze<NativeHostRegistryRegistration>({
       kind: 'registry',
-      key: WINDOWS_REGISTRY_KEY,
+      key: NATIVE_HOST_WINDOWS_REGISTRY_KEY,
       canonicalView: 'user/32',
       shadowView: 'user/64',
     })
