@@ -619,7 +619,10 @@ check(/var\(--fsb-(?:surface|primary|success|warning|danger)/.test(sidepanelCss)
 console.log('\n--- forbidden delegation authority and presentation patterns ---');
 
 const manifest = JSON.parse(read('extension/manifest.json'));
-check(!manifest.permissions.includes('nativeMessaging'), 'extension manifest still has no nativeMessaging permission');
+check(
+  manifest.permissions.filter((permission) => permission === 'nativeMessaging').length === 1,
+  'Phase 63 adds exactly one nativeMessaging permission',
+);
 const extensionAuthorityScope = [
   'extension/utils/delegation-preflight.js',
   'extension/utils/delegation-consent.js',
@@ -1246,8 +1249,10 @@ for (const cssContract of [
 }
 
 const extensionManifest = JSON.parse(read('extension/manifest.json'));
-check(!extensionManifest.permissions.includes('nativeMessaging'),
-  'Phase 62 still has no nativeMessaging permission');
+check(
+  extensionManifest.permissions.filter((permission) => permission === 'nativeMessaging').length === 1,
+  'Phase 63 retains exactly one nativeMessaging permission while Phase 62 Providers remains native-free',
+);
 const compatibilityUiScope = [providersSource, optionsSource62, controlPanelSource, optionsCss].join('\n');
 for (const forbiddenUiPattern of [
   /adapter\.compatibility/,
