@@ -196,3 +196,12 @@ None during autonomous implementation.
 - The GREEN gate passed all 125 platform/registration assertions and all 229 transaction assertions, including initial state, idempotence, both publication boundaries, rollback after canonical write, uninstall rechecks, exact removal, and empty-key cleanup. Source and compiled native-boundary verification and workspace preservation also passed.
 - The final focused matrix passed the complete installer, diagnostics, platform, and Phase 63 seams plus the 1,014-assertion Phase 61–63 contract gate with complete workspace identity preserved.
 - Genuine Windows HKCU/WOW64 behavior remains `human_needed`; no registry, browser, native host, or human UAT was run or claimed.
+
+## Security Remediation Addendum — 2026-07-18 (`F63-SECURITY-01`)
+
+- Finding `F63-SECURITY-01` is closed by RED commit `a91f3e29` and GREEN commit `409e638d`.
+- Windows registration facts now come from the packaged Win32 Registry API helper's bounded, versioned protocol rather than parsed `reg.exe` text. The helper has one fixed HKCU Chrome native-messaging-host key: user/64 is query-only, while exact user/32 write, owned-default-value deletion, and empty-key cleanup are the only mutations.
+- A successful process with localized, malformed, truncated, trailing, or oversized output is classified unavailable and never absent. Only a well-formed protocol response can assert absence; non-`REG_SZ` values remain present with their registry type and cannot collapse into absence.
+- Mutation requests use closed numeric operations and a framed stdin value. Malformed input is rejected before registry access, arbitrary key/view selection is impossible, and process failures expose bounded classifications without echoing command, path, environment, registry data, or helper output.
+- Focused tests cover English-like and localized output, truncation, oversize, non-string registry values, user/64 immutability, exact user/32 mutation operations, malformed shadow evidence, hostile inherited environment, and helper tampering. Transaction tests continue to require explicit user/64 absence at every publication/removal boundary.
+- Genuine Windows HKCU/WOW64 execution remains `human_needed`; no live registry, browser, native host, or human UAT was run or claimed.

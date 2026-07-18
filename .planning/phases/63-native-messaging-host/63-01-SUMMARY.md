@@ -202,3 +202,11 @@ None during autonomous implementation. CI supplies MSVC and produces release art
 ---
 *Phase: 63-native-messaging-host*
 *Completed: 2026-07-17*
+
+## Security Remediation Addendum — 2026-07-18 (`F63-SECURITY-02`)
+
+- Finding `F63-SECURITY-02` is closed by RED commit `a91f3e29` and GREEN commit `409e638d`.
+- The Windows artifact set now contains a distinct version-bound registry-helper PE for each supported architecture. Schema-2 artifact metadata records an ordered role roster, role marker, package version, byte length, SHA-256 digest, and PE machine for both the bootstrap and helper; runtime selection, copying, receipts, and installed-state inspection preserve and revalidate that provenance.
+- Every helper launch validates the selected packaged file's real path, regular-file/no-symlink status, size, digest, PE machine, embedded helper role, and package version immediately before an absolute-path `shell:false` spawn. The child receives an empty environment, so inherited `PATH`, `SystemRoot`, and `SYSTEMROOT` cannot select registry tooling or influence executable loading through the adapter.
+- Windows builds use `/MT`, Control Flow Guard, high-entropy ASLR, and non-incremental linking. Release workflows build and publish both bootstrap and registry-helper PEs, and the Windows CI harness is limited to read-only user/32 and user/64 queries plus a deliberately malformed write request that must fail before mutation.
+- The bootstrap C source and its closed argv protocol are unchanged. Local source, synthetic-PE, packaging, metadata-tamper, workflow, and boundary tests pass; genuine MSVC compilation and the safe harness remain owned by required `windows-latest` CI and are not claimed as locally executed.
