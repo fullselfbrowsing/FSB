@@ -138,6 +138,22 @@ function assertOwnedIndexLock(lockPath, lockIdentity, snapshot) {
   }
 }
 
+function assertInstalledIndex(indexPath, lockIdentity, snapshot) {
+  let stat;
+  try {
+    stat = lstatSync(indexPath);
+  } catch {
+    throw new GitIndexPreservationError('raw Git index identity differs after restoration');
+  }
+  if (
+    !sameOwnedLockIdentity(stat, lockIdentity)
+    || stat.size !== snapshot.bytes.length
+    || !sameGitIndex(captureGitIndex(indexPath), snapshot)
+  ) {
+    throw new GitIndexPreservationError('raw Git index identity differs after restoration');
+  }
+}
+
 function fsyncIndexDirectory(indexPath) {
   if (process.platform === 'win32') return;
   let directoryFd;
@@ -216,9 +232,7 @@ function restoreGitIndexAtomically(
     committed = true;
     fsyncIndexDirectory(indexPath);
 
-    if (!sameGitIndex(captureGitIndex(indexPath), snapshot)) {
-      throw new GitIndexPreservationError('raw Git index identity differs after restoration');
-    }
+    assertInstalledIndex(indexPath, lockIdentity, snapshot);
   } catch (error) {
     if (lockFd !== undefined) {
       try {
@@ -489,6 +503,33 @@ function captureWorkspaceState(label) {
   });
 }
 
+function captureStableInitialState() {
+  const maximumAttempts = 4;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    const indexPathBefore = resolveGitIndexPath();
+    const indexBefore = captureGitIndex(indexPathBefore);
+    if (indexBefore.kind !== 'file') {
+      throw new GitIndexPreservationError(
+        'stable initial Git index capture requires a regular file',
+      );
+    }
+    const workspace = captureWorkspaceState('initial attempt ' + attempt);
+    const indexPathAfter = resolveGitIndexPath();
+    const indexAfter = captureGitIndex(indexPathAfter);
+    if (
+      indexPathAfter === indexPathBefore
+      && sameGitIndex(indexAfter, indexBefore)
+    ) {
+      return Object.freeze({
+        indexPath: indexPathAfter,
+        index: indexAfter,
+        workspace,
+      });
+    }
+  }
+  throw new GitIndexPreservationError('stable initial Git index capture did not converge');
+}
+
 function runRootTests() {
   const injected = process.env.FSB_PHASE60_TEST_COMMAND_JSON;
   if (injected !== undefined) {
@@ -531,12 +572,10 @@ let indexBefore;
 let indexSemanticUnchanged = false;
 
 try {
-  indexPath = resolveGitIndexPath();
-  indexBefore = captureGitIndex(indexPath);
-  if (indexBefore.kind !== 'file') {
-    throw new Error('raw Git index must be an existing regular file');
-  }
-  workspaceBefore = captureWorkspaceState('initial');
+  const initialState = captureStableInitialState();
+  indexPath = initialState.indexPath;
+  indexBefore = initialState.index;
+  workspaceBefore = initialState.workspace;
   trackedDirtySnapshots = Object.freeze(
     workspaceBefore.worktreeDirtyPaths.map(snapshotWorkspacePath),
   );
