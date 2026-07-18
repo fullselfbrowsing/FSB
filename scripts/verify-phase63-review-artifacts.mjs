@@ -254,6 +254,7 @@ function sha256(bytes) {
 function gitBytes(args) {
   const result = spawnSync('git', args, {
     cwd: REPO_ROOT,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
     encoding: null,
     maxBuffer: 128 * 1024 * 1024,
   });
