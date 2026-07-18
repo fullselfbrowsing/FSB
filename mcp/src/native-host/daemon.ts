@@ -262,27 +262,58 @@ async function writeOwnedLock(
   }
 }
 
+async function cleanupAttemptLock(
+  dependencies: NativeHostDaemonDependencies,
+  pathname: string,
+  token: string,
+): Promise<void> {
+  try {
+    await dependencies.removeAttemptDirectory(pathname, token);
+  } catch (_error) {
+    // A failed exact-attempt cleanup must not broaden deletion authority.
+  }
+}
+
+async function publishOwnedLock(
+  dependencies: NativeHostDaemonDependencies,
+  paths: NativeHostLockPaths,
+  token: string,
+): Promise<NativeHostLockState> {
+  const attemptDirectory = `${paths.directory}.pending-${token}`;
+  const attemptPaths: NativeHostLockPaths = Object.freeze({
+    directory: attemptDirectory,
+    metadata: join(attemptDirectory, LOCK_METADATA_NAME),
+  });
+  let created = false;
+  try {
+    created = await dependencies.createDirectory(
+      attemptDirectory,
+      NATIVE_HOST_RUNTIME_DIRECTORY_MODE,
+    );
+    if (!created) return Object.freeze({ kind: 'failure' });
+    if (!await writeOwnedLock(dependencies, attemptPaths, token)) {
+      await cleanupAttemptLock(dependencies, attemptDirectory, token);
+      return Object.freeze({ kind: 'failure' });
+    }
+    if (await dependencies.renameDirectory(attemptDirectory, paths.directory)) {
+      return Object.freeze({ kind: 'owner', token });
+    }
+    await cleanupAttemptLock(dependencies, attemptDirectory, token);
+    return Object.freeze({ kind: 'contender' });
+  } catch (_error) {
+    if (created) await cleanupAttemptLock(dependencies, attemptDirectory, token);
+    return Object.freeze({ kind: 'failure' });
+  }
+}
+
 async function acquireLock(
   dependencies: NativeHostDaemonDependencies,
   paths: NativeHostLockPaths,
 ): Promise<NativeHostLockState> {
   const ownerToken = nextToken(dependencies);
   if (!ownerToken) return Object.freeze({ kind: 'failure' });
-  let created;
-  try {
-    created = await dependencies.createDirectory(
-      paths.directory,
-      NATIVE_HOST_RUNTIME_DIRECTORY_MODE,
-    );
-  } catch (_error) {
-    return Object.freeze({ kind: 'failure' });
-  }
-  if (created) {
-    if (!await writeOwnedLock(dependencies, paths, ownerToken)) {
-      return Object.freeze({ kind: 'failure' });
-    }
-    return Object.freeze({ kind: 'owner', token: ownerToken });
-  }
+  const attempted = await publishOwnedLock(dependencies, paths, ownerToken);
+  if (attempted.kind !== 'contender') return attempted;
 
   let existing: NativeHostLockMetadata | null = null;
   try {
@@ -293,14 +324,15 @@ async function acquireLock(
   } catch (_error) {
     return Object.freeze({ kind: 'contender' });
   }
-  const now = dependencies.now();
-  if (
-    !existing
-    || !Number.isSafeInteger(now)
-    || now < existing.createdAt
-    || now - existing.createdAt < NATIVE_HOST_START_LOCK_STALE_MS
-  ) {
-    return Object.freeze({ kind: 'contender' });
+  if (existing) {
+    const now = dependencies.now();
+    if (
+      !Number.isSafeInteger(now)
+      || now < existing.createdAt
+      || now - existing.createdAt < NATIVE_HOST_START_LOCK_STALE_MS
+    ) {
+      return Object.freeze({ kind: 'contender' });
+    }
   }
 
   const health = await probeHealth(dependencies);
@@ -312,19 +344,22 @@ async function acquireLock(
     if (!await dependencies.renameDirectory(paths.directory, quarantinePath)) {
       return Object.freeze({ kind: 'contender' });
     }
-    await dependencies.removeDirectory(quarantinePath);
-    created = await dependencies.createDirectory(
-      paths.directory,
-      NATIVE_HOST_RUNTIME_DIRECTORY_MODE,
-    );
-    if (!created) return Object.freeze({ kind: 'contender' });
-    if (!await writeOwnedLock(dependencies, paths, ownerToken)) {
-      return Object.freeze({ kind: 'failure' });
-    }
-    return Object.freeze({ kind: 'owner', token: ownerToken });
   } catch (_error) {
     return Object.freeze({ kind: 'failure' });
   }
+  if (existing) {
+    try {
+      await dependencies.removeOwnedDirectory(
+        quarantinePath,
+        'quarantine',
+        quarantineToken,
+        existing.token,
+      );
+    } catch (_error) {
+      // Unproven quarantine contents stay isolated while canonical recovery continues.
+    }
+  }
+  return publishOwnedLock(dependencies, paths, ownerToken);
 }
 
 async function releaseLock(
@@ -340,17 +375,9 @@ async function releaseLock(
     if (!current || current.token !== token) return;
     const releasePath = `${paths.directory}.release-${token}`;
     if (!await dependencies.renameDirectory(paths.directory, releasePath)) return;
-    const releasedMetadata = parseLockMetadata(await dependencies.readPrivateFile(
-      join(releasePath, LOCK_METADATA_NAME),
-      LOCK_METADATA_MAX_BYTES,
-    ));
-    if (!releasedMetadata || releasedMetadata.token !== token) {
-      await dependencies.renameDirectory(releasePath, paths.directory);
-      return;
-    }
-    await dependencies.removeDirectory(releasePath);
+    await dependencies.removeOwnedDirectory(releasePath, 'release', token, token);
   } catch (_error) {
-    // Failure to prove ownership leaves the lock in place for bounded stale recovery.
+    // Failure to prove ownership leaves the tokened release quarantine untouched.
   }
 }
 

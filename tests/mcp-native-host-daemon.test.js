@@ -2,6 +2,14 @@
 
 const { EventEmitter } = require('node:events');
 const { readFileSync } = require('node:fs');
+const {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
@@ -115,7 +123,6 @@ function createWakeHarness(options = {}) {
     writePrivateFile: [],
     readPrivateFile: [],
     renameDirectory: [],
-    removeDirectory: [],
     removeAttemptDirectory: [],
     removeOwnedDirectory: [],
     spawn: [],
@@ -227,11 +234,6 @@ function createWakeHarness(options = {}) {
       directories.delete(source);
       return true;
     },
-    removeDirectory: async (pathname) => {
-      calls.removeDirectory.push(pathname);
-      trace.push(`remove:${pathname}`);
-      directories.delete(pathname);
-    },
     removeAttemptDirectory: async (pathname, token) => {
       calls.removeAttemptDirectory.push({ pathname, token });
       trace.push(`remove-attempt:${pathname}:${token}`);
@@ -241,11 +243,11 @@ function createWakeHarness(options = {}) {
       directories.delete(pathname);
       return true;
     },
-    removeOwnedDirectory: async (pathname, directoryToken, ownerToken) => {
-      calls.removeOwnedDirectory.push({ pathname, directoryToken, ownerToken });
-      trace.push(`remove-owned:${pathname}:${directoryToken}:${ownerToken}`);
+    removeOwnedDirectory: async (pathname, kind, directoryToken, ownerToken) => {
+      calls.removeOwnedDirectory.push({ pathname, kind, directoryToken, ownerToken });
+      trace.push(`remove-owned:${pathname}:${kind}:${directoryToken}:${ownerToken}`);
       const directory = directories.get(pathname);
-      if (!pathname.endsWith(`-${directoryToken}`) || !directory || directory.size !== 1) return false;
+      if (!pathname.endsWith(`.${kind}-${directoryToken}`) || !directory || directory.size !== 1) return false;
       const rawMetadata = directory.get(`${pathname}/owner.json`);
       if (typeof rawMetadata !== 'string') return false;
       try {
@@ -535,9 +537,10 @@ async function runBindRaceSection() {
 }
 
 async function runWakeDaemonSection() {
-  const [daemon, nativeConstants] = await Promise.all([
+  const [daemon, nativeConstants, platform] = await Promise.all([
     importBuild('native-host/daemon.js'),
     importBuild('native-host/constants.js'),
+    importBuild('native-host/platform.js'),
   ]);
 
   {
@@ -783,7 +786,11 @@ async function runWakeDaemonSection() {
     const rename = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
     assert(Boolean(rename), 'stale directory is atomically renamed to a tokened quarantine');
     assert(
-      rename && harness.state.calls.removeDirectory.includes(rename.destination),
+      rename && harness.state.calls.removeOwnedDirectory.some((cleanup) => (
+        cleanup.pathname === rename.destination
+        && cleanup.kind === 'quarantine'
+        && cleanup.ownerToken === staleToken
+      )),
       'only the exact tokened stale quarantine is removed',
     );
     const renameTraceIndex = harness.state.trace.findIndex((item) => item.includes('.quarantine-'));
@@ -809,9 +816,11 @@ async function runWakeDaemonSection() {
     assertEqual(result.outcome, 'started', 'readiness remains factual when lock ownership changes');
     assertEqual(harness.state.directories.has(harness.state.lockPath), true, 'release refuses a non-matching lock token');
     assertEqual(
-      harness.state.calls.removeDirectory.includes(harness.state.lockPath),
+      harness.state.calls.renameDirectory.some(({ source, destination }) => (
+        source === harness.state.lockPath && destination.includes('.release-')
+      )),
       false,
-      'release never removes the shared lock path without exact token proof',
+      'release never quarantines the shared lock path without exact token proof',
     );
   }
 
@@ -871,6 +880,121 @@ async function runWakeDaemonSection() {
   assert(!/\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u.test(platformSource), 'platform exposes no kill or signal authority');
   assert(!/\.kill\s*\(|process\.kill|\bSIG(?:TERM|KILL|INT)\b/u.test(daemonSource), 'daemon exposes no kill or signal authority');
   assert(!/\bpid\b/iu.test(`${platformSource}\n${daemonSource}`), 'wake authority never relies on process identifiers');
+  assert(!/\brm\s*\(|recursive\s*:\s*true/u.test(platformSource), 'wake cleanup exposes no recursive directory deletion');
+
+  const cleanupRoot = await mkdtemp(path.join(os.tmpdir(), 'fsb-wake-cleanup-'));
+  try {
+    const dependencies = platform.createNativeHostDaemonDependencies({});
+    const ownerToken = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const publishToken = 'dddddddddddddddddddddddddddddddd';
+    const publishSource = path.join(cleanupRoot, `wake.lock.pending-${publishToken}`);
+    const publishDestination = path.join(cleanupRoot, 'wake.lock');
+    await mkdir(publishSource, { mode: 0o700 });
+    await writeFile(
+      path.join(publishSource, 'owner.json'),
+      JSON.stringify({ schema: 1, token: publishToken, createdAt: 0 }),
+      { mode: 0o600 },
+    );
+    await mkdir(publishDestination, { mode: 0o700 });
+    assertEqual(
+      await dependencies.renameDirectory(publishSource, publishDestination),
+      false,
+      'production publication never replaces a preexisting empty canonical lock',
+    );
+    assertEqual((await readdir(publishDestination)).length, 0, 'preexisting empty canonical contents remain untouched');
+    assertEqual((await readdir(publishSource)).length, 1, 'losing staged publication remains available for exact cleanup');
+    await rm(publishSource, { recursive: true });
+    await rm(publishDestination, { recursive: true });
+
+    const attemptPath = path.join(cleanupRoot, `wake.lock.pending-${ownerToken}`);
+    await mkdir(attemptPath, { mode: 0o700 });
+    await writeFile(path.join(attemptPath, 'owner.json'), '{', { mode: 0o600 });
+    await writeFile(path.join(attemptPath, 'foreign.txt'), 'preserve me', { mode: 0o600 });
+    assertEqual(
+      await dependencies.removeAttemptDirectory(attemptPath, ownerToken),
+      false,
+      'attempt cleanup refuses a directory with any foreign roster entry',
+    );
+    assertEqual(
+      await readFile(path.join(attemptPath, 'foreign.txt'), 'utf8'),
+      'preserve me',
+      'attempt cleanup does not delete a foreign roster entry',
+    );
+    await rm(path.join(attemptPath, 'foreign.txt'));
+    assertEqual(
+      await dependencies.removeAttemptDirectory(
+        attemptPath,
+        'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+      ),
+      false,
+      'attempt cleanup refuses a mismatched directory token',
+    );
+    assertEqual(
+      await dependencies.removeAttemptDirectory(attemptPath, ownerToken),
+      true,
+      'attempt cleanup removes only its empty-or-owner-only tokened directory',
+    );
+    assertEqual((await readdir(cleanupRoot)).includes(path.basename(attemptPath)), false, 'attempt directory is removed exactly');
+
+    const quarantineToken = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const quarantinePath = path.join(cleanupRoot, `wake.lock.quarantine-${quarantineToken}`);
+    await mkdir(quarantinePath, { mode: 0o700 });
+    await writeFile(
+      path.join(quarantinePath, 'owner.json'),
+      JSON.stringify({ schema: 1, token: ownerToken, createdAt: 0 }),
+      { mode: 0o600 },
+    );
+    await writeFile(path.join(quarantinePath, 'foreign.txt'), 'preserve me too', { mode: 0o600 });
+    assertEqual(
+      await dependencies.removeOwnedDirectory(
+        quarantinePath,
+        'quarantine',
+        quarantineToken,
+        ownerToken,
+      ),
+      false,
+      'owned cleanup refuses a quarantine with any foreign roster entry',
+    );
+    assertEqual(
+      await readFile(path.join(quarantinePath, 'foreign.txt'), 'utf8'),
+      'preserve me too',
+      'owned cleanup leaves foreign quarantine contents untouched',
+    );
+    await rm(path.join(quarantinePath, 'foreign.txt'));
+    assertEqual(
+      await dependencies.removeOwnedDirectory(
+        quarantinePath,
+        'quarantine',
+        'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        ownerToken,
+      ),
+      false,
+      'owned cleanup refuses a mismatched quarantine token',
+    );
+    assertEqual(
+      await dependencies.removeOwnedDirectory(
+        quarantinePath,
+        'quarantine',
+        quarantineToken,
+        'cccccccccccccccccccccccccccccccc',
+      ),
+      false,
+      'owned cleanup refuses a mismatched metadata token',
+    );
+    assertEqual(
+      await dependencies.removeOwnedDirectory(
+        quarantinePath,
+        'quarantine',
+        quarantineToken,
+        ownerToken,
+      ),
+      true,
+      'owned cleanup removes only an exact token-and-metadata match',
+    );
+    assertEqual((await readdir(cleanupRoot)).length, 0, 'production cleanup leaves no self-owned residue');
+  } finally {
+    await rm(cleanupRoot, { recursive: true, force: true });
+  }
 }
 
 async function runProductionEntrySection() {

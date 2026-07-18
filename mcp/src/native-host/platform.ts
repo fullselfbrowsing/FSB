@@ -4,11 +4,14 @@ import {
   lstat,
   mkdir,
   readFile,
+  readdir,
   rename,
-  rm,
+  rmdir,
+  unlink,
   writeFile,
 } from 'node:fs/promises';
 import { request as requestHttp } from 'node:http';
+import { isAbsolute, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export type NativeHostReadable = NodeJS.ReadableStream & {
@@ -62,7 +65,13 @@ export interface NativeHostDaemonDependencies {
   writePrivateFile(pathname: string, contents: string, mode: number): Promise<void>;
   readPrivateFile(pathname: string, maxBytes: number): Promise<string | null>;
   renameDirectory(source: string, destination: string): Promise<boolean>;
-  removeDirectory(pathname: string): Promise<void>;
+  removeAttemptDirectory(pathname: string, token: string): Promise<boolean>;
+  removeOwnedDirectory(
+    pathname: string,
+    kind: 'quarantine' | 'release',
+    directoryToken: string,
+    ownerToken: string,
+  ): Promise<boolean>;
   spawn(
     command: string,
     argv: readonly string[],
@@ -93,6 +102,16 @@ function isAlreadyPresent(error: unknown): boolean {
     && 'code' in error
     && ['EEXIST', 'ENOTEMPTY'].includes(String(error.code)),
   );
+}
+
+async function pathExists(pathname: string): Promise<boolean> {
+  try {
+    await lstat(pathname);
+    return true;
+  } catch (error) {
+    if (isMissing(error)) return false;
+    throw error;
+  }
 }
 
 function requestBoundedHealth(
@@ -172,6 +191,61 @@ async function readBoundedPrivateFile(
   }
 }
 
+const LOCK_OWNER_NAME = 'owner.json';
+const LOCK_TOKEN_PATTERN = /^[a-f0-9]{32}$/u;
+
+function exactLockMetadataOwner(value: string | null, ownerToken: string): boolean {
+  if (!value || !LOCK_TOKEN_PATTERN.test(ownerToken)) return false;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (
+      !parsed
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || Object.getPrototypeOf(parsed) !== Object.prototype
+    ) {
+      return false;
+    }
+    const fields = parsed as Record<string, unknown>;
+    const keys = Reflect.ownKeys(fields);
+    return keys.length === 3
+      && keys[0] === 'schema'
+      && keys[1] === 'token'
+      && keys[2] === 'createdAt'
+      && fields.schema === 1
+      && fields.token === ownerToken
+      && Number.isSafeInteger(fields.createdAt)
+      && (fields.createdAt as number) >= 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function exactLockDirectoryEntries(pathname: string): Promise<readonly string[] | null> {
+  const stat = await lstat(pathname);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) return null;
+  const entries = await readdir(pathname, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name !== LOCK_OWNER_NAME || !entry.isFile() || entry.isSymbolicLink()) return null;
+  }
+  return Object.freeze(entries.map((entry) => entry.name));
+}
+
+function exactTokenedLockPath(
+  pathname: string,
+  kind: 'pending' | 'quarantine' | 'release',
+  token: string,
+): boolean {
+  return LOCK_TOKEN_PATTERN.test(token)
+    && Buffer.byteLength(pathname, 'utf8') <= 4096
+    && isAbsolute(pathname)
+    && normalize(pathname) === pathname
+    && pathname.endsWith(`wake.lock.${kind}-${token}`)
+    && !pathname.includes('\0')
+    && !pathname.includes('\r')
+    && !pathname.includes('\n');
+}
+
 export function createNativeHostDaemonDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): NativeHostDaemonDependencies {
@@ -197,16 +271,53 @@ export function createNativeHostDaemonDependencies(
     },
     readPrivateFile: readBoundedPrivateFile,
     renameDirectory: async (source: string, destination: string) => {
+      if (await pathExists(destination)) return false;
       try {
         await rename(source, destination);
         return true;
       } catch (error) {
         if (isMissing(error) || isAlreadyPresent(error)) return false;
+        if (await pathExists(destination)) return false;
         throw error;
       }
     },
-    removeDirectory: async (pathname: string) => {
-      await rm(pathname, { recursive: true, force: false, maxRetries: 0 });
+    removeAttemptDirectory: async (pathname: string, token: string) => {
+      if (!exactTokenedLockPath(pathname, 'pending', token)) return false;
+      try {
+        const entries = await exactLockDirectoryEntries(pathname);
+        if (!entries || entries.length > 1) return false;
+        if (entries.length === 1) await unlink(join(pathname, LOCK_OWNER_NAME));
+        await rmdir(pathname);
+        return true;
+      } catch (error) {
+        return isMissing(error);
+      }
+    },
+    removeOwnedDirectory: async (
+      pathname: string,
+      kind: 'quarantine' | 'release',
+      directoryToken: string,
+      ownerToken: string,
+    ) => {
+      if (
+        !['quarantine', 'release'].includes(kind)
+        || !exactTokenedLockPath(pathname, kind, directoryToken)
+        || !LOCK_TOKEN_PATTERN.test(ownerToken)
+      ) {
+        return false;
+      }
+      try {
+        const entries = await exactLockDirectoryEntries(pathname);
+        if (!entries || entries.length !== 1) return false;
+        const metadataPath = join(pathname, LOCK_OWNER_NAME);
+        const metadata = await readBoundedPrivateFile(metadataPath, 256);
+        if (!exactLockMetadataOwner(metadata, ownerToken)) return false;
+        await unlink(metadataPath);
+        await rmdir(pathname);
+        return true;
+      } catch (_error) {
+        return false;
+      }
     },
     spawn: (
       command: string,

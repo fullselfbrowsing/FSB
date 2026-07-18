@@ -107,7 +107,8 @@ function productionDependencies(options = {}) {
       return typeof marker === 'string' ? marker : JSON.stringify(marker);
     },
     renameDirectory: async () => { throw new Error('unexpected lock rename'); },
-    removeDirectory: async () => { throw new Error('unexpected lock remove'); },
+    removeAttemptDirectory: async () => { throw new Error('unexpected attempt lock remove'); },
+    removeOwnedDirectory: async () => { throw new Error('unexpected owned lock remove'); },
     spawn: () => {
       calls.spawn += 1;
       throw new Error('unexpected spawn');

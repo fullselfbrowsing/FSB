@@ -33,6 +33,7 @@ const ALLOWED_CORE_IMPORTS = Object.freeze({
     'node:crypto',
     'node:fs/promises',
     'node:http',
+    'node:path',
     'node:url',
   ]),
   'platform.js': new Set([
@@ -40,6 +41,7 @@ const ALLOWED_CORE_IMPORTS = Object.freeze({
     'node:crypto',
     'node:fs/promises',
     'node:http',
+    'node:path',
     'node:url',
   ]),
   'protocol.ts': new Set(['node:os']),
@@ -118,6 +120,9 @@ function verifyProductionAuthority(sources, diagnostics) {
   }
   if (/\b(?:process\.kill|\.kill\s*\(|SIGTERM|SIGKILL|SIGINT)\b/u.test(`${daemon}\n${platform}`)) {
     diagnostics.push('daemon: process signaling authority is forbidden');
+  }
+  if (/\b(?:rm|rmSync)\s*\(|recursive\s*:\s*true/u.test(platform)) {
+    diagnostics.push('platform: recursive wake-lock deletion authority is forbidden');
   }
   if (countMatches(entry, /wakeServeDaemon\s*\(/gu) !== 1) {
     diagnostics.push('entry: wakeServeDaemon must be invoked exactly once');
