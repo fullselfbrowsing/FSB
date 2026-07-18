@@ -34,6 +34,20 @@ function write(repository, relativePath, value) {
   fs.writeFileSync(target, value);
 }
 
+function findExecutable(name) {
+  for (const directory of (process.env.PATH || '').split(path.delimiter)) {
+    if (!directory) continue;
+    const candidate = path.join(directory, name);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep searching the configured PATH.
+    }
+  }
+  throw new Error('unable to locate executable: ' + name);
+}
+
 function main() {
   const repository = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-phase60-harness-'));
   const compatibilityDirectory = path.join(
@@ -193,6 +207,70 @@ function main() {
     fs.unlinkSync(`${indexPath}.lock`);
     fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
     fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    if (process.platform !== 'win32') {
+      const indexBeforeInitialCaptureRace = fs.readFileSync(indexPath);
+      const raceShimDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-phase60-git-shim-'));
+      const raceSentinel = path.join(raceShimDirectory, 'staged-once');
+      const gitShimPath = path.join(raceShimDirectory, 'git');
+      const realGit = findExecutable('git');
+      fs.writeFileSync(gitShimPath, [
+        '#!/usr/bin/env node',
+        "'use strict';",
+        "const { spawnSync } = require('node:child_process');",
+        "const fs = require('node:fs');",
+        "const args = process.argv.slice(2);",
+        "const environment = { ...process.env };",
+        "if (!fs.existsSync(environment.FSB_PHASE60_RACE_SENTINEL)",
+        "  && args[0] === 'diff'",
+        "  && args.includes('--name-only')",
+        "  && !args.includes('--cached')) {",
+        "  fs.writeFileSync(environment.FSB_PHASE60_RACE_SENTINEL, 'staged\\n');",
+        "  const staged = spawnSync(environment.FSB_PHASE60_REAL_GIT, ['add', '--', 'clean.txt'], { env: environment, shell: false });",
+        "  if (staged.status !== 0) process.exit(121);",
+        "}",
+        "const delegated = spawnSync(environment.FSB_PHASE60_REAL_GIT, args, { env: environment, stdio: 'inherit', shell: false });",
+        "if (delegated.signal) process.kill(process.pid, delegated.signal);",
+        "process.exit(Number.isInteger(delegated.status) ? delegated.status : 122);",
+        '',
+      ].join('\n'));
+      fs.chmodSync(gitShimPath, 0o755);
+      write(repository, 'clean.txt', 'concurrently staged during initial capture\n');
+      try {
+        const initialCaptureRace = runHarness('void 0;', {
+          environment: {
+            PATH: raceShimDirectory + path.delimiter + (process.env.PATH || ''),
+            FSB_PHASE60_RACE_SENTINEL: raceSentinel,
+            FSB_PHASE60_REAL_GIT: realGit,
+          },
+        });
+        assert.equal(
+          initialCaptureRace.status,
+          0,
+          'stable initial capture retries around a concurrent Git writer: '
+            + initialCaptureRace.stderr,
+        );
+        assert.match(
+          initialCaptureRace.stdout,
+          /PASS: full suite passed and workspace state was preserved/,
+        );
+        assert.equal(
+          runGit(repository, ['show', ':clean.txt']),
+          'concurrently staged during initial capture\n',
+          'harness accepts and preserves the stable index created by the concurrent writer',
+        );
+        assert.notDeepEqual(
+          fs.readFileSync(indexPath),
+          indexBeforeInitialCaptureRace,
+          'concurrent staging is never overwritten with the earlier raw index snapshot',
+        );
+      } finally {
+        fs.rmSync(raceShimDirectory, { recursive: true, force: true });
+        fs.writeFileSync(indexPath, indexBeforeInitialCaptureRace);
+        fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+        write(repository, 'clean.txt', 'committed clean baseline\n');
+      }
+    }
 
     const intentToAddDebug = runGit(
       repository,
