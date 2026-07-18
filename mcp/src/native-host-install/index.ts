@@ -259,7 +259,7 @@ function registrationSurfaceAbsent(
   if (facts.manifest.status !== 'absent') return false;
   if (dependencies.platform.layout.registration.kind !== 'registry') return true;
   return facts.registry32?.status === 'absent'
-    && (facts.registry64?.status === 'absent' || facts.registry64?.status === 'unavailable');
+    && facts.registry64?.status === 'absent';
 }
 
 async function rollbackRuntime(

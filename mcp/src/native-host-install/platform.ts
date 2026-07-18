@@ -139,6 +139,15 @@ export function createNativeHostPlatformAdapter(
   const registryRegistration = layout.registration.kind === 'registry'
     ? layout.registration
     : null;
+  const requireAbsentShadow = async (): Promise<void> => {
+    if (!registryRegistration) return;
+    if (!dependencies.registry) refuse();
+    const shadow = await dependencies.registry.readDefault(
+      registryRegistration.shadowView,
+      registryRegistration.key,
+    );
+    if (shadow.status !== 'absent') refuse();
+  };
 
   return Object.freeze({
     layout,
@@ -164,6 +173,7 @@ export function createNativeHostPlatformAdapter(
     },
     publishRegistration: async (contents: string): Promise<void> => {
       const exactContents = validateManifestContents(contents);
+      await requireAbsentShadow();
       await dependencies.files.writePrivateFileAtomic(
         layout.manifestPath,
         exactContents,
@@ -171,6 +181,7 @@ export function createNativeHostPlatformAdapter(
       );
       if (registryRegistration) {
         if (!dependencies.registry) refuse();
+        await requireAbsentShadow();
         await dependencies.registry.writeDefault(
           registryRegistration.canonicalView,
           registryRegistration.key,
@@ -181,6 +192,7 @@ export function createNativeHostPlatformAdapter(
     removeCanonicalRegistration: async (): Promise<void> => {
       if (registryRegistration) {
         if (!dependencies.registry) refuse();
+        await requireAbsentShadow();
         await dependencies.registry.deleteDefault(
           registryRegistration.canonicalView,
           registryRegistration.key,
@@ -197,7 +209,9 @@ export function createNativeHostPlatformAdapter(
       );
     },
     deleteCanonicalKeyIfEmpty: async (): Promise<void> => {
-      if (!registryRegistration || !dependencies.registry) return;
+      if (!registryRegistration) return;
+      if (!dependencies.registry) refuse();
+      await requireAbsentShadow();
       await dependencies.registry.deleteEmptyKey(
         registryRegistration.canonicalView,
         registryRegistration.key,

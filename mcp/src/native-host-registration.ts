@@ -275,7 +275,10 @@ export function inspectNativeHostRegistration(
 
   if (input.layout.registration.kind === 'registry') {
     const shadow = input.registry64;
-    if (shadow?.status === 'value') return result('mismatched', 'registry-shadow');
+    if (!shadow || shadow.status === 'unavailable') {
+      return result('unavailable', 'registry-unavailable');
+    }
+    if (shadow.status === 'value') return result('mismatched', 'registry-shadow');
     const canonicalState = registryState(input.registry32, input.layout.manifestPath);
     if (canonicalState === 'unavailable') return result('unavailable', 'registry-unavailable');
     if (canonicalState === 'invalid') return result('invalid', 'registry-invalid');
@@ -284,7 +287,6 @@ export function inspectNativeHostRegistration(
       canonicalState === 'absent'
       && manifest.state === 'absent'
       && marker.state === 'absent'
-      && (!shadow || shadow.status === 'absent' || shadow.status === 'unavailable')
     ) {
       return result('absent', 'absent');
     }
