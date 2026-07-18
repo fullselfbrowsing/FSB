@@ -1774,6 +1774,20 @@ body[data-sidepanel-view="history"] .author-footer {
   border-left: 4px solid var(--fsb-info);
 }
 
+.delegation-state-card[data-delegation-state="native-wake-checking"] {
+  border-left-color: var(--fsb-info);
+}
+
+.delegation-native-wake-spinner {
+  color: var(--fsb-info);
+  animation: delegation-native-wake-spin 900ms linear infinite;
+}
+
+@keyframes delegation-native-wake-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .delegation-state-card[data-delegation-tone="success"],
 .delegation-entry[data-delegation-tone="success"],
 .delegation-summary[data-delegation-tone="success"] {
@@ -2095,6 +2109,19 @@ body[data-sidepanel-view="history"] .author-footer {
 }
 
 @media (max-width: 350px) {
+  .delegation-native-wake-heading {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .delegation-native-wake-body {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
   .delegation-state-actions,
   .delegation-control-bar {
     align-items: stretch;
@@ -2116,6 +2143,23 @@ body[data-sidepanel-view="history"] .author-footer {
   }
 }
 
+@media (forced-colors: active) {
+  .delegation-state-card[data-delegation-state="native-wake-checking"] {
+    border-color: CanvasText;
+    border-left-color: CanvasText;
+  }
+
+  .delegation-native-wake-heading,
+  .delegation-native-wake-body,
+  .delegation-native-wake-spinner {
+    color: CanvasText;
+  }
+
+  .delegation-native-wake-spinner {
+    forced-color-adjust: auto;
+  }
+}
+
 @media (min-width: 500px) {
   .delegation-result-grid,
   .delegation-consent-permissions {
@@ -2126,6 +2170,12 @@ body[data-sidepanel-view="history"] .author-footer {
 @media (prefers-reduced-motion: reduce) {
   .chat-messages {
     scroll-behavior: auto !important;
+  }
+
+  .delegation-native-wake-spinner {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 
   .status-dot.running,
