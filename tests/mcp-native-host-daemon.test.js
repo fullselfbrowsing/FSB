@@ -646,6 +646,7 @@ async function runWakeDaemonSection() {
       'health probe pins the exact URL, 500 ms timeout, and 4096-byte cap',
     );
     assertEqual(harness.state.calls.createDirectory.length, 0, 'ready health takes no wake lock');
+    assertEqual(harness.state.calls.acquireStartLease.length, 0, 'ready health takes no start lease');
     assertEqual(harness.state.calls.spawn.length, 0, 'ready health spawns no child');
   }
 
@@ -734,6 +735,12 @@ async function runWakeDaemonSection() {
         < harness.state.trace.indexOf(`rename:${publish?.source}->${publish?.destination}`),
       'owner metadata publication precedes the canonical rename',
     );
+    assert(
+      harness.state.trace.indexOf('lease:acquire')
+        < harness.state.trace.indexOf(`rename:${publish?.source}->${publish?.destination}`),
+      'the OS lease is held before canonical owner publication',
+    );
+    assertEqual(harness.state.calls.releaseStartLease, 1, 'winner releases one exact start lease');
   }
 
   {
@@ -898,6 +905,8 @@ async function runWakeDaemonSection() {
     const freshA = harness.state.inspectDirectory(harness.state.lockPath);
     const freshAToken = JSON.parse(freshA.ownerContents).token;
     assert(freshAToken !== staleToken, 'contender A replaces S and publishes fresh owner A');
+    const cLease = await harness.dependencies.acquireStartLease();
+    assertEqual(cLease, null, 'contender C also cannot publish while A holds the one-flight lease');
     resumeB();
     const bTakeoverResult = await bTakeover;
     const afterB = harness.state.inspectDirectory(harness.state.lockPath);
@@ -940,7 +949,9 @@ async function runWakeDaemonSection() {
     });
     assertEqual(result.outcome, 'started', 'an empty abandoned lock is quarantined and recovered');
     assertEqual(harness.state.calls.spawn.length, 1, 'empty-lock recovery starts at most one child');
-    const quarantine = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
+    const quarantine = harness.state.calls.claimLockDirectory.find(
+      ({ destination }) => destination.includes('.quarantine-'),
+    );
     assert(Boolean(quarantine), 'the empty lock is moved aside atomically before a new owner is published');
     assertEqual(
       harness.state.directories.has(quarantine?.destination),
@@ -968,7 +979,9 @@ async function runWakeDaemonSection() {
     });
     assertEqual(result.outcome, 'started', 'a malformed abandoned lock is quarantined and recovered');
     assertEqual(harness.state.calls.spawn.length, 1, 'malformed-lock recovery starts at most one child');
-    const quarantine = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
+    const quarantine = harness.state.calls.claimLockDirectory.find(
+      ({ destination }) => destination.includes('.quarantine-'),
+    );
     const quarantinedFiles = harness.state.directories.get(quarantine?.destination);
     assert(Boolean(quarantine), 'the malformed lock is moved aside atomically before replacement');
     assertEqual(quarantinedFiles?.size, 2, 'malformed and foreign quarantine entries are preserved');
@@ -1006,7 +1019,9 @@ async function runWakeDaemonSection() {
     });
     assertEqual(result.outcome, 'started', 'expired lock is recovered and one daemon is started');
     assertEqual(harness.state.calls.spawn.length, 1, 'stale recovery still spawns only once');
-    const rename = harness.state.calls.renameDirectory.find(({ destination }) => destination.includes('.quarantine-'));
+    const rename = harness.state.calls.claimLockDirectory.find(
+      ({ destination }) => destination.includes('.quarantine-'),
+    );
     assert(Boolean(rename), 'stale directory is atomically renamed to a tokened quarantine');
     assert(
       rename && harness.state.calls.removeOwnedDirectory.some((cleanup) => (
@@ -1039,9 +1054,10 @@ async function runWakeDaemonSection() {
     assertEqual(result.outcome, 'started', 'readiness remains factual when lock ownership changes');
     assertEqual(harness.state.directories.has(harness.state.lockPath), true, 'release refuses a non-matching lock token');
     assertEqual(
-      harness.state.calls.renameDirectory.some(({ source, destination }) => (
-        source === harness.state.lockPath && destination.includes('.release-')
-      )),
+      [...harness.state.calls.renameDirectory, ...harness.state.calls.claimLockDirectory]
+        .some(({ source, destination }) => (
+          source === harness.state.lockPath && destination.includes('.release-')
+        )),
       false,
       'release never quarantines the shared lock path without exact token proof',
     );

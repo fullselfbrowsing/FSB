@@ -12,9 +12,12 @@ import {
 } from './constants.js';
 import type {
   NativeHostDaemonDependencies,
+  NativeHostLockClaimResult,
+  NativeHostLockDirectoryIdentity,
   NativeHostRuntimeConfig,
   NativeHostSpawnHandle,
   NativeHostSpawnOptions,
+  NativeHostStartLease,
 } from './platform.js';
 
 export type NativeHostWakeResult = Readonly<
@@ -49,9 +52,14 @@ type NativeHostLockPaths = Readonly<{
 }>;
 
 type NativeHostLockState =
-  | Readonly<{ kind: 'owner'; token: string }>
+  | Readonly<{ kind: 'owner'; token: string; lease: NativeHostStartLease }>
   | Readonly<{ kind: 'contender' }>
   | Readonly<{ kind: 'health'; health: NativeHostHealthClassification }>
+  | Readonly<{ kind: 'failure' }>;
+
+type NativeHostLockPublicationState =
+  | Readonly<{ kind: 'owner'; token: string }>
+  | Readonly<{ kind: 'contender' }>
   | Readonly<{ kind: 'failure' }>;
 
 const HEALTH_URL = 'http://127.0.0.1:7226/health';
@@ -141,6 +149,91 @@ function exactObject(value: unknown): value is Record<string, unknown> {
     && !Array.isArray(value)
     && Object.getPrototypeOf(value) === Object.prototype,
   );
+}
+
+function normalizedLockIdentity(value: unknown): NativeHostLockDirectoryIdentity | null {
+  if (!exactObject(value)) return null;
+  const keys = Reflect.ownKeys(value);
+  const expectedKeys = ['directoryId', 'ownerContents', 'roster'];
+  if (
+    keys.length !== 3
+    || keys.some((key, index) => key !== expectedKeys[index])
+  ) {
+    return null;
+  }
+  const fields: Record<string, unknown> = Object.create(null);
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+    fields[key] = descriptor.value;
+  }
+  const directoryId = fields.directoryId;
+  const ownerContents = fields.ownerContents;
+  const roster = fields.roster;
+  if (
+    typeof directoryId !== 'string'
+    || directoryId.length < 1
+    || Buffer.byteLength(directoryId, 'utf8') > 128
+    || /[\0\r\n]/u.test(directoryId)
+    || (ownerContents !== null && (
+      typeof ownerContents !== 'string'
+      || Buffer.byteLength(ownerContents, 'utf8') > LOCK_METADATA_MAX_BYTES
+    ))
+    || !Array.isArray(roster)
+    || roster.length > 64
+  ) {
+    return null;
+  }
+  let previous = '';
+  const normalizedRoster: string[] = [];
+  for (const entry of roster) {
+    if (
+      typeof entry !== 'string'
+      || entry.length < 1
+      || Buffer.byteLength(entry, 'utf8') > 512
+      || /[\0\r\n]/u.test(entry)
+      || (previous && entry <= previous)
+    ) {
+      return null;
+    }
+    previous = entry;
+    normalizedRoster.push(entry);
+  }
+  if (Buffer.byteLength(normalizedRoster.join('\0'), 'utf8') > MAX_PATH_BYTES) return null;
+  return Object.freeze({
+    directoryId,
+    ownerContents,
+    roster: Object.freeze(normalizedRoster),
+  });
+}
+
+function lockIdentitiesEqual(
+  left: NativeHostLockDirectoryIdentity,
+  right: NativeHostLockDirectoryIdentity,
+): boolean {
+  return left.directoryId === right.directoryId
+    && left.ownerContents === right.ownerContents
+    && left.roster.length === right.roster.length
+    && left.roster.every((entry, index) => entry === right.roster[index]);
+}
+
+async function inspectLockIdentity(
+  dependencies: NativeHostDaemonDependencies,
+  pathname: string,
+): Promise<NativeHostLockDirectoryIdentity | null> {
+  try {
+    return normalizedLockIdentity(await dependencies.inspectLockDirectory(pathname));
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function releaseStartLease(lease: NativeHostStartLease): Promise<void> {
+  try {
+    await lease.release();
+  } catch (_error) {
+    // The OS releases the listener automatically if this process exits unexpectedly.
+  }
 }
 
 async function probeHealth(
@@ -278,7 +371,7 @@ async function publishOwnedLock(
   dependencies: NativeHostDaemonDependencies,
   paths: NativeHostLockPaths,
   token: string,
-): Promise<NativeHostLockState> {
+): Promise<NativeHostLockPublicationState> {
   const attemptDirectory = `${paths.directory}.pending-${token}`;
   const attemptPaths: NativeHostLockPaths = Object.freeze({
     directory: attemptDirectory,
@@ -312,54 +405,78 @@ async function acquireLock(
 ): Promise<NativeHostLockState> {
   const ownerToken = nextToken(dependencies);
   if (!ownerToken) return Object.freeze({ kind: 'failure' });
-  const attempted = await publishOwnedLock(dependencies, paths, ownerToken);
-  if (attempted.kind !== 'contender') return attempted;
-
-  let existing: NativeHostLockMetadata | null = null;
+  const observed = await inspectLockIdentity(dependencies, paths.directory);
+  let lease: NativeHostStartLease | null = null;
   try {
-    existing = parseLockMetadata(await dependencies.readPrivateFile(
-      paths.metadata,
-      LOCK_METADATA_MAX_BYTES,
-    ));
+    lease = await dependencies.acquireStartLease();
   } catch (_error) {
     return Object.freeze({ kind: 'contender' });
   }
-  if (existing) {
-    const now = dependencies.now();
-    if (
-      !Number.isSafeInteger(now)
-      || now < existing.createdAt
-      || now - existing.createdAt < NATIVE_HOST_START_LOCK_STALE_MS
-    ) {
-      return Object.freeze({ kind: 'contender' });
-    }
-  }
+  if (!lease) return Object.freeze({ kind: 'contender' });
 
-  const health = await probeHealth(dependencies);
-  if (health !== 'offline') return Object.freeze({ kind: 'health', health });
-  const quarantineToken = nextToken(dependencies);
-  if (!quarantineToken) return Object.freeze({ kind: 'failure' });
-  const quarantinePath = `${paths.directory}.quarantine-${quarantineToken}`;
+  let retainLease = false;
   try {
-    if (!await dependencies.renameDirectory(paths.directory, quarantinePath)) {
+    const attempted = await publishOwnedLock(dependencies, paths, ownerToken);
+    if (attempted.kind === 'owner') {
+      retainLease = true;
+      return Object.freeze({ kind: 'owner', token: attempted.token, lease });
+    }
+    if (attempted.kind === 'failure') return Object.freeze({ kind: 'failure' });
+    if (!observed) return Object.freeze({ kind: 'contender' });
+
+    const current = await inspectLockIdentity(dependencies, paths.directory);
+    if (!current || !lockIdentitiesEqual(observed, current)) {
       return Object.freeze({ kind: 'contender' });
     }
-  } catch (_error) {
-    return Object.freeze({ kind: 'failure' });
-  }
-  if (existing) {
+    const existing = parseLockMetadata(current.ownerContents);
+    if (existing) {
+      const now = dependencies.now();
+      if (
+        !Number.isSafeInteger(now)
+        || now < existing.createdAt
+        || now - existing.createdAt < NATIVE_HOST_START_LOCK_STALE_MS
+      ) {
+        return Object.freeze({ kind: 'contender' });
+      }
+    }
+
+    const health = await probeHealth(dependencies);
+    if (health !== 'offline') return Object.freeze({ kind: 'health', health });
+    const quarantineToken = nextToken(dependencies);
+    if (!quarantineToken) return Object.freeze({ kind: 'failure' });
+    const quarantinePath = `${paths.directory}.quarantine-${quarantineToken}`;
+    let claim: NativeHostLockClaimResult;
     try {
-      await dependencies.removeOwnedDirectory(
+      claim = await dependencies.claimLockDirectory(
+        paths.directory,
         quarantinePath,
-        'quarantine',
-        quarantineToken,
-        existing.token,
+        current,
       );
     } catch (_error) {
-      // Unproven quarantine contents stay isolated while canonical recovery continues.
+      return Object.freeze({ kind: 'contender' });
     }
+    if (claim !== 'claimed') return Object.freeze({ kind: 'contender' });
+    if (existing) {
+      try {
+        await dependencies.removeOwnedDirectory(
+          quarantinePath,
+          'quarantine',
+          quarantineToken,
+          existing.token,
+        );
+      } catch (_error) {
+        // Unproven quarantine contents stay isolated while canonical recovery continues.
+      }
+    }
+    const replacement = await publishOwnedLock(dependencies, paths, ownerToken);
+    if (replacement.kind === 'owner') {
+      retainLease = true;
+      return Object.freeze({ kind: 'owner', token: replacement.token, lease });
+    }
+    return replacement;
+  } finally {
+    if (!retainLease) await releaseStartLease(lease);
   }
-  return publishOwnedLock(dependencies, paths, ownerToken);
 }
 
 async function releaseLock(
@@ -368,13 +485,16 @@ async function releaseLock(
   token: string,
 ): Promise<void> {
   try {
-    const current = parseLockMetadata(await dependencies.readPrivateFile(
-      paths.metadata,
-      LOCK_METADATA_MAX_BYTES,
-    ));
+    const identity = await inspectLockIdentity(dependencies, paths.directory);
+    if (!identity) return;
+    const current = parseLockMetadata(identity.ownerContents);
     if (!current || current.token !== token) return;
     const releasePath = `${paths.directory}.release-${token}`;
-    if (!await dependencies.renameDirectory(paths.directory, releasePath)) return;
+    if (await dependencies.claimLockDirectory(
+      paths.directory,
+      releasePath,
+      identity,
+    ) !== 'claimed') return;
     await dependencies.removeOwnedDirectory(releasePath, 'release', token, token);
   } catch (_error) {
     // Failure to prove ownership leaves the tokened release quarantine untouched.
@@ -534,6 +654,7 @@ export async function wakeServeDaemon(options: Readonly<{
         : failed('serve_readiness_timeout');
     } finally {
       await releaseLock(dependencies, paths, lock.token);
+      await releaseStartLease(lock.lease);
     }
   } catch (_error) {
     return failed('internal_failure');

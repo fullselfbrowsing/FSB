@@ -11,8 +11,10 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { request as requestHttp } from 'node:http';
+import { createServer } from 'node:net';
 import { isAbsolute, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { NATIVE_HOST_START_LEASE_PORT } from './constants.js';
 
 export type NativeHostReadable = NodeJS.ReadableStream & {
   removeListener(event: string, listener: (...args: never[]) => void): unknown;
@@ -55,6 +57,18 @@ export interface NativeHostRuntimeConfig {
   absoluteStableBuildIndex: string;
 }
 
+export interface NativeHostLockDirectoryIdentity {
+  readonly directoryId: string;
+  readonly ownerContents: string | null;
+  readonly roster: readonly string[];
+}
+
+export type NativeHostLockClaimResult = 'claimed' | 'changed' | 'unavailable';
+
+export interface NativeHostStartLease {
+  release(): Promise<void>;
+}
+
 export interface NativeHostDaemonDependencies {
   environment: Readonly<Record<string, string | undefined>>;
   now(): number;
@@ -64,6 +78,13 @@ export interface NativeHostDaemonDependencies {
   createDirectory(pathname: string, mode: number): Promise<boolean>;
   writePrivateFile(pathname: string, contents: string, mode: number): Promise<void>;
   readPrivateFile(pathname: string, maxBytes: number): Promise<string | null>;
+  inspectLockDirectory(pathname: string): Promise<NativeHostLockDirectoryIdentity | null>;
+  claimLockDirectory(
+    source: string,
+    destination: string,
+    expected: NativeHostLockDirectoryIdentity,
+  ): Promise<NativeHostLockClaimResult>;
+  acquireStartLease(): Promise<NativeHostStartLease | null>;
   renameDirectory(source: string, destination: string): Promise<boolean>;
   removeAttemptDirectory(pathname: string, token: string): Promise<boolean>;
   removeOwnedDirectory(
@@ -193,6 +214,8 @@ async function readBoundedPrivateFile(
 
 const LOCK_OWNER_NAME = 'owner.json';
 const LOCK_TOKEN_PATTERN = /^[a-f0-9]{32}$/u;
+const LOCK_IDENTITY_MAX_ENTRIES = 64;
+const LOCK_IDENTITY_MAX_ROSTER_BYTES = 4096;
 
 function exactLockMetadataOwner(value: string | null, ownerToken: string): boolean {
   if (!value || !LOCK_TOKEN_PATTERN.test(ownerToken)) return false;
@@ -229,6 +252,149 @@ async function exactLockDirectoryEntries(pathname: string): Promise<readonly str
     if (entry.name !== LOCK_OWNER_NAME || !entry.isFile() || entry.isSymbolicLink()) return null;
   }
   return Object.freeze(entries.map((entry) => entry.name));
+}
+
+type LockDirectoryEntry = Readonly<{
+  name: string;
+  isFile(): boolean;
+  isDirectory(): boolean;
+  isSymbolicLink(): boolean;
+  isBlockDevice(): boolean;
+  isCharacterDevice(): boolean;
+  isFIFO(): boolean;
+  isSocket(): boolean;
+}>;
+
+function lockEntryKind(entry: LockDirectoryEntry): string {
+  if (entry.isFile()) return 'file';
+  if (entry.isDirectory()) return 'directory';
+  if (entry.isSymbolicLink()) return 'symlink';
+  if (entry.isBlockDevice()) return 'block';
+  if (entry.isCharacterDevice()) return 'character';
+  if (entry.isFIFO()) return 'fifo';
+  if (entry.isSocket()) return 'socket';
+  return 'other';
+}
+
+async function inspectLockDirectoryIdentity(
+  pathname: string,
+): Promise<NativeHostLockDirectoryIdentity | null> {
+  try {
+    const stat = await lstat(pathname);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return null;
+    const entries = await readdir(pathname, { withFileTypes: true });
+    if (entries.length > LOCK_IDENTITY_MAX_ENTRIES) return null;
+    const roster = entries
+      .map((entry) => `${lockEntryKind(entry)}:${entry.name}`)
+      .sort();
+    if (Buffer.byteLength(roster.join('\0'), 'utf8') > LOCK_IDENTITY_MAX_ROSTER_BYTES) {
+      return null;
+    }
+    const ownerContents = roster.includes(`file:${LOCK_OWNER_NAME}`)
+      ? await readBoundedPrivateFile(join(pathname, LOCK_OWNER_NAME), 256)
+      : null;
+    return Object.freeze({
+      directoryId: `${stat.dev}:${stat.ino}`,
+      ownerContents,
+      roster: Object.freeze(roster),
+    });
+  } catch (_error) {
+    return null;
+  }
+}
+
+function lockDirectoryIdentitiesEqual(
+  left: NativeHostLockDirectoryIdentity | null,
+  right: NativeHostLockDirectoryIdentity | null,
+): boolean {
+  return Boolean(
+    left
+    && right
+    && left.directoryId === right.directoryId
+    && left.ownerContents === right.ownerContents
+    && left.roster.length === right.roster.length
+    && left.roster.every((entry, index) => entry === right.roster[index]),
+  );
+}
+
+async function claimLockDirectoryIdentity(
+  source: string,
+  destination: string,
+  expected: NativeHostLockDirectoryIdentity,
+): Promise<NativeHostLockClaimResult> {
+  try {
+    if (!lockDirectoryIdentitiesEqual(await inspectLockDirectoryIdentity(source), expected)) {
+      return 'changed';
+    }
+    if (await pathExists(destination)) return 'changed';
+    try {
+      await rename(source, destination);
+    } catch (error) {
+      if (isMissing(error) || isAlreadyPresent(error) || await pathExists(destination)) {
+        return 'changed';
+      }
+      return 'unavailable';
+    }
+    if (lockDirectoryIdentitiesEqual(await inspectLockDirectoryIdentity(destination), expected)) {
+      return 'claimed';
+    }
+
+    if (!await pathExists(source) && await pathExists(destination)) {
+      try {
+        await rename(destination, source);
+      } catch (_error) {
+        return 'unavailable';
+      }
+      if (lockDirectoryIdentitiesEqual(await inspectLockDirectoryIdentity(source), expected)) {
+        return 'changed';
+      }
+    }
+    return 'unavailable';
+  } catch (_error) {
+    return 'unavailable';
+  }
+}
+
+function acquireExclusiveStartLease(): Promise<NativeHostStartLease | null> {
+  return new Promise((resolveLease) => {
+    const server = createServer((socket) => socket.destroy());
+    let settled = false;
+    const unavailable = () => {
+      if (settled) return;
+      settled = true;
+      resolveLease(null);
+    };
+    server.once('error', unavailable);
+    try {
+      server.listen({
+        host: '127.0.0.1',
+        port: NATIVE_HOST_START_LEASE_PORT,
+        exclusive: true,
+      }, () => {
+        if (settled) {
+          server.close();
+          return;
+        }
+        settled = true;
+        server.removeListener('error', unavailable);
+        server.unref();
+        let released = false;
+        resolveLease(Object.freeze({
+          release: () => new Promise<void>((resolveRelease) => {
+            if (released || !server.listening) {
+              released = true;
+              resolveRelease();
+              return;
+            }
+            released = true;
+            server.close(() => resolveRelease());
+          }),
+        }));
+      });
+    } catch (_error) {
+      unavailable();
+    }
+  });
 }
 
 function exactTokenedLockPath(
@@ -270,6 +436,9 @@ export function createNativeHostDaemonDependencies(
       await writeFile(pathname, contents, { encoding: 'utf8', flag: 'wx', mode });
     },
     readPrivateFile: readBoundedPrivateFile,
+    inspectLockDirectory: inspectLockDirectoryIdentity,
+    claimLockDirectory: claimLockDirectoryIdentity,
+    acquireStartLease: acquireExclusiveStartLease,
     renameDirectory: async (source: string, destination: string) => {
       if (await pathExists(destination)) return false;
       try {
