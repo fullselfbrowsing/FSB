@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 63-10-PLAN.md
-last_updated: "2026-07-18T14:52:47.748Z"
+stopped_at: Completed 63-11-PLAN.md
+last_updated: "2026-07-18T20:25:17.000Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 18
   completed_phases: 6
   total_plans: 40
-  completed_plans: 40
+  completed_plans: 41
   percent: 33
 ---
 
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 63 (native-messaging-host) — EXECUTING
-Plan: 11 of 12
+Plan: 12 of 12
 Status: Ready to execute
 Last activity: 2026-07-18
 
@@ -48,7 +48,7 @@ Last activity: 2026-07-18
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 10/12 complete |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 11/12 complete |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
@@ -186,16 +186,19 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Keep all eight genuine OS, Chrome, visual, keyboard, and screen-reader scenarios in one milestone-end ledger — Automated evidence may validate ledger integrity but cannot populate or promote live UAT
 - [Phase 63]: Run compiled Phase 63 seams in one workspace-preserving build lifecycle — The complete prior build graph, unrelated dirty bytes, and raw Git index must survive every automated gate exactly
 - [Phase 63]: Derive all 30 validation mappings directly from the twelve PLAN files — A mechanical bijection fails on any missing, duplicate, or altered task mapping while future reviews remain honestly pending
+- [Phase 63]: Bind independent code, security, and UI reviews to one canonical patch, ordered manifest, implementation index, and worktree fingerprint — Review prose and verifier infrastructure cannot silently alter the implementation identity being approved
+- [Phase 63]: Preserve resolved blocking findings in the final review record and rerun each affected review after RED/GREEN remediation — Any open or accepted HIGH/CRITICAL row remains a hard stop, while historical resolved rows stay auditable
+- [Phase 63]: Use one separately packaged fixed Win32 Registry API helper instead of `reg.exe`, inherited `SystemRoot`, or `PATH` executable authority — Locale-dependent output and attacker-influenced executable selection cannot authorize an absent fact or registry mutation
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-10 are complete and 2 approved serialized plans remain.
+None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-11 are complete and 1 approved serialized plan remains.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source evidence is green through Phase 63 Plan 10, and no live pass is inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source and independent review evidence is green through Phase 63 Plan 11, and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -232,13 +235,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-18T14:52:47.745Z
-Stopped at: Completed 63-10-PLAN.md
+Last session: 2026-07-18T20:25:17.000Z
+Stopped at: Completed 63-11-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 63 Plan 11 by freezing the implementation identity and running the independent code, ASVS security, and six-pillar UI source-review gates. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute Phase 63 Plan 12 by rerunning the reviewed focused matrix and the workspace-preserving repository-wide regression gate. Keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -254,3 +257,4 @@ Execute Phase 63 Plan 11 by freezing the implementation identity and running the
 | Phase 63 P08 | 28 min | 3 tasks | 5 files |
 | Phase 63 P09 | 17 min | 2 tasks | 3 files |
 | Phase 63 P10 | 25 min | 3 tasks | 7 files |
+| Phase 63 P11 | 5h 26m | 3 review tasks | 38 files |
