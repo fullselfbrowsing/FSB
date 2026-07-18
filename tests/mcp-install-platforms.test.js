@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 let passed = 0;
 let failed = 0;
@@ -89,6 +89,52 @@ function assertIncludes(text, needle, msg) {
 
 function assertNotIncludes(text, needle, msg) {
   assert(!text.includes(needle), `${msg} (unexpected: ${needle})`);
+}
+
+function runProductionDoctor(fixture) {
+  const result = runCli(['doctor', '--json', '--timeout', '0'], fixture);
+  let snapshot = null;
+  try {
+    snapshot = JSON.parse(result.stdout);
+  } catch {
+    // The assertions below retain bounded stdout/stderr evidence on failure.
+  }
+  assertEqual(result.status, 1, 'production doctor preserves historical bridge-health exit semantics');
+  if (fixture.doctorLayer === undefined && snapshot) fixture.doctorLayer = snapshot.diagnosticLayer;
+  assert(snapshot && snapshot.diagnosticLayer === fixture.doctorLayer,
+    'native-host facts do not change the historical doctor health layer');
+  return snapshot;
+}
+
+function startReadyHealthFixture(fixture) {
+  const readyPath = path.join(fixture.root, 'health-ready.txt');
+  const source = [
+    "const fs = require('node:fs');",
+    "const http = require('node:http');",
+    'const readyPath = process.argv[1];',
+    'const body = JSON.stringify({ ok: true, service: \'fsb-mcp-server\', version: \'0.10.0\', nativeHostProtocol: 1, serveReady: true });',
+    'const server = http.createServer((_request, response) => {',
+    "  response.writeHead(200, { 'content-type': 'application/json' });",
+    '  response.end(body);',
+    '});',
+    "server.once('error', (error) => fs.writeFileSync(readyPath, `error:${error.code || 'unknown'}`));",
+    "server.listen(7226, '127.0.0.1', () => fs.writeFileSync(readyPath, 'ready'));",
+    "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+  ].join('\n');
+  const child = spawn(process.execPath, ['-e', source, readyPath], {
+    cwd: repoRoot,
+    env: { ...process.env },
+    shell: false,
+    stdio: 'ignore',
+  });
+  const waitArray = new Int32Array(new SharedArrayBuffer(4));
+  const deadline = Date.now() + 3000;
+  while (!fs.existsSync(readyPath) && Date.now() < deadline) {
+    Atomics.wait(waitArray, 0, 0, 20);
+  }
+  const state = fs.existsSync(readyPath) ? readText(readyPath) : 'timeout';
+  assertEqual(state, 'ready', 'production doctor fixture owns the exact loopback health endpoint');
+  return child;
 }
 
 function run() {
@@ -320,6 +366,12 @@ function run() {
       'invalid native syntax creates no Chrome registration directory',
     );
 
+    const missingDoctor = runProductionDoctor(fixture);
+    assertEqual(missingDoctor?.nativeHost?.reason, 'not_installed',
+      'production doctor derives the missing state from real local facts');
+    assertEqual(missingDoctor?.nativeHost?.installState, 'not_installed',
+      'production doctor reports a fully absent native host as not installed');
+
     const productionInstall = runCli(['install', '--native-host'], fixture);
     const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
     assertEqual(productionInstall.status, 0, 'production CLI reaches the real native install transaction');
@@ -348,6 +400,40 @@ function run() {
       );
     assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
     assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
+
+    const offlineDoctor = runProductionDoctor(fixture);
+    assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
+      'production doctor reuses the exact daemon health classifier');
+    assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
+      'an exact install remains installed while its daemon is offline');
+
+    const exactManifest = readText(manifestPath);
+    const mismatchedManifest = JSON.parse(exactManifest);
+    mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
+    fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
+    const mismatchDoctor = runProductionDoctor(fixture);
+    assertEqual(mismatchDoctor?.nativeHost?.reason, 'allowlist_mismatch',
+      'production doctor distinguishes a structurally valid allowlist mismatch');
+    fs.writeFileSync(manifestPath, exactManifest, 'utf8');
+
+    const launcherPath = path.join(stableRoot, 'bin', 'fsb-native-host-launcher.mjs');
+    const exactLauncher = fs.readFileSync(launcherPath);
+    fs.appendFileSync(launcherPath, '\n// corrupt fixture\n');
+    const corruptDoctor = runProductionDoctor(fixture);
+    assertEqual(corruptDoctor?.nativeHost?.reason, 'runtime_invalid',
+      'production doctor rejects a corrupt owned runtime before daemon facts');
+    fs.writeFileSync(launcherPath, exactLauncher);
+
+    const healthChild = startReadyHealthFixture(fixture);
+    try {
+      const readyDoctor = runProductionDoctor(fixture);
+      assertEqual(readyDoctor?.nativeHost?.reason, 'ok',
+        'production doctor reports ready only from exact install and health facts');
+      assertEqual(readyDoctor?.nativeHost?.daemon, 'reachable',
+        'production doctor maps the exact loopback health contract to reachable');
+    } finally {
+      healthChild.kill('SIGTERM');
+    }
 
     const idempotentInstall = runCli(['install', '--native-host'], fixture);
     assertEqual(idempotentInstall.status, 0, 'production native install is idempotent');
