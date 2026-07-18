@@ -40,6 +40,7 @@ const PHASE63_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/mcp-native-host-packaging.test.js --section workflow-and-pack',
   'node tests/mcp-native-host-protocol.test.js',
   'node tests/mcp-native-host-daemon.test.js',
+  'node tests/mcp-native-host-registry-helper.test.js',
   'node tests/mcp-native-host-install.test.js',
   'node tests/native-host-background-wake.test.js',
 ]);
@@ -1528,7 +1529,7 @@ const firstDependentMcpIndex = rootCommands.indexOf('node tests/mcp-bridge-clien
 check(phase63BuildIndex >= 0
   && phase63RootIndexes.every((index) => index > phase63BuildIndex && index < firstDependentMcpIndex)
   && phase63RootIndexes.every((index, position) => position === 0 || index > phase63RootIndexes[position - 1]),
-'all five Phase 63 root gates occupy one ordered slot after build and before dependent seams');
+'all six Phase 63 root gates occupy one ordered slot after build and before dependent seams');
 check(exactOccurrences(ciSource, 'name: Phase 63 native-host contract (sole Linux root invocation)') === 1
   && exactOccurrences(ciSource, 'run: npm test') === 1
   && !ciSource.includes('run: node scripts/run-phase63-focused-tests.mjs'),
