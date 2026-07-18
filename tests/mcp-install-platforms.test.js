@@ -27,6 +27,19 @@ const cliPath = path.join(repoRoot, 'mcp', 'build', 'index.js');
 const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
+function findNpmCliPath() {
+  const result = spawnSync('npm', ['root', '--global'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    shell: false,
+  });
+  assertEqual(result.status, 0, 'production native-host fixture resolves the installed npm CLI');
+  const candidate = path.join(result.stdout.trim(), 'npm', 'bin', 'npm-cli.js');
+  return fs.realpathSync(candidate);
+}
+
+const npmCliPath = findNpmCliPath();
+
 function runCli(args, fixture) {
   return spawnSync('node', [cliPath, ...args], {
     cwd: repoRoot,
@@ -36,6 +49,7 @@ function runCli(args, fixture) {
       HOME: fixture.home,
       APPDATA: fixture.appData,
       LOCALAPPDATA: fixture.localAppData,
+      npm_execpath: npmCliPath,
     },
   });
 }
@@ -306,27 +320,42 @@ function run() {
       'invalid native syntax creates no Chrome registration directory',
     );
 
-    const unavailableInstall = runCli(['install', '--native-host'], fixture);
-    const unavailableInstallOutput = `${unavailableInstall.stdout}${unavailableInstall.stderr}`;
-    const unavailableUninstall = runCli(['uninstall', '--native-host'], fixture);
-    const unavailableUninstallOutput = `${unavailableUninstall.stdout}${unavailableUninstall.stderr}`;
-    assertEqual(unavailableInstall.status, 1, 'unresolved production native install fails closed');
+    const productionInstall = runCli(['install', '--native-host'], fixture);
+    const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
+    assertEqual(productionInstall.status, 0, 'production CLI reaches the real native install transaction');
     assertIncludes(
-      unavailableInstallOutput,
-      'Native messaging host was not changed: unavailable',
-      'unresolved production native install reports only bounded unavailable',
+      productionInstallOutput,
+      'Native messaging host installed.',
+      'production CLI reports the bounded real install receipt',
     );
+    const stableRoot = path.join(fixture.home, '.fsb', 'native-host');
+    const manifestPath = path.join(
+      fixture.home,
+      '.config',
+      'google-chrome',
+      'NativeMessagingHosts',
+      'io.github.fullselfbrowsing.fsb_native_host.json',
+    );
+    assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
+    assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
+
+    const idempotentInstall = runCli(['install', '--native-host'], fixture);
+    assertEqual(idempotentInstall.status, 0, 'production native install is idempotent');
     assertIncludes(
-      unavailableInstallOutput,
-      'Run fsb-mcp-server doctor for repair details.',
-      'unresolved production native install gives exact doctor guidance',
+      `${idempotentInstall.stdout}${idempotentInstall.stderr}`,
+      'Native messaging host is already installed.',
+      'production composition reuses its persisted exact ownership receipt',
     );
-    assertEqual(unavailableUninstall.status, 1, 'unresolved production native uninstall fails closed');
+
+    const productionUninstall = runCli(['uninstall', '--native-host'], fixture);
+    assertEqual(productionUninstall.status, 0, 'production CLI reaches the real native uninstall transaction');
     assertIncludes(
-      unavailableUninstallOutput,
-      'Native messaging host was not changed: unavailable',
-      'unresolved production native uninstall reports only bounded unavailable',
+      `${productionUninstall.stdout}${productionUninstall.stderr}`,
+      'Native messaging host removed.',
+      'production CLI reports the bounded real uninstall receipt',
     );
+    assert(!fs.existsSync(stableRoot), 'production uninstall removes only the exact owned runtime');
+    assert(!fs.existsSync(manifestPath), 'production uninstall removes the exact Chrome manifest');
 
     const duplicateId = runCli([
       'install',
