@@ -134,9 +134,13 @@ function fakePlatformDependencies(options = {}) {
     ? options.registryFacts
     : new Map(options.registryFacts || []);
   let keyInspectionCount = 0;
+  const registryReadCounts = new Map();
   function step(entry) {
     trace.push(entry);
     if (options.failAt === entry) throw new Error(`sensitive:${entry}:must-not-leak`);
+  }
+  function afterStep(entry) {
+    if (options.failAfter === entry) throw new Error(`sensitive:${entry}:must-not-leak`);
   }
   const dependencies = {
     files: {
@@ -161,11 +165,18 @@ function fakePlatformDependencies(options = {}) {
     registry: {
       readDefault: async (view, key) => {
         step(`registry:read:${view}:${key}`);
-        return registryFacts.get(view) || Object.freeze({ status: 'absent' });
+        const count = registryReadCounts.get(view) || 0;
+        registryReadCounts.set(view, count + 1);
+        const current = registryFacts.get(view) || Object.freeze({ status: 'absent' });
+        return typeof options.registryReadFact === 'function'
+          ? options.registryReadFact({ view, key, count, current, trace })
+          : current;
       },
       writeDefault: async (view, key, value) => {
-        step(`registry:write:${view}:${key}:${value.type}`);
+        const entry = `registry:write:${view}:${key}:${value.type}`;
+        step(entry);
         registryFacts.set(view, Object.freeze({ status: 'value', ...value }));
+        afterStep(entry);
       },
       deleteDefault: async (view, key) => {
         step(`registry:delete:${view}:${key}`);
@@ -531,7 +542,10 @@ function fakeInstallTransaction(platformModule, platformLayout, runtimeLayout, o
       value: platformLayout.manifestPath,
     }));
   } else if (platformLayout.platform === 'win32') {
-    registryFacts.set('user/64', Object.freeze({ status: 'absent' }));
+    registryFacts.set(
+      'user/64',
+      Object.freeze(options.registry64Fact || { status: 'absent' }),
+    );
   }
 
   const platformHarness = fakePlatformDependencies({
@@ -539,6 +553,8 @@ function fakeInstallTransaction(platformModule, platformLayout, runtimeLayout, o
     manifestFacts,
     registryFacts,
     failAt: options.failAt,
+    failAfter: options.failAfter,
+    registryReadFact: options.registryReadFact,
     keyFact: options.keyFact,
     keyFacts: options.keyFacts,
   });
@@ -896,7 +912,8 @@ async function runPlatformAndRegistration() {
   const windowsClassifications = [
     [{ ...windowsExactInput, registry64: Object.freeze({ status: 'value', type: 'REG_SZ', value: windows.manifestPath }) }, 'mismatched'],
     [{ ...windowsExactInput, registry64: Object.freeze({ status: 'value', type: 'REG_SZ', value: 'C:\\foreign.json' }) }, 'mismatched'],
-    [{ ...windowsExactInput, registry64: Object.freeze({ status: 'unavailable' }) }, 'exact'],
+    [{ ...windowsExactInput, registry64: Object.freeze({ status: 'unavailable' }) }, 'unavailable'],
+    [{ ...windowsExactInput, registry64: undefined }, 'unavailable'],
     [{ ...windowsExactInput, registry32: Object.freeze({ status: 'unavailable' }) }, 'unavailable'],
     [{ ...windowsExactInput, registry32: Object.freeze({ status: 'value', type: 'REG_BINARY', value: windows.manifestPath }) }, 'invalid'],
     [{ ...windowsExactInput, registry32: Object.freeze({ status: 'value', type: 'REG_SZ', value: 'C:\\foreign.json' }) }, 'mismatched'],
@@ -918,6 +935,19 @@ async function runPlatformAndRegistration() {
     'absent',
     'Windows absent marker, manifest, and both views classify absent',
   );
+  for (const registry64 of [undefined, Object.freeze({ status: 'unavailable' })]) {
+    equal(
+      registration.inspectNativeHostRegistration({
+        ...windowsExactInput,
+        manifest: Object.freeze({ status: 'absent' }),
+        marker: Object.freeze({ status: 'absent' }),
+        registry32: Object.freeze({ status: 'absent' }),
+        registry64,
+      }).state,
+      'unavailable',
+      'Windows absence requires an explicit clear user/64 shadow fact',
+    );
+  }
 
   for (const table of layouts) {
     const layout = platform.resolveNativeHostPlatformLayout(table.input);
@@ -1421,6 +1451,33 @@ async function runInstallTransaction() {
     equal(transactionMutations(harness.trace).length, 0, 'Windows shadow refusal performs zero mutation in either view');
   }
 
+  for (const fixture of [
+    { runtimeState: 'absent', registrationState: 'absent', label: 'initial absence' },
+    { runtimeState: 'exact', registrationState: 'exact', label: 'idempotent ownership' },
+  ]) {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        ...fixture,
+        registry64Fact: { status: 'unavailable' },
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', `Windows ${fixture.label} refuses an unavailable user/64 proof`);
+    equal(result.reason, 'unavailable', `Windows ${fixture.label} reports unavailable shadow evidence`);
+    equal(
+      transactionMutations(harness.trace).length,
+      0,
+      `Windows ${fixture.label} performs zero mutation without explicit user/64 absence`,
+    );
+  }
+
   for (const invalidExtensionId of ['', 'a'.repeat(31), 'q'.repeat(32), '../profile']) {
     const resolved = layouts('darwin');
     const harness = fakeInstallTransaction(platform, resolved.platformLayout, resolved.runtimeLayout);
@@ -1476,6 +1533,60 @@ async function runInstallTransaction() {
     );
   }
 
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        registryReadFact: ({ view, count, current }) => (
+          view === 'user/64' && count >= 1
+            ? Object.freeze({ status: 'unavailable' })
+            : current
+        ),
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'Windows publication boundary refuses a lost user/64 proof');
+    equal(result.reason, 'boundary-changed', 'Windows lost publication proof is a stable boundary refusal');
+    check(harness.trace.includes('runtime:remove'), 'Windows lost publication proof rolls back only the new runtime');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('file:write:') && !entry.startsWith('registry:write:')),
+      'Windows lost publication proof blocks all registration mutation',
+    );
+  }
+
+  for (const unavailableAtRead of [2, 3]) {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        registryReadFact: ({ view, count, current }) => (
+          view === 'user/64' && count >= unavailableAtRead
+            ? Object.freeze({ status: 'unavailable' })
+            : current
+        ),
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', `Windows publication mutation ${unavailableAtRead - 1} refuses a lost shadow proof`);
+    equal(result.reason, 'registration-publish-failed', 'Windows publication mutation refusal is contained');
+    check(harness.trace.includes('runtime:remove'), 'Windows failed publication mutation rolls back the exact runtime');
+    check(
+      harness.trace.every((entry) => !entry.startsWith('registry:write:user/32:')),
+      'Windows never publishes canonical registration after shadow proof is lost',
+    );
+  }
+
   for (const platformName of ['darwin', 'win32']) {
     const resolved = layouts(platformName);
     const failAt = platformName === 'win32'
@@ -1498,6 +1609,38 @@ async function runInstallTransaction() {
     check(!harness.manifestFacts.has(resolved.platformLayout.manifestPath), `${platformName} publication failure leaves no owned manifest`);
     check(!harness.registryFacts.has('user/32'), `${platformName} publication failure leaves no canonical registry value`);
     check(!JSON.stringify(result).includes('sensitive:'), `${platformName} publication failure never exposes raw error content`);
+  }
+
+  {
+    const resolved = layouts('win32');
+    const writeEntry = `registry:write:user/32:${resolved.platformLayout.registration.key}:REG_SZ`;
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        failAfter: writeEntry,
+        registryReadFact: ({ view, current, trace }) => (
+          view === 'user/64' && trace.includes(writeEntry)
+            ? Object.freeze({ status: 'unavailable' })
+            : current
+        ),
+      },
+    );
+    const result = await installer.installNativeHost(
+      { extensionId: EXTENSION_ID },
+      harness.dependencies,
+    );
+    equal(result.status, 'refused', 'Windows post-write failure remains contained when shadow proof is lost');
+    equal(result.reason, 'registration-publish-failed', 'Windows post-write rollback uses a stable refusal');
+    check(
+      harness.registryFacts.has('user/32'),
+      'Windows rollback preserves canonical evidence when user/64 absence cannot be reproved',
+    );
+    check(
+      harness.trace.every((entry) => !entry.startsWith('registry:delete:user/32:')),
+      'Windows rollback never deletes canonical registration without fresh shadow proof',
+    );
   }
 
   for (const platformName of ['darwin', 'linux', 'win32']) {
@@ -1589,6 +1732,94 @@ async function runInstallTransaction() {
     equal(result.status, 'refused', 'Windows shadow blocks uninstall without deleting either view');
     equal(result.reason, 'registry-shadow', 'Windows shadow uninstall refusal is stable');
     equal(transactionMutations(harness.trace).length, 0, 'Windows shadow uninstall refusal performs zero deletes');
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        registry64Fact: { status: 'unavailable' },
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'Windows uninstall refuses unavailable initial user/64 proof');
+    equal(result.reason, 'unavailable', 'Windows unavailable initial shadow proof is explicit');
+    equal(
+      transactionMutations(harness.trace).length,
+      0,
+      'Windows uninstall performs zero deletion without initial user/64 absence',
+    );
+  }
+
+  {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        registryReadFact: ({ view, count, current }) => (
+          view === 'user/64' && count >= 1
+            ? Object.freeze({ status: 'unavailable' })
+            : current
+        ),
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', 'Windows uninstall recheck refuses a lost user/64 proof');
+    equal(result.reason, 'boundary-changed', 'Windows uninstall lost proof is a stable boundary refusal');
+    equal(
+      transactionMutations(harness.trace).length,
+      0,
+      'Windows uninstall recheck blocks every deletion after shadow proof is lost',
+    );
+  }
+
+  for (const fixture of [
+    {
+      unavailableAtRead: 2,
+      reason: 'registration-remove-failed',
+      label: 'canonical removal',
+    },
+    {
+      unavailableAtRead: 3,
+      reason: 'registry-key-cleanup-failed',
+      label: 'key cleanup',
+    },
+  ]) {
+    const resolved = layouts('win32');
+    const harness = fakeInstallTransaction(
+      platform,
+      resolved.platformLayout,
+      resolved.runtimeLayout,
+      {
+        runtimeState: 'exact',
+        registrationState: 'exact',
+        registryReadFact: ({ view, count, current }) => (
+          view === 'user/64' && count >= fixture.unavailableAtRead
+            ? Object.freeze({ status: 'unavailable' })
+            : current
+        ),
+      },
+    );
+    const result = await installer.uninstallNativeHost(harness.dependencies);
+    equal(result.status, 'refused', `Windows ${fixture.label} refuses a lost user/64 proof`);
+    equal(result.reason, fixture.reason, `Windows ${fixture.label} reports a stable refusal`);
+    check(
+      harness.trace.every((entry) => !entry.startsWith('registry:key-delete:user/32:')),
+      `Windows ${fixture.label} never broad-deletes a key after shadow proof is lost`,
+    );
+    check(
+      !harness.trace.includes('runtime:remove'),
+      `Windows ${fixture.label} preserves runtime evidence after shadow proof is lost`,
+    );
   }
 
   {
