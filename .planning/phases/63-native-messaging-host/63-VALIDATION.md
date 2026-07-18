@@ -42,7 +42,7 @@ The guarded full-suite wrapper is mandatory because the workspace contains unrel
 
 ## Per-Task Verification Map
 
-Every planned implementation/review/gate task maps to one exact row and has a deterministic automated command. Plans 63-01 through 63-10 are green; the independent reviews and guarded full-suite rows remain honestly pending until Plans 63-11 and 63-12 execute.
+Every planned implementation/review/gate task maps to one exact row and has a deterministic automated command. Plans 63-01 through 63-11 and Plan 63-12 Task 1 are green; only the guarded full-suite row remains pending until Plan 63-12 Task 2 executes.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
@@ -71,10 +71,10 @@ Every planned implementation/review/gate task maps to one exact row and has a de
 | 63-10-01 | 10 | 10 | NATIVE-01–04 | T63-12 | One ledger keeps every genuine OS/Chrome/accessibility scenario unchecked, human_needed, pending, and evidence-empty | artifact/contract | `node tests/delegation-phase-contract.test.js --section phase63-uat-ledger` | ✅ present | ✅ green |
 | 63-10-02 | 10 | 10 | NATIVE-01–04 | T63-01–T63-12 | Focused/root/CI/package/boundary gates run exactly once in protected serial order without dropping prior contracts | integration/source | `node scripts/run-phase63-focused-tests.mjs` | ✅ present | ✅ green |
 | 63-10-03 | 10 | 10 | NATIVE-01–04 | T63-01–T63-12 | Mechanical contract maps all 30 tasks, four requirements, 25 decisions, 12 threats, ASVS themes, key links, and forbidden patterns against fresh compiled output while restoring the complete generated graph/index | artifact/contract | `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/delegation-phase-contract.test.js"],["node","tests/mcp-version-parity.test.js"]]'` | ✅ present | ✅ green |
-| 63-11-01 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | Independent code review covers final diff/regressions and cannot pass with unresolved HIGH/CRITICAL findings | code review/artifact | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs --kind code` | ✅ runner / ❌ review verifier/artifact | ⬜ pending |
-| 63-11-02 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | ASVS L1 security review dispositions every threat, then validates compiled boundary/protocol/install evidence inside one restoring build lifecycle | security review | `node scripts/verify-phase63-review-artifacts.mjs --kind security && node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/verify-native-host-boundary.mjs"],["node","tests/mcp-native-host-protocol.test.js"],["node","tests/mcp-native-host-install.test.js"]]'` | ❌ review verifier/artifact | ⬜ pending |
-| 63-11-03 | 11 | 11 | NATIVE-01–04 | T63-09–T63-12 | Six-pillar UI review proves source/DOM contract while leaving rendered/accessibility UAT pending | UI review/artifact | `node tests/delegation-sidepanel-ui.test.js && node tests/native-host-background-wake.test.js && node scripts/verify-phase63-review-artifacts.mjs --kind ui` | ❌ review verifier/artifact | ⬜ pending |
-| 63-12-01 | 12 | 12 | NATIVE-01–04 | T63-01–T63-12 | Final focused/package/boundary/review gates pass once against the exact reviewed diff with protected workspace/index unchanged | final integration | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs` | ✅ runner / ❌ review verifier | ⬜ pending |
+| 63-11-01 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | Independent code review covers final diff/regressions and cannot pass with unresolved HIGH/CRITICAL findings | code review/artifact | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs --kind code` | ✅ runner/verifier/artifact | ✅ green |
+| 63-11-02 | 11 | 11 | NATIVE-01–04 | T63-01–T63-12 | ASVS L1 security review dispositions every threat, then validates compiled boundary/protocol/install evidence inside one restoring build lifecycle | security review | `node scripts/verify-phase63-review-artifacts.mjs --kind security && node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/verify-native-host-boundary.mjs"],["node","tests/mcp-native-host-protocol.test.js"],["node","tests/mcp-native-host-install.test.js"]]'` | ✅ verifier/artifact | ✅ green |
+| 63-11-03 | 11 | 11 | NATIVE-01–04 | T63-09–T63-12 | Six-pillar UI review proves source/DOM contract while leaving rendered/accessibility UAT pending | UI review/artifact | `node tests/delegation-sidepanel-ui.test.js && node tests/native-host-background-wake.test.js && node scripts/verify-phase63-review-artifacts.mjs --kind ui` | ✅ verifier/artifact | ✅ green |
+| 63-12-01 | 12 | 12 | NATIVE-01–04 | T63-01–T63-12 | Final focused/package/boundary/review gates pass once against the exact reviewed diff with protected workspace/index unchanged | final integration | `node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs` | ✅ runner/verifier | ✅ green |
 | 63-12-02 | 12 | 12 | NATIVE-01–04 | T63-01–T63-12 | Wrapper negative fixtures pass, then the existing guarded repository suite runs inside complete `mcp/build/**` and raw-index snapshot/restore without promoting human evidence | full regression | `node tests/mcp-native-host-packaging.test.js --section workspace-preserving-build && node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/run-phase60-full-tests.mjs"]]'` | ✅ harness/wrapper | ⬜ pending |
 
 *Status: ✅ green only after the mapped command passed · ⬜ pending for unexecuted review/full-suite work*
@@ -125,6 +125,20 @@ No new JavaScript test runner, browser driver, live daemon, real registry, or th
 | Keyboard focus retention and screen-reader announcement order | NATIVE-02 | Assistive-technology behavior needs a live browser/AT session | Run at milestone end; preserve exact focus/announcement evidence |
 
 Every row remains `human_needed`; automated/source evidence must not be represented as a live pass.
+
+---
+
+## Plan 63-12 Automated Completion Evidence
+
+### Task 1 — Reviewed focused and review-artifact gate
+
+- **Execution window:** 2026-07-18T20:37:11Z–2026-07-18T20:40:08Z (2m57s total); reviewed-tree commit `d3f7d2f314602a5a0bd8915e4ebbf4dfd562ef5f`.
+- **Focused command:** `node scripts/run-phase63-focused-tests.mjs` — sanitized exit `0`. The runner completed its closed 14-command serial child matrix, both source and compiled native-host boundary gates, and the Phase 61–63 contract result `1016 passed, 0 failed`.
+- **Review command:** `node scripts/verify-phase63-review-artifacts.mjs` — sanitized exit `0` (0.38s). Code, security, and UI artifacts passed together; negative fixtures passed for dispatch, missing kind/artifact, hash, output, severity, unresolved HIGH, and UAT promotion.
+- **Frozen reviewed identity:** base `27bddf00517738c87fcc6ca4b27940e8121f2124`; end/compatibility `6d868ee1348219f95fd0cc0e5f5f3f9cf9fc6887`; canonical patch `887858` bytes; patch SHA-256 `24072007a6af1754e496804471c3b21e9afd01f20bcdec9bcfaa9c694e5e46d6`; manifest SHA-256 `5135dbf243f0f123f60217584cd2ae8ab6865c78c85fcdae20464a539b27dcc7`; implementation-index SHA-256 `ab66af77cbb8989a3d76425afa36cc10a75db80530f70800c3f443f047077c23`; worktree/index SHA-256 `3120d40b00f57e0a29cbd774baaaaac798147ab131b37114b8781a63d801ae47`.
+- **Preservation proof:** the focused runner's final restoration comparison passed for complete Git status, dirty paths, staged paths, untracked listing, index entries, raw index bytes/mode, generated build graph, and pre-existing dirty bytes. Before and after the commands, HEAD remained `d3f7d2f314602a5a0bd8915e4ebbf4dfd562ef5f`, the raw status SHA-256 remained `466161ab4b11bb1ac87bd1c07d7dcbc35b7423d95dfbeb77044523b2a9590c90`, the cached diff remained empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`), and the unrelated tracked worktree diff remained `b1ccbbcd93a1a121f8d6b77c2c3ca2dda0690e87816a5bae71610c2013426e91`.
+- **Protected artifacts:** `mcp/build/index.js` remained `6a492a2edf5607c1ece9bdc8e6f7e715cc3459dca0a77e7b839fdf42a8c205f4`; the three modified showcase artifacts remained `664347e0e6a30c276bdbdfea8bb2bfdf1242bd7d61fb6493de870fccd4ddd38e`, `c69ed23d415f8f9f097ec386e789372a3a8a71b011b4d4420bf09ee949587e76`, and `826aa8f8b2bc828c423572a6b9697d0666a94a830b7aebbdf1812501e88c3bea`.
+- **Human boundary:** `.planning/phases/63-native-messaging-host/63-HUMAN-UAT.md` remained SHA-256 `6161b427fc8d209fe278952345460b2dacd7ede7ca0e4813ded21abd11d5bde2`; all eight scenarios remain unchecked, `human_needed`, `pending`, and evidence-empty.
 
 ---
 
