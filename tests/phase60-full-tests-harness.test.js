@@ -153,6 +153,39 @@ function main() {
       'harness preserves raw index mode after a child-only Git stat-cache refresh',
     );
 
+    const differentIndexMode = indexModeBeforeStatRefresh ^ 0o100;
+    const indexModeMutation = runHarness([
+      "const fs = require('node:fs');",
+      `fs.chmodSync('.git/index', ${differentIndexMode});`,
+    ].join('\n'));
+    assert.equal(indexModeMutation.status, 1, 'raw index mode mutation fails closed');
+    assert.match(indexModeMutation.stderr, /raw Git index mode changed/);
+    assert.equal(
+      fs.lstatSync(indexPath).mode & 0o7777,
+      differentIndexMode,
+      'harness detects but does not overwrite a changed raw index mode',
+    );
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    const missingIndex = runHarness("require('node:fs').unlinkSync('.git/index');");
+    assert.equal(missingIndex.status, 1, 'missing raw index fails closed');
+    assert.match(missingIndex.stderr, /raw Git index is missing|workspace preservation check failed/);
+    assert.equal(fs.existsSync(indexPath), false, 'harness does not recreate a removed raw index');
+    fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
+    const directoryIndex = runHarness([
+      "const fs = require('node:fs');",
+      "fs.unlinkSync('.git/index');",
+      "fs.mkdirSync('.git/index');",
+    ].join('\n'));
+    assert.equal(directoryIndex.status, 1, 'non-file raw index fails closed');
+    assert.match(directoryIndex.stderr, /raw Git index is not a regular file|workspace preservation check failed/);
+    assert.equal(fs.lstatSync(indexPath).isDirectory(), true, 'harness does not overwrite a non-file index');
+    fs.rmSync(indexPath, { recursive: true, force: true });
+    fs.writeFileSync(indexPath, indexBytesBeforeStatRefresh);
+    fs.chmodSync(indexPath, indexModeBeforeStatRefresh);
+
     const unexpectedSource = [
       restoredDirtySource,
       "fs.writeFileSync('clean.txt', 'child changed a previously clean tracked path\\n');",
