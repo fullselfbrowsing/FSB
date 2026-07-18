@@ -27,30 +27,20 @@ const cliPath = path.join(repoRoot, 'mcp', 'build', 'index.js');
 const EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk';
 const DEVELOPMENT_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 
-function findNpmCliPath() {
-  const result = spawnSync('npm', ['root', '--global'], {
+function runCli(args, fixture, options = {}) {
+  const env = {
+    ...process.env,
+    HOME: fixture.home,
+    APPDATA: fixture.appData,
+    LOCALAPPDATA: fixture.localAppData,
+    ...(options.env ?? {}),
+  };
+  if (!Object.hasOwn(options.env ?? {}, 'npm_execpath')) delete env.npm_execpath;
+  return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: repoRoot,
     encoding: 'utf8',
+    env,
     shell: false,
-  });
-  assertEqual(result.status, 0, 'production native-host fixture resolves the installed npm CLI');
-  const candidate = path.join(result.stdout.trim(), 'npm', 'bin', 'npm-cli.js');
-  return fs.realpathSync(candidate);
-}
-
-const npmCliPath = findNpmCliPath();
-
-function runCli(args, fixture) {
-  return spawnSync('node', [cliPath, ...args], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      HOME: fixture.home,
-      APPDATA: fixture.appData,
-      LOCALAPPDATA: fixture.localAppData,
-      npm_execpath: npmCliPath,
-    },
   });
 }
 
@@ -376,7 +366,11 @@ function run() {
 
     const productionInstall = runCli(['install', '--native-host'], fixture);
     const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
-    assertEqual(productionInstall.status, 0, 'production CLI reaches the real native install transaction');
+    assertEqual(
+      productionInstall.status,
+      0,
+      'direct production CLI installs without inherited npm_execpath',
+    );
     assertIncludes(
       productionInstallOutput,
       'Native messaging host installed.',
@@ -399,48 +393,53 @@ function run() {
         'google-chrome',
         'NativeMessagingHosts',
         'io.github.fullselfbrowsing.fsb_native_host.json',
-      );
+    );
     assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
     assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
-    const exactManifest = readText(manifestPath);
+    if (fs.existsSync(manifestPath)) {
+      const exactManifest = readText(manifestPath);
+      const offlineDoctor = runProductionDoctor(fixture);
+      assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
+        'production doctor reuses the exact daemon health classifier');
+      assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
+        'an exact install remains installed while its daemon is offline');
+      assertEqual(readText(manifestPath), exactManifest,
+        'installed-state production inspection performs zero registration mutation');
 
-    const offlineDoctor = runProductionDoctor(fixture);
-    assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
-      'production doctor reuses the exact daemon health classifier');
-    assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
-      'an exact install remains installed while its daemon is offline');
-    assertEqual(readText(manifestPath), exactManifest,
-      'installed-state production inspection performs zero registration mutation');
+      const mismatchedManifest = JSON.parse(exactManifest);
+      mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
+      fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
+      const mismatchDoctor = runProductionDoctor(fixture);
+      assertEqual(mismatchDoctor?.nativeHost?.reason, 'allowlist_mismatch',
+        'production doctor distinguishes a structurally valid allowlist mismatch');
+      fs.writeFileSync(manifestPath, exactManifest, 'utf8');
 
-    const mismatchedManifest = JSON.parse(exactManifest);
-    mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
-    fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
-    const mismatchDoctor = runProductionDoctor(fixture);
-    assertEqual(mismatchDoctor?.nativeHost?.reason, 'allowlist_mismatch',
-      'production doctor distinguishes a structurally valid allowlist mismatch');
-    fs.writeFileSync(manifestPath, exactManifest, 'utf8');
+      const launcherPath = path.join(stableRoot, 'bin', 'fsb-native-host-launcher.mjs');
+      const exactLauncher = fs.readFileSync(launcherPath);
+      fs.appendFileSync(launcherPath, '\n// corrupt fixture\n');
+      const corruptDoctor = runProductionDoctor(fixture);
+      assertEqual(corruptDoctor?.nativeHost?.reason, 'runtime_invalid',
+        'production doctor rejects a corrupt owned runtime before daemon facts');
+      fs.writeFileSync(launcherPath, exactLauncher);
 
-    const launcherPath = path.join(stableRoot, 'bin', 'fsb-native-host-launcher.mjs');
-    const exactLauncher = fs.readFileSync(launcherPath);
-    fs.appendFileSync(launcherPath, '\n// corrupt fixture\n');
-    const corruptDoctor = runProductionDoctor(fixture);
-    assertEqual(corruptDoctor?.nativeHost?.reason, 'runtime_invalid',
-      'production doctor rejects a corrupt owned runtime before daemon facts');
-    fs.writeFileSync(launcherPath, exactLauncher);
-
-    const healthChild = startReadyHealthFixture(fixture);
-    try {
-      const readyDoctor = runProductionDoctor(fixture);
-      assertEqual(readyDoctor?.nativeHost?.reason, 'ok',
-        'production doctor reports ready only from exact install and health facts');
-      assertEqual(readyDoctor?.nativeHost?.daemon, 'reachable',
-        'production doctor maps the exact loopback health contract to reachable');
-    } finally {
-      healthChild.kill('SIGTERM');
+      const healthChild = startReadyHealthFixture(fixture);
+      try {
+        const readyDoctor = runProductionDoctor(fixture);
+        assertEqual(readyDoctor?.nativeHost?.reason, 'ok',
+          'production doctor reports ready only from exact install and health facts');
+        assertEqual(readyDoctor?.nativeHost?.daemon, 'reachable',
+          'production doctor maps the exact loopback health contract to reachable');
+      } finally {
+        healthChild.kill('SIGTERM');
+      }
     }
 
     const idempotentInstall = runCli(['install', '--native-host'], fixture);
-    assertEqual(idempotentInstall.status, 0, 'production native install is idempotent');
+    assertEqual(
+      idempotentInstall.status,
+      0,
+      'direct production native install is idempotent without inherited npm_execpath',
+    );
     assertIncludes(
       `${idempotentInstall.stdout}${idempotentInstall.stderr}`,
       'Native messaging host is already installed.',
@@ -448,7 +447,11 @@ function run() {
     );
 
     const productionUninstall = runCli(['uninstall', '--native-host'], fixture);
-    assertEqual(productionUninstall.status, 0, 'production CLI reaches the real native uninstall transaction');
+    assertEqual(
+      productionUninstall.status,
+      0,
+      'direct production CLI uninstalls without inherited npm_execpath',
+    );
     assertIncludes(
       `${productionUninstall.stdout}${productionUninstall.stderr}`,
       'Native messaging host removed.',
@@ -497,6 +500,61 @@ function run() {
         `${label} prints stable bounded usage`,
       );
     }
+  });
+
+  console.log('\n--- native npm CLI provenance ---');
+  withTempHome('mcp-native-hostile-npm-cli', (fixture) => {
+    const sentinelPath = path.join(fixture.root, 'untrusted-npm-ran.txt');
+    const untrustedNpmCli = path.join(fixture.root, 'untrusted', 'npm', 'bin', 'npm-cli.js');
+    writeText(
+      untrustedNpmCli,
+      `require('node:fs').writeFileSync(${JSON.stringify(sentinelPath)}, 'executed');\n`,
+    );
+
+    const installResult = runCli(['install', '--native-host'], fixture, {
+      env: { npm_execpath: untrustedNpmCli },
+    });
+    assertEqual(
+      installResult.status,
+      0,
+      'production install ignores an out-of-provenance absolute npm CLI candidate',
+    );
+    assert(
+      !fs.existsSync(sentinelPath),
+      'production install never executes an out-of-provenance npm CLI candidate',
+    );
+
+    const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
+      env: { npm_execpath: untrustedNpmCli },
+    });
+    assertEqual(
+      uninstallResult.status,
+      0,
+      'production uninstall has no npm CLI resolution or materialization dependency',
+    );
+    assert(
+      !fs.existsSync(sentinelPath),
+      'production uninstall never executes an inherited npm CLI candidate',
+    );
+  });
+
+  withTempHome('mcp-native-invalid-npm-cli', (fixture) => {
+    const installResult = runCli(['install', '--native-host'], fixture, {
+      env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
+    });
+    assertEqual(
+      installResult.status,
+      0,
+      'production install resolves a trusted npm CLI when the inherited candidate is invalid',
+    );
+    const uninstallResult = runCli(['uninstall', '--native-host'], fixture, {
+      env: { npm_execpath: path.join(fixture.root, 'not-npm.js') },
+    });
+    assertEqual(
+      uninstallResult.status,
+      0,
+      'production uninstall remains available when the inherited npm candidate is invalid',
+    );
   });
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
