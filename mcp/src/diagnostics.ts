@@ -1078,7 +1078,7 @@ export async function watchBridgeDiagnostics(options: {
   includeConfig?: boolean;
   includeTabs?: boolean;
   onUpdate: (diagnostics: BridgeDiagnostics) => void | Promise<void>;
-}): Promise<void> {
+}, dependencies: BridgeDiagnosticsDependencies = {}): Promise<void> {
   const intervalMs = Math.max(250, options.intervalMs ?? 1000);
   let stopped = false;
 
@@ -1095,7 +1095,7 @@ export async function watchBridgeDiagnostics(options: {
         waitForExtensionMs: options.waitForExtensionMs,
         includeConfig: options.includeConfig,
         includeTabs: options.includeTabs,
-      });
+      }, dependencies);
       await options.onUpdate(diagnostics);
       if (stopped) break;
       await sleep(intervalMs);

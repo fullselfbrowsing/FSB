@@ -30,7 +30,7 @@ export type NativeHostWakeResult = Readonly<
   }
 >;
 
-type NativeHostHealthClassification =
+export type NativeHostHealthClassification =
   | 'offline'
   | 'not_ready'
   | 'ready'
@@ -188,6 +188,12 @@ async function probeHealth(
   }
   if (typeof value.serveReady !== 'boolean') return 'identity_mismatch';
   return value.serveReady ? 'ready' : 'not_ready';
+}
+
+export async function inspectNativeHostDaemonHealth(
+  dependencies: NativeHostDaemonDependencies,
+): Promise<NativeHostHealthClassification> {
+  return probeHealth(dependencies);
 }
 
 function parseLockMetadata(value: string | null): NativeHostLockMetadata | null {

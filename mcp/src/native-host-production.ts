@@ -27,10 +27,20 @@ import {
 import { fileURLToPath } from 'node:url';
 import {
   NATIVE_HOST_DEFAULT_EXTENSION_ID,
+  NATIVE_HOST_ENTRY_RELATIVE_PATH,
   NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH,
+  NATIVE_HOST_INTEGRITY_RELATIVE_PATH,
+  NATIVE_HOST_PACKAGE_RELATIVE_PATH,
+  isNativeHostExtensionId,
+  nativeHostOrigin,
 } from './native-host/constants.js';
 import { resolveNativeHostRuntimeLayout } from './native-host/runtime-layout.js';
-import { validateNativeHostMarker } from './native-host-registration.js';
+import {
+  validateNativeHostManifest,
+  validateNativeHostMarker,
+} from './native-host-registration.js';
+import { inspectNativeHostDaemonHealth } from './native-host/daemon.js';
+import { createNativeHostDaemonDependencies } from './native-host/platform.js';
 import {
   installNativeHost,
   uninstallNativeHost,
@@ -380,6 +390,30 @@ async function artifact(pathname: string, withContents = false): Promise<Record<
   };
 }
 
+async function inspectSecurePath(
+  pathname: string,
+  expectedKind: 'file' | 'directory',
+): Promise<NativeHostSecurePathFact> {
+  try {
+    const value = await lstat(pathname);
+    if (value.isSymbolicLink()) return Object.freeze({ status: 'symlink' });
+    const kind = value.isFile() ? 'file' : value.isDirectory() ? 'directory' : 'other';
+    if (kind !== expectedKind) return Object.freeze({ status: 'other' });
+    const resolved = await realpath(pathname);
+    if (resolved !== resolve(pathname)) return Object.freeze({ status: 'symlink' });
+    return Object.freeze({
+      status: expectedKind,
+      path: pathname,
+      realPath: resolved,
+      mode: value.mode & 0o7777,
+    });
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ? Object.freeze({ status: 'absent' })
+      : Object.freeze({ status: 'unavailable' });
+  }
+}
+
 function createRuntimeFiles(stageRoot: string, platform: NodeJS.Platform): NativeHostRuntimeFileAdapter {
   const requireStagePath = (pathname: string): void => {
     if (!inside(pathname, stageRoot)) throw new Error('outside-stage');
@@ -388,26 +422,7 @@ function createRuntimeFiles(stageRoot: string, platform: NodeJS.Platform): Nativ
     inspectSecurePath: async (
       pathname: string,
       expectedKind: 'file' | 'directory',
-    ): Promise<NativeHostSecurePathFact> => {
-      try {
-        const value = await lstat(pathname);
-        if (value.isSymbolicLink()) return Object.freeze({ status: 'symlink' });
-        const kind = value.isFile() ? 'file' : value.isDirectory() ? 'directory' : 'other';
-        if (kind !== expectedKind) return Object.freeze({ status: 'other' });
-        const resolved = await realpath(pathname);
-        if (resolved !== resolve(pathname)) return Object.freeze({ status: 'symlink' });
-        return Object.freeze({
-          status: expectedKind,
-          path: pathname,
-          realPath: resolved,
-          mode: value.mode & 0o7777,
-        });
-      } catch (error) {
-        return (error as NodeJS.ErrnoException).code === 'ENOENT'
-          ? Object.freeze({ status: 'absent' })
-          : Object.freeze({ status: 'unavailable' });
-      }
-    },
+    ): Promise<NativeHostSecurePathFact> => inspectSecurePath(pathname, expectedKind),
     readPackageSnapshot: async (packageRoot: string): Promise<unknown> => {
       const packageRealPath = await realpath(packageRoot);
       if (packageRealPath !== resolve(packageRoot)) throw new Error('unsafe-package-root');
@@ -579,71 +594,87 @@ function receiptsEqual(
   return Boolean(left && JSON.stringify(left) === JSON.stringify(right));
 }
 
+type RuntimeInspectionLayout = Readonly<{
+  platform: 'darwin' | 'linux' | 'win32';
+  stableRoot: string;
+  markerPath: string;
+  launcherPath: string;
+  packageRoot: string;
+  packageEntryPath: string;
+  integrityReceiptPath: string;
+}>;
+
+async function inspectOwnedRuntime(
+  layout: RuntimeInspectionLayout,
+): Promise<Readonly<NativeHostRuntimeOwnedInspection>> {
+  const receiptPath = join(layout.stableRoot, NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH);
+  const root = await inspectSecurePath(layout.stableRoot, 'directory');
+  if (root.status === 'absent') {
+    return Object.freeze({
+      state: 'absent', reason: 'absent', markerFact: Object.freeze({ status: 'absent' }),
+      marker: null, receipt: null,
+    });
+  }
+  if (root.status !== 'directory') {
+    return Object.freeze({
+      state: root.status === 'unavailable' ? 'unavailable' : 'foreign',
+      reason: 'runtime-root-not-owned',
+      markerFact: Object.freeze({ status: 'unavailable' }), marker: null, receipt: null,
+    });
+  }
+  const markerFact = await inspectFile(layout.markerPath, 16 * 1024);
+  const receiptFact = await inspectFile(receiptPath, 32 * 1024);
+  if (markerFact.status !== 'file' || receiptFact.status !== 'file') {
+    return Object.freeze({
+      state: markerFact.status === 'unavailable' ? 'unavailable' : 'invalid',
+      reason: 'runtime-metadata-invalid', markerFact, marker: null, receipt: null,
+    });
+  }
+  try {
+    const markerValue = ordinaryRecord(JSON.parse(markerFact.contents) as unknown);
+    const markerOrigin = markerValue?.origin;
+    const marker = typeof markerOrigin === 'string'
+      ? validateNativeHostMarker(markerValue, { platform: layout.platform, origin: markerOrigin })
+      : null;
+    const receipt = parseReceipt(JSON.parse(receiptFact.contents) as unknown, layout.platform);
+    if (!marker || !receipt || JSON.stringify(marker) !== JSON.stringify(receipt.marker)) {
+      throw new Error('invalid-metadata');
+    }
+    if (
+      receipt.stableRoot !== layout.stableRoot
+      || receipt.markerPath !== layout.markerPath
+      || receipt.launcherPath !== layout.launcherPath
+      || receipt.packageRoot !== layout.packageRoot
+      || receipt.platform !== layout.platform
+    ) {
+      return Object.freeze({
+        state: 'mismatched', reason: 'runtime-layout-mismatch', markerFact, marker, receipt,
+      });
+    }
+    const launcher = await inspectSecurePath(layout.launcherPath, 'file');
+    const entry = await inspectSecurePath(layout.packageEntryPath, 'file');
+    const integrity = await inspectSecurePath(layout.integrityReceiptPath, 'file');
+    if (
+      launcher.status !== 'file' || entry.status !== 'file' || integrity.status !== 'file'
+      || await hashFile(layout.launcherPath, 'sha256') !== receipt.artifactSha256
+    ) {
+      throw new Error('invalid-runtime');
+    }
+    return Object.freeze({ state: 'exact', reason: 'exact', markerFact, marker, receipt });
+  } catch {
+    return Object.freeze({
+      state: 'invalid', reason: 'runtime-metadata-invalid', markerFact, marker: null, receipt: null,
+    });
+  }
+}
+
 function createRuntimeAdapter(
   layout: ReturnType<typeof resolveNativeHostRuntimeLayout>,
 ): NativeHostInstallRuntimeAdapter {
-  const receiptPath = join(layout.stableRoot, NATIVE_HOST_INSTALL_RECEIPT_RELATIVE_PATH);
   const files = createRuntimeFiles(layout.stageRoot, process.platform);
-  const inspectRuntime = async (): Promise<Readonly<NativeHostRuntimeOwnedInspection>> => {
-    const root = await files.inspectSecurePath(layout.stableRoot, 'directory');
-    if (root.status === 'absent') {
-      return Object.freeze({
-        state: 'absent', reason: 'absent', markerFact: Object.freeze({ status: 'absent' }),
-        marker: null, receipt: null,
-      });
-    }
-    if (root.status !== 'directory') {
-      return Object.freeze({
-        state: root.status === 'unavailable' ? 'unavailable' : 'foreign',
-        reason: 'runtime-root-not-owned',
-        markerFact: Object.freeze({ status: 'unavailable' }), marker: null, receipt: null,
-      });
-    }
-    const markerFact = await inspectFile(layout.markerPath, 16 * 1024);
-    const receiptFact = await inspectFile(receiptPath, 32 * 1024);
-    if (markerFact.status !== 'file' || receiptFact.status !== 'file') {
-      return Object.freeze({
-        state: markerFact.status === 'unavailable' ? 'unavailable' : 'invalid',
-        reason: 'runtime-metadata-invalid', markerFact, marker: null, receipt: null,
-      });
-    }
-    try {
-      const markerValue = ordinaryRecord(JSON.parse(markerFact.contents) as unknown);
-      const markerOrigin = markerValue?.origin;
-      const marker = typeof markerOrigin === 'string'
-        ? validateNativeHostMarker(markerValue, { platform: layout.platform, origin: markerOrigin })
-        : null;
-      const receipt = parseReceipt(JSON.parse(receiptFact.contents) as unknown, layout.platform);
-      if (!marker || !receipt || JSON.stringify(marker) !== JSON.stringify(receipt.marker)) {
-        throw new Error('invalid-metadata');
-      }
-      if (
-        receipt.stableRoot !== layout.stableRoot
-        || receipt.markerPath !== layout.markerPath
-        || receipt.launcherPath !== layout.launcherPath
-        || receipt.packageRoot !== layout.packageRoot
-        || receipt.platform !== layout.platform
-      ) {
-        return Object.freeze({
-          state: 'mismatched', reason: 'runtime-layout-mismatch', markerFact, marker, receipt,
-        });
-      }
-      const launcher = await files.inspectSecurePath(layout.launcherPath, 'file');
-      const entry = await files.inspectSecurePath(layout.packageEntryPath, 'file');
-      const integrity = await files.inspectSecurePath(layout.integrityReceiptPath, 'file');
-      if (
-        launcher.status !== 'file' || entry.status !== 'file' || integrity.status !== 'file'
-        || await hashFile(layout.launcherPath, 'sha256') !== receipt.artifactSha256
-      ) {
-        throw new Error('invalid-runtime');
-      }
-      return Object.freeze({ state: 'exact', reason: 'exact', markerFact, marker, receipt });
-    } catch {
-      return Object.freeze({
-        state: 'invalid', reason: 'runtime-metadata-invalid', markerFact, marker: null, receipt: null,
-      });
-    }
-  };
+  const inspectRuntime = (): Promise<Readonly<NativeHostRuntimeOwnedInspection>> => (
+    inspectOwnedRuntime(layout)
+  );
   return Object.freeze({
     layout,
     inspectRuntime,
@@ -719,6 +750,187 @@ async function productionDependencies(
     })),
     runtime: createRuntimeAdapter(runtimeLayout),
   });
+}
+
+type RegistrationDoctorFacts = Readonly<{
+  registration: 'valid' | 'missing' | 'invalid' | 'unavailable';
+  registrationShadow: 'clear' | 'shadowed' | 'not_reported' | 'unavailable';
+  allowlist: 'matches' | 'mismatch' | 'not_reported';
+}>;
+
+function extensionIdFromOrigin(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('chrome-extension://') || !value.endsWith('/')) {
+    return null;
+  }
+  const extensionId = value.slice('chrome-extension://'.length, -1);
+  return isNativeHostExtensionId(extensionId) && nativeHostOrigin(extensionId) === value
+    ? extensionId
+    : null;
+}
+
+function inspectManifestForDoctor(
+  fact: NativeHostFileFact,
+  platformLayout: ReturnType<typeof resolveNativeHostPlatformLayout>,
+  expectedExtensionId: string,
+): Omit<RegistrationDoctorFacts, 'registrationShadow'> {
+  if (fact.status === 'absent') {
+    return Object.freeze({ registration: 'missing', allowlist: 'not_reported' });
+  }
+  if (fact.status === 'unavailable') {
+    return Object.freeze({ registration: 'unavailable', allowlist: 'not_reported' });
+  }
+  if (fact.status !== 'file') {
+    return Object.freeze({ registration: 'invalid', allowlist: 'not_reported' });
+  }
+  try {
+    const value = JSON.parse(fact.contents) as unknown;
+    const fields = ordinaryRecord(value);
+    const allowedOrigins = fields?.allowed_origins;
+    const candidateOrigin = Array.isArray(allowedOrigins) && allowedOrigins.length === 1
+      ? allowedOrigins[0]
+      : null;
+    const candidateExtensionId = extensionIdFromOrigin(candidateOrigin);
+    if (
+      !candidateExtensionId
+      || !validateNativeHostManifest(value, {
+        platform: platformLayout.platform,
+        launcherPath: platformLayout.launcherPath,
+        extensionId: candidateExtensionId,
+      })
+    ) {
+      return Object.freeze({ registration: 'invalid', allowlist: 'not_reported' });
+    }
+    return Object.freeze({
+      registration: 'valid',
+      allowlist: candidateExtensionId === expectedExtensionId ? 'matches' : 'mismatch',
+    });
+  } catch {
+    return Object.freeze({ registration: 'invalid', allowlist: 'not_reported' });
+  }
+}
+
+function inspectRegistrationForDoctor(
+  facts: Awaited<ReturnType<ReturnType<typeof createNativeHostPlatformAdapter>['readRegistrationFacts']>>,
+  platformLayout: ReturnType<typeof resolveNativeHostPlatformLayout>,
+  expectedExtensionId: string,
+): RegistrationDoctorFacts {
+  const manifest = inspectManifestForDoctor(facts.manifest, platformLayout, expectedExtensionId);
+  if (platformLayout.registration.kind !== 'registry') {
+    return Object.freeze({ ...manifest, registrationShadow: 'not_reported' });
+  }
+  const canonical = facts.registry32;
+  let registration = manifest.registration;
+  if (registration === 'valid') {
+    if (!canonical || canonical.status === 'unavailable') registration = 'unavailable';
+    else if (canonical.status === 'absent') registration = 'missing';
+    else if (
+      canonical.type !== 'REG_SZ'
+      || canonical.value.toLowerCase() !== platformLayout.manifestPath.toLowerCase()
+    ) registration = 'invalid';
+  }
+  const shadow = facts.registry64;
+  const registrationShadow = !shadow || shadow.status === 'unavailable'
+    ? 'unavailable'
+    : shadow.status === 'absent'
+      ? 'clear'
+      : 'shadowed';
+  return Object.freeze({
+    registration,
+    registrationShadow,
+    allowlist: manifest.allowlist,
+  });
+}
+
+function unavailableDoctorInspection(expectedLocation: string): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    platform: 'supported',
+    expectedLocation,
+    registration: 'unavailable',
+    registrationShadow: 'unavailable',
+    allowlist: 'not_reported',
+    runtime: 'unavailable',
+    launcher: 'unavailable',
+    daemon: 'unavailable',
+  });
+}
+
+export async function inspectProductionNativeHost(): Promise<unknown> {
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) {
+    return Object.freeze({ platform: 'unsupported' });
+  }
+  const platform = process.platform as 'darwin' | 'linux' | 'win32';
+  let expectedLocation = 'Not reported';
+  try {
+    const platformLayout = resolveNativeHostPlatformLayout({
+      platform,
+      homeDirectory: await realpath(homedir()),
+      ...(platform === 'win32' ? { localAppData: process.env.LOCALAPPDATA } : {}),
+    });
+    expectedLocation = platformLayout.manifestPath;
+    const runtimeLayout: RuntimeInspectionLayout = Object.freeze({
+      platform,
+      stableRoot: platformLayout.stableRoot,
+      markerPath: platformLayout.markerPath,
+      launcherPath: platformLayout.launcherPath,
+      packageRoot: join(
+        platformLayout.stableRoot,
+        ...NATIVE_HOST_PACKAGE_RELATIVE_PATH.split('/'),
+      ),
+      packageEntryPath: join(
+        platformLayout.stableRoot,
+        ...NATIVE_HOST_ENTRY_RELATIVE_PATH.split('/'),
+      ),
+      integrityReceiptPath: join(
+        platformLayout.stableRoot,
+        ...NATIVE_HOST_INTEGRITY_RELATIVE_PATH.split('/'),
+      ),
+    });
+    const platformAdapter = createNativeHostPlatformAdapter(platformLayout, Object.freeze({
+      files: createInstallFileAdapter(),
+      ...(platform === 'win32' ? { registry: createRegistryAdapter() } : {}),
+    }));
+    const runtimeInspection = await inspectOwnedRuntime(runtimeLayout);
+    const expectedExtensionId = extensionIdFromOrigin(runtimeInspection.marker?.origin)
+      ?? NATIVE_HOST_DEFAULT_EXTENSION_ID;
+    const registration = inspectRegistrationForDoctor(
+      await platformAdapter.readRegistrationFacts(),
+      platformLayout,
+      expectedExtensionId,
+    );
+    const launcherFact = await inspectSecurePath(platformLayout.launcherPath, 'file');
+    const launcher = launcherFact.status === 'absent'
+      ? 'missing'
+      : launcherFact.status === 'unavailable'
+        ? 'unavailable'
+        : launcherFact.status === 'file' && runtimeInspection.state === 'exact'
+          ? 'reachable'
+          : 'invalid';
+    const runtime = runtimeInspection.state === 'absent'
+      ? 'missing'
+      : runtimeInspection.state === 'exact'
+        ? 'valid'
+        : runtimeInspection.state === 'unavailable'
+          ? 'unavailable'
+          : 'invalid';
+    const health = await inspectNativeHostDaemonHealth(createNativeHostDaemonDependencies());
+    const daemon = health === 'ready'
+      ? 'reachable'
+      : health === 'offline' || health === 'not_ready'
+        ? 'offline'
+        : health;
+    return Object.freeze({
+      platform: 'supported',
+      expectedLocation,
+      registration: registration.registration,
+      registrationShadow: registration.registrationShadow,
+      allowlist: registration.allowlist,
+      runtime,
+      launcher,
+      daemon,
+    });
+  } catch {
+    return unavailableDoctorInspection(expectedLocation);
+  }
 }
 
 function unavailableLocation(): string {

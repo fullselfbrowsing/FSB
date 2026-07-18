@@ -18,7 +18,10 @@ import {
   FSB_MCP_VERSION,
 } from './version.js';
 import { getSetupSections, runInstall, runUninstall } from './install.js';
-import { createProductionNativeHostCliOperations } from './native-host-production.js';
+import {
+  createProductionNativeHostCliOperations,
+  inspectProductionNativeHost,
+} from './native-host-production.js';
 import { pushMcpClientInventory } from './client-inventory.js';
 import {
   FSB_EXT_PROTOCOL,
@@ -31,6 +34,9 @@ import {
 type FlagValue = boolean | string;
 
 const productionNativeHostCliOperations = createProductionNativeHostCliOperations();
+const productionNativeHostDiagnostics = Object.freeze({
+  inspectNativeHost: inspectProductionNativeHost,
+});
 
 function parseArgs(argv: string[]): { command: string; flags: Record<string, FlagValue> } {
   const flags: Record<string, FlagValue> = {};
@@ -465,7 +471,7 @@ async function runStatus(flags: Record<string, FlagValue>): Promise<void> {
         }
         process.stdout.write(formatWatchSnapshot(diagnostics));
       },
-    });
+    }, productionNativeHostDiagnostics);
     return;
   }
 
@@ -473,7 +479,7 @@ async function runStatus(flags: Record<string, FlagValue>): Promise<void> {
     waitForExtensionMs,
     includeConfig: true,
     includeTabs: true,
-  });
+  }, productionNativeHostDiagnostics);
 
   if (isJson(flags)) {
     console.log(JSON.stringify(diagnostics, null, 2));
@@ -488,7 +494,7 @@ async function runDoctor(flags: Record<string, FlagValue>): Promise<void> {
     waitForExtensionMs: readNumberFlag(flags, 'timeout', 2500),
     includeConfig: true,
     includeTabs: true,
-  });
+  }, productionNativeHostDiagnostics);
 
   if (isJson(flags)) {
     console.log(JSON.stringify(diagnostics, null, 2));

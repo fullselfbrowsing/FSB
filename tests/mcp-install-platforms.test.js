@@ -371,6 +371,8 @@ function run() {
       'production doctor derives the missing state from real local facts');
     assertEqual(missingDoctor?.nativeHost?.installState, 'not_installed',
       'production doctor reports a fully absent native host as not installed');
+    assert(!fs.existsSync(path.join(fixture.home, '.fsb', 'native-host')),
+      'missing-state production inspection performs zero runtime mutation');
 
     const productionInstall = runCli(['install', '--native-host'], fixture);
     const productionInstallOutput = `${productionInstall.stdout}${productionInstall.stderr}`;
@@ -400,14 +402,16 @@ function run() {
       );
     assert(fs.existsSync(stableRoot), 'production composition publishes the stable owned runtime');
     assert(fs.existsSync(manifestPath), 'production composition publishes the Chrome manifest');
+    const exactManifest = readText(manifestPath);
 
     const offlineDoctor = runProductionDoctor(fixture);
     assertEqual(offlineDoctor?.nativeHost?.reason, 'daemon_offline',
       'production doctor reuses the exact daemon health classifier');
     assertEqual(offlineDoctor?.nativeHost?.installState, 'installed',
       'an exact install remains installed while its daemon is offline');
+    assertEqual(readText(manifestPath), exactManifest,
+      'installed-state production inspection performs zero registration mutation');
 
-    const exactManifest = readText(manifestPath);
     const mismatchedManifest = JSON.parse(exactManifest);
     mismatchedManifest.allowed_origins = [`chrome-extension://${DEVELOPMENT_EXTENSION_ID}/`];
     fs.writeFileSync(manifestPath, `${JSON.stringify(mismatchedManifest)}\n`, 'utf8');
