@@ -32,6 +32,14 @@ const PHASE62_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/agent-protocol-drift-diagnostics.test.js',
 ]);
 
+const PHASE63_NEW_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-native-host-packaging.test.js --section workflow-and-pack',
+  'node tests/mcp-native-host-protocol.test.js',
+  'node tests/mcp-native-host-daemon.test.js',
+  'node tests/mcp-native-host-install.test.js',
+  'node tests/native-host-background-wake.test.js',
+]);
+
 const PHASE62_EXPECTED_TASKS = Object.freeze([
   ['62-01-01', 'npm --prefix mcp run build && node tests/mcp-adapter-compatibility.test.js'],
   ['62-01-02', 'npm --prefix mcp run build && node tests/mcp-claude-code-adapter.test.js && node tests/mcp-adapter-compatibility.test.js'],
@@ -429,6 +437,7 @@ for (const command of PHASE61_NEW_TEST_COMMANDS) {
 const prePhase61Commands = rootCommands.filter((command) => (
   !PHASE61_NEW_TEST_COMMANDS.includes(command)
   && !PHASE62_NEW_TEST_COMMANDS.includes(command)
+  && !PHASE63_NEW_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -1081,7 +1090,10 @@ for (const command of PHASE62_NEW_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the serial root chain`);
 }
-const prePhase62Commands = rootCommands.filter((command) => !PHASE62_NEW_TEST_COMMANDS.includes(command));
+const prePhase62Commands = rootCommands.filter((command) => (
+  !PHASE62_NEW_TEST_COMMANDS.includes(command)
+  && !PHASE63_NEW_TEST_COMMANDS.includes(command)
+));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');
 check(rootCommands.filter((command) => command === 'npm --prefix mcp run build').length === 1,
@@ -1096,6 +1108,148 @@ check(rootCommands.indexOf('node tests/mcp-bridge-background-dispatch.test.js')
 'extension drift diagnostics stays beside the background diagnostics contract');
 check(!packageJson.scripts.test.includes('scripts/run-phase60-full-tests.mjs'),
   'the guarded full-suite runner is not nested into the root test chain');
+
+console.log('\n--- Phase 63 focused, root, CI, and authority boundaries ---');
+
+const phase63FocusedSource = read('scripts/run-phase63-focused-tests.mjs');
+const mcpPackageJson = JSON.parse(read('mcp/package.json'));
+for (const command of PHASE63_NEW_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the serial root chain`);
+}
+const phase63RootIndexes = PHASE63_NEW_TEST_COMMANDS.map((command) => rootCommands.indexOf(command));
+const phase63BuildIndex = rootCommands.indexOf('npm --prefix mcp run build');
+const firstDependentMcpIndex = rootCommands.indexOf('node tests/mcp-bridge-client-lifecycle.test.js');
+check(phase63BuildIndex >= 0
+  && phase63RootIndexes.every((index) => index > phase63BuildIndex && index < firstDependentMcpIndex)
+  && phase63RootIndexes.every((index, position) => position === 0 || index > phase63RootIndexes[position - 1]),
+'all five Phase 63 root gates occupy one ordered slot after build and before dependent seams');
+check(exactOccurrences(ciSource, 'name: Phase 63 native-host contract (sole Linux root invocation)') === 1
+  && exactOccurrences(ciSource, 'run: npm test') === 1
+  && !ciSource.includes('run: node scripts/run-phase63-focused-tests.mjs'),
+'CI source-pins the sole Linux root invocation without a duplicate focused run');
+for (const retainedCiToken of [
+  'native-host-windows:',
+  'runtime-payload:',
+  'mcp/native-host/bin/win32-x64/fsb-native-host.exe',
+  'mcp/native-host/bin/win32-arm64/fsb-native-host.exe',
+  'node tests/mcp-native-host-packaging.test.js --section workflow-and-pack',
+]) {
+  check(ciSource.includes(retainedCiToken), `CI retains required Phase 63 artifact gate: ${retainedCiToken}`);
+}
+
+check(exactOccurrences(mcpPackageJson.scripts.prebuild,
+  'verify-native-host-boundary.mjs --source') === 1
+  && exactOccurrences(mcpPackageJson.scripts.build,
+    'verify-native-host-boundary.mjs --compiled') === 1,
+'the one MCP build owns exactly one source and one compiled native-host boundary pass');
+check(!packageJson.scripts.test.includes('verify-native-host-boundary.mjs')
+  && !phase63FocusedSource.includes("['node', 'scripts/verify-native-host-boundary.mjs'")
+  && !phase63FocusedSource.includes("['node', 'scripts/verify-native-host-boundary.mjs', '--all'")
+  && !PHASE63_NEW_TEST_COMMANDS.some((command) => /(?:--all|verify-native-host-boundary)/.test(command)),
+'root and focused chains add no default or all-mode native-host boundary invocation');
+check(exactOccurrences(phase63FocusedSource, "innerWrapperPath,\n    '--commands-json'") === 1
+  && !phase63FocusedSource.includes('npm --prefix mcp run build &&'),
+'focused runner delegates one closed command sequence to the preserving MCP builder');
+for (const orderedFocusedSeam of [
+  "['node', 'tests/native-host-background-wake.test.js']",
+  "['node', 'tests/mcp-bridge-background-dispatch.test.js']",
+  "['node', 'tests/mcp-diagnostics-status.test.js']",
+  "['node', 'tests/mcp-install-platforms.test.js']",
+  "['node', 'tests/delegation-sidepanel-ui.test.js']",
+  "['node', 'tests/mcp-bridge-topology.test.js']",
+  "['node', 'tests/mcp-version-parity.test.js']",
+  "['node', 'tests/delegation-phase-contract.test.js']",
+]) {
+  check(phase63FocusedSource.includes(orderedFocusedSeam),
+    `focused runner retains required seam: ${orderedFocusedSeam}`);
+}
+
+const phase63RequirementIds = Array.from(
+  requirements.matchAll(/^- \[x\] \*\*(NATIVE-\d{2})\*\*:/gm),
+  (match) => match[1],
+);
+equal(phase63RequirementIds, ['NATIVE-01', 'NATIVE-02', 'NATIVE-03', 'NATIVE-04'],
+  'all four Phase 63 native requirements remain present and complete');
+
+const nativeBoundarySource = read('scripts/verify-native-host-boundary.mjs');
+const nativeEntrySource = read('mcp/src/native-host/entry.ts');
+const nativePlatformSource = read('mcp/src/native-host/platform.ts');
+const nativeDaemonSource = read('mcp/src/native-host/daemon.ts');
+const nativeInstallSource = read('mcp/src/native-host-install/index.ts');
+const nativeWakeSource = read('extension/utils/native-host-wake.js');
+const backgroundSource63 = read('extension/background.js');
+const sidepanelSource63 = read('extension/ui/sidepanel.js');
+const bridgeSource63 = read('extension/ws/mcp-bridge-client.js');
+
+for (const boundaryToken of [
+  "'constants.ts'",
+  "'daemon.ts'",
+  "'entry.ts'",
+  "'index.ts'",
+  "'platform.ts'",
+  "'protocol.ts'",
+  "'runtime-layout.ts'",
+  'agent-provider authority',
+  'task or prompt authority',
+  'bridge authentication authority',
+  'historical native IPC authority',
+  'exact serve argv tuple is not uniquely pinned',
+]) {
+  check(nativeBoundarySource.includes(boundaryToken),
+    `native authority boundary retains ${boundaryToken}`);
+}
+check(exactOccurrences(nativePlatformSource, "from 'node:child_process'") === 1
+  && exactOccurrences(nativePlatformSource, 'spawnChild(command, [...argv], options)') === 1
+  && !/\b(?:exec|execSync|execFile|execFileSync|fork|spawnSync)\s*\(/.test(nativePlatformSource),
+'platform owns one injected child-process edge and no alternate process authority');
+check(nativeDaemonSource.includes("runtime.absoluteStableBuildIndex,\n    'serve',\n    '--host',\n    '127.0.0.1',\n    '--port',\n    '7226'")
+  && nativeDaemonSource.includes('shell: false')
+  && !/process\.kill|\.kill\s*\(|SIGTERM|SIGKILL/.test(nativeDaemonSource),
+'daemon retains the exact shell-free serve tuple and no process-kill authority');
+for (const forbiddenHostAuthority of [
+  /agent-providers|spawn-supervisor/,
+  /delegate\.start|delegation-task/,
+  /bridge-auth|session-secret/,
+  /native-host-install|diagnostics/,
+]) {
+  check(!forbiddenHostAuthority.test(nativeEntrySource),
+    `one-shot host entry excludes authority matching ${forbiddenHostAuthority}`);
+}
+check(/installNativeHost[\s\S]*uninstallNativeHost/.test(nativeInstallSource)
+  && /registration[\s\S]*runtime|runtime[\s\S]*registration/.test(nativeInstallSource),
+'native installer source owns both exact registration and runtime lifecycle paths');
+
+check(backgroundSource63.includes("importScripts('utils/native-host-wake.js')")
+  && backgroundSource63.includes("authority.result.code !== 'agent_offline'")
+  && backgroundSource63.includes('return (await fsbDelegationPreflightResult()).result'),
+'background alone invokes offline wake and then reruns the established authoritative preflight');
+check(nativeWakeSource.includes('runtime.connectNative(NATIVE_HOST_NAME)')
+  && nativeWakeSource.includes('runtime.sendNativeMessage(')
+  && nativeWakeSource.includes("action: 'wake'")
+  && !/delegate|task|provider|pair|sessionSecret|agent/i.test(nativeWakeSource),
+'native wake helper exposes lifecycle-only native authority');
+for (const browserAuthorityPattern of [
+  /chrome\.runtime\.(?:connectNative|sendNativeMessage)\s*\(/,
+  /\bNATIVE_HOST_NAME\b/,
+  /\bnativeMessaging\b/,
+]) {
+  check(!browserAuthorityPattern.test(sidepanelSource63)
+    && !browserAuthorityPattern.test(bridgeSource63),
+  `side panel and bridge retain no native authority matching ${browserAuthorityPattern}`);
+}
+for (const channelCommand of [
+  'node tests/mcp-reverse-channel-contract.test.js',
+  'node tests/mcp-bridge-auth.test.js',
+  'node tests/mcp-bridge-topology.test.js',
+]) {
+  check(rootCommands.filter((candidate) => candidate === channelCommand).length === 1,
+    `Phase 59 channel gate remains exact in root tests: ${channelCommand}`);
+}
+check(read('mcp/src/bridge.ts').includes('state.allowedExtensionOrigin === metadata.browserOrigin')
+  && read('mcp/src/bridge.ts').includes('state.sessionId === metadata.sessionId')
+  && read('mcp/src/bridge-auth.ts').includes('timingSafeEqual(expected, candidate)'),
+'Phase 59 Origin, session, and credential gates remain mechanically present');
 
 console.log('\n--- Phase 62 doctor, authenticated projection, and durable freshness ---');
 

@@ -50,6 +50,22 @@ const phase63ExtensionPermissions = [
   'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
   'offscreen', 'nativeMessaging', 'system.memory',
 ];
+const phase63ExactProductionDependencies = Object.freeze({
+  '@modelcontextprotocol/sdk': '1.29.0',
+  'smol-toml': '1.6.1',
+  'strip-json-comments': '5.0.3',
+  ws: '8.19.0',
+  yaml: '2.8.3',
+  zod: '3.25.76',
+});
+const phase63BundleDependencies = Object.freeze([
+  '@modelcontextprotocol/sdk',
+  'smol-toml',
+  'strip-json-comments',
+  'ws',
+  'yaml',
+  'zod',
+]);
 const prePhase61ContentScripts = [
   {
     matches: ['<all_urls>'],
@@ -77,6 +93,70 @@ function readJson(relativePath) {
 
 function sha256(relativePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(path.join(repoRoot, relativePath))).digest('hex');
+}
+
+function dependencyNameFromLockPath(lockPath) {
+  const match = lockPath.match(/(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+  return match ? match[1] : null;
+}
+
+function resolveLockedDependencyPath(lock, fromPackagePath, dependencyName) {
+  let current = fromPackagePath;
+  while (true) {
+    const candidate = current
+      ? `${current}/node_modules/${dependencyName}`
+      : `node_modules/${dependencyName}`;
+    if (lock.packages[candidate]) return candidate;
+    if (!current) break;
+    const parentNodeModules = current.lastIndexOf('/node_modules/');
+    current = parentNodeModules === -1 ? '' : current.slice(0, parentNodeModules);
+  }
+  return null;
+}
+
+function deriveProductionLockRows(lock) {
+  const root = lock.packages[''];
+  const queue = Object.keys(root.dependencies || {})
+    .sort()
+    .map((name) => resolveLockedDependencyPath(lock, '', name));
+  const seen = new Set();
+  while (queue.length > 0) {
+    const lockPath = queue.shift();
+    if (!lockPath || seen.has(lockPath)) continue;
+    seen.add(lockPath);
+    const entry = lock.packages[lockPath];
+    for (const name of [...new Set([
+      ...Object.keys(entry.dependencies || {}),
+      ...Object.keys(entry.optionalDependencies || {}),
+    ])].sort()) {
+      queue.push(resolveLockedDependencyPath(lock, lockPath, name));
+    }
+  }
+  return [...seen].sort().map((lockPath) => {
+    const entry = lock.packages[lockPath];
+    return {
+      path: lockPath,
+      name: dependencyNameFromLockPath(lockPath),
+      version: entry.version,
+      integrity: entry.integrity,
+    };
+  });
+}
+
+function recursivelyListFiles(relativeRoot) {
+  const files = [];
+  const absoluteRoot = path.join(repoRoot, relativeRoot);
+  function visit(absoluteDirectory, relativeDirectory) {
+    for (const name of fs.readdirSync(absoluteDirectory).sort()) {
+      const absolutePath = path.join(absoluteDirectory, name);
+      const relativePath = relativeDirectory ? `${relativeDirectory}/${name}` : name;
+      const stat = fs.lstatSync(absolutePath);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) visit(absolutePath, relativePath);
+      else files.push(relativePath);
+    }
+  }
+  visit(absoluteRoot, '');
+  return files;
 }
 
 function extractMcpMessageTypes(typesSource) {
@@ -135,6 +215,13 @@ async function run() {
   const diagnosticsSource = readText('mcp/src/diagnostics.ts');
   const indexSource = readText('mcp/src/index.ts');
   const compatibilitySource = readText('mcp/src/agent-providers/compatibility.ts');
+  const nativeConstantsSource = readText('mcp/src/native-host/constants.ts');
+  const builtNativeConstantsSource = readText('mcp/build/native-host/constants.js');
+  const nativeDaemonSource = readText('mcp/src/native-host/daemon.ts');
+  const mcpLock = readJson('mcp/package-lock.json');
+  const runtimeIntegrity = readJson('mcp/native-host/runtime-integrity.json');
+  const ciSource = readText('.github/workflows/ci.yml');
+  const packagingTestSource = readText('tests/mcp-native-host-packaging.test.js');
 
   console.log('\n--- metadata parity ---');
   assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
@@ -437,6 +524,106 @@ async function run() {
     assert(delegationUiSpec.includes(snippet), `approved future UI contract retains data-only recovery text: ${snippet}`);
   }
   assert(!/doctor|provider setup/i.test(bridgeSource), 'bridge does not implement or execute future doctor/setup UI dispositions');
+
+  console.log('\n--- Phase 63 protocol, package, and artifact parity ---');
+  const nativeConstantTokens = [
+    "NATIVE_HOST_NAME = 'io.github.fullselfbrowsing.fsb_native_host'",
+    "NATIVE_HOST_DEFAULT_EXTENSION_ID = 'badgafnfchcihdfnjneklogedcdkmjfk'",
+    'NATIVE_HOST_PROTOCOL_VERSION = 1',
+    'NATIVE_HOST_MAX_FRAME_BYTES = 4096',
+    "NATIVE_HOST_HEALTH_PRODUCT = 'fsb-mcp-server'",
+    "NATIVE_HOST_HEALTH_PROTOCOL = 'fsb-native-host-health-v1'",
+    'NATIVE_HOST_OWNER_MARKER_SCHEMA = 1',
+  ];
+  for (const token of nativeConstantTokens) {
+    assert(nativeConstantsSource.includes(token), `source native-host constants retain ${token}`);
+    assert(builtNativeConstantsSource.includes(token), `compiled native-host constants retain ${token}`);
+  }
+  assert(
+    nativeDaemonSource.includes("const HEALTH_URL = 'http://127.0.0.1:7226/health';")
+      && nativeDaemonSource.includes('value.service !== NATIVE_HOST_HEALTH_PRODUCT')
+      && nativeDaemonSource.includes('value.nativeHostProtocol !== NATIVE_HOST_PROTOCOL_VERSION')
+      && nativeDaemonSource.includes("return value.serveReady ? 'ready' : 'not_ready';"),
+    'daemon health gate pins loopback endpoint, product, protocol, and explicit readiness',
+  );
+
+  assert(
+    JSON.stringify(packageJson.dependencies) === JSON.stringify(phase63ExactProductionDependencies),
+    'MCP direct production dependencies remain exact-pinned and closed',
+  );
+  assert(
+    JSON.stringify(packageJson.bundleDependencies) === JSON.stringify(phase63BundleDependencies),
+    'MCP bundleDependencies retain the exact ordered production roster',
+  );
+  assert(
+    JSON.stringify(mcpLock.packages[''].dependencies) === JSON.stringify(phase63ExactProductionDependencies)
+      && JSON.stringify(mcpLock.packages[''].bundleDependencies) === JSON.stringify(phase63BundleDependencies),
+    'lock root repeats the exact dependency pins and bundle roster',
+  );
+  assert(
+    runtimeIntegrity.schema === 1
+      && runtimeIntegrity.packageName === packageJson.name
+      && runtimeIntegrity.packageVersion === packageJson.version
+      && runtimeIntegrity.lockSha256 === sha256('mcp/package-lock.json'),
+    'runtime integrity receipt binds schema, package identity, version, and exact lock bytes',
+  );
+  assert(
+    JSON.stringify(runtimeIntegrity.directDependencies) === JSON.stringify(
+      phase63BundleDependencies.map((name) => ({
+        name,
+        version: phase63ExactProductionDependencies[name],
+      })),
+    )
+      && JSON.stringify(runtimeIntegrity.bundleDependencies) === JSON.stringify(phase63BundleDependencies)
+      && JSON.stringify(runtimeIntegrity.productionPackages) === JSON.stringify(deriveProductionLockRows(mcpLock)),
+    'runtime integrity receipt is the exact lock-derived production closure',
+  );
+
+  assertEqual(packageJson.files.filter((entry) => entry === 'native-host/').length, 1,
+    'MCP package includes the native-host payload root exactly once');
+  for (const artifactPath of [
+    'mcp/native-host/posix/fsb-native-host-launcher.mjs.in',
+    'mcp/native-host/runtime-integrity.json',
+    'mcp/native-host/windows/fsb-native-host-bootstrap.c',
+    'mcp/native-host/windows/fsb-native-host-bootstrap-version.rc.in',
+  ]) {
+    assert(fs.existsSync(path.join(repoRoot, artifactPath)), `required native package source exists: ${artifactPath}`);
+  }
+  for (const workflowToken of [
+    'native-host-windows:',
+    'node scripts/build-native-host-windows.mjs --arch x64',
+    'node scripts/build-native-host-windows.mjs --arch arm64',
+    'mcp/native-host/bin/win32-x64/fsb-native-host.exe',
+    'mcp/native-host/bin/win32-arm64/fsb-native-host.exe',
+    'mcp/native-host/windows-artifacts.json',
+    'runtime-payload:',
+    'node tests/mcp-native-host-packaging.test.js --section workflow-and-pack',
+  ]) {
+    assert(ciSource.includes(workflowToken), `CI retains blocking native artifact proof: ${workflowToken}`);
+  }
+  for (const packedArtifactToken of [
+    'native-host/bin/win32-x64/fsb-native-host.exe',
+    'native-host/bin/win32-arm64/fsb-native-host.exe',
+    'native-host/windows-artifacts.json',
+    'native-host/posix/fsb-native-host-launcher.mjs.in',
+    'native-host/runtime-integrity.json',
+    'build/native-host/index.js',
+  ]) {
+    assert(packagingTestSource.includes(packedArtifactToken),
+      `packed-artifact contract retains ${packedArtifactToken}`);
+  }
+  const nativePayloadFiles = recursivelyListFiles('mcp/native-host');
+  assert(
+    nativePayloadFiles.every((relativePath) => !/(?:^|\/)(?:[^/]+\.(?:bat|cmd)|native-host-shim|com\.fsb\.mcp|sea-config)(?:$|\/)/iu.test(relativePath)),
+    'native payload tree contains no batch, command, SEA, or historical-shim artifact',
+  );
+  const nativeSourceGraph = recursivelyListFiles('mcp/src/native-host')
+    .map((relativePath) => readText(`mcp/src/native-host/${relativePath}`))
+    .join('\n');
+  assert(
+    !/com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp|ipc[-_ ]relay|echo[-_ ]mode/iu.test(nativeSourceGraph),
+    'native source graph contains no historical shim, relay, or echo-mode authority',
+  );
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
