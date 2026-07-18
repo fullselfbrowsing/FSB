@@ -16,6 +16,10 @@ const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
 const PRE_PHASE62_ROOT_TEST_HASH = 'cc320c1dfb3fefb292ebb8edc789993ec5fcd42a2b2ec2a057a37d4c49281808';
 const PHASE63_DIR = '.planning/phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
+const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
+const PHASE63_CONTEXT_PATH = `${PHASE63_DIR}/63-CONTEXT.md`;
+const PHASE63_RESEARCH_PATH = `${PHASE63_DIR}/63-RESEARCH.md`;
+const PHASE63_UI_SPEC_PATH = `${PHASE63_DIR}/63-UI-SPEC.md`;
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
@@ -259,20 +263,415 @@ function runPhase63UatLedgerContract() {
   'all twelve Phase 63 plans remain free of blocking checkpoints');
 }
 
+function phase63PlanRecords() {
+  const planNames = fs.readdirSync(path.join(ROOT, PHASE63_DIR))
+    .filter((name) => /^63-\d{2}-PLAN\.md$/.test(name))
+    .sort((left, right) => left.localeCompare(right));
+  const records = [];
+  for (const planName of planNames) {
+    const source = read(`${PHASE63_DIR}/${planName}`);
+    const plan = (planName.match(/^63-(\d{2})-/) || [null, null])[1];
+    const wave = (source.match(/^wave:\s*(\d+)$/m) || [null, null])[1];
+    for (const taskMatch of source.matchAll(/<task\b[\s\S]*?<\/task>/g)) {
+      const block = taskMatch[0];
+      const id = (block.match(/<name>(63-\d{2}-\d{2}):/) || [null, null])[1];
+      const automated = (block.match(/<automated>([\s\S]*?)<\/automated>/) || [null, null])[1];
+      records.push(Object.freeze({
+        id,
+        plan,
+        wave,
+        command: automated === null ? null : decodeXml(automated),
+      }));
+    }
+  }
+  return Object.freeze({ planNames, records });
+}
+
+function phase63ValidationRows(source) {
+  return source.split('\n')
+    .filter((line) => /^\| 63-\d{2}-\d{2} \|/.test(line))
+    .map((line) => {
+      const columns = line.split('|').slice(1, -1).map((column) => column.trim());
+      return Object.freeze({
+        id: columns[0],
+        plan: columns[1],
+        wave: columns[2],
+        requirements: columns[3],
+        threats: columns[4],
+        behavior: columns[5],
+        testType: columns[6],
+        command: columns[7].replace(/^`|`$/g, ''),
+        fileState: columns[8],
+        status: columns[9],
+      });
+    });
+}
+
+function phase63ExpandReferences(value, prefix) {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const references = new Set();
+  const pattern = new RegExp(`${escaped}(\\d{2})(?:[–-](?:${escaped})?(\\d{2}))?`, 'g');
+  for (const match of value.matchAll(pattern)) {
+    const start = Number(match[1]);
+    const end = match[2] ? Number(match[2]) : start;
+    for (let index = start; index <= end; index += 1) {
+      references.add(`${prefix}${String(index).padStart(2, '0')}`);
+    }
+  }
+  return [...references].sort((left, right) => left.localeCompare(right));
+}
+
+function runPhase63FinalContract() {
+  console.log('\n--- Phase 63 final plan, traceability, and forbidden-boundary contract ---');
+
+  const validation63 = read(PHASE63_VALIDATION_PATH);
+  const context63 = read(PHASE63_CONTEXT_PATH);
+  const research63 = read(PHASE63_RESEARCH_PATH);
+  const uiSpec63 = read(PHASE63_UI_SPEC_PATH);
+  const roadmap63 = read('.planning/ROADMAP.md');
+  const requirements63 = read('.planning/REQUIREMENTS.md');
+  const { planNames, records: planRecords } = phase63PlanRecords();
+  const validationRows = phase63ValidationRows(validation63);
+
+  equal(planNames, Array.from({ length: 12 }, (_, index) =>
+    `63-${String(index + 1).padStart(2, '0')}-PLAN.md`),
+  'Phase 63 retains the exact twelve-plan roster');
+  check(planRecords.length === 30
+    && planRecords.every((record) => record.id && record.plan && record.wave && record.command),
+  'all thirty planned tasks expose an id, plan, wave, and automated command');
+  check(new Set(planRecords.map((record) => record.id)).size === 30,
+    'all thirty planned task ids are unique');
+  check(validationRows.length === 30
+    && new Set(validationRows.map((row) => row.id)).size === 30,
+  'validation contains every task exactly once and cannot silently duplicate one');
+  equal(
+    validationRows.map(({ id, plan, wave, command }) => ({ id, plan, wave, command })),
+    planRecords,
+    'validation task/plan/wave/command rows are mechanically identical to all PLAN tasks',
+  );
+  check(!/63-TBD|\bTBD\b|\bW0\b|wave:\s*0/i.test(validation63),
+    'validation contains no provisional task, plan, wave, or Wave 0 placeholder');
+  check(validationRows.every((row) => row.requirements
+      && row.threats
+      && row.behavior
+      && row.testType
+      && row.fileState
+      && row.status),
+  'every validation row owns requirements, threats, behavior, type, file state, and status');
+  check(validationRows.filter((row) => Number(row.plan) <= 10)
+    .every((row) => row.status === '✅ green' && row.fileState.includes('✅')),
+  'Plans 01-10 are green only after their mapped implementation/harness exists');
+  check(validationRows.filter((row) => Number(row.plan) >= 11)
+    .every((row) => row.status === '⬜ pending' || row.status === '✅ green'),
+  'future review/full-suite rows use only honest pending or evidenced green states');
+  if (!exists('scripts/verify-phase63-review-artifacts.mjs')) {
+    check(validationRows.filter((row) => Number(row.plan) >= 11)
+      .every((row) => row.status === '⬜ pending'),
+    'review and full-suite rows remain pending before their verifier exists');
+  }
+
+  const mappedRequirements = new Set(validationRows.flatMap((row) =>
+    phase63ExpandReferences(row.requirements, 'NATIVE-')));
+  equal([...mappedRequirements].sort(), ['NATIVE-01', 'NATIVE-02', 'NATIVE-03', 'NATIVE-04'],
+    'validation maps exactly NATIVE-01 through NATIVE-04');
+  const mappedThreats = new Set(validationRows.flatMap((row) =>
+    phase63ExpandReferences(row.threats, 'T63-')));
+  equal([...mappedThreats].sort(), Array.from({ length: 12 }, (_, index) =>
+    `T63-${String(index + 1).padStart(2, '0')}`),
+  'validation maps exactly T63-01 through T63-12');
+
+  const roadmapBlock63 = between(roadmap63, '### Phase 63: Native-Messaging Host', '### Phase 64:');
+  check(roadmapBlock63.includes('auto-attempts to wake `fsb-mcp-server serve`')
+      && roadmapBlock63.includes('All spawn authority stays inside the serve daemon')
+      && roadmapBlock63.includes("Phase 59's CHAN gates")
+      && roadmapBlock63.includes('never spawns agent CLIs'),
+  'roadmap retains the exact wake-only goal and Phase 59 authority boundary');
+  const successCriteria63 = Array.from(
+    roadmapBlock63.matchAll(/^\s{2}(\d+)\. ([^\n]+)$/gm),
+    (match) => [match[1], match[2]],
+  );
+  check(successCriteria63.length === 4
+      && successCriteria63.map((entry) => entry[0]).join(',') === '1,2,3,4',
+  'roadmap retains exactly four ordered Phase 63 success criteria');
+  const requirementLines63 = Array.from(
+    requirements63.matchAll(/^- \[x\] \*\*(NATIVE-\d{2})\*\*: ([^\n]+)$/gm),
+    (match) => match[1],
+  );
+  equal(requirementLines63, ['NATIVE-01', 'NATIVE-02', 'NATIVE-03', 'NATIVE-04'],
+    'NATIVE-01 through NATIVE-04 remain the exact completed requirement roster');
+  for (const requirementId of requirementLines63) {
+    check(new RegExp(`\\| ${requirementId.replace('-', '\\-')} \\| Phase 63 \\| Complete \\|`).test(requirements63),
+      `${requirementId} retains its Phase 63 complete trace-table row`);
+  }
+
+  const lockedDecisionBlock = between(
+    context63,
+    '## Implementation Decisions',
+    "### the agent's Discretion",
+  );
+  const lockedDecisions = Array.from(lockedDecisionBlock.matchAll(/^- ([^\n]+)$/gm),
+    (match) => match[1]);
+  check(lockedDecisions.length === 25,
+    'the context retains exactly 25 locked decisions before agent discretion');
+  const decisionEvidence = Object.freeze([
+    ['D63-01', 'tests/mcp-native-host-protocol.test.js', /framing-and-schema|NATIVE_HOST_PROTOCOL_VERSION/],
+    ['D63-02', 'mcp/src/native-host/entry.ts', /runProductionNativeHostEntry/],
+    ['D63-03', 'scripts/verify-native-host-boundary.mjs', /agent-provider authority/],
+    ['D63-04', 'mcp/src/native-host/daemon.ts', /shell:\s*false/],
+    ['D63-05', 'tests/mcp-native-host-daemon.test.js', /concurrent native hosts create at most one child/],
+    ['D63-06', 'tests/native-host-background-wake.test.js', /positive wake never replays delegate\.start/],
+    ['D63-07', 'tests/mcp-native-host-install.test.js', /--native-host/],
+    ['D63-08', 'mcp/src/native-host-install/platform.ts', /NativeMessagingHosts/],
+    ['D63-09', 'mcp/src/native-host-registration.ts', /allowed_origins/],
+    ['D63-10', 'tests/mcp-native-host-install.test.js', /atomic rename/],
+    ['D63-11', 'tests/mcp-native-host-install.test.js', /uninstall preserves adjacent user\/host files/],
+    ['D63-12', 'mcp/src/native-host-install/platform.ts', /registry32[\s\S]*registry64/],
+    ['D63-13', 'extension/manifest.json', /nativeMessaging/],
+    ['D63-14', 'tests/native-host-background-wake.test.js', /native APIs and the host name exist only in the approved background helper/],
+    ['D63-15', 'tests/native-host-background-wake.test.js', /probe never calls sendNativeMessage/],
+    ['D63-16', 'tests/native-host-background-wake.test.js', /reruns preflight exactly once/],
+    ['D63-17', 'tests/delegation-sidepanel-ui.test.js', /Agent offline/],
+    ['D63-18', 'tests/delegation-sidepanel-ui.test.js', /Pair this browser/],
+    ['D63-19', 'tests/delegation-sidepanel-ui.test.js', /forced-colors[\s\S]*reduced-motion/],
+    ['D63-20', 'tests/mcp-diagnostics-status.test.js', /nativeHost/],
+    ['D63-21', 'tests/mcp-diagnostics-status.test.js', /doctor never calls any injected mutation/],
+    ['D63-22', 'tests/mcp-version-parity.test.js', /browser-safe native projector/],
+    ['D63-23', 'scripts/run-phase63-focused-tests.mjs', /mcp-native-host-protocol\.test\.js/],
+    ['D63-24', PHASE63_VALIDATION_PATH, /63-11-01[\s\S]*63-12-02/],
+    ['D63-25', PHASE63_UAT_PATH, /UAT63-01[\s\S]*UAT63-08/],
+  ]);
+  equal(decisionEvidence.map((entry) => entry[0]), Array.from({ length: 25 }, (_, index) =>
+    `D63-${String(index + 1).padStart(2, '0')}`),
+  'derived D63-01 through D63-25 remain in locked source order');
+  for (let index = 0; index < decisionEvidence.length; index += 1) {
+    const [decisionId, evidencePath, pattern] = decisionEvidence[index];
+    check(lockedDecisions[index].length > 20 && hasEvidence(evidencePath, pattern),
+      `${decisionId} has concrete evidence in ${evidencePath}`);
+  }
+
+  const plan10 = read(`${PHASE63_DIR}/63-10-PLAN.md`);
+  const threats63 = Array.from(
+    plan10.matchAll(/<threat id="(T63-\d{2})"[^>]*?asvs="(V\d+)">/g),
+    (match) => [match[1], match[2]],
+  );
+  equal(threats63, [
+    ['T63-01', 'V5'], ['T63-02', 'V4'], ['T63-03', 'V13'], ['T63-04', 'V2'],
+    ['T63-05', 'V12'], ['T63-06', 'V12'], ['T63-07', 'V14'], ['T63-08', 'V12'],
+    ['T63-09', 'V7'], ['T63-10', 'V14'], ['T63-11', 'V3'], ['T63-12', 'V3'],
+  ], 'the threat model retains twelve exact threat-to-ASVS mappings');
+  const threatEvidence = Object.freeze([
+    ['T63-01', 'tests/mcp-native-host-protocol.test.js', /native_trailing_data|NATIVE_HOST_MAX_FRAME_BYTES/],
+    ['T63-02', 'scripts/verify-native-host-boundary.mjs', /exact serve argv tuple/],
+    ['T63-03', 'tests/mcp-native-host-daemon.test.js', /wrong product|protocol mismatch|not ready/i],
+    ['T63-04', 'tests/mcp-bridge-topology.test.js', /bind loser|rotation|rotate/i],
+    ['T63-05', 'tests/mcp-native-host-daemon.test.js', /stale lock|at most one child/],
+    ['T63-06', 'tests/mcp-native-host-packaging.test.js', /offline|runtime integrity/i],
+    ['T63-07', '.github/workflows/ci.yml', /win32-x64[\s\S]*win32-arm64/],
+    ['T63-08', 'tests/mcp-native-host-install.test.js', /symlink[\s\S]*adjacent/],
+    ['T63-09', 'tests/mcp-diagnostics-status.test.js', /sentinel|browser-safe/i],
+    ['T63-10', 'tests/native-host-background-wake.test.js', /boot composition never calls actual wake/],
+    ['T63-11', 'tests/native-host-background-wake.test.js', /late|never replays delegate\.start/],
+    ['T63-12', 'tests/delegation-sidepanel-ui.test.js', /no native success toast|optimistic/],
+  ]);
+  for (const [threatId, evidencePath, pattern] of threatEvidence) {
+    check(hasEvidence(evidencePath, pattern), `${threatId} has blocking evidence in ${evidencePath}`);
+  }
+  const asvsBlock = between(research63, '### ASVS-Oriented Controls', '## Sources');
+  const asvsThemes = Array.from(asvsBlock.matchAll(/^- (V\d+)\s/gm), (match) => match[1]);
+  equal(asvsThemes, ['V2', 'V3', 'V4', 'V5', 'V7', 'V12', 'V13', 'V14'],
+    'research retains the eight applicable ASVS themes in source order');
+  equal([...new Set(threats63.map((entry) => entry[1]))].sort((left, right) =>
+    Number(left.slice(1)) - Number(right.slice(1))), asvsThemes,
+  'the threat model covers every applicable ASVS theme exactly as a closed set');
+
+  const nativeSourceRoster = fs.readdirSync(path.join(ROOT, 'mcp/src/native-host'))
+    .filter((name) => name.endsWith('.ts'))
+    .sort((left, right) => left.localeCompare(right));
+  equal(nativeSourceRoster, [
+    'constants.ts', 'daemon.ts', 'entry.ts', 'index.ts',
+    'platform.ts', 'protocol.ts', 'runtime-layout.ts',
+  ], 'native source authority remains the exact seven-file leaf graph');
+  check(nativeSourceRoster.every((name) =>
+    exists(`mcp/build/native-host/${name.replace(/\.ts$/, '.js')}`)),
+  'the same fresh build lifecycle supplies every compiled native leaf');
+  const nativeIndex63 = read('mcp/src/native-host/index.ts');
+  const nativeEntry63 = read('mcp/src/native-host/entry.ts');
+  const installRouter63 = read('mcp/src/install.ts');
+  check(nativeIndex63.includes("from './entry.js'")
+      && nativeIndex63.includes("from './platform.js'")
+      && nativeEntry63.includes("from './daemon.js'")
+      && nativeEntry63.includes("from './protocol.js'")
+      && nativeEntry63.includes("from './runtime-layout.js'")
+      && installRouter63.includes("from './native-host-install/index.js'")
+      && installRouter63.includes("from './native-host-install/platform.js'"),
+  'production import links connect only the intended host and installer leaves');
+  check(read('extension/background.js').includes("importScripts('utils/native-host-wake.js')")
+      && read('mcp/src/diagnostics.ts').includes('collectNativeHostDoctor')
+      && read('mcp/src/index.ts').includes("lines.push('Native messaging host:');"),
+  'background, diagnostics, and doctor formatter retain their exact integration links');
+
+  const rootPackage63 = JSON.parse(read('package.json'));
+  const rootCommands63 = rootPackage63.scripts.test.split(' && ');
+  for (const command of PHASE63_NEW_TEST_COMMANDS) {
+    check(rootCommands63.filter((candidate) => candidate === command).length === 1,
+      `root test chain owns one Phase 63 gate: ${command}`);
+  }
+  const focused63 = read('scripts/run-phase63-focused-tests.mjs');
+  const compiledFocused63 = between(
+    focused63,
+    'const COMPILED_COMMANDS = Object.freeze([',
+    ']);',
+  );
+  for (const suite of [
+    'tests/mcp-native-host-protocol.test.js',
+    'tests/mcp-native-host-daemon.test.js',
+    'tests/mcp-native-host-install.test.js',
+    'tests/native-host-background-wake.test.js',
+  ]) {
+    check(exactOccurrences(compiledFocused63, suite) === 1,
+      `focused runner executes the ${suite} suite exactly once`);
+  }
+
+  const ci63 = read('.github/workflows/ci.yml');
+  const publish63 = read('.github/workflows/npm-publish.yml');
+  const nativePayloadNames = fs.readdirSync(path.join(ROOT, 'mcp/native-host'), { recursive: true })
+    .map((entry) => String(entry));
+  check(/native-host-windows:[\s\S]*--arch x64[\s\S]*--arch arm64/.test(ci63)
+      && /win32-x64[\s\S]*win32-arm64/.test(publish63)
+      && read('mcp/package.json').includes('"native-host/"'),
+  'CI, publication, and package allowlist retain both Windows artifacts and native payload');
+  check(nativePayloadNames.every((name) => !/\.(?:bat|cmd)$/i.test(name))
+      && !/Node SEA|sea-config|native-host-shim|com\.fsb\.mcp/i.test(nativePayloadNames.join('\n')),
+  'native payload contains no batch, command, SEA, or historical-shim fallback');
+  const runtimeLayout63 = read('mcp/src/native-host/runtime-layout.ts');
+  check(runtimeLayout63.includes("api.join(homeDirectory, '.fsb', 'native-host')")
+      && /input\.localAppData[\s\S]*?'FSB',[\s\S]*?'NativeMessagingHost'/.test(runtimeLayout63)
+      && runtimeLayout63.includes('_npx|node_modules|\\.cache|npm-cache|\\.npm|worktrees'),
+  'registration runtime roots are stable and transient cache/worktree roots are rejected');
+
+  const nativeInstall63 = read('mcp/src/native-host-install/index.ts');
+  check(nativeInstall63.indexOf('dependencies.runtime.publishRuntime()')
+      < nativeInstall63.indexOf('dependencies.platform.publishRegistration('),
+  'install publishes and validates the owned runtime before registration');
+  check(nativeInstall63.lastIndexOf('dependencies.platform.removeCanonicalRegistration()')
+      < nativeInstall63.lastIndexOf('dependencies.runtime.removeExactRuntime(receipt)'),
+  'uninstall removes the exact registration before its exact owned runtime');
+  for (const installProof of [
+    'writes and syncs ownership before atomic rename',
+    'uninstall preserves adjacent user/host files',
+    'Windows never mutates the user/64 shadow view',
+    'foreign',
+    'symlink',
+  ]) {
+    check(read('tests/mcp-native-host-install.test.js').includes(installProof),
+      `atomic platform contract retains proof: ${installProof}`);
+  }
+
+  const manifest63 = JSON.parse(read('extension/manifest.json'));
+  check(manifest63.permissions.filter((permission) => permission === 'nativeMessaging').length === 1,
+    'extension manifest contains exactly one nativeMessaging permission');
+  const nativeWakeTest63 = read('tests/native-host-background-wake.test.js');
+  check(nativeWakeTest63.includes('boot composition never calls actual wake')
+      && nativeWakeTest63.includes('positive wake never replays delegate.start')
+      && nativeWakeTest63.includes('reruns preflight exactly once'),
+  'background contract pins boot silence, offline-only wake, one rerun, and no replay');
+  const browserProjector63 = extractFunction(read('mcp/src/diagnostics.ts'),
+    'projectNativeHostBrowserStatus');
+  check(browserProjector63.includes(
+    'return Object.freeze({ installState, registration, allowlist, launcher, daemon });')
+      && !/expectedLocation|reason|registry|path|secret|session|task|child|\.\.\./i.test(browserProjector63),
+  'browser projection reconstructs exactly five safe keys with no path, reason, or secret spread');
+
+  const sidepanel63 = read('extension/ui/sidepanel.js');
+  const sidepanelHtml63 = read('extension/ui/sidepanel.html');
+  const sidepanelCss63 = read('extension/ui/sidepanel.css');
+  const checkingRender63 = extractFunction(sidepanel63, '_renderDelegationNativeWakeChecking');
+  const checkingHandler63 = extractFunction(sidepanel63, '_handleDelegationNativeWakeChecking');
+  for (const copy of [
+    'Checking local agent service',
+    'FSB is trying to make the local agent service available. Your message has not been sent.',
+    'Checking local agent service. Your message has not been sent.',
+    'Checking agent service',
+    'Agent offline',
+    'FSB cannot reach the local agent service. Run the doctor command, then try this message again.',
+    'Copy doctor command',
+    'Open provider setup',
+    'Doctor command copied',
+    'Pair this browser before starting ',
+    'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.',
+    'fsb-mcp-server doctor',
+  ]) {
+    check(uiSpec63.includes(copy) && sidepanel63.includes(copy),
+      `UI spec and source retain exact copy: ${copy}`);
+  }
+  check(!/connectNative|sendNativeMessage|nativeMessaging|child_process|process\.platform|message\.(?:reason|path|secret|registry|manifest|task)/i
+    .test(`${checkingRender63}\n${checkingHandler63}`),
+  'side-panel checking code has no native, process, platform, path, secret, or task authority');
+  check(!/_delegationAction|createElement\(['"]button|success|toast/i.test(checkingRender63)
+      && !/nativeWake|native-wake/.test(sidepanelHtml63)
+      && exactOccurrences(sidepanelHtml63, 'aria-live="polite"') === 1,
+  'checking adds no second page, CTA, toast, static card, or live region');
+  check(sidepanelCss63.includes('@media (max-width: 350px)')
+      && sidepanelCss63.includes('@media (forced-colors: active)')
+      && sidepanelCss63.includes('@media (prefers-reduced-motion: reduce)'),
+  'checking retains narrow, forced-colors, and reduced-motion source contracts');
+
+  const productionNativeSurface = [
+    nativeIndex63,
+    nativeEntry63,
+    read('mcp/src/native-host/daemon.ts'),
+    read('mcp/src/native-host/platform.ts'),
+    read('mcp/src/native-host/protocol.ts'),
+    runtimeLayout63,
+    read('extension/utils/native-host-wake.js'),
+  ].join('\n');
+  check(!/agent-providers|spawn-supervisor|delegate\.start|auto[-_ ]?pair|pairing-secret|remote\/LAN|persistent broker|OpenCode|Codex|Edge|Brave/i
+    .test(productionNativeSurface),
+  'production native surface contains no deferred agent, pairing, remote, broker, adapter, or multi-browser authority');
+  for (const deferredScope of [
+    'Automatic/system-wide host installation',
+    'background auto-update/repair',
+    'browser-profile discovery',
+    'multi-browser (Edge/Brave/Chromium) manifests',
+    'Pairing-secret transport',
+    'remote/LAN wake',
+    'persistent broker',
+    'host-direct agent spawning',
+  ]) {
+    check(context63.includes(deferredScope), `context keeps deferred scope explicit: ${deferredScope}`);
+  }
+
+  const futureRows = new Map(validationRows.filter((row) => Number(row.plan) >= 11)
+    .map((row) => [row.id, row]));
+  check(futureRows.get('63-11-01')?.command
+      === 'node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs --kind code'
+      && futureRows.get('63-11-02')?.command.includes('--kind security')
+      && futureRows.get('63-11-03')?.command.endsWith('--kind ui')
+      && futureRows.get('63-12-01')?.command
+        === 'node scripts/run-phase63-focused-tests.mjs && node scripts/verify-phase63-review-artifacts.mjs'
+      && futureRows.get('63-12-02')?.command.includes('scripts/run-phase60-full-tests.mjs'),
+  'validation preserves exact independent review and guarded full-suite tasks');
+  check(/^status: human_needed$/m.test(read(PHASE63_UAT_PATH))
+      && /^results_recorded: false$/m.test(read(PHASE63_UAT_PATH)),
+  'final automated contract leaves genuine OS/browser/accessibility evidence human-needed');
+}
+
 const sectionArgs = process.argv.slice(2);
 if (sectionArgs.length > 0) {
   if (sectionArgs.length !== 2
       || sectionArgs[0] !== '--section'
-      || sectionArgs[1] !== 'phase63-uat-ledger') {
-    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger]');
+      || !['phase63-uat-ledger', 'phase63-final-contract'].includes(sectionArgs[1])) {
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract]');
     process.exit(2);
   }
   runPhase63UatLedgerContract();
-  console.log(`\n=== Phase 63 UAT ledger results: ${passed} passed, ${failed} failed ===`);
+  if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
+  console.log(`\n=== Phase 63 focused contract results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
 runPhase63UatLedgerContract();
+runPhase63FinalContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.

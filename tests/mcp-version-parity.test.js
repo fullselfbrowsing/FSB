@@ -66,6 +66,27 @@ const phase63BundleDependencies = Object.freeze([
   'yaml',
   'zod',
 ]);
+const phase63NativeSourceFiles = Object.freeze([
+  'constants.ts',
+  'daemon.ts',
+  'entry.ts',
+  'index.ts',
+  'platform.ts',
+  'protocol.ts',
+  'runtime-layout.ts',
+]);
+const phase63NativeCompiledFiles = Object.freeze(
+  phase63NativeSourceFiles.map((entry) => entry.replace(/\.ts$/u, '.js')),
+);
+const phase63InstallSourceFiles = Object.freeze([
+  'index.ts',
+  'platform.ts',
+  'runtime.ts',
+  'types.ts',
+]);
+const phase63InstallCompiledFiles = Object.freeze(
+  phase63InstallSourceFiles.map((entry) => entry.replace(/\.ts$/u, '.js')),
+);
 const prePhase61ContentScripts = [
   {
     matches: ['<all_urls>'],
@@ -222,6 +243,9 @@ async function run() {
   const runtimeIntegrity = readJson('mcp/native-host/runtime-integrity.json');
   const ciSource = readText('.github/workflows/ci.yml');
   const packagingTestSource = readText('tests/mcp-native-host-packaging.test.js');
+  const nativeBoundarySource = readText('scripts/verify-native-host-boundary.mjs');
+  const buildPreserverSource = readText('scripts/run-mcp-build-preserving-workspace.mjs');
+  const focusedRunnerSource = readText('scripts/run-phase63-focused-tests.mjs');
 
   console.log('\n--- metadata parity ---');
   assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
@@ -623,6 +647,94 @@ async function run() {
   assert(
     !/com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp|ipc[-_ ]relay|echo[-_ ]mode/iu.test(nativeSourceGraph),
     'native source graph contains no historical shim, relay, or echo-mode authority',
+  );
+
+  console.log('\n--- Phase 63 fresh source/compiled topology and build lifecycle parity ---');
+  const actualNativeSourceFiles = recursivelyListFiles('mcp/src/native-host')
+    .filter((relativePath) => relativePath.endsWith('.ts'));
+  const actualNativeCompiledFiles = recursivelyListFiles('mcp/build/native-host')
+    .filter((relativePath) => relativePath.endsWith('.js'));
+  assert(
+    JSON.stringify(actualNativeSourceFiles) === JSON.stringify(phase63NativeSourceFiles),
+    'source native-host graph is the exact ordered seven-file leaf roster',
+  );
+  assert(
+    JSON.stringify(actualNativeCompiledFiles) === JSON.stringify(phase63NativeCompiledFiles),
+    'fresh compiled native-host graph mirrors the exact ordered seven-file leaf roster',
+  );
+  const actualInstallSourceFiles = recursivelyListFiles('mcp/src/native-host-install')
+    .filter((relativePath) => relativePath.endsWith('.ts'));
+  const actualInstallCompiledFiles = recursivelyListFiles('mcp/build/native-host-install')
+    .filter((relativePath) => relativePath.endsWith('.js'));
+  assert(
+    JSON.stringify(actualInstallSourceFiles) === JSON.stringify(phase63InstallSourceFiles),
+    'source installer graph is the exact ordered four-file roster',
+  );
+  assert(
+    JSON.stringify(actualInstallCompiledFiles) === JSON.stringify(phase63InstallCompiledFiles),
+    'fresh compiled installer graph mirrors the exact ordered four-file roster',
+  );
+  for (const compiledPath of [
+    'mcp/build/native-host-registration.js',
+    'mcp/build/install.js',
+    'mcp/build/diagnostics.js',
+    'mcp/build/index.js',
+  ]) {
+    assert(fs.existsSync(path.join(repoRoot, compiledPath)),
+      `fresh build includes the Phase 63 integration output: ${compiledPath}`);
+  }
+
+  const builtNativeGraph = actualNativeCompiledFiles
+    .map((relativePath) => readText(`mcp/build/native-host/${relativePath}`))
+    .join('\n');
+  assert(
+    !/com\.fsb\.mcp|native-host-shim|mcp-to-ext|ext-to-mcp|ipc[-_ ]relay|echo[-_ ]mode/iu
+      .test(builtNativeGraph),
+    'compiled native graph contains no historical shim, relay, or echo-mode authority',
+  );
+  for (const graphToken of [
+    "'constants.ts'",
+    "'daemon.ts'",
+    "'entry.ts'",
+    "'index.ts'",
+    "'platform.ts'",
+    "'protocol.ts'",
+    "'runtime-layout.ts'",
+    "entry.replace(/\\.ts$/u, '.js')",
+  ]) {
+    assert(nativeBoundarySource.includes(graphToken),
+      `boundary verifier derives source/compiled parity from ${graphToken}`);
+  }
+  assert(
+    nativeBoundarySource.includes("if (argv.length === 0 || (argv.length === 1 && argv[0] === '--all'))")
+      && nativeBoundarySource.includes("if (argv.length === 1 && argv[0] === '--source')")
+      && nativeBoundarySource.includes("if (argv.length === 1 && argv[0] === '--compiled')"),
+    'boundary verifier retains closed source, compiled, and all-mode dispatch',
+  );
+
+  assertEqual(
+    (buildPreserverSource.match(/\[process\.execPath, npmCliPath, '--prefix', 'mcp', 'run', 'build'\]/g) || []).length,
+    1,
+    'workspace preserver owns exactly one explicit MCP build argv',
+  );
+  assert(
+    buildPreserverSource.includes('buildBefore = captureTree(buildRoot)')
+      && buildPreserverSource.includes('restoreTree(buildRoot, buildBefore)')
+      && buildPreserverSource.includes("indexBefore = captureEntry(indexPath, 'Git index')")
+      && buildPreserverSource.includes('restoreSingleEntry(indexPath, indexBefore)')
+      && buildPreserverSource.includes('shell: false')
+      && !/runGit\(\['(?:add|checkout|restore|reset)'/.test(buildPreserverSource),
+    'workspace preserver snapshots/restores the complete build and raw index without destructive Git mutation or a shell',
+  );
+  assertEqual(
+    (focusedRunnerSource.match(/innerWrapperPath,\s*'--commands-json'/g) || []).length,
+    1,
+    'focused runner delegates one closed sequence to the inner workspace preserver',
+  );
+  assert(
+    !focusedRunnerSource.includes('npm --prefix mcp run build &&')
+      && !focusedRunnerSource.includes("['npm', '--prefix', 'mcp', 'run', 'build']"),
+    'focused runner has no second direct MCP build lifecycle',
   );
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
