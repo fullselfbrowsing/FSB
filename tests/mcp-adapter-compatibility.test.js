@@ -8,6 +8,7 @@
  */
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -18,6 +19,13 @@ const compatibilityBuildPath = path.join(
   'build',
   'agent-providers',
   'compatibility.js',
+);
+const serveDelegationBuildPath = path.join(
+  repoRoot,
+  'mcp',
+  'build',
+  'agent-providers',
+  'serve-delegation.js',
 );
 
 const ROW_KEYS = Object.freeze([
@@ -73,8 +81,96 @@ function assertClassification(actual, status, reason, adapterId = 'claude-code')
   assertDeepFrozen(actual);
 }
 
+function retainedDetection(version, binaryPath, overrides = {}) {
+  return {
+    installed: version !== null && binaryPath !== null,
+    version,
+    authState: 'unknown',
+    binary: binaryPath === null ? null : {
+      command: binaryPath,
+      realPath: binaryPath,
+      argvPrefix: [],
+    },
+    profileVersion: version,
+    ...overrides,
+  };
+}
+
+function compatibilityRegistry(ids, detections, tracker = { requireCalls: 0 }) {
+  return Object.freeze({
+    ids() {
+      return Object.freeze([...ids]);
+    },
+    require(adapterId) {
+      tracker.requireCalls += 1;
+      if (!Object.hasOwn(detections, adapterId)) throw new Error('unknown fixture adapter');
+      return Object.freeze({ detect: async () => detections[adapterId] });
+    },
+  });
+}
+
+async function requestServeCompatibility(serveDelegation, registry, checkedAt = 1_784_222_000_000) {
+  let handleExtRequest = null;
+  const bridge = {
+    currentMode: 'hub',
+    topology: {
+      instanceId: 'compatibility-test',
+      mode: 'hub',
+      hubConnected: true,
+      extensionConnected: true,
+      relayCount: 0,
+      pendingRequestCount: 0,
+      activeHubInstanceId: 'compatibility-test',
+      lastExtensionHeartbeatAt: checkedAt,
+      lastDisconnectReason: null,
+    },
+    async connect() {},
+    disconnect() {},
+  };
+  const supervisor = {
+    async recover() { return { spawnAvailable: true }; },
+    async close() { return { cancelled: 0, failed: 0, alreadySettled: 0 }; },
+    async handleExtRequest() { throw new Error('compatibility request reached spawn routing'); },
+  };
+  const running = await serveDelegation.startServeDelegation({
+    host: '127.0.0.1',
+    port: 7225,
+    dependencies: {
+      createBridge(options) {
+        handleExtRequest = options.handleExtRequest;
+        return bridge;
+      },
+      createQueue: () => ({}),
+      startHttp: async () => ({
+        endpoint: 'http://127.0.0.1:7225',
+        healthEndpoint: 'http://127.0.0.1:7225/health',
+        markServeReady() {},
+        async close() {},
+      }),
+      createSupervisor: () => supervisor,
+      createCompatibilityRegistry: () => registry,
+      now: () => checkedAt,
+      prepareBridgeAuth: () => undefined,
+      pushInventory: async () => undefined,
+      registerSignal: () => undefined,
+      exit: () => undefined,
+    },
+  });
+  try {
+    assert.equal(typeof handleExtRequest, 'function', 'serve harness captures the extension request handler');
+    return await handleExtRequest(
+      { method: 'adapter.compatibility', payload: {} },
+      () => undefined,
+      { connectionId: 'compatibility-test' },
+    );
+  } finally {
+    await running.shutdown();
+  }
+}
+
 async function main() {
   const compatibility = await import(pathToFileURL(compatibilityBuildPath).href);
+  const serveDelegation = await import(pathToFileURL(serveDelegationBuildPath).href);
   const {
     ADAPTER_COMPATIBILITY_MATRIX,
     COMPATIBILITY_REASONS,
@@ -326,6 +422,201 @@ async function main() {
   ]) {
     assert.equal(serializedSnapshot.includes(forbidden), false, `safe projection excludes ${forbidden}`);
   }
+
+  const canonicalClosedRows = ADAPTER_COMPATIBILITY_MATRIX.adapters.map((contract) => ({
+    adapterId: contract.adapterId,
+    displayLabel: contract.displayLabel,
+    status: 'unsupported',
+    reason: 'matrix_invalid',
+  }));
+  const daemonSentinels = [
+    '/private/CLAUDE_EXECUTABLE_SENTINEL',
+    '/private/OPENCODE_EXECUTABLE_SENTINEL',
+    'DAEMON_RAW_VERSION_SENTINEL',
+    'DAEMON_AUTH_SENTINEL',
+    'DAEMON_BILLING_SENTINEL',
+    'DAEMON_MODEL_SENTINEL',
+    'DAEMON_CONFIG_SENTINEL',
+    'DAEMON_NATIVE_BODY_SENTINEL',
+    'DAEMON_DIAGNOSTIC_SENTINEL',
+    'DAEMON_TOPOLOGY_SENTINEL',
+    'DAEMON_ENDPOINT_SENTINEL',
+    'DAEMON_PORT_SENTINEL',
+    'DAEMON_SECRET_SENTINEL',
+  ];
+  const daemonSnapshot = await requestServeCompatibility(
+    serveDelegation,
+    compatibilityRegistry(
+      ['claude-code', 'opencode'],
+      {
+        'claude-code': retainedDetection('2.1.177', daemonSentinels[0]),
+        opencode: retainedDetection('1.14.25', daemonSentinels[1], {
+          rawVersion: daemonSentinels[2],
+          auth: daemonSentinels[3],
+          billing: daemonSentinels[4],
+          model: daemonSentinels[5],
+          config: daemonSentinels[6],
+          nativeBody: daemonSentinels[7],
+          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[8] },
+          topology: daemonSentinels[9],
+          endpoint: daemonSentinels[10],
+          port: daemonSentinels[11],
+          secret: daemonSentinels[12],
+        }),
+      },
+    ),
+  );
+  assert.deepEqual(daemonSnapshot, snapshot,
+    'serve compatibility returns the exact two-row browser-safe canonical snapshot');
+  assertDeepFrozen(daemonSnapshot);
+  const serializedDaemonSnapshot = JSON.stringify(daemonSnapshot);
+  for (const sentinel of daemonSentinels) {
+    assert.equal(serializedDaemonSnapshot.includes(sentinel), false,
+      `daemon safe projection excludes ${sentinel}`);
+  }
+
+  const daemonEvidenceCases = [
+    ['exact profile', retainedDetection('1.14.25', '/opt/opencode'), 'supported', 'within_tested_range'],
+    ['newer retained profile', retainedDetection('1.14.26', '/opt/opencode', {
+      installed: false,
+      profileVersion: null,
+      diagnostic: { code: 'version_unsupported', message: 'NEWER_MESSAGE_SENTINEL' },
+    }), 'degraded', 'newer_than_tested_range'],
+    ['missing binary', retainedDetection(null, null, {
+      installed: false,
+      profileVersion: null,
+      diagnostic: { code: 'binary_missing', message: 'MISSING_MESSAGE_SENTINEL' },
+    }), 'unsupported', 'binary_not_found'],
+    ['malformed version', retainedDetection(null, '/opt/opencode', {
+      installed: false,
+      profileVersion: null,
+      diagnostic: { code: 'version_unparseable', message: 'MALFORMED_MESSAGE_SENTINEL' },
+    }), 'unsupported', 'version_malformed'],
+    ['changed binary identity', retainedDetection(null, null, {
+      installed: false,
+      profileVersion: null,
+      diagnostic: { code: 'binary_changed', message: 'CHANGED_MESSAGE_SENTINEL' },
+    }), 'unsupported', 'binary_not_found'],
+  ];
+  for (const [label, openCodeDetection, expectedStatus, expectedReason] of daemonEvidenceCases) {
+    const projected = await requestServeCompatibility(
+      serveDelegation,
+      compatibilityRegistry(
+        ['claude-code', 'opencode'],
+        {
+          'claude-code': retainedDetection('2.1.177', '/opt/claude'),
+          opencode: openCodeDetection,
+        },
+      ),
+      1_784_222_000_001,
+    );
+    assert.deepEqual(projected.adapters[1], {
+      adapterId: 'opencode',
+      displayLabel: 'OpenCode',
+      status: expectedStatus,
+      reason: expectedReason,
+    }, `${label} produces one deterministic OpenCode safe row without omission`);
+    assert.equal(projected.adapters.length, 2, `${label} preserves the exact two-provider roster`);
+    for (const sentinel of [
+      'NEWER_MESSAGE_SENTINEL',
+      'MISSING_MESSAGE_SENTINEL',
+      'MALFORMED_MESSAGE_SENTINEL',
+      'CHANGED_MESSAGE_SENTINEL',
+    ]) {
+      assert.equal(JSON.stringify(projected).includes(sentinel), false,
+        `${label} omits raw diagnostic text`);
+    }
+  }
+
+  let detectionAccessorReads = 0;
+  const accessorDetection = {};
+  for (const key of ['binary', 'version']) {
+    Object.defineProperty(accessorDetection, key, {
+      enumerable: true,
+      get() {
+        detectionAccessorReads += 1;
+        return key === 'binary'
+          ? retainedDetection('1.14.25', '/opt/opencode').binary
+          : '1.14.25';
+      },
+    });
+  }
+  for (const [label, unsafeDetection] of [
+    ['accessor', accessorDetection],
+    ['prototype', Object.create(retainedDetection('1.14.25', '/opt/opencode'))],
+  ]) {
+    const projected = await requestServeCompatibility(
+      serveDelegation,
+      compatibilityRegistry(
+        ['claude-code', 'opencode'],
+        {
+          'claude-code': retainedDetection('2.1.177', '/opt/claude'),
+          opencode: unsafeDetection,
+        },
+      ),
+    );
+    assert.deepEqual(projected.adapters[1], {
+      adapterId: 'opencode',
+      displayLabel: 'OpenCode',
+      status: 'unsupported',
+      reason: 'binary_not_found',
+    }, `${label} detector evidence fails closed`);
+  }
+  assert.equal(detectionAccessorReads, 0, 'daemon projection never invokes detector accessors');
+
+  let mismatchRequireCalls = 0;
+  let rosterAccessorReads = 0;
+  const accessorRegistry = {};
+  Object.defineProperty(accessorRegistry, 'ids', {
+    enumerable: true,
+    get() {
+      rosterAccessorReads += 1;
+      return () => ['claude-code', 'opencode'];
+    },
+  });
+  accessorRegistry.require = () => {
+    mismatchRequireCalls += 1;
+    return Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') });
+  };
+  const prototypeRegistry = Object.create({
+    ids: () => Object.freeze(['claude-code', 'opencode']),
+    require: () => Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') }),
+  });
+  const mismatchRegistries = [
+    ['missing', ['claude-code']],
+    ['duplicate', ['claude-code', 'opencode', 'opencode']],
+    ['orphan', ['claude-code', 'opencode', 'codex']],
+    ['case variant', ['claude-code', 'OpenCode']],
+    ['reordered', ['opencode', 'claude-code']],
+  ].map(([label, ids]) => [label, Object.freeze({
+    ids: () => Object.freeze([...ids]),
+    require: () => {
+      mismatchRequireCalls += 1;
+      return Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') });
+    },
+  })]);
+  mismatchRegistries.push(['accessor', accessorRegistry], ['prototype', prototypeRegistry]);
+  for (const [label, registry] of mismatchRegistries) {
+    const projected = await requestServeCompatibility(serveDelegation, registry);
+    assert.deepEqual(projected.adapters, canonicalClosedRows,
+      `${label} daemon registry mismatch returns the exact closed canonical roster`);
+  }
+  assert.equal(mismatchRequireCalls, 0, 'daemon roster mismatch never resolves or detects adapters');
+  assert.equal(rosterAccessorReads, 0, 'daemon roster validation never invokes an ids accessor');
+
+  const serveSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'serve-delegation.ts'),
+    'utf8',
+  );
+  const collectorSource = serveSource.slice(
+    serveSource.indexOf('async function collectCompatibilitySnapshot'),
+    serveSource.indexOf('async function closeStartupResources'),
+  );
+  assert.doesNotMatch(
+    collectorSource,
+    /\b(?:selectProvider|recommendProvider|saveSettings|markDirty|grantSpawn|spawnAgent)\b/,
+    'compatibility collection has no provider selection, recommendation, settings, dirty, or spawn authority',
+  );
 
   for (const badRow of [
     { ...supported, extra: true },

@@ -31,7 +31,20 @@ function compatibilityRow(overrides = {}) {
   };
 }
 
-function compatibilitySnapshot(checkedAt, adapters = [compatibilityRow()]) {
+function openCodeCompatibilityRow(overrides = {}) {
+  return {
+    adapterId: 'opencode',
+    displayLabel: 'OpenCode',
+    status: 'supported',
+    reason: 'within_tested_range',
+    ...overrides
+  };
+}
+
+function compatibilitySnapshot(
+  checkedAt,
+  adapters = [compatibilityRow(), openCodeCompatibilityRow()]
+) {
   return { schemaVersion: 1, checkedAt, adapters };
 }
 
@@ -173,7 +186,7 @@ async function main() {
       fsbAgentProviders: {
         clicked: { cursor: { count: 1 } },
         connected: { claude: { name: 'Claude' } },
-        installed: { codex: { detected: false } },
+        installed: { codex: { detected: false, checkedAt: 1 } },
         schemaHint: { keep: true }
       }
     };
@@ -186,7 +199,7 @@ async function main() {
     assert.deepEqual(localArea.dump().fsbAgentProviders, {
       clicked: { cursor: { count: 2 }, vscode: { count: 1 } },
       connected: { 'claude-code': { name: 'Claude' } },
-      installed: { codex: { detected: false } },
+      installed: { codex: { detected: false, checkedAt: 1 } },
       schemaHint: { keep: true }
     }, 'a mutation preserves both sibling maps and unknown envelope keys');
     await assert.rejects(
@@ -280,7 +293,7 @@ async function main() {
     const { localArea } = installChrome();
     const providers = freshProviders();
     const installedInput = JSON.parse(
-      '{"__proto__":{"detected":false,"configPath":null,"checkedAt":1}}'
+      '{"__proto__":{"detected":false,"checkedAt":1}}'
     );
     const installedInputPrototype = Object.getPrototypeOf(installedInput);
 
@@ -295,7 +308,6 @@ async function main() {
       'a JSON-supplied __proto__ platform id survives as durable installed evidence');
     assert.deepEqual(stored.installed['__proto__'], {
       detected: false,
-      configPath: null,
       checkedAt: 1
     }, 'the __proto__ installed record remains intact');
     assert.equal(Object.getOwnPropertyDescriptor(envelope.installed, '__proto__').enumerable, true,
@@ -322,20 +334,26 @@ async function main() {
     await providers.replaceInstalled({
       cursor: {
         detected: true,
-        configPath: '/tmp/cursor.json',
-        version: '1.2.3',
-        checkedAt: 300,
-        ignored: 'drop'
+        checkedAt: 300
       },
       codex: {
         detected: false,
-        configPath: null,
-        version: 123,
         checkedAt: 301
       },
-      badDetected: { detected: 'yes', configPath: null, checkedAt: 302 },
-      badPath: { detected: true, configPath: 42, checkedAt: 303 },
-      badTime: { detected: true, configPath: null, checkedAt: Infinity },
+      opencode: {
+        detected: true,
+        checkedAt: 302,
+        configPath: '/private/INVENTORY_PATH_SENTINEL',
+        version: 'INVENTORY_VERSION_SENTINEL',
+        auth: 'INVENTORY_AUTH_SENTINEL',
+        billing: 'INVENTORY_BILLING_SENTINEL',
+        model: 'INVENTORY_MODEL_SENTINEL',
+        config: 'INVENTORY_CONFIG_SENTINEL',
+        nativeBody: 'INVENTORY_NATIVE_SENTINEL',
+        diagnostic: 'INVENTORY_DIAGNOSTIC_SENTINEL'
+      },
+      badDetected: { detected: 'yes', checkedAt: 303 },
+      badTime: { detected: true, checkedAt: Infinity },
       badRecord: []
     });
     assert.deepEqual(localArea.dump().fsbAgentProviders, {
@@ -344,18 +362,29 @@ async function main() {
       installed: {
         cursor: {
           detected: true,
-          configPath: '/tmp/cursor.json',
-          checkedAt: 300,
-          version: '1.2.3'
+          checkedAt: 300
         },
         codex: {
           detected: false,
-          configPath: null,
           checkedAt: 301
         }
       },
       futureField: 'preserve'
-    }, 'installed replacement validates records, drops malformed fields, and preserves siblings');
+    }, 'installed replacement accepts only exact availability records and preserves siblings');
+    const serializedInstalled = JSON.stringify(localArea.dump().fsbAgentProviders.installed);
+    for (const sentinel of [
+      'INVENTORY_PATH_SENTINEL',
+      'INVENTORY_VERSION_SENTINEL',
+      'INVENTORY_AUTH_SENTINEL',
+      'INVENTORY_BILLING_SENTINEL',
+      'INVENTORY_MODEL_SENTINEL',
+      'INVENTORY_CONFIG_SENTINEL',
+      'INVENTORY_NATIVE_SENTINEL',
+      'INVENTORY_DIAGNOSTIC_SENTINEL'
+    ]) {
+      assert.equal(serializedInstalled.includes(sentinel), false,
+        `installed storage excludes ${sentinel}`);
+    }
 
     const reloaded = freshProviders();
     assert.deepEqual(await reloaded.read(), localArea.dump().fsbAgentProviders,
@@ -370,7 +399,7 @@ async function main() {
       fsbAgentProviders: {
         clicked: { cursor: { count: 7 } },
         connected: { claude: { name: 'Claude', lastSeenAt: 8 } },
-        installed: { cursor: { detected: true, configPath: null, checkedAt: 9 } },
+        installed: { cursor: { detected: true, checkedAt: 9 } },
         futureEnvelope: { nested: ['preserve', 1] }
       }
     };
@@ -384,7 +413,7 @@ async function main() {
     assert.deepEqual(localArea.dump().fsbAgentProviders, {
       clicked: { cursor: { count: 7 } },
       connected: { 'claude-code': { name: 'Claude', lastSeenAt: 8 } },
-      installed: { cursor: { detected: true, configPath: null, checkedAt: 9 } },
+      installed: { cursor: { detected: true, checkedAt: 9 } },
       futureEnvelope: { nested: ['preserve', 1] },
       compatibility: inputBefore
     }, 'compatibility replacement preserves all sibling and forward-compatible envelope data');
@@ -393,10 +422,10 @@ async function main() {
   }
 
   {
-    const durable = compatibilitySnapshot(2_000_000, [compatibilityRow({
-      status: 'unsupported',
-      reason: 'binary_not_found'
-    })]);
+    const durable = compatibilitySnapshot(2_000_000, [
+      compatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
+      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' })
+    ]);
     const { localArea } = installChrome({
       local: { fsbAgentProviders: { clicked: {}, connected: {}, installed: {}, compatibility: durable } }
     });
@@ -412,24 +441,70 @@ async function main() {
       }
     });
     const poisonedRow = Object.assign(Object.create({ inherited: true }), compatibilityRow());
-    const sparseAdapters = new Array(1);
+    const sparseAdapters = new Array(2);
     const inheritedSnapshot = Object.assign(Object.create({ inherited: true }),
       compatibilitySnapshot(2_000_001));
+    const compatibilitySentinels = [
+      '/private/COMPAT_EXECUTABLE_SENTINEL',
+      'COMPAT_VERSION_SENTINEL',
+      'COMPAT_AUTH_SENTINEL',
+      'COMPAT_BILLING_SENTINEL',
+      'COMPAT_MODEL_SENTINEL',
+      'COMPAT_CONFIG_SENTINEL',
+      'COMPAT_NATIVE_SENTINEL',
+      'COMPAT_DIAGNOSTIC_SENTINEL',
+      'COMPAT_TOPOLOGY_SENTINEL',
+      'COMPAT_ENDPOINT_SENTINEL',
+      'COMPAT_PORT_SENTINEL',
+      'COMPAT_SECRET_SENTINEL'
+    ];
     const invalidSnapshots = [
       { ...compatibilitySnapshot(2_000_001), extra: true },
-      compatibilitySnapshot(2_000_001, [{ ...compatibilityRow(), extra: true }]),
-      compatibilitySnapshot(2_000_001, [compatibilityRow({ reason: 'arbitrary_reason' })]),
+      compatibilitySnapshot(2_000_001, [
+        { ...compatibilityRow(), extra: true }, openCodeCompatibilityRow()
+      ]),
+      compatibilitySnapshot(2_000_001, [
+        compatibilityRow({ reason: 'arbitrary_reason' }), openCodeCompatibilityRow()
+      ]),
       compatibilitySnapshot(2_000_001, [compatibilityRow({
         status: 'supported',
         reason: 'evidence_stale'
-      })]),
+      }), openCodeCompatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow()]),
       compatibilitySnapshot(2_000_001, [compatibilityRow(), compatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [openCodeCompatibilityRow(), compatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
+        adapterId: 'codex', displayLabel: 'Codex'
+      })]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
+        adapterId: 'OpenCode'
+      })]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
+        displayLabel: 'Open Code'
+      })]),
+      compatibilitySnapshot(2_000_001, [compatibilityRow(), {
+        ...openCodeCompatibilityRow(),
+        executablePath: compatibilitySentinels[0],
+        version: compatibilitySentinels[1],
+        auth: compatibilitySentinels[2],
+        billing: compatibilitySentinels[3],
+        model: compatibilitySentinels[4],
+        config: compatibilitySentinels[5],
+        nativeBody: compatibilitySentinels[6],
+        diagnostic: compatibilitySentinels[7],
+        topology: compatibilitySentinels[8],
+        endpoint: compatibilitySentinels[9],
+        port: compatibilitySentinels[10],
+        secret: compatibilitySentinels[11]
+      }]),
       compatibilitySnapshot(2_000_001, sparseAdapters),
-      compatibilitySnapshot(2_000_001, [accessorRow]),
-      compatibilitySnapshot(2_000_001, [poisonedRow]),
+      compatibilitySnapshot(2_000_001, [accessorRow, openCodeCompatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [poisonedRow, openCodeCompatibilityRow()]),
       inheritedSnapshot,
       compatibilitySnapshot(Number.NaN),
-      compatibilitySnapshot(2_000_001, [compatibilityRow({ adapterId: 'x'.repeat(65) })])
+      compatibilitySnapshot(2_000_001, [
+        compatibilityRow({ adapterId: 'x'.repeat(65) }), openCodeCompatibilityRow()
+      ])
     ];
 
     for (const candidate of invalidSnapshots) {
@@ -443,6 +518,11 @@ async function main() {
     assert.equal(localArea.setCount, 0, 'invalid snapshots never enter the durable mutation path');
     assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility, durable,
       'invalid replacements preserve the last durably validated snapshot');
+    const serializedEnvelope = JSON.stringify(localArea.dump().fsbAgentProviders);
+    for (const sentinel of compatibilitySentinels) {
+      assert.equal(serializedEnvelope.includes(sentinel), false,
+        `durable provider storage excludes ${sentinel}`);
+    }
   }
 
   {
@@ -519,10 +599,10 @@ async function main() {
       checkedAt
     }, 'snapshot-only Claude compatibility remains visible without unrelated evidence maps');
     assert.deepEqual(merged.opencode.compatibility, {
-      status: 'unsupported',
-      reason: 'adapter_unshipped',
+      status: 'supported',
+      reason: 'within_tested_range',
       checkedAt
-    }, 'snapshot-only OpenCode compatibility remains closed until its adapter ships');
+    }, 'snapshot-only OpenCode compatibility ships from its validated daemon row');
     assert.deepEqual(merged.codex.compatibility, {
       status: 'unsupported',
       reason: 'adapter_unshipped',
@@ -586,10 +666,10 @@ async function main() {
       checkedAt
     }, 'supported evidence becomes stale at the exact fifteen-minute boundary');
     assert.deepEqual(atBoundary.opencode.compatibility, {
-      status: 'unsupported',
-      reason: 'adapter_unshipped',
+      status: 'degraded',
+      reason: 'evidence_stale',
       checkedAt
-    }, 'OpenCode remains visibly unsupported until its adapter ships');
+    }, 'OpenCode support follows the same closed freshness boundary as Claude');
     assert.deepEqual(atBoundary.codex.compatibility, {
       status: 'unsupported',
       reason: 'adapter_unshipped',
@@ -612,10 +692,10 @@ async function main() {
       checkedAt: null
     }, 'clock rollback/future-dated evidence fails closed instead of manufacturing freshness');
 
-    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
-      status: 'degraded',
-      reason: 'newer_than_tested_range'
-    })]));
+    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
+      compatibilityRow({ status: 'degraded', reason: 'newer_than_tested_range' }),
+      openCodeCompatibilityRow()
+    ]));
     const oldDegraded = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
     assert.deepEqual(oldDegraded['claude-code'].compatibility, {
       status: 'degraded',
@@ -623,10 +703,10 @@ async function main() {
       checkedAt
     }, 'already degraded evidence is never rewritten into a more permissive state');
 
-    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
-      status: 'unsupported',
-      reason: 'wrong_major'
-    })]));
+    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
+      compatibilityRow({ status: 'unsupported', reason: 'wrong_major' }),
+      openCodeCompatibilityRow()
+    ]));
     const oldUnsupported = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
     assert.deepEqual(oldUnsupported['claude-code'].compatibility, {
       status: 'unsupported',
@@ -634,15 +714,20 @@ async function main() {
       checkedAt
     }, 'already unsupported evidence retains its canonical fail-closed reason');
 
-    await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [compatibilityRow({
-      displayLabel: 'Matrix Mismatch'
-    })]));
+    await assert.rejects(
+      providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
+        compatibilityRow({ displayLabel: 'Matrix Mismatch' }),
+        openCodeCompatibilityRow()
+      ])),
+      /Invalid MCP agent compatibility snapshot/,
+      'a canonical-id row with a mismatched display label rejects before storage'
+    );
     const mismatched = await providers.getMergedClients([], () => checkedAt);
     assert.deepEqual(mismatched['claude-code'].compatibility, {
       status: 'unsupported',
-      reason: 'matrix_invalid',
+      reason: 'wrong_major',
       checkedAt
-    }, 'a safe-shape row that mismatches the shipped matrix label still projects unsupported');
+    }, 'a rejected label mismatch preserves the last durably validated closed row');
   }
 
   {
@@ -671,10 +756,10 @@ async function main() {
   }
 
   {
-    const oldSnapshot = compatibilitySnapshot(7_000_000, [compatibilityRow({
-      status: 'unsupported',
-      reason: 'binary_not_found'
-    })]);
+    const oldSnapshot = compatibilitySnapshot(7_000_000, [
+      compatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
+      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' })
+    ]);
     const { localArea } = installChrome({
       local: {
         fsbAgentProviders: {
@@ -768,6 +853,34 @@ async function main() {
   }
 
   {
+    const source = fs.readFileSync(providersPath, 'utf8');
+    const installedSource = source.slice(
+      source.indexOf('function normalizeInstalled'),
+      source.indexOf('async function replaceInstalled')
+    );
+    assert.doesNotMatch(installedSource, /\b(?:configPath|version|auth|billing|model|nativeBody|diagnostic)\b/,
+      'installed storage normalization has no local path/version/provider/native fields');
+    const compatibilityParserSource = source.slice(
+      source.indexOf('function parseCompatibilityRow'),
+      source.indexOf('function cloneMap')
+    );
+    assert.doesNotMatch(
+      compatibilityParserSource,
+      /\b(?:executablePath|version|semver|auth|billing|model|config|nativeBody|diagnostic|topology|endpoint|port|secret)\b/,
+      'browser compatibility parsing contains only the approved safe status grammar'
+    );
+    const compatibilityProjectionSource = source.slice(
+      source.indexOf('function projectedCompatibility'),
+      source.indexOf('function resolveProjectionTime')
+    );
+    assert.doesNotMatch(
+      compatibilityProjectionSource,
+      /\b(?:selectProvider|recommendProvider|saveSettings|markDirty|grantSpawn|spawnAgent)\b/,
+      'browser compatibility projection has no selection, recommendation, settings, dirty, or spawn authority'
+    );
+  }
+
+  {
     const { localArea } = installChrome();
     const providers = freshProviders();
     const stampCalls = [];
@@ -798,7 +911,7 @@ async function main() {
         connectionId: 'connection-identity-1',
         clientInfo: { name: longName, version: longVersion, authority: 'admin' },
         platforms: {
-          cursor: { detected: true, configPath: '/tmp/cursor.json', checkedAt: 400 }
+          cursor: { detected: true, checkedAt: 400 }
         }
       }
     });
@@ -825,7 +938,7 @@ async function main() {
 
     const envelope = localArea.dump().fsbAgentProviders;
     assert.deepEqual(envelope.installed, {
-      cursor: { detected: true, configPath: '/tmp/cursor.json', checkedAt: 400 }
+      cursor: { detected: true, checkedAt: 400 }
     }, 'agent:register platforms piggyback reaches the installed map');
     assert.equal(Object.keys(envelope.connected).includes('cursor'), true,
       'name-only connected identity is recorded');
@@ -850,7 +963,7 @@ async function main() {
         connectionId: 'connection-storage-failure',
         clientInfo: { name: 'Claude Code' },
         platforms: {
-          codex: { detected: true, configPath: null, checkedAt: 500 }
+          codex: { detected: true, checkedAt: 500 }
         }
       }
     });
@@ -877,7 +990,7 @@ async function main() {
     });
     const harness = loadBridgeHarness();
     const validPayload = vm.runInNewContext(`({ platforms: {
-      codex: { detected: true, configPath: null, version: '0.142.5', checkedAt: 600 }
+      codex: { detected: true, checkedAt: 600 }
     } })`, harness.context);
     const accepted = await harness.client._routeMessage('system:client-inventory', validPayload, 'inventory-1');
     assert.deepEqual(clone(accepted), { accepted: true }, 'system inventory route returns accepted:true');
@@ -885,7 +998,7 @@ async function main() {
       clicked: { cursor: { count: 1 } },
       connected: { cursor: { name: 'Cursor' } },
       installed: {
-        codex: { detected: true, configPath: null, checkedAt: 600, version: '0.142.5' }
+        codex: { detected: true, checkedAt: 600 }
       },
       unknownSibling: 'keep'
     }, 'system frame converges through replaceInstalled without clobbering siblings');
