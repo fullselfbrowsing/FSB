@@ -82,7 +82,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### MULTI -- Additional Adapters
 
-- [ ] **MULTI-01**: An OpenCode adapter (`mcp/src/agent-providers/opencode.ts`) implements the `AgentProviderAdapter` contract with `caps.serverMode=true`; the supervisor either spawns `opencode run` cold or attaches to a running `opencode serve` per the adapter's `buildSpawn` output (contract-stresser: the ADAPT contract must accommodate both spawn and attach without hardcoding).
+- [x] **MULTI-01**: An OpenCode adapter (`mcp/src/agent-providers/opencode.ts`) implements the `AgentProviderAdapter` contract with `caps.serverMode=true`; the supervisor either spawns `opencode run` cold or attaches to a running `opencode serve` per the adapter's `buildSpawn` output (contract-stresser: the ADAPT contract must accommodate both spawn and attach without hardcoding).
 - [x] **MULTI-02**: The OpenCode adapter ships a pinned agent definition (equivalent to Claude Code's `--agents fsb`) using OpenCode's `agent create` / `agents` config surface, keyed to a version pinned during phase spike.
 - [x] **MULTI-03**: A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-1.14.25/` (or the latest pinned version) proves the adapter's event schema in CI without a live CLI.
 - [ ] **MULTI-04**: A Codex adapter (`mcp/src/agent-providers/codex.ts`) implements the `AgentProviderAdapter` contract, invoking `codex exec --json` with the current-verified flag set (v0.142.5 as baseline: use `--ephemeral` + `--ignore-user-config` for hermeticity; do not use the deprecated `--full-auto`).
@@ -175,7 +175,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | NATIVE-02 | Phase 63 | Complete |
 | NATIVE-03 | Phase 63 | Complete |
 | NATIVE-04 | Phase 63 | Complete |
-| MULTI-01 | Phase 64 | Pending |
+| MULTI-01 | Phase 64 | Complete |
 | MULTI-02 | Phase 64 | Complete |
 | MULTI-03 | Phase 64 | Complete |
 | MULTI-04 | Phase 65 | Pending |
