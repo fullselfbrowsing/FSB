@@ -22,6 +22,7 @@ const compatibilityBuildPath = path.join(
 
 const ROW_KEYS = Object.freeze([
   'adapterId',
+  'capabilities',
   'displayLabel',
   'expectedNormalizedSequence',
   'fixtureManifest',
@@ -92,11 +93,21 @@ async function main() {
 
   assert.deepEqual(Object.keys(ADAPTER_COMPATIBILITY_MATRIX).sort(), ['adapters', 'schemaVersion']);
   assert.equal(ADAPTER_COMPATIBILITY_MATRIX.schemaVersion, 1);
-  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 1);
+  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 2);
+  assert.deepEqual(
+    ADAPTER_COMPATIBILITY_MATRIX.adapters.map((candidate) => candidate.adapterId),
+    ['claude-code', 'opencode'],
+  );
   const row = ADAPTER_COMPATIBILITY_MATRIX.adapters[0];
   assert.deepEqual(Object.keys(row).sort(), ROW_KEYS);
   assert.deepEqual(row, {
     adapterId: 'claude-code',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: false,
+    },
     displayLabel: 'Claude Code',
     profileVersion: '2.1.177',
     minimumVersion: '2.1.177',
@@ -116,9 +127,60 @@ async function main() {
       'result',
     ],
   });
+  const openCodeRow = ADAPTER_COMPATIBILITY_MATRIX.adapters[1];
+  assert.deepEqual(Object.keys(openCodeRow).sort(), ROW_KEYS);
+  assert.deepEqual(openCodeRow, {
+    adapterId: 'opencode',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: true,
+    },
+    displayLabel: 'OpenCode',
+    profileVersion: '1.14.25',
+    minimumVersion: '1.14.25',
+    testedThroughVersion: '1.14.25',
+    supportedMajor: 1,
+    fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json',
+    requiredInitFields: [
+      'type',
+      'timestamp',
+      'sessionID',
+      'part.id',
+      'part.sessionID',
+      'part.messageID',
+      'part.type',
+    ],
+    requiredResultFields: [
+      'type',
+      'timestamp',
+      'sessionID',
+      'part.id',
+      'part.sessionID',
+      'part.messageID',
+      'part.type',
+      'part.reason',
+      'part.cost',
+      'part.tokens',
+    ],
+    expectedNormalizedSequence: [
+      'init',
+      'assistant_delta',
+      'assistant',
+      'tool_use',
+      'tool_result',
+      'tool_use',
+      'tool_result',
+      'assistant',
+      'result',
+    ],
+  });
   assertDeepFrozen(ADAPTER_COMPATIBILITY_MATRIX);
   assert.strictEqual(getAdapterCompatibilityContract('claude-code'), row);
-  assert.equal(getAdapterCompatibilityContract('opencode'), null);
+  assert.strictEqual(getAdapterCompatibilityContract('opencode'), openCodeRow);
+  assert.equal(getAdapterCompatibilityContract('codex'), null);
+  assert.equal(getAdapterCompatibilityContract('OpenCode'), null);
 
   assert.equal(extractAdapterVersion('Claude Code 2.1.177'), '2.1.177');
   assert.equal(extractAdapterVersion('2.1.178\n'), '2.1.178');
@@ -185,10 +247,34 @@ async function main() {
     'version_missing',
   );
   assertClassification(
-    classifyAdapterCompatibility('opencode', '2.1.177'),
+    classifyAdapterCompatibility('opencode', '1.14.25'),
+    'supported',
+    'within_tested_range',
+    'opencode',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('opencode', '1.14.26'),
+    'degraded',
+    'newer_than_tested_range',
+    'opencode',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('opencode', '1.14.24'),
+    'unsupported',
+    'below_minimum',
+    'opencode',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('opencode', '2.0.0'),
+    'unsupported',
+    'wrong_major',
+    'opencode',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('codex', '1.14.25'),
     'unsupported',
     'adapter_unshipped',
-    'opencode',
+    'codex',
   );
 
   const invalidMatrix = clone(ADAPTER_COMPATIBILITY_MATRIX);
@@ -201,13 +287,22 @@ async function main() {
   );
 
   const supported = classifyAdapterCompatibility('claude-code', '2.1.177');
-  const snapshot = createSafeCompatibilitySnapshot(1_784_222_000_000, [supported]);
+  const openCodeSupported = classifyAdapterCompatibility('opencode', '1.14.25');
+  const snapshot = createSafeCompatibilitySnapshot(
+    1_784_222_000_000,
+    [supported, openCodeSupported],
+  );
   assert.deepEqual(snapshot, {
     schemaVersion: 1,
     checkedAt: 1_784_222_000_000,
     adapters: [{
       adapterId: 'claude-code',
       displayLabel: 'Claude Code',
+      status: 'supported',
+      reason: 'within_tested_range',
+    }, {
+      adapterId: 'opencode',
+      displayLabel: 'OpenCode',
       status: 'supported',
       reason: 'within_tested_range',
     }],
@@ -309,8 +404,27 @@ async function main() {
   duplicateAdapter.adapters.push(clone(row));
   invalidMatrices.push(duplicateAdapter);
   const sparseAdapters = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  sparseAdapters.adapters.length = 2;
+  sparseAdapters.adapters.length = 3;
   invalidMatrices.push(sparseAdapters);
+  const missingOpenCode = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  missingOpenCode.adapters.pop();
+  invalidMatrices.push(missingOpenCode);
+  const reversedAdapters = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  reversedAdapters.adapters.reverse();
+  invalidMatrices.push(reversedAdapters);
+  const caseVariedAdapter = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  caseVariedAdapter.adapters[1].adapterId = 'OpenCode';
+  invalidMatrices.push(caseVariedAdapter);
+  const codexOrphan = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  codexOrphan.adapters[1].adapterId = 'codex';
+  codexOrphan.adapters[1].fixtureManifest = 'tests/fixtures/agent-streams/codex-1.14.25/manifest.json';
+  invalidMatrices.push(codexOrphan);
+  const wrongCapabilities = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  wrongCapabilities.adapters[1].capabilities.serverMode = false;
+  invalidMatrices.push(wrongCapabilities);
+  const extraCapability = clone(ADAPTER_COMPATIBILITY_MATRIX);
+  extraCapability.adapters[1].capabilities.shellMode = true;
+  invalidMatrices.push(extraCapability);
   const forbiddenPrototypeKey = JSON.parse(JSON.stringify(ADAPTER_COMPATIBILITY_MATRIX));
   Object.defineProperty(forbiddenPrototypeKey.adapters[0], 'prototype', {
     value: 'poison',

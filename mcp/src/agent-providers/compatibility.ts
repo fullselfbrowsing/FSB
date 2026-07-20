@@ -1,3 +1,9 @@
+import {
+  CLAUDE_CODE_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+  type AdapterCapabilities,
+} from './adapter.js';
+
 export type CompatibilityStatus = 'supported' | 'degraded' | 'unsupported';
 
 export type CompatibilityReason =
@@ -14,6 +20,7 @@ export type CompatibilityReason =
 
 export interface AdapterCompatibilityContract {
   readonly adapterId: string;
+  readonly capabilities: AdapterCapabilities;
   readonly displayLabel: string;
   readonly profileVersion: string;
   readonly minimumVersion: string;
@@ -70,6 +77,7 @@ export const COMPATIBILITY_REASONS = Object.freeze([
 const MATRIX_KEYS = Object.freeze(['adapters', 'schemaVersion']);
 const CONTRACT_KEYS = Object.freeze([
   'adapterId',
+  'capabilities',
   'displayLabel',
   'expectedNormalizedSequence',
   'fixtureManifest',
@@ -80,6 +88,12 @@ const CONTRACT_KEYS = Object.freeze([
   'supportedMajor',
   'testedThroughVersion',
 ]);
+const CAPABILITY_KEYS = Object.freeze([
+  'chatMode',
+  'resume',
+  'serverMode',
+  'taskMode',
+] as const);
 const EVIDENCE_KEYS = Object.freeze(['binaryFound', 'version']);
 const SAFE_ROW_KEYS = Object.freeze(['adapterId', 'displayLabel', 'reason', 'status']);
 
@@ -92,7 +106,7 @@ const MAX_FIXTURE_REFERENCE_LENGTH = 256;
 const MAX_VERSION_OUTPUT_BYTES = 64 * 1024;
 
 const ADAPTER_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
-const FIELD_NAME_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
+const FIELD_NAME_PATTERN = /^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
 const STRICT_VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const KNOWN_NORMALIZED_EVENTS = new Set([
   'init',
@@ -105,6 +119,24 @@ const KNOWN_NORMALIZED_EVENTS = new Set([
   'result',
   'diagnostic',
 ]);
+const CANONICAL_ADAPTER_IDS = Object.freeze([
+  CLAUDE_CODE_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+] as const);
+const EXPECTED_CAPABILITIES = Object.freeze({
+  [CLAUDE_CODE_ADAPTER_ID]: Object.freeze({
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: false,
+  }),
+  [OPENCODE_ADAPTER_ID]: Object.freeze({
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: true,
+  }),
+});
 
 interface ParsedVersion {
   readonly raw: string;
@@ -216,11 +248,33 @@ function parseFixtureReference(value: unknown, adapterId: string, profileVersion
   return value === expected ? value : null;
 }
 
+function parseCapabilities(
+  value: unknown,
+  adapterId: typeof CLAUDE_CODE_ADAPTER_ID | typeof OPENCODE_ADAPTER_ID,
+): AdapterCapabilities | null {
+  const record = ownDataRecord(value, CAPABILITY_KEYS);
+  if (!record || CAPABILITY_KEYS.some((key) => typeof record[key] !== 'boolean')) return null;
+  const expected = EXPECTED_CAPABILITIES[adapterId];
+  if (CAPABILITY_KEYS.some((key) => record[key] !== expected[key])) return null;
+  return Object.freeze({
+    taskMode: record.taskMode as boolean,
+    chatMode: record.chatMode as boolean,
+    resume: record.resume as boolean,
+    serverMode: record.serverMode as boolean,
+  });
+}
+
 function parseContract(value: unknown): AdapterCompatibilityContract | null {
   const record = ownDataRecord(value, CONTRACT_KEYS);
   if (!record) return null;
   if (!boundedString(record.adapterId, MAX_ID_OR_LABEL_LENGTH, ADAPTER_ID_PATTERN)) return null;
+  if (
+    record.adapterId !== CLAUDE_CODE_ADAPTER_ID
+    && record.adapterId !== OPENCODE_ADAPTER_ID
+  ) return null;
   if (!boundedString(record.displayLabel, MAX_ID_OR_LABEL_LENGTH)) return null;
+  const capabilities = parseCapabilities(record.capabilities, record.adapterId);
+  if (!capabilities) return null;
 
   const profileVersion = parseVersion(record.profileVersion);
   const minimumVersion = parseVersion(record.minimumVersion);
@@ -270,6 +324,7 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
 
   return Object.freeze({
     adapterId: record.adapterId,
+    capabilities,
     displayLabel: record.displayLabel,
     profileVersion: profileVersion.raw,
     minimumVersion: minimumVersion.raw,
@@ -288,13 +343,17 @@ export function parseAdapterCompatibilityMatrix(
   const record = ownDataRecord(value, MATRIX_KEYS);
   if (!record || record.schemaVersion !== 1) return null;
   const values = denseDataArray(record.adapters, MAX_ADAPTERS);
-  if (!values || values.length === 0) return null;
+  if (!values || values.length !== CANONICAL_ADAPTER_IDS.length) return null;
 
   const adapters: AdapterCompatibilityContract[] = [];
   const ids = new Set<string>();
-  for (const valueItem of values) {
+  for (const [index, valueItem] of values.entries()) {
     const adapter = parseContract(valueItem);
-    if (!adapter || ids.has(adapter.adapterId)) return null;
+    if (
+      !adapter
+      || ids.has(adapter.adapterId)
+      || adapter.adapterId !== CANONICAL_ADAPTER_IDS[index]
+    ) return null;
     ids.add(adapter.adapterId);
     adapters.push(adapter);
   }
@@ -308,6 +367,12 @@ const RAW_ADAPTER_COMPATIBILITY_MATRIX = {
   schemaVersion: 1,
   adapters: [{
     adapterId: 'claude-code',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: false,
+    },
     displayLabel: 'Claude Code',
     profileVersion: '2.1.177',
     minimumVersion: '2.1.177',
@@ -324,6 +389,52 @@ const RAW_ADAPTER_COMPATIBILITY_MATRIX = {
       'user',
       'tool_result',
       'retry',
+      'result',
+    ],
+  }, {
+    adapterId: 'opencode',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: true,
+    },
+    displayLabel: 'OpenCode',
+    profileVersion: '1.14.25',
+    minimumVersion: '1.14.25',
+    testedThroughVersion: '1.14.25',
+    supportedMajor: 1,
+    fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json',
+    requiredInitFields: [
+      'type',
+      'timestamp',
+      'sessionID',
+      'part.id',
+      'part.sessionID',
+      'part.messageID',
+      'part.type',
+    ],
+    requiredResultFields: [
+      'type',
+      'timestamp',
+      'sessionID',
+      'part.id',
+      'part.sessionID',
+      'part.messageID',
+      'part.type',
+      'part.reason',
+      'part.cost',
+      'part.tokens',
+    ],
+    expectedNormalizedSequence: [
+      'init',
+      'assistant_delta',
+      'assistant',
+      'tool_use',
+      'tool_result',
+      'tool_use',
+      'tool_result',
+      'assistant',
       'result',
     ],
   }],

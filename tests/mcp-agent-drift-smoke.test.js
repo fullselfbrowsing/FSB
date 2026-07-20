@@ -326,16 +326,42 @@ function encode(lines) {
   return Buffer.from(`${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, 'utf8');
 }
 
-function assertProductionRoster(registryIds, rows) {
+function assertProductionRoster(registryIds, rows, registry) {
+  const exactProductionIds = ['claude-code', 'opencode'];
   const sortedRegistryIds = [...registryIds].sort();
   const matrixIds = rows.map((row) => row.adapterId).sort();
   assert.deepEqual(matrixIds, sortedRegistryIds, 'registry and matrix adapter rosters agree');
   assert.equal(new Set(matrixIds).size, matrixIds.length, 'matrix adapter ids are unique');
+  assert.deepEqual(registryIds, exactProductionIds, 'production registry order is exact');
+  assert.deepEqual(rows.map((row) => row.adapterId), exactProductionIds, 'matrix order is exact');
+  assert.deepEqual(
+    Object.keys(FIXTURE_CONTRACTS),
+    exactProductionIds,
+    'parser-contract roster is exact',
+  );
   const matrixFixtures = rows.map((row) => row.fixtureManifest).sort();
   const registeredFixtures = sortedRegistryIds.map(
     (adapterId) => `tests/fixtures/agent-streams/${FIXTURE_CONTRACTS[adapterId].directory}/manifest.json`,
   ).sort();
   assert.deepEqual(matrixFixtures, registeredFixtures, 'registered matrix fixtures agree');
+  assert.deepEqual(
+    listCommittedManifests(),
+    registeredFixtures,
+    'committed manifest roster agrees with production exposure',
+  );
+  const productionAdapterIds = registryIds.filter((adapterId) => {
+    const adapter = registry.require(adapterId);
+    assert.deepEqual(
+      Object.keys(adapter),
+      ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+      `${adapterId} production adapter has exactly five methods`,
+    );
+    assert.ok(Object.isFrozen(adapter), `${adapterId} production adapter is immutable`);
+    const row = rows.find((candidate) => candidate.adapterId === adapterId);
+    assert.deepEqual(adapter.caps(), row.capabilities, `${adapterId} capabilities agree`);
+    return true;
+  });
+  assert.deepEqual(productionAdapterIds, exactProductionIds, 'production adapter roster is exact');
 }
 
 function assertCompatibilityBoundaries(classify, row) {
@@ -402,12 +428,13 @@ async function loadParser(contract, registry) {
   const productionModule = await import(pathToFileURL(modulePath).href);
   const parser = productionModule[contract.parserExport];
   assert.equal(typeof parser, 'function', `${contract.adapterId} production parser exists`);
-  if (contract.adapterId === 'claude-code') {
-    const registeredParser = registry.require(contract.adapterId).parseEvents;
-    assert.equal(typeof registeredParser, 'function', 'Claude registry exposes its production parser');
-    return registeredParser;
-  }
-  return parser;
+  const registeredParser = registry.require(contract.adapterId).parseEvents;
+  assert.equal(
+    typeof registeredParser,
+    'function',
+    `${contract.adapterId} registry exposes its production parser`,
+  );
+  return registeredParser;
 }
 
 async function main() {
@@ -425,14 +452,19 @@ async function main() {
   const registryIds = registry.ids();
   const matrixRows = compatibility.ADAPTER_COMPATIBILITY_MATRIX.adapters;
   const matrixIds = matrixRows.map((row) => row.adapterId);
-  assert.deepEqual(registryIds, ['claude-code'], 'production registry remains Claude-only');
-  assert.deepEqual(matrixIds, ['claude-code'], 'compatibility matrix remains Claude-only');
-  assertProductionRoster(registryIds, matrixRows);
+  assert.deepEqual(registryIds, ['claude-code', 'opencode'], 'production registry is exact');
+  assert.deepEqual(matrixIds, ['claude-code', 'opencode'], 'compatibility matrix is exact');
+  assertProductionRoster(registryIds, matrixRows, registry);
   assert.throws(
-    () => assertProductionRoster(registryIds, [...matrixRows, { ...matrixRows[0], adapterId: 'opencode' }]),
+    () => assertProductionRoster(
+      registryIds,
+      [...matrixRows, { ...matrixRows[0], adapterId: 'opencode' }],
+      registry,
+    ),
     /registry and matrix/,
   );
-  assert.throws(() => registry.require('opencode'), /Unknown adapter id/);
+  assert.ok(registry.require('opencode'));
+  assert.throws(() => registry.require('codex'), /Unknown adapter id/);
 
   const contractIds = Object.keys(FIXTURE_CONTRACTS).sort();
   const committedManifests = listCommittedManifests();
@@ -478,17 +510,26 @@ async function main() {
     contract.assertTerminal(events, manifest);
 
     const matrixRow = matrixRows.find((row) => row.adapterId === adapterId);
-    if (matrixRow) {
-      assert.equal(matrixRow.profileVersion, manifest.profileVersion);
-      assert.deepEqual(matrixRow.expectedNormalizedSequence, manifest.expectedSequence);
-      assert.equal(
-        compatibility.classifyAdapterCompatibility(adapterId, manifest.profileVersion).status,
-        'supported',
-      );
-      assertCompatibilityBoundaries(compatibility.classifyAdapterCompatibility, matrixRow);
-    } else {
-      assert.equal(adapterId, 'opencode', 'only OpenCode may be fixture-gated before registration');
-    }
+    assert.ok(matrixRow, `${adapterId} has one compatibility row`);
+    assert.equal(matrixRow.profileVersion, manifest.profileVersion);
+    assert.deepEqual(matrixRow.expectedNormalizedSequence, manifest.expectedSequence);
+    assert.deepEqual(
+      matrixRow.requiredInitFields,
+      contract.adapterId === 'claude-code'
+        ? ['type', 'subtype', ...contract.requiredInitFields]
+        : ['type', ...contract.requiredInitFields],
+    );
+    assert.deepEqual(
+      matrixRow.requiredResultFields,
+      contract.adapterId === 'claude-code'
+        ? ['type', 'subtype', 'session_id', 'is_error']
+        : ['type', ...contract.requiredTerminalFields],
+    );
+    assert.equal(
+      compatibility.classifyAdapterCompatibility(adapterId, manifest.profileVersion).status,
+      'supported',
+    );
+    assertCompatibilityBoundaries(compatibility.classifyAdapterCompatibility, matrixRow);
 
     for (const negative of contract.negativeMutators) {
       await expectDrift(parser, encode(negative.mutate(clone(rawLines))), negative.reason);
@@ -506,8 +547,10 @@ async function main() {
   assert.match(source, /const FIXTURE_CONTRACTS = deepFreeze/);
   assert.match(source, /parserModule: 'claude-stream\.js'/);
   assert.match(source, /parserModule: 'opencode-stream\.js'/);
-  assert.match(source, /production registry remains Claude-only/);
-  assert.match(source, /compatibility matrix remains Claude-only/);
+  assert.match(source, /production registry order is exact/);
+  assert.match(source, /production adapter roster is exact/);
+  assert.equal(source.includes(['production registry', ' remains Claude-only'].join('')), false);
+  assert.equal(source.includes(['compatibility matrix', ' remains Claude-only'].join('')), false);
   assertCiEntry();
 
   console.log('mcp-agent-drift-smoke.test.js: PASS');

@@ -161,6 +161,7 @@ async function main() {
 
   const {
     CLAUDE_CODE_ADAPTER_ID,
+    OPENCODE_ADAPTER_ID,
     OPENCODE_SERVER_PASSWORD_ENV_KEY,
     OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
     TASK_ONLY_CAPABILITIES,
@@ -170,9 +171,11 @@ async function main() {
   const {
     AdapterRegistryError,
     createAdapterRegistry,
+    createProductionAdapterRegistry,
   } = registryModule;
 
   assert.equal(CLAUDE_CODE_ADAPTER_ID, 'claude-code');
+  assert.equal(OPENCODE_ADAPTER_ID, 'opencode');
   assert.equal(OPENCODE_SERVER_PASSWORD_ENV_KEY, 'OPENCODE_SERVER_PASSWORD');
   assert.equal(OWNED_SERVER_BASIC_PASSWORD_SECRET_REF, 'owned_server_basic_password');
   assert.equal(PLATFORMS['claude-code'].flag, 'claude-code', 'platform id remains canonical');
@@ -214,6 +217,19 @@ async function main() {
     parseEvents: async function* () {},
     kill: async () => {},
     caps: () => TASK_ONLY_CAPABILITIES,
+  });
+  const openCodeCapabilities = Object.freeze({
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: true,
+  });
+  const fakeOpenCodeAdapter = Object.freeze({
+    detect: async () => detection,
+    buildSpawn: async (_task, _context) => immutableSpec,
+    parseEvents: async function* () {},
+    kill: async () => {},
+    caps: () => openCodeCapabilities,
   });
 
   assert.deepEqual(
@@ -456,11 +472,17 @@ async function main() {
   assert.equal(JSON.stringify(passed).includes(passwordCanary), false);
   assert.equal(JSON.stringify(failed).includes(passwordCanary), false);
 
-  const registry = createAdapterRegistry([{ id: 'claude-code', adapter: fakeAdapter }]);
+  const registry = createAdapterRegistry([
+    { id: 'claude-code', adapter: fakeAdapter },
+    { id: 'opencode', adapter: fakeOpenCodeAdapter },
+  ]);
   assert.strictEqual(registry.require('claude-code'), fakeAdapter, 'exact canonical lookup succeeds');
-  assert.deepEqual(registry.ids(), ['claude-code']);
+  assert.strictEqual(registry.require('opencode'), fakeOpenCodeAdapter, 'second canonical lookup succeeds');
+  assert.deepEqual(registry.ids(), ['claude-code', 'opencode']);
   assert.ok(Object.isFrozen(registry));
   assert.ok(Object.isFrozen(registry.ids()));
+  assert.throws(() => registry.ids().push('codex'), TypeError);
+  assert.throws(() => { registry.require = () => fakeAdapter; }, TypeError);
 
   expectRegistryError(
     () => registry.require('Claude-Code'),
@@ -491,12 +513,68 @@ async function main() {
     'duplicate_adapter',
   );
   expectRegistryError(
-    () => createAdapterRegistry([{ id: 'Claude-Code', adapter: fakeAdapter }]),
+    () => createAdapterRegistry([
+      { id: 'Claude-Code', adapter: fakeAdapter },
+      { id: 'opencode', adapter: fakeOpenCodeAdapter },
+    ]),
     AdapterRegistryError,
     'invalid_adapter_id',
   );
   expectRegistryError(
-    () => createAdapterRegistry([{ id: 'opencode', adapter: fakeAdapter }]),
+    () => createAdapterRegistry([
+      { id: 'claude-code', adapter: fakeAdapter },
+      { id: 'codex', adapter: fakeOpenCodeAdapter },
+    ]),
+    AdapterRegistryError,
+    'unknown_adapter_id',
+  );
+  expectRegistryError(
+    () => createAdapterRegistry([{ id: 'claude-code', adapter: fakeAdapter }]),
+    AdapterRegistryError,
+    'missing_adapter',
+  );
+  expectRegistryError(
+    () => createAdapterRegistry([{ id: 'opencode', adapter: fakeOpenCodeAdapter }]),
+    AdapterRegistryError,
+    'missing_adapter',
+  );
+  expectRegistryError(
+    () => createAdapterRegistry([
+      { id: 'claude-code', adapter: fakeAdapter },
+      { id: 'OpenCode', adapter: fakeOpenCodeAdapter },
+    ]),
+    AdapterRegistryError,
+    'invalid_adapter_id',
+  );
+  expectRegistryError(
+    () => createAdapterRegistry([
+      { id: 'opencode', adapter: fakeOpenCodeAdapter },
+      { id: 'claude-code', adapter: fakeAdapter },
+    ]),
+    AdapterRegistryError,
+    'invalid_adapter_id',
+  );
+  assert.throws(
+    () => createAdapterRegistry([
+      { id: 'claude-code', adapter: { ...fakeAdapter } },
+      { id: 'opencode', adapter: fakeOpenCodeAdapter },
+    ]),
+    /immutable/i,
+  );
+
+  const productionRegistry = createProductionAdapterRegistry({ kill: async () => {} });
+  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode']);
+  for (const id of productionRegistry.ids()) {
+    const productionAdapter = productionRegistry.require(id);
+    assert.ok(Object.isFrozen(productionAdapter), `${id} production adapter is immutable`);
+    assert.deepEqual(
+      Object.keys(productionAdapter),
+      ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+      `${id} production adapter has exactly five methods in contract order`,
+    );
+  }
+  expectRegistryError(
+    () => productionRegistry.require('codex'),
     AdapterRegistryError,
     'unknown_adapter_id',
   );

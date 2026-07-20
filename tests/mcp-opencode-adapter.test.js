@@ -11,6 +11,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const buildRoot = path.join(repoRoot, 'mcp', 'build', 'agent-providers');
 const adapterBuildPath = path.join(buildRoot, 'adapter.js');
 const compatibilityBuildPath = path.join(buildRoot, 'compatibility.js');
+const opencodeAdapterBuildPath = path.join(buildRoot, 'opencode.js');
 const opencodeDetectBuildPath = path.join(buildRoot, 'opencode-detect.js');
 const opencodeProfileBuildPath = path.join(buildRoot, 'opencode-profile.js');
 const policyAttestationBuildPath = path.join(buildRoot, 'policy-attestation.js');
@@ -247,10 +248,10 @@ async function runFirstCommitDriftGate() {
   assert.equal(isExactOwnDataRecord(accessor, ['a']), false);
 
   const registry = registryModule.createProductionAdapterRegistry({ kill: async () => {} });
-  assert.deepEqual(registry.ids(), ['claude-code']);
+  assert.deepEqual(registry.ids(), ['claude-code', 'opencode']);
   assert.deepEqual(
     compatibility.ADAPTER_COMPATIBILITY_MATRIX.adapters.map((row) => row.adapterId),
-    ['claude-code'],
+    ['claude-code', 'opencode'],
   );
 
   const events = await collect(parseOpenCodeEvents, [fixtureBytes]);
@@ -670,6 +671,150 @@ function openCodeProfileFixture() {
     ]),
   };
   return { context, runtime };
+}
+
+async function runComposition() {
+  const adapterSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'opencode.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /from ['"]node:(?:child_process|fs|http|https|net|tls|crypto|timers)['"]/,
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /\b(?:fetch|spawn|execFile|exec|connect|request|readFile|writeFile|randomBytes|setTimeout|setInterval)\s*\(/,
+  );
+  assert.doesNotMatch(adapterSource, /process\.env|OPENCODE_SERVER_PASSWORD|Authorization|Basic /);
+  assert.match(adapterSource, /buildOpenCodeSpawnSpec/);
+  assert.match(adapterSource, /createOpenCodeDetector/);
+  assert.match(adapterSource, /parseOpenCodeEvents/);
+
+  const adapterModule = await import(pathToFileURL(opencodeAdapterBuildPath).href);
+  const profileModule = await import(pathToFileURL(opencodeProfileBuildPath).href);
+  const registryModule = await import(pathToFileURL(registryBuildPath).href);
+  const { OPENCODE_CAPABILITIES, createOpenCodeAdapter } = adapterModule;
+  const { buildOpenCodeSpawnSpec } = profileModule;
+
+  assert.deepEqual(Object.keys(adapterModule).sort(), [
+    'OPENCODE_CAPABILITIES',
+    'createOpenCodeAdapter',
+  ]);
+  assert.deepEqual(OPENCODE_CAPABILITIES, {
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: true,
+  });
+  assertRecursivelyFrozen(OPENCODE_CAPABILITIES, 'OpenCode capabilities');
+
+  const { context, runtime } = openCodeProfileFixture();
+  const task = Object.freeze({ text: 'TASK_CANARY_composition_64_05_0001' });
+  const detection = retainedOpenCodeDetection();
+  const normalizedEvent = Object.freeze({
+    type: 'init',
+    sessionId: 'synthetic-composition-session',
+    payload: Object.freeze({ provider: 'opencode' }),
+  });
+  const parserInput = Readable.from([Buffer.from('{}\n')]);
+  const child = Object.freeze({
+    pid: 64_005,
+    processGroupId: 64_005,
+    platform: 'linux',
+    closed: Promise.resolve({ code: 0, signal: null }),
+  });
+  const killOptions = Object.freeze({ grace: 250 });
+  let detectCalls = 0;
+  let runtimeCalls = 0;
+  let parserCalls = 0;
+  let killCalls = 0;
+  const dependencies = Object.freeze({
+    detect: async () => {
+      detectCalls += 1;
+      return detection;
+    },
+    resolveProfileRuntime: (observedContext) => {
+      runtimeCalls += 1;
+      assert.strictEqual(observedContext, context);
+      return runtime;
+    },
+    parseEvents: async function* (stream) {
+      parserCalls += 1;
+      assert.strictEqual(stream, parserInput);
+      yield normalizedEvent;
+    },
+    kill: async (observedChild, observedOptions) => {
+      killCalls += 1;
+      assert.strictEqual(observedChild, child);
+      assert.strictEqual(observedOptions, killOptions);
+    },
+  });
+  const adapter = createOpenCodeAdapter(dependencies);
+
+  assert.deepEqual(
+    Object.keys(adapter),
+    ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+    'OpenCode exposes exactly the five adapter methods in contract order',
+  );
+  assert.ok(Object.values(adapter).every((value) => typeof value === 'function'));
+  assert.ok(Object.isFrozen(adapter));
+  assert.strictEqual(await adapter.detect(), detection);
+  assert.equal(detectCalls, 1);
+
+  const spawnSpec = await adapter.buildSpawn(task, context);
+  assert.deepEqual(spawnSpec, buildOpenCodeSpawnSpec(task, context, runtime));
+  assert.equal(spawnSpec.adapterId, 'opencode');
+  assert.equal(spawnSpec.profileVersion, '1.14.25');
+  assert.equal(spawnSpec.topology.kind, 'owned_server');
+  assert.equal(JSON.stringify(spawnSpec).includes(task.text), false);
+  assertRecursivelyFrozen(spawnSpec, 'composed OpenCode spawn spec');
+  assert.equal(runtimeCalls, 1);
+
+  const parsed = [];
+  for await (const event of adapter.parseEvents(parserInput)) parsed.push(event);
+  assert.deepEqual(parsed, [normalizedEvent]);
+  assert.equal(parserCalls, 1);
+  await adapter.kill(child, killOptions);
+  assert.equal(killCalls, 1);
+  assert.strictEqual(adapter.caps(), OPENCODE_CAPABILITIES);
+  assert.strictEqual(adapter.caps(), adapter.caps());
+  assert.throws(() => { adapter.caps().serverMode = false; }, TypeError);
+
+  for (const invalid of [
+    null,
+    {},
+    { kill: true },
+    { kill: async () => {}, detect: true },
+    { kill: async () => {}, parseEvents: true },
+    { kill: async () => {}, resolveProfileRuntime: true },
+  ]) {
+    assert.throws(() => createOpenCodeAdapter(invalid), TypeError);
+  }
+  const failClosed = createOpenCodeAdapter({ kill: async () => {} });
+  await assert.rejects(
+    failClosed.buildSpawn(task, context),
+    /profile runtime dependency is unavailable/i,
+  );
+
+  const productionRegistry = registryModule.createProductionAdapterRegistry({
+    openCodeDetect: dependencies.detect,
+    openCodeParseEvents: dependencies.parseEvents,
+    resolveOpenCodeProfileRuntime: dependencies.resolveProfileRuntime,
+    kill: dependencies.kill,
+  });
+  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode']);
+  const productionAdapter = productionRegistry.require('opencode');
+  assert.deepEqual(Object.keys(productionAdapter), [
+    'detect',
+    'buildSpawn',
+    'parseEvents',
+    'kill',
+    'caps',
+  ]);
+  assert.deepEqual(await productionAdapter.buildSpawn(task, context), spawnSpec);
+  assert.strictEqual(productionAdapter.caps(), OPENCODE_CAPABILITIES);
+  assert.throws(() => productionRegistry.require('codex'), /Unknown adapter id/);
 }
 
 async function runProfilePolicy() {
@@ -1146,6 +1291,11 @@ async function run() {
   if (argv[1] === 'attestation') {
     await runAttestation();
     console.log('mcp-opencode-adapter.test.js: attestation PASS');
+    return;
+  }
+  if (argv[1] === 'composition') {
+    await runComposition();
+    console.log('mcp-opencode-adapter.test.js: composition PASS');
     return;
   }
   assert.fail(`unknown section: ${argv[1]}`);
