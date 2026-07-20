@@ -339,10 +339,22 @@ async function run() {
     /export interface AgentEvent\s*\{\s*readonly type: AgentEventType;\s*readonly sessionId: string;\s*readonly payload: Readonly<Record<string, unknown>>;\s*\}/m.test(adapterSource),
     'Phase 60 adapter still exposes only normalized type/sessionId/payload events',
   );
+  const productionRegistryBlock = adapterRegistrySource.match(
+    /export function createProductionAdapterRegistry\([\s\S]*?\n\}/,
+  );
+  const productionRegistryIds = productionRegistryBlock
+    ? Array.from(productionRegistryBlock[0].matchAll(/^\s*id: ([A-Z_]+_ADAPTER_ID),$/gm), (match) => match[1])
+    : [];
   assert(
-    /const CANONICAL_IDS = Object\.freeze\(\[CLAUDE_CODE_ADAPTER_ID\] as const\);/.test(adapterRegistrySource)
-      && /id: CLAUDE_CODE_ADAPTER_ID,\s*adapter: createClaudeCodeAdapter\(dependencies\)/m.test(adapterRegistrySource),
-    'Phase 60 production registry remains the single closed Claude Code adapter slot',
+    /const CANONICAL_IDS = Object\.freeze\(\[\s*CLAUDE_CODE_ADAPTER_ID,\s*OPENCODE_ADAPTER_ID,\s*\] as const\);/m.test(adapterRegistrySource)
+      && JSON.stringify(productionRegistryIds) === JSON.stringify([
+        'CLAUDE_CODE_ADAPTER_ID',
+        'OPENCODE_ADAPTER_ID',
+      ])
+      && /adapter: createClaudeCodeAdapter\(dependencies\)/m.test(productionRegistryBlock?.[0] || '')
+      && /adapter: createOpenCodeAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
+      && !/\b(?:CODEX_ADAPTER_ID|createCodexAdapter)\b|from '\.\/codex\.js'/.test(adapterRegistrySource),
+    'production registry remains the exact closed Claude Code/OpenCode roster with Codex absent',
   );
   assert(
     !/(?:hold|resume|status)\s*\(/.test(adapterInterface ? adapterInterface[1] : ''),
