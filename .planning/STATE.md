@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: executing
-stopped_at: Completed 63-11-PLAN.md
-last_updated: "2026-07-18T20:25:17.000Z"
-last_activity: 2026-07-18
+status: verifying
+stopped_at: Completed 63-12-PLAN.md
+last_updated: "2026-07-20T12:01:50.513Z"
+last_activity: 2026-07-20
 progress:
   total_phases: 18
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 40
-  completed_plans: 41
-  percent: 33
+  completed_plans: 42
+  percent: 39
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -22,7 +22,7 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 45/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 49/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
@@ -33,10 +33,10 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 ## Current Position
 
-Phase: 63 (native-messaging-host) — EXECUTING
+Phase: 63 (native-messaging-host) — EXECUTED (awaiting verification)
 Plan: 12 of 12
-Status: Ready to execute
-Last activity: 2026-07-18
+Status: Phase complete — ready for verification
+Last activity: 2026-07-20
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -48,11 +48,11 @@ Last activity: 2026-07-18
 | 60 | Adapter Contract & Claude Code MVP | ADAPT-01..05, CLAUDE-01..04 | Complete (2026-07-14; UAT deferred to milestone end) |
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
-| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | In Progress — 11/12 complete |
+| 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 45/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
+Coverage: 51/51 v0.9.91 requirements mapped, 49/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -189,16 +189,18 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Bind independent code, security, and UI reviews to one canonical patch, ordered manifest, implementation index, and worktree fingerprint — Review prose and verifier infrastructure cannot silently alter the implementation identity being approved
 - [Phase 63]: Preserve resolved blocking findings in the final review record and rerun each affected review after RED/GREEN remediation — Any open or accepted HIGH/CRITICAL row remains a hard stop, while historical resolved rows stay auditable
 - [Phase 63]: Use one separately packaged fixed Win32 Registry API helper instead of `reg.exe`, inherited `SystemRoot`, or `PATH` executable authority — Locale-dependent output and attacker-influenced executable selection cannot authorize an absent fact or registry mutation
+- [Phase 63 closeout]: Supersede stale gate receipts by full task restart at a fresh commit fingerprint — Prior green evidence is retained in history but never represented as current when the reviewed tree has advanced
+- [Phase 63 closeout]: Neutralize external lock-enabled Git stat-refresh interference with reversible per-entry assume-unchanged flags on content-clean generated files, reverted after the gates — Frozen wrappers, verifiers, and tests stay untouched while the raw-index byte invariant holds
 
 ### Pending Todos
 
-None. Phases 57-62 are automated/source complete; Phase 63 Plans 01-11 are complete and 1 approved serialized plan remains.
+None. Phases 57-63 are automated/source complete; Phase 63 automated validation is closed (all 30 per-task rows green) and awaits phase verification plus the milestone-end human UAT sweep.
 
 ### Blockers/Concerns
 
 No active blocker.
 
-- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source and independent review evidence is green through Phase 63 Plan 11, and no live pass is inferred.
+- **Milestone-end UAT gate:** Phase 58's 12 live Providers checks, Phase 59's 4 live pairing/lifecycle/accessibility checks, Phase 60's 7 authenticated CLI/OS/browser checks, Phase 61's 8 consolidated consent/theme/handoff/stream/worker/endurance/POSIX/restart scenarios, Phase 62's 3 doctor/stream/layout/accessibility checks, and Phase 63's eight genuine OS/Chrome/visual/accessibility scenarios remain pending. Per user instruction, all live evidence is accumulated and audited at milestone end; automated/source and independent review evidence is green through Phase 63 Plan 12 (automated validation closed), and no live pass is inferred.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
@@ -235,13 +237,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-18T20:25:17.000Z
-Stopped at: Completed 63-11-PLAN.md
+Last session: 2026-07-20T12:01:50.509Z
+Stopped at: Completed 63-12-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute Phase 63 Plan 12 by rerunning the reviewed focused matrix and the workspace-preserving repository-wide regression gate. Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Run Phase 63 verification, then plan Phase 64 (OpenCode Adapter). Keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -258,3 +260,4 @@ Execute Phase 63 Plan 12 by rerunning the reviewed focused matrix and the worksp
 | Phase 63 P09 | 17 min | 2 tasks | 3 files |
 | Phase 63 P10 | 25 min | 3 tasks | 7 files |
 | Phase 63 P11 | 5h 26m | 3 review tasks | 38 files |
+| Phase 63 P12 | 34min | 2 tasks | 1 files |
