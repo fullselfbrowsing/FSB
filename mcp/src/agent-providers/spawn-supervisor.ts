@@ -8,12 +8,14 @@ import {
 import { readFileSync } from 'node:fs';
 import { request as nodeHttpRequest } from 'node:http';
 import { isAbsolute } from 'node:path';
+import { TextDecoder } from 'node:util';
 import { z } from 'zod';
 import type {
   AdapterDetection,
   AgentEvent,
   AgentProviderId,
   AgentProviderAdapter,
+  AttestationDescriptor,
   ChildExit,
   ProcessSpec,
   SpawnSecretEnvBinding,
@@ -51,6 +53,9 @@ import type {
 } from './process-tree.js';
 import { createArgvSignature, TreeUnsettledError } from './process-tree.js';
 import { createProcessInspector, createProcessTreeTerminator } from './process-tree.js';
+import {
+  verifyPolicyAttestation,
+} from './policy-attestation.js';
 import type {
   ExtEvent,
   ExtRequest,
@@ -852,6 +857,38 @@ function containsSensitiveValue(serialized: string, values: readonly string[]): 
   ));
 }
 
+function exactOwnDataRecord(
+  value: unknown,
+  expectedKeys: readonly string[],
+): Readonly<Record<string, unknown>> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.length !== expectedKeys.length
+    || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+  ) return null;
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+  }
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function ownDataValue(record: Readonly<Record<string, unknown>>, key: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+class PolicyAttestationFailure extends Error {
+  readonly code = 'adapter_unavailable' as const;
+
+  constructor() {
+    super('adapter_unavailable');
+    this.name = 'PolicyAttestationFailure';
+  }
+}
+
 class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   readonly handleExtRequest: ExtRequestHandler;
 
@@ -1101,12 +1138,21 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         if (!directArgv) throw new Error('adapter_unavailable');
         argv = directArgv;
       } else {
+        await this.executePolicyAttestations(
+          run,
+          spec.attestations,
+          'process_json',
+          null,
+          runtimeFingerprint,
+        );
+        this.throwIfStopped(run);
         const selection = await this.selectOwnedServerTask(
           run,
           detection,
           spec.topology,
           spec.profileVersion,
           this.configurationDigest(spec),
+          spec.attestations,
         );
         process = selection.process;
         argv = selection.argv;
@@ -1408,6 +1454,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topology: OwnedServerTopology,
     profileVersion: string,
     configurationDigest: string,
+    attestations: readonly AttestationDescriptor[],
   ): Promise<Readonly<{ process: ProcessSpec; argv: readonly string[] }>> {
     this.requireOwnedServerTopology(topology);
     const topologyKey = this.topologyKey(topology, profileVersion, configurationDigest);
@@ -1423,13 +1470,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       process: topology.coldTask,
       argv: this.resolveProcessArguments(topology.coldTask, null),
     });
-    await this.ensureOwnedServer(
-      run,
-      detection,
-      topology,
-      topologyKey,
-      configurationDigest,
-    ).catch(() => null);
+    try {
+      await this.ensureOwnedServer(
+        run,
+        detection,
+        topology,
+        topologyKey,
+        configurationDigest,
+        attestations,
+      );
+    } catch (error) {
+      if (error instanceof PolicyAttestationFailure) throw error;
+    }
     return selection;
   }
 
@@ -1513,6 +1565,303 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       return;
     }
     this.armOwnedServerIdle(lease);
+  }
+
+  private async executePolicyAttestations(
+    run: DelegationRun,
+    descriptors: readonly AttestationDescriptor[],
+    source: AttestationDescriptor['source'],
+    endpoint: string | null,
+    runtimeFingerprint: string | null,
+  ): Promise<void> {
+    for (const descriptor of descriptors) {
+      if (descriptor.source !== source) continue;
+      try {
+        let document: unknown;
+        if (descriptor.source === 'process_json') {
+          if (runtimeFingerprint === null) throw new PolicyAttestationFailure();
+          document = await this.executeProcessJsonAttestation(
+            run,
+            descriptor,
+            runtimeFingerprint,
+          );
+        } else if (descriptor.source === 'owned_server_json') {
+          if (endpoint === null) throw new PolicyAttestationFailure();
+          document = await this.executeOwnedServerJsonAttestation(endpoint, descriptor);
+        } else {
+          throw new PolicyAttestationFailure();
+        }
+        const verdict = verifyPolicyAttestation(document, descriptor.assertions);
+        document = null;
+        if (!Object.isFrozen(verdict) || !verdict.pass) {
+          throw new PolicyAttestationFailure();
+        }
+      } catch (error) {
+        if (error instanceof TreeUnsettledError) throw error;
+        if (error instanceof PolicyAttestationFailure) throw error;
+        throw new PolicyAttestationFailure();
+      }
+    }
+  }
+
+  private async executeProcessJsonAttestation(
+    run: DelegationRun,
+    descriptor: Extract<AttestationDescriptor, { source: 'process_json' }>,
+    runtimeFingerprint: string,
+  ): Promise<unknown> {
+    const process = descriptor.process;
+    const argv = directProcessArguments(process);
+    if (
+      process.role !== 'policy_preflight'
+      || process.stdin !== 'none'
+      || process.stdout !== 'bounded_json'
+      || !hasNoSecretBindings(process.spawnSecretEnvBindings)
+      || !argv
+      || argv.length === 0
+      || descriptor.assertions.length === 0
+    ) throw new PolicyAttestationFailure();
+
+    const argvSignature = createArgvSignature(process.command, argv);
+    const environment = this.createEnvironment(process.fixedEnv, argvSignature);
+    environment.FSB_AGENT_FINGERPRINT = runtimeFingerprint;
+    const options: SpawnInvocationOptions = Object.freeze({
+      shell: false,
+      detached: true,
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
+      cwd: process.cwd,
+      env: environment,
+    });
+    const createdAt = this.wallNow();
+    let entry: JournalEntry = Object.freeze({
+      state: 'prepared' as const,
+      role: 'delegation' as const,
+      delegationId: run.delegationId,
+      adapterId: run.adapterId,
+      profileVersion: run.profileVersion,
+      createdAt,
+      binaryRealPath: process.command,
+      argvSignature,
+      fixedEnv: process.fixedEnv,
+      envFingerprint: runtimeFingerprint,
+      generation: this.generation,
+    });
+    let child: ChildProcessWithoutNullStreams | null = null;
+    let supervisedChild: SupervisedChild | null = null;
+    let body: Buffer | null = null;
+    let treeStopAttempted = false;
+    try {
+      child = this.spawnChild(process.command, argv, options);
+      if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
+        throw new PolicyAttestationFailure();
+      }
+      const observed = observeChild(child);
+      supervisedChild = Object.freeze({
+        pid: child.pid!,
+        processGroupId: child.pid!,
+        platform: this.platform,
+        closed: observed.closed,
+      });
+      this.entriesByPid.set(supervisedChild.pid, entry);
+      const stdout = this.readBoundedStream(child.stdout, descriptor.maxBytes);
+      const stderr = this.readBoundedStream(child.stderr, STDERR_LIMIT_BYTES);
+      await observed.ready;
+      const ignoreStdinError = (): void => undefined;
+      child.stdin.once('error', ignoreStdinError);
+      try {
+        child.stdin.end();
+      } catch {
+        child.stdin.off('error', ignoreStdinError);
+        throw new PolicyAttestationFailure();
+      }
+      const identity = await this.resolveActivation(entry as PreparedJournalEntry, supervisedChild.pid);
+      entry = Object.freeze({
+        ...entry,
+        state: 'active' as const,
+        pid: supervisedChild.pid,
+        processGroupId: identity.process.processGroupId,
+        startedAt: Math.max(createdAt, this.wallNow()),
+        processStartIdentity: identity.process.processStartIdentity,
+      }) as ActiveJournalEntry;
+      this.entriesByPid.set(supervisedChild.pid, entry);
+      const [boundedBody, discardedStderr, exit] = await this.withDeadline(
+        Promise.all([stdout, stderr, observed.closed]),
+        descriptor.timeoutMs,
+      );
+      discardedStderr.fill(0);
+      child.stdin.off('error', ignoreStdinError);
+      if (exit.code !== 0 || exit.signal !== null) throw new PolicyAttestationFailure();
+      body = boundedBody;
+      treeStopAttempted = true;
+      try {
+        await this.dependencies.terminator.stop(
+          entry,
+          supervisedChild,
+          { grace: this.terminationGrace },
+        );
+      } catch {
+        this.markDegraded('tree_unsettled');
+        throw new TreeUnsettledError();
+      }
+      return this.parseJsonDocument(body);
+    } catch (error) {
+      if (!treeStopAttempted && entry && supervisedChild) {
+        treeStopAttempted = true;
+        try {
+          await this.dependencies.terminator.stop(
+            entry,
+            supervisedChild,
+            { grace: this.terminationGrace },
+          );
+        } catch {
+          this.markDegraded('tree_unsettled');
+          throw new TreeUnsettledError();
+        }
+      }
+      if (error instanceof TreeUnsettledError) throw error;
+      throw new PolicyAttestationFailure();
+    } finally {
+      if (body) body.fill(0);
+      if (supervisedChild) this.entriesByPid.delete(supervisedChild.pid);
+    }
+  }
+
+  private async executeOwnedServerJsonAttestation(
+    endpoint: string,
+    descriptor: Extract<AttestationDescriptor, { source: 'owned_server_json' }>,
+  ): Promise<unknown> {
+    if (
+      descriptor.method !== 'GET'
+      || descriptor.secretRef !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
+      || descriptor.assertions.length === 0
+    ) throw new PolicyAttestationFailure();
+    const secret = this.ownedServerSecrets.get(descriptor.secretRef);
+    if (!secret || secret.length < OWNED_SERVER_SECRET_BYTES) {
+      throw new PolicyAttestationFailure();
+    }
+    const parsed = new URL(endpoint);
+    const port = Number(parsed.port);
+    if (
+      parsed.protocol !== 'http:'
+      || parsed.hostname !== '127.0.0.1'
+      || parsed.pathname !== '/'
+      || parsed.search !== ''
+      || parsed.hash !== ''
+      || parsed.username !== ''
+      || parsed.password !== ''
+      || !Number.isSafeInteger(port)
+      || port < 1
+      || port > 65_535
+    ) throw new PolicyAttestationFailure();
+
+    let password: string | null = secret.toString('base64url');
+    const credentialBytes = Buffer.from(
+      `${OWNED_SERVER_BASIC_USERNAME}:${password}`,
+      'utf8',
+    );
+    let authorization: string | null = `Basic ${credentialBytes.toString('base64')}`;
+    credentialBytes.fill(0);
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: authorization,
+    };
+    const requestOptions: OwnedServerHttpRequestOptions = {
+      hostname: '127.0.0.1',
+      port,
+      path: descriptor.path,
+      method: 'GET',
+      timeout: descriptor.timeoutMs,
+      maximumBytes: descriptor.maxBytes,
+      agent: false,
+      headers,
+    };
+    let body: Buffer | null = null;
+    try {
+      const response = await this.withDeadline(
+        this.requestOwnedServer(requestOptions),
+        descriptor.timeoutMs,
+      );
+      const responseRecord = exactOwnDataRecord(response, ['statusCode', 'headers', 'body']);
+      if (!responseRecord) throw new PolicyAttestationFailure();
+      const responseHeaders = exactOwnDataRecord(
+        ownDataValue(responseRecord, 'headers'),
+        ['content-type'],
+      );
+      const responseBody = ownDataValue(responseRecord, 'body');
+      const contentType = responseHeaders
+        ? ownDataValue(responseHeaders, 'content-type')
+        : null;
+      if (
+        ownDataValue(responseRecord, 'statusCode') !== 200
+        || typeof contentType !== 'string'
+        || !/^application\/json(?:\s*;.*)?$/i.test(contentType)
+        || !Buffer.isBuffer(responseBody)
+        || responseBody.length > descriptor.maxBytes
+      ) throw new PolicyAttestationFailure();
+      body = Buffer.from(responseBody);
+      return this.parseJsonDocument(body);
+    } catch (error) {
+      if (error instanceof PolicyAttestationFailure) throw error;
+      throw new PolicyAttestationFailure();
+    } finally {
+      if (body) body.fill(0);
+      headers.Authorization = '';
+      delete headers.Authorization;
+      authorization = null;
+      password = null;
+    }
+  }
+
+  private async readBoundedStream(
+    stream: NodeJS.ReadableStream,
+    maximumBytes: number,
+  ): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    try {
+      for await (const chunk of stream as AsyncIterable<Buffer | string>) {
+        const value = Buffer.isBuffer(chunk) ? Buffer.from(chunk) : Buffer.from(chunk, 'utf8');
+        bytes += value.length;
+        if (bytes > maximumBytes) {
+          value.fill(0);
+          throw new PolicyAttestationFailure();
+        }
+        chunks.push(value);
+      }
+      return Buffer.concat(chunks, bytes);
+    } finally {
+      for (const chunk of chunks) chunk.fill(0);
+    }
+  }
+
+  private parseJsonDocument(bytes: Buffer): unknown {
+    let text: string | null = null;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new PolicyAttestationFailure();
+    } finally {
+      bytes.fill(0);
+      text = null;
+    }
+  }
+
+  private withDeadline<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+    let timer: unknown = null;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = this.schedule(() => reject(new PolicyAttestationFailure()), timeoutMs);
+      if (timer && typeof timer === 'object' && 'unref' in timer) {
+        try {
+          (timer as { unref?: () => void }).unref?.();
+        } catch {
+          // The policy deadline remains authoritative when unref is unavailable.
+        }
+      }
+    });
+    return Promise.race([operation, timeout]).finally(() => {
+      if (timer !== null) this.clearScheduled(timer);
+    });
   }
 
   private createEnvironment(
@@ -1855,6 +2204,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topology: OwnedServerTopology,
     topologyKey: string,
     configurationDigest: string,
+    attestations: readonly AttestationDescriptor[],
   ): Promise<OwnedServerLease | null> {
     const retained = this.ownedServerLease;
     if (
@@ -1881,6 +2231,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         topology,
         topologyKey,
         configurationDigest,
+        attestations,
       );
     })();
     this.ownedServerWarmPromise = operation;
@@ -1902,6 +2253,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topology: OwnedServerTopology,
     topologyKey: string,
     configurationDigest: string,
+    attestations: readonly AttestationDescriptor[],
   ): Promise<OwnedServerLease | null> {
     const process = topology.server;
     const binding = process.spawnSecretEnvBindings[0];
@@ -1990,6 +2342,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         || retained.process.processGroupId !== active.processGroupId
         || retained.process.processStartIdentity !== active.processStartIdentity
       ) throw new Error('activation_failed');
+      await this.executePolicyAttestations(
+        run,
+        attestations,
+        'owned_server_json',
+        endpoint,
+        null,
+      );
       if (!this.accepting) throw new Error('daemon_shutdown');
       child.stdout.resume();
       const lease = Object.freeze({
@@ -2016,7 +2375,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       void observed.closed.then(() => this.handleOwnedServerExit(lease));
       this.armOwnedServerIdle(lease);
       return lease;
-    } catch {
+    } catch (error) {
       if (entry) {
         try {
           await this.dependencies.terminator.stop(
@@ -2034,6 +2393,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       }
       if (supervisedChild) this.entriesByPid.delete(supervisedChild.pid);
       this.clearOwnedServerSecret(secretRef);
+      if (error instanceof PolicyAttestationFailure) throw error;
       return null;
     }
   }
