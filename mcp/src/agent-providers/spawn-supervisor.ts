@@ -357,6 +357,7 @@ interface DelegationRun {
   routeSignal: AbortSignal | null;
   routeAbortListener: (() => void) | null;
   replayClosed: boolean;
+  ownedServerLease: OwnedServerLease | null;
 }
 
 type OwnedServerTopology = Extract<SpawnSpec['topology'], { readonly kind: 'owned_server' }>;
@@ -371,6 +372,15 @@ interface OwnedServerLease {
   readonly entry: ActiveJournalEntry;
   readonly child: ChildProcessWithoutNullStreams;
   readonly supervisedChild: SupervisedChild;
+  readonly activity: {
+    activeCount: number;
+    lastUse: number;
+    idleTimeoutMs: number;
+    idleTimer: unknown | null;
+    idleToken: number;
+    exited: boolean;
+    retiring: boolean;
+  };
 }
 
 export class InvalidDelegationRequestError extends Error {
@@ -867,6 +877,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly clearScheduled: NonNullable<SpawnSupervisorDependencies['clearScheduled']>;
   private ownedServerLease: OwnedServerLease | null = null;
   private ownedServerWarmPromise: Promise<OwnedServerLease | null> | null = null;
+  private ownedServerStopPromise: Promise<void> | null = null;
   private readonly ownedServerSecrets = new Map<string, Buffer>();
   private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
   private readonly routeLosses = new Map<string, DelegationRouteLoss>();
@@ -1040,6 +1051,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       routeSignal: context?.signal ?? null,
       routeAbortListener: null,
       replayClosed: false,
+      ownedServerLease: null,
     };
     this.activeRuns.set(delegationId, run);
     run.executionPromise = this.executeRun(run);
@@ -1227,7 +1239,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         ),
       );
     } finally {
-      run.resolveSetup();
+      try {
+        await this.releaseOwnedServerLease(run);
+      } catch {
+        this.markDegraded('runtime_cleanup_failed');
+      } finally {
+        run.resolveSetup();
+      }
     }
   }
 
@@ -1394,7 +1412,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     this.requireOwnedServerTopology(topology);
     const topologyKey = this.topologyKey(topology, profileVersion, configurationDigest);
     const lease = await this.verifiedOwnedServerLease(topologyKey);
-    if (lease) {
+    if (lease && this.acquireOwnedServerLease(run, lease)) {
       return Object.freeze({
         process: topology.attachTask,
         argv: this.resolveProcessArguments(topology.attachTask, lease.endpoint),
@@ -1405,15 +1423,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       process: topology.coldTask,
       argv: this.resolveProcessArguments(topology.coldTask, null),
     });
-    if (!this.ownedServerLease) {
-      await this.ensureOwnedServer(
-        run,
-        detection,
-        topology,
-        topologyKey,
-        configurationDigest,
-      ).catch(() => null);
-    }
+    await this.ensureOwnedServer(
+      run,
+      detection,
+      topology,
+      topologyKey,
+      configurationDigest,
+    ).catch(() => null);
     return selection;
   }
 
@@ -1426,17 +1442,21 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || lease.entry.generation !== this.generation
       || !secret
       || secret.length < OWNED_SERVER_SECRET_BYTES
+      || lease.activity.exited
+      || lease.activity.retiring
     ) {
+      if (lease) await this.retireOwnedServerLease(lease);
       return null;
     }
     let inspection: ProcessInspection;
     try {
       inspection = await this.dependencies.inspector.inspect(lease.entry);
     } catch {
+      await this.retireOwnedServerLease(lease);
       return null;
     }
     if (inspection.classification === 'stale') {
-      await this.stopOwnedServerLease().catch(() => undefined);
+      await this.retireOwnedServerLease(lease);
       return null;
     }
     if (
@@ -1444,7 +1464,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || inspection.process.pid !== lease.entry.pid
       || inspection.process.processGroupId !== lease.entry.processGroupId
       || inspection.process.processStartIdentity !== lease.entry.processStartIdentity
-    ) return null;
+    ) {
+      await this.retireOwnedServerLease(lease);
+      return null;
+    }
     try {
       await this.requireOwnedServerHealth(
         lease.endpoint,
@@ -1453,10 +1476,43 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         lease.healthTimeoutMs,
       );
     } catch {
-      await this.stopOwnedServerLease().catch(() => undefined);
+      await this.retireOwnedServerLease(lease);
       return null;
     }
     return lease;
+  }
+
+  private acquireOwnedServerLease(run: DelegationRun, lease: OwnedServerLease): boolean {
+    if (
+      this.ownedServerLease !== lease
+      || this.ownedServerStopPromise
+      || lease.activity.exited
+      || lease.activity.retiring
+    ) return false;
+    this.clearOwnedServerIdle(lease);
+    lease.activity.activeCount += 1;
+    lease.activity.lastUse = this.monotonicNow();
+    run.ownedServerLease = lease;
+    return true;
+  }
+
+  private async releaseOwnedServerLease(run: DelegationRun): Promise<void> {
+    const lease = run.ownedServerLease;
+    if (!lease) return;
+    run.ownedServerLease = null;
+    if (lease.activity.activeCount < 1) throw new Error('runtime_cleanup_failed');
+    lease.activity.activeCount -= 1;
+    lease.activity.lastUse = this.monotonicNow();
+    if (lease.activity.activeCount !== 0) return;
+    if (
+      lease.activity.retiring
+      || lease.activity.exited
+      || !this.accepting
+    ) {
+      if (this.ownedServerLease === lease) await this.stopOwnedServerLease();
+      return;
+    }
+    this.armOwnedServerIdle(lease);
   }
 
   private createEnvironment(
@@ -1800,19 +1856,37 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topologyKey: string,
     configurationDigest: string,
   ): Promise<OwnedServerLease | null> {
-    if (this.ownedServerLease?.topologyKey === topologyKey) {
-      return Promise.resolve(this.ownedServerLease);
+    const retained = this.ownedServerLease;
+    if (
+      retained?.topologyKey === topologyKey
+      && !retained.activity.exited
+      && !retained.activity.retiring
+    ) {
+      return Promise.resolve(retained);
     }
     if (this.ownedServerWarmPromise) return this.ownedServerWarmPromise;
-    const operation = this.startOwnedServer(
-      run,
-      detection,
-      topology,
-      topologyKey,
-      configurationDigest,
-    );
+    const operation = (async (): Promise<OwnedServerLease | null> => {
+      const stopping = this.ownedServerStopPromise;
+      if (stopping) {
+        try {
+          await stopping;
+        } catch {
+          return null;
+        }
+      }
+      if (!this.accepting || this.ownedServerLease) return null;
+      return this.startOwnedServer(
+        run,
+        detection,
+        topology,
+        topologyKey,
+        configurationDigest,
+      );
+    })();
     this.ownedServerWarmPromise = operation;
-    void operation.finally(() => {
+    void operation.then(() => {
+      if (this.ownedServerWarmPromise === operation) this.ownedServerWarmPromise = null;
+    }, () => {
       if (this.ownedServerWarmPromise === operation) this.ownedServerWarmPromise = null;
     });
     return operation;
@@ -1928,8 +2002,19 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         entry: active,
         child,
         supervisedChild,
+        activity: {
+          activeCount: 0,
+          lastUse: this.monotonicNow(),
+          idleTimeoutMs: topology.idle.timeoutMs,
+          idleTimer: null,
+          idleToken: 0,
+          exited: false,
+          retiring: false,
+        },
       });
       this.ownedServerLease = lease;
+      void observed.closed.then(() => this.handleOwnedServerExit(lease));
+      this.armOwnedServerIdle(lease);
       return lease;
     } catch {
       if (entry) {
@@ -2043,23 +2128,96 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     });
   }
 
-  private async stopOwnedServerLease(): Promise<void> {
+  private clearOwnedServerIdle(lease: OwnedServerLease): void {
+    lease.activity.idleToken += 1;
+    const timer = lease.activity.idleTimer;
+    lease.activity.idleTimer = null;
+    if (timer !== null) this.clearScheduled(timer);
+  }
+
+  private armOwnedServerIdle(lease: OwnedServerLease): void {
+    if (
+      this.ownedServerLease !== lease
+      || lease.activity.activeCount !== 0
+      || lease.activity.exited
+      || lease.activity.retiring
+      || !this.accepting
+    ) return;
+    this.clearOwnedServerIdle(lease);
+    const token = lease.activity.idleToken;
+    const timer = this.schedule(() => {
+      if (
+        this.ownedServerLease !== lease
+        || lease.activity.idleToken !== token
+        || lease.activity.activeCount !== 0
+        || lease.activity.exited
+        || lease.activity.retiring
+        || !this.accepting
+      ) return;
+      lease.activity.idleTimer = null;
+      void this.stopOwnedServerLease().catch(() => {
+        this.markDegraded('runtime_cleanup_failed');
+      });
+    }, lease.activity.idleTimeoutMs);
+    lease.activity.idleTimer = timer;
+    if (timer && typeof timer === 'object' && 'unref' in timer) {
+      try {
+        (timer as { unref?: () => void }).unref?.();
+      } catch {
+        // The generation-owned lease still has a bounded teardown timer.
+      }
+    }
+  }
+
+  private handleOwnedServerExit(lease: OwnedServerLease): void {
+    lease.activity.exited = true;
+    lease.activity.retiring = true;
+    this.clearOwnedServerIdle(lease);
+    if (this.ownedServerLease !== lease || lease.activity.activeCount !== 0) return;
+    void this.stopOwnedServerLease().catch(() => {
+      this.markDegraded('runtime_cleanup_failed');
+    });
+  }
+
+  private async retireOwnedServerLease(lease: OwnedServerLease): Promise<void> {
+    if (this.ownedServerLease !== lease) return;
+    lease.activity.retiring = true;
+    this.clearOwnedServerIdle(lease);
+    if (lease.activity.activeCount === 0) await this.stopOwnedServerLease();
+  }
+
+  private stopOwnedServerLease(): Promise<void> {
+    if (this.ownedServerStopPromise) return this.ownedServerStopPromise;
     const lease = this.ownedServerLease;
-    if (!lease) return;
-    this.ownedServerLease = null;
+    if (!lease) return Promise.resolve();
+    const operation = this.stopOwnedServerLeaseOnce(lease);
+    this.ownedServerStopPromise = operation;
+    void operation.then(() => {
+      if (this.ownedServerStopPromise === operation) this.ownedServerStopPromise = null;
+    }, () => {
+      if (this.ownedServerStopPromise === operation) this.ownedServerStopPromise = null;
+    });
+    return operation;
+  }
+
+  private async stopOwnedServerLeaseOnce(lease: OwnedServerLease): Promise<void> {
+    if (this.ownedServerLease === lease) this.ownedServerLease = null;
+    lease.activity.retiring = true;
+    this.clearOwnedServerIdle(lease);
     try {
       await this.dependencies.terminator.stop(
         lease.entry,
         lease.supervisedChild,
         { grace: this.terminationGrace },
       );
+      lease.activity.exited = true;
       await this.dependencies.runtimeFiles.removeRun({
         delegationId: lease.entry.delegationId,
         role: 'provider_server',
       });
       this.entriesByPid.delete(lease.supervisedChild.pid);
     } catch (error) {
-      this.ownedServerLease = lease;
+      this.markDegraded('runtime_cleanup_failed');
       throw error;
     } finally {
       this.clearOwnedServerSecret(lease.secretRef);
