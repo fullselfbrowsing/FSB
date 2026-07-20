@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Phase 64 UI-SPEC approved
-last_updated: "2026-07-20T18:23:52.894Z"
-last_activity: 2026-07-20 -- Phase 64 planning complete
+stopped_at: Completed 64-01-PLAN.md
+last_updated: "2026-07-20T18:57:59.772Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 01 complete; OpenCode parser and drift gate green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 42
+  completed_plans: 43
   percent: 39
 ---
 
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 999.1 — mcp tool gaps click heuristics
+**Current focus:** Phase 64 — OpenCode Adapter
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 64 (OpenCode Adapter) — EXECUTING
+Plan: 2 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 planning complete
+Last activity: 2026-07-20 -- Phase 64 Plan 01 complete; OpenCode parser and drift gate green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -49,7 +49,7 @@ Last activity: 2026-07-20 -- Phase 64 planning complete
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | Not started |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (1/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
 Coverage: 51/51 v0.9.91 requirements mapped, 49/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
@@ -191,6 +191,9 @@ v0.9.91-specific decisions so far:
 - [Phase 63]: Use one separately packaged fixed Win32 Registry API helper instead of `reg.exe`, inherited `SystemRoot`, or `PATH` executable authority — Locale-dependent output and attacker-influenced executable selection cannot authorize an absent fact or registry mutation
 - [Phase 63 closeout]: Supersede stale gate receipts by full task restart at a fresh commit fingerprint — Prior green evidence is retained in history but never represented as current when the reviewed tree has advanced
 - [Phase 63 closeout]: Neutralize external lock-enabled Git stat-refresh interference with reversible per-entry assume-unchanged flags on content-clean generated files, reverted after the gates — Frozen wrappers, verifiers, and tests stay untouched while the raw-index byte invariant holds
+- [Phase 64]: Treat only tool-calls and unknown as continuation finishes. — The pinned OpenCode 1.14.25 prompt loop continues only for those two reasons; every other bounded source-valid finish remains a candidate until EOF.
+- [Phase 64]: Keep OpenCode fixture-gated but absent from production registry and compatibility exposure until Plan 05. — Parser and fixture drift must block CI before production selection, while the first-commit boundary must not smuggle in start authority.
+- [Phase 64]: Project fixed tool and provider-error fields above the OpenCode parser. — Call identity, tool name, error status, and a closed diagnostic are sufficient; raw input, output, metadata, and error bodies remain confidential below the parser boundary.
 
 ### Pending Todos
 
@@ -237,13 +240,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T13:59:01.860Z
-Stopped at: Phase 64 UI-SPEC approved
-Resume file: .planning/phases/64-opencode-adapter/64-UI-SPEC.md
+Last session: 2026-07-20T18:57:59.767Z
+Stopped at: Completed 64-01-PLAN.md
+Resume file: None
 
 ## Next Actions
 
-Run Phase 63 verification, then plan Phase 64 (OpenCode Adapter). Keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute 64-02-PLAN.md next. Keep OpenCode production registration and compatibility exposure absent until Plan 05, and keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -261,3 +264,4 @@ Run Phase 63 verification, then plan Phase 64 (OpenCode Adapter). Keep every acc
 | Phase 63 P10 | 25 min | 3 tasks | 7 files |
 | Phase 63 P11 | 5h 26m | 3 review tasks | 38 files |
 | Phase 63 P12 | 34min | 2 tasks | 1 files |
+| Phase 64 P01 | 30 min | 1 task | 9 files |

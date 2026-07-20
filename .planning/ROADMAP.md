@@ -197,7 +197,7 @@
 **Plans**: 13 plans
 
 **Wave 1**
-- [ ] 64-01-PLAN.md — Land the complete strict parser, honest 1.14.25 fixture, native negative corpus, and generalized adapter-native Phase 62 CI drift gate as the sole first implementation commit.
+- [x] 64-01-PLAN.md — Land the complete strict parser, honest 1.14.25 fixture, native negative corpus, and generalized adapter-native Phase 62 CI drift gate as the sole first implementation commit.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 64-02-PLAN.md — Freeze the exact five-method provider-neutral topology/attestation seam and the public fixed-env versus transient secret-binding contract.
@@ -255,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 0/13 | Planned | — |
+| 64. OpenCode Adapter | 1/13 | In Progress | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones
