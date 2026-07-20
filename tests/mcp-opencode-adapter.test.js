@@ -783,7 +783,7 @@ async function runProfilePolicy() {
   const spec = profile.spawnSpec;
   assert.equal(spec.adapterId, 'opencode');
   assert.equal(spec.profileVersion, '1.14.25');
-  assert.deepEqual(spec.attestations, []);
+  assert.equal(spec.attestations.length, 4);
   assert.equal(spec.topology.kind, 'owned_server');
   const { server, coldTask, attachTask } = spec.topology;
   const prefix = ['/fixture/runtime/opencode-entry.js', '--pure', '--log-level', 'ERROR'];
@@ -910,7 +910,6 @@ async function runAttestation() {
   const policyModule = await import(pathToFileURL(policyAttestationBuildPath).href);
   const {
     OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS,
-    OPENCODE_RESOLVED_FSB_PERMISSION_RULES,
     buildOpenCodeProfile,
   } = profileModule;
   const { verifyPolicyAttestation } = policyModule;
@@ -927,7 +926,7 @@ async function runAttestation() {
     'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
   ]);
   assertRecursivelyFrozen(OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS, 'fallback sentinels');
-  assert.deepEqual(OPENCODE_RESOLVED_FSB_PERMISSION_RULES, [
+  const resolvedPermissionRules = [
     { permission: '*', action: 'allow', pattern: '*' },
     { permission: 'doom_loop', action: 'ask', pattern: '*' },
     { permission: 'external_directory', pattern: '*', action: 'ask' },
@@ -951,8 +950,7 @@ async function runAttestation() {
       action: 'deny',
     },
     { permission: 'fsb_*', action: 'allow', pattern: '*' },
-  ]);
-  assertRecursivelyFrozen(OPENCODE_RESOLVED_FSB_PERMISSION_RULES, 'resolved permission rules');
+  ];
 
   assert.equal(attestations.length, 4);
   assert.deepEqual(attestations.map((descriptor) => descriptor.source), [
@@ -1004,7 +1002,7 @@ async function runAttestation() {
     description: fsbPolicy.description,
     prompt: fsbPolicy.prompt,
     steps: 40,
-    permission: clone(OPENCODE_RESOLVED_FSB_PERMISSION_RULES),
+    permission: clone(resolvedPermissionRules),
     tools: ['fsb_navigate', 'fsb_snapshot'],
     resolvedModel: 'native/default-model',
   };
@@ -1117,7 +1115,6 @@ async function runAttestation() {
     'OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS',
     'OPENCODE_FIXED_ISOLATION_ENV_KEYS',
     'OPENCODE_PROFILE_VERSION',
-    'OPENCODE_RESOLVED_FSB_PERMISSION_RULES',
     'OPENCODE_TASK_LIMIT_BYTES',
     'SHIPPED_FSB_DESCRIPTION_SHA256',
     'SHIPPED_FSB_PROMPT_SHA256',

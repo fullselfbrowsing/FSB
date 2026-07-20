@@ -7,6 +7,8 @@ import {
   OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
   freezeSpawnSpec,
   type AgentTask,
+  type AttestationDescriptor,
+  type PolicyAttestationAssertion,
   type ProcessArgument,
   type ProcessRole,
   type ProcessSpec,
@@ -57,6 +59,11 @@ export const OPENCODE_FIXED_ISOLATION_ENV_KEYS = Object.freeze([
   'OPENCODE_TEST_HOME',
   'OPENCODE_TEST_MANAGED_CONFIG_DIR',
   'XDG_CONFIG_HOME',
+] as const);
+
+export const OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS = Object.freeze([
+  'agent "fsb" not found. Falling back to default agent',
+  'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
 ] as const);
 
 const RUNTIME_CONTEXT_KEYS = Object.freeze([
@@ -392,9 +399,9 @@ function fixedEnvironment(runtime: OpenCodeProfileRuntime): Readonly<Record<stri
   });
 }
 
-function privateArtifacts(runtime: OpenCodeProfileRuntime): readonly RuntimePrivateArtifact[] {
+function privateConfigDocument(runtime: OpenCodeProfileRuntime) {
   const truncationGlob = join(runtime.opencodeDataRoot, 'tool-output', '*');
-  const document = {
+  return {
     share: 'disabled',
     autoupdate: false,
     default_agent: 'fsb',
@@ -426,10 +433,251 @@ function privateArtifacts(runtime: OpenCodeProfileRuntime): readonly RuntimePriv
       },
     },
   };
+}
+
+function privateArtifacts(runtime: OpenCodeProfileRuntime): readonly RuntimePrivateArtifact[] {
+  const document = privateConfigDocument(runtime);
   return Object.freeze([
     Object.freeze({ kind: 'opencode_config' as const, contents: `${JSON.stringify(document)}\n` }),
     Object.freeze({ kind: 'opencode_test_home' as const }),
     Object.freeze({ kind: 'opencode_managed_config' as const }),
+  ]);
+}
+
+function simpleRule(
+  permission: string,
+  action: 'allow' | 'deny' | 'ask',
+) {
+  return Object.freeze({ permission, action, pattern: '*' });
+}
+
+function patternedRule(
+  permission: string,
+  pattern: string,
+  action: 'allow' | 'deny' | 'ask',
+) {
+  return Object.freeze({ permission, pattern, action });
+}
+
+function resolvedFsbPermissionRules(runtime: OpenCodeProfileRuntime) {
+  const truncationGlob = join(runtime.opencodeDataRoot, 'tool-output', '*');
+  return Object.freeze([
+    simpleRule('*', 'allow'),
+    simpleRule('doom_loop', 'ask'),
+    patternedRule('external_directory', '*', 'ask'),
+    patternedRule('external_directory', truncationGlob, 'allow'),
+    simpleRule('question', 'deny'),
+    simpleRule('plan_enter', 'deny'),
+    simpleRule('plan_exit', 'deny'),
+    patternedRule('read', '*', 'allow'),
+    patternedRule('read', '*.env', 'ask'),
+    patternedRule('read', '*.env.*', 'ask'),
+    patternedRule('read', '*.env.example', 'allow'),
+    simpleRule('*', 'deny'),
+    patternedRule('external_directory', '*', 'deny'),
+    patternedRule('external_directory', truncationGlob, 'deny'),
+    simpleRule('fsb_*', 'allow'),
+  ]);
+}
+
+function configAssertions(runtime: OpenCodeProfileRuntime): readonly PolicyAttestationAssertion[] {
+  const config = privateConfigDocument(runtime);
+  return Object.freeze([
+    Object.freeze({
+      kind: 'exact_keys' as const,
+      path: Object.freeze([]),
+      keys: Object.freeze([
+        'share',
+        'autoupdate',
+        'default_agent',
+        'plugin',
+        'command',
+        'instructions',
+        'agent',
+        'mcp',
+      ]),
+    }),
+    Object.freeze({
+      kind: 'document_sha256' as const,
+      path: Object.freeze([]),
+      sha256: digest(JSON.stringify(config)),
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['share']),
+      sha256: digest('disabled'),
+    }),
+    Object.freeze({
+      kind: 'exact_scalar' as const,
+      path: Object.freeze(['autoupdate']),
+      value: false,
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['default_agent']),
+      sha256: digest('fsb'),
+    }),
+    Object.freeze({
+      kind: 'exact_keys' as const,
+      path: Object.freeze(['mcp']),
+      keys: Object.freeze(['fsb']),
+    }),
+    Object.freeze({
+      kind: 'document_sha256' as const,
+      path: Object.freeze(['mcp', 'fsb']),
+      sha256: digest(JSON.stringify(config.mcp.fsb)),
+    }),
+    Object.freeze({
+      kind: 'exact_keys' as const,
+      path: Object.freeze(['agent']),
+      keys: Object.freeze(['fsb']),
+    }),
+    Object.freeze({
+      kind: 'document_sha256' as const,
+      path: Object.freeze(['agent', 'fsb']),
+      sha256: digest(JSON.stringify(config.agent.fsb)),
+    }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['model']) }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['provider']) }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['skills']) }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['permission']) }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['tools']) }),
+  ]);
+}
+
+function agentAssertions(runtime: OpenCodeProfileRuntime): readonly PolicyAttestationAssertion[] {
+  const permission = resolvedFsbPermissionRules(runtime);
+  return Object.freeze([
+    Object.freeze({
+      kind: 'exact_keys' as const,
+      path: Object.freeze([]),
+      keys: Object.freeze([
+        'name',
+        'mode',
+        'description',
+        'prompt',
+        'steps',
+        'permission',
+        'tools',
+        'resolvedModel',
+      ]),
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['name']),
+      sha256: digest('fsb'),
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['mode']),
+      sha256: digest('primary'),
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['description']),
+      sha256: SHIPPED_FSB_DESCRIPTION_SHA256,
+    }),
+    Object.freeze({
+      kind: 'string_sha256' as const,
+      path: Object.freeze(['prompt']),
+      sha256: SHIPPED_FSB_PROMPT_SHA256,
+    }),
+    Object.freeze({
+      kind: 'exact_scalar' as const,
+      path: Object.freeze(['steps']),
+      value: 40,
+    }),
+    Object.freeze({
+      kind: 'document_sha256' as const,
+      path: Object.freeze(['permission']),
+      sha256: digest(JSON.stringify(permission)),
+    }),
+    Object.freeze({
+      kind: 'all_strings_prefix' as const,
+      path: Object.freeze(['tools']),
+      prefixRef: 'fsb_mcp_tool_prefix' as const,
+    }),
+    Object.freeze({
+      kind: 'nonempty_string' as const,
+      path: Object.freeze(['resolvedModel']),
+    }),
+    Object.freeze({ kind: 'absent' as const, path: Object.freeze(['model']) }),
+  ]);
+}
+
+function policyProcess(
+  command: string,
+  argv: readonly ProcessArgument[],
+  cwd: string,
+  privateFiles: readonly string[],
+  fixedEnv: Readonly<Record<string, string>>,
+): ProcessSpec {
+  return processSpec({
+    role: 'policy_preflight',
+    command,
+    argv,
+    cwd,
+    privateFiles,
+    fixedEnv,
+  });
+}
+
+function policyAttestations(
+  context: ValidatedContext,
+  runtime: OpenCodeProfileRuntime,
+  prefix: readonly string[],
+  privateFiles: readonly string[],
+  fixedEnv: Readonly<Record<string, string>>,
+): readonly AttestationDescriptor[] {
+  const config = configAssertions(runtime);
+  const agent = agentAssertions(runtime);
+  const maxBytes = 128 * 1024;
+  const timeoutMs = 5_000;
+  return Object.freeze([
+    Object.freeze({
+      source: 'process_json' as const,
+      process: policyProcess(
+        context.command,
+        Object.freeze([...prefix, 'debug', 'config']),
+        context.cwd,
+        privateFiles,
+        fixedEnv,
+      ),
+      maxBytes,
+      timeoutMs,
+      assertions: config,
+    }),
+    Object.freeze({
+      source: 'process_json' as const,
+      process: policyProcess(
+        context.command,
+        Object.freeze([...prefix, 'debug', 'agent', 'fsb']),
+        context.cwd,
+        privateFiles,
+        fixedEnv,
+      ),
+      maxBytes,
+      timeoutMs,
+      assertions: agent,
+    }),
+    Object.freeze({
+      source: 'owned_server_json' as const,
+      method: 'GET' as const,
+      path: '/config',
+      secretRef: OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
+      maxBytes,
+      timeoutMs,
+      assertions: config,
+    }),
+    Object.freeze({
+      source: 'owned_server_json' as const,
+      method: 'GET' as const,
+      path: '/agent',
+      secretRef: OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
+      maxBytes,
+      timeoutMs,
+      assertions: agent,
+    }),
   ]);
 }
 
@@ -554,7 +802,7 @@ export function buildOpenCodeProfile(
         generation: 'daemon_generation',
       },
     },
-    attestations: [],
+    attestations: policyAttestations(context, runtime, prefix, privateFiles, fixedEnv),
   });
   const artifacts = privateArtifacts(runtime);
   const profile = Object.freeze({ privateArtifacts: artifacts, spawnSpec });
