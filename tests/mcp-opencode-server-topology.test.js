@@ -31,8 +31,8 @@ function startRequest(adapterId, task, id) {
   };
 }
 
-function normalizedEvent(type, payload = {}) {
-  return { type, sessionId: 'session_topology_fixture', payload };
+function normalizedEvent(type, payload = {}, sessionId = 'session_topology_fixture') {
+  return { type, sessionId, payload };
 }
 
 async function* parseNormalizedLines(stream) {
@@ -66,6 +66,7 @@ function makeChild(role, pid, controls) {
   };
 
   const send = (events, exit = { code: 0, signal: null }) => {
+    if (closed) return;
     for (const event of events) stdout.write(`${JSON.stringify(event)}\n`);
     close(exit);
   };
@@ -82,16 +83,23 @@ function makeChild(role, pid, controls) {
     final(callback) {
       callback();
       if (role === 'owned_server') return;
-      setImmediate(() => {
+      const finish = () => {
         if (controls.zeroEventRoles.has(role)) {
           close({ code: 1, signal: null });
           return;
         }
         send([
-          normalizedEvent('init', { role }),
-          normalizedEvent('result', { is_error: false, role }),
+          normalizedEvent('init', { role }, `session-topology-${pid}`),
+          normalizedEvent('result', { is_error: false, role }, `session-topology-${pid}`),
         ]);
-      });
+      };
+      if (controls.holdTaskRoles.has(role)) {
+        const pending = controls.pendingTaskCompletions.get(role) ?? [];
+        pending.push(finish);
+        controls.pendingTaskCompletions.set(role, pending);
+      } else {
+        setImmediate(finish);
+      }
     },
   });
 
@@ -231,14 +239,22 @@ function makeHarness(supervisorModule, options = {}) {
       headers: { 'content-type': 'application/json' },
       body: Buffer.from(JSON.stringify({ healthy: true, version: 'fixture-profile-1' })),
     },
+    healthGate: null,
+    holdTaskRoles: new Set(),
+    pendingTaskCompletions: new Map(),
   };
   const spawnCalls = [];
   const emitted = [];
   const journal = new Map();
   const activePids = new Map();
+  const spawnedPids = new Map();
   const children = new Map();
   const randomCalls = [];
   const httpCalls = [];
+  const terminationCalls = [];
+  const lifecycleEvents = [];
+  const scheduledTimers = [];
+  let fakeClock = 0;
   let nextPid = 51000;
   let lastSpawn = null;
   let idCounter = 0;
@@ -310,6 +326,7 @@ function makeHarness(supervisorModule, options = {}) {
       const id = typeof input === 'string' ? input : input.delegationId;
       journal.delete(`${role}:${id}`);
       activePids.delete(`${role}:${id}`);
+      lifecycleEvents.push(`remove:${role}:${id}`);
     },
   };
 
@@ -319,7 +336,7 @@ function makeHarness(supervisorModule, options = {}) {
         return { classification: 'stale' };
       }
       const key = `${entry.role}:${entry.delegationId}`;
-      const pid = activePids.get(key) ?? lastSpawn?.child.pid;
+      const pid = activePids.get(key) ?? spawnedPids.get(key) ?? lastSpawn?.child.pid;
       if (!pid) return { classification: 'stale' };
       return {
         classification: 'confirmed',
@@ -335,7 +352,9 @@ function makeHarness(supervisorModule, options = {}) {
   };
 
   const terminator = {
-    async stop(_entry, supervisedChild) {
+    async stop(entry, supervisedChild) {
+      terminationCalls.push({ entry, supervisedChild });
+      lifecycleEvents.push(`stop:${entry.role}:${entry.delegationId}`);
       if (!supervisedChild) return;
       const child = children.get(supervisedChild.pid);
       if (child && !child.closed) child.close({ code: null, signal: 'SIGTERM' });
@@ -389,6 +408,12 @@ function makeHarness(supervisorModule, options = {}) {
       call.child = child;
       lastSpawn = call;
       children.set(child.pid, child);
+      const journalKey = role === 'owned_server'
+        ? [...journal.entries()]
+            .filter(([, entry]) => entry.role === 'provider_server' && entry.state === 'prepared')
+            .at(-1)?.[0]
+        : `delegation:${options.env.FSB_DELEGATION_ID}`;
+      if (journalKey) spawnedPids.set(journalKey, child.pid);
       return child;
     },
     randomBytes(size) {
@@ -400,6 +425,7 @@ function makeHarness(supervisorModule, options = {}) {
         options: requestOptions,
         authorizationAtCall: requestOptions.headers.Authorization,
       });
+      if (controls.healthGate) await controls.healthGate.promise;
       if (controls.healthResponse instanceof Error) throw controls.healthResponse;
       return controls.healthResponse;
     },
@@ -409,6 +435,19 @@ function makeHarness(supervisorModule, options = {}) {
     mintDelegationId: () => `delegation_topology_${String(++idCounter).padStart(4, '0')}`,
     mintFingerprint: () => `runtime_fingerprint_${String(idCounter).padStart(4, '0')}`,
     mintGeneration: () => 'generation_topology_0001',
+    schedule(callback, milliseconds) {
+      const timer = {
+        callback,
+        milliseconds,
+        dueAt: fakeClock + milliseconds,
+        cleared: false,
+        fired: false,
+        unref() {},
+      };
+      scheduledTimers.push(timer);
+      return timer;
+    },
+    clearScheduled(timer) { timer.cleared = true; },
     terminationGrace: 25,
     activationAttempts: 3,
   });
@@ -420,7 +459,29 @@ function makeHarness(supervisorModule, options = {}) {
     randomCalls,
     httpCalls,
     journal,
+    terminationCalls,
+    lifecycleEvents,
+    scheduledTimers,
     secretPassword: secretBytes.toString('base64url'),
+    releaseTasks(role, count = Infinity) {
+      const pending = controls.pendingTaskCompletions.get(role) ?? [];
+      const selected = pending.splice(0, count);
+      for (const finish of selected) setImmediate(finish);
+    },
+    async advanceClock(milliseconds) {
+      fakeClock += milliseconds;
+      while (true) {
+        const timer = scheduledTimers
+          .filter((candidate) => (
+            !candidate.cleared && !candidate.fired && candidate.dueAt <= fakeClock
+          ))
+          .sort((left, right) => left.dueAt - right.dueAt)[0];
+        if (!timer) break;
+        timer.fired = true;
+        timer.callback();
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    },
     emitted,
     emit(event) { emitted.push(event); },
   };
@@ -432,6 +493,20 @@ async function waitFor(predicate, label) {
     await new Promise((resolve) => setImmediate(resolve));
   }
   throw new Error(`Timed out waiting for ${label}`);
+}
+
+async function bounded(operation, label, milliseconds = 2000) {
+  let timer;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), milliseconds);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function runSelectionReplay(supervisorModule) {
@@ -724,6 +799,203 @@ async function runOwnedHealth(supervisorModule) {
   }
 }
 
+async function runLeaseLifecycle(supervisorModule) {
+  {
+    const harness = makeHarness(supervisorModule);
+    const healthGate = deferred();
+    harness.controls.healthGate = healthGate;
+    const first = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'concurrent cold task one', 'ext-concurrent-cold-1'),
+      harness.emit,
+    );
+    await waitFor(() => harness.httpCalls.length === 1, 'held owned-server health');
+    const second = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'concurrent cold task two', 'ext-concurrent-cold-2'),
+      harness.emit,
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      harness.spawnCalls.filter((call) => call.role === 'owned_server').length,
+      1,
+      'concurrent warming coalesces to one server process',
+    );
+    healthGate.resolve();
+    const terminals = await bounded(Promise.all([first, second]), 'concurrent cold terminals');
+    assert(terminals.every((terminal) => terminal.status === 'succeeded'));
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 2);
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'attach_task').length, 0);
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule);
+    const seed = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'lease lifecycle seed', 'ext-lease-seed'),
+      harness.emit,
+    );
+    assert.equal(seed.status, 'succeeded');
+    harness.controls.holdTaskRoles.add('attach_task');
+    const firstAttach = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'held attach one', 'ext-held-attach-1'),
+      harness.emit,
+    );
+    const secondAttach = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'held attach two', 'ext-held-attach-2'),
+      harness.emit,
+    );
+    await waitFor(
+      () => (
+        harness.spawnCalls.filter((call) => call.role === 'attach_task').length === 2
+        && (harness.controls.pendingTaskCompletions.get('attach_task')?.length ?? 0) === 2
+      ),
+      'two held attach children',
+    );
+    const attachedChildren = harness.spawnCalls.filter((call) => call.role === 'attach_task');
+    assert.equal(new Set(attachedChildren.map((call) => call.child.pid)).size, 2);
+    await harness.advanceClock(300000);
+    assert.equal(
+      harness.terminationCalls.filter((call) => call.entry.role === 'provider_server').length,
+      0,
+      'idle teardown cannot run while leases are active',
+    );
+
+    harness.releaseTasks('attach_task');
+    const attachedTerminals = await bounded(
+      Promise.all([firstAttach, secondAttach]),
+      'held attach terminals',
+    );
+    assert(attachedTerminals.every((terminal) => terminal.status === 'succeeded'));
+    const resultSessions = harness.emitted
+      .filter((event) => event.payload?.event?.type === 'result')
+      .map((event) => event.payload.event.sessionId);
+    assert.equal(new Set(resultSessions.slice(-2)).size, 2, 'every attach has a fresh session');
+    await waitFor(
+      () => harness.scheduledTimers.some((timer) => (
+        timer.milliseconds === 300000 && !timer.cleared && !timer.fired
+      )),
+      'zero-count idle teardown timer',
+    );
+    const staleIdleTimer = harness.scheduledTimers.find((timer) => (
+      timer.milliseconds === 300000 && !timer.cleared && !timer.fired
+    ));
+
+    const renewedAttach = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'renewed attach cancels idle', 'ext-renewed-attach'),
+      harness.emit,
+    );
+    await waitFor(
+      () => (
+        harness.spawnCalls.filter((call) => call.role === 'attach_task').length === 3
+        && (harness.controls.pendingTaskCompletions.get('attach_task')?.length ?? 0) === 1
+      ),
+      'renewed attach child',
+    );
+    assert.equal(staleIdleTimer.cleared, true, 'new lease cancels the prior idle timer');
+    staleIdleTimer.callback();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      harness.terminationCalls.filter((call) => call.entry.role === 'provider_server').length,
+      0,
+      'a stale timer token cannot stop a renewed lease',
+    );
+    harness.releaseTasks('attach_task');
+    assert.equal((await bounded(renewedAttach, 'renewed attach terminal')).status, 'succeeded');
+    const liveIdleTimer = harness.scheduledTimers
+      .filter((timer) => timer.milliseconds === 300000 && !timer.cleared && !timer.fired)
+      .at(-1);
+    assert(liveIdleTimer, 'lease release re-arms bounded idle teardown');
+    await harness.advanceClock(299999);
+    assert.equal(
+      harness.terminationCalls.filter((call) => call.entry.role === 'provider_server').length,
+      0,
+    );
+    await harness.advanceClock(1);
+    await waitFor(
+      () => harness.terminationCalls.some((call) => call.entry.role === 'provider_server'),
+      'idle server teardown',
+    );
+    assert.equal(
+      harness.terminationCalls.filter((call) => call.entry.role === 'provider_server').length,
+      1,
+      'idle teardown settles the owned tree exactly once',
+    );
+
+    harness.controls.holdTaskRoles.delete('attach_task');
+    const afterIdle = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'cold after idle teardown', 'ext-after-idle'),
+      harness.emit,
+    );
+    assert.equal(afterIdle.status, 'succeeded');
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 2);
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'owned_server').length, 2);
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule);
+    await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'health loss seed', 'ext-health-loss-seed'),
+      harness.emit,
+    );
+    harness.controls.healthResponse = {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ healthy: false, version: 'fixture-profile-1' })),
+    };
+    const fallback = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'health loss cold fallback', 'ext-health-loss-fallback'),
+      harness.emit,
+    );
+    assert.equal(fallback.status, 'succeeded');
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'attach_task').length, 0);
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 2);
+    const serverStops = harness.terminationCalls
+      .filter((call) => call.entry.role === 'provider_server')
+      .map((call) => call.entry.delegationId);
+    assert.equal(
+      serverStops.filter((id) => id === serverStops[0]).length,
+      1,
+      'health loss settles the previously verified server tree once',
+    );
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule);
+    await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'overlapping close seed', 'ext-close-seed'),
+      harness.emit,
+    );
+    harness.controls.holdTaskRoles.add('attach_task');
+    const firstAttach = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'close held attach one', 'ext-close-attach-1'),
+      harness.emit,
+    );
+    const secondAttach = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'close held attach two', 'ext-close-attach-2'),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.spawnCalls.filter((call) => call.role === 'attach_task').length === 2,
+      'close-held attach children',
+    );
+    const firstClose = harness.supervisor.close();
+    const secondClose = harness.supervisor.close();
+    assert.strictEqual(firstClose, secondClose, 'overlapping close shares one operation');
+    const [closed, firstTerminal, secondTerminal] = await bounded(Promise.all([
+      firstClose,
+      firstAttach,
+      secondAttach,
+    ]), 'overlapping close settlement');
+    assert.deepEqual(closed, { cancelled: 2, failed: 0, alreadySettled: 0 });
+    assert.equal(firstTerminal.status, 'cancelled');
+    assert.equal(secondTerminal.status, 'cancelled');
+    const stopRoles = harness.terminationCalls.map((call) => call.entry.role);
+    assert.deepEqual(stopRoles.slice(-3), ['delegation', 'delegation', 'provider_server']);
+    assert.equal(stopRoles.filter((role) => role === 'provider_server').length, 1);
+  }
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
@@ -734,7 +1006,10 @@ async function main() {
   if (!section || section === 'owned-health') {
     await runOwnedHealth(supervisorModule);
   }
-  if (section && !['selection-replay', 'owned-health'].includes(section)) {
+  if (!section || section === 'lease-lifecycle') {
+    await runLeaseLifecycle(supervisorModule);
+  }
+  if (section && !['selection-replay', 'owned-health', 'lease-lifecycle'].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }
   console.log('mcp-opencode-server-topology.test.js: PASS');
