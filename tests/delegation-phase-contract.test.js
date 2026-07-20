@@ -1759,7 +1759,7 @@ const doctorCollectorSource = between(
 );
 for (const doctorToken of [
   'registryIds = denseStringArray(idsMethod.call(registry))',
-  'const adapter = requireMethod.call(registry, adapterId)',
+  'const adapter = requireMethod.call(registry, contract.adapterId)',
   'detection = await detectMethod.call(adapter)',
   'classifyAdapterCompatibility',
   "authState: 'unknown'",
