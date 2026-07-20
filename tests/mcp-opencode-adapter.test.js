@@ -10,6 +10,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const buildRoot = path.join(repoRoot, 'mcp', 'build', 'agent-providers');
 const adapterBuildPath = path.join(buildRoot, 'adapter.js');
 const compatibilityBuildPath = path.join(buildRoot, 'compatibility.js');
+const opencodeDetectBuildPath = path.join(buildRoot, 'opencode-detect.js');
 const opencodeStreamBuildPath = path.join(buildRoot, 'opencode-stream.js');
 const protocolDriftBuildPath = path.join(buildRoot, 'protocol-drift.js');
 const registryBuildPath = path.join(buildRoot, 'registry.js');
@@ -164,8 +165,7 @@ function replacementStart(overrides = {}) {
   };
 }
 
-async function run() {
-  assert.deepEqual(process.argv.slice(2), ['--section', 'first-commit-drift-gate']);
+async function runFirstCommitDriftGate() {
   assertManifest();
 
   const parserSource = fs.readFileSync(
@@ -419,8 +419,222 @@ async function run() {
   };
   await expectDrift(parseOpenCodeEvents, [encode(unknownEvent)], 'unknown_event_type', 2);
 
-  console.log('mcp-opencode-adapter.test.js: PASS');
-  console.log('MULTI-03 provenance: schema-derived-contract; liveCapturePending: true');
+}
+
+function detectionDependencies(overrides = {}) {
+  const candidate = Object.freeze({
+    sourcePath: '/fixture/bin/opencode',
+    realPath: '/fixture/bin/opencode',
+  });
+  return {
+    platform: 'linux',
+    pathValue: '/fixture/bin',
+    resolveBinary: async () => candidate,
+    resolveRealPath: async () => candidate.realPath,
+    resolveWindowsShim: async () => null,
+    probe: async () => ({ stdout: '1.14.25\n', stderr: '' }),
+    ...overrides,
+  };
+}
+
+async function runDetection() {
+  const detectorSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'opencode-detect.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(detectorSource, /auth\.json|credentials?|api[_-]?key|defaultModel|readFile/i);
+  assert.doesNotMatch(detectorSource, /\b(?:spawn|exec|execSync)\s*\(/);
+  assert.match(detectorSource, /shell:\s*false/);
+
+  const detectorModule = await import(pathToFileURL(opencodeDetectBuildPath).href);
+  const {
+    OPENCODE_NATIVE_EXECUTABLE_NAMES,
+    OPENCODE_PROBE_OPTIONS,
+    OPENCODE_PROFILE_VERSION,
+    createOpenCodeDetector,
+  } = detectorModule;
+
+  assert.equal(OPENCODE_PROFILE_VERSION, '1.14.25');
+  assert.deepEqual(OPENCODE_NATIVE_EXECUTABLE_NAMES, {
+    posix: ['opencode'],
+    win32: ['opencode.exe', 'opencode.com', 'opencode.cmd', 'opencode.bat'],
+  });
+  assert.deepEqual(OPENCODE_PROBE_OPTIONS, {
+    timeout: 3_000,
+    windowsHide: true,
+    maxBuffer: 64 * 1024,
+    shell: false,
+  });
+  assert.ok(Object.isFrozen(OPENCODE_NATIVE_EXECUTABLE_NAMES));
+  assert.ok(Object.isFrozen(OPENCODE_NATIVE_EXECUTABLE_NAMES.posix));
+  assert.ok(Object.isFrozen(OPENCODE_NATIVE_EXECUTABLE_NAMES.win32));
+  assert.ok(Object.isFrozen(OPENCODE_PROBE_OPTIONS));
+
+  let observedProbe = null;
+  const exact = await createOpenCodeDetector(detectionDependencies({
+    probe: async (file, argv, options) => {
+      observedProbe = { file, argv, options };
+      return { stdout: 'opencode 1.14.25\n', stderr: '' };
+    },
+  })).detect();
+  assert.deepEqual(exact, {
+    installed: true,
+    version: '1.14.25',
+    authState: 'unknown',
+    binary: {
+      command: '/fixture/bin/opencode',
+      realPath: '/fixture/bin/opencode',
+      argvPrefix: [],
+    },
+    profileVersion: '1.14.25',
+  });
+  assert.deepEqual(observedProbe, {
+    file: '/fixture/bin/opencode',
+    argv: ['--version'],
+    options: OPENCODE_PROBE_OPTIONS,
+  });
+  assert.ok(Object.isFrozen(exact));
+  assert.ok(Object.isFrozen(exact.binary));
+  assert.ok(Object.isFrozen(exact.binary.argvPrefix));
+
+  const missing = await createOpenCodeDetector(detectionDependencies({
+    resolveBinary: async () => null,
+  })).detect();
+  assert.equal(missing.installed, false);
+  assert.equal(missing.diagnostic.code, 'binary_missing');
+  assert.equal(missing.authState, 'unknown');
+
+  for (const version of ['1.14.24', '1.14.26', '2.0.0']) {
+    const result = await createOpenCodeDetector(detectionDependencies({
+      probe: async () => ({ stdout: `${version}\n`, stderr: '' }),
+    })).detect();
+    assert.equal(result.installed, false, `${version} stays spawn-ineligible`);
+    assert.equal(result.version, version);
+    assert.equal(result.profileVersion, null);
+    assert.equal(result.diagnostic.code, 'version_unsupported');
+  }
+
+  const malformedCanary = 'CREDENTIAL_CANARY_detection_64_04_0001';
+  for (const output of [
+    malformedCanary,
+    '1.14.25 1.14.25',
+    'v1.14',
+    '\ud800',
+  ]) {
+    const result = await createOpenCodeDetector(detectionDependencies({
+      probe: async () => ({ stdout: output, stderr: '' }),
+    })).detect();
+    assert.equal(result.installed, false);
+    assert.equal(result.diagnostic.code, 'version_unparseable');
+    assert.doesNotMatch(result.diagnostic.message, new RegExp(malformedCanary));
+    assert.ok(Buffer.byteLength(result.diagnostic.message, 'utf8') <= 160);
+  }
+
+  const oversize = await createOpenCodeDetector(detectionDependencies({
+    probe: async () => ({ stdout: `1.14.25${'x'.repeat(64 * 1024)}`, stderr: '' }),
+  })).detect();
+  assert.equal(oversize.installed, false);
+  assert.equal(oversize.diagnostic.code, 'version_unparseable');
+  assert.doesNotMatch(oversize.diagnostic.message, /x{16}/);
+
+  let identityChecks = 0;
+  const changed = await createOpenCodeDetector(detectionDependencies({
+    resolveRealPath: async () => {
+      identityChecks += 1;
+      return identityChecks === 1 ? '/fixture/bin/opencode' : '/fixture/bin/replaced';
+    },
+  })).detect();
+  assert.equal(changed.installed, false);
+  assert.equal(changed.diagnostic.code, 'binary_changed');
+  assert.equal(changed.binary, null);
+  assert.doesNotMatch(changed.diagnostic.message, /fixture|replaced/);
+
+  const unsafe = await createOpenCodeDetector(detectionDependencies({
+    resolveBinary: async () => ({ sourcePath: 'relative/opencode', realPath: 'relative/opencode' }),
+  })).detect();
+  assert.equal(unsafe.installed, false);
+  assert.equal(unsafe.diagnostic.code, 'binary_unsafe');
+
+  const windowsExe = await createOpenCodeDetector(detectionDependencies({
+    platform: 'win32',
+    pathValue: 'C:\\fixture\\bin',
+    resolveBinary: async () => ({
+      sourcePath: 'C:\\fixture\\bin\\opencode.exe',
+      realPath: 'C:\\fixture\\bin\\opencode.exe',
+    }),
+    resolveRealPath: async () => 'C:\\fixture\\bin\\opencode.exe',
+  })).detect();
+  assert.equal(windowsExe.installed, true);
+  assert.equal(windowsExe.binary.command, 'C:\\fixture\\bin\\opencode.exe');
+  assert.deepEqual(windowsExe.binary.argvPrefix, []);
+
+  const windowsShim = await createOpenCodeDetector(detectionDependencies({
+    platform: 'win32',
+    pathValue: 'C:\\fixture\\bin',
+    resolveBinary: async () => ({
+      sourcePath: 'C:\\fixture\\bin\\opencode.cmd',
+      realPath: 'C:\\fixture\\bin\\opencode.cmd',
+    }),
+    resolveRealPath: async (value) => (
+      value.endsWith('bun.exe') ? 'C:\\fixture\\runtime\\bun.exe' : value
+    ),
+    resolveWindowsShim: async () => ({
+      verified: true,
+      command: 'C:\\fixture\\runtime\\bun.exe',
+      realPath: 'C:\\fixture\\runtime\\bun.exe',
+      argvPrefix: ['C:\\fixture\\app\\opencode.js'],
+    }),
+  })).detect();
+  assert.equal(windowsShim.installed, true);
+  assert.equal(windowsShim.binary.command, 'C:\\fixture\\runtime\\bun.exe');
+  assert.deepEqual(windowsShim.binary.argvPrefix, ['C:\\fixture\\app\\opencode.js']);
+
+  const rejectedShim = await createOpenCodeDetector(detectionDependencies({
+    platform: 'win32',
+    pathValue: 'C:\\fixture\\bin',
+    resolveBinary: async () => ({
+      sourcePath: 'C:\\fixture\\bin\\opencode.cmd',
+      realPath: 'C:\\fixture\\bin\\opencode.cmd',
+    }),
+    resolveRealPath: async (value) => value,
+  })).detect();
+  assert.equal(rejectedShim.installed, false);
+  assert.equal(rejectedShim.diagnostic.code, 'binary_unsafe');
+
+  let poisonTouched = false;
+  const poisonOverrides = detectionDependencies();
+  for (const name of ['readAuth', 'readConfig', 'readState', 'resolveModel']) {
+    Object.defineProperty(poisonOverrides, name, {
+      enumerable: false,
+      get() {
+        poisonTouched = true;
+        throw new Error(malformedCanary);
+      },
+    });
+  }
+  const poisoned = await createOpenCodeDetector(poisonOverrides).detect();
+  assert.equal(poisoned.installed, true);
+  assert.equal(poisoned.authState, 'unknown');
+  assert.equal(poisonTouched, false);
+  assert.doesNotMatch(JSON.stringify(poisoned), new RegExp(malformedCanary));
+}
+
+async function run() {
+  const argv = process.argv.slice(2);
+  assert.equal(argv.length, 2);
+  assert.equal(argv[0], '--section');
+  if (argv[1] === 'first-commit-drift-gate') {
+    await runFirstCommitDriftGate();
+    console.log('mcp-opencode-adapter.test.js: first-commit-drift-gate PASS');
+    console.log('MULTI-03 provenance: schema-derived-contract; liveCapturePending: true');
+    return;
+  }
+  if (argv[1] === 'detection') {
+    await runDetection();
+    console.log('mcp-opencode-adapter.test.js: detection PASS');
+    return;
+  }
+  assert.fail(`unknown section: ${argv[1]}`);
 }
 
 run().catch((error) => {
