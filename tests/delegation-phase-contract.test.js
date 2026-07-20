@@ -1429,7 +1429,8 @@ const rawCompatibilityMatrix = between(
   'const parsedMatrix',
 );
 equal(Array.from(rawCompatibilityMatrix.matchAll(/adapterId:\s*'([^']+)'/g), (match) => match[1]),
-  ['claude-code'], 'Phase 62 ships exactly one Claude Code matrix row');
+  ['claude-code', 'opencode'],
+  'the canonical matrix has the exact Claude Code/OpenCode production order');
 for (const exactMatrixToken of [
   'schemaVersion: 1',
   "profileVersion: '2.1.177'",
@@ -1443,6 +1444,22 @@ for (const exactMatrixToken of [
   check(rawCompatibilityMatrix.includes(exactMatrixToken),
     `canonical Claude row retains ${exactMatrixToken}`);
 }
+for (const exactOpenCodeMatrixToken of [
+  "displayLabel: 'OpenCode'",
+  "profileVersion: '1.14.25'",
+  "minimumVersion: '1.14.25'",
+  "testedThroughVersion: '1.14.25'",
+  'supportedMajor: 1',
+  "fixtureManifest: 'tests/fixtures/agent-streams/opencode-1.14.25/manifest.json'",
+  "'part.messageID'",
+  "'part.reason'",
+  "'part.tokens'",
+]) {
+  check(rawCompatibilityMatrix.includes(exactOpenCodeMatrixToken),
+    `canonical OpenCode row retains ${exactOpenCodeMatrixToken}`);
+}
+check(/adapterId: 'opencode',[\s\S]*capabilities: \{[\s\S]*taskMode: true,[\s\S]*chatMode: false,[\s\S]*resume: false,[\s\S]*serverMode: true,[\s\S]*displayLabel: 'OpenCode'/.test(rawCompatibilityMatrix),
+  'canonical OpenCode row retains exact server/task-only capabilities');
 check(/compareVersions\(version, minimum\) < 0[\s\S]*'below_minimum'[\s\S]*compareVersions\(version, testedThrough\) > 0[\s\S]*'degraded'[\s\S]*'newer_than_tested_range'[\s\S]*'supported'[\s\S]*'within_tested_range'/.test(compatibilitySource),
   'canonical classifier keeps inclusive tested bounds and same-major newer degradation');
 
@@ -1508,16 +1525,18 @@ for (const productionRosterToken of [
   check(productionRosterSource.includes(productionRosterToken),
     `production roster keeps its registry/matrix/fixture bijection: ${productionRosterToken}`);
 }
-for (const preRegistrationBoundaryToken of [
-  "assert.deepEqual(registryIds, ['claude-code'], 'production registry remains Claude-only');",
-  "assert.deepEqual(matrixIds, ['claude-code'], 'compatibility matrix remains Claude-only');",
-  'assertProductionRoster(registryIds, matrixRows);',
-  "assertProductionRoster(registryIds, [...matrixRows, { ...matrixRows[0], adapterId: 'opencode' }])",
-  "assert.throws(() => registry.require('opencode'), /Unknown adapter id/);",
+for (const atomicProductionExposureToken of [
+  "assert.deepEqual(registryIds, ['claude-code', 'opencode'], 'production registry is exact');",
+  "assert.deepEqual(matrixIds, ['claude-code', 'opencode'], 'compatibility matrix is exact');",
+  'assertProductionRoster(registryIds, matrixRows, registry);',
+  "assert.deepEqual(registryIds, exactProductionIds, 'production registry order is exact')",
+  "assert.deepEqual(productionAdapterIds, exactProductionIds, 'production adapter roster is exact')",
+  "assert.ok(registry.require('opencode'));",
+  "assert.throws(() => registry.require('codex'), /Unknown adapter id/);",
   "assert.deepEqual(committedManifests, expectedManifests, 'fixture roster is exactly Claude and OpenCode');",
 ]) {
-  check(driftSmokeSource.includes(preRegistrationBoundaryToken),
-    `OpenCode fixture readiness preserves the Claude-only production boundary: ${preRegistrationBoundaryToken}`);
+  check(driftSmokeSource.includes(atomicProductionExposureToken),
+    `OpenCode exposure retains its exact atomic roster boundary: ${atomicProductionExposureToken}`);
 }
 
 const loadParserSource = extractFunction(driftSmokeSource, 'loadParser');
@@ -1530,8 +1549,10 @@ for (const productionParserToken of [
   check(loadParserSource.includes(productionParserToken),
     `drift smoke loads production parser evidence: ${productionParserToken}`);
 }
-check(/if \(contract\.adapterId === 'claude-code'\) \{[\s\S]*return registeredParser;\s*\}\s*return parser;/.test(loadParserSource),
-  'Claude replays through its registered adapter while pre-registration OpenCode replays its compiled parser directly');
+check(!loadParserSource.includes("contract.adapterId === 'claude-code'")
+  && exactOccurrences(loadParserSource, 'registry.require(contract.adapterId).parseEvents') === 1
+  && /return registeredParser;/.test(loadParserSource),
+  'both production fixtures replay only through their exact registered adapter parser');
 check(/Offline adapter-native fixture drift gate\.[\s\S]*only compiled[\s\S]*production parsers over committed synthetic streams; it never invokes a[\s\S]*provider binary, account, browser, or network\./.test(driftSmokeSource),
   'drift smoke declares its committed-fixture-only offline authority boundary');
 check(!/child_process|execFile|spawnSync|fetch\s*\(|new WebSocket|claude\s+--/.test(driftSmokeSource),
@@ -1990,9 +2011,25 @@ for (const forbiddenUiPattern of [
   check(!forbiddenUiPattern.test(compatibilityUiScope),
     `Providers UI has no direct compatibility/process/private authority matching ${forbiddenUiPattern}`);
 }
-check(!exists('mcp/src/agent-providers/opencode.ts')
+check(exists('mcp/src/agent-providers/opencode.ts')
   && !exists('mcp/src/agent-providers/codex.ts'),
-'Phase 62 ships no OpenCode or Codex adapter implementation');
+  'production exposure adds only OpenCode while Codex remains absent');
+const openCodeAdapterSource = read('mcp/src/agent-providers/opencode.ts');
+const openCodeAdapterComposition = extractFunction(openCodeAdapterSource, 'createOpenCodeAdapter');
+equal(Array.from(
+  openCodeAdapterComposition.matchAll(/^    (?:async )?([a-zA-Z][a-zA-Z0-9]*)\([^)]*\)(?::[^\{]+)? \{/gm),
+  (match) => match[1],
+), ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+  'OpenCode production composition exposes exactly the five reviewed methods');
+for (const atomicAdapterToken of [
+  'createOpenCodeDetector().detect',
+  'buildOpenCodeSpawnSpec',
+  'parseOpenCodeEvents',
+  'OPENCODE_CAPABILITIES',
+]) {
+  check(openCodeAdapterSource.includes(atomicAdapterToken),
+    `OpenCode production composition retains ${atomicAdapterToken}`);
+}
 
 const compatibilityBrowserProjection = [
   projectedCompatibilitySource,
