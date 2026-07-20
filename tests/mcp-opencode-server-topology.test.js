@@ -107,7 +107,8 @@ function makeChild(role, pid, controls) {
   queueMicrotask(() => {
     child.emit('spawn');
     if (role === 'owned_server') {
-      stdout.write('opencode server listening on http://127.0.0.1:43123\n');
+      for (const chunk of controls.readinessChunks) stdout.write(chunk);
+      if (controls.closeServerBeforeReadiness) close({ code: 1, signal: null });
     }
   });
   return child;
@@ -213,18 +214,31 @@ function makeAdapter(adapterId, topologyKind) {
   });
 }
 
-function makeHarness(supervisorModule) {
+function makeHarness(supervisorModule, options = {}) {
+  const secretBytes = options.secretBytes ?? Buffer.from(
+    'owned-server-secret-fixture-material-0001',
+    'utf8',
+  );
   const controls = {
     spawnFailureRoles: new Set(),
     stdinFailureRoles: new Set(),
     zeroEventRoles: new Set(),
     serverIdentityValid: true,
+    readinessChunks: ['opencode server listening on http://127.0.0.1:43123\n'],
+    closeServerBeforeReadiness: false,
+    healthResponse: {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ healthy: true, version: 'fixture-profile-1' })),
+    },
   };
   const spawnCalls = [];
   const emitted = [];
   const journal = new Map();
   const activePids = new Map();
   const children = new Map();
+  const randomCalls = [];
+  const httpCalls = [];
   let nextPid = 51000;
   let lastSpawn = null;
   let idCounter = 0;
@@ -351,11 +365,22 @@ function makeHarness(supervisorModule) {
     endpoint: 'http://127.0.0.1:7226/mcp',
     cwd: '/fixture/workspace',
     platform: 'linux',
-    environment: { PATH: '/fixture/bin', SAFE_VALUE: 'safe' },
+    environment: {
+      PATH: '/fixture/bin',
+      SAFE_VALUE: 'safe',
+      OPENCODE_SERVER_PASSWORD: 'inherited-password-must-not-cross',
+    },
     spawn(command, argv, options) {
       const role = options.env.FSB_TEST_PROCESS_ROLE;
       assert.equal(typeof role, 'string');
-      const call = { command, argv: [...argv], options, role, child: null };
+      const call = {
+        command,
+        argv: [...argv],
+        options,
+        role,
+        passwordAtSpawn: options.env.OPENCODE_SERVER_PASSWORD,
+        child: null,
+      };
       spawnCalls.push(call);
       if (controls.spawnFailureRoles.has(role)) {
         throw new Error(`fixture ${role} spawn failure`);
@@ -365,6 +390,18 @@ function makeHarness(supervisorModule) {
       lastSpawn = call;
       children.set(child.pid, child);
       return child;
+    },
+    randomBytes(size) {
+      randomCalls.push(size);
+      return Buffer.from(secretBytes);
+    },
+    async requestOwnedServer(requestOptions) {
+      httpCalls.push({
+        options: requestOptions,
+        authorizationAtCall: requestOptions.headers.Authorization,
+      });
+      if (controls.healthResponse instanceof Error) throw controls.healthResponse;
+      return controls.healthResponse;
     },
     wallNow: (() => { let now = 1000; return () => ++now; })(),
     monotonicNow: (() => { let now = 0; return () => ++now; })(),
@@ -380,6 +417,10 @@ function makeHarness(supervisorModule) {
     supervisor,
     controls,
     spawnCalls,
+    randomCalls,
+    httpCalls,
+    journal,
+    secretPassword: secretBytes.toString('base64url'),
     emitted,
     emit(event) { emitted.push(event); },
   };
@@ -515,6 +556,174 @@ async function runSelectionReplay(supervisorModule) {
   }
 }
 
+async function runOwnedHealth(supervisorModule) {
+  {
+    const harness = makeHarness(supervisorModule);
+    const direct = await harness.supervisor.handleExtRequest(
+      startRequest('opencode', 'secret-negative direct task', 'ext-health-direct'),
+      harness.emit,
+    );
+    assert.equal(direct.status, 'succeeded');
+    const cold = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'owned health cold task', 'ext-health-cold'),
+      harness.emit,
+    );
+    assert.equal(cold.status, 'succeeded');
+
+    assert.deepEqual(harness.randomCalls, [32], 'one server mints exactly 32 CSPRNG bytes');
+    const serverCall = harness.spawnCalls.find((call) => call.role === 'owned_server');
+    const coldCall = harness.spawnCalls.find((call) => call.role === 'cold_task');
+    const directCall = harness.spawnCalls.find((call) => call.role === 'direct_task');
+    assert.equal(serverCall.passwordAtSpawn, harness.secretPassword);
+    assert.equal(coldCall.passwordAtSpawn, undefined, 'cold task receives no server password');
+    assert.equal(directCall.passwordAtSpawn, undefined, 'direct task receives no server password');
+    assert.equal(
+      Object.hasOwn(serverCall.options.env, 'OPENCODE_SERVER_PASSWORD'),
+      false,
+      'server spawn environment is scrubbed immediately after spawn returns',
+    );
+    assert.equal(
+      Object.hasOwn(coldCall.options.env, 'OPENCODE_SERVER_PASSWORD'),
+      false,
+      'inherited password is scrubbed from cold task environment',
+    );
+
+    assert.equal(harness.httpCalls.length, 1);
+    const expectedAuthorization = `Basic ${Buffer.from(
+      `opencode:${harness.secretPassword}`,
+      'utf8',
+    ).toString('base64')}`;
+    assert.equal(harness.httpCalls[0].authorizationAtCall, expectedAuthorization);
+    assert.equal(harness.httpCalls[0].options.hostname, '127.0.0.1');
+    assert.equal(harness.httpCalls[0].options.port, 43123);
+    assert.equal(harness.httpCalls[0].options.path, '/global/health');
+    assert.equal(harness.httpCalls[0].options.method, 'GET');
+    assert.equal(
+      Object.hasOwn(harness.httpCalls[0].options.headers, 'Authorization'),
+      false,
+      'transient Basic header is scrubbed after the direct HTTP call',
+    );
+
+    const attached = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'owned health attach task', 'ext-health-attach'),
+      harness.emit,
+    );
+    assert.equal(attached.status, 'succeeded');
+    const attachCall = harness.spawnCalls.find((call) => call.role === 'attach_task');
+    assert.equal(attachCall.passwordAtSpawn, harness.secretPassword);
+    assert.equal(
+      Object.hasOwn(attachCall.options.env, 'OPENCODE_SERVER_PASSWORD'),
+      false,
+      'attach spawn environment is scrubbed immediately after spawn returns',
+    );
+    assert.equal(harness.randomCalls.length, 1, 'attach reuses the opaque stored secret bytes');
+
+    const retained = JSON.stringify({
+      cold,
+      attached,
+      emitted: harness.emitted,
+      journal: [...harness.journal.values()],
+      supervisor: harness.supervisor,
+    });
+    for (const forbidden of [
+      harness.secretPassword,
+      expectedAuthorization,
+      'inherited-password-must-not-cross',
+    ]) {
+      assert.equal(retained.includes(forbidden), false, 'raw credentials are not serialized');
+    }
+    await harness.supervisor.close();
+  }
+
+  const invalidHealth = [
+    ['unauthorized', {
+      statusCode: 401,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ healthy: true, version: 'fixture-profile-1' })),
+    }],
+    ['wrong-version', {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ healthy: true, version: 'fixture-profile-other' })),
+    }],
+    ['unhealthy', {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ healthy: false, version: 'fixture-profile-1' })),
+    }],
+    ['unknown-field', {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({
+        healthy: true,
+        version: 'fixture-profile-1',
+        extra: true,
+      })),
+    }],
+    ['oversize', {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.alloc(64 * 1024, 0x20),
+    }],
+    ['request-error', new Error('fixture health transport failure')],
+  ];
+  for (const [label, response] of invalidHealth) {
+    const harness = makeHarness(supervisorModule);
+    harness.controls.healthResponse = response;
+    const first = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `${label} health cold one`, `ext-health-invalid-${label}-1`),
+      harness.emit,
+    );
+    const second = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `${label} health cold two`, `ext-health-invalid-${label}-2`),
+      harness.emit,
+    );
+    assert.equal(first.status, 'succeeded', `${label} does not block the selected cold task`);
+    assert.equal(second.status, 'succeeded', `${label} remains a cold-only optimization failure`);
+    assert.equal(
+      harness.spawnCalls.filter((call) => call.role === 'attach_task').length,
+      0,
+      `${label} cannot create an attachable lease`,
+    );
+    assert.equal(
+      harness.spawnCalls.filter((call) => call.role === 'cold_task').length,
+      2,
+      `${label} deterministically keeps both tasks cold`,
+    );
+    await harness.supervisor.close();
+  }
+
+  const invalidReadiness = [
+    ['non-loopback', ['opencode server listening on http://0.0.0.0:43123\n'], false],
+    ['duplicate', [
+      'opencode server listening on http://127.0.0.1:43123\n'
+        + 'opencode server listening on http://127.0.0.1:43124\n',
+    ], false],
+    ['oversize', [`${'x'.repeat(4097)}\n`], false],
+    ['missing', [], true],
+  ];
+  for (const [label, chunks, closeBeforeReady] of invalidReadiness) {
+    const harness = makeHarness(supervisorModule);
+    harness.controls.readinessChunks = chunks;
+    harness.controls.closeServerBeforeReadiness = closeBeforeReady;
+    await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `${label} readiness cold one`, `ext-ready-invalid-${label}-1`),
+      harness.emit,
+    );
+    await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `${label} readiness cold two`, `ext-ready-invalid-${label}-2`),
+      harness.emit,
+    );
+    assert.equal(
+      harness.spawnCalls.filter((call) => call.role === 'attach_task').length,
+      0,
+      `${label} readiness never creates a lease`,
+    );
+    assert.equal(harness.httpCalls.length, 0, `${label} readiness sends no HTTP request`);
+    await harness.supervisor.close();
+  }
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
@@ -522,7 +731,10 @@ async function main() {
   if (!section || section === 'selection-replay') {
     await runSelectionReplay(supervisorModule);
   }
-  if (section && section !== 'selection-replay') {
+  if (!section || section === 'owned-health') {
+    await runOwnedHealth(supervisorModule);
+  }
+  if (section && !['selection-replay', 'owned-health'].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }
   console.log('mcp-opencode-server-topology.test.js: PASS');
