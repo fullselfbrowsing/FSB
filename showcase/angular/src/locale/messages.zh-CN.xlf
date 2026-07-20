@@ -9583,8 +9583,8 @@
         </context-group>
       </trans-unit>
       <trans-unit id="stats.back.aria" datatype="html">
-        <source>Go back</source>
-        <target state="translated">回来</target>
+        <source>Go to home</source>
+        <target state="translated">前往首页</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
           <context context-type="linenumber">3,4</context>
@@ -9614,20 +9614,64 @@
           <context context-type="linenumber">12,13</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.live.aria" datatype="html">
-        <source>Live data</source>
-        <target state="translated">实时数据</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">14</context>
-        </context-group>
-      </trans-unit>
       <trans-unit id="stats.live.label" datatype="html">
         <source>Live</source>
         <target state="translated">现场直播</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">14,17</context>
+          <context context-type="linenumber">19,20</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">69,70</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.partial" datatype="html">
+        <source>Partial</source>
+        <target state="translated">部分</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">20,21</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">70,71</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.stale" datatype="html">
+        <source>Stale</source>
+        <target state="translated">陈旧</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">21,22</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">71,72</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.loadingLabel" datatype="html">
+        <source>Loading</source>
+        <target state="translated">加载中</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">22,23</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">72,73</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.unavailableLabel" datatype="html">
+        <source>Unavailable</source>
+        <target state="translated">不可用</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">23,26</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">73,75</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.tabMetrics.aria" datatype="html">
@@ -9635,15 +9679,19 @@
         <target state="translated">当前标签页指标</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">18,19</context>
+          <context context-type="linenumber">30,31</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ARIA" datatype="html">
-        <source>Live FSB metrics</source>
-        <target state="translated">实时 FSB 指标</target>
+        <source>FSB aggregate metrics</source>
+        <target state="translated">FSB 汇总指标</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">24,25</context>
+          <context context-type="linenumber">38,39</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">66,68</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ACTIVE" datatype="html">
@@ -9651,23 +9699,31 @@
         <target state="translated">当前活跃</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">28,30</context>
+          <context context-type="linenumber">43,45</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOTAL" datatype="html">
-        <source>total users</source>
-        <target state="translated">总用户数</target>
+        <source>users (365d)</source>
+        <target state="translated">用户（365 天）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">33,35</context>
+          <context context-type="linenumber">49,51</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS" datatype="html">
+        <source>agent-days since active v2</source>
+        <target state="translated">Active v2 以来的智能体天数</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">54,56</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOKENS" datatype="html">
-        <source>tokens (last 24h)</source>
-        <target state="translated">令牌（过去 24 小时）</target>
+        <source>tokens (24h)</source>
+        <target state="translated">令牌（24 小时）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">38,41</context>
+          <context context-type="linenumber">59,62</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.loading.sr" datatype="html">
@@ -9675,15 +9731,39 @@
         <target state="translated">正在装入数据...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">46,48</context>
+          <context context-type="linenumber">83,85</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.stale.notice" datatype="html">
+        <source>This view is showing the last available snapshot while fresh data is unavailable.</source>
+        <target state="translated">当前无法获取最新数据，此视图正在显示最后可用的快照。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">90,92</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.partial.notice" datatype="html">
+        <source>This view is usable, but some reporting or historical coverage is incomplete.</source>
+        <target state="translated">此视图可用，但部分上报或历史覆盖不完整。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">96,98</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.mcp.empty" datatype="html">
+        <source>No MCP client data yet.</source>
+        <target state="translated">尚无 MCP 客户端数据。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
+          <context context-type="linenumber">115,117</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_ANNOTATION" datatype="html">
-        <source>Each lit node is live activity, clustered by region.</source>
-        <target state="translated">每个亮起的节点代表实时活动，按地区聚类显示。</target>
+        <source>Regional distribution from today&apos;s hourly aggregate.</source>
+        <target state="translated">来自今日每小时汇总的地区分布。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">58,60</context>
+          <context context-type="linenumber">137,139</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_EMPTY" datatype="html">
@@ -9691,23 +9771,23 @@
         <target state="translated">匿名活动数据尚不足以按地区细分——请稍后再来查看。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">60,63</context>
+          <context context-type="linenumber">139,141</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.rate.title" datatype="html">
-        <source>GitHub rate-limited</source>
-        <target state="translated">GitHub 利率限制</target>
+      <trans-unit id="stats.globe.partial" datatype="html">
+        <source>The regional aggregate is not available yet.</source>
+        <target state="translated">地区汇总尚不可用。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">67,68</context>
+          <context context-type="linenumber">142,143</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.rate.body" datatype="html">
-        <source> Retrying at <x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/><x id="INTERPOLATION" equiv-text="{{ rateLimitedUntil | date:&apos;HH:mm&apos; }}"/><x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. The unauthenticated API allows 60 requests / hour / IP - we&apos;ll be back shortly. </source>
-        <target state="translated">重试在<x id="START_TAG_STRONG" ctype="x-strong" equiv-text="&lt;strong&gt;"/><x id="INTERPOLATION" equiv-text="{{ rateLimitedUntil | date:&apos;HH:mm&apos; }}"/><x id="CLOSE_TAG_STRONG" ctype="x-strong" equiv-text="&lt;/strong&gt;"/>. 未认证的API允许60个请求 / hour / IP - 我们很快回来.</target>
+      <trans-unit id="stats.globe.stale" datatype="html">
+        <source>The regional breakdown is older than two hours.</source>
+        <target state="translated">地区明细已超过两小时未更新。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">69,72</context>
+          <context context-type="linenumber">144,146</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.title" datatype="html">
@@ -9715,7 +9795,7 @@
         <target state="translated">无法装入数据</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">77,78</context>
+          <context context-type="linenumber">151,152</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.retry" datatype="html">
@@ -9723,7 +9803,7 @@
         <target state="translated">页面每5分钟自动重试一次.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">78,80</context>
+          <context context-type="linenumber">152,154</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.aria" datatype="html">
@@ -9731,7 +9811,7 @@
         <target state="translated">显示视图</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">84,85</context>
+          <context context-type="linenumber">158,159</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.credit" datatype="html">
@@ -9739,7 +9819,7 @@
         <target state="translated">制作人:<x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">114,115</context>
+          <context context-type="linenumber">192,193</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.version" datatype="html">
@@ -9747,7 +9827,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;version-tag&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>▽<x id="INTERPOLATION" equiv-text="{{ appVersion }}"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">115,117</context>
+          <context context-type="linenumber">194,196</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.default" datatype="html">
@@ -9755,39 +9835,39 @@
         <target state="translated">网络或剖析错误 。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">100</context>
+          <context context-type="linenumber">123</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeStars" datatype="html">
-        <source>Cumulative stars</source>
-        <target state="translated">累积恒星</target>
+        <source>Stars</source>
+        <target state="translated">星标</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">106</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.view.issues" datatype="html">
-        <source>Issues</source>
-        <target state="translated">问题</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">107</context>
+          <context context-type="linenumber">130</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeCommits" datatype="html">
-        <source>Cumulative commits</source>
-        <target state="translated">累计承付款</target>
+        <source>Commits</source>
+        <target state="translated">提交</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">108</context>
+          <context context-type="linenumber">132</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW" datatype="html">
-        <source>Active right now</source>
+      <trans-unit id="SHOWCASE_STATS_FSB_VIEW_ACTIVE" datatype="html">
+        <source>Active now</source>
         <target state="translated">当前活跃</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">109</context>
+          <context context-type="linenumber">128</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.activeAgents" datatype="html">
+        <source>active agents</source>
+        <target state="translated">活动代理</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">333</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_TOKENS" datatype="html">
@@ -9795,135 +9875,15 @@
         <target state="translated">令牌</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">110</context>
+          <context context-type="linenumber">134</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP" datatype="html">
-        <source>Popular MCP clients</source>
-        <target state="translated">热门 MCP 客户端</target>
+        <source>Popular</source>
+        <target state="translated">热门</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">111</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.totalStars" datatype="html">
-        <source>total stars</source>
-        <target state="translated">恒星总数</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">156</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.last7Days" datatype="html">
-        <source>last 7 days</source>
-        <target state="translated">过去7天</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">157</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.open" datatype="html">
-        <source>open</source>
-        <target state="translated">打开</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">165</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.closed" datatype="html">
-        <source>closed</source>
-        <target state="translated">关闭</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">166</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.totalCommits" datatype="html">
-        <source>total commits</source>
-        <target state="translated">承付总额</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">172</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.last30Days" datatype="html">
-        <source>last 30 days</source>
-        <target state="translated">过去30天</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">173</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.activeAgents" datatype="html">
-        <source>active agents</source>
-        <target state="translated">活动代理人</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">178</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.avgPerUser" datatype="html">
-        <source>avg per user</source>
-        <target state="translated">每个用户的avg</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">179</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.tokensLifetime" datatype="html">
-        <source>tokens lifetime</source>
-        <target state="translated">累计令牌数</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">183</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.tokens24h" datatype="html">
-        <source>tokens 24h</source>
-        <target state="translated">24 小时令牌数</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">184</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.trackedClients" datatype="html">
-        <source>tracked clients</source>
-        <target state="translated">跟踪客户</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">190</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.topNamed" datatype="html">
-        <source>top: <x id="entityLabel" equiv-text="top.label"/></source>
-        <target state="translated">顶部 :<x id="entityLabel" equiv-text="top.label"/></target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">191</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.topClient" datatype="html">
-        <source>top client</source>
-        <target state="translated">顶端客户端</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">191</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.meta.title" datatype="html">
-        <source>FSB · Stats</source>
-        <target state="translated">FSB 数据</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">275</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.meta.description" datatype="html">
-        <source>Live aggregate adoption, usage, and repository signals for FSB.</source>
-        <target state="translated">实时汇总 FSB 的采用情况、使用情况和代码仓库信号。</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">278</context>
+          <context context-type="linenumber">135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.chartLibrary" datatype="html">
@@ -9931,39 +9891,203 @@
         <target state="translated">无法装入图表库 。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">426</context>
+          <context context-type="linenumber">176</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.chart.issuesSankey.aria" datatype="html">
-        <source>Sankey: <x id="openedCount" equiv-text="O"/> opened, <x id="closedCount" equiv-text="closedFlow"/> closed, <x id="backlogCount" equiv-text="backlog"/> still open</source>
-        <target state="translated">桑凯:<x id="openedCount" equiv-text="O"/>打开<x id="closedCount" equiv-text="closedFlow"/>关闭,<x id="backlogCount" equiv-text="backlog"/>还开着</target>
+      <trans-unit id="stats.error.chartRender" datatype="html">
+        <source>Could not render the selected chart.</source>
+        <target state="translated">无法呈现所选图表。</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">705</context>
+          <context context-type="linenumber">183</context>
+        </context-group>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">869</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.chart.issuesSankey.opened" datatype="html">
-        <source>Opened (<x id="openedCount" equiv-text="O"/>)</source>
-        <target state="translated">已开启（<x id="openedCount" equiv-text="O"/>）</target>
+      <trans-unit id="stats.status.freshAt" datatype="html">
+        <source>Fresh snapshot checked <x id="checkedAt" equiv-text="formatted"/></source>
+        <target state="translated">最新快照检查于 <x id="checkedAt" equiv-text="formatted"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">762</context>
+          <context context-type="linenumber">234</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.chart.issuesSankey.closed" datatype="html">
-        <source>Closed (<x id="closedCount" equiv-text="closedFlow"/>)</source>
-        <target state="translated">已关闭（<x id="closedCount" equiv-text="closedFlow"/>）</target>
+      <trans-unit id="stats.status.partialAt" datatype="html">
+        <source>Partial snapshot checked <x id="checkedAt" equiv-text="formatted"/></source>
+        <target state="translated">部分快照检查于 <x id="checkedAt" equiv-text="formatted"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">763</context>
+          <context context-type="linenumber">237</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.chart.issuesSankey.stillOpen" datatype="html">
-        <source>Still open (<x id="backlogCount" equiv-text="backlog"/>)</source>
-        <target state="translated">仍未关闭（<x id="backlogCount" equiv-text="backlog"/>）</target>
+      <trans-unit id="stats.status.staleAt" datatype="html">
+        <source>Stale snapshot from <x id="fetchedAt" equiv-text="formatted"/></source>
+        <target state="translated">陈旧快照来自 <x id="fetchedAt" equiv-text="formatted"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">765</context>
+          <context context-type="linenumber">238</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.loading" datatype="html">
+        <source>Loading selected stats</source>
+        <target state="translated">正在加载所选统计数据</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">241</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.status.unavailable" datatype="html">
+        <source>Selected stats unavailable</source>
+        <target state="translated">所选统计数据不可用</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">242</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.chart.stars.aria" datatype="html">
+        <source>Cumulative repository stars over time</source>
+        <target state="translated">代码库累计星标随时间变化</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">253</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.chart.commits.aria" datatype="html">
+        <source>Cumulative repository commits over time</source>
+        <target state="translated">代码库累计提交随时间变化</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">255</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.chart.tokens.aria" datatype="html">
+        <source>FSB token usage over the last 30 days</source>
+        <target state="translated">过去 30 天的 FSB 令牌用量</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">257</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.chart.mcp.aria" datatype="html">
+        <source>Share of tracked MCP clients</source>
+        <target state="translated">已跟踪 MCP 客户端的占比</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">259</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.globe.aria" datatype="html">
+        <source>Globe showing today&apos;s hourly FSB regional distribution</source>
+        <target state="translated">显示今日每小时 FSB 地区分布的地球仪</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">300</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.totalStars" datatype="html">
+        <source>total stars</source>
+        <target state="translated">恒星总数</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">309</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.last7Days" datatype="html">
+        <source>last 7 days</source>
+        <target state="translated">过去7天</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">310</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.totalCommits" datatype="html">
+        <source>total commits</source>
+        <target state="translated">承付总额</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">322</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.last30Days" datatype="html">
+        <source>last 30 days</source>
+        <target state="translated">过去30天</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">326</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.avgPerUser" datatype="html">
+        <source>avg/reporting user</source>
+        <target state="translated">平均值/上报用户</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">335</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.tokensLifetime" datatype="html">
+        <source>tokens</source>
+        <target state="translated">令牌</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">341</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.tokens24h" datatype="html">
+        <source>tokens (24h)</source>
+        <target state="translated">令牌（24 小时）</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">342</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.trackedClients" datatype="html">
+        <source>tracked clients</source>
+        <target state="translated">跟踪客户</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">348</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.topNamed" datatype="html">
+        <source>top: <x id="entityLabel" equiv-text="top.label"/></source>
+        <target state="translated">顶部 :<x id="entityLabel" equiv-text="top.label"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">349</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.topClient" datatype="html">
+        <source>top client</source>
+        <target state="translated">顶端客户端</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">349</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.view.currentAria" datatype="html">
+        <source>Choose stats view. Current view: <x id="viewLabel" equiv-text="this.activeViewLabel"/></source>
+        <target state="translated">选择统计视图。当前视图：<x id="viewLabel" equiv-text="this.activeViewLabel"/></target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">383</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.meta.title" datatype="html">
+        <source>FSB · Stats</source>
+        <target state="translated">FSB 数据</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">467</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.meta.description" datatype="html">
+        <source>Live aggregate adoption, usage, and repository signals for FSB.</source>
+        <target state="translated">实时汇总 FSB 的采用情况、使用情况和代码仓库信号。</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">475</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeStars.legend" datatype="html">
@@ -9971,7 +10095,7 @@
         <target state="translated">累积恒星</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">813</context>
+          <context context-type="linenumber">1106</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeCommits.legend" datatype="html">
@@ -9979,7 +10103,7 @@
         <target state="translated">累计承付款</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">839</context>
+          <context context-type="linenumber">1133</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND" datatype="html">
@@ -9987,15 +10111,7 @@
         <target state="translated">令牌（过去 30 天）</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">866</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="SHOWCASE_STATS_FSB_CHART_PENDING_MCP" datatype="html">
-        <source>Pending (k&gt;=5 floor)</source>
-        <target state="translated">待定（k&gt;=5 阈值）</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">882</context>
+          <context context-type="linenumber">1161</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND" datatype="html">
@@ -10003,7 +10119,7 @@
         <target state="translated">热门 MCP 客户端</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">889</context>
+          <context context-type="linenumber">1184</context>
         </context-group>
       </trans-unit>
       <trans-unit id="support.hero.title" datatype="html">

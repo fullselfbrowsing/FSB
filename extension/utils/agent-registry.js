@@ -50,6 +50,10 @@
   // so we MUST use setTimeout for the staged release; hydrate-time recovery
   // covers SW eviction.
   var FSB_AGENT_CAP_STORAGE_KEY = 'fsbAgentCap';
+  // Compatibility mirror consumed by the anonymous telemetry collector. The
+  // registry Map is authoritative; this storage value is always replaced with
+  // `_agents.size` and is never incremented/decremented independently.
+  var FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY = 'fsbActiveAgentsCount';
   var FSB_AGENT_CAP_DEFAULT = 8;
   var FSB_AGENT_CAP_MIN = 1;
   var FSB_AGENT_CAP_MAX = 64;
@@ -870,6 +874,29 @@
   };
 
   /**
+   * Return the exact number of live registry records. This is the authoritative
+   * active-agent count; callers must not maintain a second lifecycle counter.
+   */
+  AgentRegistry.prototype.getActiveAgentCount = function() {
+    return this._agents.size;
+  };
+
+  /**
+   * Reconcile the legacy chrome.storage.local telemetry mirror from registry
+   * state. Every lifecycle mutation reaches `_persist()`, including last-tab
+   * drain, explicit release, reconnect-grace expiry, and hydrate-time reaping.
+   */
+  AgentRegistry.prototype._reconcileActiveAgentCount = async function() {
+    var c = _getChrome();
+    if (!c || !c.storage || !c.storage.local || typeof c.storage.local.set !== 'function') return;
+    try {
+      var payload = {};
+      payload[FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY] = this.getActiveAgentCount();
+      await c.storage.local.set(payload);
+    } catch (_e) { /* best-effort telemetry mirror */ }
+  };
+
+  /**
    * Phase 241 D-05: Best-effort hydrate of the cached cap from
    * chrome.storage.local. Called from hydrate() before serving requests so
    * the SW wakes with the operator-configured cap (not the static default).
@@ -1211,6 +1238,7 @@
       // be conservative: keep everything (do not reap).
       var c = _getChrome();
       if (!c || !c.tabs || typeof c.tabs.query !== 'function') {
+        await self._reconcileActiveAgentCount();
         self._hydrated = true;
         return;
       }
@@ -1218,6 +1246,7 @@
       try {
         liveTabs = await c.tabs.query({});
       } catch (_e) {
+        await self._reconcileActiveAgentCount();
         self._hydrated = true;
         return;
       }
@@ -1270,6 +1299,8 @@
       // Step 5: write reconciled snapshot back if anything changed.
       if (reapedThisWake.length > 0) {
         await self._persist();
+      } else {
+        await self._reconcileActiveAgentCount();
       }
 
       self._hydrated = true;
@@ -1414,6 +1445,7 @@
       if (hasStagedReleases) extras.stagedReleases = stagedReleases;
     }
     await writePersistedAgentRegistry(records, extras);
+    await this._reconcileActiveAgentCount();
   };
 
   /**
@@ -1456,6 +1488,7 @@
     FSB_AGENT_DISPLAY_HEX_LENGTH: FSB_AGENT_DISPLAY_HEX_LENGTH,
     FSB_AGENT_LOG_PREFIX: FSB_AGENT_LOG_PREFIX,
     FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE: FSB_AGENT_REAP_RATE_LIMIT_CATEGORY_BASE,
+    FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY: FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY,
     // _internal: test-only hooks. NOT to be consumed by production callers.
     _internal: {
       emitAgentReapedEvent: emitAgentReapedEvent,

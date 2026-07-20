@@ -3,7 +3,7 @@
  *
  * Codex flagged a P1 leak on PR #50: telemetry-collector._runFlush() POSTed
  * a JSON body containing in-memory queue events whose `attempts` retry
- * counter (set by _bumpAttempts) leaked into the JSON. The server's 9-field
+ * counter (set by _bumpAttempts) leaked into the JSON. The server's versioned
  * allowlist (showcase/server/src/routes/telemetry.js line 41-44) rejects
  * the first non-allowlisted key with 400 unknown_field, which causes
  * retried events to burn through the 5-attempt cap and be permanently
@@ -13,7 +13,7 @@
  *   Scenario A -- wire payload strips `attempts`:
  *     Seed the queue with events that have `attempts: 2`. Run flush().
  *     The captured POST body's events array must contain EXACTLY the
- *     9 allowlisted keys per event -- no `attempts`, no other extras.
+ *     allowlisted keys per event -- no `attempts`, no other extras.
  *
  *   Scenario B -- in-memory queue retains `attempts` on POST failure:
  *     Same seed but fetch returns 500. After flush(), the re-enqueued
@@ -120,7 +120,7 @@ function wireShims(mod, storage, fetchShim, identity) {
   mod._setIdentityShim(identity);
 }
 
-// Build a fully-formed 9-field event with `attempts` set. Used to seed the
+// Build a legacy event with `attempts` set. Used to seed the
 // queue so we exercise the wire-payload projection on retried events. The
 // crypto.randomUUID call produces a valid UUIDv4 cosmetically (no server
 // runs in this test; the shape is irrelevant to the harness but is kept
@@ -128,7 +128,7 @@ function wireShims(mod, storage, fetchShim, identity) {
 function makeSeedEvent(attempts) {
   const tsMinute = Math.floor(Date.now() / 60000) * 60000;
   return {
-    // The 9 allowlisted fields
+    // The versioned allowlisted fields
     event_id: require('crypto').randomUUID(),
     install_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     ts_minute: tsMinute,
@@ -145,6 +145,7 @@ function makeSeedEvent(attempts) {
 
 const ALLOWLIST_SORTED = [
   'active_agent_count',
+  'active_count_version',
   'event_id',
   'event_type',
   'install_uuid',
@@ -158,7 +159,7 @@ const ALLOWLIST_SORTED = [
 (async function runTests() {
 
   // -------------------------------------------------------------------------
-  // Scenario A: wire payload contains EXACTLY the 9 allowlist keys per event
+  // Scenario A: wire payload contains exactly the versioned keys per event
   // -------------------------------------------------------------------------
   console.log('\n--- Scenario A: POST body strips `attempts` (and any other extras) ---');
   {
@@ -193,17 +194,17 @@ const ALLOWLIST_SORTED = [
     // retried events themselves. Pre-8qv this assertion was `=== 3` (2
     // seeded + 1 heartbeat); post-8qv it is `=== 2` (the heartbeat slot is
     // gone). The wire-strip contract still applies uniformly across both
-    // events (the per-event loop below verifies the 9-key allowlist on
+    // events (the per-event loop below verifies the versioned allowlist on
     // EACH event).
     passAssertEqual(body.events.length, 2, 'POST body contains 2 seeded events (heartbeat suppressed by 260524-8qv)');
 
     // For each event in the wire payload, the key set must be EXACTLY the
-    // 9-key allowlist (sorted). NO `attempts`. NO other extras.
+    // versioned allowlist (sorted). NO `attempts`. NO other extras.
     for (let i = 0; i < body.events.length; i++) {
       const ev = body.events[i];
       const keys = Object.keys(ev).sort();
       passAssertDeepEqual(keys, ALLOWLIST_SORTED,
-        'wire event[' + i + '] has EXACTLY the 9-key allowlist (sorted)');
+        'wire event[' + i + '] has exactly the versioned allowlist (sorted)');
       passAssert(!Object.prototype.hasOwnProperty.call(ev, 'attempts'),
         'wire event[' + i + '] does NOT include `attempts` (server allowlist gate)');
     }

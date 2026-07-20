@@ -4,15 +4,10 @@
 // fields we actually consume), plus pure-data aggregator outputs and a
 // per-dataset discriminated-union state. No I/O here -- types only.
 
-/**
- * 7 chart views exposed by /stats. The component renders one at a time;
- * data for all views is shared via the same set of BehaviorSubjects so
- * switching views never triggers a refetch.
- */
+/** GitHub chart view identifiers supported by the stats helpers. */
 export type StatsViewId =
   | 'stars-cumulative'
   | 'stars-weekly'
-  | 'issues-open-vs-closed'
   | 'forks-growth'
   | 'prs-opened-vs-merged'
   | 'commits-cumulative'
@@ -35,18 +30,20 @@ export interface StarEvent {
   starred_at: string;
 }
 
-/**
- * GET /repos/{owner}/{repo}/issues?state=all
- *
- * GitHub returns PRs inside the issues stream. The `pull_request` discriminator
- * field is present (and non-`undefined`) on PRs -- the aggregator uses this to
- * filter PRs back out of the issue series.
- */
-export interface IssueEvent {
-  number: number;
-  created_at: string;
-  closed_at: string | null;
-  pull_request?: unknown;
+/** One privacy-safe cumulative star snapshot, grouped by UTC calendar day. */
+export interface GitHubStarHistoryPoint {
+  day_utc: string;
+  total: number;
+}
+
+/** Aggregate-only response from GET /api/public-stats/github/stars. */
+export interface GitHubStarsStats {
+  schema_version: 1;
+  total: number;
+  history: GitHubStarHistoryPoint[];
+  history_complete: boolean;
+  source: 'stargazers' | 'repository-count';
+  as_of: string;
 }
 
 /** GET /repos/{owner}/{repo}/pulls?state=all */
@@ -61,6 +58,22 @@ export interface PullEvent {
 export interface CommitEvent {
   sha: string;
   commit: { author: { date: string } };
+}
+
+/** One privacy-safe cumulative commit snapshot, grouped by UTC calendar day. */
+export interface GitHubCommitHistoryPoint {
+  day_utc: string;
+  total: number;
+}
+
+/** Aggregate-only response from GET /api/public-stats/github/commits. */
+export interface GitHubCommitsStats {
+  schema_version: 1;
+  total: number;
+  last_30_days: number;
+  history: GitHubCommitHistoryPoint[];
+  history_complete: boolean;
+  as_of: string;
 }
 
 /** GET /repos/{owner}/{repo}/forks?sort=oldest */
@@ -98,11 +111,14 @@ export interface WeeklyDelta {
  *
  * - `loading`: pre-first-fetch and during SSR. Component renders skeleton.
  * - `ready`:   normal happy-path; data is the parsed (or aggregated) payload.
- * - `rate-limited`: HTTP 403 + `X-RateLimit-Remaining: 0`. UI shows retry card.
- * - `error`:   any other fetch/parse failure. UI shows generic retry hint.
+ * - `partial`: usable snapshot whose historical series is known incomplete.
+ * - `stale`:   a refresh failed after a prior success; data remains usable but
+ *              consumers must label it stale rather than live.
+ * - `error`:   first load failed and no usable snapshot exists.
  */
 export type DatasetState<T> =
   | { kind: 'loading' }
   | { kind: 'ready'; data: T; fetchedAt: number }
-  | { kind: 'rate-limited'; resetAt: number }
+  | { kind: 'partial'; data: T; fetchedAt: number; message: string }
+  | { kind: 'stale'; data: T; fetchedAt: number; message: string }
   | { kind: 'error'; message: string };
