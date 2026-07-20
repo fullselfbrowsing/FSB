@@ -40,7 +40,7 @@ See: .planning/milestones/v1.1.0-ROADMAP.md, .planning/milestones/v1.1.0-REQUIRE
 Phase: none active
 Plan: none active
 Status: v1.2.0 milestone complete and archived; no active milestone
-Last activity: 2026-07-15 - Completed quick task 260715-hs1: Replace Google Sheets OAuth with a zero-extra-auth signed-in tab session
+Last activity: 2026-07-20 - Completed quick task 260720-jb5: Patch Sheets session redaction and multi-tab visual-session token finalization
 
 Progress: [██████████] 100% (5/5 phases in v1.2.0)
 
@@ -94,6 +94,7 @@ None yet. Two open judgment calls flagged by research to resolve during Phase 52
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
+| 260720-jb5 | Patch Sheets session redaction and multi-tab visual-session token finalization | 2026-07-20 | 2f8359b2 | Verified | [260720-jb5-patch-sheets-session-redaction-and-multi](./quick/260720-jb5-patch-sheets-session-redaction-and-multi/) |
 | 260715-hs1 | Replace Google Sheets OAuth with a zero-extra-auth signed-in tab session | 2026-07-15 | 9ab3d40d | Needs Review | [260715-hs1-replace-google-sheets-oauth-with-a-signe](./quick/260715-hs1-replace-google-sheets-oauth-with-a-signe/) |
 | 260715-8wh | Implement production-safe Google Sheets API MVP with Chrome OAuth, typed read/write capabilities, and spreadsheet-data recording redaction | 2026-07-15 | a83d21b8 |  | [260715-8wh-implement-production-safe-google-sheets-](./quick/260715-8wh-implement-production-safe-google-sheets-/) |
 | 260707-7id | Record MCP agent sessions into logs, history, replay, and memory like autopilot runs | 2026-07-07 | 721e2826 |  | [260707-7id-record-mcp-agent-sessions-into-logs-hist](./quick/260707-7id-record-mcp-agent-sessions-into-logs-hist/) |
