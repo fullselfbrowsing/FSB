@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-01-PLAN.md
-last_updated: "2026-07-20T18:57:59.772Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 01 complete; OpenCode parser and drift gate green
+stopped_at: Completed 64-02-PLAN.md
+last_updated: "2026-07-20T19:50:02Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 02 complete; closed topology and attestation contract green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 43
+  completed_plans: 44
   percent: 39
 ---
 
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 2 of 13
+Plan: 3 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 01 complete; OpenCode parser and drift gate green
+Last activity: 2026-07-20 -- Phase 64 Plan 02 complete; closed topology and attestation contract green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -49,7 +49,7 @@ Last activity: 2026-07-20 -- Phase 64 Plan 01 complete; OpenCode parser and drif
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (1/13) |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (2/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
 Coverage: 51/51 v0.9.91 requirements mapped, 49/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
@@ -194,6 +194,9 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Treat only tool-calls and unknown as continuation finishes. — The pinned OpenCode 1.14.25 prompt loop continues only for those two reasons; every other bounded source-valid finish remains a candidate until EOF.
 - [Phase 64]: Keep OpenCode fixture-gated but absent from production registry and compatibility exposure until Plan 05. — Parser and fixture drift must block CI before production selection, while the first-commit boundary must not smuggle in start authority.
 - [Phase 64]: Project fixed tool and provider-error fields above the OpenCode parser. — Call identity, tool name, error status, and a closed diagnostic are sufficient; raw input, output, metadata, and error bodies remain confidential below the parser boundary.
+- [Phase 64]: Reconstruct and recursively freeze the closed direct/owned-server topology before the supervisor reads adapter output. — Roles, streams, runtime references, bindings, lifecycle policy, and attestations remain provider-neutral data rather than callbacks or adapter-id branches.
+- [Phase 64]: Keep fixed environment data serializable and spawn secrets opaque. — The sole Basic-password binding names a supervisor-owned reference and is legal only on the owned server and attach task; raw secret values have no contract field.
+- [Phase 64]: Interpret policy evidence through one bounded own-data verifier and a closed assertion grammar. — Provider-native JSON, arbitrary prefixes, accessors, inherited records, cycles, and unbounded input cannot cross the attestation boundary.
 
 ### Pending Todos
 
@@ -240,13 +243,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T18:57:59.767Z
-Stopped at: Completed 64-01-PLAN.md
+Last session: 2026-07-20T19:50:02Z
+Stopped at: Completed 64-02-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute 64-02-PLAN.md next. Keep OpenCode production registration and compatibility exposure absent until Plan 05, and keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute 64-03-PLAN.md next. Keep secret-bearing environment values out of every persisted journal/artifact, keep OpenCode production registration and compatibility exposure absent until Plan 05, and keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -265,3 +268,4 @@ Execute 64-02-PLAN.md next. Keep OpenCode production registration and compatibil
 | Phase 63 P11 | 5h 26m | 3 review tasks | 38 files |
 | Phase 63 P12 | 34min | 2 tasks | 1 files |
 | Phase 64 P01 | 30 min | 1 task | 9 files |
+| Phase 64 P02 | 27 min | 1 task | 7 files |
