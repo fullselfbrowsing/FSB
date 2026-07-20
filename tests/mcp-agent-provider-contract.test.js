@@ -95,7 +95,11 @@ function ownedServerSpawn(overrides = {}) {
       { kind: 'exact_scalar', path: ['enabled'], value: true },
       { kind: 'absent', path: ['providerCredential'] },
       { kind: 'string_sha256', path: ['prompt'], sha256: sha256('static prompt') },
-      { kind: 'document_sha256', path: ['model'], sha256: sha256(JSON.stringify({ resolved: true })) },
+      {
+        kind: 'document_sha256',
+        path: ['model'],
+        sha256: sha256(JSON.stringify({ resolved: true, name: 'provider/model' })),
+      },
       { kind: 'nonempty_string', path: ['model', 'name'] },
       { kind: 'all_strings_prefix', path: ['tools'], prefixRef: 'fsb_mcp_tool_prefix' },
     ],
@@ -308,9 +312,35 @@ async function main() {
     ownedServerSpawn({
       topology: {
         ...ownedServerSpawn().topology,
+        server: processSpec('owned_server', {
+          fixedEnv: { SAFE_VALUE: `Basic ${passwordCanary}` },
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+          }],
+          stdout: 'bounded_readiness',
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      topology: {
+        ...ownedServerSpawn().topology,
         attachTask: processSpec('attach_task', {
           argv: ['--pure', 'run', { runtimeRef: 'owned_server_endpoint' }],
           spawnSecretEnvBindings: [{ envKey: 'ARBITRARY_PASSWORD', secretRef: 'arbitrary' }],
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      topology: {
+        ...ownedServerSpawn().topology,
+        attachTask: processSpec('attach_task', {
+          argv: ['--pure', 'run', { runtimeRef: 'owned_server_endpoint' }],
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+            secretValue: passwordCanary,
+          }],
         }),
       },
     }),
@@ -341,6 +371,12 @@ async function main() {
       attestations: [{
         ...ownedServerSpawn().attestations[0],
         assertions: [{ kind: 'all_strings_prefix', path: ['tools'], prefix: 'arbitrary_' }],
+      }],
+    }),
+    ownedServerSpawn({
+      attestations: [{
+        ...ownedServerSpawn().attestations[0],
+        assertions: [{ kind: 'custom', path: [], check: () => true }],
       }],
     }),
   ];
@@ -396,6 +432,26 @@ async function main() {
     { pass: false, reason: 'invalid_document' },
   );
   assert.equal(documentGetterTouched, false, 'attestation verifier never invokes accessors');
+  const sparseDocument = [];
+  sparseDocument.length = 1;
+  assert.deepEqual(
+    verifyPolicyAttestation(sparseDocument, []),
+    { pass: false, reason: 'invalid_document' },
+  );
+  let assertionGetterTouched = false;
+  const accessorAssertion = { kind: 'absent' };
+  Object.defineProperty(accessorAssertion, 'path', {
+    enumerable: true,
+    get() {
+      assertionGetterTouched = true;
+      return [passwordCanary];
+    },
+  });
+  assert.deepEqual(
+    verifyPolicyAttestation(cleanDocument, [accessorAssertion]),
+    { pass: false, reason: 'invalid_descriptor' },
+  );
+  assert.equal(assertionGetterTouched, false, 'attestation descriptor validation never invokes accessors');
   assert.equal(JSON.stringify(passed).includes(passwordCanary), false);
   assert.equal(JSON.stringify(failed).includes(passwordCanary), false);
 

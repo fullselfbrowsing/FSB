@@ -301,6 +301,8 @@ async function main() {
     runtimeFiles: Object.freeze(['/fixture/runtime/mcp-config.json']),
   });
   const spec = buildClaudeSpawnSpec({ text: taskCanary }, context);
+  assert.equal(spec.topology.kind, 'direct');
+  const taskProcess = spec.topology.task;
   const exactArgv = [
     '-p',
     '--verbose',
@@ -320,20 +322,27 @@ async function main() {
     '--max-turns', '40',
     '--no-session-persistence',
   ];
-  assert.deepEqual(spec.argv, exactArgv, 'profile argv order and literal empty values are fixed');
-  assert.equal(spec.command, nativeCandidate.realPath, 'spawn spec retains the probed command');
-  assert.equal(spec.cwd, context.cwd);
-  assert.deepEqual(spec.privateFiles, [context.privateMcpConfigPath]);
-  assert.deepEqual(spec.fixedEnv, {
+  assert.deepEqual(taskProcess.argv, exactArgv, 'profile argv order and literal empty values are fixed');
+  assert.equal(taskProcess.command, nativeCandidate.realPath, 'spawn spec retains the probed command');
+  assert.equal(taskProcess.cwd, context.cwd);
+  assert.deepEqual(taskProcess.privateFiles, [context.privateMcpConfigPath]);
+  assert.deepEqual(taskProcess.fixedEnv, {
     FSB_AGENT_ADAPTER: 'claude-code',
     FSB_AGENT_PROFILE: '2.1.177',
     FSB_DELEGATION_ID: context.delegationId,
     FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
   });
+  assert.equal(taskProcess.role, 'direct_task');
+  assert.equal(taskProcess.stdin, 'task');
+  assert.equal(taskProcess.stdout, 'agent_jsonl');
+  assert.deepEqual(taskProcess.spawnSecretEnvBindings, []);
+  assert.deepEqual(spec.attestations, []);
   assert.ok(Object.isFrozen(spec));
-  assert.ok(Object.isFrozen(spec.argv));
-  assert.ok(Object.isFrozen(spec.privateFiles));
-  assert.ok(Object.isFrozen(spec.fixedEnv));
+  assert.ok(Object.isFrozen(spec.topology));
+  assert.ok(Object.isFrozen(taskProcess));
+  assert.ok(Object.isFrozen(taskProcess.argv));
+  assert.ok(Object.isFrozen(taskProcess.privateFiles));
+  assert.ok(Object.isFrozen(taskProcess.fixedEnv));
   assert.equal(JSON.stringify(spec).includes(taskCanary), false, 'task canary is absent from all spawn metadata');
   for (const providerKey of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY']) {
     assert.equal(JSON.stringify(spec).includes(providerKey), false, `${providerKey} is absent`);
@@ -363,12 +372,20 @@ async function main() {
   assert.ok(Object.isFrozen(SHIPPED_FSB_AGENT_POLICY));
 
   const retainedSpec = buildClaudeSpawnSpec({ text: 'Use the retained path.' }, context);
-  assert.equal(retainedSpec.command, nativeCandidate.realPath, 'later PATH changes cannot alter the spec');
+  assert.equal(
+    retainedSpec.topology.task.command,
+    nativeCandidate.realPath,
+    'later PATH changes cannot alter the spec',
+  );
 
   const degradedContext = Object.freeze({ ...context, detection: newerDetection });
   const degradedSpec = buildClaudeSpawnSpec({ text: 'Use a newer same-major CLI.' }, degradedContext);
   assert.equal(degradedSpec.profileVersion, compatibilityRow.profileVersion);
-  assert.deepEqual(degradedSpec.argv, exactArgv, 'degraded start eligibility preserves fixed spawn policy');
+  assert.deepEqual(
+    degradedSpec.topology.task.argv,
+    exactArgv,
+    'degraded start eligibility preserves fixed spawn policy',
+  );
 
   assert.throws(
     () => buildClaudeSpawnSpec({ text: 'x'.repeat(65537) }, context),

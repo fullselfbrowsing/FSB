@@ -149,8 +149,14 @@ async function run() {
     'utf8',
   );
   assert(
-    supervisorSource.includes("import { AgentProtocolDriftError } from './claude-stream.js';"),
-    'the supervisor recognizes the production typed drift before generic error normalization',
+    /import\s*\{[^}]*\bAgentProtocolDriftError\b[^}]*\}\s*from '\.\/protocol-drift\.js';/.test(
+      supervisorSource,
+    ),
+    'the supervisor recognizes shared production typed drift before generic error normalization',
+  );
+  assert(
+    !supervisorSource.includes("from './claude-stream.js'"),
+    'the supervisor does not import a provider-native parser',
   );
   for (const safeLabel of [
     'bounded_jsonl',

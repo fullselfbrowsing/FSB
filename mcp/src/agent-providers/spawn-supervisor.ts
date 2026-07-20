@@ -14,10 +14,17 @@ import type {
   AgentProviderId,
   AgentProviderAdapter,
   ChildExit,
+  ProcessSpec,
+  SpawnSecretEnvBinding,
+  SpawnSpec,
   SupervisedChild,
 } from './adapter.js';
-import { CLAUDE_CODE_ADAPTER_ID } from './adapter.js';
-import { AgentProtocolDriftError } from './claude-stream.js';
+import { CLAUDE_CODE_ADAPTER_ID, freezeSpawnSpec } from './adapter.js';
+import {
+  AGENT_PROTOCOL_DRIFT_REASONS,
+  AgentProtocolDriftError,
+  type AgentProtocolDriftReason,
+} from './protocol-drift.js';
 import type { AgentProviderRegistry } from './registry.js';
 import { createProductionAdapterRegistry } from './registry.js';
 import type {
@@ -78,26 +85,10 @@ type DriftExpected =
   | 'single_terminal_result'
   | 'adapter_contract';
 
-type ClaudeDriftReason =
-  | 'configuration_surface'
-  | 'duplicate_init'
-  | 'duplicate_result'
-  | 'event_after_result'
-  | 'event_before_init'
-  | 'invalid_json'
-  | 'invalid_shape'
-  | 'invalid_utf8'
-  | 'line_too_large'
-  | 'missing_result'
-  | 'session_mismatch'
-  | 'unknown_event_type'
-  | 'unknown_stream_event'
-  | 'unknown_system_subtype';
-
-type DriftObserved = ClaudeDriftReason | 'protocol_drift';
+type DriftObserved = AgentProtocolDriftReason | 'protocol_drift';
 
 interface DriftTerminalDetail {
-  readonly adapterId: typeof CLAUDE_CODE_ADAPTER_ID;
+  readonly adapterId: AgentProviderId;
   readonly expected: DriftExpected;
   readonly observed: DriftObserved;
 }
@@ -105,20 +96,25 @@ interface DriftTerminalDetail {
 const DRIFT_LABEL_LIMIT = 64;
 const DRIFT_EXPECTED_BY_REASON = Object.freeze({
   configuration_surface: 'known_event_shape',
+  counter_overflow: 'bounded_jsonl',
+  duplicate_id: 'known_event_shape',
   duplicate_init: 'single_init_session',
   duplicate_result: 'single_terminal_result',
   event_after_result: 'single_terminal_result',
   event_before_init: 'single_init_session',
   invalid_json: 'bounded_jsonl',
+  invalid_order: 'known_event_shape',
   invalid_shape: 'known_event_shape',
   invalid_utf8: 'bounded_jsonl',
   line_too_large: 'bounded_jsonl',
   missing_result: 'single_terminal_result',
+  provider_error: 'adapter_contract',
   session_mismatch: 'single_init_session',
+  stream_too_large: 'bounded_jsonl',
   unknown_event_type: 'known_event_shape',
   unknown_stream_event: 'known_event_shape',
   unknown_system_subtype: 'known_event_shape',
-} satisfies Readonly<Record<ClaudeDriftReason, DriftExpected>>);
+} satisfies Readonly<Record<AgentProtocolDriftReason, DriftExpected>>);
 
 const DelegateStartSchema = z.object({
   adapterId: z.literal(CLAUDE_CODE_ADAPTER_ID),
@@ -513,6 +509,17 @@ function isWellFormedText(value: string): boolean {
   return true;
 }
 
+function hasNoSecretBindings(bindings: readonly SpawnSecretEnvBinding[]): boolean {
+  return Array.isArray(bindings) && bindings.length === 0;
+}
+
+function directProcessArguments(process: ProcessSpec): readonly string[] | null {
+  if (!Array.isArray(process.argv) || process.argv.some((value) => typeof value !== 'string')) {
+    return null;
+  }
+  return process.argv as readonly string[];
+}
+
 function parseStartRequest(request: ExtRequest): { adapterId: 'claude-code'; task: string } {
   if (
     !isPlainRecord(request)
@@ -600,6 +607,10 @@ function driftTerminalDetail(
 ): DriftTerminalDetail {
   let expected: DriftExpected = 'adapter_contract';
   let observed: DriftObserved = 'protocol_drift';
+  const safeAdapterId = typeof adapterId === 'string'
+    && Object.hasOwn(AGENT_PROTOCOL_DRIFT_REASONS, adapterId)
+    ? adapterId as AgentProviderId
+    : CLAUDE_CODE_ADAPTER_ID;
 
   if (error instanceof AgentProtocolDriftError) {
     const descriptor = Object.getOwnPropertyDescriptor(error, 'reason');
@@ -607,17 +618,15 @@ function driftTerminalDetail(
     if (
       isBoundedDriftLabel(reason)
       && Object.hasOwn(DRIFT_EXPECTED_BY_REASON, reason)
+      && (AGENT_PROTOCOL_DRIFT_REASONS[safeAdapterId] as readonly AgentProtocolDriftReason[])
+        .includes(reason as AgentProtocolDriftReason)
     ) {
-      const typedReason = reason as ClaudeDriftReason;
+      const typedReason = reason as AgentProtocolDriftReason;
       expected = DRIFT_EXPECTED_BY_REASON[typedReason];
       observed = typedReason;
     }
   }
 
-  const safeAdapterId = adapterId === CLAUDE_CODE_ADAPTER_ID
-    && isBoundedDriftLabel(adapterId)
-    ? adapterId
-    : CLAUDE_CODE_ADAPTER_ID;
   if (
     !isBoundedDriftLabel(expected)
     || !isBoundedDriftLabel(observed)
@@ -936,7 +945,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const runtimeFingerprint = this.uniqueFingerprint();
       const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
       run.runtimeOwned = true;
-      const spec = await run.adapter.buildSpawn({ text: run.task }, {
+      const declaredSpec = await run.adapter.buildSpawn({ text: run.task }, {
         adapterId: run.adapterId,
         detection,
         delegationId: run.delegationId,
@@ -946,15 +955,19 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         runtimeFiles: [paths.mcpConfigPath],
       });
       this.throwIfStopped(run);
-      this.validateSpawnSpec(run, detection, spec.command, spec.argv, spec.cwd, spec.fixedEnv);
-      const argvSignature = createArgvSignature(spec.command, spec.argv);
+      const spec = freezeSpawnSpec(declaredSpec);
+      const process = this.requireDirectProcess(spec);
+      const argv = directProcessArguments(process);
+      if (!argv) throw new Error('adapter_unavailable');
+      this.validateSpawnSpec(run, detection, spec, process, argv);
+      const argvSignature = createArgvSignature(process.command, argv);
       const createdAt = this.wallNow();
       const prepared = await this.dependencies.runtimeFiles.prepareRun({
         delegationId: run.delegationId,
         adapterId: run.adapterId,
         profileVersion,
         createdAt,
-        binaryRealPath: spec.command,
+        binaryRealPath: process.command,
         argvSignature,
         envFingerprint: runtimeFingerprint,
         generation: this.generation,
@@ -963,16 +976,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.entry = prepared.entry;
       this.throwIfStopped(run);
 
-      const environment = this.createEnvironment(spec.fixedEnv, argvSignature);
+      const environment = this.createEnvironment(process.fixedEnv, argvSignature);
       const options: SpawnInvocationOptions = Object.freeze({
         shell: false,
         detached: true,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
-        cwd: spec.cwd,
+        cwd: process.cwd,
         env: environment,
       });
-      const child = this.spawnChild(spec.command, spec.argv, options);
+      const child = this.spawnChild(process.command, argv, options);
       run.child = child;
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
         throw new Error('spawn_failed');
@@ -1086,25 +1099,48 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     return value;
   }
 
+  private requireDirectProcess(spec: SpawnSpec): ProcessSpec {
+    if (
+      !spec
+      || typeof spec !== 'object'
+      || spec.topology.kind !== 'direct'
+      || spec.topology.task.role !== 'direct_task'
+      || spec.topology.task.stdin !== 'task'
+      || spec.topology.task.stdout !== 'agent_jsonl'
+      || !hasNoSecretBindings(spec.topology.task.spawnSecretEnvBindings)
+      || spec.attestations.length !== 0
+    ) throw new Error('adapter_unavailable');
+    return spec.topology.task;
+  }
+
   private validateSpawnSpec(
     run: DelegationRun,
     detection: AdapterDetection & { binary: NonNullable<AdapterDetection['binary']> },
-    command: string,
+    spec: SpawnSpec,
+    process: ProcessSpec,
     argv: readonly string[],
-    cwd: string,
-    fixedEnv: Readonly<Record<string, string>>,
   ): void {
     if (
-      command !== detection.binary.command
-      || cwd !== this.cwd
+      spec.adapterId !== run.adapterId
+      || spec.profileVersion !== detection.profileVersion
+      || process.command !== detection.binary.command
+      || process.cwd !== this.cwd
       || !Array.isArray(argv)
       || argv.length === 0
-      || !isPlainRecord(fixedEnv)
-      || Object.keys(fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
+      || !isPlainRecord(process.fixedEnv)
+      || Object.keys(process.fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
         key as typeof PROVIDER_KEY_NAMES[number],
       ))
     ) throw new Error('adapter_unavailable');
-    const serialized = safeJson({ command, argv, cwd, fixedEnv });
+    const serialized = safeJson({
+      command: process.command,
+      argv,
+      cwd: process.cwd,
+      privateFiles: process.privateFiles,
+      fixedEnv: process.fixedEnv,
+      spawnSecretEnvBindings: process.spawnSecretEnvBindings,
+      attestations: spec.attestations,
+    });
     const sensitive = [run.task, ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? '')];
     if (!serialized || containsSensitiveValue(serialized, sensitive)) {
       throw new Error('adapter_unavailable');
