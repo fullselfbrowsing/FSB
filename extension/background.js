@@ -2805,14 +2805,12 @@ async function restoreSessionsFromStorage() {
       }
     }
 
-    // Restore conversation session mappings after sessions are restored
+    // Restore conversation session mappings after sessions are restored.
+    // Agent-registry bootstrap is intentionally NOT chained here: this whole
+    // restore can fail before reaching this point (for example, session.get
+    // or conversation restore), while registry reconciliation is required on
+    // every service-worker wake for telemetry and dispatch correctness.
     await restoreConversationSessions();
-    // Phase 237 -- hydrate the agent registry adjacent to the visual-session
-    // restore site so registry ownership is reconciled before any message
-    // handler can read getOwner(tabId). The bootstrap function swallows its
-    // own errors, but we still chain a defensive .catch in case construction
-    // throws so SW boot is never poisoned.
-    await bootstrapAgentRegistry().catch(() => {});
     await restorePersistedMcpVisualSessions();
 
     // Phase 256 Plan 03 -- restore implicit visual-session lifecycles after
@@ -2863,6 +2861,15 @@ async function restoreSessionsFromStorage() {
 
 // Immediately restore sessions when service worker wakes up
 // This handles both service worker restarts and browser startups
+//
+// Start the registry first and publish its readiness promise. This invocation
+// is deliberately independent of restoreSessionsFromStorage(): a failure in
+// any earlier session-restore await must not prevent registry construction,
+// hydration, live-tab reconciliation, or the telemetry collector from waiting
+// for the resulting authoritative count.
+globalThis.fsbAgentRegistryReady = bootstrapAgentRegistry().catch(err => {
+  console.warn('FSB: Failed to bootstrap agent registry on wake:', err);
+});
 restoreSessionsFromStorage().catch(err => {
   console.warn('FSB: Failed to restore sessions on wake:', err);
 });

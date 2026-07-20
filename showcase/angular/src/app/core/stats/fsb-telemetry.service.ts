@@ -1,33 +1,6 @@
-// Phase 274 / AGG-01..09 + STATS-03 -- FSB public-stats client service.
-//
-// Mirror of github-stats.service.ts at every structural axis (PLATFORM_ID
-// guard, BehaviorSubject<DatasetState<T>> streams, idempotent start()/stop(),
-// 5-min visibility-aware polling, in-memory ETag cache, SSR no-op posture)
-// but pointed at our own /api/public-stats endpoint instead of GitHub.
-//
-// Why a mirror rather than a shared base class:
-//   - github-stats.service has 8 endpoints + 8 aggregator helpers; ours has
-//     2 endpoints + 0 helpers (server returns ready-to-render shapes). A
-//     shared base would generalise over a single useful axis (the polling
-//     state machine) and force the github service to grow null-handling
-//     branches it currently doesn't have. The mirror is cheaper.
-//
-// Key delta vs. github-stats.service:
-//   - The 403 + X-RateLimit-Remaining=0 branch is REMOVED. Our endpoint is
-//     server-cached (30 s memo + Cache-Control: max-age=60), not rate-limited.
-//     If the server is ever overloaded it returns 500, which lands as
-//     { kind: 'error' } on the subjects -- the page renders a generic
-//     retry card and the next 5-min cycle tries again.
-//   - Accept header is 'application/json' (no GitHub vendor type).
-//   - `credentials: 'omit'` to belt-and-suspenders against the CORS layer
-//     ever attaching a cookie -- the server-side test verifies no Set-Cookie
-//     ever leaves the server, but the client also opts out.
-//
-// SSR safety: every fetch + every `document` reference is gated by
-// `isPlatformBrowser(PLATFORM_ID)`. On the Node SSR pass, start() returns
-// without touching anything and both subjects stay at { kind: 'loading' }.
-// The stats-page component bootstraps start() inside `afterNextRender`, so
-// this gate is belt-and-suspenders.
+// Browser lifecycle for the two aggregate FSB endpoints. Each route visit
+// begins in loading state; failed refreshes preserve a prior snapshot as
+// explicitly stale, and stop() aborts in-flight work from the old visit.
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
@@ -45,7 +18,6 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 interface EtagCacheEntry {
   etag: string;
   body: unknown;
-  fetchedAt: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -55,14 +27,13 @@ export class FSBTelemetryService {
   /** ETag store keyed by full request URL. */
   private readonly etagCache = new Map<string, EtagCacheEntry>();
 
-  /** Active polling timer handle; null when polling is paused or stopped. */
   private pollHandle: ReturnType<typeof setInterval> | null = null;
-
-  /** Bound visibilitychange listener so we can remove it cleanly in stop(). */
+  private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private visibilityListener: (() => void) | null = null;
-
-  /** Whether start() has been called and resources are wired. */
   private started = false;
+  private generation = 0;
+  private readonly controllers = new Set<AbortController>();
+  private refreshInFlight: Promise<void> | null = null;
 
   // Per-dataset state streams. Both start at { kind: 'loading' } and stay
   // there until the first browser-side fetch resolves. On the SSR pass we
@@ -79,30 +50,24 @@ export class FSBTelemetryService {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.started) return;
     this.started = true;
+    this.generation += 1;
+    this.headline$.next({ kind: 'loading' });
+    this.series$.next({ kind: 'loading' });
 
-    // Immediate first refresh -- do not block on it.
     void this.refreshAll();
-
-    this.pollHandle = setInterval(() => {
-      void this.refreshAll();
-    }, POLL_INTERVAL_MS);
+    this.startPoller();
 
     this.visibilityListener = () => {
       if (typeof document === 'undefined') return;
       if (document.hidden) {
-        // Tab backgrounded -- stop the interval. Resume on focus.
         if (this.pollHandle !== null) {
           clearInterval(this.pollHandle);
           this.pollHandle = null;
         }
       } else {
-        // Tab refocused -- if we have no active interval, fire an immediate
-        // refresh and restart the schedule.
         if (this.pollHandle === null && this.started) {
           void this.refreshAll();
-          this.pollHandle = setInterval(() => {
-            void this.refreshAll();
-          }, POLL_INTERVAL_MS);
+          this.startPoller();
         }
       }
     };
@@ -120,11 +85,19 @@ export class FSBTelemetryService {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
     }
+    if (this.retryHandle !== null) {
+      clearTimeout(this.retryHandle);
+      this.retryHandle = null;
+    }
     if (this.visibilityListener !== null && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.visibilityListener);
     }
     this.visibilityListener = null;
     this.started = false;
+    this.generation += 1;
+    for (const controller of this.controllers) controller.abort();
+    this.controllers.clear();
+    this.refreshInFlight = null;
   }
 
   /**
@@ -132,33 +105,49 @@ export class FSBTelemetryService {
    * Uses Promise.allSettled so one endpoint failing does NOT cascade.
    */
   async refreshAll(): Promise<void> {
-    if (!isPlatformBrowser(this.platformId)) return;
-
-    await Promise.allSettled([
-      this.fetchHeadline(),
-      this.fetchSeries(),
-    ]);
-  }
-
-  private async fetchHeadline(): Promise<void> {
-    const url = `${API_ROOT}/global`;
+    if (!isPlatformBrowser(this.platformId) || !this.started) return;
+    if (this.refreshInFlight) return this.refreshInFlight;
+    const generation = this.generation;
+    const refresh = Promise.allSettled([
+      this.fetchDataset(`${API_ROOT}/global`, this.headline$, generation),
+      this.fetchDataset(`${API_ROOT}/global/series`, this.series$, generation),
+    ]).then(() => undefined);
+    this.refreshInFlight = refresh;
     try {
-      const data = await this.fetchJson<FSBTelemetryHeadline>(url);
-      if (data === null) return; // SSR no-op short-circuit.
-      this.headline$.next({ kind: 'ready', data, fetchedAt: Date.now() });
-    } catch (err) {
-      this.headline$.next({ kind: 'error', message: humanError(err) });
+      await refresh;
+    } finally {
+      if (this.refreshInFlight === refresh) this.refreshInFlight = null;
     }
   }
 
-  private async fetchSeries(): Promise<void> {
-    const url = `${API_ROOT}/global/series`;
+  private startPoller(): void {
+    if (this.pollHandle !== null) return;
+    this.pollHandle = setInterval(() => void this.refreshAll(), POLL_INTERVAL_MS);
+  }
+
+  private async fetchDataset<T>(
+    url: string,
+    subject: BehaviorSubject<DatasetState<T>>,
+    generation: number
+  ): Promise<void> {
     try {
-      const data = await this.fetchJson<FSBTelemetrySeries>(url);
-      if (data === null) return;
-      this.series$.next({ kind: 'ready', data, fetchedAt: Date.now() });
+      const data = await this.fetchJson<T>(url);
+      if (!this.isCurrent(generation)) return;
+      subject.next({ kind: 'ready', data, fetchedAt: generatedAt(data) ?? Date.now() });
     } catch (err) {
-      this.series$.next({ kind: 'error', message: humanError(err) });
+      if (!this.isCurrent(generation) || isAbortError(err)) return;
+      const message = humanError(err);
+      const previous = subject.value;
+      if (previous.kind === 'ready' || previous.kind === 'partial' || previous.kind === 'stale') {
+        subject.next({
+          kind: 'stale',
+          data: previous.data,
+          fetchedAt: previous.fetchedAt,
+          message,
+        });
+      } else {
+        subject.next({ kind: 'error', message });
+      }
     }
   }
 
@@ -174,8 +163,8 @@ export class FSBTelemetryService {
    * rate-limited. If a 500 ever fires, the caller surfaces it as an error
    * state and the next poll retries.
    */
-  private async fetchJson<T>(url: string): Promise<T | null> {
-    if (!isPlatformBrowser(this.platformId)) return null;
+  private async fetchJson<T>(url: string): Promise<T> {
+    if (!isPlatformBrowser(this.platformId)) throw new Error('Stats are browser-only');
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -185,13 +174,28 @@ export class FSBTelemetryService {
       headers['If-None-Match'] = cached.etag;
     }
 
-    const response = await fetch(url, { headers, credentials: 'omit' });
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers,
+        credentials: 'omit',
+        signal: controller.signal,
+      });
+    } finally {
+      this.controllers.delete(controller);
+    }
 
     if (response.status === 304 && cached) {
       // ETag match: reuse cached body, don't read response.
       return cached.body as T;
     }
 
+    if (response.status === 503) {
+      this.scheduleRetry(response.headers.get('retry-after'));
+      throw new Error('FSB stats are warming up; retrying shortly.');
+    }
     if (!response.ok) {
       throw new Error(`FSB stats ${response.status} on ${url}`);
     }
@@ -199,13 +203,39 @@ export class FSBTelemetryService {
     const parsed = (await response.json()) as T;
     const etag = response.headers.get('etag');
     if (etag) {
-      this.etagCache.set(url, { etag, body: parsed, fetchedAt: Date.now() });
+      this.etagCache.set(url, { etag, body: parsed });
     }
     return parsed;
+  }
+
+  private scheduleRetry(retryAfter: string | null): void {
+    if (!this.started || this.retryHandle !== null) return;
+    const seconds = Number(retryAfter);
+    const delay = Number.isFinite(seconds) && seconds > 0
+      ? Math.min(seconds * 1000, POLL_INTERVAL_MS)
+      : 30_000;
+    this.retryHandle = setTimeout(() => {
+      this.retryHandle = null;
+      if (this.started) void this.refreshAll();
+    }, delay);
+  }
+
+  private isCurrent(generation: number): boolean {
+    return this.started && generation === this.generation;
   }
 }
 
 function humanError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function isAbortError(err: unknown): boolean {
+  return typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError';
+}
+
+function generatedAt(value: unknown): number | null {
+  if (typeof value !== 'object' || value === null || !('generated_at' in value)) return null;
+  const parsed = Date.parse(String((value as { generated_at?: unknown }).generated_at ?? ''));
+  return Number.isFinite(parsed) ? parsed : null;
 }

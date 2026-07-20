@@ -27,7 +27,7 @@ import {
   afterNextRender,
   inject,
 } from '@angular/core';
-import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
+import { CommonModule, DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { Title, Meta } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -35,12 +35,10 @@ import { Subscription } from 'rxjs';
 import { APP_VERSION } from '../../core/seo/version';
 import { GitHubStatsService } from '../../core/stats/github-stats.service';
 import {
-  CommitEvent,
   DatasetState,
-  IssueEvent,
-  StarEvent,
+  GitHubCommitsStats,
+  GitHubStarsStats,
   StatsViewId,
-  WeeklyDelta,
 } from '../../core/stats/github-stats.types';
 import { FSBTelemetryService } from '../../core/stats/fsb-telemetry.service';
 import {
@@ -48,17 +46,32 @@ import {
   FSBTelemetryHeadline,
   FSBTelemetrySeries,
 } from '../../core/stats/fsb-telemetry.types';
+import {
+  activeSnapshotDatasetState,
+  aggregateDatasetState,
+  combineDatasetStates,
+  initialStatsSourceStates,
+  rollingSevenDayStars,
+  selectedStatsViewState,
+  sourcesForStatsView,
+  StatsDataSource,
+  StatsSourceStateMap,
+  StatsViewDataState,
+  updateStatsSourceState,
+} from '../../core/stats/stats-view.model';
 import { regionCentroid } from '../../core/stats/region-geo';
 import { GlobeVisualizationService } from '../../core/globe/globe-visualization.service';
 import { GlobeRegion } from '../../core/globe/globe-visualization.types';
+import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
-// Phase 274 / STATS-01 -- FSB view ids shown on this page. Local union
-// widening so we do NOT have to touch github-stats.types.ts (which describes
-// the GitHub dataset shape, a different concern). The view selector + chart
-// switch operate on AnyViewId, while existing GitHub helpers continue to
-// take StatsViewId.
+// The picker combines two GitHub aggregate views with three FSB telemetry
+// views. The local union keeps component switches limited to those five.
 export type FSBViewId = 'fsb-active-now' | 'fsb-tokens' | 'fsb-popular-mcp';
-export type AnyViewId = StatsViewId | FSBViewId;
+export type GitHubViewId = Extract<
+  StatsViewId,
+  'stars-cumulative' | 'commits-cumulative'
+>;
+export type AnyViewId = GitHubViewId | FSBViewId;
 
 interface ViewOption {
   id: AnyViewId;
@@ -66,6 +79,11 @@ interface ViewOption {
 }
 
 interface TabMetric {
+  label: string;
+  value: string;
+}
+
+interface AccessibleDatum {
   label: string;
   value: string;
 }
@@ -81,13 +99,14 @@ interface FanItem {
 @Component({
   selector: 'app-stats-page',
   standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink],
+  imports: [CommonModule, RouterLink, LanguagePickerComponent],
   templateUrl: './stats-page.component.html',
   styleUrl: './stats-page.component.scss',
 })
 export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly doc = inject(DOCUMENT);
   private readonly localeId = inject(LOCALE_ID);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly statsService = inject(GitHubStatsService);
@@ -101,20 +120,19 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('chartCanvas') chartCanvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('globeCanvas') globeCanvasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('activeViewButton') activeViewButton?: ElementRef<HTMLButtonElement>;
 
   readonly views: readonly ViewOption[] = [
-    { id: 'stars-cumulative', label: $localize`:@@stats.view.cumulativeStars:Cumulative stars` },
-    { id: 'issues-open-vs-closed', label: $localize`:@@stats.view.issues:Issues` },
-    { id: 'commits-cumulative', label: $localize`:@@stats.view.cumulativeCommits:Cumulative commits` },
-    { id: 'fsb-active-now', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_ACTIVE_NOW:Active right now` },
+    { id: 'stars-cumulative', label: $localize`:@@stats.view.cumulativeStars:Stars` },
+    { id: 'commits-cumulative', label: $localize`:@@stats.view.cumulativeCommits:Commits` },
+    { id: 'fsb-active-now', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_ACTIVE:Active now` },
     { id: 'fsb-tokens', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_TOKENS:Tokens` },
-    { id: 'fsb-popular-mcp', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP:Popular MCP clients` },
+    { id: 'fsb-popular-mcp', label: $localize`:@@SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP:Popular` },
   ];
 
   selectedView: AnyViewId = 'stars-cumulative';
-  viewState: 'loading' | 'ready' | 'rate-limited' | 'error' = 'loading';
-  rateLimitedUntil: Date | null = null;
-  errorMessage = '';
+  private sourceStates: StatsSourceStateMap = initialStatsSourceStates();
+  private chartLibraryState: 'loading' | 'ready' | 'error' = 'loading';
 
   // Fan-picker UI state (redesign) -- fanOpen drives the hover-expanded side
   // menus, tabPulse is a brief "pop" on the newly-selected center pill, and
@@ -130,10 +148,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // Latest dataset snapshots, populated from subject subscriptions. We keep
   // these as fields (not signals) because the redraw cycle is driven by
   // setView() / new dataset arrival, not by Angular change-detection ticks.
-  private latestStars: StarEvent[] = [];
-  private latestWeeklyStars: WeeklyDelta[] = [];
-  private latestIssues: IssueEvent[] = [];
-  private latestCommits: CommitEvent[] = [];
+  private latestStars: GitHubStarsStats | null = null;
+  private latestCommits: GitHubCommitsStats | null = null;
 
   // Phase 274 / STATS-02 + STATS-03 -- FSB telemetry snapshots; template
   // reads `fsbHeadline` getter for the live headline row above the chart card.
@@ -144,44 +160,184 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.latestFsbHeadline;
   }
 
+  get viewState(): StatsViewDataState {
+    const dataState = selectedStatsViewState(this.selectedView, this.sourceStates);
+    if (dataState.kind === 'error' || dataState.kind === 'loading') return dataState;
+    if (this.requiresChartLibrary && this.chartLibraryState === 'loading') return { kind: 'loading' };
+    if (this.requiresChartLibrary && this.chartLibraryState === 'error') {
+      return {
+        kind: 'error',
+        message: $localize`:@@stats.error.chartLibrary:Could not load chart library.`,
+      };
+    }
+    if (this.requiresChartLibrary && this.chartRenderErrorView === this.selectedView) {
+      return {
+        kind: 'error',
+        message: this.chartRenderErrorMessage ||
+          $localize`:@@stats.error.chartRender:Could not render the selected chart.`,
+      };
+    }
+    return dataState;
+  }
+
+  get isViewRenderable(): boolean {
+    return this.viewState.kind === 'ready' ||
+      this.viewState.kind === 'partial' ||
+      this.viewState.kind === 'stale';
+  }
+
+  get fsbSummaryState(): StatsViewDataState {
+    return combineDatasetStates([
+      this.sourceStates['fsb-active'],
+      this.sourceStates['fsb-headline'],
+    ]);
+  }
+
+  get hasFsbHeadlineSnapshot(): boolean {
+    const state = this.fsbSummaryState;
+    return this.latestFsbHeadline !== null &&
+      (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale');
+  }
+
+  get isFsbActiveSnapshotCurrent(): boolean {
+    const state = this.sourceStates['fsb-active'];
+    return state.kind === 'ready' || state.kind === 'partial';
+  }
+
+  get isMcpEmpty(): boolean {
+    return this.selectedView === 'fsb-popular-mcp' &&
+      this.latestFsbHeadline !== null &&
+      this.latestFsbHeadline.popular_mcp_clients.length === 0;
+  }
+
+  get stateBadgeTitle(): string {
+    return this.formatStateTitle(this.viewState);
+  }
+
+  private formatStateTitle(state: StatsViewDataState): string {
+    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+      const formatted = new Intl.DateTimeFormat(this.localeId, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(state.fetchedAt);
+      if (state.kind === 'ready') {
+        return $localize`:@@stats.status.freshAt:Fresh snapshot checked ${formatted}:checkedAt:`;
+      }
+      return state.kind === 'partial'
+        ? $localize`:@@stats.status.partialAt:Partial snapshot checked ${formatted}:checkedAt:`
+        : $localize`:@@stats.status.staleAt:Stale snapshot from ${formatted}:fetchedAt:`;
+    }
+    return state.kind === 'loading'
+      ? $localize`:@@stats.status.loading:Loading selected stats`
+      : $localize`:@@stats.status.unavailable:Selected stats unavailable`;
+  }
+
+  get errorMessage(): string {
+    const state = this.viewState;
+    return state.kind === 'error' ? state.message : '';
+  }
+
+  get chartAriaLabel(): string {
+    switch (this.selectedView) {
+      case 'stars-cumulative':
+        return $localize`:@@stats.chart.stars.aria:Cumulative repository stars over time`;
+      case 'commits-cumulative':
+        return $localize`:@@stats.chart.commits.aria:Cumulative repository commits over time`;
+      case 'fsb-tokens':
+        return $localize`:@@stats.chart.tokens.aria:FSB token usage over the last 30 days`;
+      case 'fsb-popular-mcp':
+        return $localize`:@@stats.chart.mcp.aria:Share of tracked MCP clients`;
+      default:
+        return this.activeViewLabel;
+    }
+  }
+
+  get accessibleChartData(): readonly AccessibleDatum[] {
+    switch (this.selectedView) {
+      case 'stars-cumulative':
+        return (this.latestStars?.history ?? []).map((point) => ({
+          label: point.day_utc,
+          value: this.fmtNum(point.total),
+        }));
+      case 'commits-cumulative':
+        return (this.latestCommits?.history ?? []).map((point) => ({
+          label: point.day_utc,
+          value: this.fmtNum(point.total),
+        }));
+      case 'fsb-tokens':
+        return (this.latestFsbSeries?.d30 ?? []).map((point) => ({
+          label: point.day_utc,
+          value: this.fmtBig(point.tokens),
+        }));
+      case 'fsb-popular-mcp':
+        return (this.latestFsbHeadline?.popular_mcp_clients ?? []).map((item) => ({
+          label: item.label,
+          value: this.fmtNum(item.uniq),
+        }));
+      default:
+        return [];
+    }
+  }
+
+  get accessibleGlobeData(): readonly AccessibleDatum[] {
+    return (this.latestFsbHeadline?.popular_regions ?? []).map((item) => ({
+      label: item.label,
+      value: this.fmtNum(item.uniq),
+    }));
+  }
+
+  get globeAriaLabel(): string {
+    return $localize`:@@stats.globe.aria:Globe showing today's hourly FSB regional distribution`;
+  }
+
   get tabMetrics(): readonly TabMetric[] {
     const headline = this.latestFsbHeadline;
     switch (this.selectedView) {
       case 'stars-cumulative': {
-        const cumulative = this.statsService.cumulativeStarsSeries(this.latestStars);
-        const weekly = this.latestWeeklyStars.length
-          ? this.latestWeeklyStars
-          : this.statsService.weeklyStarsDelta(this.latestStars);
+        const rolling = this.latestStars ? rollingSevenDayStars(this.latestStars) : null;
         return [
-          { label: $localize`:@@stats.metric.totalStars:total stars`, value: this.fmtNum(cumulative.at(-1)?.y ?? 0) },
-          { label: $localize`:@@stats.metric.last7Days:last 7 days`, value: this.fmtNum(weekly.at(-1)?.count ?? 0) },
-        ];
-      }
-      case 'issues-open-vs-closed': {
-        const { opened, closed } = this.statsService.issuesOpenVsClosed(this.latestIssues);
-        const openedTotal = sumPoints(opened);
-        const closedTotal = sumPoints(closed);
-        return [
-          { label: $localize`:@@stats.metric.open:open`, value: this.fmtNum(Math.max(0, openedTotal - closedTotal)) },
-          { label: $localize`:@@stats.metric.closed:closed`, value: this.fmtNum(closedTotal) },
+          { label: $localize`:@@stats.metric.totalStars:total stars`, value: this.fmtNum(this.latestStars?.total ?? 0) },
+          { label: $localize`:@@stats.metric.last7Days:last 7 days`, value: rolling === null ? '—' : this.fmtNum(rolling) },
         ];
       }
       case 'commits-cumulative': {
-        const cumulative = this.statsService.cumulativeCommitsSeries(this.latestCommits);
+        const commitsComplete = this.latestCommits?.history_complete !== false;
         return [
-          { label: $localize`:@@stats.metric.totalCommits:total commits`, value: this.fmtNum(cumulative.at(-1)?.y ?? this.latestCommits.length) },
-          { label: $localize`:@@stats.metric.last30Days:last 30 days`, value: this.fmtNum(countRecentCommits(this.latestCommits, 30)) },
+          {
+            label: $localize`:@@stats.metric.totalCommits:total commits`,
+            value: `${commitsComplete ? '' : '≥'}${this.fmtNum(this.latestCommits?.total ?? 0)}`,
+          },
+          {
+            label: $localize`:@@stats.metric.last30Days:last 30 days`,
+            value: `${commitsComplete ? '' : '≥'}${this.fmtNum(this.latestCommits?.last_30_days ?? 0)}`,
+          },
         ];
       }
-      case 'fsb-active-now':
+      case 'fsb-active-now': {
+        const reportingUsers = headline?.active_agents_reporting_users_now;
+        const hasTrustedActiveCount = Number(headline?.active_count_version) >= 2 &&
+          headline?.active_metric_semantics === 'reported_registry_count_v2' &&
+          typeof reportingUsers === 'number' && Number.isInteger(reportingUsers) &&
+          reportingUsers > 0;
+        const reportedAverage = headline?.avg_agents_per_reporting_user;
         return [
-          { label: $localize`:@@stats.metric.activeAgents:active agents`, value: this.fmtNum(headline?.active_agents_now ?? 0) },
-          { label: $localize`:@@stats.metric.avgPerUser:avg per user`, value: (headline?.avg_agents_per_user ?? 0).toFixed(1) },
+          {
+            label: $localize`:@@stats.metric.activeAgents:active agents`,
+            value: hasTrustedActiveCount ? this.fmtNum(headline?.active_agents_now ?? 0) : '—',
+          },
+          {
+            label: $localize`:@@stats.metric.avgPerUser:avg/reporting user`,
+            value: hasTrustedActiveCount &&
+              typeof reportedAverage === 'number' && Number.isFinite(reportedAverage)
+              ? reportedAverage.toFixed(1)
+              : '—',
+          },
         ];
+      }
       case 'fsb-tokens':
         return [
-          { label: $localize`:@@stats.metric.tokensLifetime:tokens lifetime`, value: this.fmtBig(headline?.tokens_total_lifetime ?? 0) },
-          { label: $localize`:@@stats.metric.tokens24h:tokens 24h`, value: this.fmtBig(headline?.tokens_24h ?? 0) },
+          { label: $localize`:@@stats.metric.tokensLifetime:tokens`, value: this.fmtBig(headline?.tokens_total_lifetime ?? 0) },
+          { label: $localize`:@@stats.metric.tokens24h:tokens (24h)`, value: this.fmtBig(headline?.tokens_24h ?? 0) },
         ];
       case 'fsb-popular-mcp': {
         const list = headline?.popular_mcp_clients ?? [];
@@ -192,9 +348,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         ];
       }
       default:
-        // Every other StatsViewId member is no longer reachable via `views`
-        // (Phase 274 redesign trimmed the tab list to 6) but the type itself
-        // still spans github-stats.types.ts's full StatsViewId union.
+        // Legacy GitHub helper view IDs are not exposed by this page.
         return [];
     }
   }
@@ -204,7 +358,18 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get formattedFsbTotal(): string {
-    return this.fmtNum(this.latestFsbHeadline?.total_users ?? 0);
+    return this.fmtNum(
+      this.latestFsbHeadline?.users_365d ?? this.latestFsbHeadline?.total_users ?? 0
+    );
+  }
+
+  get formattedFsbAgentDays(): string {
+    return this.fmtBig(this.latestFsbHeadline?.agent_days_since_active_v2 ?? 0);
+  }
+
+  get hasFsbAgentDaysSinceActiveV2(): boolean {
+    return typeof this.latestFsbHeadline?.agent_days_since_active_v2 === 'number' &&
+      Number.isFinite(this.latestFsbHeadline.agent_days_since_active_v2);
   }
 
   get formattedFsbTokens(): string {
@@ -215,6 +380,17 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.views.find((v) => v.id === this.selectedView)?.label ?? '';
   }
 
+  get viewPickerAriaLabel(): string {
+    return $localize`:@@stats.view.currentAria:Choose stats view. Current view: ${this.activeViewLabel}:viewLabel:`;
+  }
+
+  private get requiresChartLibrary(): boolean {
+    return this.selectedView === 'stars-cumulative' ||
+      this.selectedView === 'commits-cumulative' ||
+      this.selectedView === 'fsb-tokens' ||
+      (this.selectedView === 'fsb-popular-mcp' && !this.isMcpEmpty);
+  }
+
   // Redesign: whether the "Active now" globe has at least one geolocatable
   // region to glow. k>=5-anonymity-floored entries like 'unknown'/'Other'
   // (see region-geo.ts) don't count -- the annotation caption falls back to
@@ -223,6 +399,14 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   get hasPlottableRegions(): boolean {
     const regions = this.latestFsbHeadline?.popular_regions ?? [];
     return regions.some((r) => regionCentroid(r.label) !== null);
+  }
+
+  get regionAggregateState(): 'ready' | 'partial' | 'stale' | 'unavailable' {
+    const state = this.sourceStates['fsb-headline'];
+    if (state.kind === 'ready') return 'ready';
+    if (state.kind === 'partial') return 'partial';
+    if (state.kind === 'stale') return 'stale';
+    return 'unavailable';
   }
 
   get fanItemsLeft(): readonly FanItem[] {
@@ -238,6 +422,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // server bundle.
   private ChartCtor: any = null;
   private chartInstance: any = null;
+  private chartRenderErrorView: AnyViewId | null = null;
+  private chartRenderErrorMessage = '';
   // Cleanup for the "Active now" globe, set while it's running (see
   // GlobeVisualizationService.setupGlobe's return value).
   private stopGlobe?: () => void;
@@ -252,27 +438,39 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // race against a route change (see the guard after the chart.js import).
   private destroyed = false;
   private themeMedia: MediaQueryList | null = null;
-  private readonly onThemeChange = () => this.redrawChart();
+  private motionMedia: MediaQueryList | null = null;
+  private prefersReducedMotion = false;
+  private readonly onThemeChange = () => this.scheduleViewRedraw();
+  private readonly onMotionChange = (event: MediaQueryListEvent) => {
+    this.prefersReducedMotion = event.matches;
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
+    this.lastGlobeKey = '';
+    this.scheduleViewRedraw();
+  };
 
   constructor() {
     afterNextRender(() => {
-      // Browser-only by Angular contract. Bootstrap Chart.js + the service
-      // and wire up subscriptions. We re-render on every dataset update and
-      // on view switches.
-      void this.bootstrap();
-      // readChartTokens() reads live CSS custom properties, so it already
-      // tracks the OS theme; the chart itself still needs an explicit
-      // redraw when those tokens change underneath it.
       if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
         this.themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
         this.themeMedia.addEventListener('change', this.onThemeChange);
+        this.motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+        this.prefersReducedMotion = this.motionMedia.matches;
+        this.motionMedia.addEventListener('change', this.onMotionChange);
       }
+      this.bootstrapData();
+      void this.bootstrapChart();
     });
   }
 
   ngOnInit(): void {
     // Runs on server + browser. Static head-only work: metadata + robots noindex.
     this.title.setTitle($localize`:@@stats.meta.title:FSB · Stats`);
+    this.doc.head
+      .querySelectorAll(
+        'link[rel="canonical"], link[rel="alternate"], script[data-ld], meta[property^="og:"], meta[name^="twitter:"]'
+      )
+      .forEach((node) => node.remove());
     this.meta.updateTag({
       name: 'description',
       content: $localize`:@@stats.meta.description:Live aggregate adoption, usage, and repository signals for FSB.`,
@@ -297,6 +495,10 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.themeMedia.removeEventListener('change', this.onThemeChange);
       this.themeMedia = null;
     }
+    if (this.motionMedia) {
+      this.motionMedia.removeEventListener('change', this.onMotionChange);
+      this.motionMedia = null;
+    }
     if (this.chartInstance) {
       try {
         this.chartInstance.destroy();
@@ -311,6 +513,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     clearTimeout(this.tabsHoverTimer);
     clearTimeout(this.tabsCloseTimer);
     clearTimeout(this.pulseTimer);
+    this.meta.removeTag('name="robots"');
   }
 
   setView(id: AnyViewId): void {
@@ -327,6 +530,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.frozenView = null;
       return;
     }
+    this.clearChartRenderError(id);
     this.frozenView = this.selectedView;
     this.selectedView = id;
     this.fanOpen = false;
@@ -338,6 +542,13 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     // Defer one frame so Angular can apply the active globe/tab classes before
     // canvas measurements run.
     this.scheduleViewRedraw();
+  }
+
+  selectFanView(id: AnyViewId): void {
+    this.setView(id);
+    // Keyboard activation otherwise leaves focus on a fan item that becomes
+    // visibility:hidden as soon as setView() collapses the disclosure.
+    this.activeViewButton?.nativeElement.focus();
   }
 
   onTabsEnter(): void {
@@ -362,6 +573,36 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.fanOpen = !this.fanOpen;
   }
 
+  onViewPickerKeydown(event: KeyboardEvent): void {
+    const current = this.views.findIndex((view) => view.id === this.selectedView);
+    let next = current;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = (current + 1) % this.views.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = (current - 1 + this.views.length) % this.views.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = this.views.length - 1;
+        break;
+      case 'Escape':
+        this.fanOpen = false;
+        event.preventDefault();
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.setView(this.views[next].id);
+    this.activeViewButton?.nativeElement.focus();
+  }
+
   trackByView(_index: number, opt: ViewOption): string {
     return opt.id;
   }
@@ -371,7 +612,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // Balanced circular split: walks outward from the active view in both
-  // directions so both fans stay roughly even regardless of which of the 6
+  // directions so both fans stay even regardless of which of the 5
   // views is active, instead of dumping everything on one side when the
   // active tab sits at either end of the list. Keyed on frozenView while a
   // selection is collapsing so the folding list keeps its old tiles rather
@@ -414,125 +655,97 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.fmtNum(value);
   }
 
-  private async bootstrap(): Promise<void> {
+  private bootstrapData(): void {
+    if (!isPlatformBrowser(this.platformId) || this.destroyed) return;
+    this.sourceStates = initialStatsSourceStates();
+
+    // start() synchronously resets singleton subjects to loading before the
+    // subscriptions attach, so a snapshot from a previous route visit cannot
+    // flash as ready in this component.
+    this.statsService.start();
+    this.fsbService.start();
+    this.subs.push(
+      this.statsService.stars$.subscribe((state) => this.onSourceUpdate('stars', state)),
+      this.statsService.commits$.subscribe((state) => this.onSourceUpdate('commits', state)),
+      this.fsbService.headline$.subscribe((state) => this.onFsbHeadlineUpdate(state)),
+      this.fsbService.series$.subscribe((state) => this.onFsbSeriesUpdate(state))
+    );
+  }
+
+  private async bootstrapChart(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      // Dynamic import -- never bundled into the SSR pass.
       const chartMod = await import('chart.js/auto');
+      if (this.destroyed) return;
       this.ChartCtor = chartMod.default ?? chartMod;
+      this.chartLibraryState = 'ready';
+      this.scheduleViewRedraw();
     } catch (err) {
       console.warn('[stats-page] failed to load chart.js', err);
-      this.viewState = 'error';
-      this.errorMessage = $localize`:@@stats.error.chartLibrary:Could not load chart library.`;
-      return;
-    }
-
-    // Route change can destroy this component while the chart.js import
-    // above is in flight; starting the services then would orphan their
-    // pollers for the rest of the SPA session.
-    if (this.destroyed) return;
-
-    this.statsService.start();
-
-    // Wire the 4 dataset subjects the remaining views need. Any
-    // "rate-limited" state flips the whole page into the rate-limit card;
-    // any "error" updates the inline message.
-    this.subs.push(this.statsService.stars$.subscribe((s) => this.onDatasetUpdate('stars', s)));
-    this.subs.push(this.statsService.weeklyStars$.subscribe((s) => this.onDatasetUpdate('weeklyStars', s)));
-    this.subs.push(this.statsService.issues$.subscribe((s) => this.onDatasetUpdate('issues', s)));
-    this.subs.push(this.statsService.commits$.subscribe((s) => this.onDatasetUpdate('commits', s)));
-    // repoSummary subscription is intentionally omitted from per-update redraw
-    // because no chart view depends on it directly; we still surface its
-    // rate-limit state for UI.
-    this.subs.push(
-      this.statsService.repoSummary$.subscribe((s) => {
-        if (s.kind === 'rate-limited') this.applyRateLimit(s.resetAt);
-      })
-    );
-
-    // Phase 274 / STATS-03 -- bring up the FSB telemetry stream alongside GitHub.
-    // FSBTelemetryService never emits `rate-limited` (server endpoint is
-    // server-cached, not rate-limited). On `error` we silently keep the prior
-    // snapshot -- the GitHub side dominates the page's overall viewState
-    // machine, so a transient FSB blip should not flip the whole page into an
-    // error card.
-    this.fsbService.start();
-    this.subs.push(this.fsbService.headline$.subscribe((s) => this.onFsbHeadlineUpdate(s)));
-    this.subs.push(this.fsbService.series$.subscribe((s) => this.onFsbSeriesUpdate(s)));
-  }
-
-  private onFsbHeadlineUpdate(state: FSBDatasetState<FSBTelemetryHeadline>): void {
-    if (state.kind === 'ready') {
-      this.latestFsbHeadline = state.data;
-      if (this.viewState !== 'rate-limited') {
-        this.viewState = 'ready';
-        this.errorMessage = '';
-        this.scheduleViewRedraw();
-      }
-    }
-    // `error` and `loading` fall through silently; the headline row is
-    // conditionally rendered via @if (fsbHeadline) so a null snapshot just
-    // hides the row.
-  }
-
-  private onFsbSeriesUpdate(state: FSBDatasetState<FSBTelemetrySeries>): void {
-    if (state.kind === 'ready') {
-      this.latestFsbSeries = state.data;
-      if (this.viewState !== 'rate-limited') {
-        this.viewState = 'ready';
-        this.errorMessage = '';
-        this.scheduleViewRedraw();
-      }
-    }
-  }
-
-  private onDatasetUpdate(
-    key: 'stars' | 'weeklyStars' | 'issues' | 'commits',
-    state: DatasetState<unknown>
-  ): void {
-    if (state.kind === 'rate-limited') {
-      this.applyRateLimit(state.resetAt);
-      return;
-    }
-    if (state.kind === 'error') {
-      // Per-dataset error; only surface globally if we have nothing else.
-      if (this.viewState === 'loading') {
-        this.viewState = 'error';
-        this.errorMessage = this.fallbackErrorMessage;
-      }
-      return;
-    }
-    if (state.kind !== 'ready') return;
-
-    switch (key) {
-      case 'stars':
-        this.latestStars = state.data as StarEvent[];
-        break;
-      case 'weeklyStars':
-        this.latestWeeklyStars = state.data as WeeklyDelta[];
-        break;
-      case 'issues':
-        this.latestIssues = state.data as IssueEvent[];
-        break;
-      case 'commits':
-        this.latestCommits = state.data as CommitEvent[];
-        break;
-    }
-    if (this.viewState !== 'rate-limited') {
-      this.viewState = 'ready';
-      this.errorMessage = '';
+      if (this.destroyed) return;
+      this.chartLibraryState = 'error';
       this.scheduleViewRedraw();
     }
   }
 
-  private applyRateLimit(resetAt: number): void {
-    // Leaving 'ready' unmounts the @if template branch that owns the globe
-    // canvas; stop the globe's rAF loop so it doesn't keep rendering to the
-    // detached canvas (no redraw runs while rate-limited to stop it later).
-    this.stopGlobe?.();
-    this.stopGlobe = undefined;
-    this.viewState = 'rate-limited';
-    this.rateLimitedUntil = new Date(resetAt);
+  private onFsbHeadlineUpdate(state: FSBDatasetState<FSBTelemetryHeadline>): void {
+    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+      this.latestFsbHeadline = state.data;
+    }
+    if (state.kind === 'ready') {
+      this.onSourceState(
+        'fsb-active',
+        activeSnapshotDatasetState(state.data, state.fetchedAt)
+      );
+      this.onSourceState(
+        'fsb-headline',
+        aggregateDatasetState(state.data, state.fetchedAt)
+      );
+    } else {
+      this.onSourceState('fsb-active', state);
+      this.onSourceState('fsb-headline', state);
+    }
+  }
+
+  private onFsbSeriesUpdate(state: FSBDatasetState<FSBTelemetrySeries>): void {
+    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+      this.latestFsbSeries = state.data;
+    }
+    this.onSourceState(
+      'fsb-series',
+      state.kind === 'ready' ? aggregateDatasetState(state.data, state.fetchedAt) : state
+    );
+  }
+
+  private onSourceUpdate(key: 'stars' | 'commits', state: DatasetState<unknown>): void {
+    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+    switch (key) {
+      case 'stars':
+          this.latestStars = state.data as GitHubStarsStats;
+        break;
+      case 'commits':
+          this.latestCommits = state.data as GitHubCommitsStats;
+        break;
+      }
+    }
+    this.onSourceState(key, state);
+  }
+
+  private onSourceState(
+    source: StatsDataSource,
+    state: DatasetState<unknown> | FSBDatasetState<unknown>
+  ): void {
+    this.sourceStates = updateStatsSourceState(
+      this.sourceStates,
+      source,
+      state as DatasetState<unknown>
+    );
+    if (!sourcesForStatsView(this.selectedView).includes(source)) return;
+    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+      this.clearChartRenderError(this.selectedView);
+    }
+    if (!this.isViewRenderable) this.teardownVisualization();
+    this.scheduleViewRedraw();
   }
 
   private scheduleViewRedraw(): void {
@@ -564,15 +777,19 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private redrawChart(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    if (!this.ChartCtor) return;
+    if (!this.isViewRenderable) {
+      this.teardownVisualization();
+      return;
+    }
 
     if (this.selectedView === 'fsb-active-now') {
-      const key = JSON.stringify(this.latestFsbHeadline?.popular_regions ?? []);
-      // Globe already running on the same region data (poll ticks re-emit
-      // unchanged aggregates; theme flips are read per frame by the draw
-      // loop): keep it spinning instead of resetting rotation + refetching
-      // coastlines. The key is order-sensitive -- a server-side reorder just
-      // costs one harmless rebuild.
+      const key = JSON.stringify({
+        regions: this.latestFsbHeadline?.popular_regions ?? [],
+        reducedMotion: this.prefersReducedMotion,
+        theme: typeof document === 'undefined'
+          ? ''
+          : document.documentElement.getAttribute('data-theme'),
+      });
       if (this.stopGlobe && key === this.lastGlobeKey) return;
       this.stopGlobe?.();
       this.stopGlobe = undefined;
@@ -580,12 +797,16 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         try { this.chartInstance.destroy(); } catch { /* swallow */ }
         this.chartInstance = null;
       }
-      this.clearSankeySvg();
       const globeCanvas = this.globeCanvasRef?.nativeElement;
       if (globeCanvas) {
         this.lastGlobeKey = key;
         this.stopGlobe = this.zone.runOutsideAngular(() =>
-          this.globeService.setupGlobe(globeCanvas, this.buildGlobeRegions())
+          this.globeService.setupGlobe(
+            globeCanvas,
+            this.buildGlobeRegions(),
+            undefined,
+            !this.prefersReducedMotion
+          )
         );
       }
       return;
@@ -610,26 +831,43 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.chartInstance = null;
     }
 
-    // Quick task 260515-kw1 -- Sankey branch renders inline SVG instead of a
-    // Chart.js config. Hide the canvas while this view is active so the SVG
-    // can take the .chart-mount real estate.
-    if (this.selectedView === 'issues-open-vs-closed') {
+    if (this.isMcpEmpty) {
       try { canvas.style.display = 'none'; } catch { /* swallow */ }
-      this.renderSankeySvg();
       return;
     }
 
-    // For every other view, ensure the canvas is visible (a prior Sankey
-    // render may have hidden it) and the SVG host is cleared.
+    // Restore the canvas after leaving an empty MCP view.
     try { canvas.style.display = ''; } catch { /* swallow */ }
-    this.clearSankeySvg();
 
-    const config = this.buildChartConfig();
-    if (!config) return;
     try {
+      if (!this.ChartCtor) return;
+      const config = this.buildChartConfig();
+      if (!config) return;
       this.chartInstance = new this.ChartCtor(canvas, config);
+      this.clearChartRenderError(this.selectedView);
     } catch (err) {
       console.warn('[stats-page] chart render failed', err);
+      this.zone.run(() => {
+        this.chartRenderErrorView = this.selectedView;
+        this.chartRenderErrorMessage =
+          $localize`:@@stats.error.chartRender:Could not render the selected chart.`;
+        this.teardownVisualization();
+      });
+    }
+  }
+
+  private clearChartRenderError(view: AnyViewId): void {
+    if (this.chartRenderErrorView !== view) return;
+    this.chartRenderErrorView = null;
+    this.chartRenderErrorMessage = '';
+  }
+
+  private teardownVisualization(): void {
+    this.stopGlobe?.();
+    this.stopGlobe = undefined;
+    if (this.chartInstance) {
+      try { this.chartInstance.destroy(); } catch { /* swallow */ }
+      this.chartInstance = null;
     }
   }
 
@@ -657,195 +895,106 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return regions;
   }
 
-  /**
-   * Quick task 260515-kw1 -- inline-SVG Sankey renderer for
-   * issues-open-vs-closed. Two nodes (Opened on the left, Closed on the right)
-   * with one flow path; backlog (O - C) is drawn as a thinner secondary flow
-   * into a small "Open" node on the far right so the diagram has visual
-   * meaning even when every issue is closed. Uses readChartTokens for theme.
-   */
-  private renderSankeySvg(): void {
-    const canvasRef = this.chartCanvas;
-    const mount = canvasRef?.nativeElement?.parentElement;
-    if (!mount) return;
-
-    this.clearSankeySvg();
-
-    const { opened, closed } = this.statsService.issuesOpenVsClosed(this.latestIssues);
-    const O = opened.reduce((acc, p) => acc + (p.y || 0), 0);
-    const C = closed.reduce((acc, p) => acc + (p.y || 0), 0);
-    const backlog = Math.max(0, O - C);
-    const closedFlow = Math.max(0, Math.min(O, C));
-    const tokens = readChartTokens();
-
-    const VB_W = 600;
-    const VB_H = 240;
-    const nodeW = 18;
-    const leftX = 60;
-    const rightX = VB_W - 60 - nodeW;
-    const maxBar = VB_H - 60;
-    const oH = O > 0 ? maxBar : 0;
-    const total = closedFlow + backlog || 1;
-    const closedH = (closedFlow / total) * oH;
-    const backlogH = (backlog / total) * oH;
-    const oY = (VB_H - oH) / 2;
-    const closedY = 30;
-    const backlogY = VB_H - 30 - backlogH;
-
-    // Two cubic Bezier flow paths from the right edge of the Opened node to
-    // the left edge of the Closed / Backlog nodes. Stroke width = flow size.
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('class', 'sankey-svg');
-    svg.setAttribute('viewBox', `0 0 ${VB_W} ${VB_H}`);
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    svg.setAttribute('role', 'img');
-    svg.setAttribute(
-      'aria-label',
-      $localize`:@@stats.chart.issuesSankey.aria:Sankey: ${O}:openedCount: opened, ${closedFlow}:closedCount: closed, ${backlog}:backlogCount: still open`
-    );
-
-    const mkPath = (y1: number, h1: number, y2: number, h2: number, fill: string): SVGPathElement => {
-      const sx = leftX + nodeW;
-      const ex = rightX;
-      const mx = (sx + ex) / 2;
-      const sy1 = y1;
-      const sy2 = y1 + h1;
-      const ey1 = y2;
-      const ey2 = y2 + h2;
-      const d = [
-        `M ${sx} ${sy1}`,
-        `C ${mx} ${sy1}, ${mx} ${ey1}, ${ex} ${ey1}`,
-        `L ${ex} ${ey2}`,
-        `C ${mx} ${ey2}, ${mx} ${sy2}, ${sx} ${sy2}`,
-        'Z',
-      ].join(' ');
-      const path = document.createElementNS(svgNS, 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('fill', fill);
-      path.setAttribute('fill-opacity', '0.55');
-      return path;
-    };
-
-    if (closedFlow > 0) {
-      svg.appendChild(mkPath(oY, closedH, closedY, closedH, tokens.primary));
-    }
-    if (backlog > 0) {
-      svg.appendChild(mkPath(oY + closedH, backlogH, backlogY, backlogH, tokens.muted));
-    }
-
-    // Nodes
-    const mkRect = (x: number, y: number, w: number, h: number, fill: string): SVGRectElement => {
-      const r = document.createElementNS(svgNS, 'rect');
-      r.setAttribute('x', String(x));
-      r.setAttribute('y', String(y));
-      r.setAttribute('width', String(w));
-      r.setAttribute('height', String(Math.max(2, h)));
-      r.setAttribute('fill', fill);
-      return r;
-    };
-    svg.appendChild(mkRect(leftX, oY, nodeW, oH, tokens.primary));
-    svg.appendChild(mkRect(rightX, closedY, nodeW, Math.max(2, closedH), tokens.primary));
-    svg.appendChild(mkRect(rightX, backlogY, nodeW, Math.max(2, backlogH), tokens.muted));
-
-    const mkText = (x: number, y: number, anchor: string, fill: string, content: string): SVGTextElement => {
-      const t = document.createElementNS(svgNS, 'text');
-      t.setAttribute('x', String(x));
-      t.setAttribute('y', String(y));
-      t.setAttribute('fill', fill);
-      t.setAttribute('font-size', '13');
-      t.setAttribute('font-family', 'ui-sans-serif, system-ui, sans-serif');
-      t.setAttribute('text-anchor', anchor);
-      t.textContent = content;
-      return t;
-    };
-    svg.appendChild(mkText(leftX - 8, oY - 8, 'end', tokens.text, $localize`:@@stats.chart.issuesSankey.opened:Opened (${O}:openedCount:)`));
-    svg.appendChild(mkText(rightX + nodeW + 8, closedY + Math.max(closedH, 12) / 2, 'start', tokens.text, $localize`:@@stats.chart.issuesSankey.closed:Closed (${closedFlow}:closedCount:)`));
-    if (backlog > 0) {
-      svg.appendChild(mkText(rightX + nodeW + 8, backlogY + Math.max(backlogH, 12) / 2, 'start', tokens.muted, $localize`:@@stats.chart.issuesSankey.stillOpen:Still open (${backlog}:backlogCount:)`));
-    }
-
-    mount.appendChild(svg);
-  }
-
-  private clearSankeySvg(): void {
-    const canvasRef = this.chartCanvas;
-    const mount = canvasRef?.nativeElement?.parentElement;
-    if (!mount) return;
-    const prior = mount.querySelector('.sankey-svg');
-    if (prior) {
-      try { prior.remove(); } catch { /* swallow */ }
-    }
-  }
-
   private buildChartConfig(): unknown {
     const tokens = readChartTokens();
-    const baseScales = {
-      x: {
-        ticks: { color: tokens.muted },
-        grid: { color: tokens.border },
-      },
-      y: {
-        ticks: { color: tokens.muted },
-        grid: { color: tokens.border },
-        beginAtZero: true,
-      },
+    const formatDate = (value: unknown): string => {
+      const numeric = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(numeric)) return '';
+      return new Intl.DateTimeFormat(this.localeId, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+      }).format(numeric);
     };
-    const baseOpts = {
+    const animation = this.prefersReducedMotion ? false : { duration: 400 };
+    const lineOpts = {
       responsive: true,
       maintainAspectRatio: false,
+      animation,
+      parsing: false,
+      plugins: {
+        legend: { labels: { color: tokens.text } },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            title: (items: Array<{ parsed?: { x?: number } }>) =>
+              formatDate(items[0]?.parsed?.x),
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: {
+            color: tokens.muted,
+            maxTicksLimit: 8,
+            callback: (value: unknown) => formatDate(value),
+          },
+          grid: { color: tokens.border },
+        },
+        y: {
+          ticks: { color: tokens.muted },
+          grid: { color: tokens.border },
+          beginAtZero: true,
+        },
+      },
+    };
+    const doughnutOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation,
       plugins: {
         legend: { labels: { color: tokens.text } },
         tooltip: { enabled: true },
       },
-      scales: baseScales,
     };
+    const point = (day: string, value: number): { x: number; y: number } => ({
+      x: Date.parse(`${day}T00:00:00Z`),
+      y: value,
+    });
 
     switch (this.selectedView) {
       case 'stars-cumulative': {
-        const series = this.statsService.cumulativeStarsSeries(this.latestStars);
+        const series = this.latestStars?.history ?? [];
         return {
           type: 'line',
           data: {
-            labels: series.map((p) => p.t),
             datasets: [
               {
                 label: $localize`:@@stats.chart.cumulativeStars.legend:Cumulative stars`,
-                data: series.map((p) => p.y),
+                data: series.map((p) => point(p.day_utc, p.total)),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
                 fill: true,
                 tension: 0.2,
+                pointRadius: 0,
+                pointHitRadius: 8,
               },
             ],
           },
-          options: baseOpts,
+          options: lineOpts,
         };
       }
-      case 'issues-open-vs-closed': {
-        // Quick task 260515-kw1 -- handled by renderSankeySvg() above; the
-        // early-return in redrawChart() short-circuits before reaching here.
-        // We still need a `case` arm so the switch is exhaustive over AnyViewId.
-        return null;
-      }
       case 'commits-cumulative': {
-        const series = this.statsService.cumulativeCommitsSeries(this.latestCommits);
+        const series = this.latestCommits?.history ?? [];
         return {
           type: 'line',
           data: {
-            labels: series.map((p) => p.t),
             datasets: [
               {
                 label: $localize`:@@stats.chart.cumulativeCommits.legend:Cumulative commits`,
-                data: series.map((p) => p.y),
+                data: series.map((p) => point(p.day_utc, p.total)),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
                 fill: true,
                 tension: 0.2,
+                pointRadius: 0,
+                pointHitRadius: 8,
               },
             ],
           },
-          options: baseOpts,
+          options: lineOpts,
         };
       }
       // -----------------------------------------------------------------
@@ -860,26 +1009,25 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return {
           type: 'line',
           data: {
-            labels: pts.map((p) => p.day_utc),
             datasets: [
               {
                 label: $localize`:@@SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND:Tokens (last 30 days)`,
-                data: pts.map((p) => p.tokens),
+                data: pts.map((p) => point(p.day_utc, p.tokens)),
                 borderColor: tokens.primary,
                 backgroundColor: tokens.primarySoft,
                 fill: true,
                 tension: 0.2,
+                pointRadius: 0,
+                pointHitRadius: 8,
               },
             ],
           },
-          options: baseOpts,
+          options: lineOpts,
         };
       }
       case 'fsb-popular-mcp': {
-        const raw = this.latestFsbHeadline?.popular_mcp_clients ?? [];
-        const list = raw.length > 0
-          ? raw
-          : [{ label: $localize`:@@SHOWCASE_STATS_FSB_CHART_PENDING_MCP:Pending (k>=5 floor)`, uniq: 1 }];
+        const list = this.latestFsbHeadline?.popular_mcp_clients ?? [];
+        if (list.length === 0) return null;
         return {
           type: 'doughnut',
           data: {
@@ -895,13 +1043,11 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
               },
             ],
           },
-          options: baseOpts,
+          options: doughnutOpts,
         };
       }
       default:
-        // Every other AnyViewId member is no longer reachable via `views`
-        // (Phase 274 redesign trimmed the tab list to 6; fsb-active-now is
-        // handled before this method is ever called for that view).
+        // fsb-active-now is rendered before this method is called.
         return null;
     }
   }
@@ -935,16 +1081,4 @@ function readChartTokens(): ChartTokens {
     muted: (style.getPropertyValue('--text-secondary') || '#94a3b8').trim(),
     border: (style.getPropertyValue('--border-color') || 'rgba(255,255,255,0.08)').trim(),
   };
-}
-
-function sumPoints(points: ReadonlyArray<{ y: number }>): number {
-  return points.reduce((total, point) => total + (Number.isFinite(point.y) ? point.y : 0), 0);
-}
-
-function countRecentCommits(commits: readonly CommitEvent[], days: number): number {
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return commits.filter((commit) => {
-    const date = Date.parse(commit.commit?.author?.date ?? '');
-    return Number.isFinite(date) && date >= cutoff;
-  }).length;
 }

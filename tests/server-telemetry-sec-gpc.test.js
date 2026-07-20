@@ -51,10 +51,10 @@ function uuidv4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
-function evt() {
+function evt(installUuid) {
   return {
     event_id: uuidv4(),
-    install_uuid: uuidv4(),
+    install_uuid: installUuid || uuidv4(),
     ts_minute: Date.now(),
     mcp_client: 'Claude',
     model: 'm',
@@ -94,7 +94,8 @@ function postWithGpc(events, gpcValue) {
   console.log('--- server-telemetry-sec-gpc (INGEST-10) ---');
 
   // Build a 50-event batch -- worst-case work that should be skipped entirely on Sec-GPC:1.
-  const batch = Array.from({ length: 50 }, evt);
+  const installUuid = uuidv4();
+  const batch = Array.from({ length: 50 }, () => evt(installUuid));
 
   const r1 = await postWithGpc(batch, '1');
   check('Sec-GPC: 1 -> 204', r1.statusCode === 204, `got ${r1.statusCode}, body=${r1.body}`);

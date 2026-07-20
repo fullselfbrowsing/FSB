@@ -17,12 +17,12 @@
  *      queue, fetch shim is NOT called.
  *   6. Install announce timing: explicit enqueue({event_type:'install_announce'})
  *      -> queue gains exactly 1 event with event_type='install_announce'
- *      and 9 fields present, defaults applied.
+ *      and the versioned fields present, defaults applied.
  *   7. Retry cap: 5 server-failure POSTs -> 5th attempt's events dropped on
  *      the 6th flush.
- *   8. Active agent count: fsbActiveAgentsCount=3 -> emitted event has
- *      active_agent_count=3; missing/non-numeric/negative -> 0.
- *   9. Allowlist gate (RUNTIME): emitted event has EXACTLY 9 keys.
+ *   8. Active agent trust: legacy mirrors remain protocol v0; only a live,
+ *      reconciled registry can emit active_count_version=2.
+ *   9. Allowlist gate (RUNTIME): emitted event has exactly the versioned keys.
  *  10. SW eviction race: two concurrent flush() calls do not double-POST
  *      (flushLock serialization).
  *
@@ -171,15 +171,15 @@ function wireShims(mod, storage, fetchShim, identity) {
     // generally deterministic for string keys in V8, but we sort to be
     // robust).
     const events = body.events.slice().sort((a, b) => a.mcp_client.localeCompare(b.mcp_client));
-    const claudeEv = events.find(e => e.mcp_client === 'claude-code');
-    const codexEv = events.find(e => e.mcp_client === 'codex');
+    const claudeEv = events.find(e => e.mcp_client === 'Claude');
+    const codexEv = events.find(e => e.mcp_client === 'Codex');
 
     passAssert(claudeEv && codexEv, 'both groups emitted');
-    passAssertEqual(claudeEv.mcp_client, 'claude-code', 'claude group client');
+    passAssertEqual(claudeEv.mcp_client, 'Claude', 'claude group client');
     passAssertEqual(claudeEv.model, 'claude-opus-4-7', 'claude group model');
     passAssertEqual(claudeEv.tokens_in, 350, 'claude tokens_in summed: 100+200+50 = 350');
     passAssertEqual(claudeEv.tokens_out, 150, 'claude tokens_out summed: 50+80+20 = 150');
-    passAssertEqual(codexEv.mcp_client, 'codex', 'codex group client');
+    passAssertEqual(codexEv.mcp_client, 'Codex', 'codex group client');
     passAssertEqual(codexEv.model, 'gpt-5', 'codex group model');
     passAssertEqual(codexEv.tokens_in, 450, 'codex tokens_in summed: 300+150 = 450');
     passAssertEqual(codexEv.tokens_out, 225, 'codex tokens_out summed: 150+75 = 225');
@@ -242,7 +242,7 @@ function wireShims(mod, storage, fetchShim, identity) {
     passAssertEqual(body3.events.length, 1, 'flush #3 emitted exactly one event');
     passAssertEqual(body3.events[0].tokens_in, 999, 'flush #3 picked up only the new row (tokens_in=999)');
     passAssertEqual(body3.events[0].tokens_out, 111, 'flush #3 picked up only the new row (tokens_out=111)');
-    passAssertEqual(body3.events[0].mcp_client, 'claude-code',
+    passAssertEqual(body3.events[0].mcp_client, 'Claude',
       'flush #3 event is the aggregated row, not a heartbeat');
   }
 
@@ -278,8 +278,8 @@ function wireShims(mod, storage, fetchShim, identity) {
     // tag-50 ... tag-249.
     const queue = storage._store.fsbTelemetryQueue;
     passAssert(Array.isArray(queue) && queue.length === 200, 'persisted queue has 200 entries');
-    passAssertEqual(queue[0].mcp_client, 'tag-50', 'oldest surviving is tag-50 (tag-0..tag-49 dropped)');
-    passAssertEqual(queue[queue.length - 1].mcp_client, 'tag-249', 'newest is tag-249');
+    passAssertEqual(queue[0].tokens_in, 50, 'oldest surviving is tag-50 (tag-0..tag-49 dropped)');
+    passAssertEqual(queue[queue.length - 1].tokens_in, 249, 'newest is tag-249');
   }
 
   // -------------------------------------------------------------------------
@@ -328,7 +328,8 @@ function wireShims(mod, storage, fetchShim, identity) {
     passAssert(ids.includes('f2'), 'fresh event_id "f2" preserved');
     passAssert(!ids.includes('s1') && !ids.includes('s2') && !ids.includes('s3'),
       'stale event_ids s1/s2/s3 removed');
-    const heartbeatEv = body.events.find(e => e.mcp_client === 'unknown' && e.event_type === 'periodic');
+    const heartbeatEv = body.events.find(e => e.mcp_client === 'unknown'
+      && e.tokens_in === 0 && e.tokens_out === 0 && e.event_type === 'periodic');
     passAssert(!heartbeatEv,
       'NO PRESENCE-01 heartbeat in POST -- queue.length > 0 suppresses heartbeat per 260524-8qv Finding 2');
     // Queue should be empty after successful POST.
@@ -400,10 +401,11 @@ function wireShims(mod, storage, fetchShim, identity) {
     passAssert(typeof ev.ts_minute === 'number' && ev.ts_minute > 0, 'ts_minute computed');
     passAssertEqual(ev.ts_minute % 60000, 0, 'ts_minute floors to one-minute resolution');
 
-    // Allowlist check: the event has EXACTLY 9 keys.
+    // Allowlist check: the event has the exact versioned keys.
     const keys = Object.keys(ev).sort();
     passAssertDeepEqual(keys, [
       'active_agent_count',
+      'active_count_version',
       'event_id',
       'event_type',
       'install_uuid',
@@ -412,7 +414,7 @@ function wireShims(mod, storage, fetchShim, identity) {
       'tokens_in',
       'tokens_out',
       'ts_minute'
-    ], 'event has EXACTLY the 9 allowlisted keys');
+    ], 'event has exactly the versioned allowlisted keys');
   }
 
   // -------------------------------------------------------------------------
@@ -489,9 +491,9 @@ function wireShims(mod, storage, fetchShim, identity) {
   }
 
   // -------------------------------------------------------------------------
-  // Section 8: Active agent count default/coercion
+  // Section 8: Active agent count coercion and trust version
   // -------------------------------------------------------------------------
-  console.log('\n--- Section 8: Active agent count default/coercion ---');
+  console.log('\n--- Section 8: Active agent count coercion and trust version ---');
   {
     // 8a: explicit value 3
     {
@@ -504,6 +506,8 @@ function wireShims(mod, storage, fetchShim, identity) {
       await m.enqueue({ event_type: 'install_announce' });
       const ev = storage._store.fsbTelemetryQueue[0];
       passAssertEqual(ev.active_agent_count, 3, 'fsbActiveAgentsCount=3 -> event.active_agent_count=3');
+      passAssertEqual(ev.active_count_version, 0,
+        'legacy storage mirror remains untrusted protocol v0');
     }
     // 8b: missing key -> 0
     {
@@ -553,12 +557,100 @@ function wireShims(mod, storage, fetchShim, identity) {
       const ev = storage._store.fsbTelemetryQueue[0];
       passAssertEqual(ev.active_agent_count, 4, 'float 4.7 -> active_agent_count=4 (floor)');
     }
+    // 8f: a live registry overrides and repairs a stale persisted mirror.
+    {
+      const m = freshRequire();
+      const storage = makeShim();
+      const fetchShim = makeFetchShim();
+      const identity = makeIdentityShim(false);
+      wireShims(m, storage, fetchShim, identity);
+      storage._store.fsbActiveAgentsCount = 999;
+      globalThis.fsbAgentRegistryInstance = {
+        getActiveAgentCount() { return 2; }
+      };
+      try {
+        await m.enqueue({ event_type: 'install_announce' });
+        const ev = storage._store.fsbTelemetryQueue[0];
+        passAssertEqual(ev.active_agent_count, 2,
+          'live registry count overrides a stale persisted counter');
+        passAssertEqual(ev.active_count_version, 2,
+          'live reconciled registry count is explicitly trusted protocol v2');
+        passAssertEqual(storage._store.fsbActiveAgentsCount, 2,
+          'collector reconciles the compatibility mirror from registry state');
+      } finally {
+        delete globalThis.fsbAgentRegistryInstance;
+      }
+    }
+    // 8g: legacy mirrors above the registry's hard cap clamp to wire-valid 64.
+    {
+      const m = freshRequire();
+      const storage = makeShim();
+      const fetchShim = makeFetchShim();
+      const identity = makeIdentityShim(false);
+      wireShims(m, storage, fetchShim, identity);
+      storage._store.fsbActiveAgentsCount = 4472;
+      await m.enqueue({ event_type: 'install_announce' });
+      const ev = storage._store.fsbTelemetryQueue[0];
+      passAssertEqual(ev.active_agent_count, 64,
+        'legacy persisted count above the registry cap clamps to 64');
+      passAssertEqual(ev.active_count_version, 0,
+        'clamped legacy persisted count cannot be laundered into protocol v2');
+    }
+    // 8h: token fields stay within the matching server-side plausibility cap.
+    {
+      const m = freshRequire();
+      const ev = m._buildEvent({
+        install_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        mcp_client: 'Claude',
+        model: 'm',
+        tokens_in: 1_000_000_000,
+        tokens_out: 20_000_000,
+        active_agent_count: 0,
+        event_type: 'periodic'
+      });
+      passAssertEqual(ev.tokens_in, 10_000_000,
+        'tokens_in clamps to the server plausibility ceiling');
+      passAssertEqual(ev.tokens_out, 10_000_000,
+        'tokens_out clamps to the server plausibility ceiling');
+
+      const bounded = m._buildAggregateEvents({
+        install_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        mcp_client: 'Claude',
+        model: 'm',
+        tokens_in: Number.MAX_VALUE,
+        tokens_out: Number.MAX_VALUE,
+        active_agent_count: 0,
+        event_type: 'periodic'
+      });
+      passAssertEqual(bounded.length, m.MAX_AGGREGATE_CHUNKS,
+        'finite pathological aggregates cannot create an unbounded chunk loop');
+      passAssertEqual(bounded.reduce((sum, item) => sum + item.tokens_in, 0),
+        m.MAX_AGGREGATE_CHUNKS * m.MAX_TOKEN_COUNT,
+        'bounded pathological aggregate retains the declared maximum contribution');
+
+      const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+      let fallbackId = '';
+      try {
+        Object.defineProperty(globalThis, 'crypto', {
+          value: undefined,
+          configurable: true,
+        });
+        fallbackId = m._mintEventId();
+      } finally {
+        if (cryptoDescriptor) Object.defineProperty(globalThis, 'crypto', cryptoDescriptor);
+        else delete globalThis.crypto;
+      }
+      passAssert(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(fallbackId),
+        'randomUUID fallback still mints a server-valid UUIDv4 shape'
+      );
+    }
   }
 
   // -------------------------------------------------------------------------
-  // Section 9: Runtime allowlist gate (every emitted event has 9 keys exactly)
+  // Section 9: Runtime allowlist gate (every event has the versioned shape)
   // -------------------------------------------------------------------------
-  console.log('\n--- Section 9: Runtime allowlist gate (9 keys exactly) ---');
+  console.log('\n--- Section 9: Runtime allowlist gate (versioned shape) ---');
   {
     const m = freshRequire();
     const storage = makeShim();
@@ -595,6 +687,7 @@ function wireShims(mod, storage, fetchShim, identity) {
     const keys = Object.keys(ev).sort();
     const expected = [
       'active_agent_count',
+      'active_count_version',
       'event_id',
       'event_type',
       'install_uuid',
@@ -604,13 +697,90 @@ function wireShims(mod, storage, fetchShim, identity) {
       'tokens_out',
       'ts_minute'
     ];
-    passAssertDeepEqual(keys, expected, 'event has EXACTLY 9 allowlisted keys');
+    passAssertDeepEqual(keys, expected, 'event has exactly the versioned allowlisted keys');
 
     // Explicit negation: NONE of the banned row-derived fields appear.
     const banned = ['tool', 'cost_usd', 'pricing_confidence', 'token_source', 'ts', 'source', 'client'];
     for (const b of banned) {
       passAssert(!(b in ev), 'event does NOT include banned field "' + b + '"');
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Section 8.i: aggregates above the per-direction wire ceiling are split
+  // without truncation before the watermark advances.
+  // -------------------------------------------------------------------------
+  console.log('\n--- Section 8.i: oversized aggregate splits exactly at the wire ceiling ---');
+  {
+    const m = freshRequire();
+    const storage = makeShim();
+    const fetchShim = makeFetchShim();
+    const identity = makeIdentityShim(false);
+    wireShims(m, storage, fetchShim, identity);
+
+    const now = Date.now();
+    storage._store.fsbUsageData = [
+      { source: 'mcp', client: 'codex', model: 'gpt-5', tokens_in: 12_000_000, tokens_out: 4_000_000, ts: now - 2 },
+      { source: 'mcp', client: 'codex', model: 'gpt-5', tokens_in: 13_000_001, tokens_out: 6_000_001, ts: now - 1 }
+    ];
+
+    await m.flush();
+
+    passAssertEqual(fetchShim._calls.length, 1, 'oversized aggregate still uses one POST');
+    const events = fetchShim._calls[0].init.body.events;
+    passAssertEqual(events.length, 3,
+      '25,000,001 input tokens require the minimum three wire-valid events');
+    passAssert(events.every(e => e.tokens_in <= m.MAX_TOKEN_COUNT && e.tokens_out <= m.MAX_TOKEN_COUNT),
+      'every split event respects both 10M token ceilings');
+    passAssertEqual(events.reduce((sum, e) => sum + e.tokens_in, 0), 25_000_001,
+      'split events preserve the exact tokens_in aggregate');
+    passAssertEqual(events.reduce((sum, e) => sum + e.tokens_out, 0), 10_000_001,
+      'split events preserve the exact tokens_out aggregate');
+    passAssertEqual(new Set(events.map(e => e.event_id)).size, 3,
+      'each split event has its own stable retry identity');
+    passAssert(events.every(e => Object.keys(e).sort().join('|') === m.ALLOWED_EVENT_KEYS.slice().sort().join('|')),
+      'each split event retains the exact versioned wire shape');
+    passAssert(typeof storage._store.fsbTelemetryLastBeatTs === 'number'
+      && storage._store.fsbTelemetryLastBeatTs >= now,
+      'watermark advances only after the exact split events are assembled');
+  }
+
+  // -------------------------------------------------------------------------
+  // Section 8.j: split events retain ordinary queue + retry semantics.
+  // -------------------------------------------------------------------------
+  console.log('\n--- Section 8.j: split events retry without recomputation or loss ---');
+  {
+    const m = freshRequire();
+    const storage = makeShim();
+    const fetchShim = makeFetchShim();
+    const identity = makeIdentityShim(false);
+    wireShims(m, storage, fetchShim, identity);
+
+    storage._store.fsbUsageData = [{
+      source: 'mcp', client: 'claude-code', model: 'claude-opus-4-7',
+      tokens_in: 10_000_001, tokens_out: 20_000_001, ts: Date.now()
+    }];
+    fetchShim._responses.push({ ok: false, status: 503 });
+    fetchShim._responses.push({ ok: true, status: 200 });
+
+    await m.flush();
+    const queued = storage._store.fsbTelemetryQueue || [];
+    passAssertEqual(queued.length, 3,
+      'failed POST retains all minimum split events in the persisted queue');
+    passAssert(queued.every(e => e.attempts === 1),
+      'ordinary retry counter applies independently to every split event');
+    const queuedIds = queued.map(e => e.event_id).sort();
+
+    await m.flush();
+    const retried = fetchShim._calls[1].init.body.events;
+    passAssertDeepEqual(retried.map(e => e.event_id).sort(), queuedIds,
+      'retry sends the same split event identities without re-aggregation');
+    passAssertEqual(retried.reduce((sum, e) => sum + e.tokens_in, 0), 10_000_001,
+      'retry preserves exact tokens_in');
+    passAssertEqual(retried.reduce((sum, e) => sum + e.tokens_out, 0), 20_000_001,
+      'retry preserves exact tokens_out');
+    passAssertEqual(await m.getPendingCount(), 0,
+      'successful retry clears all split events under normal queue semantics');
   }
 
   // -------------------------------------------------------------------------
@@ -646,8 +816,8 @@ function wireShims(mod, storage, fetchShim, identity) {
     const body = fetchShim._calls[0].init.body;
     passAssertEqual(body.events.length, 1, 'single event in the first (aggregated) POST');
     passAssertEqual(body.events[0].tokens_in, 100, 'event carries the single row tokens_in=100');
-    passAssertEqual(body.events[0].mcp_client, 'claude-code',
-      'first POST is the aggregated row (mcp_client=claude-code)');
+    passAssertEqual(body.events[0].mcp_client, 'Claude',
+      'first POST is the normalized aggregated row (mcp_client=Claude)');
     // Second POST: PRESENCE-01 heartbeat (second flush saw no MCP rows).
     const body2 = fetchShim._calls[1].init.body;
     passAssertEqual(body2.events.length, 1, 'single event in the second (heartbeat) POST');
@@ -720,10 +890,11 @@ function wireShims(mod, storage, fetchShim, identity) {
     passAssertEqual(ev.model, 'unknown',
       '11.a: heartbeat model normalized to "unknown" by _buildEvent default');
 
-    // Allowlist check: heartbeat carries EXACTLY the 9 keys (no leakage).
+    // Allowlist check: heartbeat carries exactly the versioned keys.
     const keys = Object.keys(ev).sort();
     passAssertDeepEqual(keys, [
       'active_agent_count',
+      'active_count_version',
       'event_id',
       'event_type',
       'install_uuid',
@@ -732,7 +903,7 @@ function wireShims(mod, storage, fetchShim, identity) {
       'tokens_in',
       'tokens_out',
       'ts_minute'
-    ], '11.a: heartbeat has EXACTLY the 9 allowlisted keys');
+    ], '11.a: heartbeat has exactly the versioned allowlisted keys');
 
     // After successful POST, queue is empty (heartbeat was sent and cleared).
     const pendingAfter = await m.getPendingCount();
@@ -769,9 +940,9 @@ function wireShims(mod, storage, fetchShim, identity) {
     const ev = body.events[0];
     // Confirm the surviving event is the AGGREGATED group (not the heartbeat).
     // Distinguishing field: aggregated group has the real mcp_client value
-    // ('claude-code'), heartbeat would have 'unknown'.
-    passAssertEqual(ev.mcp_client, 'claude-code',
-      '11.b: surviving event is the aggregated group, not the heartbeat (mcp_client=claude-code)');
+    // ('Claude'), heartbeat would have 'unknown'.
+    passAssertEqual(ev.mcp_client, 'Claude',
+      '11.b: surviving event is the aggregated group, not the heartbeat (mcp_client=Claude)');
     passAssertEqual(ev.tokens_in, 300, '11.b: aggregated tokens_in = 100+200 = 300');
     passAssertEqual(ev.tokens_out, 130, '11.b: aggregated tokens_out = 50+80 = 130');
     // Negative assertion: NO event with mcp_client='unknown' snuck through.
@@ -859,7 +1030,7 @@ function wireShims(mod, storage, fetchShim, identity) {
     passAssertEqual(body.events.length, 1,
       '11.d: POST contains EXACTLY ONE event (the retried claude-code row), NOT 2 (no heartbeat appended)');
     const ev = body.events[0];
-    passAssertEqual(ev.mcp_client, 'claude-code',
+    passAssertEqual(ev.mcp_client, 'Claude',
       '11.d: surviving event is the retried real row, not a heartbeat');
     passAssertEqual(ev.tokens_in, 100, '11.d: retried tokens_in preserved');
     passAssertEqual(ev.tokens_out, 50, '11.d: retried tokens_out preserved');
@@ -887,6 +1058,54 @@ function wireShims(mod, storage, fetchShim, identity) {
       '11.d cross-check: second POST contains exactly ONE event (the heartbeat)');
     passAssertEqual(body2.events[0].mcp_client, 'unknown',
       '11.d cross-check: heartbeat is the unknown-client zero-token shape');
+  }
+
+  // -------------------------------------------------------------------------
+  // Section 12: one wire request is bounded independently of the persisted
+  // 200-event FIFO; failure attempts apply only to the selected prefix.
+  // -------------------------------------------------------------------------
+  console.log('\n--- Section 12: bounded wire batches preserve queue retry semantics ---');
+  {
+    const m = freshRequire();
+    const storage = makeShim();
+    const fetchShim = makeFetchShim();
+    const identity = makeIdentityShim(false);
+    wireShims(m, storage, fetchShim, identity);
+    const now = Math.floor(Date.now() / 60000) * 60000;
+    storage._store.fsbUsageData = [];
+    storage._store.fsbTelemetryQueue = Array.from({ length: 60 }, (_, i) => ({
+      event_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      install_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      ts_minute: now,
+      mcp_client: 'claude-code',
+      model: '\ud83e\uddea'.repeat(128),
+      tokens_in: 1,
+      tokens_out: 1,
+      active_agent_count: 2,
+      event_type: 'periodic',
+    }));
+    fetchShim._responses.push({ ok: false, status: 503 });
+
+    await m.flush();
+    const firstBody = fetchShim._calls[0].init.body;
+    passAssert(firstBody.events.length <= m.MAX_WIRE_EVENTS,
+      'wire request respects the 50-event server cap');
+    passAssert(m._utf8ByteLength(JSON.stringify(firstBody)) <= m.MAX_WIRE_BYTES,
+      'wire request respects the 30 KiB UTF-8 cap');
+    passAssert(firstBody.events.every(e => e.model.length <= 128 && e.mcp_client === 'Claude'),
+      'wire projection normalizes the client and bounds model length');
+    const failedQueue = storage._store.fsbTelemetryQueue;
+    passAssert(failedQueue.slice(0, firstBody.events.length).every(e => e.attempts === 1),
+      'failed selected prefix increments its retry counter');
+    passAssert(failedQueue.slice(firstBody.events.length).every(e => e.attempts === undefined),
+      'unsent queue tail does not consume retry attempts');
+
+    await m.flush();
+    passAssertEqual(storage._store.fsbTelemetryQueue.length, 60 - firstBody.events.length,
+      'successful retry removes only the selected prefix');
+    await m.flush();
+    passAssertEqual(storage._store.fsbTelemetryQueue.length, 0,
+      'a later bounded request drains the untouched tail');
   }
 
   // -------------------------------------------------------------------------

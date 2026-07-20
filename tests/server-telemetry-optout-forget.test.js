@@ -25,7 +25,12 @@ const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 's
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
 const { hashIp } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'utils', 'telemetry-hash'));
 const createTelemetryRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'telemetry'));
-const { resetPerUuidBudget } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'telemetry-rate-limit'));
+const {
+  checkPerUuidBudget,
+  getPerUuidBudgetSizeForTest,
+  resetPerUuidBudget,
+} = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'telemetry-rate-limit'));
+const activeTracker = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'active-tracker'));
 
 resetPerUuidBudget();
 const db = new Database(':memory:');
@@ -86,6 +91,12 @@ function post(routePath, body) {
   queries.insertTelemetryEvent.run(uuidv4(), B, Date.now(), 'Codex', 'm', 1, 1, 0, 'periodic', 'hash-B', Date.now());
   queries.upsertRollupDaily.run(A, '2026-05-14', 100, 50, 2, 3);
   queries.upsertRollupDaily.run(B, '2026-05-14', 10, 5, 1, 1);
+  activeTracker._resetForTest();
+  const activeNow = Date.now();
+  activeTracker.recordSeen(A, 2, activeNow);
+  activeTracker.recordSeen(B, 1, activeNow);
+  checkPerUuidBudget(A, activeNow);
+  checkPerUuidBudget(B, activeNow);
 
   // Pre-condition checks.
   const aBefore = db.prepare('SELECT COUNT(*) AS c FROM telemetry_events WHERE install_uuid = ?').get(A).c;
@@ -102,6 +113,8 @@ function post(routePath, body) {
   const aRollupAfter = db.prepare('SELECT COUNT(*) AS c FROM telemetry_rollups_daily WHERE install_uuid = ?').get(A).c;
   check('/optout {A} deleted all events for A', aAfter === 0, `got ${aAfter}`);
   check('/optout {A} deleted all rollups for A', aRollupAfter === 0, `got ${aRollupAfter}`);
+  check('/optout {A} removed A from active-now memory', activeTracker.countActiveUsers(10 * 60 * 1000, activeNow) === 1, 'expected only B to remain');
+  check('/optout {A} released A from per-UUID budget memory', getPerUuidBudgetSizeForTest() === 1, `got ${getPerUuidBudgetSizeForTest()}`);
 
   // Other UUID's rows untouched.
   const bAfter = db.prepare('SELECT COUNT(*) AS c FROM telemetry_events WHERE install_uuid = ?').get(B).c;
@@ -116,6 +129,8 @@ function post(routePath, body) {
   check('/forget {B} -> 204', r3.statusCode === 204, `got ${r3.statusCode}, body=${r3.body}`);
   const bFinal = db.prepare('SELECT COUNT(*) AS c FROM telemetry_events WHERE install_uuid = ?').get(B).c;
   check('/forget {B} deleted all events for B', bFinal === 0, `got ${bFinal}`);
+  check('/forget {B} removed B from active-now memory', activeTracker.countActiveUsers(10 * 60 * 1000, activeNow) === 0, 'expected no live installs');
+  check('/forget {B} released B from per-UUID budget memory', getPerUuidBudgetSizeForTest() === 0, `got ${getPerUuidBudgetSizeForTest()}`);
 
   // POST /forget with malformed UUID -> 400.
   const r4 = await post('/forget', { install_uuid: 'not-a-uuid' });

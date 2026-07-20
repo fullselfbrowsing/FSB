@@ -43,7 +43,8 @@ const {
   FSB_AGENT_REGISTRY_STORAGE_KEY,
   FSB_AGENT_REGISTRY_PAYLOAD_VERSION,
   FSB_AGENT_LOG_PREFIX,
-  FSB_AGENT_ID_PREFIX
+  FSB_AGENT_ID_PREFIX,
+  FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY
 } = reg;
 
 // ---- Plan 02 chrome mock harness (createStorageArea copied from
@@ -177,6 +178,8 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   assert.strictEqual(FSB_AGENT_REGISTRY_PAYLOAD_VERSION, 1, 'payload version is 1');
   assert.strictEqual(FSB_AGENT_LOG_PREFIX, 'AGT', 'log prefix is AGT');
   assert.strictEqual(FSB_AGENT_ID_PREFIX, 'agent_', 'id prefix is agent_');
+  assert.strictEqual(FSB_ACTIVE_AGENT_COUNT_STORAGE_KEY, 'fsbActiveAgentsCount',
+    'active-count compatibility key is exported');
   console.log('  PASS: module exports verified');
 
   console.log('--- formatAgentIdForDisplay returns 6-char prefix (D-02 canonical) ---');
@@ -487,6 +490,43 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
     }
   }
   console.log('  PASS: registerAgent writes through to chrome.storage.session');
+
+  console.log('--- Active-agent telemetry mirror is registry-derived across lifecycle paths ---');
+  {
+    const mock = setupChromeMock({ local: { fsbActiveAgentsCount: 999 } });
+    setupDiagnosticCapture();
+    try {
+      const fresh = freshRequireRegistry();
+      const registry = new fresh.AgentRegistry();
+      assert.strictEqual(registry.getActiveAgentCount(), 0,
+        'fresh registry is authoritative even when legacy storage is stale');
+
+      const first = await registry.registerAgent();
+      assert.strictEqual(registry.getActiveAgentCount(), 1, 'register derives count=1');
+      assert.strictEqual(mock.local._dump().fsbActiveAgentsCount, 1,
+        'register replaces stale storage mirror with exact count');
+
+      await registry.bindTab(first.agentId, 101);
+      await registry.releaseTab(101);
+      assert.strictEqual(registry.getActiveAgentCount(), 0,
+        'last-tab drain removes the agent from the authoritative Map');
+      assert.strictEqual(mock.local._dump().fsbActiveAgentsCount, 0,
+        'last-tab drain reconciles the mirror to zero');
+
+      const second = await registry.registerAgent();
+      registry.stampConnectionId(second.agentId, 'conn-reconcile-test');
+      await registry.stageReleaseByConnectionId('conn-reconcile-test', 60000);
+      await registry._fireStagedRelease('conn-reconcile-test');
+      assert.strictEqual(registry.getActiveAgentCount(), 0,
+        'reconnect-grace expiry removes the agent from the authoritative Map');
+      assert.strictEqual(mock.local._dump().fsbActiveAgentsCount, 0,
+        'reconnect-grace expiry reconciles the mirror to zero');
+    } finally {
+      teardownDiagnosticCapture();
+      teardownChromeMock();
+    }
+  }
+  console.log('  PASS: active count cannot drift across register, tab-drain, or grace expiry');
 
   console.log('--- Plan 02 / Test 2: storage round-trip -- bindTab persists ---');
   {

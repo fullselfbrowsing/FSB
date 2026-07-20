@@ -697,11 +697,6 @@
         "id": "home.install.manualFlag",
         "sourceSha256": "36bde66f289a35683683b041c6d8f418a5f36607b547da25d00ad55891e80b88",
         "reason": "natural Spanish technical term or product name"
-      },
-      {
-        "id": "SHOWCASE_STATS_FSB_VIEW_TOKENS",
-        "sourceSha256": "a039dfb9628b53ddaebcfe8ef0793e3fdf19867601295f00d192acef59050869",
-        "reason": "natural Spanish technical term or product name"
       }
     ],
     "de": [
