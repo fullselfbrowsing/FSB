@@ -1,17 +1,27 @@
 import { randomBytes } from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
-import { CLAUDE_CODE_ADAPTER_ID, type AgentProviderId } from './adapter.js';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  CLAUDE_CODE_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+  type AgentProviderId,
+} from './adapter.js';
 import type { ProcessInspector, ProcessTreeTerminator } from './process-tree.js';
 
 const DIRECTORY_MODE = 0o700;
 const FILE_MODE = 0o600;
-const JOURNAL_VERSION = 1 as const;
+const LEGACY_JOURNAL_VERSION = 1 as const;
+const JOURNAL_VERSION = 2 as const;
 const JOURNAL_FILENAME = 'agent-orphans.json';
 const RECOVERY_VERSION = 1 as const;
 const RECOVERY_FILENAME = 'agent-recovery.json';
 const MCP_CONFIG_FILENAME = 'mcp-config.json';
+const OPENCODE_CONFIG_ROOT_DIRECTORY = 'config';
+const OPENCODE_CONFIG_DIRECTORY = 'opencode';
+const OPENCODE_CONFIG_FILENAME = 'opencode.json';
+const OPENCODE_TEST_HOME_DIRECTORY = 'test-home';
+const OPENCODE_MANAGED_CONFIG_DIRECTORY = 'managed-config';
 const JOURNAL_LIMIT_BYTES = 256 * 1024;
 const RECOVERY_LIMIT_BYTES = 64 * 1024;
 const MAX_JOURNAL_ENTRIES = 256;
@@ -22,8 +32,28 @@ const PROFILE_VERSION_PATTERN = /^[0-9A-Za-z.+-]{1,64}$/;
 const FINGERPRINT_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
 const PROCESS_IDENTITY_PATTERN = /^[A-Za-z0-9_.:+-]{1,256}$/;
 const GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const ENV_KEY_PATTERN = /^[A-Z_][A-Z0-9_]{0,127}$/;
+const SECRET_ENV_KEY_PATTERN = /(?:^|_)(?:API_KEY|AUTHORIZATION|CREDENTIALS?|PASSWORD|PRIVATE_KEY|SECRETS?|TOKENS?)(?:_|$)/i;
+const SECRET_VALUE_PATTERNS = Object.freeze([
+  /\b(?:Basic|Bearer)\s+\S+/i,
+  /\bsk-[A-Za-z0-9_-]{8,}/,
+  /\bAKIA[A-Z0-9]{12,}/,
+  /\b(?:api[_ -]?key|authorization|credentials?|password|private[_ -]?key|secrets?|tokens?)\b\s*[:=]\s*\S+/i,
+  /\b(?:AUTHORIZATION|PASSWORD|RAW_SECRET|SECRET|TOKEN)_CANARY(?:_|\b)/i,
+]);
 
-const PREPARED_KEYS = Object.freeze([
+const RUNTIME_ROLES = Object.freeze(['delegation', 'provider_server'] as const);
+const PRIVATE_ARTIFACT_KINDS = Object.freeze([
+  'mcp_config',
+  'opencode_config',
+  'opencode_test_home',
+  'opencode_managed_config',
+] as const);
+
+export type RuntimeRole = (typeof RUNTIME_ROLES)[number];
+export type RuntimePrivateArtifactKind = (typeof PRIVATE_ARTIFACT_KINDS)[number];
+
+const LEGACY_PREPARED_KEYS = Object.freeze([
   'adapterId',
   'argvSignature',
   'binaryRealPath',
@@ -34,6 +64,18 @@ const PREPARED_KEYS = Object.freeze([
   'profileVersion',
   'state',
 ]);
+const LEGACY_ACTIVE_KEYS = Object.freeze([
+  ...LEGACY_PREPARED_KEYS,
+  'pid',
+  'processGroupId',
+  'processStartIdentity',
+  'startedAt',
+].sort());
+const PREPARED_KEYS = Object.freeze([
+  ...LEGACY_PREPARED_KEYS,
+  'fixedEnv',
+  'role',
+].sort());
 const ACTIVE_KEYS = Object.freeze([
   ...PREPARED_KEYS,
   'pid',
@@ -44,7 +86,7 @@ const ACTIVE_KEYS = Object.freeze([
 const JOURNAL_KEYS = Object.freeze(['entries', 'version']);
 const RECOVERY_KEYS = Object.freeze(['dispositions', 'version']);
 const RECOVERY_DISPOSITION_KEYS = Object.freeze(['code', 'delegationId', 'recoveredAt']);
-const PREPARE_INPUT_KEYS = Object.freeze([
+const LEGACY_PREPARE_INPUT_KEYS = Object.freeze([
   'adapterId',
   'argvSignature',
   'binaryRealPath',
@@ -55,13 +97,34 @@ const PREPARE_INPUT_KEYS = Object.freeze([
   'generation',
   'profileVersion',
 ]);
-const ACTIVATE_INPUT_KEYS = Object.freeze([
+const PREPARE_INPUT_KEYS = Object.freeze([
+  'adapterId',
+  'argvSignature',
+  'binaryRealPath',
+  'createdAt',
+  'delegationId',
+  'envFingerprint',
+  'fixedEnv',
+  'generation',
+  'privateArtifacts',
+  'profileVersion',
+  'role',
+]);
+const LEGACY_ACTIVATE_INPUT_KEYS = Object.freeze([
   'delegationId',
   'pid',
   'processGroupId',
   'processStartIdentity',
   'startedAt',
 ]);
+const ACTIVATE_INPUT_KEYS = Object.freeze([
+  ...LEGACY_ACTIVATE_INPUT_KEYS,
+  'role',
+].sort());
+const REMOVE_INPUT_KEYS = Object.freeze(['delegationId', 'role']);
+const MCP_ARTIFACT_KEYS = Object.freeze(['endpoint', 'kind']);
+const OPENCODE_CONFIG_ARTIFACT_KEYS = Object.freeze(['contents', 'kind']);
+const DIRECTORY_ARTIFACT_KEYS = Object.freeze(['kind']);
 
 export type RuntimeFilesErrorCode =
   | 'invalid_runtime_input'
@@ -81,24 +144,28 @@ export class RuntimeFilesError extends Error {
 
 export interface PreparedJournalEntry {
   readonly state: 'prepared';
+  readonly role: RuntimeRole;
   readonly delegationId: string;
   readonly adapterId: AgentProviderId;
   readonly profileVersion: string;
   readonly createdAt: number;
   readonly binaryRealPath: string;
   readonly argvSignature: string;
+  readonly fixedEnv: Readonly<Record<string, string>>;
   readonly envFingerprint: string;
   readonly generation: string;
 }
 
 export interface ActiveJournalEntry {
   readonly state: 'active';
+  readonly role: RuntimeRole;
   readonly delegationId: string;
   readonly adapterId: AgentProviderId;
   readonly profileVersion: string;
   readonly createdAt: number;
   readonly binaryRealPath: string;
   readonly argvSignature: string;
+  readonly fixedEnv: Readonly<Record<string, string>>;
   readonly envFingerprint: string;
   readonly generation: string;
   readonly pid: number;
@@ -135,7 +202,7 @@ export type RecoveryDispositionReadResult =
   | { readonly status: 'ok'; readonly journal: AgentRecoveryDispositionJournal }
   | { readonly status: 'unavailable'; readonly reason: JournalUnavailableReason };
 
-export interface PrepareRunInput {
+export interface LegacyPrepareRunInput {
   readonly delegationId: string;
   readonly adapterId: AgentProviderId;
   readonly profileVersion: string;
@@ -147,7 +214,47 @@ export interface PrepareRunInput {
   readonly endpoint: string;
 }
 
-export interface ActivateRunInput {
+export interface McpConfigRuntimeArtifact {
+  readonly kind: 'mcp_config';
+  readonly endpoint: string;
+}
+
+export interface OpenCodeConfigRuntimeArtifact {
+  readonly kind: 'opencode_config';
+  readonly contents: string;
+}
+
+export interface OpenCodeTestHomeRuntimeArtifact {
+  readonly kind: 'opencode_test_home';
+}
+
+export interface OpenCodeManagedConfigRuntimeArtifact {
+  readonly kind: 'opencode_managed_config';
+}
+
+export type RuntimePrivateArtifact =
+  | McpConfigRuntimeArtifact
+  | OpenCodeConfigRuntimeArtifact
+  | OpenCodeTestHomeRuntimeArtifact
+  | OpenCodeManagedConfigRuntimeArtifact;
+
+export interface RoleAwarePrepareRunInput {
+  readonly role: RuntimeRole;
+  readonly delegationId: string;
+  readonly adapterId: AgentProviderId;
+  readonly profileVersion: string;
+  readonly createdAt: number;
+  readonly binaryRealPath: string;
+  readonly argvSignature: string;
+  readonly fixedEnv: Readonly<Record<string, string>>;
+  readonly envFingerprint: string;
+  readonly generation: string;
+  readonly privateArtifacts: readonly RuntimePrivateArtifact[];
+}
+
+export type PrepareRunInput = LegacyPrepareRunInput | RoleAwarePrepareRunInput;
+
+export interface LegacyActivateRunInput {
   readonly delegationId: string;
   readonly pid: number;
   readonly processGroupId: number;
@@ -155,18 +262,33 @@ export interface ActivateRunInput {
   readonly processStartIdentity: string;
 }
 
-export interface PreparedRun {
+export interface RoleAwareActivateRunInput extends LegacyActivateRunInput {
+  readonly role: RuntimeRole;
+}
+
+export type ActivateRunInput = LegacyActivateRunInput | RoleAwareActivateRunInput;
+
+export interface RoleAwareRemoveRunInput {
+  readonly delegationId: string;
+  readonly role: RuntimeRole;
+}
+
+export interface PreparedRun extends RuntimeRunPaths {
   readonly entry: PreparedJournalEntry;
-  readonly runDirectory: string;
-  readonly mcpConfigPath: string;
 }
 
 export interface RuntimeRunPaths {
   readonly runDirectory: string;
   readonly mcpConfigPath: string;
+  readonly opencodeConfigRoot: string;
+  readonly opencodeConfigDirectory: string;
+  readonly opencodeConfigPath: string;
+  readonly opencodeTestHomePath: string;
+  readonly opencodeManagedConfigPath: string;
 }
 
 export interface AgentRecoveryProfileSummary {
+  readonly role: RuntimeRole;
   readonly adapterId: AgentProviderId;
   readonly profileVersion: string;
   readonly confirmedKilled: number;
@@ -186,7 +308,10 @@ export interface AgentStartupRecoveryResult {
 export interface AgentStartupRecoveryDependencies {
   readonly runtimeFiles: Pick<
     AgentRuntimeFiles,
-    'readJournal' | 'readRecoveryDispositions' | 'recordRestartLossAndRemoveRun'
+    | 'readJournal'
+    | 'readRecoveryDispositions'
+    | 'recordRestartLossAndRemoveRun'
+    | 'removeRecoveredRun'
   >;
   readonly inspector: ProcessInspector;
   readonly terminator: ProcessTreeTerminator;
@@ -241,10 +366,40 @@ const DEFAULT_FS: RuntimeFsDependencies = {
   rmdirSync: nodeFs.rmdirSync,
 };
 
+function isOwnDataRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  return Reflect.ownKeys(value).every((key) => (
+    typeof key === 'string'
+    && descriptors[key]?.enumerable === true
+    && 'value' in descriptors[key]
+  ));
+}
+
 function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  return actual.length === expected.length
-    && actual.every((key, index) => key === expected[index]);
+  if (!isOwnDataRecord(value)) return false;
+  const actual = Reflect.ownKeys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === sortedExpected.length
+    && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function isDenseDataArray(value: unknown, maximumLength: number): value is readonly unknown[] {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+  if (value.length > maximumLength) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(value);
+  if (keys.some((key) => typeof key !== 'string')) return false;
+  const expected = Array.from({ length: value.length }, (_, index) => String(index));
+  const dataKeys = keys.filter((key) => key !== 'length');
+  return dataKeys.length === expected.length
+    && expected.every((key) => (
+      dataKeys.includes(key)
+      && descriptors[key]?.enumerable === true
+      && 'value' in descriptors[key]
+    ));
 }
 
 function isSafeInteger(value: unknown, minimum = 0): value is number {
@@ -259,20 +414,106 @@ function isAbsoluteBoundedPath(value: unknown): value is string {
     && isAbsolute(value);
 }
 
+function isRuntimeRole(value: unknown): value is RuntimeRole {
+  return value === 'delegation' || value === 'provider_server';
+}
+
+function isAllowedRoleAdapter(role: RuntimeRole, adapterId: unknown): adapterId is AgentProviderId {
+  if (role === 'provider_server') return adapterId === OPENCODE_ADAPTER_ID;
+  return adapterId === CLAUDE_CODE_ADAPTER_ID || adapterId === OPENCODE_ADAPTER_ID;
+}
+
+function normalizedFieldName(value: string): string {
+  return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[- ]/g, '_').toUpperCase();
+}
+
+function containsCredentialUrl(value: string): boolean {
+  for (const match of value.matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+    try {
+      const parsed = new URL(match[0]);
+      if (parsed.username !== '' || parsed.password !== '') return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isSecretBearingString(value: string): boolean {
+  return value.includes('\0')
+    || containsCredentialUrl(value)
+    || SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function cloneFixedEnv(value: unknown): Readonly<Record<string, string>> | null {
+  if (!isOwnDataRecord(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length > 64) return null;
+  const clone: Record<string, string> = {};
+  for (const key of keys) {
+    const candidate = value[key];
+    if (
+      !ENV_KEY_PATTERN.test(key)
+      || SECRET_ENV_KEY_PATTERN.test(key)
+      || typeof candidate !== 'string'
+      || candidate.length > 4096
+      || isSecretBearingString(candidate)
+    ) return null;
+    clone[key] = candidate;
+  }
+  return Object.freeze(clone);
+}
+
+function isSafePublicDocument(
+  value: unknown,
+  state: { nodes: number },
+  depth = 0,
+): boolean {
+  state.nodes += 1;
+  if (state.nodes > 4096 || depth > 32) return false;
+  if (value === null || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string') {
+    return value.length <= 64 * 1024 && !isSecretBearingString(value);
+  }
+  if (Array.isArray(value)) {
+    return isDenseDataArray(value, 1024)
+      && value.every((entry) => isSafePublicDocument(entry, state, depth + 1));
+  }
+  if (!isOwnDataRecord(value) || Object.keys(value).length > 256) return false;
+  for (const [key, entry] of Object.entries(value)) {
+    const normalized = normalizedFieldName(key);
+    if (
+      SECRET_ENV_KEY_PATTERN.test(normalized)
+      || normalized === 'HEADERS'
+      || normalized === 'RESOLVED_ENV'
+      || normalized === 'SPAWN_SECRET_ENV_BINDINGS'
+      || normalized === 'RAW_SECRET'
+      || normalized === 'RAW_SECRET_BYTES'
+      || normalized === 'ENDPOINT_CREDENTIALS'
+    ) return false;
+    if (!isSafePublicDocument(entry, state, depth + 1)) return false;
+  }
+  return true;
+}
+
 function isPreparedEntry(value: unknown): value is PreparedJournalEntry {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const entry = value as Record<string, unknown>;
+  if (!isOwnDataRecord(value)) return false;
+  const entry = value;
+  const fixedEnv = cloneFixedEnv(entry.fixedEnv);
   return exactKeys(entry, PREPARED_KEYS)
     && entry.state === 'prepared'
+    && isRuntimeRole(entry.role)
     && typeof entry.delegationId === 'string'
     && DELEGATION_ID_PATTERN.test(entry.delegationId)
-    && entry.adapterId === CLAUDE_CODE_ADAPTER_ID
+    && isAllowedRoleAdapter(entry.role, entry.adapterId)
     && typeof entry.profileVersion === 'string'
     && PROFILE_VERSION_PATTERN.test(entry.profileVersion)
     && isSafeInteger(entry.createdAt)
     && isAbsoluteBoundedPath(entry.binaryRealPath)
     && typeof entry.argvSignature === 'string'
     && FINGERPRINT_PATTERN.test(entry.argvSignature)
+    && fixedEnv !== null
     && typeof entry.envFingerprint === 'string'
     && FINGERPRINT_PATTERN.test(entry.envFingerprint)
     && typeof entry.generation === 'string'
@@ -280,17 +521,19 @@ function isPreparedEntry(value: unknown): value is PreparedJournalEntry {
 }
 
 function isActiveEntry(value: unknown): value is ActiveJournalEntry {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const entry = value as Record<string, unknown>;
+  if (!isOwnDataRecord(value)) return false;
+  const entry = value;
   if (!exactKeys(entry, ACTIVE_KEYS)) return false;
   const preparedShape = {
     state: 'prepared',
+    role: entry.role,
     delegationId: entry.delegationId,
     adapterId: entry.adapterId,
     profileVersion: entry.profileVersion,
     createdAt: entry.createdAt,
     binaryRealPath: entry.binaryRealPath,
     argvSignature: entry.argvSignature,
+    fixedEnv: entry.fixedEnv,
     envFingerprint: entry.envFingerprint,
     generation: entry.generation,
   };
@@ -305,7 +548,10 @@ function isActiveEntry(value: unknown): value is ActiveJournalEntry {
 }
 
 function freezeEntry(entry: JournalEntry): JournalEntry {
-  return Object.freeze({ ...entry });
+  return Object.freeze({
+    ...entry,
+    fixedEnv: cloneFixedEnv(entry.fixedEnv)!,
+  });
 }
 
 function freezeJournal(entries: readonly JournalEntry[]): AgentOrphanJournal {
@@ -339,8 +585,7 @@ function parseRecoveryDispositions(value: unknown): AgentRecoveryDispositionJour
   const journal = value as Record<string, unknown>;
   if (!exactKeys(journal, RECOVERY_KEYS) || journal.version !== RECOVERY_VERSION) return null;
   if (
-    !Array.isArray(journal.dispositions)
-    || journal.dispositions.length > MAX_RECOVERY_DISPOSITIONS
+    !isDenseDataArray(journal.dispositions, MAX_RECOVERY_DISPOSITIONS)
   ) return null;
   const delegationIds = new Set<string>();
   const dispositions: AgentRestartLossDisposition[] = [];
@@ -355,30 +600,82 @@ function parseRecoveryDispositions(value: unknown): AgentRecoveryDispositionJour
 function sameJournalEntry(left: JournalEntry, right: JournalEntry): boolean {
   if (left.state !== right.state) return false;
   const keys = left.state === 'active' ? ACTIVE_KEYS : PREPARED_KEYS;
-  return keys.every((key) => (
-    (left as unknown as Record<string, unknown>)[key]
-    === (right as unknown as Record<string, unknown>)[key]
-  ));
+  return keys.every((key) => {
+    const leftValue = (left as unknown as Record<string, unknown>)[key];
+    const rightValue = (right as unknown as Record<string, unknown>)[key];
+    if (key !== 'fixedEnv') return leftValue === rightValue;
+    return JSON.stringify(leftValue) === JSON.stringify(rightValue);
+  });
+}
+
+function isLegacyPreparedEntry(value: unknown): value is Record<string, unknown> {
+  if (!isOwnDataRecord(value)) return false;
+  return exactKeys(value, LEGACY_PREPARED_KEYS)
+    && value.state === 'prepared'
+    && typeof value.delegationId === 'string'
+    && DELEGATION_ID_PATTERN.test(value.delegationId)
+    && value.adapterId === CLAUDE_CODE_ADAPTER_ID
+    && typeof value.profileVersion === 'string'
+    && PROFILE_VERSION_PATTERN.test(value.profileVersion)
+    && isSafeInteger(value.createdAt)
+    && isAbsoluteBoundedPath(value.binaryRealPath)
+    && typeof value.argvSignature === 'string'
+    && FINGERPRINT_PATTERN.test(value.argvSignature)
+    && typeof value.envFingerprint === 'string'
+    && FINGERPRINT_PATTERN.test(value.envFingerprint)
+    && typeof value.generation === 'string'
+    && GENERATION_PATTERN.test(value.generation);
+}
+
+function isLegacyActiveEntry(value: unknown): value is Record<string, unknown> {
+  if (!isOwnDataRecord(value) || !exactKeys(value, LEGACY_ACTIVE_KEYS)) return false;
+  const prepared = Object.fromEntries(
+    LEGACY_PREPARED_KEYS.map((key) => [key, key === 'state' ? 'prepared' : value[key]]),
+  );
+  return isLegacyPreparedEntry(prepared)
+    && value.state === 'active'
+    && isSafeInteger(value.pid, 1)
+    && isSafeInteger(value.processGroupId, 1)
+    && isSafeInteger(value.startedAt)
+    && value.startedAt >= (value.createdAt as number)
+    && typeof value.processStartIdentity === 'string'
+    && PROCESS_IDENTITY_PATTERN.test(value.processStartIdentity);
+}
+
+function normalizeLegacyEntry(value: Record<string, unknown>): JournalEntry {
+  return freezeEntry({
+    ...value,
+    role: 'delegation',
+    fixedEnv: Object.freeze({}),
+  } as unknown as JournalEntry);
 }
 
 function parseJournal(value: unknown): AgentOrphanJournal | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const journal = value as Record<string, unknown>;
-  if (!exactKeys(journal, JOURNAL_KEYS) || journal.version !== JOURNAL_VERSION) return null;
-  if (!Array.isArray(journal.entries) || journal.entries.length > MAX_JOURNAL_ENTRIES) return null;
+  if (!isOwnDataRecord(value)) return null;
+  const journal = value;
+  if (!exactKeys(journal, JOURNAL_KEYS)) return null;
+  if (journal.version !== JOURNAL_VERSION && journal.version !== LEGACY_JOURNAL_VERSION) return null;
+  if (!isDenseDataArray(journal.entries, MAX_JOURNAL_ENTRIES)) return null;
 
   const entries: JournalEntry[] = [];
   const delegationIds = new Set<string>();
   const envFingerprints = new Set<string>();
   for (const candidate of journal.entries) {
-    if (!isPreparedEntry(candidate) && !isActiveEntry(candidate)) return null;
+    let entry: JournalEntry;
+    if (journal.version === LEGACY_JOURNAL_VERSION) {
+      if (!isLegacyPreparedEntry(candidate) && !isLegacyActiveEntry(candidate)) return null;
+      entry = normalizeLegacyEntry(candidate);
+    } else {
+      if (!isPreparedEntry(candidate) && !isActiveEntry(candidate)) return null;
+      entry = freezeEntry(candidate);
+    }
     if (
-      delegationIds.has(candidate.delegationId)
-      || envFingerprints.has(candidate.envFingerprint)
+      delegationIds.has(entry.delegationId)
+      || envFingerprints.has(entry.envFingerprint)
     ) return null;
-    delegationIds.add(candidate.delegationId);
-    envFingerprints.add(candidate.envFingerprint);
-    entries.push(candidate);
+    delegationIds.add(entry.delegationId);
+    envFingerprints.add(entry.envFingerprint);
+    entries.push(entry);
   }
   return freezeJournal(entries);
 }
@@ -415,36 +712,137 @@ function validateEndpoint(endpoint: unknown): string {
   return parsed.toString();
 }
 
-function validatePrepareInput(input: PrepareRunInput): PreparedJournalEntry {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+interface ValidatedPrepareRun {
+  readonly entry: PreparedJournalEntry;
+  readonly privateArtifacts: readonly RuntimePrivateArtifact[];
+}
+
+function validatePrivateArtifacts(
+  value: unknown,
+  role: RuntimeRole,
+  adapterId: AgentProviderId,
+): readonly RuntimePrivateArtifact[] | null {
+  if (!isDenseDataArray(value, PRIVATE_ARTIFACT_KINDS.length)) return null;
+  const artifacts: RuntimePrivateArtifact[] = [];
+  for (const candidate of value) {
+    if (!isOwnDataRecord(candidate) || typeof candidate.kind !== 'string') return null;
+    if (candidate.kind === 'mcp_config') {
+      if (!exactKeys(candidate, MCP_ARTIFACT_KEYS)) return null;
+      let endpoint: string;
+      try {
+        endpoint = validateEndpoint(candidate.endpoint);
+      } catch {
+        return null;
+      }
+      artifacts.push(Object.freeze({ kind: 'mcp_config', endpoint }));
+      continue;
+    }
+    if (candidate.kind === 'opencode_config') {
+      if (
+        !exactKeys(candidate, OPENCODE_CONFIG_ARTIFACT_KEYS)
+        || typeof candidate.contents !== 'string'
+        || Buffer.byteLength(candidate.contents, 'utf8') > 128 * 1024
+      ) return null;
+      let document: unknown;
+      try {
+        document = JSON.parse(candidate.contents) as unknown;
+      } catch {
+        return null;
+      }
+      if (!isOwnDataRecord(document) || !isSafePublicDocument(document, { nodes: 0 })) return null;
+      artifacts.push(Object.freeze({ kind: 'opencode_config', contents: candidate.contents }));
+      continue;
+    }
+    if (
+      candidate.kind === 'opencode_test_home'
+      || candidate.kind === 'opencode_managed_config'
+    ) {
+      if (!exactKeys(candidate, DIRECTORY_ARTIFACT_KEYS)) return null;
+      artifacts.push(Object.freeze({ kind: candidate.kind }));
+      continue;
+    }
+    return null;
+  }
+  const kinds = artifacts.map((artifact) => artifact.kind);
+  const expected = adapterId === CLAUDE_CODE_ADAPTER_ID && role === 'delegation'
+    ? ['mcp_config']
+    : adapterId === OPENCODE_ADAPTER_ID
+      ? ['opencode_config', 'opencode_test_home', 'opencode_managed_config']
+      : [];
+  return kinds.length === expected.length
+    && kinds.every((kind, index) => kind === expected[index])
+    ? Object.freeze(artifacts)
+    : null;
+}
+
+function validatePrepareInput(input: PrepareRunInput): ValidatedPrepareRun {
+  if (!isOwnDataRecord(input)) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
   }
-  if (!exactKeys(input as unknown as Record<string, unknown>, PREPARE_INPUT_KEYS)) {
+  const record = input as unknown as Record<string, unknown>;
+  let role: RuntimeRole;
+  let fixedEnv: Readonly<Record<string, string>>;
+  let artifacts: readonly RuntimePrivateArtifact[] | null;
+  if (exactKeys(record, LEGACY_PREPARE_INPUT_KEYS)) {
+    if (record.adapterId !== CLAUDE_CODE_ADAPTER_ID) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
+    }
+    role = 'delegation';
+    fixedEnv = Object.freeze({});
+    let endpoint: string;
+    try {
+      endpoint = validateEndpoint(record.endpoint);
+    } catch {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
+    }
+    artifacts = Object.freeze([Object.freeze({ kind: 'mcp_config', endpoint })]);
+  } else if (exactKeys(record, PREPARE_INPUT_KEYS) && isRuntimeRole(record.role)) {
+    role = record.role;
+    if (!isAllowedRoleAdapter(role, record.adapterId)) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
+    }
+    const clonedFixedEnv = cloneFixedEnv(record.fixedEnv);
+    if (!clonedFixedEnv) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
+    }
+    fixedEnv = clonedFixedEnv;
+    artifacts = validatePrivateArtifacts(record.privateArtifacts, role, record.adapterId);
+  } else {
     throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
   }
   const entry: PreparedJournalEntry = {
     state: 'prepared',
-    delegationId: input.delegationId,
-    adapterId: input.adapterId,
-    profileVersion: input.profileVersion,
-    createdAt: input.createdAt,
-    binaryRealPath: input.binaryRealPath,
-    argvSignature: input.argvSignature,
-    envFingerprint: input.envFingerprint,
-    generation: input.generation,
+    role,
+    delegationId: record.delegationId as string,
+    adapterId: record.adapterId as AgentProviderId,
+    profileVersion: record.profileVersion as string,
+    createdAt: record.createdAt as number,
+    binaryRealPath: record.binaryRealPath as string,
+    argvSignature: record.argvSignature as string,
+    fixedEnv,
+    envFingerprint: record.envFingerprint as string,
+    generation: record.generation as string,
   };
-  if (!isPreparedEntry(entry)) {
+  if (!isPreparedEntry(entry) || !artifacts) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime state is invalid');
   }
-  validateEndpoint(input.endpoint);
-  return freezeEntry(entry) as PreparedJournalEntry;
+  return Object.freeze({
+    entry: freezeEntry(entry) as PreparedJournalEntry,
+    privateArtifacts: artifacts,
+  });
 }
 
-function validateActivateInput(input: ActivateRunInput): void {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+function validateActivateInput(input: ActivateRunInput): RuntimeRole | null {
+  if (!isOwnDataRecord(input)) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Active runtime state is invalid');
   }
-  if (!exactKeys(input as unknown as Record<string, unknown>, ACTIVATE_INPUT_KEYS)) {
+  const record = input as unknown as Record<string, unknown>;
+  const role = exactKeys(record, LEGACY_ACTIVATE_INPUT_KEYS)
+    ? null
+    : exactKeys(record, ACTIVATE_INPUT_KEYS) && isRuntimeRole(record.role)
+      ? record.role
+      : undefined;
+  if (role === undefined) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Active runtime state is invalid');
   }
   if (
@@ -458,6 +856,7 @@ function validateActivateInput(input: ActivateRunInput): void {
   ) {
     throw new RuntimeFilesError('invalid_runtime_input', 'Active runtime state is invalid');
   }
+  return role;
 }
 
 export function getAgentRuntimeRoot(homeDir = homedir()): string {
@@ -475,10 +874,11 @@ export class AgentRuntimeFiles {
   private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(options: RuntimeFilesOptions = {}) {
-    this.rootPath = options.rootPath ?? getAgentRuntimeRoot();
-    if (!isAbsoluteBoundedPath(this.rootPath)) {
+    const requestedRoot = options.rootPath ?? getAgentRuntimeRoot();
+    if (!isAbsoluteBoundedPath(requestedRoot)) {
       throw new RuntimeFilesError('invalid_runtime_input', 'Runtime root path is invalid');
     }
+    this.rootPath = resolve(requestedRoot);
     this.journalPath = join(this.rootPath, JOURNAL_FILENAME);
     this.recoveryPath = join(this.rootPath, RECOVERY_FILENAME);
     this.platform = options.platform ?? process.platform;
@@ -496,7 +896,7 @@ export class AgentRuntimeFiles {
       if (
         root.isSymbolicLink()
         || !root.isDirectory()
-        || (this.platform !== 'win32' && (root.mode & 0o077) !== 0)
+        || (this.platform !== 'win32' && (root.mode & 0o777) !== DIRECTORY_MODE)
       ) {
         return { status: 'unavailable', reason: 'insecure' };
       }
@@ -507,7 +907,7 @@ export class AgentRuntimeFiles {
       if (
         target.isSymbolicLink()
         || !target.isFile()
-        || (this.platform !== 'win32' && (target.mode & 0o077) !== 0)
+        || (this.platform !== 'win32' && (target.mode & 0o777) !== FILE_MODE)
       ) {
         return { status: 'unavailable', reason: 'insecure' };
       }
@@ -520,6 +920,7 @@ export class AgentRuntimeFiles {
       }
       const journal = parseJournal(JSON.parse(raw) as unknown);
       return journal
+        && journal.entries.every((entry) => this.hasValidRuntimePaths(entry))
         ? { status: 'ok', journal }
         : { status: 'unavailable', reason: 'corrupt' };
     } catch (error) {
@@ -539,7 +940,7 @@ export class AgentRuntimeFiles {
       if (
         root.isSymbolicLink()
         || !root.isDirectory()
-        || (this.platform !== 'win32' && (root.mode & 0o077) !== 0)
+        || (this.platform !== 'win32' && (root.mode & 0o777) !== DIRECTORY_MODE)
       ) {
         return { status: 'unavailable', reason: 'insecure' };
       }
@@ -550,7 +951,7 @@ export class AgentRuntimeFiles {
       if (
         target.isSymbolicLink()
         || !target.isFile()
-        || (this.platform !== 'win32' && (target.mode & 0o077) !== 0)
+        || (this.platform !== 'win32' && (target.mode & 0o777) !== FILE_MODE)
       ) {
         return { status: 'unavailable', reason: 'insecure' };
       }
@@ -578,15 +979,30 @@ export class AgentRuntimeFiles {
       throw new RuntimeFilesError('invalid_runtime_input', 'Delegation id is invalid');
     }
     const runDirectory = join(this.rootPath, delegationId);
-    return Object.freeze({
+    const opencodeConfigRoot = join(runDirectory, OPENCODE_CONFIG_ROOT_DIRECTORY);
+    const opencodeConfigDirectory = join(opencodeConfigRoot, OPENCODE_CONFIG_DIRECTORY);
+    const paths = Object.freeze({
       runDirectory,
       mcpConfigPath: join(runDirectory, MCP_CONFIG_FILENAME),
+      opencodeConfigRoot,
+      opencodeConfigDirectory,
+      opencodeConfigPath: join(opencodeConfigDirectory, OPENCODE_CONFIG_FILENAME),
+      opencodeTestHomePath: join(runDirectory, OPENCODE_TEST_HOME_DIRECTORY),
+      opencodeManagedConfigPath: join(runDirectory, OPENCODE_MANAGED_CONFIG_DIRECTORY),
     });
+    for (const path of Object.values(paths)) this.assertContainedPath(path);
+    return paths;
   }
 
   prepareRun(input: PrepareRunInput): Promise<PreparedRun> {
-    const entry = validatePrepareInput(input);
-    const endpoint = validateEndpoint(input.endpoint);
+    const validated = validatePrepareInput(input);
+    const { entry, privateArtifacts } = validated;
+    const paths = this.pathsFor(entry.delegationId);
+    if (!this.hasValidRuntimePaths(entry)) {
+      return Promise.reject(
+        new RuntimeFilesError('invalid_runtime_input', 'Prepared runtime paths are invalid'),
+      );
+    }
     return this.serializeMutation(() => {
       const journal = this.requireJournal();
       if (
@@ -598,24 +1014,15 @@ export class AgentRuntimeFiles {
         throw new RuntimeFilesError('journal_conflict', 'Prepared runtime identity conflicts');
       }
       this.ensureRoot();
-      const runDirectory = this.ensureRunDirectory(entry.delegationId);
-      const mcpConfigPath = join(runDirectory, MCP_CONFIG_FILENAME);
-      const config = {
-        mcpServers: {
-          fsb: {
-            type: 'http',
-            url: endpoint,
-          },
-        },
-      };
-      this.atomicWrite(mcpConfigPath, `${JSON.stringify(config)}\n`, false);
+      this.ensureRunDirectory(entry.delegationId);
+      this.writePrivateArtifacts(paths, privateArtifacts);
       this.writeJournal([...journal.entries, entry]);
-      return Object.freeze({ entry, runDirectory, mcpConfigPath });
+      return Object.freeze({ entry, ...paths });
     });
   }
 
   activateRun(input: ActivateRunInput): Promise<ActiveJournalEntry> {
-    validateActivateInput(input);
+    const requestedRole = validateActivateInput(input);
     return this.serializeMutation(() => {
       const journal = this.requireJournal();
       const index = journal.entries.findIndex(
@@ -624,6 +1031,12 @@ export class AgentRuntimeFiles {
       const prepared = journal.entries[index];
       if (index < 0 || !prepared || prepared.state !== 'prepared') {
         throw new RuntimeFilesError('journal_conflict', 'Prepared runtime entry is unavailable');
+      }
+      if (
+        (requestedRole === null && prepared.role !== 'delegation')
+        || (requestedRole !== null && prepared.role !== requestedRole)
+      ) {
+        throw new RuntimeFilesError('journal_conflict', 'Prepared runtime role conflicts');
       }
       const active: ActiveJournalEntry = {
         ...prepared,
@@ -643,17 +1056,22 @@ export class AgentRuntimeFiles {
     });
   }
 
-  removeRun(delegationId: string): Promise<void> {
-    if (!DELEGATION_ID_PATTERN.test(delegationId)) {
+  removeRun(input: string | RoleAwareRemoveRunInput): Promise<void> {
+    const validated = this.validateRemoveInput(input);
+    if (!validated) {
       return Promise.reject(
-        new RuntimeFilesError('invalid_runtime_input', 'Delegation id is invalid'),
+        new RuntimeFilesError('invalid_runtime_input', 'Runtime removal identity is invalid'),
       );
     }
     return this.serializeMutation(() => {
       const journal = this.requireJournal();
-      const entries = journal.entries.filter((entry) => entry.delegationId !== delegationId);
-      this.cleanupRunDirectory(delegationId);
-      if (entries.length !== journal.entries.length) this.writeJournal(entries);
+      const stored = journal.entries.find((entry) => entry.delegationId === validated.delegationId);
+      if (!stored) return;
+      if (stored.role !== validated.role) {
+        throw new RuntimeFilesError('journal_conflict', 'Runtime removal role conflicts');
+      }
+      this.cleanupRunDirectory(stored);
+      this.writeJournal(journal.entries.filter((entry) => entry !== stored));
     });
   }
 
@@ -663,6 +1081,7 @@ export class AgentRuntimeFiles {
   ): Promise<readonly AgentRestartLossDisposition[]> {
     if (
       (!isPreparedEntry(entry) && !isActiveEntry(entry))
+      || entry.role !== 'delegation'
       || !isRecoveryDisposition(disposition)
       || disposition.delegationId !== entry.delegationId
     ) {
@@ -687,7 +1106,7 @@ export class AgentRuntimeFiles {
         throw new RuntimeFilesError('journal_conflict', 'Restart recovery identity conflicts');
       }
 
-      this.cleanupRunDirectory(entry.delegationId);
+      this.cleanupRunDirectory(entry);
       let dispositions = recovery.dispositions;
       if (!existing) {
         dispositions = Object.freeze([
@@ -700,6 +1119,28 @@ export class AgentRuntimeFiles {
         (candidate) => candidate.delegationId !== entry.delegationId,
       ));
       return dispositions;
+    });
+  }
+
+  removeRecoveredRun(entry: JournalEntry): Promise<void> {
+    if ((!isPreparedEntry(entry) && !isActiveEntry(entry)) || entry.role !== 'provider_server') {
+      return Promise.reject(
+        new RuntimeFilesError('invalid_runtime_input', 'Recovered runtime state is invalid'),
+      );
+    }
+    return this.serializeMutation(() => {
+      const journal = this.requireJournal();
+      const stored = journal.entries.find(
+        (candidate) => candidate.delegationId === entry.delegationId,
+      );
+      if (!stored) {
+        throw new RuntimeFilesError('journal_conflict', 'Recovered runtime entry is unavailable');
+      }
+      if (!sameJournalEntry(stored, entry)) {
+        throw new RuntimeFilesError('journal_conflict', 'Recovered runtime identity conflicts');
+      }
+      this.cleanupRunDirectory(entry);
+      this.writeJournal(journal.entries.filter((candidate) => candidate !== stored));
     });
   }
 
@@ -728,6 +1169,50 @@ export class AgentRuntimeFiles {
     return result.journal;
   }
 
+  private validateRemoveInput(
+    input: string | RoleAwareRemoveRunInput,
+  ): Readonly<{ delegationId: string; role: RuntimeRole }> | null {
+    if (typeof input === 'string') {
+      return DELEGATION_ID_PATTERN.test(input)
+        ? Object.freeze({ delegationId: input, role: 'delegation' })
+        : null;
+    }
+    if (
+      !isOwnDataRecord(input)
+      || !exactKeys(input as unknown as Record<string, unknown>, REMOVE_INPUT_KEYS)
+      || typeof input.delegationId !== 'string'
+      || !DELEGATION_ID_PATTERN.test(input.delegationId)
+      || !isRuntimeRole(input.role)
+    ) return null;
+    return Object.freeze({ delegationId: input.delegationId, role: input.role });
+  }
+
+  private hasValidRuntimePaths(entry: JournalEntry): boolean {
+    if (entry.adapterId !== OPENCODE_ADAPTER_ID) return entry.role === 'delegation';
+    const paths = this.pathsFor(entry.delegationId);
+    const fixedEnv = entry.fixedEnv;
+    return fixedEnv.XDG_CONFIG_HOME === paths.opencodeConfigRoot
+      && fixedEnv.OPENCODE_TEST_HOME === paths.opencodeTestHomePath
+      && fixedEnv.OPENCODE_TEST_MANAGED_CONFIG_DIR === paths.opencodeManagedConfigPath
+      && fixedEnv.OPENCODE_DISABLE_PROJECT_CONFIG === '1'
+      && fixedEnv.HOME === undefined
+      && fixedEnv.XDG_DATA_HOME === undefined
+      && fixedEnv.XDG_STATE_HOME === undefined
+      && fixedEnv.XDG_CACHE_HOME === undefined;
+  }
+
+  private assertContainedPath(path: string): void {
+    const relativePath = relative(this.rootPath, resolve(path));
+    if (
+      relativePath === ''
+      || relativePath === '..'
+      || relativePath.startsWith(`..${sep}`)
+      || isAbsolute(relativePath)
+    ) {
+      throw new RuntimeFilesError('invalid_runtime_input', 'Runtime path is outside its root');
+    }
+  }
+
   private ensureRoot(): void {
     this.ensureDirectory(this.rootPath);
   }
@@ -739,8 +1224,10 @@ export class AgentRuntimeFiles {
   }
 
   private ensureDirectory(path: string): void {
+    this.assertContainedOrRoot(path);
     try {
-      this.fs.mkdirSync(path, { recursive: true, mode: DIRECTORY_MODE });
+      const existed = this.fs.existsSync(path);
+      if (!existed) this.fs.mkdirSync(path, { recursive: true, mode: DIRECTORY_MODE });
       const target = this.fs.lstatSync(path);
       if (target.isSymbolicLink() || !target.isDirectory()) {
         throw new RuntimeFilesError(
@@ -748,17 +1235,69 @@ export class AgentRuntimeFiles {
           'Runtime directory is unavailable',
         );
       }
-      this.fs.chmodSync(path, DIRECTORY_MODE);
+      if (
+        this.platform !== 'win32'
+        && existed
+        && (target.mode & 0o777) !== DIRECTORY_MODE
+      ) {
+        throw new RuntimeFilesError(
+          'runtime_target_unavailable',
+          'Runtime directory mode is unavailable',
+        );
+      }
+      if (!existed) this.fs.chmodSync(path, DIRECTORY_MODE);
     } catch (error) {
       if (error instanceof RuntimeFilesError) throw error;
       throw new RuntimeFilesError('runtime_target_unavailable', 'Runtime directory is unavailable');
     }
   }
 
+  private assertContainedOrRoot(path: string): void {
+    if (resolve(path) === this.rootPath) return;
+    this.assertContainedPath(path);
+  }
+
+  private writePrivateArtifacts(
+    paths: RuntimeRunPaths,
+    artifacts: readonly RuntimePrivateArtifact[],
+  ): void {
+    for (const artifact of artifacts) {
+      if (artifact.kind === 'mcp_config') {
+        const config = {
+          mcpServers: {
+            fsb: {
+              type: 'http',
+              url: artifact.endpoint,
+            },
+          },
+        };
+        this.atomicWrite(paths.mcpConfigPath, `${JSON.stringify(config)}\n`, false);
+        continue;
+      }
+      if (artifact.kind === 'opencode_config') {
+        this.ensureDirectory(paths.opencodeConfigRoot);
+        this.ensureDirectory(paths.opencodeConfigDirectory);
+        this.atomicWrite(paths.opencodeConfigPath, artifact.contents, false);
+        continue;
+      }
+      if (artifact.kind === 'opencode_test_home') {
+        this.ensureDirectory(paths.opencodeTestHomePath);
+        continue;
+      }
+      this.ensureDirectory(paths.opencodeManagedConfigPath);
+    }
+  }
+
   private assertWritableFileTarget(path: string, allowExisting: boolean): void {
+    this.assertContainedPath(path);
     if (!this.fs.existsSync(path)) return;
     const target = this.fs.lstatSync(path);
-    if (target.isSymbolicLink() || !target.isFile() || !allowExisting) {
+    if (
+      target.isSymbolicLink()
+      || !target.isFile()
+      || !allowExisting
+      || (this.platform !== 'win32' && (target.mode & 0o777) !== FILE_MODE)
+    ) {
       throw new RuntimeFilesError('runtime_target_unavailable', 'Runtime file target is unavailable');
     }
   }
@@ -766,6 +1305,7 @@ export class AgentRuntimeFiles {
   private atomicWrite(path: string, value: string, allowExisting: boolean): void {
     this.assertWritableFileTarget(path, allowExisting);
     const tempPath = join(this.rootPath, `.${this.randomToken()}.agent-runtime.tmp`);
+    this.assertContainedPath(tempPath);
     let descriptor: number | null = null;
     try {
       descriptor = this.fs.openSync(
@@ -805,7 +1345,7 @@ export class AgentRuntimeFiles {
   private writeJournal(entries: readonly JournalEntry[]): void {
     const journal = freezeJournal(entries);
     const reparsed = parseJournal(journal);
-    if (!reparsed) {
+    if (!reparsed || !reparsed.entries.every((entry) => this.hasValidRuntimePaths(entry))) {
       throw new RuntimeFilesError('invalid_runtime_input', 'Agent orphan journal is invalid');
     }
     const serialized = `${JSON.stringify(journal)}\n`;
@@ -838,34 +1378,76 @@ export class AgentRuntimeFiles {
     this.atomicWrite(this.recoveryPath, serialized, true);
   }
 
-  private cleanupRunDirectory(delegationId: string): void {
-    const directory = join(this.rootPath, delegationId);
-    if (!this.fs.existsSync(directory)) return;
-    try {
-      const target = this.fs.lstatSync(directory);
-      if (target.isSymbolicLink() || !target.isDirectory()) {
+  private requireSecureDirectory(path: string, expectedChildren?: readonly string[]): void {
+    this.assertContainedOrRoot(path);
+    const target = this.fs.lstatSync(path);
+    if (
+      target.isSymbolicLink()
+      || !target.isDirectory()
+      || (this.platform !== 'win32' && (target.mode & 0o777) !== DIRECTORY_MODE)
+    ) {
+      throw new RuntimeFilesError(
+        'runtime_target_unavailable',
+        'Runtime directory cleanup is unavailable',
+      );
+    }
+    if (expectedChildren) {
+      const actual = this.fs.readdirSync(path).sort();
+      const expected = [...expectedChildren].sort();
+      if (
+        actual.length !== expected.length
+        || actual.some((name, index) => name !== expected[index])
+      ) {
         throw new RuntimeFilesError(
           'runtime_target_unavailable',
           'Runtime directory cleanup is unavailable',
         );
       }
-      const children = this.fs.readdirSync(directory);
-      for (const child of children) {
-        if (child !== MCP_CONFIG_FILENAME) {
-          throw new RuntimeFilesError(
-            'runtime_target_unavailable',
-            'Runtime directory cleanup is unavailable',
-          );
-        }
-        const childPath = join(directory, child);
-        const childTarget = this.fs.lstatSync(childPath);
-        if (childTarget.isSymbolicLink() || !childTarget.isFile()) {
-          throw new RuntimeFilesError(
-            'runtime_target_unavailable',
-            'Runtime directory cleanup is unavailable',
-          );
-        }
-        this.fs.unlinkSync(childPath);
+    }
+  }
+
+  private requireSecureFile(path: string): void {
+    this.assertContainedPath(path);
+    const target = this.fs.lstatSync(path);
+    if (
+      target.isSymbolicLink()
+      || !target.isFile()
+      || (this.platform !== 'win32' && (target.mode & 0o777) !== FILE_MODE)
+    ) {
+      throw new RuntimeFilesError(
+        'runtime_target_unavailable',
+        'Runtime file cleanup is unavailable',
+      );
+    }
+  }
+
+  private cleanupRunDirectory(entry: JournalEntry): void {
+    const paths = this.pathsFor(entry.delegationId);
+    const directory = paths.runDirectory;
+    if (!this.fs.existsSync(directory)) return;
+    try {
+      this.requireSecureDirectory(this.rootPath);
+      if (entry.adapterId === CLAUDE_CODE_ADAPTER_ID) {
+        this.requireSecureDirectory(directory, [MCP_CONFIG_FILENAME]);
+        this.requireSecureFile(paths.mcpConfigPath);
+        this.fs.unlinkSync(paths.mcpConfigPath);
+      } else {
+        this.requireSecureDirectory(directory, [
+          OPENCODE_CONFIG_ROOT_DIRECTORY,
+          OPENCODE_TEST_HOME_DIRECTORY,
+          OPENCODE_MANAGED_CONFIG_DIRECTORY,
+        ]);
+        this.requireSecureDirectory(paths.opencodeConfigRoot, [OPENCODE_CONFIG_DIRECTORY]);
+        this.requireSecureDirectory(paths.opencodeConfigDirectory, [OPENCODE_CONFIG_FILENAME]);
+        this.requireSecureFile(paths.opencodeConfigPath);
+        this.requireSecureDirectory(paths.opencodeTestHomePath, []);
+        this.requireSecureDirectory(paths.opencodeManagedConfigPath, []);
+
+        this.fs.unlinkSync(paths.opencodeConfigPath);
+        this.fs.rmdirSync(paths.opencodeConfigDirectory);
+        this.fs.rmdirSync(paths.opencodeConfigRoot);
+        this.fs.rmdirSync(paths.opencodeTestHomePath);
+        this.fs.rmdirSync(paths.opencodeManagedConfigPath);
       }
       this.fs.rmdirSync(directory);
     } catch (error) {
@@ -885,6 +1467,7 @@ export function createAgentRuntimeFiles(options: RuntimeFilesOptions = {}): Agen
 type RecoveryCategory = 'confirmedKilled' | 'staleCleared' | 'ambiguousFailClosed';
 
 interface MutableRecoveryProfileSummary {
+  role: RuntimeRole;
   adapterId: AgentProviderId;
   profileVersion: string;
   confirmedKilled: number;
@@ -966,7 +1549,7 @@ class JournalStartupRecovery implements AgentStartupRecovery {
 
       if (inspection.classification === 'stale') {
         try {
-          restartLosses = await this.recordRestartLoss(entry);
+          restartLosses = await this.clearRecoveredEntry(entry, restartLosses);
           this.increment(totals, profiles, entry, 'staleCleared');
         } catch {
           this.increment(totals, profiles, entry, 'ambiguousFailClosed');
@@ -985,7 +1568,7 @@ class JournalStartupRecovery implements AgentStartupRecovery {
           this.increment(totals, profiles, entry, 'ambiguousFailClosed');
           continue;
         }
-        restartLosses = await this.recordRestartLoss(entry);
+        restartLosses = await this.clearRecoveredEntry(entry, restartLosses);
         this.increment(totals, profiles, entry, 'confirmedKilled');
       } catch {
         this.increment(totals, profiles, entry, 'ambiguousFailClosed');
@@ -995,9 +1578,13 @@ class JournalStartupRecovery implements AgentStartupRecovery {
     return this.finish(totals, profiles, restartLosses);
   }
 
-  private recordRestartLoss(
+  private clearRecoveredEntry(
     entry: JournalEntry,
+    restartLosses: readonly AgentRestartLossDisposition[],
   ): Promise<readonly AgentRestartLossDisposition[]> {
+    if (entry.role === 'provider_server') {
+      return this.dependencies.runtimeFiles.removeRecoveredRun(entry).then(() => restartLosses);
+    }
     const recoveredAt = this.dependencies.now();
     if (!isSafeInteger(recoveredAt)) {
       return Promise.reject(
@@ -1018,10 +1605,11 @@ class JournalStartupRecovery implements AgentStartupRecovery {
     category: RecoveryCategory,
   ): void {
     totals[category] += 1;
-    const key = `${entry.adapterId}\u0000${entry.profileVersion}`;
+    const key = `${entry.role}\u0000${entry.adapterId}\u0000${entry.profileVersion}`;
     let profile = profiles.get(key);
     if (!profile) {
       profile = {
+        role: entry.role,
         adapterId: entry.adapterId,
         profileVersion: entry.profileVersion,
         confirmedKilled: 0,
@@ -1040,7 +1628,8 @@ class JournalStartupRecovery implements AgentStartupRecovery {
   ): AgentStartupRecoveryResult {
     const frozenProfiles = [...profiles.values()]
       .sort((left, right) => (
-        left.adapterId.localeCompare(right.adapterId)
+        left.role.localeCompare(right.role)
+        || left.adapterId.localeCompare(right.adapterId)
         || left.profileVersion.localeCompare(right.profileVersion)
       ))
       .map((profile) => Object.freeze({ ...profile }));
@@ -1071,6 +1660,9 @@ export function createAgentStartupRecovery(
 
 export const AGENT_RUNTIME_DIRECTORY_MODE = DIRECTORY_MODE;
 export const AGENT_RUNTIME_FILE_MODE = FILE_MODE;
+export const AGENT_RUNTIME_JOURNAL_VERSION = JOURNAL_VERSION;
+export const AGENT_RUNTIME_ROLES = RUNTIME_ROLES;
+export const AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS = PRIVATE_ARTIFACT_KINDS;
 export const AGENT_ORPHAN_JOURNAL_LIMIT_BYTES = JOURNAL_LIMIT_BYTES;
 export const AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES = RECOVERY_LIMIT_BYTES;
 export const AGENT_RECOVERY_DISPOSITION_LIMIT = MAX_RECOVERY_DISPOSITIONS;
