@@ -8,6 +8,13 @@ const { pathToFileURL } = require('url');
 
 const repoRoot = path.resolve(__dirname, '..');
 const streamBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-stream.js');
+const protocolDriftBuildPath = path.join(
+  repoRoot,
+  'mcp',
+  'build',
+  'agent-providers',
+  'protocol-drift.js',
+);
 const fixtureDir = path.join(
   repoRoot,
   'tests',
@@ -146,12 +153,21 @@ async function run() {
 
   const {
     CLAUDE_STREAM_LINE_LIMIT_BYTES,
-    AgentProtocolDriftError,
+    AgentProtocolDriftError: ClaudeExportedDriftError,
     parseClaudeEvents,
   } = await import(pathToFileURL(streamBuildPath).href);
+  const {
+    AGENT_PROTOCOL_DRIFT_REASONS,
+    AgentProtocolDriftError,
+  } = await import(pathToFileURL(protocolDriftBuildPath).href);
 
   assert.strictEqual(CLAUDE_STREAM_LINE_LIMIT_BYTES, 256 * 1024);
+  assert.strictEqual(ClaudeExportedDriftError, AgentProtocolDriftError);
   assert.strictEqual(new AgentProtocolDriftError('invalid_json', 1).code, 'agent_protocol_drift');
+  assert.deepStrictEqual(Object.keys(AGENT_PROTOCOL_DRIFT_REASONS).sort(), ['claude-code', 'opencode']);
+  assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS));
+  assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS['claude-code']));
+  assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS.opencode));
 
   // EV-01: the checked-in artifact is a schema-derived contract, not recorded provenance.
   const events = await collect(parseClaudeEvents, [fixtureBytes]);

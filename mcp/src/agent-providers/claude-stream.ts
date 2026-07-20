@@ -1,7 +1,18 @@
 import { z } from 'zod';
-import type { AgentEvent, AgentEventType } from './adapter.js';
+import { CLAUDE_CODE_ADAPTER_ID, type AgentEvent, type AgentEventType } from './adapter.js';
+import {
+  AGENT_STREAM_LINE_LIMIT_BYTES,
+  AgentProtocolDriftError,
+  appendBoundedAgentLine,
+  asPlainDataRecord,
+  decodeAgentJsonLine,
+  freezeAgentEvent,
+  parseAgentShape,
+} from './protocol-drift.js';
 
-export const CLAUDE_STREAM_LINE_LIMIT_BYTES = 256 * 1024;
+export { AgentProtocolDriftError } from './protocol-drift.js';
+
+export const CLAUDE_STREAM_LINE_LIMIT_BYTES = AGENT_STREAM_LINE_LIMIT_BYTES;
 
 const SESSION_ID_LIMIT = 256;
 const KNOWN_STREAM_EVENT_TYPES = new Set([
@@ -16,24 +27,6 @@ const KNOWN_STREAM_EVENT_TYPES = new Set([
 function isCustomizationEventName(value: unknown): boolean {
   return typeof value === 'string' && /^(?:hook|plugin)(?:_|$)/.test(value);
 }
-
-const UnknownRecordSchema = z.record(z.unknown());
-
-const AgentEventSchema = z.object({
-  type: z.enum([
-    'init',
-    'assistant',
-    'assistant_delta',
-    'user',
-    'tool_use',
-    'tool_result',
-    'retry',
-    'result',
-    'diagnostic',
-  ]),
-  sessionId: z.string().min(1).max(SESSION_ID_LIMIT),
-  payload: UnknownRecordSchema,
-}).strict();
 
 const McpServerSchema = z.union([
   z.string().min(1),
@@ -93,47 +86,8 @@ const ResultSchema = z.object({
   is_error: z.boolean(),
 }).passthrough();
 
-type DriftReason =
-  | 'configuration_surface'
-  | 'duplicate_init'
-  | 'duplicate_result'
-  | 'event_after_result'
-  | 'event_before_init'
-  | 'invalid_json'
-  | 'invalid_shape'
-  | 'invalid_utf8'
-  | 'line_too_large'
-  | 'missing_result'
-  | 'session_mismatch'
-  | 'unknown_event_type'
-  | 'unknown_stream_event'
-  | 'unknown_system_subtype';
-
-export class AgentProtocolDriftError extends Error {
-  readonly code = 'agent_protocol_drift' as const;
-  readonly eventIndex: number;
-  readonly reason: DriftReason;
-  readonly issuePaths: readonly string[];
-
-  constructor(reason: DriftReason, eventIndex: number, issuePaths: readonly string[] = []) {
-    super(`Claude stream protocol drift at event ${eventIndex}: ${reason}`);
-    this.name = 'AgentProtocolDriftError';
-    this.reason = reason;
-    this.eventIndex = eventIndex;
-    this.issuePaths = Object.freeze([...issuePaths]);
-  }
-}
-
-function issuePaths(error: z.ZodError): string[] {
-  return error.issues.map((issue) => issue.path.map(String).join('.')).filter(Boolean);
-}
-
 function parseShape<T>(schema: z.ZodType<T>, value: unknown, eventIndex: number): T {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) {
-    throw new AgentProtocolDriftError('invalid_shape', eventIndex, issuePaths(parsed.error));
-  }
-  return parsed.data;
+  return parseAgentShape(schema, value, eventIndex, CLAUDE_CODE_ADAPTER_ID);
 }
 
 function freezeEvent(
@@ -141,21 +95,11 @@ function freezeEvent(
   sessionId: string,
   payload: Record<string, unknown>,
 ): AgentEvent {
-  const candidate = {
-    type,
-    sessionId,
-    payload: Object.freeze({ ...payload }),
-  };
-  const parsed = AgentEventSchema.parse(candidate);
-  return Object.freeze({
-    ...parsed,
-    payload: Object.freeze(parsed.payload),
-  }) as AgentEvent;
+  return freezeAgentEvent(type, sessionId, payload);
 }
 
 function record(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  return asPlainDataRecord(value);
 }
 
 function contentBlocks(message: { content?: unknown }): readonly Record<string, unknown>[] {
@@ -310,35 +254,17 @@ class ClaudeEventNormalizer {
 }
 
 function decodeLine(line: Buffer, eventIndex: number): unknown {
-  let text: string;
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(line);
-  } catch {
-    throw new AgentProtocolDriftError('invalid_utf8', eventIndex);
-  }
-  if (text.length === 0) {
-    throw new AgentProtocolDriftError('invalid_json', eventIndex);
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new AgentProtocolDriftError('invalid_json', eventIndex);
-  }
+  return decodeAgentJsonLine(line, eventIndex, CLAUDE_CODE_ADAPTER_ID);
 }
 
 function appendBounded(pending: Buffer, addition: Buffer, eventIndex: number): Buffer {
-  const combinedLength = pending.length + addition.length;
-  const lastByte = addition.length > 0
-    ? addition[addition.length - 1]
-    : pending[pending.length - 1];
-  const crlfBoundaryOnly = combinedLength === CLAUDE_STREAM_LINE_LIMIT_BYTES + 1
-    && lastByte === 0x0d;
-  if (combinedLength > CLAUDE_STREAM_LINE_LIMIT_BYTES && !crlfBoundaryOnly) {
-    throw new AgentProtocolDriftError('line_too_large', eventIndex);
-  }
-  if (pending.length === 0) return Buffer.from(addition);
-  if (addition.length === 0) return pending;
-  return Buffer.concat([pending, addition], pending.length + addition.length);
+  return appendBoundedAgentLine(
+    pending,
+    addition,
+    eventIndex,
+    CLAUDE_CODE_ADAPTER_ID,
+    CLAUDE_STREAM_LINE_LIMIT_BYTES,
+  );
 }
 
 export async function* parseClaudeEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {

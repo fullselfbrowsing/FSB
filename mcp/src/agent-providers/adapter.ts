@@ -1,6 +1,9 @@
 export const CLAUDE_CODE_ADAPTER_ID = 'claude-code' as const;
+export const OPENCODE_ADAPTER_ID = 'opencode' as const;
 
-export type AgentProviderId = typeof CLAUDE_CODE_ADAPTER_ID;
+export type AgentProviderId =
+  | typeof CLAUDE_CODE_ADAPTER_ID
+  | typeof OPENCODE_ADAPTER_ID;
 
 export type AdapterAuthState = 'authenticated' | 'unauthenticated' | 'unknown';
 
