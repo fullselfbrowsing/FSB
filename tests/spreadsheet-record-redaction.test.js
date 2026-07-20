@@ -114,6 +114,58 @@ test('recordDispatch ingress strips metadata and values from every gsheets capab
   }
 });
 
+test('list_tabs records shape-redact nested docs.google.com tab titles', () => {
+  const source = {
+    client: 'test-client',
+    tool: 'mcp:get-tabs',
+    requestPayload: { agentId: 'agent:tabs' },
+    response: {
+      success: true,
+      tabs: [
+        { id: 1, title: 'Safe example', domain: 'example.com' },
+        { id: 2, title: `${SENTINEL} - Google Sheets`, domain: 'docs.google.com' },
+        { id: 3, title: 'Lookalike remains irrelevant', domain: 'docs.google.com.evil.test' }
+      ],
+      activeTabId: 2,
+      totalTabs: 3
+    },
+    success: true,
+    dispatcher_route: 'message'
+  };
+  const sink = recorder('recordDispatch');
+
+  assert.equal(redaction.recordSafely(sink.target, 'recordDispatch', source), true);
+  assert.equal(sink.entries.length, 1);
+  assert.notStrictEqual(sink.entries[0], source);
+  assert.deepEqual(sink.entries[0].requestPayload.params, {
+    operation: 'mcp:get-tabs',
+    shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+  });
+  assert.deepEqual(sink.entries[0].response, {
+    success: true,
+    shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+  });
+  assertNoContent(sink.entries[0]);
+});
+
+test('list_tabs records leave safe and lookalike tab domains unchanged', () => {
+  for (const domain of ['example.com', 'docs.google.com.evil.test']) {
+    const source = {
+      client: 'test-client',
+      tool: 'mcp:get-tabs',
+      requestPayload: { agentId: 'agent:safe-tabs' },
+      response: {
+        success: true,
+        tabs: [{ id: 1, title: SENTINEL, domain }],
+        totalTabs: 1
+      },
+      success: true,
+      dispatcher_route: 'message'
+    };
+    assert.strictEqual(redaction.sanitizeEntry(source), source);
+  }
+});
+
 test('retains only numeric request/result shape facts', () => {
   const source = capabilityEntry('gsheets.append_values', {
     values: [[SENTINEL, 1], ['x'], [true, false, `=${SENTINEL}!A1`]]

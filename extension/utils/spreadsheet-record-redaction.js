@@ -20,6 +20,10 @@
     switch_tab: true,
     close_tab: true
   });
+  var LIST_TAB_TOOLS = Object.freeze({
+    list_tabs: true,
+    'mcp:get-tabs': true
+  });
   var SHEETS_DOCUMENT_PATH = /^\/spreadsheets\/d\/[^/]+(?:\/|$)/;
   var SAFE_OPERATION = /^[a-z0-9:_-]{1,80}$/i;
   var SAFE_ERROR_CODE = /^(?:GOOGLE_SHEETS|RECIPE)_[A-Z0-9_]{1,64}$/;
@@ -58,6 +62,16 @@
     return false;
   }
 
+  function hasSensitiveGoogleDocsTabSummary(entry) {
+    if (!LIST_TAB_TOOLS[entry.tool]) { return false; }
+    var tabs = object(entry.response).tabs;
+    if (!Array.isArray(tabs)) { return false; }
+    for (var i = 0; i < tabs.length; i++) {
+      if (object(tabs[i]).domain === 'docs.google.com') { return true; }
+    }
+    return false;
+  }
+
   function classify(entry) {
     if (!entry || typeof entry !== 'object') { return null; }
     var payload = object(entry.requestPayload || entry.payload);
@@ -70,7 +84,9 @@
         actionShape: false
       };
     }
-    if (entry.spreadsheetTarget === true || hasGoogleSheetsDocumentUrl(entry, payload)) {
+    if (entry.spreadsheetTarget === true ||
+        hasGoogleSheetsDocumentUrl(entry, payload) ||
+        hasSensitiveGoogleDocsTabSummary(entry)) {
       return {
         operation: typeof entry.tool === 'string' && SAFE_OPERATION.test(entry.tool)
           ? entry.tool
