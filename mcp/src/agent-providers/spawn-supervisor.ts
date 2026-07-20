@@ -19,7 +19,11 @@ import type {
   SpawnSpec,
   SupervisedChild,
 } from './adapter.js';
-import { CLAUDE_CODE_ADAPTER_ID, freezeSpawnSpec } from './adapter.js';
+import {
+  CLAUDE_CODE_ADAPTER_ID,
+  OPENCODE_ADAPTER_ID,
+  freezeSpawnSpec,
+} from './adapter.js';
 import {
   AGENT_PROTOCOL_DRIFT_REASONS,
   AgentProtocolDriftError,
@@ -117,7 +121,7 @@ const DRIFT_EXPECTED_BY_REASON = Object.freeze({
 } satisfies Readonly<Record<AgentProtocolDriftReason, DriftExpected>>);
 
 const DelegateStartSchema = z.object({
-  adapterId: z.literal(CLAUDE_CODE_ADAPTER_ID),
+  adapterId: z.enum([CLAUDE_CODE_ADAPTER_ID, OPENCODE_ADAPTER_ID]),
   task: z.string().min(1),
 }).strict();
 
@@ -322,6 +326,18 @@ interface DelegationRun {
   executionPromise: Promise<void> | null;
   routeSignal: AbortSignal | null;
   routeAbortListener: (() => void) | null;
+  replayClosed: boolean;
+}
+
+type OwnedServerTopology = Extract<SpawnSpec['topology'], { readonly kind: 'owned_server' }>;
+
+interface OwnedServerLease {
+  readonly topologyKey: string;
+  readonly endpoint: string;
+  readonly profileVersion: string;
+  readonly entry: ActiveJournalEntry;
+  readonly child: ChildProcessWithoutNullStreams;
+  readonly supervisedChild: SupervisedChild;
 }
 
 export class InvalidDelegationRequestError extends Error {
@@ -520,7 +536,7 @@ function directProcessArguments(process: ProcessSpec): readonly string[] | null 
   return process.argv as readonly string[];
 }
 
-function parseStartRequest(request: ExtRequest): { adapterId: 'claude-code'; task: string } {
+function parseStartRequest(request: ExtRequest): { adapterId: AgentProviderId; task: string } {
   if (
     !isPlainRecord(request)
     || !exactKeys(request, START_REQUEST_KEYS)
@@ -756,6 +772,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly inspectProcessGroupStatus: ProcessGroupStatusInspector;
   private readonly schedule: NonNullable<SpawnSupervisorDependencies['schedule']>;
   private readonly clearScheduled: NonNullable<SpawnSupervisorDependencies['clearScheduled']>;
+  private ownedServerLease: OwnedServerLease | null = null;
+  private ownedServerWarmPromise: Promise<OwnedServerLease | null> | null = null;
   private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
   private readonly routeLosses = new Map<string, DelegationRouteLoss>();
   private readonly terminationGrace: number;
@@ -858,6 +876,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const result = await this.cancelRun(run, 'daemon_shutdown');
       return result.status === 'cancelled' ? 'cancelled' as const : 'failed' as const;
     }));
+    if (this.ownedServerWarmPromise) await this.ownedServerWarmPromise.catch(() => null);
+    await this.stopOwnedServerLease();
     return Object.freeze({
       cancelled: results.filter((value) => value === 'cancelled').length,
       failed: results.filter((value) => value === 'failed').length,
@@ -916,6 +936,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       executionPromise: null,
       routeSignal: context?.signal ?? null,
       routeAbortListener: null,
+      replayClosed: false,
     };
     this.activeRuns.set(delegationId, run);
     run.executionPromise = this.executeRun(run);
@@ -956,23 +977,52 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       });
       this.throwIfStopped(run);
       const spec = freezeSpawnSpec(declaredSpec);
-      const process = this.requireDirectProcess(spec);
-      const argv = directProcessArguments(process);
-      if (!argv) throw new Error('adapter_unavailable');
-      this.validateSpawnSpec(run, detection, spec, process, argv);
+      this.validateSpawnSpec(run, detection, spec);
+      let process: ProcessSpec;
+      let argv: readonly string[];
+      if (spec.topology.kind === 'direct') {
+        process = this.requireDirectProcess(spec);
+        const directArgv = directProcessArguments(process);
+        if (!directArgv) throw new Error('adapter_unavailable');
+        argv = directArgv;
+      } else {
+        const selection = await this.selectOwnedServerTask(
+          run,
+          detection,
+          spec.topology,
+          spec.profileVersion,
+        );
+        process = selection.process;
+        argv = selection.argv;
+      }
+      this.throwIfStopped(run);
       const argvSignature = createArgvSignature(process.command, argv);
       const createdAt = this.wallNow();
-      const prepared = await this.dependencies.runtimeFiles.prepareRun({
-        delegationId: run.delegationId,
-        adapterId: run.adapterId,
-        profileVersion,
-        createdAt,
-        binaryRealPath: process.command,
-        argvSignature,
-        envFingerprint: runtimeFingerprint,
-        generation: this.generation,
-        endpoint: this.dependencies.endpoint,
-      });
+      const prepared = process.role === 'direct_task'
+        ? await this.dependencies.runtimeFiles.prepareRun({
+            delegationId: run.delegationId,
+            adapterId: run.adapterId,
+            profileVersion,
+            createdAt,
+            binaryRealPath: process.command,
+            argvSignature,
+            envFingerprint: runtimeFingerprint,
+            generation: this.generation,
+            endpoint: this.dependencies.endpoint,
+          })
+        : await this.dependencies.runtimeFiles.prepareRun({
+            role: 'delegation',
+            delegationId: run.delegationId,
+            adapterId: run.adapterId,
+            profileVersion,
+            createdAt,
+            binaryRealPath: process.command,
+            argvSignature,
+            fixedEnv: process.fixedEnv,
+            envFingerprint: runtimeFingerprint,
+            generation: this.generation,
+            privateArtifacts: Object.freeze([]),
+          });
       run.entry = prepared.entry;
       this.throwIfStopped(run);
 
@@ -985,6 +1035,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         cwd: process.cwd,
         env: environment,
       });
+      run.replayClosed = true;
       const child = this.spawnChild(process.command, argv, options);
       run.child = child;
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
@@ -1117,34 +1168,139 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     run: DelegationRun,
     detection: AdapterDetection & { binary: NonNullable<AdapterDetection['binary']> },
     spec: SpawnSpec,
-    process: ProcessSpec,
-    argv: readonly string[],
   ): void {
+    const topologyProcesses = spec.topology.kind === 'direct'
+      ? [spec.topology.task]
+      : [spec.topology.server, spec.topology.coldTask, spec.topology.attachTask];
+    const attestationProcesses = spec.attestations.flatMap((attestation) => (
+      attestation.source === 'process_json' ? [attestation.process] : []
+    ));
+    const processes = [...topologyProcesses, ...attestationProcesses];
     if (
       spec.adapterId !== run.adapterId
       || spec.profileVersion !== detection.profileVersion
-      || process.command !== detection.binary.command
-      || process.cwd !== this.cwd
-      || !Array.isArray(argv)
-      || argv.length === 0
-      || !isPlainRecord(process.fixedEnv)
-      || Object.keys(process.fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
-        key as typeof PROVIDER_KEY_NAMES[number],
+      || processes.some((process) => (
+        process.command !== detection.binary.command
+        || process.cwd !== this.cwd
+        || !isPlainRecord(process.fixedEnv)
+        || Object.keys(process.fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
+          key as typeof PROVIDER_KEY_NAMES[number],
+        ))
       ))
     ) throw new Error('adapter_unavailable');
     const serialized = safeJson({
-      command: process.command,
-      argv,
-      cwd: process.cwd,
-      privateFiles: process.privateFiles,
-      fixedEnv: process.fixedEnv,
-      spawnSecretEnvBindings: process.spawnSecretEnvBindings,
+      topology: spec.topology,
       attestations: spec.attestations,
     });
     const sensitive = [run.task, ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? '')];
     if (!serialized || containsSensitiveValue(serialized, sensitive)) {
       throw new Error('adapter_unavailable');
     }
+  }
+
+  private requireOwnedServerTopology(topology: OwnedServerTopology): void {
+    if (
+      topology.server.role !== 'owned_server'
+      || topology.server.stdin !== 'none'
+      || topology.server.stdout !== 'bounded_readiness'
+      || topology.coldTask.role !== 'cold_task'
+      || topology.coldTask.stdin !== 'task'
+      || topology.coldTask.stdout !== 'agent_jsonl'
+      || !hasNoSecretBindings(topology.coldTask.spawnSecretEnvBindings)
+      || topology.attachTask.role !== 'attach_task'
+      || topology.attachTask.stdin !== 'task'
+      || topology.attachTask.stdout !== 'agent_jsonl'
+    ) throw new Error('adapter_unavailable');
+    const serverArgv = directProcessArguments(topology.server);
+    const coldArgv = directProcessArguments(topology.coldTask);
+    if (!serverArgv || serverArgv.length === 0 || !coldArgv || coldArgv.length === 0) {
+      throw new Error('adapter_unavailable');
+    }
+  }
+
+  private topologyKey(topology: OwnedServerTopology, profileVersion: string): string {
+    const serialized = safeJson({
+      profileVersion,
+      server: {
+        command: topology.server.command,
+        argv: topology.server.argv,
+      },
+      attach: {
+        command: topology.attachTask.command,
+        argv: topology.attachTask.argv,
+      },
+      readiness: topology.readiness,
+    });
+    if (!serialized) throw new Error('adapter_unavailable');
+    return serialized;
+  }
+
+  private resolveProcessArguments(process: ProcessSpec, endpoint: string | null): readonly string[] {
+    const resolved = process.argv.map((argument) => {
+      if (typeof argument === 'string') return argument;
+      if (
+        process.role !== 'attach_task'
+        || argument.runtimeRef !== 'owned_server_endpoint'
+        || endpoint === null
+      ) throw new Error('adapter_unavailable');
+      return endpoint;
+    });
+    if (resolved.length === 0) throw new Error('adapter_unavailable');
+    return Object.freeze(resolved);
+  }
+
+  private async selectOwnedServerTask(
+    run: DelegationRun,
+    detection: AdapterDetection & {
+      binary: NonNullable<AdapterDetection['binary']>;
+      profileVersion: string;
+      version: string;
+    },
+    topology: OwnedServerTopology,
+    profileVersion: string,
+  ): Promise<Readonly<{ process: ProcessSpec; argv: readonly string[] }>> {
+    this.requireOwnedServerTopology(topology);
+    const topologyKey = this.topologyKey(topology, profileVersion);
+    const lease = await this.verifiedOwnedServerLease(topologyKey);
+    if (lease) {
+      return Object.freeze({
+        process: topology.attachTask,
+        argv: this.resolveProcessArguments(topology.attachTask, lease.endpoint),
+      });
+    }
+
+    const selection = Object.freeze({
+      process: topology.coldTask,
+      argv: this.resolveProcessArguments(topology.coldTask, null),
+    });
+    if (!this.ownedServerLease) {
+      await this.ensureOwnedServer(run, detection, topology, topologyKey).catch(() => null);
+    }
+    return selection;
+  }
+
+  private async verifiedOwnedServerLease(topologyKey: string): Promise<OwnedServerLease | null> {
+    const lease = this.ownedServerLease;
+    if (!lease || lease.topologyKey !== topologyKey || lease.entry.generation !== this.generation) {
+      return null;
+    }
+    let inspection: ProcessInspection;
+    try {
+      inspection = await this.dependencies.inspector.inspect(lease.entry);
+    } catch {
+      return null;
+    }
+    if (inspection.classification === 'stale') {
+      await this.stopOwnedServerLease().catch(() => undefined);
+      return null;
+    }
+    if (
+      inspection.classification !== 'confirmed'
+      || inspection.process.pid !== lease.entry.pid
+      || inspection.process.processGroupId !== lease.entry.processGroupId
+      || inspection.process.processStartIdentity !== lease.entry.processStartIdentity
+    ) return null;
+    return lease;
   }
 
   private createEnvironment(
@@ -1347,6 +1503,252 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         fail();
       }
     });
+  }
+
+  private ensureOwnedServer(
+    run: DelegationRun,
+    detection: AdapterDetection & {
+      binary: NonNullable<AdapterDetection['binary']>;
+      profileVersion: string;
+      version: string;
+    },
+    topology: OwnedServerTopology,
+    topologyKey: string,
+  ): Promise<OwnedServerLease | null> {
+    if (this.ownedServerLease?.topologyKey === topologyKey) {
+      return Promise.resolve(this.ownedServerLease);
+    }
+    if (this.ownedServerWarmPromise) return this.ownedServerWarmPromise;
+    const operation = this.startOwnedServer(run, detection, topology, topologyKey);
+    this.ownedServerWarmPromise = operation;
+    void operation.finally(() => {
+      if (this.ownedServerWarmPromise === operation) this.ownedServerWarmPromise = null;
+    });
+    return operation;
+  }
+
+  private async startOwnedServer(
+    run: DelegationRun,
+    detection: AdapterDetection & {
+      binary: NonNullable<AdapterDetection['binary']>;
+      profileVersion: string;
+      version: string;
+    },
+    topology: OwnedServerTopology,
+    topologyKey: string,
+  ): Promise<OwnedServerLease | null> {
+    const process = topology.server;
+    const argv = this.resolveProcessArguments(process, null);
+    const serverId = `provider_server_${randomBytes(16).toString('base64url')}`;
+    const runtimeFingerprint = this.uniqueFingerprint();
+    const fixedEnv = Object.freeze({
+      ...process.fixedEnv,
+      FSB_AGENT_FINGERPRINT: runtimeFingerprint,
+    });
+    const argvSignature = createArgvSignature(process.command, argv);
+    const createdAt = this.wallNow();
+    let entry: JournalEntry | null = null;
+    let child: ChildProcessWithoutNullStreams | null = null;
+    let supervisedChild: SupervisedChild | null = null;
+    try {
+      const prepared = await this.dependencies.runtimeFiles.prepareRun({
+        role: 'provider_server',
+        delegationId: serverId,
+        adapterId: run.adapterId,
+        profileVersion: detection.profileVersion,
+        createdAt,
+        binaryRealPath: process.command,
+        argvSignature,
+        fixedEnv,
+        envFingerprint: runtimeFingerprint,
+        generation: this.generation,
+        privateArtifacts: Object.freeze([]),
+      });
+      entry = prepared.entry;
+      const environment = this.createEnvironment(fixedEnv, argvSignature);
+      const options: SpawnInvocationOptions = Object.freeze({
+        shell: false,
+        detached: true,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
+        cwd: process.cwd,
+        env: environment,
+      });
+      child = this.spawnChild(process.command, argv, options);
+      if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
+        throw new Error('spawn_failed');
+      }
+      const observed = observeChild(child);
+      supervisedChild = Object.freeze({
+        pid: child.pid!,
+        processGroupId: child.pid!,
+        platform: this.platform,
+        closed: observed.closed,
+      });
+      this.entriesByPid.set(supervisedChild.pid, prepared.entry);
+      const readiness = this.readOwnedServerReadiness(
+        child.stdout,
+        observed.closed,
+        topology.readiness,
+      );
+      void readiness.catch(() => undefined);
+      const stderr = this.drainStderr(child.stderr);
+      void stderr.catch(() => undefined);
+      await observed.ready;
+      const identity = await this.resolveActivation(prepared.entry, supervisedChild.pid);
+      const active = await this.dependencies.runtimeFiles.activateRun({
+        role: 'provider_server',
+        delegationId: serverId,
+        pid: supervisedChild.pid,
+        processGroupId: identity.process.processGroupId,
+        startedAt: Math.max(createdAt, this.wallNow()),
+        processStartIdentity: identity.process.processStartIdentity,
+      });
+      entry = active;
+      this.entriesByPid.set(supervisedChild.pid, active);
+      const endpoint = await readiness;
+      if (!this.accepting) throw new Error('daemon_shutdown');
+      child.stdout.resume();
+      const lease = Object.freeze({
+        topologyKey,
+        endpoint,
+        profileVersion: detection.profileVersion,
+        entry: active,
+        child,
+        supervisedChild,
+      });
+      this.ownedServerLease = lease;
+      return lease;
+    } catch {
+      if (entry) {
+        try {
+          await this.dependencies.terminator.stop(
+            entry,
+            supervisedChild,
+            { grace: this.terminationGrace },
+          );
+          await this.dependencies.runtimeFiles.removeRun({
+            delegationId: entry.delegationId,
+            role: 'provider_server',
+          });
+        } catch {
+          this.markDegraded('tree_unsettled');
+        }
+      }
+      if (supervisedChild) this.entriesByPid.delete(supervisedChild.pid);
+      return null;
+    }
+  }
+
+  private readOwnedServerReadiness(
+    stream: NodeJS.ReadableStream,
+    closed: Promise<ChildExit>,
+    policy: OwnedServerTopology['readiness'],
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      let pending = '';
+      let settled = false;
+      let timer: unknown = null;
+      const cleanup = (): void => {
+        stream.off('data', onData);
+        stream.off('error', onFailure);
+        stream.off('end', onFailure);
+        if (timer !== null) this.clearScheduled(timer);
+      };
+      const fail = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('activation_failed'));
+      };
+      const succeed = (endpoint: string): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(endpoint);
+      };
+      const onFailure = (): void => fail();
+      const onData = (chunk: Buffer | string): void => {
+        if (settled) return;
+        pending += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
+        if (Buffer.byteLength(pending, 'utf8') > policy.maxBytes) {
+          fail();
+          return;
+        }
+        const newline = pending.indexOf('\n');
+        if (newline < 0) return;
+        const line = pending.slice(0, newline).replace(/\r$/, '');
+        if (pending.slice(newline + 1) !== '' || !line.startsWith(policy.linePrefix)) {
+          fail();
+          return;
+        }
+        const urlOffset = policy.linePrefix.lastIndexOf('http://');
+        const suffix = line.slice(policy.linePrefix.length);
+        if (urlOffset < 0 || !/^(?:[1-9][0-9]{0,4})$/.test(suffix)) {
+          fail();
+          return;
+        }
+        const endpoint = `${policy.linePrefix.slice(urlOffset)}${suffix}`;
+        let parsed: URL;
+        try {
+          parsed = new URL(endpoint);
+        } catch {
+          fail();
+          return;
+        }
+        const port = Number(parsed.port);
+        if (
+          parsed.protocol !== 'http:'
+          || parsed.hostname !== '127.0.0.1'
+          || parsed.pathname !== '/'
+          || parsed.search !== ''
+          || parsed.hash !== ''
+          || parsed.username !== ''
+          || parsed.password !== ''
+          || !Number.isSafeInteger(port)
+          || port < 1
+          || port > 65_535
+          || parsed.origin !== endpoint
+        ) {
+          fail();
+          return;
+        }
+        succeed(endpoint);
+      };
+      stream.on('data', onData);
+      stream.once('error', onFailure);
+      stream.once('end', onFailure);
+      void closed.then(() => fail());
+      timer = this.schedule(fail, policy.timeoutMs);
+      if (timer && typeof timer === 'object' && 'unref' in timer) {
+        try {
+          (timer as { unref?: () => void }).unref?.();
+        } catch {
+          // Readiness remains bounded even when the timer cannot be unref'd.
+        }
+      }
+    });
+  }
+
+  private async stopOwnedServerLease(): Promise<void> {
+    const lease = this.ownedServerLease;
+    if (!lease) return;
+    this.ownedServerLease = null;
+    try {
+      await this.dependencies.terminator.stop(
+        lease.entry,
+        lease.supervisedChild,
+        { grace: this.terminationGrace },
+      );
+      await this.dependencies.runtimeFiles.removeRun({
+        delegationId: lease.entry.delegationId,
+        role: 'provider_server',
+      });
+      this.entriesByPid.delete(lease.supervisedChild.pid);
+    } catch (error) {
+      this.ownedServerLease = lease;
+      throw error;
+    }
   }
 
   private async terminateAndCleanup(run: DelegationRun): Promise<void> {
