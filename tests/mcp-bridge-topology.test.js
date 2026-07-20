@@ -378,26 +378,39 @@ function makeLifecycleFakes(overrides = {}) {
       state.compatibilityRegistryCalls++;
       return {
         ids() {
-          return ['claude-code'];
+          return ['claude-code', 'opencode'];
         },
         require(id) {
-          if (id !== 'claude-code') throw new Error('unknown adapter');
+          if (id !== 'claude-code' && id !== 'opencode') throw new Error('unknown adapter');
           return {
             async detect() {
               state.compatibilityDetectCalls++;
               if (overrides.compatibilityDetectionError) {
                 throw overrides.compatibilityDetectionError;
               }
-              return overrides.compatibilityDetection ?? {
+              if (id === 'claude-code') {
+                return overrides.compatibilityDetection ?? {
+                  installed: true,
+                  version: '2.1.177',
+                  authState: 'unknown',
+                  binary: {
+                    command: 'claude',
+                    realPath: '/private/compatibility-path-canary/claude',
+                    argvPrefix: [],
+                  },
+                  profileVersion: '2.1.177',
+                };
+              }
+              return {
                 installed: true,
-                version: '2.1.177',
+                version: '1.14.25',
                 authState: 'unknown',
                 binary: {
-                  command: 'claude',
-                  realPath: '/private/compatibility-path-canary/claude',
+                  command: 'opencode',
+                  realPath: '/private/compatibility-path-canary/opencode',
                   argvPrefix: [],
                 },
-                profileVersion: '2.1.177',
+                profileVersion: '1.14.25',
               };
             },
           };
@@ -470,15 +483,16 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   }, () => {});
   assertEqual(success.state.handlerCalls, 1, 'compatibility never invokes supervisor process authority');
   assertEqual(success.state.compatibilityRegistryCalls, 1, 'compatibility creates one production-registry view lazily');
-  assertEqual(success.state.compatibilityDetectCalls, 1, 'compatibility invokes the registered production detector once');
+  assertEqual(success.state.compatibilityDetectCalls, 2, 'compatibility invokes each registered production detector once');
   assertEqual(
     JSON.stringify(compatibility),
-    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range"}]}',
+    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"supported","reason":"within_tested_range"},{"adapterId":"opencode","displayLabel":"OpenCode","status":"supported","reason":"within_tested_range"}]}',
     'compatibility returns only the exact bounded browser-safe projection',
   );
   for (const forbidden of [
     'compatibility-path-canary',
     '2.1.177',
+    '1.14.25',
     'profileVersion',
     'sessionSecret',
     'sessionId',
@@ -516,7 +530,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
     );
   }
   assertEqual(success.state.handlerCalls, 1, 'invalid compatibility payloads never reach the supervisor');
-  assertEqual(success.state.compatibilityDetectCalls, 1, 'invalid compatibility payloads never run detection');
+  assertEqual(success.state.compatibilityDetectCalls, 2, 'invalid compatibility payloads never run detection');
 
   const failedDetection = makeLifecycleFakes({
     compatibilityDetectionError: new Error('PRIVATE_DETECTOR_FAILURE'),
@@ -534,7 +548,7 @@ async function runServeDelegationLifecycle(lifecycleModule) {
   }, () => {});
   assertEqual(
     JSON.stringify(unavailableCompatibility),
-    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"unsupported","reason":"binary_not_found"}]}',
+    '{"schemaVersion":1,"checkedAt":123456789,"adapters":[{"adapterId":"claude-code","displayLabel":"Claude Code","status":"unsupported","reason":"binary_not_found"},{"adapterId":"opencode","displayLabel":"OpenCode","status":"unsupported","reason":"binary_not_found"}]}',
     'detector exceptions become deterministic canonical unsupported rows',
   );
   assert(!JSON.stringify(unavailableCompatibility).includes('PRIVATE_DETECTOR_FAILURE'), 'detector exceptions cannot leak through the safe response');
