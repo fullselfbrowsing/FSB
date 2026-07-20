@@ -35,6 +35,7 @@ key-files:
     - mcp/src/agent-providers/claude-stream.ts
     - tests/mcp-agent-stream-fixture.test.js
     - tests/mcp-agent-drift-smoke.test.js
+    - tests/delegation-phase-contract.test.js
 
 key-decisions:
   - "Treat only `tool-calls` and `unknown` as continuation finishes; retain the first other bounded source-valid reason as the sole candidate and emit it only at EOF."
@@ -62,7 +63,7 @@ completed: 2026-07-20
 - **Started:** 2026-07-20T18:25:48Z
 - **Completed:** 2026-07-20T18:56:06Z
 - **Tasks:** 1
-- **Files modified:** 9
+- **Files modified:** 10 implementation/test/fixture files
 
 ## Accomplishments
 
@@ -70,6 +71,7 @@ completed: 2026-07-20
 - Added a strict OpenCode 1.14.25 state machine for fatal UTF-8/JSON framing, exact source shapes, one session, unique identities, ordered multi-step continuation, bounded usage, sanitized provider failure, and one EOF-held result candidate.
 - Added a deterministic sanitized three-step fixture whose native stream covers reasoning, text, completed/error tools, both continuation reasons, and a final `stop` candidate while retaining `schema-derived-contract`, `human_needed`, and `liveCapturePending: true` truth.
 - Generalized the existing Phase 62 drift smoke into an immutable two-provider native contract while explicitly proving that production registry and compatibility exposure remain Claude-only.
+- Refreshed the Phase 61–63 source-contract gate to structurally pin the generalized fixture roster, parser exports, required fields, production roster boundary, exact CI command, and offline-only authority.
 - Added comprehensive negative coverage for malformed bytes/JSON/shapes, line/stream overflow, lifecycle/session/id/call/counter drift, provider error, continuation EOF, duplicate terminal, and data after candidate, with zero result on every failure.
 
 ## Task Commits
@@ -77,6 +79,7 @@ completed: 2026-07-20
 Each task was committed atomically:
 
 1. **Task 64-01-01: Land the complete first-commit OpenCode parser, fixture, and CI drift gate** — `6bbf6727` (feat)
+2. **Post-wave regression repair: Refresh generalized drift-smoke source-contract pins** — `0655d3c6` (fix)
 
 ## Files Created/Modified
 
@@ -89,6 +92,7 @@ Each task was committed atomically:
 - `tests/mcp-opencode-adapter.test.js` — Positive, byte-split, immutability, provenance, confidentiality, strict-shape, bound, order, identity, error, and terminal tests.
 - `tests/mcp-agent-stream-fixture.test.js` — Claude regression plus shared drift-class/reason-roster assertions.
 - `tests/mcp-agent-drift-smoke.test.js` — Closed Claude/OpenCode native fixture table and the pre-registration registry/matrix boundary.
+- `tests/delegation-phase-contract.test.js` — Structurally pins the generalized harness while retaining the Claude-only production roster through Plan 05.
 
 ## Decisions Made
 
@@ -113,7 +117,25 @@ Each task was committed atomically:
 
 ## Deviations from Plan
 
-None - the single task, nine declared files, RED/GREEN contract, production boundary, and atomicity were executed exactly as planned.
+**1. [Rule 1 - Bug] Refreshed stale Phase 62 drift-smoke source assertions**
+
+- **Found during:** Post-wave guarded full-suite verification.
+- **Issue:** The generalized harness intentionally replaced Claude-only helper names and registry iteration with a closed Claude/OpenCode fixture table and provider-specific production parser loading, but six Phase 62 source-contract assertions still required the removed tokens. The repository suite therefore reported `1010 passed, 6 failed` even though the generalized harness and focused parser gates were green.
+- **Fix:** Replaced the stale name checks with stronger structural assertions for the exact two-provider fixture/parser mapping, per-provider native required-field validation, registry/matrix/fixture bijection, explicit Claude-only production exposure plus OpenCode rejection, the existing single CI invocation, and the committed-fixture-only offline boundary. No production roster or compatibility row was added.
+- **Files modified:** `tests/delegation-phase-contract.test.js`.
+- **Verification:** Affected workspace-preserving test passed `1030 passed, 0 failed`; the exact Plan 01 three-test wrapper and exact guarded full suite also passed.
+- **Commit:** `0655d3c6`.
+
+**2. [Rule 3 - Blocking] Neutralized external generated-file stat refresh during the final outer wrapper**
+
+- **Found during:** Post-wave exact guarded full-suite verification.
+- **Issue:** A monitored unmitigated run completed the entire inner suite green, but the frozen outer wrapper detected raw-index byte drift. Read-only index parsing proved that every changed entry retained the same blob, mode, flags, path roster, size, and extension bytes; only `ctime`/`mtime` and, after regeneration, inode stat fields changed on seven content-clean generated files: the six entries documented by Phase 63 plus `showcase/angular/src/app/core/seo/version.ts`. The dirty `mcp/build/index.js` never appeared in the delta.
+- **Fix:** Reused the Phase 63 reversible mitigation by marking only those seven proven-clean generated entries `assume-unchanged` for the final run, then removed every flag via an exit trap. No tracked content, harness, wrapper, staged entry, or unrelated file was changed.
+- **Files modified:** None (temporary local index flags, reverted).
+- **Verification:** The exact guarded command ended with both `[phase60-full-tests] PASS` and `[mcp-build-preserver] PASS`; all seven entries returned to ordinary `H` state, the staged diff remained empty, and protected user/showcase hashes remained exact.
+- **Commit:** n/a (reversible local index mitigation only).
+
+**Total deviations:** 2 auto-fixed (1 bug, 1 blocking environmental interference). **Impact:** Restored the repository-wide gate without weakening coverage or advancing OpenCode production registration ahead of Plan 05.
 
 ## Issues Encountered
 
@@ -131,7 +153,10 @@ None - all evidence is deterministic and offline.
 
 ## Verification
 
+- `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/delegation-phase-contract.test.js"]]'` — PASS (`1030 passed, 0 failed`).
 - `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/mcp-opencode-adapter.test.js","--section","first-commit-drift-gate"],["node","tests/mcp-agent-stream-fixture.test.js"],["node","tests/mcp-agent-drift-smoke.test.js"]]'` — PASS.
+- `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","scripts/run-phase60-full-tests.mjs"]]'` — PASS after the documented reversible stat-refresh mitigation; both inner full-suite and outer workspace-preservation gates passed.
+- The read-only raw-index diagnostic observed only stat-field refreshes on seven content-clean generated entries, with index extensions and every blob/mode/flag/path unchanged; the wrapper restored the raw index, complete `mcp/build` tree, dirty-status/diff fingerprints, and protected bytes.
 - Workspace-preserving focused regressions for `mcp-agent-provider-contract`, `mcp-adapter-compatibility`, `mcp-reverse-channel-contract`, and `mcp-spawn-supervisor` — PASS.
 - MCP prebuild source boundary, TypeScript build, compiled native-host boundary, forbidden-surface scans, stub scan, and `git diff --check` — PASS.
 - Protected unrelated hashes remain byte-identical: `mcp/build/index.js` `6a492a2e...`, `llms-full.txt` `664347e0...`, `llms.txt` `c69ed23d...`, and `sitemap.xml` `826aa8f8...`.
@@ -144,9 +169,9 @@ None - all evidence is deterministic and offline.
 
 ## Self-Check: PASSED
 
-- All nine declared implementation/test/fixture artifacts and this summary exist.
+- All nine originally declared implementation/test/fixture artifacts, the post-wave contract repair, and this summary exist.
 - Task commit `6bbf6727` is present immediately after Phase 64 planning commit `7f25bb02` and contains no deletion or unrelated file.
-- The exact plan verification, four focused regressions, workspace hashes, registry/matrix boundary, and clean staged-index checks pass.
+- Post-wave repair commit `0655d3c6` contains only the source-contract regression fix; the exact plan verification, affected contract, guarded full suite, workspace hashes, registry/matrix boundary, and clean staged-index checks pass.
 
 ---
 *Phase: 64-opencode-adapter*
