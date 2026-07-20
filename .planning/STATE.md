@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-05-PLAN.md
-last_updated: "2026-07-20T21:59:11.034Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 05 complete; atomic OpenCode production exposure and drift bijection green
+stopped_at: Completed 64-06-PLAN.md
+last_updated: "2026-07-20T22:44:58.300Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 06 complete; exact two-provider evidence projection and browser-safe compatibility green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 47
-  percent: 89
+  completed_plans: 48
+  percent: 91
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -22,7 +22,7 @@ progress:
 
 See: .planning/PROJECT.md (v0.9.91 MCP Clients as Providers — Current Milestone section, Key context bullets)
 See: .planning/ROADMAP.md (v0.9.91 active, Phases 57-65; v1.2.0 / v1.1.0 / v1.0.0 / v0.9.99 / etc. archived and collapsed)
-See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 50/51 complete)
+See: .planning/REQUIREMENTS.md (51 v1 requirements across 10 categories: IDENT, PROV, CHAN, ADAPT, CLAUDE, UX, LIFE, DRIFT, NATIVE, MULTI — all mapped to Phases 57-65, 48/51 complete)
 See: .planning/research/SUMMARY.md (converged research summary; suggested phase structure; HIGH confidence)
 See: .planning/research/PITFALLS.md (16 pitfalls with phase assignments; security section verified against 2025-2026 CVE class incidents)
 See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield mapping onto existing FSB architecture)
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 6 of 13
+Plan: 7 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 05 complete; atomic OpenCode production exposure and drift bijection green
+Last activity: 2026-07-20 -- Phase 64 Plan 06 complete; exact two-provider evidence projection and browser-safe compatibility green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -49,10 +49,10 @@ Last activity: 2026-07-20 -- Phase 64 Plan 05 complete; atomic OpenCode producti
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (5/13) |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (6/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 50/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
+Coverage: 51/51 v0.9.91 requirements mapped, 48/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
 
 ## Hard Invariants (v0.9.91)
 
@@ -208,6 +208,9 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Expose OpenCode only as an exact five-method frozen composition with task/server-only capabilities. — Detector, profile, parser, and supervisor-owned tree kill remain the only dependencies; the adapter gains no process, filesystem, network, secret, or timer authority.
 - [Phase 64]: Promote Claude Code and OpenCode as one exact ordered registry/matrix/parser/manifest/fixture/adapter bijection. — The seven production and drift paths land in one atomic implementation commit, so registration cannot outrun its compatibility and native-drift evidence.
 - [Phase 64]: Keep OpenCode spawn eligibility exact at 1.14.25 while Codex remains absent. — Newer same-major versions may be observed as degraded but cannot become spawn-authorizing evidence.
+- [Phase 64]: Keep local provider evidence and browser evidence asymmetric. — Local doctor may expose bounded executable/version facts, while browser inventory and durable compatibility storage receive only closed availability/status facts.
+- [Phase 64]: Require exact Claude Code/OpenCode registry and matrix membership before collecting or projecting evidence. — Roster corruption fails closed to canonical unsupported rows and cannot inject, omit, reorder, or case-vary provider authority.
+- [Phase 64]: Ship OpenCode compatibility as observational data only while Codex remains unshipped. — Compatibility cannot select or recommend a provider, mutate settings, mark state dirty, grant spawn, or retain auth/billing/topology/native evidence.
 
 ### Pending Todos
 
@@ -254,13 +257,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T21:59:11.027Z
-Stopped at: Completed 64-05-PLAN.md
+Last session: 2026-07-20T22:44:58.300Z
+Stopped at: Completed 64-06-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute 64-06-PLAN.md next. Project the exact Claude Code/OpenCode production roster into bounded local inventory and doctor evidence plus the browser-safe compatibility plane while preserving Codex absence, local/native confidentiality, observational-only diagnostics, and all accumulated milestone-end UAT items.
+Execute 64-07-PLAN.md next. Implement the generic cold-first and FSB-owned OpenCode server lifecycle, including exact lease identity, transient secret delivery, readiness, attach fallback, idle shutdown, recovery, and all accumulated milestone-end UAT items.
 
 ## Performance Metrics
 
@@ -283,3 +286,4 @@ Execute 64-06-PLAN.md next. Project the exact Claude Code/OpenCode production ro
 | Phase 64 P03 | 32 min | 1 task | 3 files |
 | Phase 64 P04 | 36 min | 3 tasks | 4 files |
 | Phase 64 P05 | 41 min | 1 task | 9 files |
+| Phase 64 P06 | 38 min | 2 tasks | 13 files |
