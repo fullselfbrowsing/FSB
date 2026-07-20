@@ -108,7 +108,21 @@ async function main() {
   }
 
   {
-    __configureClientInventoryForTests({ platforms: {} });
+    __configureClientInventoryForTests({
+      platforms: {
+        'claude-code': {},
+        opencode: {},
+      },
+      now: () => 700,
+      execFile: (_file, _args, _options, callback) => callback(new Error('missing'), '', ''),
+      detectOpenCode: async () => ({
+        installed: false,
+        version: null,
+        authState: 'unknown',
+        binary: null,
+        profileVersion: null,
+      }),
+    });
     try {
       const runtime = createRuntime();
       let initializedClient = null;
@@ -119,6 +133,10 @@ async function main() {
       await runtime.agentScope.ensure(bridge);
       assert.deepEqual(bridge.calls[0].payload, {
         clientInfo: { name: 'Cursor', version: '1.2.3' },
+        platforms: {
+          'claude-code': { detected: false, checkedAt: 700 },
+          opencode: { detected: false, checkedAt: 700 },
+        },
       }, 'createRuntime injects a lazy SDK client-version supplier');
     } finally {
       __configureClientInventoryForTests(null);
