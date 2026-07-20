@@ -41,6 +41,29 @@ function failingError(code) {
   return error;
 }
 
+function openCodeDetection(overrides = {}) {
+  return {
+    installed: true,
+    version: '1.14.25',
+    authState: 'unknown',
+    binary: {
+      command: '/private/OPENCODE_EXECUTABLE_SENTINEL',
+      realPath: '/private/OPENCODE_EXECUTABLE_SENTINEL',
+      argvPrefix: [],
+    },
+    profileVersion: '1.14.25',
+    ...overrides,
+  };
+}
+
+function requiredInventoryPlatforms(extra = {}) {
+  return {
+    'claude-code': fakePlatform('Claude Code'),
+    opencode: fakePlatform('OpenCode'),
+    ...extra,
+  };
+}
+
 class MockRegisterBridge {
   constructor() {
     this.calls = [];
@@ -75,6 +98,13 @@ async function main() {
         platform: 'linux',
         now: () => 1_783_858_833_000,
         execFile: successfulExec('Claude Code 2.1.177', execCalls),
+        detectOpenCode: async () => openCodeDetection({
+          authState: 'OPENCODE_AUTH_SENTINEL',
+          model: 'OPENCODE_MODEL_SENTINEL',
+          config: 'OPENCODE_CONFIG_SENTINEL',
+          nativeBody: 'OPENCODE_NATIVE_BODY_SENTINEL',
+          diagnostic: { code: 'ok', message: 'OPENCODE_DIAGNOSTIC_SENTINEL' },
+        }),
         resolvePlatformTarget: (key) => {
           resolvedKeys.push(key);
           return {
@@ -92,25 +122,40 @@ async function main() {
       assert.deepEqual(Object.keys(inventory), Object.keys(PLATFORMS), 'every registry key appears');
       assert.deepEqual(
         resolvedKeys,
-        Object.keys(PLATFORMS).filter((key) => key !== 'claude-code'),
-        'every non-Claude entry delegates unchanged to resolvePlatformTarget',
+        Object.keys(PLATFORMS).filter((key) => key !== 'claude-code' && key !== 'opencode'),
+        'every non-provider entry delegates unchanged to resolvePlatformTarget',
       );
       assert.deepEqual(inventory.cursor, {
         detected: true,
-        configPath: '/fixture/cursor.json',
         checkedAt: 1_783_858_833_000,
-      }, 'file-mode detection is copied from the platform target');
+      }, 'browser-bound file-mode evidence strips the local config path');
       assert.deepEqual(inventory.jetbrains, {
         detected: false,
-        configPath: null,
         checkedAt: 1_783_858_833_000,
       }, 'instructions-mode entries remain honestly undetected');
       assert.deepEqual(inventory['claude-code'], {
         detected: true,
-        configPath: null,
         checkedAt: 1_783_858_833_000,
-        version: '2.1.177',
       });
+      assert.deepEqual(inventory.opencode, {
+        detected: true,
+        checkedAt: 1_783_858_833_000,
+      }, 'OpenCode inventory reuses retained detector evidence but projects availability only');
+      const serializedInventory = JSON.stringify(inventory);
+      for (const forbidden of [
+        '/fixture/cursor.json',
+        '2.1.177',
+        '1.14.25',
+        'OPENCODE_EXECUTABLE_SENTINEL',
+        'OPENCODE_AUTH_SENTINEL',
+        'OPENCODE_MODEL_SENTINEL',
+        'OPENCODE_CONFIG_SENTINEL',
+        'OPENCODE_NATIVE_BODY_SENTINEL',
+        'OPENCODE_DIAGNOSTIC_SENTINEL',
+      ]) {
+        assert.equal(serializedInventory.includes(forbidden), false,
+          `browser-bound inventory excludes ${forbidden}`);
+      }
       assert.ok(
         Object.values(inventory).every((record) => record.checkedAt === 1_783_858_833_000),
         'one checkedAt value is shared across the sweep',
@@ -122,8 +167,9 @@ async function main() {
       const failures = ['ENOENT', 'EACCES'];
       __configureClientInventoryForTests({
         platform: 'win32',
-        platforms: { 'claude-code': fakePlatform('Claude Code') },
+        platforms: requiredInventoryPlatforms(),
         now: () => 200,
+        detectOpenCode: async () => openCodeDetection(),
         execFile: (file, args, options, callback) => {
           calls.push({ file, args, options });
           const failure = failures.shift();
@@ -143,30 +189,31 @@ async function main() {
         }, 'probe options are fixed and contain no shell option');
         assert.equal(Object.hasOwn(call.options, 'shell'), false, 'shell escalation is absent');
       }
-      assert.equal(inventory['claude-code'].version, '3.4.5');
+      assert.deepEqual(inventory['claude-code'], { detected: true, checkedAt: 200 });
     }
 
     {
       const calls = [];
       __configureClientInventoryForTests({
         platform: 'darwin',
-        platforms: { 'claude-code': fakePlatform('Claude Code') },
+        platforms: requiredInventoryPlatforms(),
+        detectOpenCode: async () => openCodeDetection(),
         execFile: successfulExec('Claude development build', calls),
       });
       const inventory = await detectMcpClientInventory();
       assert.deepEqual(calls.map((call) => call.file), ['claude'], 'POSIX probes only bare claude');
       assert.deepEqual(inventory['claude-code'], {
         detected: true,
-        configPath: null,
         checkedAt: inventory['claude-code'].checkedAt,
-      }, 'successful unparseable output remains detected without a version');
+      }, 'successful unparseable output remains detected without exposing a version');
     }
 
     for (const code of ['EINVAL', 'ETIMEDOUT', 'NON_ZERO_EXIT']) {
       __configureClientInventoryForTests({
         platform: 'linux',
-        platforms: { 'claude-code': fakePlatform('Claude Code') },
+        platforms: requiredInventoryPlatforms(),
         now: () => 400,
+        detectOpenCode: async () => openCodeDetection(),
         execFile: (_file, _args, _options, callback) => {
           callback(failingError(code), '', '');
         },
@@ -174,7 +221,6 @@ async function main() {
       const inventory = await detectMcpClientInventory();
       assert.deepEqual(inventory['claude-code'], {
         detected: false,
-        configPath: null,
         checkedAt: 400,
       }, `${code} falls through to an honest not-detected record`);
     }
@@ -183,7 +229,8 @@ async function main() {
       let execCount = 0;
       __configureClientInventoryForTests({
         platform: 'linux',
-        platforms: { 'claude-code': fakePlatform('Claude Code') },
+        platforms: requiredInventoryPlatforms(),
+        detectOpenCode: async () => openCodeDetection(),
         execFile: (_file, _args, _options, callback) => {
           execCount += 1;
           callback(null, '1.2.3', '');
@@ -197,12 +244,72 @@ async function main() {
     }
 
     {
+      let accessorRead = false;
+      const accessorDetection = {};
+      Object.defineProperty(accessorDetection, 'version', {
+        enumerable: true,
+        get() {
+          accessorRead = true;
+          return '1.14.25';
+        },
+      });
+      Object.defineProperty(accessorDetection, 'binary', {
+        enumerable: true,
+        get() {
+          accessorRead = true;
+          return openCodeDetection().binary;
+        },
+      });
+      const inheritedDetection = Object.create(openCodeDetection());
+      const cases = [
+        ['exact profile', openCodeDetection(), true],
+        ['newer retained profile', openCodeDetection({ installed: false, version: '1.14.26' }), true],
+        ['missing binary', openCodeDetection({ installed: false, version: null, binary: null }), false],
+        ['malformed version', openCodeDetection({ installed: false, version: null }), false],
+        ['changed binary identity', openCodeDetection({ installed: false, binary: null }), false],
+        ['accessor evidence', accessorDetection, false],
+        ['prototype evidence', inheritedDetection, false],
+      ];
+
+      for (const [label, detection, expectedDetected] of cases) {
+        __configureClientInventoryForTests({
+          platform: 'linux',
+          platforms: requiredInventoryPlatforms(),
+          now: () => 450,
+          execFile: (_file, _args, _options, callback) => {
+            callback(failingError('ENOENT'), '', '');
+          },
+          detectOpenCode: async () => detection,
+        });
+        const inventory = await detectMcpClientInventory();
+        assert.deepEqual(inventory.opencode, {
+          detected: expectedDetected,
+          checkedAt: 450,
+        }, `${label} projects deterministic OpenCode availability only`);
+        assert.deepEqual(Object.keys(inventory.opencode), ['detected', 'checkedAt'],
+          `${label} cannot expand the browser-bound inventory grammar`);
+      }
+      assert.equal(accessorRead, false, 'inventory rejects OpenCode accessors without invoking them');
+    }
+
+    {
       const platforms = {
-        cursor: { detected: true, configPath: '/fixture/cursor.json', checkedAt: 500 },
+        'claude-code': { detected: false, checkedAt: 500 },
+        opencode: { detected: false, checkedAt: 500 },
+        cursor: { detected: true, checkedAt: 500 },
       };
       __configureClientInventoryForTests({
-        platforms: { cursor: fakePlatform('Cursor') },
+        platforms: requiredInventoryPlatforms({ cursor: fakePlatform('Cursor') }),
         now: () => 500,
+        execFile: (_file, _args, _options, callback) => {
+          callback(failingError('ENOENT'), '', '');
+        },
+        detectOpenCode: async () => openCodeDetection({
+          installed: false,
+          version: null,
+          binary: null,
+          profileVersion: null,
+        }),
         resolvePlatformTarget: (key) => ({
           platformKey: key,
           platform: fakePlatform('Cursor'),
@@ -240,7 +347,7 @@ async function main() {
       const scope = new AgentScope();
       const bridge = new MockRegisterBridge();
       const platforms = {
-        codex: { detected: true, configPath: '/fixture/config.toml', checkedAt: 600 },
+        codex: { detected: true, checkedAt: 600 },
       };
       scope.setClientInventorySupplier(async () => platforms);
       await scope.ensure(bridge);
@@ -256,6 +363,22 @@ async function main() {
         type: 'agent:register',
         payload: {},
       }, 'a bare AgentScope keeps the exact legacy payload');
+    }
+
+    {
+      __configureClientInventoryForTests({
+        platforms: {
+          'claude-code': fakePlatform('Claude Code'),
+        },
+        now: () => 700,
+        execFile: successfulExec('Claude Code 2.1.177', []),
+        detectOpenCode: async () => openCodeDetection(),
+      });
+      await assert.rejects(
+        detectMcpClientInventory(),
+        /inventory roster/i,
+        'missing OpenCode membership fails the browser-bound inventory closed',
+      );
     }
 
     const typesSource = fs.readFileSync(path.join(repoRoot, 'mcp', 'src', 'types.ts'), 'utf8');

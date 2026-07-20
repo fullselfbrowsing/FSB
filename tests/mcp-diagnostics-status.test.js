@@ -183,15 +183,18 @@ function makeOfflineBridge() {
   };
 }
 
-function makeAdapterRegistry(detect) {
-  const adapter = Object.freeze({ detect });
+function makeAdapterRegistry(claudeDetect, openCodeDetect = async () => makeOpenCodeDetection()) {
+  const adapters = Object.freeze({
+    'claude-code': Object.freeze({ detect: claudeDetect }),
+    opencode: Object.freeze({ detect: openCodeDetect }),
+  });
   return Object.freeze({
     ids() {
-      return Object.freeze(['claude-code']);
+      return Object.freeze(['claude-code', 'opencode']);
     },
     require(id) {
-      if (id !== 'claude-code') throw new Error('unknown adapter');
-      return adapter;
+      if (!Object.hasOwn(adapters, id)) throw new Error('unknown adapter');
+      return adapters[id];
     },
   });
 }
@@ -207,6 +210,21 @@ function makeDetection(overrides = {}) {
       argvPrefix: [],
     },
     profileVersion: '2.1.177',
+    ...overrides,
+  };
+}
+
+function makeOpenCodeDetection(overrides = {}) {
+  return {
+    installed: true,
+    version: '1.14.25',
+    authState: 'authenticated',
+    binary: {
+      command: '/opt/opencode',
+      realPath: '/opt/opencode',
+      argvPrefix: [],
+    },
+    profileVersion: '1.14.25',
     ...overrides,
   };
 }
@@ -679,7 +697,20 @@ async function run() {
       { waitForExtensionMs: 0, includeConfig: true, includeTabs: true },
       {
         bridgeFactory: makeOfflineBridge,
-        adapterRegistry: makeAdapterRegistry(async () => makeDetection()),
+        adapterRegistry: makeAdapterRegistry(
+          async () => makeDetection(),
+          async () => makeOpenCodeDetection({
+            authState: 'DOCTOR_OPENCODE_AUTH_SENTINEL',
+            billing: 'DOCTOR_OPENCODE_BILLING_SENTINEL',
+            model: 'DOCTOR_OPENCODE_MODEL_SENTINEL',
+            config: 'DOCTOR_OPENCODE_CONFIG_SENTINEL',
+            nativeBody: 'DOCTOR_OPENCODE_NATIVE_BODY_SENTINEL',
+            diagnostic: {
+              code: 'version_unsupported',
+              message: 'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
+            },
+          }),
+        ),
         readBridgeAuthState: () => ({
           version: 1,
           allowedExtensionOrigin: 'chrome-extension://doctor-test',
@@ -701,7 +732,7 @@ async function run() {
     offlineSnapshot.compatibilityMatrix === compatibility.ADAPTER_COMPATIBILITY_MATRIX,
     'doctor snapshot reuses the canonical compatibility matrix object',
   );
-  assertEqual(offlineSnapshot.adapterDiagnostics.length, 1, 'doctor emits one row for the shipped registry/matrix adapter');
+  assertEqual(offlineSnapshot.adapterDiagnostics.length, 2, 'doctor emits the exact two-row registry/matrix roster');
   const doctorRow = offlineSnapshot.adapterDiagnostics[0];
   assertDeepEqual(
     Object.keys(doctorRow).sort(),
@@ -732,6 +763,20 @@ async function run() {
     'doctor row reports canonical detector-backed facts without inferring Claude auth',
   );
   assertDeepEqual(
+    offlineSnapshot.adapterDiagnostics[1],
+    {
+      adapterId: 'opencode',
+      displayLabel: 'OpenCode',
+      binaryPath: '/opt/opencode',
+      detectedVersion: '1.14.25',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'unknown',
+      profileVersion: '1.14.25',
+    },
+    'OpenCode doctor row retains bounded local path/version facts but never infers auth',
+  );
+  assertDeepEqual(
     offlineSnapshot.bridgeAuthMetadata,
     {
       sharedSecretPresent: true,
@@ -748,9 +793,109 @@ async function run() {
   const serializedOfflineSnapshot = JSON.stringify(offlineSnapshot);
   const formattedOfflineSnapshot = indexModule.formatDoctor(offlineSnapshot);
   assert(formattedOfflineSnapshot.includes('  Auth: Not reported'), 'offline doctor text keeps Claude auth explicitly unreported');
-  for (const sentinel of [secretSentinel, sessionSentinel, envSentinel, 'allowedExtensionOrigin']) {
+  for (const sentinel of [
+    secretSentinel,
+    sessionSentinel,
+    envSentinel,
+    'allowedExtensionOrigin',
+    'DOCTOR_OPENCODE_AUTH_SENTINEL',
+    'DOCTOR_OPENCODE_BILLING_SENTINEL',
+    'DOCTOR_OPENCODE_MODEL_SENTINEL',
+    'DOCTOR_OPENCODE_CONFIG_SENTINEL',
+    'DOCTOR_OPENCODE_NATIVE_BODY_SENTINEL',
+    'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
+  ]) {
     assert(!serializedOfflineSnapshot.includes(sentinel), `serialized offline doctor snapshot omits ${sentinel}`);
     assert(!formattedOfflineSnapshot.includes(sentinel), `formatted offline doctor snapshot omits ${sentinel}`);
+  }
+
+  console.log('\n--- deterministic OpenCode doctor evidence ---');
+  const openCodeDoctorCases = [
+    ['exact profile', makeOpenCodeDetection(), {
+      binaryPath: '/opt/opencode',
+      detectedVersion: '1.14.25',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+    }],
+    ['newer retained profile', makeOpenCodeDetection({
+      installed: false,
+      version: '1.14.26',
+      profileVersion: null,
+      diagnostic: { code: 'version_unsupported', message: 'NEWER_DIAGNOSTIC_SENTINEL' },
+    }), {
+      binaryPath: '/opt/opencode',
+      detectedVersion: '1.14.26',
+      compatibilityStatus: 'degraded',
+      compatibilityReason: 'newer_than_tested_range',
+    }],
+    ['missing binary', makeOpenCodeDetection({
+      installed: false,
+      version: null,
+      binary: null,
+      profileVersion: null,
+      diagnostic: { code: 'binary_missing', message: 'MISSING_DIAGNOSTIC_SENTINEL' },
+    }), {
+      binaryPath: null,
+      detectedVersion: null,
+      compatibilityStatus: 'unsupported',
+      compatibilityReason: 'binary_not_found',
+    }],
+    ['malformed version', makeOpenCodeDetection({
+      installed: false,
+      version: null,
+      profileVersion: null,
+      diagnostic: { code: 'version_unparseable', message: 'MALFORMED_DIAGNOSTIC_SENTINEL' },
+    }), {
+      binaryPath: '/opt/opencode',
+      detectedVersion: null,
+      compatibilityStatus: 'unsupported',
+      compatibilityReason: 'version_malformed',
+    }],
+    ['changed binary identity', makeOpenCodeDetection({
+      installed: false,
+      version: null,
+      binary: null,
+      profileVersion: null,
+      diagnostic: { code: 'binary_changed', message: 'CHANGED_DIAGNOSTIC_SENTINEL' },
+    }), {
+      binaryPath: null,
+      detectedVersion: null,
+      compatibilityStatus: 'unsupported',
+      compatibilityReason: 'binary_not_found',
+    }],
+  ];
+  for (const [label, detection, expected] of openCodeDoctorCases) {
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(async () => makeDetection(), async () => detection),
+        readBridgeAuthState: () => null,
+        now: () => 10_000,
+      },
+    );
+    assertDeepEqual(
+      snapshot.adapterDiagnostics[1],
+      {
+        adapterId: 'opencode',
+        displayLabel: 'OpenCode',
+        ...expected,
+        authState: 'unknown',
+        profileVersion: '1.14.25',
+      },
+      `${label} maps to the canonical local-only OpenCode doctor row`,
+    );
+    const serialized = JSON.stringify(snapshot);
+    const formatted = indexModule.formatDoctor(snapshot);
+    for (const sentinel of [
+      'NEWER_DIAGNOSTIC_SENTINEL',
+      'MISSING_DIAGNOSTIC_SENTINEL',
+      'MALFORMED_DIAGNOSTIC_SENTINEL',
+      'CHANGED_DIAGNOSTIC_SENTINEL',
+    ]) {
+      assert(!serialized.includes(sentinel), `${label} JSON omits raw detector diagnostic text`);
+      assert(!formatted.includes(sentinel), `${label} text omits raw detector diagnostic text`);
+    }
   }
 
   console.log('\n--- malformed injected authorities fail closed ---');
@@ -819,23 +964,64 @@ async function run() {
       'Date exception text never enters the bounded diagnostics snapshot');
   }
 
-  const unshippedRegistrySnapshot = await diagnostics.collectBridgeDiagnostics(
-    { waitForExtensionMs: 0 },
-    {
-      bridgeFactory: makeOfflineBridge,
-      adapterRegistry: Object.freeze({
-        ids: () => Object.freeze(['future-adapter']),
-        require: () => { throw new Error('must not resolve an unshipped row'); },
-      }),
-      readBridgeAuthState: () => null,
-      now: () => 10_000,
+  console.log('\n--- doctor roster mismatch fails closed ---');
+  let mismatchedRequireCalls = 0;
+  let rosterAccessorReads = 0;
+  const accessorRegistry = {};
+  Object.defineProperty(accessorRegistry, 'ids', {
+    enumerable: true,
+    get() {
+      rosterAccessorReads++;
+      return () => ['claude-code', 'opencode'];
     },
-  );
-  assertEqual(
-    unshippedRegistrySnapshot.adapterDiagnostics.length,
-    0,
-    'doctor enumerates only adapter ids present in both the shipped registry and canonical matrix',
-  );
+  });
+  accessorRegistry.require = () => {
+    mismatchedRequireCalls++;
+    return Object.freeze({ detect: async () => makeDetection() });
+  };
+  const prototypeRegistry = Object.create({
+    ids: () => Object.freeze(['claude-code', 'opencode']),
+    require: () => Object.freeze({ detect: async () => makeDetection() }),
+  });
+  const rosterCases = [
+    ['missing', ['claude-code']],
+    ['duplicate', ['claude-code', 'opencode', 'opencode']],
+    ['orphan', ['claude-code', 'opencode', 'codex']],
+    ['case variant', ['claude-code', 'OpenCode']],
+    ['reordered', ['opencode', 'claude-code']],
+  ].map(([label, ids]) => [label, Object.freeze({
+    ids: () => Object.freeze([...ids]),
+    require: () => {
+      mismatchedRequireCalls++;
+      return Object.freeze({ detect: async () => makeDetection() });
+    },
+  })]);
+  rosterCases.push(['accessor', accessorRegistry], ['prototype', prototypeRegistry]);
+  const closedRosterRows = compatibility.ADAPTER_COMPATIBILITY_MATRIX.adapters.map((contract) => ({
+    adapterId: contract.adapterId,
+    displayLabel: contract.displayLabel,
+    binaryPath: null,
+    detectedVersion: null,
+    compatibilityStatus: 'unsupported',
+    compatibilityReason: 'matrix_invalid',
+    authState: 'unknown',
+    profileVersion: contract.profileVersion,
+  }));
+  for (const [label, adapterRegistry] of rosterCases) {
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry,
+        readBridgeAuthState: () => null,
+        now: () => 10_000,
+      },
+    );
+    assertDeepEqual(snapshot.adapterDiagnostics, closedRosterRows,
+      `${label} doctor registry mismatch returns the exact closed canonical roster`);
+  }
+  assertEqual(mismatchedRequireCalls, 0, 'roster mismatch never resolves or detects an adapter');
+  assertEqual(rosterAccessorReads, 0, 'roster validation never invokes an ids accessor');
 
   let accessorReads = 0;
   const accessorDetection = makeDetection();
@@ -865,6 +1051,42 @@ async function run() {
     { sharedSecretPresent: false, secretRotatedAt: null, secretRotationAgeMs: null },
     'prototype-bearing auth state fails closed without inherited reads',
   );
+
+  let openCodeAccessorReads = 0;
+  const openCodeAccessorDetection = {};
+  for (const key of ['binary', 'version']) {
+    Object.defineProperty(openCodeAccessorDetection, key, {
+      enumerable: true,
+      get() {
+        openCodeAccessorReads++;
+        return key === 'binary' ? makeOpenCodeDetection().binary : '1.14.25';
+      },
+    });
+  }
+  const openCodePrototypeDetection = Object.create(makeOpenCodeDetection());
+  for (const [label, unsafeDetection] of [
+    ['accessor', openCodeAccessorDetection],
+    ['prototype', openCodePrototypeDetection],
+  ]) {
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(
+          async () => makeDetection(),
+          async () => unsafeDetection,
+        ),
+        readBridgeAuthState: () => null,
+        now: () => 10_000,
+      },
+    );
+    assertDeepEqual(snapshot.adapterDiagnostics[1], {
+      ...closedRosterRows[1],
+      compatibilityReason: 'binary_not_found',
+    },
+      `${label} OpenCode detector evidence fails closed without inherited or computed reads`);
+  }
+  assertEqual(openCodeAccessorReads, 0, 'doctor never invokes OpenCode detector accessors');
 
   const futureAuthSnapshot = await diagnostics.collectBridgeDiagnostics(
     { waitForExtensionMs: 0 },
