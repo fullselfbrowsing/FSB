@@ -7,7 +7,6 @@ import type { AdapterDetection } from './agent-providers/adapter.js';
 import {
   ADAPTER_COMPATIBILITY_MATRIX,
   classifyAdapterCompatibility,
-  getAdapterCompatibilityContract,
   type AdapterCompatibilityMatrix,
   type CompatibilityReason,
   type CompatibilityStatus,
@@ -180,7 +179,7 @@ function ownDataRecord(value: unknown): Readonly<Record<string, unknown>> | null
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (Object.getPrototypeOf(value) !== Object.prototype) return null;
 
-  const record: Record<string, unknown> = {};
+  const record: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') return null;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -516,11 +515,31 @@ function unavailableAdapterRow(
   });
 }
 
+function matrixInvalidAdapterRows(): readonly AdapterDoctorRow[] {
+  return Object.freeze(ADAPTER_COMPATIBILITY_MATRIX.adapters.map((contract) => Object.freeze({
+    adapterId: contract.adapterId,
+    displayLabel: contract.displayLabel,
+    binaryPath: null,
+    detectedVersion: null,
+    compatibilityStatus: 'unsupported' as const,
+    compatibilityReason: 'matrix_invalid' as const,
+    authState: 'unknown' as const,
+    profileVersion: contract.profileVersion,
+  })));
+}
+
 function normalizeAdapterDetection(
   value: unknown,
 ): { binaryPath: string | null; version: string | null; evidenceVersion: string | null } | null {
   const detection = ownDataRecord(value);
   if (!detection) return null;
+
+  let diagnosticCode: string | null = null;
+  if (Object.hasOwn(detection, 'diagnostic') && detection.diagnostic !== undefined) {
+    const diagnostic = ownDataRecord(detection.diagnostic);
+    if (!diagnostic) return null;
+    diagnosticCode = typeof diagnostic.code === 'string' ? diagnostic.code : null;
+  }
 
   const binary = detection.binary === null ? null : ownDataRecord(detection.binary);
   const realPath = binary?.realPath;
@@ -528,9 +547,12 @@ function normalizeAdapterDetection(
     && isAbsolute(realPath)
     ? realPath
     : null;
-  const evidenceVersion = typeof detection.version === 'string' ? detection.version : null;
-  const version = boundedDoctorString(evidenceVersion, MAX_DOCTOR_FIELD_LENGTH)
-    ? evidenceVersion
+  const rawVersion = typeof detection.version === 'string' ? detection.version : null;
+  const evidenceVersion = rawVersion === null && diagnosticCode === 'version_unparseable'
+    ? 'malformed'
+    : rawVersion;
+  const version = boundedDoctorString(rawVersion, MAX_DOCTOR_FIELD_LENGTH)
+    ? rawVersion
     : null;
 
   return Object.freeze({ binaryPath, version, evidenceVersion });
@@ -550,15 +572,17 @@ async function collectAdapterDoctorRows(
     }
   }
 
-  const rows: AdapterDoctorRow[] = [];
-  if (!registryIds || !requireMethod) return Object.freeze(rows);
-  for (const adapterId of registryIds) {
-    const contract = getAdapterCompatibilityContract(adapterId);
-    if (!contract) continue;
+  const contracts = ADAPTER_COMPATIBILITY_MATRIX.adapters;
+  const exactRoster = registryIds !== null
+    && registryIds.length === contracts.length
+    && registryIds.every((adapterId, index) => adapterId === contracts[index]?.adapterId);
+  if (!exactRoster || !requireMethod) return matrixInvalidAdapterRows();
 
+  const rows: AdapterDoctorRow[] = [];
+  for (const contract of contracts) {
     let detection: AdapterDetection | null = null;
     try {
-      const adapter = requireMethod.call(registry, adapterId);
+      const adapter = requireMethod.call(registry, contract.adapterId);
       const detectMethod = readOwnCallable(adapter, 'detect');
       if (detectMethod) {
         detection = await detectMethod.call(adapter) as AdapterDetection;
