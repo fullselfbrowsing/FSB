@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Readable } = require('node:stream');
@@ -11,6 +12,7 @@ const buildRoot = path.join(repoRoot, 'mcp', 'build', 'agent-providers');
 const adapterBuildPath = path.join(buildRoot, 'adapter.js');
 const compatibilityBuildPath = path.join(buildRoot, 'compatibility.js');
 const opencodeDetectBuildPath = path.join(buildRoot, 'opencode-detect.js');
+const opencodeProfileBuildPath = path.join(buildRoot, 'opencode-profile.js');
 const opencodeStreamBuildPath = path.join(buildRoot, 'opencode-stream.js');
 const protocolDriftBuildPath = path.join(buildRoot, 'protocol-drift.js');
 const registryBuildPath = path.join(buildRoot, 'registry.js');
@@ -49,6 +51,17 @@ const MANIFEST_KEYS = Object.freeze([
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function assertRecursivelyFrozen(value, label, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  assert.ok(Object.isFrozen(value), `${label} is recursively frozen`);
+  for (const child of Object.values(value)) assertRecursivelyFrozen(child, label, seen);
 }
 
 function cloneFixtureLines() {
@@ -619,6 +632,274 @@ async function runDetection() {
   assert.doesNotMatch(JSON.stringify(poisoned), new RegExp(malformedCanary));
 }
 
+function retainedOpenCodeDetection() {
+  return Object.freeze({
+    installed: true,
+    version: '1.14.25',
+    authState: 'unknown',
+    binary: Object.freeze({
+      command: '/fixture/runtime/opencode',
+      realPath: '/fixture/runtime/opencode',
+      argvPrefix: Object.freeze(['/fixture/runtime/opencode-entry.js']),
+    }),
+    profileVersion: '1.14.25',
+  });
+}
+
+function openCodeProfileFixture() {
+  const runtime = {
+    fsbMcpEndpoint: 'http://127.0.0.1:7226/mcp',
+    opencodeConfigRoot: '/fixture/run/config',
+    opencodeConfigPath: '/fixture/run/config/opencode/opencode.json',
+    opencodeTestHomePath: '/fixture/run/test-home',
+    opencodeManagedConfigPath: '/fixture/run/managed-config',
+    opencodeDataRoot: '/fixture/native-data/opencode',
+  };
+  const context = {
+    adapterId: 'opencode',
+    detection: retainedOpenCodeDetection(),
+    delegationId: 'delegation_fixture_0001',
+    runtimeFingerprint: 'runtime_fingerprint_fixture_0001',
+    cwd: '/fixture/work',
+    privateMcpConfigPath: '/fixture/run/mcp-config.json',
+    runtimeFiles: Object.freeze([
+      runtime.opencodeConfigPath,
+      runtime.opencodeTestHomePath,
+      runtime.opencodeManagedConfigPath,
+    ]),
+  };
+  return { context, runtime };
+}
+
+async function runProfilePolicy() {
+  const profileSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'opencode-profile.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(profileSource, /from ['"]node:(?:child_process|http|https|net|tls)['"]/);
+  assert.doesNotMatch(profileSource, /\b(?:fetch|spawn|execFile|exec|connect)\s*\(/);
+  assert.doesNotMatch(profileSource, /process\.env|auth\.json|credentials?|api[_-]?key/i);
+
+  const fsbPolicy = JSON.parse(fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'ai', 'agents', 'fsb.json'),
+    'utf8',
+  ));
+  const profileModule = await import(pathToFileURL(opencodeProfileBuildPath).href);
+  const {
+    OPENCODE_FIXED_ISOLATION_ENV_KEYS,
+    OPENCODE_PROFILE_VERSION,
+    OPENCODE_TASK_LIMIT_BYTES,
+    SHIPPED_FSB_DESCRIPTION_SHA256,
+    SHIPPED_FSB_PROMPT_SHA256,
+    buildOpenCodeProfile,
+    buildOpenCodeSpawnSpec,
+  } = profileModule;
+
+  assert.equal(OPENCODE_PROFILE_VERSION, '1.14.25');
+  assert.equal(OPENCODE_TASK_LIMIT_BYTES, 64 * 1024);
+  assert.equal(SHIPPED_FSB_DESCRIPTION_SHA256, sha256(fsbPolicy.description));
+  assert.equal(SHIPPED_FSB_PROMPT_SHA256, sha256(fsbPolicy.prompt));
+  assert.deepEqual(OPENCODE_FIXED_ISOLATION_ENV_KEYS, [
+    'OPENCODE_DISABLE_AUTOUPDATE',
+    'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
+    'OPENCODE_DISABLE_EXTERNAL_SKILLS',
+    'OPENCODE_DISABLE_LSP_DOWNLOAD',
+    'OPENCODE_DISABLE_PROJECT_CONFIG',
+    'OPENCODE_TEST_HOME',
+    'OPENCODE_TEST_MANAGED_CONFIG_DIR',
+    'XDG_CONFIG_HOME',
+  ]);
+  assert.ok(Object.isFrozen(OPENCODE_FIXED_ISOLATION_ENV_KEYS));
+
+  const { context, runtime } = openCodeProfileFixture();
+  const taskCanary = 'TASK_CANARY_profile_64_04_0001\nwith quotes " and unicode µ';
+  const profile = buildOpenCodeProfile({ text: taskCanary }, context, runtime);
+  assert.deepEqual(Object.keys(profile).sort(), ['privateArtifacts', 'spawnSpec']);
+  assertRecursivelyFrozen(profile, 'OpenCode profile');
+  assert.strictEqual(
+    buildOpenCodeSpawnSpec({ text: taskCanary }, context, runtime).topology.kind,
+    'owned_server',
+  );
+
+  assert.deepEqual(profile.privateArtifacts.map((artifact) => artifact.kind), [
+    'opencode_config',
+    'opencode_test_home',
+    'opencode_managed_config',
+  ]);
+  assert.deepEqual(profile.privateArtifacts[1], { kind: 'opencode_test_home' });
+  assert.deepEqual(profile.privateArtifacts[2], { kind: 'opencode_managed_config' });
+  assert.ok(profile.privateArtifacts[0].contents.endsWith('\n'));
+  const config = JSON.parse(profile.privateArtifacts[0].contents);
+  assert.deepEqual(Object.keys(config), [
+    'share',
+    'autoupdate',
+    'default_agent',
+    'plugin',
+    'command',
+    'instructions',
+    'agent',
+    'mcp',
+  ]);
+  assert.equal(config.share, 'disabled');
+  assert.equal(config.autoupdate, false);
+  assert.equal(config.default_agent, 'fsb');
+  assert.deepEqual(config.plugin, []);
+  assert.deepEqual(config.command, {});
+  assert.deepEqual(config.instructions, []);
+  assert.deepEqual(Object.keys(config.agent), ['fsb']);
+  assert.deepEqual(Object.keys(config.agent.fsb), [
+    'mode',
+    'description',
+    'prompt',
+    'steps',
+    'permission',
+  ]);
+  assert.equal(config.agent.fsb.mode, 'primary');
+  assert.equal(config.agent.fsb.description, fsbPolicy.description);
+  assert.equal(config.agent.fsb.prompt, fsbPolicy.prompt);
+  assert.equal(config.agent.fsb.steps, 40);
+  assert.equal(Object.hasOwn(config.agent.fsb, 'model'), false);
+  assert.deepEqual(Object.keys(config.agent.fsb.permission), [
+    '*',
+    'external_directory',
+    'fsb_*',
+  ]);
+  assert.equal(config.agent.fsb.permission['*'], 'deny');
+  assert.deepEqual(config.agent.fsb.permission.external_directory, {
+    '*': 'deny',
+    '/fixture/native-data/opencode/tool-output/*': 'deny',
+  });
+  assert.equal(config.agent.fsb.permission['fsb_*'], 'allow');
+  assert.deepEqual(config.mcp, {
+    fsb: {
+      type: 'remote',
+      url: runtime.fsbMcpEndpoint,
+      enabled: true,
+      oauth: false,
+    },
+  });
+
+  const spec = profile.spawnSpec;
+  assert.equal(spec.adapterId, 'opencode');
+  assert.equal(spec.profileVersion, '1.14.25');
+  assert.deepEqual(spec.attestations, []);
+  assert.equal(spec.topology.kind, 'owned_server');
+  const { server, coldTask, attachTask } = spec.topology;
+  const prefix = ['/fixture/runtime/opencode-entry.js', '--pure', '--log-level', 'ERROR'];
+  assert.deepEqual(coldTask.argv, [
+    ...prefix,
+    'run', '--format', 'json', '--agent', 'fsb',
+  ]);
+  assert.deepEqual(attachTask.argv, [
+    ...prefix,
+    'run', '--format', 'json', '--agent', 'fsb',
+    '--attach', { runtimeRef: 'owned_server_endpoint' },
+  ]);
+  assert.deepEqual(server.argv, [
+    ...prefix,
+    'serve', '--hostname', '127.0.0.1', '--port', '0', '--mdns', 'false',
+  ]);
+  assert.deepEqual(spec.topology.readiness, {
+    linePrefix: 'opencode server listening on http://127.0.0.1:',
+    maxBytes: 4 * 1024,
+    timeoutMs: 5_000,
+  });
+  assert.deepEqual(spec.topology.idle, { timeoutMs: 5 * 60 * 1_000 });
+  assert.deepEqual(spec.topology.runtimeRefs, {
+    endpoint: 'owned_server_endpoint',
+    generation: 'daemon_generation',
+  });
+
+  const fixedEnv = {
+    OPENCODE_DISABLE_AUTOUPDATE: '1',
+    OPENCODE_DISABLE_CLAUDE_CODE_PROMPT: '1',
+    OPENCODE_DISABLE_EXTERNAL_SKILLS: '1',
+    OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+    OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+    OPENCODE_TEST_HOME: runtime.opencodeTestHomePath,
+    OPENCODE_TEST_MANAGED_CONFIG_DIR: runtime.opencodeManagedConfigPath,
+    XDG_CONFIG_HOME: runtime.opencodeConfigRoot,
+  };
+  const privateFiles = [
+    runtime.opencodeConfigPath,
+    runtime.opencodeTestHomePath,
+    runtime.opencodeManagedConfigPath,
+  ];
+  const binding = [{
+    envKey: 'OPENCODE_SERVER_PASSWORD',
+    secretRef: 'owned_server_basic_password',
+  }];
+  for (const processSpec of [server, coldTask, attachTask]) {
+    assert.equal(processSpec.command, context.detection.binary.command);
+    assert.equal(processSpec.cwd, context.cwd);
+    assert.deepEqual(processSpec.fixedEnv, fixedEnv);
+    assert.deepEqual(processSpec.privateFiles, privateFiles);
+  }
+  assert.deepEqual(server.spawnSecretEnvBindings, binding);
+  assert.deepEqual(attachTask.spawnSecretEnvBindings, binding);
+  assert.deepEqual(coldTask.spawnSecretEnvBindings, []);
+  assert.deepEqual(
+    [server.stdin, coldTask.stdin, attachTask.stdin],
+    ['none', 'task', 'task'],
+  );
+  assert.deepEqual(
+    [server.stdout, coldTask.stdout, attachTask.stdout],
+    ['bounded_readiness', 'agent_jsonl', 'agent_jsonl'],
+  );
+  assert.equal(Object.hasOwn(fixedEnv, 'OPENCODE_SERVER_PASSWORD'), false);
+  for (const forbidden of [
+    'HOME',
+    'XDG_DATA_HOME',
+    'XDG_STATE_HOME',
+    'XDG_CACHE_HOME',
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+  ]) assert.equal(Object.hasOwn(server.fixedEnv, forbidden), false);
+
+  const serialized = JSON.stringify(profile);
+  assert.doesNotMatch(serialized, new RegExp(taskCanary.split('\n')[0]));
+  assert.doesNotMatch(serialized, /PASSWORD_CANARY_profile_64_04_0001/);
+  for (const forbidden of [
+    '--model', '--continue', '--session', '--fork', '--share', '--file', '--command',
+    '--print-logs', '--password', '--dangerously-skip-permissions', '--yolo', '--auto',
+  ]) assert.equal(serialized.includes(forbidden), false, `${forbidden} is absent`);
+
+  const mutableRuntime = { ...runtime };
+  const mutableContext = {
+    ...context,
+    detection: {
+      ...context.detection,
+      binary: { ...context.detection.binary, argvPrefix: [...context.detection.binary.argvPrefix] },
+    },
+    runtimeFiles: [...context.runtimeFiles],
+  };
+  const isolated = buildOpenCodeProfile({ text: 'immutable task' }, mutableContext, mutableRuntime);
+  mutableRuntime.opencodeTestHomePath = '/mutated';
+  mutableContext.detection.binary.argvPrefix.push('--mutated');
+  mutableContext.runtimeFiles.push('/mutated');
+  assert.deepEqual(isolated.spawnSpec.topology.coldTask.argv, coldTask.argv);
+  assert.deepEqual(isolated.spawnSpec.topology.coldTask.privateFiles, privateFiles);
+
+  const invalidCases = [
+    [{ text: '' }, context, runtime],
+    [{ text: '\ud800' }, context, runtime],
+    [{ text: 'x'.repeat(OPENCODE_TASK_LIMIT_BYTES + 1) }, context, runtime],
+    [{ text: 'valid task' }, { ...context, adapterId: 'claude-code' }, runtime],
+    [{ text: 'valid task' }, { ...context, detection: { ...context.detection, installed: false } }, runtime],
+    [{ text: 'valid task' }, {
+      ...context,
+      detection: { ...context.detection, profileVersion: '1.14.24' },
+    }, runtime],
+    [{ text: 'valid task' }, context, { ...runtime, fsbMcpEndpoint: 'http://example.com/mcp' }],
+    [{ text: 'valid task' }, context, { ...runtime, fsbMcpEndpoint: 'http://user:secret@127.0.0.1:7226/mcp' }],
+    [{ text: 'valid task' }, context, { ...runtime, opencodeConfigPath: 'relative/opencode.json' }],
+    [{ text: 'valid task' }, context, { ...runtime, opencodeDataRoot: '/fixture/native-data/opencode/../escape' }],
+  ];
+  for (const args of invalidCases) {
+    assert.throws(() => buildOpenCodeProfile(...args), /OpenCode|Agent task/);
+  }
+}
+
 async function run() {
   const argv = process.argv.slice(2);
   assert.equal(argv.length, 2);
@@ -632,6 +913,11 @@ async function run() {
   if (argv[1] === 'detection') {
     await runDetection();
     console.log('mcp-opencode-adapter.test.js: detection PASS');
+    return;
+  }
+  if (argv[1] === 'profile-policy') {
+    await runProfilePolicy();
+    console.log('mcp-opencode-adapter.test.js: profile-policy PASS');
     return;
   }
   assert.fail(`unknown section: ${argv[1]}`);
