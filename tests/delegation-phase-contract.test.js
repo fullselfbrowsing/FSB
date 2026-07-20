@@ -1391,7 +1391,7 @@ for (const id of phase62RequirementIds) checkEvidence(id, phase62RequirementEvid
 
 const phase62ThreatEvidence = Object.freeze({
   'T62-01': [['mcp/src/agent-providers/compatibility.ts', /parseAdapterCompatibilityMatrix/]],
-  'T62-02': [['tests/mcp-agent-drift-smoke.test.js', /assertRosterBijection/]],
+  'T62-02': [['tests/mcp-agent-drift-smoke.test.js', /function assertProductionRoster\(/]],
   'T62-03': [['tests/mcp-diagnostics-status.test.js', /sharedSecretPresent/]],
   'T62-04': [['tests/mcp-version-parity.test.js', /doctor text and JSON modes consume the same collected snapshot/]],
   'T62-05': [['mcp/src/agent-providers/serve-delegation.ts', /adapter\.compatibility/]],
@@ -1472,20 +1472,76 @@ equal(fixtureManifest.expectedSequence, [
 ], 'fixture and matrix retain the exact normalized sequence');
 
 const driftSmokeSource = read('tests/mcp-agent-drift-smoke.test.js');
-for (const productionHarnessToken of [
-  'createProductionAdapterRegistry',
-  'registry.ids()',
-  'registry.require(adapterId)',
-  'adapter.parseEvents',
-  'assertRosterBijection',
-  'assertRequiredFields',
-  'EXPECTED_PROVIDER_NATIVE_SEQUENCES',
+const driftFixtureContracts = between(
+  driftSmokeSource,
+  'const FIXTURE_CONTRACTS = deepFreeze({',
+  '\n});\n\nfunction clone',
+);
+equal(Array.from(
+  driftFixtureContracts.matchAll(/^  (?:'([^']+)'|([a-z][a-z0-9-]*)):\s*\{$/gm),
+  (match) => match[1] || match[2],
+), ['claude-code', 'opencode'],
+  'drift smoke fixture table is the exact closed Claude/OpenCode roster');
+equal(Array.from(
+  driftFixtureContracts.matchAll(
+    /^    adapterId: '([^']+)',\n    directory: '([^']+)',\n    parserModule: '([^']+)',\n    parserExport: '([^']+)',/gm,
+  ),
+  (match) => match.slice(1),
+), [
+  ['claude-code', 'claude-code-2.1.177', 'claude-stream.js', 'parseClaudeEvents'],
+  ['opencode', 'opencode-1.14.25', 'opencode-stream.js', 'parseOpenCodeEvents'],
+], 'each adapter-native fixture points at its exact compiled production parser export');
+check(exactOccurrences(driftFixtureContracts, 'requiredInitFields:') === 2
+  && exactOccurrences(driftFixtureContracts, 'requiredTerminalFields:') === 2,
+  'both closed fixture contracts declare native init and terminal field requirements');
+check(/for \(const field of contract\.requiredInitFields\) \{\s*assert\.ok\(hasPath\(nativeInit\[0\], field\)/.test(driftSmokeSource)
+  && /for \(const field of contract\.requiredTerminalFields\) \{\s*assert\.ok\(hasPath\(nativeTerminal\[0\], field\)/.test(driftSmokeSource),
+  'drift smoke validates every declared dotted native init and terminal field');
+
+const productionRosterSource = extractFunction(driftSmokeSource, 'assertProductionRoster');
+for (const productionRosterToken of [
+  "assert.deepEqual(matrixIds, sortedRegistryIds, 'registry and matrix adapter rosters agree')",
+  "assert.equal(new Set(matrixIds).size, matrixIds.length, 'matrix adapter ids are unique')",
+  'FIXTURE_CONTRACTS[adapterId].directory',
+  "assert.deepEqual(matrixFixtures, registeredFixtures, 'registered matrix fixtures agree')",
 ]) {
-  check(driftSmokeSource.includes(productionHarnessToken),
-    `drift smoke uses production-registry/parser evidence: ${productionHarnessToken}`);
+  check(productionRosterSource.includes(productionRosterToken),
+    `production roster keeps its registry/matrix/fixture bijection: ${productionRosterToken}`);
 }
+for (const preRegistrationBoundaryToken of [
+  "assert.deepEqual(registryIds, ['claude-code'], 'production registry remains Claude-only');",
+  "assert.deepEqual(matrixIds, ['claude-code'], 'compatibility matrix remains Claude-only');",
+  'assertProductionRoster(registryIds, matrixRows);',
+  "assertProductionRoster(registryIds, [...matrixRows, { ...matrixRows[0], adapterId: 'opencode' }])",
+  "assert.throws(() => registry.require('opencode'), /Unknown adapter id/);",
+  "assert.deepEqual(committedManifests, expectedManifests, 'fixture roster is exactly Claude and OpenCode');",
+]) {
+  check(driftSmokeSource.includes(preRegistrationBoundaryToken),
+    `OpenCode fixture readiness preserves the Claude-only production boundary: ${preRegistrationBoundaryToken}`);
+}
+
+const loadParserSource = extractFunction(driftSmokeSource, 'loadParser');
+for (const productionParserToken of [
+  'path.join(buildRoot, contract.parserModule)',
+  'await import(pathToFileURL(modulePath).href)',
+  'productionModule[contract.parserExport]',
+  'registry.require(contract.adapterId).parseEvents',
+]) {
+  check(loadParserSource.includes(productionParserToken),
+    `drift smoke loads production parser evidence: ${productionParserToken}`);
+}
+check(/if \(contract\.adapterId === 'claude-code'\) \{[\s\S]*return registeredParser;\s*\}\s*return parser;/.test(loadParserSource),
+  'Claude replays through its registered adapter while pre-registration OpenCode replays its compiled parser directly');
+check(/Offline adapter-native fixture drift gate\.[\s\S]*only compiled[\s\S]*production parsers over committed synthetic streams; it never invokes a[\s\S]*provider binary, account, browser, or network\./.test(driftSmokeSource),
+  'drift smoke declares its committed-fixture-only offline authority boundary');
 check(!/child_process|execFile|spawnSync|fetch\s*\(|new WebSocket|claude\s+--/.test(driftSmokeSource),
   'offline drift smoke invokes no live binary, process, network, browser, or account path');
+
+const driftCiAssertionSource = extractFunction(driftSmokeSource, 'assertCiEntry');
+check(driftCiAssertionSource.includes('ci.match(/name: Phase 62 adapter drift smoke/g)')
+  && driftCiAssertionSource.includes('ci.match(/run: node tests\\/mcp-agent-drift-smoke\\.test\\.js/g)')
+  && exactOccurrences(driftSmokeSource, 'assertCiEntry();') === 1,
+  'generalized drift smoke self-pins the single existing Phase 62 CI name and exact direct invocation');
 
 const ciSource = read('.github/workflows/ci.yml');
 check(exactOccurrences(ciSource, 'name: Phase 62 adapter drift smoke') === 1,
