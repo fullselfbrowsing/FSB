@@ -57,6 +57,49 @@ function activeInput(overrides = {}) {
   };
 }
 
+function opencodePrivateArtifacts(overrides = {}) {
+  const config = {
+    share: 'disabled',
+    mcp: {
+      fsb: {
+        type: 'remote',
+        url: 'http://127.0.0.1:7226/mcp',
+        enabled: true,
+        oauth: false,
+      },
+    },
+  };
+  return [
+    { kind: 'opencode_config', contents: `${JSON.stringify(config)}\n` },
+    { kind: 'opencode_test_home' },
+    { kind: 'opencode_managed_config' },
+  ].map((entry) => ({ ...entry, ...(overrides[entry.kind] ?? {}) }));
+}
+
+function rolePreparedInput(runtime, overrides = {}) {
+  const delegationId = overrides.delegationId ?? 'provider_server_fixture_0001';
+  const paths = runtime.pathsFor(delegationId);
+  return {
+    role: 'provider_server',
+    delegationId,
+    adapterId: 'opencode',
+    profileVersion: '1.14.25',
+    createdAt: 1000,
+    binaryRealPath: '/fixture/bin/opencode',
+    argvSignature: 'argv_signature_opencode_0001',
+    fixedEnv: {
+      XDG_CONFIG_HOME: paths.opencodeConfigRoot,
+      OPENCODE_TEST_HOME: paths.opencodeTestHomePath,
+      OPENCODE_TEST_MANAGED_CONFIG_DIR: paths.opencodeManagedConfigPath,
+      OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+    },
+    envFingerprint: 'env_fingerprint_opencode_0001',
+    generation: 'generation_fixture_previous',
+    privateArtifacts: opencodePrivateArtifacts(),
+    ...overrides,
+  };
+}
+
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
@@ -89,6 +132,9 @@ async function expectRuntimeError(operation, code) {
 
 async function runRuntimeFilesTests(runtimeModule) {
   const {
+    AGENT_RUNTIME_JOURNAL_VERSION,
+    AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS,
+    AGENT_RUNTIME_ROLES,
     AGENT_RECOVERY_DISPOSITION_LIMIT,
     AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES,
     AGENT_ORPHAN_JOURNAL_LIMIT_BYTES,
@@ -99,6 +145,16 @@ async function runRuntimeFilesTests(runtimeModule) {
 
   assert.equal(AGENT_RUNTIME_DIRECTORY_MODE, 0o700);
   assert.equal(AGENT_RUNTIME_FILE_MODE, 0o600);
+  assert.equal(AGENT_RUNTIME_JOURNAL_VERSION, 2);
+  assert.deepEqual(AGENT_RUNTIME_ROLES, ['delegation', 'provider_server']);
+  assert.deepEqual(AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS, [
+    'mcp_config',
+    'opencode_config',
+    'opencode_test_home',
+    'opencode_managed_config',
+  ]);
+  assert(Object.isFrozen(AGENT_RUNTIME_ROLES));
+  assert(Object.isFrozen(AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS));
   assert.equal(AGENT_ORPHAN_JOURNAL_LIMIT_BYTES, 256 * 1024);
   assert.equal(AGENT_RECOVERY_DISPOSITION_LIMIT, 128);
   assert.equal(AGENT_RECOVERY_DISPOSITION_LIMIT_BYTES, 64 * 1024);
@@ -108,7 +164,7 @@ async function runRuntimeFilesTests(runtimeModule) {
     const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
     const empty = runtime.readJournal();
     assert.equal(empty.status, 'ok');
-    assert.deepEqual(empty.journal, { version: 1, entries: [] });
+    assert.deepEqual(empty.journal, { version: 2, entries: [] });
 
     const prepared = await runtime.prepareRun(preparedInput());
     assert.deepEqual(Object.keys(prepared.entry).sort(), [
@@ -118,11 +174,16 @@ async function runRuntimeFilesTests(runtimeModule) {
       'createdAt',
       'delegationId',
       'envFingerprint',
+      'fixedEnv',
       'generation',
       'profileVersion',
+      'role',
       'state',
     ]);
     assert.equal(prepared.entry.state, 'prepared');
+    assert.equal(prepared.entry.role, 'delegation');
+    assert.deepEqual(prepared.entry.fixedEnv, {});
+    assert(Object.isFrozen(prepared.entry.fixedEnv));
     assert.equal(fs.statSync(state.root).mode & 0o777, 0o700);
     assert.equal(fs.statSync(prepared.runDirectory).mode & 0o777, 0o700);
     assert.equal(fs.statSync(prepared.mcpConfigPath).mode & 0o777, 0o600);
@@ -136,7 +197,7 @@ async function runRuntimeFilesTests(runtimeModule) {
       },
     });
     assert.deepEqual(readJson(runtime.journalPath), {
-      version: 1,
+      version: 2,
       entries: [prepared.entry],
     });
     assert(Object.isFrozen(runtime.readJournal().journal));
@@ -151,21 +212,117 @@ async function runRuntimeFilesTests(runtimeModule) {
       'createdAt',
       'delegationId',
       'envFingerprint',
+      'fixedEnv',
       'generation',
       'pid',
       'processGroupId',
       'processStartIdentity',
       'profileVersion',
+      'role',
       'startedAt',
       'state',
     ]);
-    assert.deepEqual(readJson(runtime.journalPath), { version: 1, entries: [active] });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [active] });
 
     await runtime.removeRun(active.delegationId);
-    assert.deepEqual(readJson(runtime.journalPath), { version: 1, entries: [] });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
     assert.equal(fs.existsSync(prepared.runDirectory), false);
   } finally {
     state.cleanup();
+  }
+
+  const roleState = tempRoot('runtime-role-state');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: roleState.root, platform: 'linux' });
+    const paths = runtime.pathsFor('provider_server_fixture_0001');
+    assert.deepEqual(Object.keys(paths).sort(), [
+      'mcpConfigPath',
+      'opencodeConfigDirectory',
+      'opencodeConfigPath',
+      'opencodeConfigRoot',
+      'opencodeManagedConfigPath',
+      'opencodeTestHomePath',
+      'runDirectory',
+    ]);
+    const prepared = await runtime.prepareRun(rolePreparedInput(runtime));
+    assert.equal(prepared.entry.role, 'provider_server');
+    assert.equal(prepared.entry.adapterId, 'opencode');
+    assert.deepEqual(prepared.entry.fixedEnv, rolePreparedInput(runtime).fixedEnv);
+    assert(Object.isFrozen(prepared.entry.fixedEnv));
+    assert.equal('privateArtifacts' in prepared.entry, false);
+    assert.equal('endpoint' in prepared.entry, false);
+    assert.equal('resolvedEnv' in prepared.entry, false);
+    assert.equal('spawnSecretEnvBindings' in prepared.entry, false);
+    assert.equal(fs.statSync(paths.opencodeConfigRoot).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(paths.opencodeConfigDirectory).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(paths.opencodeTestHomePath).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(paths.opencodeManagedConfigPath).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(paths.opencodeConfigPath).mode & 0o777, 0o600);
+    assert.deepEqual(readJson(paths.opencodeConfigPath), JSON.parse(
+      opencodePrivateArtifacts()[0].contents,
+    ));
+    const active = await runtime.activateRun({
+      ...activeInput({ delegationId: prepared.entry.delegationId }),
+      role: 'provider_server',
+    });
+    assert.equal(active.role, 'provider_server');
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [active] });
+    await runtime.removeRecoveredRun(active);
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
+    assert.equal(fs.existsSync(paths.runDirectory), false);
+    assert.equal(fs.existsSync(runtime.recoveryPath), false);
+  } finally {
+    roleState.cleanup();
+  }
+
+  const legacyState = tempRoot('runtime-legacy-v1');
+  try {
+    fs.mkdirSync(legacyState.root, { recursive: true, mode: 0o700 });
+    fs.chmodSync(legacyState.root, 0o700);
+    const runtime = createAgentRuntimeFiles({ rootPath: legacyState.root, platform: 'linux' });
+    const legacy = {
+      state: 'active',
+      delegationId: 'delegation_legacy_fixture_0001',
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      createdAt: 1000,
+      binaryRealPath: '/fixture/bin/claude',
+      argvSignature: 'argv_signature_legacy_fixture_0001',
+      envFingerprint: 'env_fingerprint_legacy_fixture_0001',
+      generation: 'generation_fixture_previous',
+      pid: 41001,
+      processGroupId: 41001,
+      startedAt: 1100,
+      processStartIdentity: 'start-ticks-90001',
+    };
+    const legacyBytes = `${JSON.stringify({ version: 1, entries: [legacy] })}\n`;
+    fs.writeFileSync(runtime.journalPath, legacyBytes, { mode: 0o600 });
+    fs.chmodSync(runtime.journalPath, 0o600);
+    const parsed = runtime.readJournal();
+    assert.equal(parsed.status, 'ok');
+    assert.deepEqual(parsed.journal, {
+      version: 2,
+      entries: [{ ...legacy, role: 'delegation', fixedEnv: {} }],
+    });
+    assert.equal(fs.readFileSync(runtime.journalPath, 'utf8'), legacyBytes,
+      'read-only legacy parsing preserves exact version-1 bytes');
+    const result = await runtimeModule.createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector: { async inspect() { return { classification: 'stale' }; } },
+      terminator: { async stop() { assert.fail('stale legacy entry is never signaled'); } },
+      terminationGrace: 25,
+      generation: 'generation_fixture_current',
+      now: () => 1700000000000,
+    }).recover();
+    assert.equal(result.staleCleared, 1);
+    assert.deepEqual(result.restartLosses, [{
+      delegationId: legacy.delegationId,
+      code: 'daemon_restart_lost_run',
+      recoveredAt: 1700000000000,
+    }]);
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
+  } finally {
+    legacyState.cleanup();
   }
 
   const recoveryState = tempRoot('runtime-recovery-state');
@@ -192,7 +349,7 @@ async function runRuntimeFilesTests(runtimeModule) {
       version: 1,
       dispositions: [disposition],
     });
-    assert.deepEqual(readJson(runtime.journalPath), { version: 1, entries: [] });
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
     assert.equal(fs.existsSync(prepared.runDirectory), false);
     const persisted = runtime.readRecoveryDispositions();
     assert.deepEqual(persisted, {
@@ -354,6 +511,94 @@ async function runRuntimeFilesTests(runtimeModule) {
     }
   }
 
+  const secretCanaries = [
+    'PASSWORD_CANARY_runtime_64_03_0001',
+    'RAW_SECRET_CANARY_runtime_64_03_0001',
+    'AUTHORIZATION_CANARY_runtime_64_03_0001',
+  ];
+  const exactBoundary = tempRoot('runtime-role-exact-boundary');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: exactBoundary.root, platform: 'linux' });
+    const clean = rolePreparedInput(runtime);
+    const invalidInputs = [
+      { ...clean, role: 'user_process' },
+      { ...clean, adapterId: 'claude-code' },
+      { ...clean, endpoint: 'http://127.0.0.1:7226/mcp' },
+      { ...clean, resolvedEnv: { PATH: '/bin' } },
+      {
+        ...clean,
+        spawnSecretEnvBindings: [{
+          envKey: 'OPENCODE_SERVER_PASSWORD',
+          secretRef: 'owned_server_basic_password',
+        }],
+      },
+      { ...clean, rawSecretBytes: Buffer.from(secretCanaries[1]) },
+      { ...clean, rawSecret: secretCanaries[1] },
+      { ...clean, headers: { Authorization: `Basic ${secretCanaries[2]}` } },
+      { ...clean, endpointCredentials: { password: secretCanaries[0] } },
+      {
+        ...clean,
+        fixedEnv: { ...clean.fixedEnv, OPENCODE_SERVER_PASSWORD: secretCanaries[0] },
+      },
+      { ...clean, fixedEnv: { ...clean.fixedEnv, SAFE_VALUE: `Basic ${secretCanaries[0]}` } },
+      {
+        ...clean,
+        privateArtifacts: opencodePrivateArtifacts({
+          opencode_config: {
+            contents: `${JSON.stringify({ headers: { Authorization: `Bearer ${secretCanaries[2]}` } })}\n`,
+          },
+        }),
+      },
+      {
+        ...clean,
+        privateArtifacts: opencodePrivateArtifacts({
+          opencode_config: {
+            contents: `${JSON.stringify({ endpoint: `http://user:${secretCanaries[0]}@127.0.0.1:7226` })}\n`,
+          },
+        }),
+      },
+      {
+        ...clean,
+        privateArtifacts: [
+          ...opencodePrivateArtifacts(),
+          { kind: 'arbitrary_file', path: '../../outside' },
+        ],
+      },
+      {
+        ...clean,
+        privateArtifacts: opencodePrivateArtifacts().map((entry, index) => (
+          index === 0 ? { ...entry, path: '../../outside' } : entry
+        )),
+      },
+      { ...clean, privateArtifacts: opencodePrivateArtifacts().slice(0, 2) },
+    ];
+    for (const input of invalidInputs) {
+      await expectRuntimeError(() => runtime.prepareRun(input), 'invalid_runtime_input');
+    }
+
+    let getterTouched = false;
+    const accessorEnv = { ...clean.fixedEnv };
+    Object.defineProperty(accessorEnv, 'SAFE_ACCESSOR', {
+      enumerable: true,
+      get() {
+        getterTouched = true;
+        return secretCanaries[0];
+      },
+    });
+    await expectRuntimeError(
+      () => runtime.prepareRun({ ...clean, fixedEnv: accessorEnv }),
+      'invalid_runtime_input',
+    );
+    assert.equal(getterTouched, false, 'runtime input validation never invokes accessors');
+    assert.equal(fs.existsSync(runtime.journalPath), false);
+    const artifacts = collectArtifactText(exactBoundary.root);
+    for (const canary of secretCanaries) {
+      assert.equal(artifacts.includes(canary), false, `${canary} is absent from disk`);
+    }
+  } finally {
+    exactBoundary.cleanup();
+  }
+
   const unknownCanary = 'TASK_CANARY_DO_NOT_PERSIST_71b831c9';
   const canary = tempRoot('runtime-canary');
   try {
@@ -379,6 +624,67 @@ async function runRuntimeFilesTests(runtimeModule) {
     }
   } finally {
     canary.cleanup();
+  }
+
+  for (const [label, mutate] of [
+    ['foreign', (paths) => fs.writeFileSync(path.join(paths.runDirectory, 'foreign.txt'), 'foreign')],
+    ['symlink', (paths, parent) => {
+      const outside = path.join(parent, 'outside');
+      fs.mkdirSync(outside, { mode: 0o700 });
+      fs.rmdirSync(paths.opencodeTestHomePath);
+      fs.symlinkSync(outside, paths.opencodeTestHomePath);
+    }],
+    ['unsafe-mode', (paths) => fs.chmodSync(paths.opencodeManagedConfigPath, 0o755)],
+  ]) {
+    const guardedCleanup = tempRoot(`runtime-opencode-cleanup-${label}`);
+    try {
+      const runtime = createAgentRuntimeFiles({
+        rootPath: guardedCleanup.root,
+        platform: 'linux',
+      });
+      const input = rolePreparedInput(runtime, {
+        delegationId: `provider_server_cleanup_${label.replace('-', '_')}`,
+      });
+      const prepared = await runtime.prepareRun(input);
+      const paths = runtime.pathsFor(prepared.entry.delegationId);
+      mutate(paths, guardedCleanup.parent);
+      await expectRuntimeError(
+        () => runtime.removeRun({
+          delegationId: prepared.entry.delegationId,
+          role: 'provider_server',
+        }),
+        'runtime_target_unavailable',
+      );
+      assert.equal(
+        fs.existsSync(paths.opencodeConfigPath),
+        true,
+        'cleanup prevalidates the complete graph before removing any owned file',
+      );
+      assert.deepEqual(runtime.readJournal().journal.entries, [prepared.entry]);
+    } finally {
+      guardedCleanup.cleanup();
+    }
+  }
+
+  const unsafeCreation = tempRoot('runtime-opencode-unsafe-creation');
+  try {
+    const runtime = createAgentRuntimeFiles({
+      rootPath: unsafeCreation.root,
+      platform: 'linux',
+    });
+    const input = rolePreparedInput(runtime, {
+      delegationId: 'provider_server_unsafe_creation',
+    });
+    fs.mkdirSync(runtime.pathsFor(input.delegationId).runDirectory, {
+      recursive: true,
+      mode: 0o755,
+    });
+    fs.chmodSync(unsafeCreation.root, 0o700);
+    fs.chmodSync(runtime.pathsFor(input.delegationId).runDirectory, 0o755);
+    await expectRuntimeError(() => runtime.prepareRun(input), 'runtime_target_unavailable');
+    assert.equal(fs.existsSync(runtime.journalPath), false);
+  } finally {
+    unsafeCreation.cleanup();
   }
 
   const concurrent = tempRoot('runtime-concurrent');
@@ -542,8 +848,41 @@ async function runRuntimeFilesTests(runtimeModule) {
 
   const corruptCases = [
     ['invalid-json', '{'],
-    ['wrong-version', JSON.stringify({ version: 2, entries: [] })],
-    ['unknown-top-key', JSON.stringify({ version: 1, entries: [], extra: true })],
+    ['wrong-version', JSON.stringify({ version: 3, entries: [] })],
+    ['unknown-top-key', JSON.stringify({ version: 2, entries: [], extra: true })],
+    ['unknown-role', JSON.stringify({
+      version: 2,
+      entries: [{
+        state: 'prepared',
+        role: 'user_process',
+        delegationId: 'delegation_fixture_0001',
+        adapterId: 'claude-code',
+        profileVersion: '2.1.177',
+        createdAt: 1000,
+        binaryRealPath: '/fixture/bin/claude',
+        argvSignature: 'argv_signature_fixture_0001',
+        fixedEnv: {},
+        envFingerprint: 'env_fingerprint_fixture_0001',
+        generation: 'generation_fixture_previous',
+      }],
+    })],
+    ['secret-bearing-field', JSON.stringify({
+      version: 2,
+      entries: [{
+        state: 'prepared',
+        role: 'provider_server',
+        delegationId: 'provider_server_fixture_0001',
+        adapterId: 'opencode',
+        profileVersion: '1.14.25',
+        createdAt: 1000,
+        binaryRealPath: '/fixture/bin/opencode',
+        argvSignature: 'argv_signature_opencode_0001',
+        fixedEnv: {},
+        envFingerprint: 'env_fingerprint_opencode_0001',
+        generation: 'generation_fixture_previous',
+        spawnSecretEnvBindings: [],
+      }],
+    })],
     ['missing-generation', JSON.stringify({
       version: 1,
       entries: [{
@@ -636,12 +975,14 @@ function journalEntry(processTreeModule, state = 'active', overrides = {}) {
   const argv = ['--output-format', 'stream-json', '--print'];
   const common = {
     state,
+    role: 'delegation',
     delegationId: 'delegation_fixture_0001',
     adapterId: 'claude-code',
     profileVersion: '2.1.177',
     createdAt: 1000,
     binaryRealPath,
     argvSignature: processTreeModule.createArgvSignature(binaryRealPath, argv),
+    fixedEnv: {},
     envFingerprint: 'env_fingerprint_fixture_0001',
     generation: 'generation_fixture_previous',
   };
@@ -1340,7 +1681,7 @@ function recoveryRuntime(entries, options = {}) {
       if (options.unavailable) {
         return { status: 'unavailable', reason: options.unavailable };
       }
-      return { status: 'ok', journal: { version: 1, entries: [...remaining] } };
+      return { status: 'ok', journal: { version: 2, entries: [...remaining] } };
     },
     readRecoveryDispositions() {
       events.push('recovery:read');
@@ -1359,6 +1700,16 @@ function recoveryRuntime(entries, options = {}) {
       removed.push(entry.delegationId);
       remaining = remaining.filter((candidate) => candidate.delegationId !== entry.delegationId);
       return [...dispositions];
+    },
+    async removeRecoveredRun(entry) {
+      events.push(`remove:${entry.delegationId}`);
+      if (options.failRemove?.has(entry.delegationId)) throw new Error('injected remove failure');
+      const stored = remaining.find((candidate) => (
+        candidate.delegationId === entry.delegationId && candidate.role === entry.role
+      ));
+      if (!stored) throw new Error('injected journal conflict');
+      removed.push(entry.delegationId);
+      remaining = remaining.filter((candidate) => candidate !== stored);
     },
   };
 }
@@ -1514,6 +1865,7 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
       ambiguousFailClosed: 0,
       spawnAvailable: true,
       profiles: [{
+        role: 'delegation',
         adapterId: 'claude-code',
         profileVersion: '2.1.177',
         confirmedKilled: 1,
@@ -1545,6 +1897,95 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
     assert(Object.isFrozen(result.restartLosses[0]));
     assert.strictEqual(recovery.recover(), recovery.recover(), 'repeated startup recovery is non-destructive');
     assert.equal(runtime.recorded.length, 1, 'repeated recovery persists no duplicate disposition');
+  }
+
+  {
+    const delegation = journalEntry(processTreeModule, 'active', {
+      delegationId: 'delegation_role_fixture_0001',
+      envFingerprint: 'env_fingerprint_role_fixture_0001',
+    });
+    const providerServer = journalEntry(processTreeModule, 'active', {
+      role: 'provider_server',
+      delegationId: 'provider_server_role_fixture_0001',
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      binaryRealPath: '/fixture/bin/opencode',
+      argvSignature: 'argv_signature_provider_role_0001',
+      fixedEnv: { OPENCODE_DISABLE_PROJECT_CONFIG: '1' },
+      envFingerprint: 'env_fingerprint_provider_role_0001',
+      pid: 44001,
+      processGroupId: 44001,
+      processStartIdentity: '94001',
+    });
+    const ambiguousServer = journalEntry(processTreeModule, 'prepared', {
+      role: 'provider_server',
+      delegationId: 'provider_server_role_fixture_0002',
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      binaryRealPath: '/fixture/bin/opencode',
+      argvSignature: 'argv_signature_provider_role_0002',
+      fixedEnv: { OPENCODE_DISABLE_PROJECT_CONFIG: '1' },
+      envFingerprint: 'env_fingerprint_provider_role_0002',
+    });
+    const entries = [delegation, providerServer, ambiguousServer];
+    const events = [];
+    const runtime = recoveryRuntime(entries, { events });
+    const inspector = plannedRecoveryInspector(new Map([
+      [delegation.delegationId, [staleInspection]],
+      [providerServer.delegationId, [confirmedInspection({
+        pid: 44001,
+        processGroupId: 44001,
+      }), staleInspection]],
+      [ambiguousServer.delegationId, [ambiguousIdentity]],
+    ]), events);
+    const terminator = recoveryTerminator({ events });
+    const result = await createAgentStartupRecovery({
+      runtimeFiles: runtime,
+      inspector,
+      terminator,
+      terminationGrace: 25,
+    }).recover();
+    assert.deepEqual(result, {
+      confirmedKilled: 1,
+      staleCleared: 1,
+      ambiguousFailClosed: 1,
+      spawnAvailable: false,
+      profiles: [{
+        role: 'delegation',
+        adapterId: 'claude-code',
+        profileVersion: '2.1.177',
+        confirmedKilled: 0,
+        staleCleared: 1,
+        ambiguousFailClosed: 0,
+      }, {
+        role: 'provider_server',
+        adapterId: 'opencode',
+        profileVersion: '1.14.25',
+        confirmedKilled: 1,
+        staleCleared: 0,
+        ambiguousFailClosed: 1,
+      }],
+      restartLosses: [{
+        delegationId: delegation.delegationId,
+        code: 'daemon_restart_lost_run',
+        recoveredAt: 1700000000000,
+      }],
+    });
+    assert.deepEqual(events, [
+      'recovery:read',
+      'journal:read',
+      `inspect:${delegation.delegationId}`,
+      `record:${delegation.delegationId}`,
+      `inspect:${providerServer.delegationId}`,
+      `stop:${providerServer.delegationId}`,
+      `inspect:${providerServer.delegationId}`,
+      `remove:${providerServer.delegationId}`,
+      `inspect:${ambiguousServer.delegationId}`,
+    ]);
+    assert.equal(terminator.calls.length, 1, 'only the identity-confirmed owned server is signaled');
+    assert.strictEqual(terminator.calls[0].entry, providerServer);
+    assert.deepEqual(runtime.recorded, [result.restartLosses[0]]);
+    assert.deepEqual(runtime.remaining(), [ambiguousServer]);
   }
 
   {
@@ -1587,6 +2028,7 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
       ambiguousFailClosed: 1,
       spawnAvailable: false,
       profiles: [{
+        role: 'delegation',
         adapterId: 'claude-code',
         profileVersion: '2.1.177',
         confirmedKilled: 1,

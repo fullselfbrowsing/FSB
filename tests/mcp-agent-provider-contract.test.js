@@ -17,6 +17,7 @@ const { pathToFileURL } = require('node:url');
 const repoRoot = path.resolve(__dirname, '..');
 const adapterSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'adapter.ts');
 const policySourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'policy-attestation.ts');
+const runtimeSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'runtime-files.ts');
 const supervisorSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts');
 const adapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'adapter.js');
 const policyBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'policy-attestation.js');
@@ -502,6 +503,7 @@ async function main() {
 
   const adapterSource = fs.readFileSync(adapterSourcePath, 'utf8');
   const policySource = fs.readFileSync(policySourcePath, 'utf8');
+  const runtimeSource = fs.readFileSync(runtimeSourcePath, 'utf8');
   const supervisorSource = fs.readFileSync(supervisorSourcePath, 'utf8');
   const interfaceMatch = adapterSource.match(
     /export interface AgentProviderAdapter\s*\{([\s\S]*?)\n\}/,
@@ -521,6 +523,27 @@ async function main() {
   assert.doesNotMatch(supervisorSource, /from ['"]\.\/claude-stream\.js['"]/, 'supervisor does not import a provider parser');
   assert.doesNotMatch(supervisorSource, /from ['"][^'"]*opencode[^'"]*['"]/, 'supervisor has no OpenCode import');
   assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]opencode['"]/, 'supervisor has no OpenCode id branch');
+  const prepareIndex = supervisorSource.indexOf('runtimeFiles.prepareRun({');
+  const spawnIndex = supervisorSource.indexOf('this.spawnChild(', prepareIndex);
+  const activateIndex = supervisorSource.indexOf('runtimeFiles.activateRun({', spawnIndex);
+  const startedIndex = supervisorSource.indexOf('this.emitStarted(', activateIndex);
+  const taskWriteIndex = supervisorSource.indexOf('this.writeTask(', startedIndex);
+  assert(prepareIndex >= 0 && spawnIndex > prepareIndex,
+    'runtime identity is journaled before the supervised process spawn');
+  assert(activateIndex > spawnIndex && startedIndex > activateIndex && taskWriteIndex > startedIndex,
+    'retained process identity is activated before authority and task delivery');
+  assert.match(runtimeSource, /JOURNAL_VERSION\s*=\s*2\s+as const/);
+  assert.match(runtimeSource, /['"]delegation['"]\s*,\s*['"]provider_server['"]/);
+  for (const artifactKind of [
+    'mcp_config',
+    'opencode_config',
+    'opencode_test_home',
+    'opencode_managed_config',
+  ]) {
+    assert(runtimeSource.includes(`'${artifactKind}'`), `${artifactKind} is a closed runtime artifact kind`);
+  }
+  assert.doesNotMatch(runtimeSource, /rmSync\([^)]*recursive\s*:\s*true/,
+    'runtime cleanup does not gain arbitrary recursive deletion authority');
   assert.doesNotMatch(policySource, /claude|opencode/i, 'shared verifier is provider-neutral');
   assert.doesNotMatch(policySource, /callback|resolver|template/i, 'shared verifier has no executable extension seam');
 
