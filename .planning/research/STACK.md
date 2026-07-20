@@ -1,276 +1,130 @@
-# Technology Stack — v1.0.0 Full App Catalog (OpenTabs Parity)
+# Stack Research
 
-**Project:** FSB (Full Self-Browsing)
-**Milestone:** v1.0.0 — Full App Catalog (OpenTabs Parity): take the bundled head from 4 services to the full ~119-app OpenTabs surface via build-time descriptor codegen + a scaled minisearch catalog + a hand-ported depth tier.
-**Domain:** Build-time catalog codegen (extract per-op descriptor metadata from 119 `@opentabs-dev/plugin-sdk` plugins, ~2,400 ops) into FSB's existing `recipe-index.generated.js`; scale the minisearch index to thousands of descriptors without blowing SW startup/memory; hand-port ~15-30 apps as T1a/T1b handlers.
-**Researched:** 2026-06-23
-**Confidence:** HIGH — extraction shape verified directly against the real OpenTabs repo (`github.com/opentabs-dev/opentabs`, MIT, `pushed_at 2026-06-21`); every claim about op shape / manifest serialization / Zod usage is quoted from inspected source. Versions verified via npm + Context7 on 2026-06-23.
+**Domain:** Angular i18n translation-completeness audit tooling + XLIFF drift-detection CI gate (showcase marketing site, v1.2.0)
+**Researched:** 2026-07-07
+**Confidence:** HIGH
 
-> **Note:** This file supersedes the prior **v0.9.99** STACK research (Native Capability Catalog, dated 2026-06-19). The v0.9.99 architecture it described is now the FIXED substrate this milestone extends; recover the earlier notes from git history / the v0.9.99 milestone archive. This document covers ONLY the NEW v1.0.0 build-time codegen + scaling stack.
+> **Note:** This supersedes the prior v1.0.0 (OpenTabs Full App Catalog) `STACK.md` that occupied this path -- that research is unrelated to this milestone and has been overwritten per the current research task. Recover it from git history (`ARCHITECTURE-v1.0.0-OPENTABS-CATALOG.md` in this same directory preserves that milestone's architecture notes as a renamed sibling; the equivalent stack notes are recoverable from git log on this path if ever needed).
 
----
+## Ground-Truth Finding (verified against live repo files, not hypothetical)
 
-## TL;DR (for the roadmapper + requirements step)
+Before recommending tooling, I parsed the actual `showcase/angular/src/locale/messages*.xlf` files with a throwaway script to confirm the milestone's premise and validate the detection algorithm end-to-end. Results, run against the current working tree:
 
-- **OpenTabs op metadata IS extractable at build time — but NOT by static parsing alone.** Each op is `defineTool({ name, displayName, description, summary, icon, group, input: z.object({...}), output: z.object({...}), handle })`. `input`/`output` are **Zod 4 schemas** that import shared schemas from a sibling `schemas.ts` and helpers from the SDK, so a single-file regex/AST scrape cannot resolve a complete param schema. The robust path is **load + evaluate the Zod** (transpile TS on the fly → `import()` the plugin module → `z.toJSONSchema(tool.input)`) — exactly what OpenTabs' own `opentabs-plugin build` does (`platform/plugin-tools/src/commands/build.ts:416`).
-- **There is NO prebuilt manifest in the repo to consume.** OpenTabs writes `dist/tools.json`, but `dist/` is `.gitignore`d. FSB must run the Zod→JSON-Schema conversion itself.
-- **`z.toJSONSchema` is a Zod-4-only top-level API** (verified Zod 4.4.3 via Context7 `/websites/zod_dev_v4`). SDK declares `peerDependencies.zod: "^4.4.3"`; plugins pin `zod ^4.3.6`. → **Zod 4 is the one genuinely new build-time dependency.**
-- **NEW build deps (devDependencies ONLY):** `zod@^4.4.3` + a TS-on-the-fly evaluator (`tsx@^4.22` recommended; `jiti@^2.7` is the OpenTabs-native equivalent). esbuild is already a FSB devDep and backs the evaluator.
-- **REUSE at runtime, unchanged:** `minisearch ^7.2.0`, `@cfworker/json-schema ^4.1.1`, `jmespath ^0.16.0` — all already FSB deps and already vendored at `extension/lib/*.min.js`. FSB's target descriptor shape (`{slug, service, intentSynonyms, description, actionVerb, sideEffectClass, params}`) maps cleanly onto the OpenTabs manifest fields + **one inferred field** (`sideEffectClass` — OpenTabs has NO side-effect annotation; confirmed below).
-- **Scaling to thousands of descriptors:** keep the existing build-time-prebuilt + `loadJSON` minisearch pattern (SURF-04), but (a) **index searchable text only, hold the `params` JSON Schema out-of-band** (schema-on-hit), (b) **shard the generated catalog by service + lazy-hydrate payloads**, (c) ship the **prebuilt serialized index** so SW wake is `loadJSON` not re-index. Concrete budget below.
-- **MUST NOT ADD (Wall 1):** No runtime dependency on `@opentabs-dev/plugin-sdk`, `@opentabs-dev/plugin-tools`, `@opentabs-dev/shared`, any `@opentabs-dev/opentabs-plugin-*`, or `zod` **shipped into the extension**. Those + Zod live **only inside the Node build script**; the extension ships pure-data descriptors. No remote/eval'd code; no new `importScripts` of a plugin runtime; `verify-recipe-path-guard.mjs` stays green because nothing eval-able is added to the recipe path.
+| Locale | Missing (never extracted+translated) | Orphaned (stale id, not in current `messages.xlf`) | Drifted (id matches, `<source>` text differs from current source) |
+|--------|----|----|----|
+| es | 0 | 54 | 5 |
+| de | 0 | 54 | 5 |
+| ja | 0 | 54 | 5 |
+| zh-CN | 0 | 54 | 5 |
+| zh-TW | 0 | 54 | 5 |
 
----
+The 5 "drifted" units are a **live, reproducible instance of exactly the bug this milestone targets**: e.g. `trans-unit id="home.meta.description"` in `messages.xlf` currently reads *"Local-first Chrome automation and MCP browser layer for AI agents, with trigger watchers, real uploads, and guarded first-party API capability calls."* -- but `messages.es.xlf`'s matching trans-unit still carries the **old** English source text cached inline, and its `<target>` is a translation of that stale sentence, not the current one. No `state` attribute anywhere in the shipped locale files flags this (every unit reads `state="translated"`) -- so the existing pipeline is structurally blind to source drift. This confirms the gap is real, current, and exactly as described in `.planning/PROJECT.md`.
 
-## How the OpenTabs op metadata is shaped (verified against the real repo)
-
-Source: `github.com/opentabs-dev/opentabs` (MIT, `default_branch: main`, `pushed_at: 2026-06-21`). 119 plugin dirs under `plugins/` confirmed. **2,406** op files counted via `git/trees/main?recursive=1` filtered to `^plugins/[^/]+/src/tools/.*\.ts$` minus `schemas.ts`/`.test.ts` (the milestone's "2,523" includes schema/inline-tool variants). Op-count spot checks: linear **59**, github **37**, stripe 8+ in `tools/`.
-
-### Per-op definition — `defineTool(...)` (verified across github, stripe, linear)
-
-`plugins/github/src/tools/create-issue.ts` (verbatim head):
-
-```typescript
-import { defineTool, ToolError } from '@opentabs-dev/plugin-sdk';
-import { z } from 'zod';
-import { getMutationId, graphql, turboData } from '../github-api.js';
-import { issueSchema } from './schemas.js';
-
-export const createIssue = defineTool({
-  name: 'create_issue',
-  displayName: 'Create Issue',
-  description: 'Create a new issue in a repository.',
-  summary: 'Create a new issue in a repository',
-  icon: 'plus-circle',
-  group: 'Issues',
-  input: z.object({
-    owner: z.string().min(1).describe('Repository owner (user or org)'),
-    repo: z.string().min(1).describe('Repository name'),
-    title: z.string().min(1).describe('Issue title'),
-    body: z.string().optional().describe('Issue body in Markdown'),
-  }),
-  output: z.object({ issue: issueSchema.describe('The created issue') }),
-  handle: async params => { /* GraphQL mutation against github.com — imperative */ },
-});
-```
-
-Same shape in `plugins/stripe/src/tools/create-customer.ts` (`input: z.object({ email: z.string().optional()..., metadata: z.record(z.string(), z.string()).optional() })`, `handle` calls `api('/customers', { method: 'POST', body })`) and uniformly across `plugins/linear`. **One `defineTool({...})` export per file**, aggregated in the plugin's `index.ts`.
-
-`defineTool` is an **identity function** (`platform/plugin-sdk/src/index.ts`): `export const defineTool = (config) => config;`. No decorators, no reflection, no side effects — metadata is plain object-literal props + Zod schema objects.
-
-### The `ToolDefinition` interface (the extraction contract) — `platform/plugin-sdk/src/index.ts`
-
-```typescript
-export interface ToolDefinition<TInput extends z.ZodObject<z.ZodRawShape>, TOutput extends z.ZodType> {
-  name: string;          // build auto-prefixes: 'send_message' → 'slack__send_message' (delimiter '__')
-  displayName?: string;  // derived from name when omitted
-  description: string;
-  summary?: string;
-  icon?: LucideIconName;
-  group?: string;
-  input: TInput;         // Zod schema
-  output: TOutput;       // Zod schema
-  handle(params, context?): Promise<...>;  // imperative; endpoint + auth live HERE, not in metadata
-}
-```
-
-### Plugin-level metadata — `index.ts extends OpenTabsPlugin` + `package.json.opentabs`
-
-`plugins/github/src/index.ts`:
-
-```typescript
-class GitHubPlugin extends OpenTabsPlugin {
-  readonly name = 'github';
-  override readonly displayName = 'GitHub';
-  readonly urlPatterns = ['*://github.com/*'];
-  override readonly homepage = 'https://github.com';
-  readonly tools: ToolDefinition[] = [ listRepos, getRepo, createRepo, /* ... */ ];
-}
-```
-
-`plugins/github/package.json` carries a parallel `opentabs` block (`displayName`, `urlPatterns: ["*://github.com/*"]`, `homepage: "https://github.com"`, optional `configSchema`), typed in `platform/shared/src/manifest.ts` (`PluginOpentabsField`). **`urlPatterns`/`homepage` are FSB's source for `service`/origin** (`*://github.com/*` → `github.com`). `package.json.dependencies` declares `@opentabs-dev/plugin-sdk ^0.0.113`; `peerDependencies.zod ^4.0.0`; plugin devDeps pin `zod ^4.3.6`, `jiti ^2.6.1`, `typescript ^6.0.3`.
-
-### The OpenTabs build output `dist/tools.json` (what FSB conceptually re-derives)
-
-`platform/plugin-tools/src/commands/build.ts` = the `opentabs-plugin build` command. It `tsc`-compiles to `dist/`, dynamically `import()`s the compiled module (`pathToFileURL` + cache-busting query), then serializes each tool. The schema conversion (build.ts:414-439, verbatim):
-
-```typescript
-const convertToolSchemas = (tool: ToolDefinition) => {
-  let inputSchema = z.toJSONSchema(tool.input) as Record<string, unknown>;   // ← Zod 4 NATIVE
-  let outputSchema = z.toJSONSchema(tool.output) as Record<string, unknown>;
-  delete inputSchema.$schema;
-  delete outputSchema.$schema;
-  return { inputSchema, outputSchema };
-};
-```
-
-Emitted `ManifestTool` (`platform/shared/src/index.ts:157-176` + `generateToolsManifest` build.ts:646):
-
-```typescript
-export interface ManifestTool {
-  name: string; displayName: string; description: string; summary?: string;
-  icon: string; group?: string;
-  input_schema: Record<string, unknown>;   // standard JSON Schema
-  output_schema: Record<string, unknown>;
-}
-```
-
-**Decisive facts for FSB's extractor:**
-1. **It's Zod 4's `z.toJSONSchema()`, not the `zod-to-json-schema` npm lib.** FSB must use the same call → **Zod 4 required at build.**
-2. **`input_schema` is standard JSON Schema** (draft 2020-12; `$schema` stripped) → directly consumable by FSB's existing `@cfworker/json-schema` validator and by minisearch; **no schema-dialect translation.**
-3. The serializer **throws on `.transform()`/`.pipe()`/`.preprocess()`** (build.ts:419-422) → every op's `input` is guaranteed pure-structural JSON Schema. FSB inherits that guarantee.
-4. `.describe('...')` text is preserved into JSON Schema `description` (verified Context7) → **free human-readable param descriptions** for FSB's descriptor + `intentSynonyms` seeding.
-5. **No side-effect / mutation / destructive / readOnly annotation** exists anywhere in `ToolDefinition` or `ManifestTool`. FSB's `sideEffectClass` (`read`|`write`) **must be inferred** — the op `name` verb prefix is the signal (`list_`/`get_`/`search_`/`compare_` → read; `create_`/`update_`/`delete_`/`merge_`/`add_`/`remove_`/`archive_`/`finalize_`/`batch_`/`move_` → write), with a per-op override table for the long tail.
-
-### Why static parsing alone is insufficient (the strategy decision)
-
-`input`/`output` routinely reference **shared Zod schemas** imported from a sibling file — `import { issueSchema } from './schemas.js'` (github), `import { customerSchema } from './schemas.js'` (stripe), defined in `plugins/<app>/src/tools/schemas.ts` (`export const issueSchema = z.object({ number: z.number()..., labels: z.array(z.string())..., ... })`). A regex/AST scrape of one op file sees `output: z.object({ issue: issueSchema })` with `issueSchema` unresolved. Fully realizing the schema requires **module resolution + Zod evaluation**:
-
-- ❌ **Static parse only (regex/`@babel/parser`/`ts-morph`, single file):** brittle; can't resolve cross-file `schemas.ts`/SDK refs; re-implements Zod→JSON-Schema by hand; high drift risk. Rejected.
-- ❌ **Standalone `tsc --emit` then read `dist/`:** heavier than needed; replicates OpenTabs' gitignored `dist/`; tsconfig wrangling across 119 packages. Rejected as default.
-- ✅ **Load + evaluate at build time (RECOMMENDED):** a Node script transpiles each plugin's TS on the fly (`tsx`/`jiti`, no emit), `import()`s the plugin module, walks `plugin.tools[]`, calls `z.toJSONSchema(tool.input)` — the identical operation `build.ts` performs. Deterministic; mirrors upstream exactly; ~10 lines of conversion logic. **`handle` bodies are never executed** (we read only `.input`/`.name`/`.description`/etc. metadata), so the imperative `fetchFromPage`/`graphql`/`document.*` code never runs at build.
-
----
+The 54 "orphaned" units per locale are pre-existing (`SHOWCASE_STATS_*` ids, matching the stats-page carry-forward debt) -- a secondary but related finding: orphaned units are a weaker signal than drift (they may reflect intentionally-excluded surfaces) but should still be visible in the audit report.
 
 ## Recommended Stack
 
-### Core Technologies (BUILD-TIME ONLY — a Node script run before/by `scripts/package-extension.mjs`)
+### Core Technologies (already in place -- do not change)
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **zod** | `^4.4.3` (current 4.4.3) | `z.toJSONSchema()` to convert each op's `input` Zod schema → JSON Schema at build time | The **exact** API OpenTabs' `build.ts:416` uses; matches SDK peer `zod ^4.4.3` + plugin pins `zod ^4.3.6`. `z.toJSONSchema` is Zod-4-only. **Pin the same major as the plugins** to guarantee schema-output parity. **devDependency ONLY — never bundled into the extension.** |
-| **tsx** | `^4.22.4` (current 4.22.4) | Transpile-and-run the OpenTabs TS plugin modules so the build script can `import()` them without a separate `tsc` emit | Zero-config ESM/TS loader built on esbuild (already a FSB devDep). `node --import tsx ./scripts/import-opentabs-catalog.mjs`. Handles the plugins' `.js`-extension ESM imports + Zod. Mature, purpose-fit for "evaluate TS at build." |
-| **@opentabs-dev/plugin-sdk** | `^0.0.113` (**devDependency**) | Resolve `import { defineTool, OpenTabsPlugin } from '@opentabs-dev/plugin-sdk'` when loading a plugin module | Required so plugin TS resolves at build. **CRITICAL: devDependency only — metadata-extraction scaffolding, never shipped.** `defineTool` is identity; `OpenTabsPlugin` is an abstract class — loading them is inert. (Hardening alternative: vendor a ~30-line stub — see Variant.) |
+| Angular CLI `ng extract-i18n` | `^20.3.25` (`@angular/build`) | Source-of-truth extraction into `messages.xlf` | Already pinned; producing the XLIFF 1.2 files this milestone must audit. No version change needed or suggested. |
+| XLIFF | `1.2` (OASIS) | Translation file format | Already the format in use (`xliff version="1.2"`); do not migrate to XLIFF 2.0 -- would touch all 6 files + Angular config for zero milestone-relevant benefit. |
+| Node.js | `>=24.0.0` (repo `engines.node` floor) | Script runtime for new tooling | Matches root `package.json` engines constraint already enforced repo-wide. |
 
-### Supporting Libraries (RUNTIME — all ALREADY FSB deps, REUSED unchanged)
+### New Tooling for This Milestone
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| **minisearch** | `^7.2.0` (dep; vendored `extension/lib/minisearch.min.js`) | The capability search index over thousands of descriptors | SURF-04 substrate. Same `INDEX_OPTIONS` at build + `loadJSON`. Scaling guidance below. |
-| **@cfworker/json-schema** | `^4.1.1` (dep; vendored `extension/lib/cfworker-json-schema.min.js`) | Validate `invoke_capability` params against imported JSON-Schema `params` in the SW (eval-free) | OpenTabs `input_schema` is standard JSON Schema → drops straight into the existing CAP-03 validator. **No new validator.** |
-| **jmespath** | `^0.16.0` (dep; vendored `extension/lib/jmespath.min.js`) | Recipe `extract` expression engine (existing) | Unchanged; the descriptor import does not touch the recipe `extract` path. |
-| **esbuild** | `^0.24.0` (devDep; current 0.28.1) | Backs `tsx`; also FSB's offscreen bundler | No bump needed for tsx (it vendors its own esbuild). FSB's `esbuild ^0.24.0` is independent. |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Custom Node script, `node:fs`/`node:path` only (no XML library) | n/a (write in-repo) | **CI drift-detection gate**: parse `messages.xlf` + all 5 translated locale files, classify every trans-unit id as `ok` / `missing` / `orphaned` / `drifted`, exit 1 on any `drifted` or `missing` (see Recommendation below for why `orphaned` is warn-only) | This repo already has 2 precedents for exactly this shape of tool -- `showcase/angular/scripts/verify-locale-sync.mjs` and `showcase/angular/scripts/verify-hreflang.mjs` -- both zero-dependency ESM scripts using regex/string parsing over structured text and `process.exit(0/1/2)`. XLIFF's `trans-unit`/`source`/`target` structure is simple enough (as demonstrated by the validated prototype above, directly portable to Node) that a real XML parser is unnecessary. This keeps the new gate dependency-free, consistent with the repo's existing no-build-system/eval-free-tooling posture, and avoids introducing `ng-extract-i18n-merge`'s `xmldoc`/`sax` dependency chain into `devDependencies` for what is fundamentally a read-only CI check. |
+| (Optional, NOT required) `ng-extract-i18n-merge` | `3.4.0` (published 2026-06-06, actively maintained, 221 GitHub stars) | Local dev-time convenience: auto-syncs new/changed/removed trans-units into all 5 target files on `ng extract-i18n`, auto-marks drifted units `state="new"` | See "Alternatives Considered" below -- recommended as an optional future adoption for the human/AI translation workflow itself, but explicitly NOT required to satisfy this milestone's CI-gate requirement, and introducing it changes `angular.json`'s `extract-i18n` builder (see Pitfall below), which is a bigger footprint than the milestone's stated scope needs. |
 
-### Development Tools
+### Supporting Reference (no new runtime dependency -- informs the script's logic)
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| **Node `>=24`** | Run the codegen script | Already FSB's `engines.node` floor (v0.10.0). Native ESM + `import()` + top-level await. |
-| **Pinned OpenTabs source (git checkout / submodule / tarball)** | Acquire plugin sources at build time | Plugins are NOT importable from npm as source — `package.json.files: ["dist"]`. **Vendor `plugins/` + `platform/plugin-sdk/src` via a pinned commit** (record SHA, like `.planning/LATTICE-PIN.md`), OR generate once and **commit** `recipe-index.generated.js`. Codegen is a **maintainer build step, not an end-user install step.** |
-| **`scripts/package-extension.mjs`** | The existing generator to extend | Today reads `catalog/descriptors/*.json` + `catalog/recipes/*.json` → inlines into `recipe-index.generated.js`. The new importer produces those descriptor JSONs (or feeds the generator directly). See Integration. |
+| Reference | Version/Date | Purpose | When to Use |
+|-----------|---------|---------|-------------|
+| XLIFF 1.2 OASIS spec, `state`/`state-qualifier` attribute vocabulary | 1.2 (2008, still current for this format) | Defines the canonical values a `<target state="...">` may hold: `new`, `needs-translation`, `needs-review-translation`, `needs-adaptation`, `needs-l10n`, `translated`, `signed-off`, `final` | Use `state="needs-review-translation"` (not a made-up value) if the new gate or its companion fix-up script writes a `state` attribute onto locale files to flag drift -- this keeps output spec-compliant and compatible with any future translation-tool ingestion (e.g. if a paid TMS is adopted later, per the note below). |
 
 ## Installation
 
 ```bash
-# NEW build-time deps (devDependencies ONLY — must NEVER appear in `dependencies`)
-npm install -D zod@^4.4.3 tsx@^4.22.4 @opentabs-dev/plugin-sdk@^0.0.113
+# No new npm install needed for the CI gate itself -- it is a plain Node ESM
+# script added under showcase/angular/scripts/, invoked directly with `node`,
+# exactly like the existing verify-locale-sync.mjs / verify-hreflang.mjs.
 
-# (Variant: skip @opentabs-dev/plugin-sdk; vendor a ~30-line defineTool/OpenTabsPlugin stub instead)
-
-# Runtime deps — ALREADY PRESENT, no install:
-#   minisearch ^7.2.0, @cfworker/json-schema ^4.1.1, jmespath ^0.16.0  (vendored in extension/lib/)
-#   esbuild ^0.24.0 (devDep, backs tsx)
+# OPTIONAL (not required for milestone completion) -- only if the team also
+# wants the dev-time auto-merge convenience:
+npm install -D ng-extract-i18n-merge --prefix showcase/angular
+# then: npx ng add ng-extract-i18n-merge --prefix showcase/angular
+# (rewrites angular.json's extract-i18n builder -- read the Pitfalls section
+# below before doing this; it is a build-editing step, evaluate separately
+# from the CI-gate work.)
 ```
-
-## Integration with `scripts/package-extension.mjs` (the generator to scale)
-
-Today (`package-extension.mjs:51-89`): `readJsonDir(catalog/descriptors)` + `readJsonDir(catalog/recipes)` → `JSON.stringify({recipes, descriptors})` → inlined into the dual-export IIFE `extension/catalog/recipe-index.generated.js` (~10 descriptors). The djb2 `catalogVersion` content-hashes whatever descriptors are present.
-
-Proposed v1.0.0 flow (NEW importer is a **separate Node module run before / invoked by** `package-extension.mjs`):
-
-1. **`scripts/import-opentabs-catalog.mjs`** (NEW, run under `tsx`): for each `plugins/<app>` in the pinned OpenTabs checkout —
-   - Read `package.json.opentabs` → `service` (derive `github.com` from `urlPatterns`/`homepage`), provenance (`name`, `version`, MIT).
-   - `import()` `plugins/<app>/src/index.ts` → read the plugin instance's `tools[]` (or import each `src/tools/*.ts` named export).
-   - Per op: `slug` (FSB convention, e.g. `<service-stem>.<camelCased name>`; OpenTabs uses `app__op` — map deterministically), `params = z.toJSONSchema(tool.input)` then `delete params.$schema`, `description = tool.description`, `actionVerb`+`sideEffectClass` inferred from the `name` verb (override table), `intentSynonyms` seeded from `displayName`/`summary`/`description` (+ curated synonyms for top apps).
-   - Emit one descriptor JSON per app (or per op) into `catalog/descriptors/opentabs/<app>.json`, **stamped with provenance** (`{ source: "opentabs", sourceVersion, license: "MIT" }`).
-2. **`package-extension.mjs`** picks them up via the existing `readJsonDir` (extend it to recurse one level, or point it at the new subdir) and inlines them — **no change to the IIFE shape or `catalogVersion` hashing.**
-3. Hand-ported T1a/T1b handlers (`catalog/handlers/<app>.js`) continue through the existing `package-extension.mjs:101-115` copy step **unchanged**.
-
-The import stays a pure metadata transform: the generated artifact remains **pure data** (Wall 1 intact); `verify-recipe-path-guard.mjs` is unaffected (nothing eval-able added to the recipe path).
-
-## Hand-porting ~15-30 apps as T1a/T1b (reuse the existing handler pattern — NO new stack)
-
-Template = `extension/catalog/handlers/github.js` verbatim:
-- Each handler is a **dual-export IIFE** (`global.FsbHandler<App>` + `module.exports`), self-registering slugs into `FsbCapabilityCatalog.registerHandler` at load, calling `ctx.executeBoundSpec(spec, ctx.tabId)` against the app's **own first-party origin** (Wall 2 cookie scoping), `params` as inline JSON Schema (validated by `@cfworker/json-schema`), tokens never logged, ASCII-only.
-- OpenTabs is the **reference for endpoint + auth shape only** — its `<app>-api.ts` documents the real first-party transport (github: `getMetaContent('user-login')` auth, CSRF from `input[name="authenticity_token"]`, `turboData`/`graphql` against `github.com`; stripe: `api('/customers', {method:'POST'})`). FSB **hand-ports** that knowledge into a bound-spec handler; it does NOT ship OpenTabs' `handle` code. Endpoints flagged `[ASSUMED]` until live-captured, exactly like the current github handler.
-- Top hand-port candidates by op-richness/value (from verified counts): linear (59), github (37), stripe, vercel, datadog, jira, notion, slack (last few already partly bundled).
-
-## Scaling `recipe-index.generated.js` + minisearch to thousands of descriptors
-
-**Problem:** ~2,400 ops × (slug + synonyms + description + `params` JSON Schema) inlined into ONE IIFE string that `importScripts` parses on every SW cold start, plus a serialized minisearch index hydrated via `loadJSON`. Naive inlining risks (a) a multi-MB JS file parsed on every MV3 SW wake, (b) index hydration latency, (c) memory.
-
-**Recommended approach (build-time prebuilt, lazy + sharded — NO new runtime dep):**
-
-1. **Split searchable text from payload.** The index needs only the *searchable* fields (`slug`, `service`, `intentSynonyms`, `actionVerb`, `sideEffectClass`, `description`) — **NOT** the `params` JSON Schema. Keep `params` in a **separate slug-keyed map** looked up only on a search hit (the SURF-01 "schema-on-hit" pattern already does this). Params schemas are the byte-bulk; removing them from the index is the biggest single shrink.
-2. **Prebuild the minisearch index at build time; ship the serialized form** (already the SURF-04 contract via `INDEX_OPTIONS` + `loadJSON`). `MiniSearch.loadJSON(serialized, options)` rehydrates without re-indexing — O(load) not O(reindex). Biggest SW-startup win; already FSB's pattern — the task is keeping it healthy at ~100× the document count.
-3. **Shard by service + lazy-hydrate.** Instead of one giant IIFE, emit per-service (or per-category) chunks (`recipe-index.<service>.generated.js`) + a small **always-loaded manifest** (slug→service + the prebuilt index). Load a service's params payload only when a slug from that service is invoked (`importScripts` on demand). Cold-start cost becomes "manifest + index," not "all 2,400 param schemas." Validate lazy-`importScripts`-after-wake ergonomics during the phase; fall back to a single chunk if unreliable (the index, not the payloads, is the hot path).
-4. **Bound index size via field selection + `storeFields` discipline.** Index `intentSynonyms`/`description`/`slug`; `storeFields: ['slug','service','sideEffectClass']` (enough to render a result + route to the payload map). Do NOT store `params`/full `description` in the index.
-5. **Catalog version + integrity unchanged.** The djb2 `catalogVersion` content hash → `chrome.storage.local` snapshot keeps working; bump on any descriptor change so a stale index is detected/rebuilt.
-6. **Performance budget to gate in the phase:** target serialized index < ~1-2 MB and `loadJSON` + first `search` < ~50-100 ms on SW wake. Extend the existing SURF-06 eval harness (already measures recall@k / wrong-invoke) with **index-size + load-time assertions**. minisearch handles 100k+ small docs; ~2,400 short descriptors is comfortably in range — the real risk is **inlined-payload bytes**, which (1)+(3) remove from the hot path.
-
-minisearch `^7.2.0` is current and sufficient. **No index-engine change** (no FlexSearch/lunr/Orama swap) is warranted — scaling here is a data-layout problem, not an engine-capability problem, and a swap risks INV-01/SURF-04.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| **Load+evaluate Zod via `tsx`** | `jiti@^2.7` (OpenTabs' own devDep for module loading) | For byte-for-byte parity with OpenTabs' loader (plugins list `jiti ^2.6.1`). Equally valid; `tsx` is preferred only for the esbuild reuse + simpler `--import`. |
-| **Load+evaluate Zod** | Standalone `tsc --emit` then `import()` `dist/` | Only if a plugin's `index.ts` has type-only constructs the transpiler mishandles (not observed). Heavier; replicates gitignored `dist/`. |
-| **Load+evaluate Zod** | Static AST parse (`@babel/parser`/`ts-morph`) + hand-rolled Zod→JSON-Schema | Only to avoid executing ANY OpenTabs/Zod code at build (unnecessary — reading `.input` is inert). Rejected: can't resolve cross-file `schemas.ts`; re-implements `z.toJSONSchema`; drift risk. |
-| **Real `@opentabs-dev/plugin-sdk` devDep** | **Vendored ~30-line SDK stub** (`defineTool = c=>c`, abstract `OpenTabsPlugin`, no-op DOM/fetch helper exports) | Hardening: a stub keeps `node_modules` free of the SDK's DOM/fetch transitive surface and makes the build hermetic. Use the real SDK to validate the consumed surface first, then replace (it's tiny). |
-| **minisearch (reuse)** | FlexSearch / Orama / lunr | None for this milestone. minisearch already ships + has the prebuilt+`loadJSON` integration + handles the scale. Swapping is unjustified risk vs INV-01/SURF-04. |
-| **Commit the generated catalog** | Regenerate on every CI build | Commit `recipe-index.generated.js` (or per-service chunks) so CI/end-users build without the OpenTabs tree or build deps. Regenerate only on OpenTabs pin bump (audit trail like `.planning/LATTICE-PIN.md`). Mirrors FSB's current committed-generated-file practice. |
+| Custom zero-dependency Node script for the CI gate | `ng-extract-i18n-merge@3.4.0` as the CI gate itself | If the team wants ONE tool to do both dev-time merging AND CI drift-checking, and is willing to accept it rewriting `angular.json`'s `extract-i18n` builder (`@angular/build:extract-i18n` -> `ng-extract-i18n-merge:ng-extract-i18n-merge`). Its `resetTranslationState: true` default already does the "mark stale on source change" work by setting the target unit's `state` to `new` and, per its own merge logic, copies the new English `source` text into `target` as a placeholder (`syncTarget = syncSourceLang || isUntranslated(...)`) -- i.e. it doesn't just flag drift, it partially "fixes" it by giving an English fallback pending real translation. This is a legitimate choice but changes CI-02's existing `diff -u messages.xlf /tmp/extract-check/messages.xlf` semantics (see Pitfall below), which is a broader footprint than "add one CI gate." |
+| `ng-extract-i18n-merge@3.4.0` | `ngx-i18nsupport` / `xliffmerge` | Never for new adoption in 2026 -- **confirmed dead**: last published to npm 2018-09-21 (8 years stale), predates Angular's builder-based extraction pipeline entirely, will not resolve against `@angular/build ^20.x`. Do not use, do not reference as a "standard" tool going forward; it surfaces in search results only because of historical popularity from the pre-Ivy Angular era. |
+| Read-only source-drift CI check (custom script or wrapped `ng-extract-i18n-merge` in check-only mode) | Full commercial Translation Management System (Lokalise, Crowdin, Smartling, Phrase, doloc.io) | Only if the team decides ongoing translation-maintenance labor (not just drift *detection*) should be outsourced. `doloc.io` (built by the same author as `ng-extract-i18n-merge`, explicitly cross-promoted in its README) is a **paid per-source-text SaaS** with a 14-day trial and no stated indefinite free tier for production use. This milestone's explicit brief is "usable without a paid translation-management SaaS" -- do not adopt doloc.io or any TMS as part of this milestone. Flag as an explicit, separate decision if ever revisited, not a default. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **`@opentabs-dev/plugin-sdk` / `plugin-tools` / `shared` / `@opentabs-dev/opentabs-plugin-*` as a runtime `dependency` or `importScripts`** | **MV3 Wall 1** — these are code; the extension ships closed-vocabulary DATA only. A plugin runtime = remotely-hosted/eval-class code; fails MV3 policy + the spirit of `verify-recipe-path-guard.mjs`. | Import them **only inside the Node build script** (`devDependencies`); ship the resulting pure-data descriptors. |
-| **`zod` in `dependencies` / bundled into the extension** | Same Wall 1 concern; Zod is large; the extension never needs Zod at runtime — params are validated by the vendored `@cfworker/json-schema`. | `zod` as a **devDependency**; convert to JSON Schema at build; validate at runtime with `@cfworker/json-schema`. |
-| **`zod-to-json-schema` (the separate npm lib)** | OpenTabs uses Zod 4's **native** `z.toJSONSchema`. A different converter risks output drift vs the upstream manifest (`$ref`/`additionalProperties`/format handling). | `z.toJSONSchema()` from `zod@^4` — identical to upstream. |
-| **Zod 3** | `z.toJSONSchema` is not a Zod 3 top-level API; SDK peer-deps Zod 4. | `zod@^4.4.3`. |
-| **Static regex/AST-only extraction of op schemas** | Op `input`/`output` import shared schemas from `schemas.ts` + SDK helpers; single-file scrape can't resolve them; brittle across 2,400 ops. | Load+evaluate the module and call `z.toJSONSchema`. |
-| **Executing op `handle()` at build** | `handle` runs imperative `fetchFromPage`/`graphql`/`document.querySelector` against a live page — meaningless + side-effectful in Node. | Read only **metadata** (`name`, `description`, `input`, `group`); never call `handle`. |
-| **Inlining all ~2,400 param schemas into one IIFE parsed on every SW wake** | Multi-MB JS parsed on every MV3 cold start = startup/memory regression. | Split searchable-text (indexed) from params-payload (slug-keyed, lazy); shard by service; ship prebuilt `loadJSON` index. |
-| **Trusting OpenTabs endpoints/auth as verified for FSB handlers** | OpenTabs `handle` bodies encode first-party transport knowledge but are not FSB-validated; internal endpoints drift. | Hand-port as bound-spec T1a/T1b with `[ASSUMED]` flags + live capture, exactly like the current `github.js`. |
-| **Swapping the search engine to gain scale** | The bottleneck is inlined-payload bytes + index serialization, not engine capability. | Keep minisearch; fix the data layout (split/shard/prebuilt index). |
+| `ngx-i18nsupport` (xliffmerge) | Unmaintained since 2018; predates the Angular CLI builder-based extraction model entirely; will not function correctly (if it even installs) against Angular 20's `@angular/build:extract-i18n` output shape. | `ng-extract-i18n-merge@3.4.0` if a merge tool is wanted at all; otherwise the custom script recommended above. |
+| A full XML/DOM parser dependency (e.g. `xmldoc`, `fast-xml-parser`, `xml2js`) added solely for this one CI script | Overkill for a read-only structural check over a well-known, narrow XLIFF 1.2 shape (`<trans-unit id="..."><source>...</source></trans-unit>`), and this repo has an established zero-dependency precedent (`verify-locale-sync.mjs`, `verify-hreflang.mjs`) for exactly this class of script. Adding a parser dependency here is inconsistent with that precedent and adds supply-chain surface for no material robustness gain at this file's actual complexity. Note: if the same script also needs to *write* XLIFF (not just read/diff it), hand-rolled regex-based mutation of XML becomes materially riskier -- see Pitfall below. | Plain regex/string-based extraction (`<trans-unit id="([^"]+)"[^>]*>(.*?)</trans-unit>` block splitting, then `<source>` / `<target[^>]*>` sub-matches) for **read-only** comparison. This is the exact approach validated against the live files above. |
+| A paid Translation Management SaaS (Lokalise, Crowdin, Smartling, Phrase, doloc.io) as a *requirement* of this milestone | Milestone brief explicitly requires a no-paid-SaaS solution; introducing a recurring per-source-text billing dependency for what is fundamentally a CI-gate + audit-script problem is disproportionate and would need explicit stakeholder sign-off as a new operating cost, not a research-driven default. | Custom script (drift detection) + the same AI-filled-XLIFF workflow already used in v0.9.63 (per `.planning/PROJECT.md`: "AI-filled XLIFFs") for the actual re-translation labor. |
+| Writing ad-hoc, non-spec `state` values (e.g. `state="stale"`, `state="drifted"`) into the `.xlf` files if the drift-fix script also mutates locale files | XLIFF 1.2's `state` attribute has an OASIS-defined enumeration; non-spec values break interoperability with any XLIFF-aware tool (including Angular's own tooling, other CAT tools, or a future TMS import) and would need to be undone later. | `state="needs-review-translation"` (source changed, existing translation may still be partially valid and worth keeping as a starting point for a human/AI reviewer) or `state="needs-translation"` (no usable prior translation) -- both are OASIS-standard values already implicitly supported by tooling in this ecosystem, including `ng-extract-i18n-merge`'s own `initialTranslationState` concept (which defaults to the equivalent `'new'` for XLIFF 1.2). |
 
 ## Stack Patterns by Variant
 
-**If the build must be fully hermetic / no OpenTabs `node_modules`:**
-- Vendor a ~30-line `defineTool`/`OpenTabsPlugin`/SDK-helper stub + a pinned copy of `plugins/` + `platform/plugin-sdk/src` under e.g. `vendor/opentabs/` with a recorded commit SHA.
-- Because every op `input` is plain Zod and `defineTool` is identity, the stub suffices to `import()` + `z.toJSONSchema` each op. Only `zod` + `tsx` remain real devDeps.
+**If the milestone's drift-detection gate is read-only (recommended default):**
+- Write one script, e.g. `showcase/angular/scripts/verify-translation-currency.mjs`, that:
+  1. Parses `messages.xlf` into an `id -> sourceText` map (source of truth).
+  2. For each of the 5 translated locale files, parses into `id -> {sourceText, targetText}`.
+  3. Classifies every id into `ok` (present, source text matches), `missing` (present in current source, absent from locale file), `orphaned` (present in locale file, absent from current source), `drifted` (present in both, but `<source>` text differs between the two files).
+  4. Hard-fails (`process.exit(1)`) on any `missing` or `drifted` count > 0 across any locale.
+  5. Reports `orphaned` counts as a warning only (non-fatal) unless the milestone's stats-page resync work explicitly wants them to fail too -- these represent debt from previously-excluded surfaces, not newly-introduced drift, and conflating them with true drift will make the gate noisy on day one given the 54-per-locale baseline already present.
+- Because: it adds zero new dependencies, mirrors the two existing verification scripts in this codebase exactly, and is trivially auditable (a reviewer can read the whole script in one sitting, same bar as `verify-locale-sync.mjs`).
 
-**If breadth must ship without the OpenTabs source at install time (recommended default):**
-- Run the importer once at maintainer-time; **commit** the generated descriptor chunks + prebuilt index. CI/end-users build with **zero** new deps. Re-run only on OpenTabs pin bumps (audit trail like `.planning/LATTICE-PIN.md`).
+**If the team ALSO wants to reduce translator busywork (separate decision from the CI gate, optional):**
+- Adopt `ng-extract-i18n-merge@3.4.0` as a local `ng extract-i18n` builder replacement to auto-sync + auto-mark-stale trans-units across all 5 target files whenever `ng extract-i18n` runs.
+- Because: it eliminates hand-editing 5 XLIFF files every time a template string changes, and its `resetTranslationState`/fuzzy-match behavior is exactly the "mark drifted units for re-translation" mechanic this milestone wants -- but as a *workflow* aid, not the CI gate itself.
+- Do this only as an explicit, separate decision -- it changes `angular.json`'s existing `extract-i18n` architect target and interacts with CI-02 (see Pitfalls below); don't bundle it silently into "add a drift gate."
 
-**If an op uses `z.record`/`z.enum`/nested objects (e.g. stripe `metadata: z.record(z.string(), z.string())`, github `state: z.enum(['open','closed','all'])`):**
-- `z.toJSONSchema` emits valid JSON Schema for these (verified shapes); `@cfworker/json-schema` validates them. No special handling — but include them in the SURF-06-style fixture set to guarantee round-trip validation at scale.
+## Integration with Existing CI Gates (avoiding duplication)
+
+This repo's existing i18n-related CI steps, verified directly from `.github/workflows/ci.yml` and `showcase/angular/package.json`:
+
+| Existing gate | What it actually checks | Overlap risk with new drift gate |
+|---|---|---|
+| `lint:i18n` (`eslint "src/**/*.html" --ignore-pattern ... @angular-eslint/template/i18n`) | Every translatable template node/attribute in `.html` files carries an `i18n`/`i18n-*` marker. Operates purely on `.html` source; has no knowledge of `.xlf` file contents. | **None.** Confirmed via the rule's own docs/source that it never reads `.xlf` files. A string can pass `lint:i18n` (properly marked) while still being unextracted or drifted in `.xlf` -- these are genuinely separate failure modes, not the same check twice. |
+| CI-02, "Verify `ng extract-i18n` produces no diff" (`ng extract-i18n --output-path /tmp/extract-check && diff -u messages.xlf /tmp/extract-check/messages.xlf`) | Catches new/removed/changed `i18n`-marked strings in templates that were never re-extracted into the committed `messages.xlf` (source-file-only omission). Note: `.planning/PROJECT.md` calls this `extract-i18n-clean`, but there is no npm script by that literal name in `showcase/angular/package.json` -- the check is an inline shell step in `.github/workflows/ci.yml`; treat "extract-i18n-clean" as descriptive shorthand for this diff step, not a script to `grep` for. | **Adjacent, not overlapping.** CI-02 only ever compares `messages.xlf` (source) against a freshly regenerated copy of itself -- it never looks at the 5 translated locale files at all. It catches (a) from the research question (new strings never extracted); the new gate this milestone needs must specifically catch (b) (translated-locale drift) plus close the remaining gap in (a) (strings extracted into `messages.xlf` correctly, per CI-02, but never actually propagated/re-translated into the 5 target files -- the "missing" classification above). |
+| `verify-locale-sync.mjs` | Confirms the locale-constants TS module and `angular.json`'s locale list agree (registry parity, not content parity). | **None** -- entirely different concern (which locales exist, not whether their content is current). |
+| `i18nMissingTranslation: "error"` (Angular compiler option in `angular.json`) | Fails the Angular *build* if a trans-unit id referenced by a template has **no** `<target>` at all in a locale file. | **Partial overlap on "missing", none on "drifted".** This compiler option already hard-fails on completely absent translations at build time -- so a pure "missing" check in the new CI gate is somewhat redundant with what a full `ng build` would already catch per-locale. The genuinely new value this milestone's gate adds is the **drift** case: a `<target>` exists, is non-empty, and the build succeeds, yet it translates *stale* source text that no longer matches -- something `i18nMissingTranslation` structurally cannot detect (it only checks presence/absence, never content-equivalence against source). Recommendation: keep the new gate's primary value proposition framed as "source-drift detection" (the "b" case in the research question) and treat "missing" reporting as a bonus/earlier-signal (catching it as a fast standalone script is cheaper than waiting for a full per-locale `ng build` to fail), not the headline feature.
+
+**Net conclusion:** none of the 4 existing gates read `<source>` text in the 5 translated locale files and compare it against the current `messages.xlf` `<source>` for the same id. This is a genuine, unfilled gap -- the new gate is additive, not duplicative, provided it's scoped to this specific check.
 
 ## Version Compatibility
 
 | Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `zod@^4.4.3` (FSB build) | OpenTabs SDK peer `zod ^4.4.3`; plugin pins `zod ^4.3.6` | **Use the same Zod major as the plugins** so `z.toJSONSchema` output matches the upstream manifest exactly. Any `4.x` ≥ the plugins' pin is safe. |
-| `tsx@^4.22.4` | Node `>=24`; esbuild (vendored by tsx) | FSB runs Node ≥24; tsx ships its own esbuild, independent of FSB's `esbuild ^0.24.0`. |
-| `@cfworker/json-schema@^4.1.1` (runtime) | JSON Schema draft 2020-12 emitted by `z.toJSONSchema` (default target) | Already FSB's validator; the imported `input_schema` (post `$schema` strip) validates without translation. If a specific draft is required, pass `{ target: 'draft-2020-12' }` to `z.toJSONSchema` in the importer. |
-| `minisearch@^7.2.0` (runtime) | Existing `INDEX_OPTIONS` + `loadJSON` (SURF-04) | No API change at scale; `loadJSON` rehydrate is the supported large-index path. |
-| `@opentabs-dev/plugin-sdk@^0.0.113` (build) | `@opentabs-dev/shared@^0.0.113` (transitive) | Pre-1.0 — **pin exact** in the build pin file; treat any minor as potentially breaking the op shape; re-verify importer fixtures on bump. |
+|-----------|------------------|-------|
+| `ng-extract-i18n-merge@3.4.0` | `@angular/build ^20.0.0 || ^21.0.0 || ^22.0.0` | This repo pins `@angular/build@^20.3.25` -- within range. `engines.node >=20.19.0` required by the package; this repo's floor is `>=24.0.0`, comfortably above. |
+| `ng-extract-i18n-merge@3.4.0` | `xmldoc@^1.1.3` (transitive dep pinned in its own `package.json`, distinct from the newer `xmldoc@3.0.0` on npm's `latest` tag) | `xmldoc` itself depends only on `sax@^1.6.0`, a long-established pure-JS SAX parser with no native bindings and no `eval`/`new Function` usage -- acceptable supply-chain profile if this path is chosen, but still a net-new dependency the zero-dependency custom-script approach avoids entirely. |
+| Custom drift-detection script (recommended) | Node `>=24.0.0` (already the repo floor) | Uses only `node:fs`/`node:path`; no version sensitivity. |
 
 ## Sources
 
-- **OpenTabs repo (PRIMARY, HIGH)** `github.com/opentabs-dev/opentabs` @ `pushed_at 2026-06-21`, inspected via authenticated `gh api`:
-  - `plugins/github/src/tools/{create-issue,list-issues}.ts`, `plugins/stripe/src/tools/create-customer.ts`, `plugins/linear/src/index.ts` — op `defineTool` shape (quoted).
-  - `plugins/github/src/{index.ts,github-api.ts,tools/schemas.ts}`, `plugins/github/package.json` — plugin metadata + shared-schema imports + imperative `handle` transport + dep pins.
-  - `platform/plugin-sdk/src/index.ts` — `ToolDefinition`, `defineTool` (identity fn), `OpenTabsPlugin` (quoted); `platform/plugin-sdk/package.json` (`peerDependencies.zod ^4.4.3`).
-  - `platform/plugin-tools/src/commands/build.ts:414-439, 646-658` — `z.toJSONSchema` conversion + `generateToolsManifest` + `.transform/.pipe/.preprocess` rejection (quoted).
-  - `platform/shared/src/{index.ts:137-176,manifest.ts}` — `PluginManifest`/`ManifestTool` shape; **no side-effect field** (quoted).
-  - `.gitignore` (`dist/`) — confirms no prebuilt `tools.json` committed.
-  - `git/trees/main?recursive=1` counts — 119 plugins; 2,406 op files; linear 59, github 37.
-- **npm registry (HIGH)** verified 2026-06-23: `zod 4.4.3`, `tsx 4.22.4`, `jiti 2.7.0`, `esbuild 0.28.1`, `typescript 6.0.3`.
-- **Context7 `/websites/zod_dev_v4` (HIGH)** — `z.toJSONSchema()` documented top-level Zod 4 API; preserves `.describe()`/`.meta()` into JSON Schema.
-- **FSB repo (PRIMARY, HIGH)** — `package.json` (deps `@cfworker/json-schema ^4.1.1`, `jmespath ^0.16.0`, `minisearch ^7.2.0`; devDep `esbuild ^0.24.0`; `engines.node >=24`); `extension/lib/{minisearch,jmespath,cfworker-json-schema}.min.js` (vendored runtime libs); `scripts/package-extension.mjs` (generator); `extension/catalog/recipe-index.generated.js` (descriptor target shape); `extension/catalog/handlers/github.js` (T1a template); `.planning/PROJECT.md` (Walls, INV-01..04, v1.0.0 framing, SURF-01/04/06).
+- Live repository inspection (HIGH confidence, ground truth): `showcase/angular/src/locale/messages.xlf` and `messages.{es,de,ja,zh-CN,zh-TW}.xlf`, `showcase/angular/package.json`, `showcase/angular/angular.json`, `showcase/angular/scripts/verify-locale-sync.mjs`, `showcase/angular/scripts/verify-hreflang.mjs`, `showcase/angular/eslint.config.js`, `.github/workflows/ci.yml` -- confirmed exact CI-02 mechanism is a raw shell step (`ng extract-i18n --output-path /tmp/extract-check && diff -u messages.xlf /tmp/extract-check/messages.xlf`) in `ci.yml`, not an npm script literally named `extract-i18n-clean`; confirmed live drift instances (5 units x 5 locales) and orphan baseline (54 units x 5 locales) via direct XLIFF parsing against the actual files.
+- npm registry API (`registry.npmjs.org`), HIGH confidence: `ng-extract-i18n-merge@3.4.0` published 2026-06-06T19:31:58Z, `peerDependencies: {"@angular/build": "^20.0.0 || ^21.0.0 || ^22.0.0"}`, `engines: {"node": ">=20.19.0"}`; `ngx-i18nsupport@0.17.1` last published 2018-09-21T11:05:09Z (confirms dead/abandoned).
+- GitHub repo metadata + raw source (`daniel-sc/ng-extract-i18n-merge`, `master` branch), HIGH confidence: `README.md` (options table, upgrade notes, doloc.io cross-promotion), `src/merger.ts` (confirmed `state: isSourceLang ? 'final' : (onlyWhitespaceChanged ? destUnit.state : this.initialTranslationState)` -- the exact drift-marking mechanic), `src/builder.ts` (confirmed `STATE_INITIAL_XLF_1_2 = 'new'` literal and that the builder mutates files on disk, i.e. it's a write path not a read-only checker), `schematics/ng-add/index.ts` (confirmed `target.builder = 'ng-extract-i18n-merge:ng-extract-i18n-merge'` overwrite of the `extract-i18n` architect target in `angular.json`); repo health: not archived, pushed 2026-06-06, 221 stars, 14 open issues -- actively maintained.
+- `angular.dev/guide/i18n/merge` (official Angular docs, fetched via WebFetch), HIGH confidence: confirmed Angular's first-party i18n merge guide has **no built-in mechanism** for detecting stale/drifted translations when source text changes -- this is an acknowledged gap in core tooling, not something this research overlooked.
+- WebSearch (multiple queries, cross-referenced against the primary sources above for MEDIUM->HIGH confidence upgrade): XLIFF 1.2 OASIS `state` attribute vocabulary (`new`, `needs-translation`, `needs-review-translation`, `needs-adaptation`, `needs-l10n`, `translated`, `signed-off`, `final`) -- corroborated directly by the `oasis-open.org` spec reference in search results and independently by the `STATE_INITIAL_XLF_1_2` constant found in `ng-extract-i18n-merge`'s own source.
+- WebSearch, MEDIUM confidence (single-source via search snippet, doloc.io's pricing page not independently fetched in full): doloc.io is a paid-tier SaaS (per-source-text pricing, 14-day trial, no stated indefinite free tier) -- sufficient confidence to flag it as "do not adopt as part of this milestone" per the explicit brief constraint, but if a future milestone considers doloc.io seriously, re-verify current pricing directly against `doloc.io/pricing/`.
+- `@angular-eslint/template/i18n` rule docs + GitHub issues (WebSearch, MEDIUM confidence, corroborated by direct inspection of this repo's own `eslint.config.js`): confirmed this rule operates purely on `.html` template source (checks for missing `i18n`/`i18n-*` markers) and has no awareness of `.xlf` file contents -- no overlap/duplication risk with a new XLIFF-drift gate.
 
 ---
-*Stack research for: build-time OpenTabs op-metadata codegen + MV3 thousands-descriptor catalog scaling + T1a/T1b hand-port reuse (FSB v1.0.0 OpenTabs Parity)*
-*Researched: 2026-06-23*
+*Stack research for: Angular i18n / XLIFF translation-completeness auditing and drift-detection tooling*
+*Researched: 2026-07-07*

@@ -2,17 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- Brand-only title. Phase 265 AI translator MUST NOT rewrite "FSB" (see
-       showcase/angular/src/locale/DO-NOT-TRANSLATE.md). The lint rule
-       (@angular-eslint/template/i18n + checkAttributes:true) flags a static
-       `translate="no"` companion to an `i18n` marker because no
-       `i18n-translate` semantic exists. Plan 262-01 worked around this in
-       Angular templates via `[attr.translate]="'no'"`, but index.html is a
-       static bootstrap document (not an Angular template) so bindings are
-       not parsed. The brand identifier is protected via the canonical
-       DO-NOT-TRANSLATE.md list and Phase 265's CI invariants. -->
+  <!-- Bootstrap metadata stays brand-only because index.html is not extracted
+       by Angular i18n. Each route replaces it with localized metadata. -->
   <title i18n="@@index.title">FSB</title>
-  <meta name="description" i18n-content="@@index.meta.description" content="FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser via natural language. Multi-model AI, a 66-tool MCP catalog, and compatibility for Claude Code, Codex, Cursor, and OpenClaw.">
+  <meta name="description" i18n-content="@@index.meta.description" content="FSB">
   <base href="/">
   <!-- eslint-disable-next-line @angular-eslint/template/i18n -->
   <meta name="viewport" content="width=device-width, initial-scale=1">

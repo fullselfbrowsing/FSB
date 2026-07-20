@@ -2155,20 +2155,6 @@ async function handleAgentRegisterRoute({ payload, client } = {}) {
     try { reg.stampConnectionId(agentId, connectionId); } catch (_e) { /* best-effort */ }
   }
   console.log('[FSB MCP Dispatcher] agent:register minted ' + agentIdShort);
-  // Phase 272 / BEAT-09 sub-requirement: active-agent counter feeds the
-  // telemetry beat's active_agent_count field. Read-modify-write under
-  // best-effort semantics -- a dropped increment is acceptable telemetry
-  // quality cost; throwing here would crash the MCP dispatch chokepoint.
-  // Placed AFTER the cap check returns (so AGENT_CAP_REACHED does NOT
-  // increment) and AFTER stampConnectionId (so connection_id binding still
-  // races independently of counter writes).
-  try {
-    const cur = await chrome.storage.local.get(['fsbActiveAgentsCount']);
-    const n = (cur && typeof cur.fsbActiveAgentsCount === 'number' && cur.fsbActiveAgentsCount >= 0)
-      ? Math.floor(cur.fsbActiveAgentsCount)
-      : 0;
-    await chrome.storage.local.set({ fsbActiveAgentsCount: n + 1 });
-  } catch (_e) { /* best-effort */ }
   // Phase 240 Open Q1 resolution: agent:register response carries an empty
   // ownershipTokens map at register time. Subsequent bindTab-firing handlers
   // include `ownershipToken: <new>` in their per-call response; the MCP
@@ -2193,19 +2179,6 @@ async function handleAgentReleaseRoute({ payload } = {}) {
   // The Phase 237 registry returns a plain boolean today; future evolution may
   // return { released, releasedTabIds }. Accept either shape defensively.
   const released = (result === true) || !!(result && result.released);
-  // Phase 272 / BEAT-09 sub-requirement: clamp-to-zero decrement on release.
-  // Per CONTEXT.md "Guard against negative counts (clamp to 0)". Best-effort:
-  // storage failures are swallowed so a dropped decrement never crashes the
-  // dispatcher chokepoint (threat T-272-04 / T-272-08).
-  if (released) {
-    try {
-      const cur = await chrome.storage.local.get(['fsbActiveAgentsCount']);
-      const n = (cur && typeof cur.fsbActiveAgentsCount === 'number' && cur.fsbActiveAgentsCount > 0)
-        ? Math.floor(cur.fsbActiveAgentsCount)
-        : 0;
-      await chrome.storage.local.set({ fsbActiveAgentsCount: Math.max(0, n - 1) });
-    } catch (_e) { /* best-effort */ }
-  }
   return { success: true, released };
 }
 

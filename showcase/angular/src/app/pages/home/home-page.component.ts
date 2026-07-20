@@ -41,8 +41,8 @@ interface CapabilityApp {
 
 const ROUTE_PATH = '';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@home.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const YOUTUBE_CHANNEL = 'https://www.youtube.com/@parzival5707';
 const GITHUB_REPO = 'https://github.com/fullselfbrowsing/FSB';
 const BASE_INSTALL_COMMAND = 'npx -y fsb-mcp-server install';
@@ -106,7 +106,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'codex', name: 'Codex', logo: 'openai.svg', flag: '--codex', cmd: `${BASE_INSTALL_COMMAND} --codex` },
     { id: 'opencode', name: 'OpenCode', logo: 'opencode.svg', flag: '--opencode', cmd: `${BASE_INSTALL_COMMAND} --opencode` },
     { id: 'openclaw', name: 'OpenClaw', logo: 'openclaw.svg', flag: '', cmd: 'npx -y fsb-mcp-server' },
-    { id: 'all', name: 'All Clients', logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
+    { id: 'all', name: $localize`:@@home.install.allClients:All Clients`, logo: 'all.svg', flag: '--all', cmd: `${BASE_INSTALL_COMMAND} --all` },
   ];
   readonly capRow1: readonly CapabilityApp[] = [
     capability('GitHub', 'github'),
@@ -123,6 +123,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
     capability('Vercel', 'vercel'),
     capability('Netlify', 'netlify'),
   ];
+  private readonly manualFlagLabel = $localize`:@@home.install.manualFlag:manual`;
   readonly capRow2: readonly CapabilityApp[] = [
     capability('Cloudflare', 'cloudflare'),
     capability('CircleCI', 'circleci'),
@@ -296,24 +297,24 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       name: 'FSB',
-      description: 'Local-first Chrome automation and MCP browser layer that lets AI agents act, observe, verify, use trigger watchers, upload real files, and invoke guarded first-party API capabilities in the user browser',
+      description: $localize`:@@home.schema.description:Local-first Chrome automation and MCP browser layer that lets AI agents act, observe, verify, use trigger watchers, upload real files, and invoke guarded first-party API capabilities in the user's browser`,
       url: 'https://full-selfbrowsing.com',
       applicationCategory: 'BrowserApplication',
-      applicationSubCategory: 'AI browser automation and MCP tools',
+      applicationSubCategory: $localize`:@@home.schema.subcategory:AI browser automation and MCP tools`,
       operatingSystem: 'Chrome',
       softwareVersion: APP_VERSION,
       downloadUrl: GITHUB_REPO,
       sameAs: [GITHUB_REPO, YOUTUBE_CHANNEL],
       featureList: [
-        'MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw',
-        'Real browser automation through a local Chrome extension',
-        'Trigger watchers for reactive DOM monitoring',
-        'Native first-party API capability catalog with guarded invoke_capability calls',
-        'Real file uploads through upload_file plus synthetic drop_file support',
-        'Vault and payment autofill boundary where raw secrets never cross the MCP bridge',
-        'DOM-based page understanding, browser actions, visual feedback, local memory, and BYO model keys',
+        $localize`:@@home.schema.feature.mcp:MCP server for Claude Code, Codex, Cursor, Windsurf, and OpenClaw`,
+        $localize`:@@home.schema.feature.browser:Real browser automation through a local Chrome extension`,
+        $localize`:@@home.schema.feature.triggers:Trigger watchers for reactive DOM monitoring`,
+        $localize`:@@home.schema.feature.capabilities:Native first-party API capability catalog with guarded invoke_capability calls`,
+        $localize`:@@home.schema.feature.uploads:Real file uploads through upload_file plus synthetic drop_file support`,
+        $localize`:@@home.schema.feature.vault:Vault and payment autofill boundary where raw secrets never cross the MCP bridge`,
+        $localize`:@@home.schema.feature.dom:DOM-based page understanding, browser actions, visual feedback, local memory, and BYO model keys`,
       ],
-      keywords: 'MCP browser automation, AI browser agent, trigger watchers, first-party API capability calling, Claude Code browser testing, Codex browser testing, self-browsing automation',
+      keywords: $localize`:@@home.schema.keywords:MCP browser automation, AI browser agent, trigger watchers, first-party API capability calling, Claude Code browser testing, Codex browser testing, self-browsing automation`,
       publisher: { '@id': 'https://full-selfbrowsing.com/#org' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     };
@@ -407,7 +408,7 @@ export class HomePageComponent implements OnInit, AfterViewInit, OnDestroy {
       const t = clients.length > 1 ? index / (clients.length - 1) : 0;
       return {
         ...client,
-        flagLabel: client.flag || 'manual',
+        flagLabel: client.flag || this.manualFlagLabel,
         dx: -Math.round((1 - Math.cos(t * (Math.PI * 0.42))) * 60),
         rot: Number((direction * t * 6).toFixed(1)),
       };

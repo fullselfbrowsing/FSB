@@ -21,8 +21,8 @@ import { GlobeRegion } from '../../core/globe/globe-visualization.types';
 
 const ROUTE_PATH = '/sitemaps';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@sitemaps.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 
 @Component({
   selector: 'app-sitemaps-page',

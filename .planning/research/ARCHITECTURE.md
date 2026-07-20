@@ -1,463 +1,403 @@
-# Architecture Research: v1.0.0 Full App Catalog (OpenTabs Parity)
+# Architecture Research: v1.2.0 Showcase i18n Completeness
 
-**Domain:** Integrating a ~119-app / ~2,523-op external MIT catalog (OpenTabs) INTO FSB's existing tiered capability substrate (v0.9.99)
-**Milestone:** v1.0.0 Full App Catalog (OpenTabs Parity) — SUBSEQUENT milestone; integrate WITH the v0.9.99 substrate, do not redesign it
-**Researched:** 2026-06-23
-**Confidence:** HIGH (every integration point read live from on-disk FSB source on branch `automation`: `capability-catalog.js`, `capability-router.js`, `capability-search.js`, `package-extension.mjs`, `service-denylist.js`, `network-capture.js`, `background.js`, `catalog/handlers/github.js`, `catalog/descriptors/*.json`; OpenTabs op metadata read live via authenticated `gh api repos/opentabs-dev/opentabs/...`, 119 plugin dirs confirmed)
+**Domain:** Angular-i18n translation-completeness verification + drift detection, integrated into an existing Express-prerender showcase pipeline
+**Milestone:** v1.2.0 Showcase i18n Completeness — SUBSEQUENT milestone; re-opens and closes a gap left as accepted debt by v0.9.63 (Showcase i18n). Does not redesign the existing locale-registry/build/CI substrate.
+**Researched:** 2026-07-07
+**Confidence:** HIGH (all findings verified directly against the repo's own source files, CI workflow, and git history — this is an internal-architecture question about an existing system, not an ecosystem-discovery question)
 
-> Scope note: this is a research/integration map for `gsd-roadmapper`, not an implementation. The v0.9.99 capability architecture is a FIXED substrate (tiers T0/T1a/T1b/T2/T3, the interpreter, the consent gate, the 2 MCP tools). The substrate's own architecture research is preserved at [ARCHITECTURE-v0.9.99-CAPABILITY-CATALOG.md](ARCHITECTURE-v0.9.99-CAPABILITY-CATALOG.md) — this document **cites it as the substrate** and specifies how the four v1.0.0 streams attach. It does NOT re-derive the tiers, the interpreter, or the MCP surface.
->
-> Canonical-path note: per this directory's convention (the v0.9.99 SUMMARY states "the four research files written for THIS milestone replaced their prior-milestone content at the canonical paths"), this v1.0.0 architecture lives at the canonical `ARCHITECTURE.md`; the superseded v0.9.99 architecture is preserved on-disk at the milestone-suffixed path above (matching `PITFALLS-EXCALIDRAW.md` / `PITFALLS-v0.9.69-TELEMETRY.md`).
+> Canonical-path note: per this directory's established convention (see `PITFALLS-EXCALIDRAW.md`, `PITFALLS-v0.9.69-TELEMETRY.md` as precedent), this document replaces the prior milestone's content at the canonical `ARCHITECTURE.md` path. The superseded v1.0.0 (Full App Catalog / OpenTabs Parity) architecture research is preserved on-disk at `ARCHITECTURE-v1.0.0-OPENTABS-CATALOG.md`.
 
 ---
 
-## 0. The Load-Bearing Decision (read this first)
+## 0. Correction to Milestone Framing (read this first)
 
-The v1.0.0 mandate is **breadth + depth + safety + learning, NOT cloning OpenTabs**. The substrate already gives FSB five tiers and two front doors. The entire milestone reduces to **feeding the existing tiers** from OpenTabs metadata:
+PROJECT.md states: *"Resync the 247 trans-units whose English source changed in commit `6d3ad363`."* I verified this directly by diffing `messages.xlf` at `6d3ad363~1` vs `6d3ad363` and matching trans-units **by `id`, not by line position**:
 
-| Stream | What it actually is | NOT |
-|--------|---------------------|-----|
-| **BREADTH** | codegen OpenTabs op-metadata → FSB **descriptors (closed-vocab DATA)** so all 119 apps return from `search_capabilities` | NOT 2,523 hand-written handlers; NOT shipping OpenTabs' `handle()` code (Wall 1) |
-| **DEPTH** | hand-port ~15-30 top apps as **T1a/T1b handlers** exactly like the shipped `catalog/handlers/github.js` | NOT a new mechanism — reuses `registerHandler` + `HEAD_HANDLER_MODULES` + `seedHeadHandlers()` |
-| **DENYLIST** | grow `extension/config/service-denylist.json` DATA — the ONE hard floor under opt-out Auto — BEFORE any sensitive app is reachable | NOT new code; `service-denylist.js` is untouched |
-| **DISCOVERY** | seed the 119 origins + endpoint hints so the existing `network-capture.js` learns the tail | NOT a new discovery engine — the Phase-31 path already exists |
+- Total trans-units in `messages.xlf`: 942 (996 in each target locale file — the small gap is target-file-only housekeeping units, irrelevant here)
+- Trans-unit **IDs whose `<source>` text actually changed**: **5** (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`)
+- Trans-unit IDs added or removed: 0
 
-**The single most important architectural fact:** today `capability-catalog.js resolve()` returns **`null`** for any slug not in its `REGISTRY` (verified at `capability-catalog.js:303-304`), and the router then returns `RECIPE_NOT_FOUND` (`capability-router.js:688-691`). But `capability-search.js` indexes **all `cat.descriptors`** (`capability-search.js:135-178`), so an imported descriptor-only slug is **searchable**. Without a change, all ~2,523 imported descriptors would be **discoverable-but-uninvocable dead entries**. The load-bearing deliverable is a `resolve()` fallback that maps a descriptor-only slug to a **non-null seam tier (T3 DOM or T2 learn-pending)** — §2 Decision B. This is the quality gate.
+The `247 insertions(+), 247 deletions(-)` git-diff stat is **XML line churn**, not trans-unit count: 242 of those line-pairs are `<context-group><context context-type="linenumber">` shifts caused by unrelated TS/HTML edits moving `$localize`/`i18n` call sites up or down in their source files (harmless location-metadata noise), and only 5 are genuine `<source>` text changes. A naive `git diff --stat` or line-count/hash-based drift check would overcount by roughly 48x, and would also false-positive on every future commit that merely reformats a component file without touching any translatable string.
+
+**This has a direct architectural consequence:** the new drift-detection gate MUST diff `<source>` text keyed by `trans-unit id`, not do a raw-text/line-count/whole-file-hash comparison. This is elaborated in Pattern 1 below. The full-page audit (Phase 1 of this milestone) should re-derive the true scope from scratch — it will very likely surface MORE than these 5 units, since the milestone's own stated goal ("every translatable string on every showcase page... genuinely translated") is broader than the blast radius of one named commit. Treat "5" and "247" both as lower/upper bounds discovered so far, not as the audit's answer.
 
 ---
 
 ## 1. Standard Architecture
 
-### System Overview (the substrate + the four v1.0.0 attachment points marked ★NEW / ◆MOD)
+### System Overview
 
 ```
-+---------------------------------------------------------------------------+
-|  MCP CLIENT  (search_capabilities / invoke_capability)  |  AUTOPILOT      |
-|  -- 2 tools OUTSIDE TOOL_REGISTRY (INV-01) -- UNCHANGED  |  same engine    |
-+---------------------------+-----------------------------+-------------------+
-                            |                             |
-        (search)           v                             v   (invoke)
-+--------------------------------------+   +-------------------------------------+
-| capability-search.js  (minisearch)   |   | capability-router.js  invoke()      |
-|  indexes ALL cat.descriptors         |   |  +-- _evaluateConsent (UNCHANGED) --+|
-|  sideEffectClass: recipe method WINS |   |  |  denylist -> off -> ask -> auto  ||
-|  ◆MOD getDescriptorBySlug() export   |   |  |  denylist = the ONE hard floor   ||
-+-------------------+------------------+    |  +-------------------+--------------+|
-                    | reads                 |   catalog.resolve(slug, origin)     |
-                    v                        |  +-- tier dispatch (UNCHANGED) ----+|
-+--------------------------------------+    |  |  T0/T1a/T1b/T2/T3 -> typed reason||
-| FsbRecipeIndex (global)              |    |  +-------------------+--------------+|
-|  extension/catalog/                  |    +----------------------+---------------+
-|  recipe-index.generated.js           |                           |
-|  { recipes[], descriptors[~2523] }   |                           v
-|  ◆MOD GENERATED bigger by build      |    +-------------------------------------+
-+-------------------+------------------+    | capability-catalog.js  resolve()    |
-                    | built from             |  learned T2 -> REGISTRY T1a/T1b/T0  |
-+--------------------------------------+    |  ★NEW descriptor-only -> T3 or T2   |
-| scripts/codegen-opentabs.mjs ★NEW    |    |     (no dead RECIPE_NOT_FOUND)      |
-|  OpenTabs metadata -> descriptors    |    |  ◆MOD HEAD_HANDLER_MODULES += ports|
-+-------------------+------------------+    +----------------------+---------------+
-                    | reads (pinned snapshot)                       | ctx.executeBoundSpec
-+--------------------------------------+    +----------------------v---------------+
-| vendor/opentabs-snapshot/ ★NEW       |    | capability-fetch.js (MAIN world)    |
-|  plugins/<app>/{package.json,        |    |  executeBoundSpec re-pins origin    |
-|  src/tools/*.ts, src/index.ts} +PIN  |    +-------------------------------------+
-+--------------------------------------+
-                                            +-------------------------------------+
-+--------------------------------------+    | catalog/handlers/<app>.js ★NEW x15-30|
-| extension/config/                    |    |  T1a/T1b: own origin,               |
-|  service-denylist.json ◆MOD (FIRST)  |    |  executeBoundSpec-only,             |
-|   deniedOrigins[] + sensitiveOrigins[]|   |  self-register at load              |
-|  discovery-seeds.json ★NEW           |    +-------------------------------------+
-|   119 origins + endpoint hints       |    +-------------------------------------+
-+-------------------+------------------+    | learned-recipe-store.js (T2)        |
-                    | endpoint hints         |  per-origin fsbLearnedRecipes       |
-                    v                        |  getLearnedSync(slug, origin)       |
-+--------------------------------------+    +----------------------^--------------+
-| network-capture.js (CDP, ◆MOD small) |                           | promote-after-replay
-|  startSession consent-gated          |---------------------------+
-|  reads discovery-seeds endpointHints |
-+--------------------------------------+
++-----------------------------------------------------------------------+
+|                  SOURCE OF TRUTH (author-edited)                       |
++-----------------------------------------------------------------------+
+|  Component .html/.ts (i18n / $localize markers)                       |
+|  angular.json  i18n.locales{}         (locale -> file + subPath map)  |
+|  locale-constants.ts (Angular) <-verify-locale-sync.mjs-> .js (Express)|
++------------------------------+------------------------------------------+
+                               | ng extract-i18n
+                               v
++-----------------------------------------------------------------------+
+|              messages.xlf  (EN source-of-truth XLIFF)                 |
+|              -- one <trans-unit id="..."><source> per marker            |
++------------------------------+------------------------------------------+
+                               | (manual / AI-fill, historically)
+                               v
++-----------------------------------------------------------------------+
+|   messages.{es,de,ja,zh-CN,zh-TW}.xlf  (5 translated copies)          |
+|   -- mirrors EN's <trans-unit id> set; <source> COPIED verbatim from   |
+|      EN at fill-time, <target state="translated"> is the translation  |
+|   PROBLEM: nothing re-syncs the mirrored <source> when EN's <source>  |
+|   changes later -- these files silently go stale (this milestone's    |
+|   core gap)                                                           |
++------------------------------+------------------------------------------+
+                               |
+        +----------------------+-----------------------------+
+        |                  EXISTING CI GATES               |
+        |  (structural / build-time correctness only)      |
+        |  1. verify-locale-sync.mjs   -- registry parity   |
+        |     (Angular LOCALES[] == Express LOCALES[])      |
+        |     Does NOT touch messages.xlf content at all.   |
+        |  2. lint:i18n (eslint)       -- every visible      |
+        |     template string carries an i18n attribute      |
+        |     Does NOT check translation content.            |
+        |  3. "ng extract-i18n" + diff -u  ("extract-i18n-   |
+        |     clean")  -- messages.xlf byte-equal to a fresh |
+        |     extract. Verifies EN source is fully harvested;|
+        |     says NOTHING about the 5 target files.         |
+        |  4. ng build --localize (i18nMissingTranslation:   |
+        |     error) -- fails if a target XLIFF is MISSING a |
+        |     <target> for an id present in source. Does NOT |
+        |     fail if <target> exists but is a STALE/WRONG   |
+        |     translation of a since-changed <source>. This  |
+        |     is the exact blind spot: all 5 locale files    |
+        |     sit at 996/996 state="translated" today, and   |
+        |     that number does not move even when 5 units    |
+        |     drift.                                          |
+        +------------------------+---------------------------+
+                               |
+                               v  (NEW, this milestone)
+        +---------------------------------------------------+
+        |  NEW GATE: verify-translation-drift.mjs             |
+        |  Diffs EN <source> text (keyed by trans-unit id)   |
+        |  against the <source> mirror embedded in each of   |
+        |  the 5 target XLIFFs. Fails the build if any id's  |
+        |  EN <source> != that id's mirrored <source> in ANY |
+        |  target file. This is the ONLY gate in the whole   |
+        |  chain that can catch semantic staleness, because  |
+        |  it is the only one that compares SOURCE content   |
+        |  across files rather than checking structural      |
+        |  presence within one file.                         |
+        +------------------------+---------------------------+
+                               |
+                               v
++-----------------------------------------------------------------------+
+|  ng build --localize  emits per-locale prerendered HTML under          |
+|  dist/showcase-angular/browser/{en-root,es,de,ja,zh-CN,zh-TW}/**        |
++------------------------------+------------------------------------------+
+                               |
+                               v
++-----------------------------------------------------------------------+
+|  showcase/server/server.js (Express)                                   |
+|  - Accept-Language middleware (bare `/` only) -- WARNING-02 lives here |
+|  - express.static(dist) with redirect:false                            |
+|  - marketingRoutes whitelist + locale subPath splitter                 |
++-----------------------------------------------------------------------+
 ```
 
-### Component Responsibilities (★NEW / ◆MOD / UNCHANGED, with real anchors)
+### Component Responsibilities
 
-| Component | Responsibility | State | Anchor file |
-|-----------|----------------|-------|-------------|
-| Codegen | OpenTabs op-metadata → `catalog/descriptors/*.json` + `discovery-seeds.json`; derive service/origin/intentSynonyms/actionVerb/sideEffectClass/params/provenance | **★NEW** | `scripts/codegen-opentabs.mjs` |
-| Vendored snapshot | pinned MIT OpenTabs metadata for hermetic/offline build + auditable provenance | **★NEW** | `vendor/opentabs-snapshot/` + `PIN.md` |
-| Cross-check guard | fail build if any descriptor under-states a mutating op as `read` | **★NEW** | `scripts/verify-catalog-crosscheck.mjs` (chained into `validate:extension`) |
-| Packager | already inlines `{recipes, descriptors}` into the generated IIFE; just re-reads the bigger descriptor set | **◆MOD** (one added codegen call) | `scripts/package-extension.mjs:66-89` (`readJsonDir`) |
-| Generated index | ships `{recipes[], descriptors[~2523]}` | **◆MOD** (bigger, same shape) | `extension/catalog/recipe-index.generated.js` |
-| Search | index all descriptors incl. descriptor-only; recipe-method wins cross-check | **UNCHANGED code** + **◆MOD** add `getDescriptorBySlug` export | `extension/utils/capability-search.js:89-185,281` |
-| Catalog `resolve()` | learned→REGISTRY→**descriptor-only→T3/T2**→null | **◆MOD** (the no-dead-entry branch + `HEAD_HANDLER_MODULES` ports) | `extension/utils/capability-catalog.js:215-219,285-360` |
-| Hand-port handlers | T1a/T1b head: own first-party origin, `executeBoundSpec`-only, tokens never logged, self-register | **★NEW** ~15-30 | `catalog/handlers/<app>.js` (shape = `github.js`) |
-| Denylist data | cover banking/payments/health/ToS-hostile across the 119 BEFORE reach | **◆MOD data** (FIRST) | `extension/config/service-denylist.json` |
-| Discovery seeds | 119 origins + endpoint hints for the network-capture tail | **★NEW data** | `extension/config/discovery-seeds.json` |
-| Network capture | consent-gated CDP capture reads endpoint hints | **◆MOD small** + reads new data | `extension/utils/network-capture.js` |
-| Router / interpreter / fetch / consent gate / learned store | dispatch, bind, MAIN-world fetch, opt-out Auto gate, T2 store | **UNCHANGED** | `capability-router.js`, `capability-interpreter.js`, `capability-fetch.js`, `consent-policy-store.js`, `learned-recipe-store.js` |
+| Component | Responsibility | Today's Implementation |
+|-----------|-----------------|-------------------------|
+| `angular.json` `i18n` block | Declares the 5 target locales + `subPath` + translation file path; drives `ng build --localize` fan-out | Static config, hand-edited; `sourceLocale.subPath` is `""`, each target locale's `subPath` matches its code exactly (`es`, `de`, `ja`, `zh-CN`, `zh-TW`) |
+| `locale-constants.ts` / `.js` | Runtime-consumable locale list (`LOCALES`, `LOCALE_SUBPATHS`, native labels) for Angular UI + Express middleware | Two hand-mirrored files, kept honest by `verify-locale-sync.mjs` |
+| `verify-locale-sync.mjs` | Registry parity ONLY — asserts the two `LOCALES` arrays match | Regex-extracts array literal, string-compares |
+| `lint:i18n` (eslint) | Marking completeness — every visible template string has an `i18n`/`i18n-*` attribute | ESLint template-syntax rule, run via `npx eslint "src/**/*.html"` with 2 ignore-patterns (`dashboard/**`, `stats/**` — the latter is exactly what this milestone must remove) |
+| `ng extract-i18n` + `diff -u` | EN-source completeness — `messages.xlf` matches what a fresh harvest of `i18n`-marked templates would produce | Shell pipeline in `ci.yml`, not a named npm script (nicknamed "extract-i18n-clean" in docs/plans; `showcase/angular/package.json` has no script literally named that — confirmed by the codebase's own Phase-275 discovery note) |
+| `ng build --localize` (`i18nMissingTranslation: error`) | Per-locale structural completeness — every EN trans-unit id has a corresponding `<target>` in each target XLIFF | Angular CLI build-time i18n compiler flag in `angular.json` |
+| **(NEW) `verify-translation-drift.mjs`** | Semantic freshness — every EN trans-unit id's `<source>` text matches its mirrored `<source>` in all 5 target XLIFFs | Does not exist yet; this milestone's job |
+| `verify-hreflang.mjs` | Post-build SEO/HTML assertion (hreflang tags, canonical, `lang` attr) on emitted prerender output | Walks `dist/`, regex-checks tags |
+| Accept-Language middleware (`server.js`) | Bare-`/` locale redirect for first-visit + returning users | Cookie short-circuits today (WARNING-02); needs a redirect-to-cookie-locale fix this milestone |
 
----
-
-## 2. The Hard Decisions (resolved)
-
-### Decision A — The codegen input contract (BREADTH): OpenTabs op-metadata → FSB descriptor
-
-**Recommendation: a build-time Node ESM transform reading a PINNED snapshot, emitting committed `catalog/descriptors/*.json`. Read ONLY metadata; never vendor/ship OpenTabs' `dist/` runtime (Wall 1).**
-
-The OpenTabs op shape is verified (read live from the `airtable` plugin). Each plugin is an npm package; each op is a `defineTool({...})` in `src/tools/<op>.ts`; the service/origin metadata is in `package.json.opentabs` + the `src/index.ts` plugin class:
-
-| OpenTabs source | Location | → FSB descriptor field | Derivation |
-|-----------------|----------|------------------------|------------|
-| `urlPatterns:['*://*.airtable.com/*']`, `homepage` | `package.json.opentabs` + class | `service` (`airtable.com`) + canonical origin | parse host from urlPattern |
-| op `name` (`list_records`) + plugin `name` (`airtable`) | `defineTool` / class | `slug` (`airtable.list_records`) | `${plugin}.${op}` |
-| `description`+`summary`+`displayName`+`group` | `defineTool` | `intentSynonyms[]`, `description`, `actionVerb` | NL-phrase synthesis; verb from name prefix |
-| `handle()` uses `apiGet` vs `apiPost/Put/Delete` | `defineTool.handle` | `sideEffectClass` | **static scan of the api-helper call** (Decision C) |
-| `input: z.object({...})` (zod) | `defineTool` | `params` (JSON-Schema) | zod→JSON-Schema conversion |
-| plugin name + repo SHA | `package.json` + PIN | `provenance` (MIT) | from `_provenance.json` |
-
-**Verified read example** — OpenTabs `airtable/src/tools/list-records.ts` `defineTool({ name:'list_records', description:'List all records...', input: z.object({base_id, table_id}), handle: async p => apiGet(...) })` → FSB descriptor:
-```json
-{ "slug":"airtable.list_records", "service":"airtable.com",
-  "intentSynonyms":["list airtable records","show rows in an airtable table",
-                    "view records in airtable","get airtable table rows"],
-  "description":"List all records (rows) in an Airtable table (imported, read)",
-  "actionVerb":"list", "sideEffectClass":"read",
-  "params":{"type":"object","properties":{"base_id":{"type":"string"},
-            "table_id":{"type":"string"}},"required":["base_id","table_id"],
-            "additionalProperties":false},
-  "backing":"dom",
-  "provenance":{"source":"opentabs","license":"MIT",
-                "plugin":"@opentabs-dev/opentabs-plugin-airtable","op":"list_records"} }
-```
-This matches the existing hand-authored descriptor shape verbatim (`catalog/descriptors/github-issues-create.json`, read live: `slug/service/intentSynonyms/description/actionVerb/sideEffectClass/params`).
-
-**When:** all 119 apps / ~2,523 ops. **Trade-offs:** descriptors ship immediately, executable backing lags → Decision B guarantees no dead entry. zod→JSON-Schema must flatten constructs the closed `params` sub-schema cannot express (`z.union` → permissive `anyOf`/string) and NEVER emit a forbidden field name (`script/expr/transform/code/fn/js`) — the recipe-schema pre-scan would reject those (verified at the Phase-26 forbidden-name pre-scan).
-
-### Decision B — The no-dead "discoverable-but-uninvocable" descriptor path (THE quality gate)
-
-**Recommendation: add a descriptor-only fallback branch to `capability-catalog.js resolve()` so EVERY searchable slug resolves to a non-null tier. A descriptor with no bundled handler/recipe resolves to T3 (DOM) by default, or T2 (learn-pending) when a discovery seed exists — never `null` → never `RECIPE_NOT_FOUND` for a searchable slug.**
-
-The current `resolve()` (verified):
-```
-resolve(slug, origin):
-  learned = _getLearned(slug, origin)          # T2 wins (capability-catalog.js:294-301)
-  if learned: return {tier:'T2', recipe}
-  entry = REGISTRY[slug]                        # T1a/T1b/T0 (:303)
-  if !entry: return null                        # <-- THE DEAD-ENTRY BUG for imports (:304)
-  ...quarantine check, tier returns...
-```
-The fix is a single branch inserted at the `!entry` point, using a typeof-guarded `_getDescriptor(slug)` accessor that mirrors the existing `_getRecipeBySlug` accessor (`capability-catalog.js:54-60`) — it reads `FsbRecipeIndex.descriptors` (or a new `FsbCapabilitySearch.getDescriptorBySlug`):
-```
-  # --- ★NEW descriptor-only fallback (no dead entry) ---
-  desc = _getDescriptor(slug)
-  if desc:
-      tier = (desc.backing === 'learn') ? 'T2' : 'T3'   # default T3
-      return { tier, descriptor: desc, origin: desc.serviceOrigin }
-  return null    # genuinely-unknown slug ONLY
-```
-The router already maps the result correctly with **zero router changes**:
-- **T3** → `RECIPE_DOM_FALLBACK_PENDING` (`capability-router.js:723-727`): the model/autopilot completes the task via FSB's universal DOM engine (the always-available floor).
-- **T2 with no recipe** → `RECIPE_LEARN_PENDING` (`capability-router.js:709-721`): signals the consent-gated discovery path can learn this origin's endpoint.
-
-**Which tier for a descriptor-only slug?** Codegen stamps `"backing":"dom"` by default and `"backing":"learn"` when the app has a discovery seed (Decision E). `_descriptorTier` reads it; absent ⇒ T3. Rationale: T3/DOM needs no per-origin learning and always works; T2/learn is offered only where a seed primes the network-capture path.
-
-**Gate (Phase 36):** the search-eval harness must assert **every descriptor slug that `search_capabilities` can return resolves to a non-null tier** (T1a/T1b/T0/T2/T3) — i.e. `invoke` never returns `RECIPE_NOT_FOUND` for a searchable slug. **Trade-offs:** a T3 descriptor-only invoke does no API fast-path (DOM is slower but reliable) — intended tail behavior; hand-ports (Decision D) + learned recipes upgrade the hot subset over time.
-
-### Decision C — Side-effect class derivation + cross-check at scale (BREADTH safety)
-
-**Recommendation: derive `sideEffectClass` twice (codegen static-scan + runtime recipe-method) and cross-check; disagreement escalates to `write` (over-state, never under-state).**
-
-1. **Codegen (static):** scan the OpenTabs `handle()` for the api-helper verb (`apiGet`⇒read; `apiPost`/`apiPut`/`apiPatch`/`apiDelete`⇒write) AND the op-name prefix (`get_`/`list_`/`read_`⇒read; `create_`/`update_`/`delete_`/`add_`/`set_`⇒write). **Disagreement ⇒ `write`** + a codegen warning. (Verified: `airtable/list-records.ts` uses `apiGet`; `airtable/update-cell.ts` uses `apiPost` — the signal is reliable and present.)
-2. **Runtime (existing, UNCHANGED):** `capability-search.js buildIndex` re-derives `sideEffectClass` from the **recipe method** when a recipe is paired and **the recipe wins** (`capability-search.js:89-125`, Phase-28 D-02). `capability-router.js _deriveSideEffectClass` promotes to `mutating` whenever the HTTP method is `POST/PUT/PATCH/DELETE` regardless of any authored class (`capability-router.js:290-305`). So a mis-authored descriptor can never cause a mutating call to be gated as a read.
-
-**Enforcement:** `scripts/verify-catalog-crosscheck.mjs` (★NEW, chained into `validate:extension` alongside `verify-recipe-path-guard.mjs`) fails the build if any descriptor's authored `sideEffectClass:read` pairs with a mutating recipe/handler method, or if the codegen static-scan flagged a disagreement resolved to `read`. **Trade-offs:** over-stating to `write` adds write-friction to some genuine reads — acceptable; a later hand-port/learned recipe with a real GET method corrects it via recipe-wins.
-
-### Decision D — Hand-ported head (DEPTH): T1a/T1b registration, origin-pin, executeBoundSpec-only
-
-**Recommendation: hand-port ~15-30 apps EXACTLY like the shipped `catalog/handlers/github.js` — the mechanism already exists and is tested. No new registration machinery.**
-
-Each hand-port is a dual-export IIFE that (verified against `github.js`):
-- targets its app's **own first-party origin** (the separate-origin public API is FORBIDDEN — the session cookie does not cross; `github.js` asserts `api.github.com` never appears, and the test enforces it);
-- builds bound spec(s) and calls **`ctx.executeBoundSpec` ONLY** (never a browser scripting/tabs API), so the active-tab origin-pin inside `executeBoundSpec` holds on the head path;
-- keeps scraped CSRF/tokens **only inside the bound spec, never in a log line**;
-- **self-registers** its slugs via `FsbCapabilityCatalog.registerHandler(slug, {tier:'T1a', handler, origin, params, descriptor})` at load (typeof-guarded — verified at `github.js` tail).
-
-**Three required wiring edits per hand-port (all verified seams):**
-1. **Handler self-register at load** — the IIFE tail (verbatim shape from `github.js:` self-registration block).
-2. **`HEAD_HANDLER_MODULES` += entry** — `capability-catalog.js:215-219` (`{ global:'FsbHandlerLinear', service:'linear.app', origin:'https://linear.app' }`); `seedHeadHandlers()` (`:232-253`) reads each present global (defense-in-depth).
-3. **`background.js` importScripts** — add `importScripts('catalog/handlers/linear.js')` in the block at `background.js:191-197`, AFTER `capability-catalog.js` (`:179`) and BEFORE the `seedHeadHandlers()` call (`:196-197`). The packager already copies `catalog/handlers/*.js` → `extension/catalog/handlers/` (`package-extension.mjs:101-115`).
-
-**T1a vs T1b:** single same-origin GET/POST the closed recipe schema expresses ⇒ ship a **T1b recipe** (`catalog/recipes/<app>.json`, like the verified `reddit-inbox.json`); multi-call / persisted-query-hash / split-token CSRF (Slack xoxc/xoxd, Notion `/api/v3`, GraphQL persisted queries) ⇒ ship a **T1a handler**. A slug is EITHER T1a OR T1b — declared explicitly, no runtime tie-break.
-
-**Guarded writes:** a write op stays **fail-closed to `RECIPE_DOM_FALLBACK_PENDING`** (the verified `github.issues.create` pattern at `github.js`) until a live-captured mutation body is confirmed — never stamp success for an unverified mutation. Each hand-port's `[ASSUMED-ENDPOINT]` carries a human_needed live-UAT (the Phase-29 posture). **Trade-offs:** real engineering + live-capture per port → keep the head small (15-30) and high-value; the tail rides BREADTH(T3)+DISCOVERY(T2).
-
-### Decision E — Discovery seeding (the tail): origins + endpoint hints
-
-**Recommendation: a NEW `extension/config/discovery-seeds.json` (codegen-emitted) listing all 119 origins + endpoint hints, read by `network-capture.js` to prime the consent-gated capture path for the non-hand-ported tail.**
-
-Data shape (mirrors the verified denylist host-pattern form):
-```json
-{ "v":1, "seeds":[
-  { "service":"airtable.com", "origin":"https://airtable.com",
-    "urlPatterns":["*://*.airtable.com/*"],
-    "endpointHints":["/v0.3/application/{appId}/read","/row/{rowId}/updatePrimitiveCell"] },
-  { "service":"linear.app", "origin":"https://linear.app",
-    "urlPatterns":["*://*.linear.app/*"], "endpointHints":["/graphql"] } ] }
-```
-Endpoint hints are extracted by codegen from the OpenTabs `handle()` bodies (e.g. airtable `application/{base}/read`, the verified `apiGet` path). `network-capture.js startSession` (verified consent-gated, rides the existing Input-domain `chrome.debugger` attach — NO manifest change) reads the hints to recognize the relevant XHR/Fetch faster and bias the synthesizer toward the known endpoint.
-
-**Critical constraint:** hints are `[ASSUMED]` until live-observed — they only **bias**, never **execute**. The synthesizer still caps to declarative-executable auth and **replay-verifies before promotion** (the Phase-31 promote-after-replay gate, verified) — a hint never becomes a recipe without a real captured + replayed call. A descriptor whose origin has a seed gets `"backing":"learn"` (Decision B) so its descriptor-only resolve offers T2/learn instead of T3/DOM. **Trade-offs:** seeds add zero permission and zero execution risk; they are pure priming data.
-
----
-
-## 3. Recommended Project Structure (deltas only — ★NEW / ◆MOD)
+## Recommended Project Structure
 
 ```
-scripts/
-  package-extension.mjs            # ◆MOD: invoke/consume codegen output (existing readJsonDir covers descriptors)
-  codegen-opentabs.mjs             # ★NEW: OpenTabs metadata -> descriptors + discovery-seeds
-  verify-catalog-crosscheck.mjs    # ★NEW (CI): descriptor sideEffectClass vs recipe-derived at scale
+showcase/angular/
+├── scripts/
+│   ├── verify-locale-sync.mjs          # existing -- registry parity (UNCHANGED)
+│   ├── verify-hreflang.mjs             # existing -- post-build HTML assertions (UNCHANGED)
+│   ├── verify-bundle-budgets.mjs       # existing -- gzip size gate (UNCHANGED)
+│   ├── verify-translation-drift.mjs    # NEW -- source-text drift gate (this milestone, permanent)
+│   └── audit-translation-completeness.mjs   # NEW, TEMPORARY -- one-shot full-page audit script
+│                                        #   (see "Suggested Build Order" -- this is a diagnostic
+│                                        #    tool for the audit phase of this milestone, not a
+│                                        #    permanent CI gate; retire or demote to a manual
+│                                        #    `npm run audit:i18n` script post-milestone)
+├── src/locale/
+│   ├── messages.xlf                    # EN source-of-truth (UNCHANGED structurally)
+│   ├── messages.{es,de,ja,zh-CN,zh-TW}.xlf   # 5 target files -- CONTENT resync happens here,
+│   │                                    #   not a new file format
+│   └── DO-NOT-TRANSLATE.md             # existing -- machine-token allowlist (UNCHANGED)
+├── package.json                        # ADD: "verify:translation-drift": "node scripts/verify-translation-drift.mjs"
+│                                        # MODIFY: lint:i18n -- remove `--ignore-pattern "src/app/pages/stats/**"`
+│                                        #   (only after stats-page translation work lands, see build order)
+└── angular.json                        # UNCHANGED (no new locale, no new subPath)
 
-vendor/opentabs-snapshot/          # ★NEW: pinned MIT source snapshot (hermetic build + provenance)
-  PIN.md                           #   commit SHA + MIT license text + attribution
-  plugins/<app>/{package.json, src/tools/*.ts, src/index.ts}   # METADATA ONLY (no dist/)
+showcase/server/
+├── src/middleware/
+│   └── accept-language.js              # MODIFY -- fix WARNING-02 cookie-short-circuit semantics
+│                                        #   (see Pattern 2 below)
+└── server.js                           # UNCHANGED mount point/order; same middleware, same
+                                         #   position (before express.static)
 
-catalog/
-  descriptors/                     # GROWS ~11 -> ~2523 (codegen-emitted, committed for reviewable diff)
-    <app>-<op>.json                #   one per OpenTabs op (closed-vocab DATA)
-    _provenance.json               # ★NEW: per-app MIT attribution + source SHA
-  recipes/                         # hand-authored T1b recipes ONLY (unchanged policy)
-    <app>.json                     # ★NEW (only for hand-ported T1b apps)
-  handlers/                        # GROWS +15..30 hand-ported T1a/T1b head modules
-    linear.js / jira.js / vercel.js / datadog.js / ...   # ★NEW (shape = github.js)
+tests/
+├── server-accept-language.test.js      # MODIFY -- flip one existing assertion + add new ones for
+│                                        #   the fixed cookie-redirect behavior
+└── translation-drift.test.js           # NEW -- unit tests for verify-translation-drift.mjs's
+                                         #   trans-unit-id-keyed diff logic (mirrors the existing
+                                         #   test style: pure Node assert, in-repo fixtures)
 
-extension/
-  config/
-    service-denylist.json          # ◆MOD: expanded denied + sensitive (LANDS FIRST, Phase 35)
-    discovery-seeds.json           # ★NEW: 119 origins + endpoint hints
-  catalog/
-    recipe-index.generated.js      # ◆MOD GENERATED, bigger
-    handlers/<app>.js              # copied by package-extension.mjs (existing mechanism)
-  utils/
-    capability-catalog.js          # ◆MOD: descriptor-only -> T3/T2 (no dead entry) + HEAD_HANDLER_MODULES += ports
-    capability-search.js           # ◆MOD: add getDescriptorBySlug export (code otherwise unchanged)
-    network-capture.js             # ◆MOD (small): read discovery-seeds endpoint hints
-  background.js                    # ◆MOD: importScripts each hand-port before seedHeadHandlers()
+.github/workflows/ci.yml                 # MODIFY -- insert one new step in the `website` job
 ```
 
 ### Structure Rationale
 
-- **`vendor/opentabs-snapshot/` (pinned, committed):** the codegen MUST run against a pinned snapshot, not a live `gh api` fetch at build time — builds must be hermetic/offline and the MIT provenance auditable (`PIN.md` = SHA + license, mirroring the existing `.planning/LATTICE-PIN.md` discipline). Only metadata files are vendored; OpenTabs' compiled `dist/` and `handle()` runtime are NOT shipped (Wall 1: metadata as DATA, never their code).
-- **`catalog/descriptors/` grows, `catalog/recipes/` does not (much):** descriptors are cheap closed-vocab search DATA (codegen-safe). A recipe is the executable closed-vocab contract — only hand-authored + `validateRecipe`-passing recipes enter `catalog/recipes/`; an auto-learned recipe enters via the **learned-store** (promote-after-replay), never the bundled catalog (Anti-Pattern 4).
-- **Committed codegen output (not pure build-time generation):** emit descriptors as committed files so the diff is reviewable, the search-eval harness runs in CI against a stable corpus, and a codegen regression is visible in PR review. `package-extension.mjs` re-reads them via the existing `readJsonDir` (verified at `:51-68`).
+- **`verify-translation-drift.mjs` lives alongside the other `verify-*.mjs` scripts, not inside a new subfolder.** This repo's established convention (`verify-locale-sync.mjs`, `verify-hreflang.mjs`, `verify-bundle-budgets.mjs`) is one flat `scripts/verify-*.mjs` file per concern, each independently invocable via a matching `npm run verify:*` script, each wired as its own named step in `ci.yml`'s `website` job. A new script that follows this exact naming and invocation pattern is the path of least surprise for anyone who already knows this codebase's i18n tooling, and it keeps each gate single-purpose and independently debuggable (a red `verify:translation-drift` step in CI immediately tells you it's a semantic-drift failure, not a registry-parity or hreflang failure).
+- **The full-page completeness audit is NOT the same artifact as the CI drift gate**, and should not be built as one script that tries to do both. The audit is a one-time (or infrequent, manually-invoked) diagnostic that answers "what is untranslated or drifted RIGHT NOW across the whole surface" — it needs to walk every showcase page/component and cross-reference against every `i18n`-marked template string (or the rendered per-locale output), and produce a human-readable report. The drift gate is a permanent, fast, CI-blocking check that answers a narrower question: "did this commit's EN source change leave any of the 5 target files' mirrored source out of sync." Conflating them either makes the audit too slow/heavy to run on every PR, or makes the permanent gate too broad and fragile (e.g. if it tries to also assert "target text differs meaningfully from source text" as a proxy for "was this ever actually translated," it will misfire on short EN loanwords that are legitimately identical across locales, like "FSB" or brand names already carved out in `DO-NOT-TRANSLATE.md`).
+- **No new locale-registry file, no new XLIFF format, no new translation-storage layer.** The milestone's job is drift *detection* and *resync*, not a new translation pipeline. `angular.json`'s `i18n.locales` block and `locale-constants.{ts,js}` are correctly the single source of truth for "which locales exist" and stay untouched; this milestone only adds a new comparison over the *content* of files that already exist in that structure.
+- **`accept-language.js` gets modified in place, not replaced.** The bug is a semantics change to one branch of existing logic (see Pattern 2), not a rewrite. The existing `pickBestLocale`, `parseCookieHeader`, and BCP-47 alias-matching logic (`aliasTag`, `ZH_HANS_TARGETS`/`ZH_HANT_TARGETS`) are correct and heavily tested (42 assertions in `server-accept-language.test.js`) — none of that needs to move.
 
----
+## Architectural Patterns
 
-## 4. Architectural Patterns
+### Pattern 1: ID-Keyed Source-Text Diff (the drift gate itself)
 
-### Pattern 1: Feed the existing tiers, don't add tiers (the whole milestone)
+**What:** Parse `messages.xlf` and each of the 5 target XLIFFs into `Map<trans-unit id, source text>`. For every id present in the EN map, assert the corresponding entry in each target map has byte-identical `<source>` text (after whitespace normalization). Report every (`id`, `locale`) pair that fails, then exit 1 if any failures exist.
 
-**What:** BREADTH→T3/T2, DEPTH→T1a/T1b, DISCOVERY→T2-via-learn. No new tier, no new router branch, no new MCP tool.
-**When:** always — this is the substrate-respecting posture.
-**Trade-offs:** + zero churn to the load-bearing router/interpreter/gate (INV-01..04 trivially preserved) + reuses tested machinery. − descriptor-only tail is DOM-speed until upgraded (accepted).
+**When to use:** This is the correct check because XLIFF's `<trans-unit>` structure (per the XLIFF 1.2 spec, `urn:oasis:names:tc:xliff:document:1.2`, used here) mirrors the EN `<source>` into every target file as an audit trail — the whole point of that mirrored `<source>` field in a translated XLIFF is "this is what was translated FROM." When the real EN source changes but that mirror doesn't get refreshed, the mirror becomes evidence of drift, and this is exactly what to diff against. This is a well-known TMS (translation management system) pattern, often called "source drift" or "fuzzy-match invalidation" — professional i18n pipelines (Phrase, Lokalise, Crowdin, and similar) typically auto-flag or fuzzy-mark units whose source changed since last translation. This project has no TMS; a small custom script fills that exact role.
 
-### Pattern 2: Descriptor-only → typed seam reason, never RECIPE_NOT_FOUND (Decision B)
+**Trade-offs:**
+- Pro: Cheap (regex/text parse of 5 files, roughly 1MB each, sub-second), zero new dependencies — matching this repo's stated preference (`verify-hreflang.mjs`'s comment: "Zero new npm dependencies — regex-based, no jsdom"; `accept-language.js`'s comment: "Zero new dependencies — inline cookie parse + Node stdlib only").
+- Pro: Catches exactly the failure mode this milestone cares about (5 real drifted units from the named commit, not 247 phantom ones — see the framing correction above), and generalizes correctly to whatever additional drift the full-page audit surfaces.
+- Con: A pure text-diff cannot tell you the target *translation* is wrong, only that the EN source moved out from under it. It is necessarily a heuristic proxy for "needs re-review," not a semantic-correctness checker. This is fine and expected — closing the loop on translation *quality* is a human/AI-fill review step downstream of this gate, not something the gate itself can verify.
+- Con (must design around): must be robust to legitimate structural/whitespace differences that XLIFF tooling introduces (e.g. `<x id="INTERPOLATION"/>` placeholder ordering should usually stay stable, but Angular's extractor can reformat attribute quoting or context-group ordering across regenerations). Normalize whitespace before comparing, and compare only the `<source>` inner content, not the full `<trans-unit>` block (which also contains `<context-group>` linenumber metadata that legitimately differs commit-to-commit and MUST be ignored — per the framing-correction finding above, 242 of 247 diff lines in the named commit were exactly this kind of noise).
 
-**What:** `resolve()` returns T3/T2 for a searchable-but-unbacked slug; the router's existing T3/T2 mapping yields `RECIPE_DOM_FALLBACK_PENDING` / `RECIPE_LEARN_PENDING` — actionable typed reasons the model acts on.
-**When:** every imported descriptor.
-**Trade-offs:** + no dead catalog entries + the autopilot self-heals to DOM automatically + discovery is offered where seeded. − one extra accessor + one branch in `resolve()` (cheap).
+**Example (regex-based parse matching the codebase's existing `verify-locale-sync.mjs` style, dependency-free):**
+```javascript
+// scripts/verify-translation-drift.mjs
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { LOCALES, SOURCE_LOCALE } from '../src/app/core/i18n/locale-constants.js';
+// (Illustrative import path -- actual implementation should reuse whichever locale
+// registry module is import-compatible from a .mjs script; derive TARGET_LOCALES
+// from it rather than hardcoding, exactly per the WARNING-01 lesson below.)
 
-### Pattern 3: Two derivations + escalate-to-write (Decision C)
+const LOCALE_DIR = join(process.cwd(), 'src', 'locale');
+const SOURCE_FILE = join(LOCALE_DIR, 'messages.xlf');
+const TARGET_LOCALES = LOCALES.filter((l) => l !== SOURCE_LOCALE);
 
-**What:** codegen static-scan + runtime recipe-method, cross-checked; disagreement ⇒ `write`; a CI guard enforces it.
-**When:** every imported descriptor; guard runs in `validate:extension`.
-**Trade-offs:** + a mis-authored read can never become an ungated mutation + the recipe-wins runtime rule is the backstop. − some genuine reads carry write-friction until corrected by a recipe.
+// Extracts { id -> raw inner-XML of <source>...</source> } keyed by trans-unit id.
+// Deliberately ignores everything else in the <trans-unit> block (context-group,
+// linenumber, notes) -- those legitimately churn on every unrelated code edit and
+// MUST NOT be treated as drift (see the 242-line-noise finding in this document's
+// framing-correction section: only 5 of 247 diff lines in commit 6d3ad363 were
+// real source-text changes).
+function extractSourceMap(xliffText) {
+  const map = new Map();
+  const unitRe = /<trans-unit id="([^"]+)"[^>]*>([\s\S]*?)<\/trans-unit>/g;
+  let m;
+  while ((m = unitRe.exec(xliffText)) !== null) {
+    const [, id, body] = m;
+    const sourceMatch = /<source>([\s\S]*?)<\/source>/.exec(body);
+    if (sourceMatch) map.set(id, sourceMatch[1].trim());
+  }
+  return map;
+}
 
-### Pattern 4: Hand-port = github.js shape, verbatim (Decision D)
+const sourceMap = extractSourceMap(readFileSync(SOURCE_FILE, 'utf8'));
+const failures = [];
 
-**What:** new `catalog/handlers/<app>.js` modules using `registerHandler` + `HEAD_HANDLER_MODULES` + `seedHeadHandlers()` + `executeBoundSpec`-only + own-origin + guarded-write-fail-closed.
-**When:** the ~15-30 highest-value apps only.
-**Trade-offs:** + first-class API fast path with the origin-pin intact + reuses the tested registration mechanism. − real engineering + live-capture UAT per port (keep the head small).
+for (const locale of TARGET_LOCALES) {
+  const targetPath = join(LOCALE_DIR, `messages.${locale}.xlf`);
+  const targetMap = extractSourceMap(readFileSync(targetPath, 'utf8'));
+  for (const [id, enSource] of sourceMap) {
+    const mirroredSource = targetMap.get(id);
+    if (mirroredSource === undefined) {
+      failures.push({ locale, id, reason: 'missing trans-unit (should already be caught by ng build)' });
+    } else if (mirroredSource !== enSource) {
+      failures.push({ locale, id, reason: 'source drift', en: enSource, mirrored: mirroredSource });
+    }
+  }
+}
 
-### Pattern 5: Seed-then-learn for the tail (Decision E)
-
-**What:** `discovery-seeds.json` primes `network-capture.js`; a real captured+replayed call promotes a T2 learned recipe that then outranks the descriptor-T3 on the next visit (verified learned-first `resolve()` order).
-**When:** the non-hand-ported origins.
-**Trade-offs:** + the hot tail upgrades to the API fast path from the user's own traffic, consent-gated + no permission change. − hints are assumed until observed (they only bias, never execute).
-
----
-
-## 5. Data Flow
-
-### Build-time (BREADTH + DISCOVERY seeding)
-
-```
-vendor/opentabs-snapshot/plugins/<app>/{package.json, src/tools/*.ts, src/index.ts}
-   |  scripts/codegen-opentabs.mjs (★NEW)
-   |    parse opentabs.urlPatterns + class -> service/origin
-   |    parse each defineTool -> slug, intentSynonyms, actionVerb, params(zod->JSON-Schema)
-   |    static-scan handle() api-helper verb -> sideEffectClass (escalate-to-write on disagree)
-   v                                              v
-catalog/descriptors/<app>-<op>.json          extension/config/discovery-seeds.json
-catalog/descriptors/_provenance.json         (119 origins + endpoint hints)
-   |  scripts/package-extension.mjs (◆MOD: existing readJsonDir at :51-68)
-   v
-extension/catalog/recipe-index.generated.js   { recipes[], descriptors[~2523] }
-   |  CI: verify-catalog-crosscheck.mjs (★NEW) + verify-recipe-path-guard.mjs (existing)
-   v
-fail build if any descriptor under-states a mutating op as read
-```
-
-### Runtime invoke (the no-dead-entry path)
-
-```
-invoke_capability(slug) / autopilot executeCapabilityToolForAutopilot
-   v
-capability-router.invoke(slug, args, {origin, tabId})        [UNCHANGED]
-   v
-_evaluateConsent(...)  denylist -> off -> ask -> auto         [UNCHANGED]
-   denylist.isDenied(origin) -> RECIPE_CONSENT_BLOCKED  (the ONE hard floor)
-   v allow
-catalog.resolve(slug, origin)                                 [◆MOD]
-   |-- learned T2 (recipe) ----------> _runDeclarativeTier('local')  -> API fast path
-   |-- REGISTRY T1a ------------------> _runHandlerTier -> handler.handle -> executeBoundSpec
-   |-- REGISTRY T1b/T0 (recipe) ------> _runDeclarativeTier -> executeBoundSpec
-   |-- ★NEW descriptor-only, seeded --> T2 no-recipe -> RECIPE_LEARN_PENDING (offer discovery)
-   |-- ★NEW descriptor-only, unseeded-> T3 -> RECIPE_DOM_FALLBACK_PENDING (DOM completes it)
-   |-- genuinely unknown -------------> null -> RECIPE_NOT_FOUND
+if (failures.length > 0) {
+  console.error(`Translation drift detected: ${failures.length} (locale, id) pairs out of sync.`);
+  for (const f of failures) console.error(`  [${f.locale}] ${f.id}: ${f.reason}`);
+  process.exit(1);
+}
+console.log(`Translation drift check passed: ${sourceMap.size} trans-units x ${TARGET_LOCALES.length} locales, zero drift.`);
 ```
 
-### Discovery → learned upgrade (existing Phase-31 machinery, primed by seeds)
+### Pattern 2: Cookie-Directed Redirect (WARNING-02 fix)
+
+**What:** Change the Accept-Language middleware's cookie branch from "cookie present and valid -> `next()` (do nothing, let whatever static file exists at `/` serve)" to "cookie present, valid, and NOT the default locale -> actively 302 redirect to `/{cookieLocale}/`." Only fall through to Accept-Language-header-based detection when there is no usable cookie. The default-locale case (`cookieVal === defaultLocale`, i.e. `en`) still correctly falls through to `next()` since there's no redirect needed to reach the EN root.
+
+**When to use:** This directly closes the gap documented in `v0.9.63-INTEGRATION-CHECK.md`'s WARNING-02 and the audit's own suggested follow-up: *"flip cookie-precedence semantics from 'skip middleware' to 'redirect to cookie locale.'"* The audit already flagged the one real risk this introduces — a **redirect loop** — and named its own mitigation requirement: *"opens T-267-02 redirect-loop surface, needs explicit `/{locale}/` skip guard."* That guard is already structurally present and must be preserved: the middleware only runs `if (req.path !== '/') return next();` (`accept-language.js` line 93), so a redirect to `/{locale}/` (any non-root path) can never re-enter this same middleware branch on the very next request — the loop-guard is the existing path check, not something that needs to be newly invented. The only new invariant to add explicitly is: never redirect if the cookie's locale IS the default locale (`en`), because `/en/` is not a valid subPath in this project's `subPath` scheme (EN's `subPath` is `""`, per `angular.json`'s `sourceLocale.subPath` and `locale-constants.js`'s `LOCALE_SUBPATHS.en === ''`) — redirecting to `/en/` would 404.
+
+**Trade-offs:**
+- Pro: Closes exactly the UX gap the milestone names (returning fresh-tab/shared-link visitors with a previously-set locale cookie now land on their locale, not EN).
+- Pro: Minimal diff — this is a roughly 5-line change to one function (`createAcceptLanguageMiddleware`'s cookie-branch), not a new module. All the hard parsing/matching work (`pickBestLocale`, `aliasTag`, `parseCookieHeader`) is reused unchanged.
+- Con (must test explicitly): the existing test `'GET / + Accept-Language ja + Cookie fsb-locale=de -> next() (cookie wins)'` at `tests/server-accept-language.test.js:81-85` currently asserts `nextCalled: true, redirectArgs: null` for this exact case and encodes the OLD (short-circuit) semantics. Under the fixed behavior this assertion must flip to `nextCalled: false, redirectArgs: { status: 302, location: '/de/' }`. This is a deliberate, expected test-behavior change and should be called out explicitly in the phase/plan doc, not silently altered. The adjacent test `'GET / + Cookie fsb-locale=en -> next() (cookie wins, even for default)'` (lines 87-91) keeps its current expected outcome unchanged — the default-locale case still correctly falls through to `next()`.
+- Con: a returning visitor whose cookie locale no longer matches their live preference (e.g. they set `fsb-locale=de` once, months ago, but their browser's Accept-Language has since changed) will now be forced back to `/de/` on every bare-`/` visit, with no Accept-Language override, until they use the in-page picker again. This is the correct, intentional trade-off implied by "cookie wins" (matches how this repo's picker semantics have always been described), but is worth a one-line note in the phase's SUMMARY so a future WARNING doesn't reopen it as a new bug.
+
+**Example:**
+```javascript
+// showcase/server/src/middleware/accept-language.js -- inside createAcceptLanguageMiddleware's
+// returned function, replacing the current cookie branch (lines 95-98 today):
+
+const cookieVal = parseCookieHeader(req.headers && req.headers.cookie, cookieName);
+if (cookieVal && cookieVal !== defaultLocale && supportedSet.has(cookieVal)) {
+  // WARNING-02 fix: cookie now actively redirects instead of short-circuiting.
+  // Loop-safe: this middleware only ever runs on req.path === '/' (checked above),
+  // and this redirect always targets a non-'/' subpath, so the redirected request
+  // never re-enters this branch.
+  return res.redirect(302, '/' + cookieVal + '/');
+}
+if (cookieVal && cookieVal === defaultLocale) {
+  // Cookie explicitly says default locale (en) -- already at the right place; no redirect.
+  return next();
+}
+
+const best = pickBestLocale(req.headers && req.headers['accept-language'], supported);
+if (!best || best === defaultLocale) return next();
+res.redirect(302, '/' + best + '/');
+```
+
+## Data Flow
+
+### Drift-Gate Data Flow (new)
 
 ```
-user opts into discovery on seeded origin
-   v  network-capture.startSession(origin,{tabId,confirmedSensitive?})  [consent-gated, ◆MOD reads hints]
-observe same-origin XHR/Fetch (redacted at handler) -> synthesizer
-synthesize recipe (caps to declarative-executable; flags response-CSRF for Phase32)
-promote-after-replay (interpret 'local' -> executeBoundSpec -> clean? promote)
-   v
-learned-recipe-store.addLearnedRecipe -> fsbLearnedRecipes + index +learnedN
-   next visit: catalog.resolve learned-first -> T2 -> API fast path (no longer T3/DOM)
+git commit changes showcase/angular/src/locale/messages.xlf (EN source)
+    v
+CI `website` job runs (existing steps, unchanged order):
+    verify-locale-sync.mjs -> lint:i18n -> [ng extract-i18n + diff -u]
+    v
+NEW STEP inserted here (see Suggested Build Order for exact position):
+    verify-translation-drift.mjs
+    - reads messages.xlf -> Map<id, source>
+    - reads each messages.{locale}.xlf -> Map<id, mirroredSource>
+    - diffs by id; exit 1 on any mismatch
+    v (pass)
+ng build (i18nMissingTranslation: error) -- existing, unchanged
+    v
+verify:hreflang -> verify-bundle-budgets.mjs -- existing, unchanged
 ```
 
----
+### Cookie-Redirect Data Flow (WARNING-02 fix)
 
-## 6. Scaling Considerations
+```
+Returning visitor, fresh tab / shared link, GET /
+    v
+Request headers carry Cookie: fsb-locale=de (set by picker in a prior session)
+    v
+accept-language middleware (mounted before express.static, server.js:175)
+    v
+    cookieVal = 'de'; cookieVal !== 'en' (default); supportedSet.has('de') -- TRUE
+    v  (NEW behavior)
+    res.redirect(302, '/de/')
+    v
+Browser re-requests GET /de/
+    v
+req.path !== '/' -> middleware calls next() immediately (loop-safe, existing guard)
+    v
+express.static serves dist/showcase-angular/browser/de/index.html (prerendered German)
+```
 
-| Scale | Architecture adjustment |
-|-------|-------------------------|
-| ~11 → ~2,523 descriptors | minisearch index size + `catalogVersion` (djb2 over sorted slugs, verified at `capability-search.js:190-199`) — measure SW-startup build time + snapshot-restore time; eval harness must re-pass on the larger near-neighbor corpus |
-| search recall at 2,523 docs | `intentSynonyms` quality is load-bearing (Phase-28 D-14 proved a description-only index fails wrong-invoke=0). Codegen must emit ≥3-4 distinct intent phrases per op; the harness gates it |
-| `recipe-index.generated.js` byte size | ~2,523 descriptors inline as one JSON IIFE could be hundreds of KB. Measure `importScripts` parse cost; if needed split descriptors into a second generated file (`descriptor-index.generated.js`) loaded before `capability-search.js` — `package-extension.mjs` already owns generation, so it is a one-file addition, not an architecture change |
-| snapshot churn | codegen shifts `catalogVersion` only if slugs change (content hash) — stable across same-corpus rebuilds, so the persisted index restores rather than rebuilds (verified restore-on-base-match at `capability-search.js:154-175`) |
+## Scaling Considerations
 
-### Scaling priorities
+| Scale | Architecture Adjustments |
+|-------|---------------------------|
+| Current (6 locales, ~942 trans-units, 5 target files) | The `Map`-based, single-pass regex parse in Pattern 1 runs in well under a second; no optimization needed. This is a build-time/CI-time script, not a runtime hot path — it never touches production request latency. |
+| If locale count grows (e.g. adding a 7th/8th locale) | `TARGET_LOCALES` in the new script must be derived from `locale-constants.js`'s `LOCALES` array (filtered to exclude `SOURCE_LOCALE`), exactly the pattern `v0.9.63-INTEGRATION-CHECK.md`'s own WARNING-01 already recommended for `server.js` (`supported = LOCALES.filter(l => l !== SOURCE_LOCALE)`). Hardcoding the array in the new script would reproduce WARNING-01's exact mistake in a new file; the real implementation should import from the locale registry instead of hardcoding, keeping the single-source-of-truth property intact. |
+| If trans-unit count grows by 10x (e.g. thousands of marketing strings) | Still trivially fast for a single-pass Map diff; no architectural change needed until file sizes reach tens of MB, which is far outside this project's marketing-copy scope. |
+| If translation workflow moves to a real TMS (Phrase/Lokalise/Crowdin) in a future milestone | Those platforms have first-class "source changed since last translation" flagging built in, which would make this custom script redundant. Not a near-term concern; flagged here only so a future milestone doesn't have to rediscover this trade-off. |
 
-1. **First bottleneck — search precision, not size.** 2,523 ops with weak synonyms collapses `search_capabilities` precision (wrong-invoke). Fix: codegen emits rich `intentSynonyms`; the Phase-28 eval harness re-runs in Phase 36 as the BREADTH gate.
-2. **Second bottleneck — generated-file parse cost at cold SW start.** Fix: split descriptors into `extension/catalog/descriptor-index.generated.js` if the single IIFE is too large; one-file build addition.
+### Scaling Priorities
 
----
+1. **Not a scaling concern at this project's size.** The real risk this milestone's gate should optimize against is **false positives from the linenumber-churn noise already characterized above**, not runtime/CI performance. Keeping the diff strictly `<source>`-text-scoped (not whole-`<trans-unit>`-scoped) is the single most important design decision for this script's long-term reliability.
+2. **Second-order risk: the audit script and the drift-gate script overlapping in scope over time.** If the one-time audit script (the diagnostic tool from the audit phase) accretes CI-gate-like assertions and never gets retired or demoted, the project ends up with two overlapping i18n-completeness checks that can disagree with each other. See Suggested Build Order for how to sequence these to avoid that outcome.
 
-## 7. Anti-Patterns
+## Anti-Patterns
 
-### Anti-Pattern 1: Shipping descriptors with no resolution path (the dead-entry trap)
-**What people do:** import all 119 apps as descriptors, leave `resolve()` returning `null` for them.
-**Why it's wrong:** every imported slug is discoverable-but-uninvocable — `invoke_capability` returns `RECIPE_NOT_FOUND`, breaking the search→invoke progressive-disclosure contract and eroding catalog trust.
-**Do this instead:** Decision B — descriptor-only → **T3 (DOM)** or **T2 (learn-pending)**, never `null`; gate it with the harness assertion that every searchable slug resolves non-null.
+### Anti-Pattern 1: Whole-File Hash/Byte Comparison for Drift Detection
 
-### Anti-Pattern 2: Cloning OpenTabs' code/handlers (Wall 1 violation + scope blowup)
-**What people do:** vendor/ship the 2,523 OpenTabs `handle()` implementations (their `dist/` IIFEs) so every op has a real backing.
-**Why it's wrong:** (a) Wall 1 — shipping their runtime as the executable layer is "code as control flow," the Web-Store-ban risk the substrate exists to avoid; (b) it is the npm-per-plugin model v0.9.99 explicitly rejected; (c) 2,523 code handlers is unmaintainable.
-**Do this instead:** import only **metadata as DATA** (descriptors); execute via the existing tiers (small hand-ported head + T1b recipes + learned T2 + T3 DOM).
+**What people do:** Compare a checksum or raw byte-diff of `messages.xlf` against a checksum of each target file, or treat any git diff on `messages.xlf` as "translations are now stale, re-review everything."
+**Why it's wrong:** As demonstrated by the actual commit `6d3ad363` in this repo (247 diff lines, only 5 real source-text changes), the overwhelming majority of `messages.xlf` diffs are `<context-group><linenumber>` churn from unrelated code motion. A whole-file or byte-level check would flag 242 units of pure noise as "drifted," creating alert fatigue and, worse, sending false-positive re-translation work to the 5-locale AI-fill/translator pipeline for units that never actually changed.
+**Instead:** Parse and compare only the `<source>` inner-text, keyed by `trans-unit id` (Pattern 1). This is the only comparison granularity that isolates true content drift from harmless structural churn.
 
-### Anti-Pattern 3: Letting a sensitive app become reachable before the denylist covers it
-**What people do:** import finance/health/social descriptors + hand-ports, expand the denylist "later."
-**Why it's wrong:** the shipped default is **opt-out Auto** (v0.9.99 Phase 30) — the denylist is the ONE hard floor (verified at `capability-router.js _evaluateConsent` step 1). A reachable banking/payments/health origin under Auto could replay credentials — the "safe brand inversion / credential-replay weapon" top risk.
-**Do this instead:** **DENYLIST LANDS FIRST** (Phase 35). No category batch containing a sensitive app ships its descriptors/hand-ports until `deniedOrigins`/`sensitiveOrigins` cover that category.
+### Anti-Pattern 2: Merging the One-Time Audit and the Permanent CI Gate Into One Script
 
-### Anti-Pattern 4: Codegen emitting recipes (not just descriptors) for the tail
-**What people do:** auto-synthesize `catalog/recipes/*.json` from OpenTabs endpoints so the tail has a bundled T1b backing.
-**Why it's wrong:** an unreplayed synthesized recipe is confidently-wrong execution from birth (recipe-rot at t=0) and bloats the locked recipe contract with unverified entries.
-**Do this instead:** codegen emits **descriptors only**; a recipe enters `catalog/recipes/` only by hand-authoring + `validateRecipe`; an auto-learned recipe enters via the learned-store (promote-after-replay), never the bundled catalog.
+**What people do:** Write a single "do everything i18n" script that both (a) walks every page/component to check completeness against the live DOM/render output, and (b) runs on every CI push as the hard-fail drift gate.
+**Why it's wrong:** These have fundamentally different cost/frequency profiles. A full-page completeness audit that inspects every locale's output for every route is inherently heavier (potentially needs a built `dist/` to inspect, or headless-browser assertions) and is meant to run once (or occasionally, on-demand) to find the current gap — not on every commit. Baking it into the permanent CI gate either makes CI slow, or forces the audit logic to be watered down to something fast enough for every-push execution, defeating the audit's own purpose of being thorough. It also risks the exact trap PROJECT.md's milestone framing already fell into: conflating "247 lines changed" with "247 units need resync" — a heavier, less-precise tool is more likely to produce an inflated, misleading count.
+**Instead:** Two artifacts with two different lifecycles (see Suggested Build Order): a temporary/manually-invoked audit script for the audit phase (find the current gap, including anything beyond the one named commit), and a small, fast, permanent `verify-translation-drift.mjs` for every subsequent commit (Pattern 1). The audit's findings feed the resync work; the gate prevents recurrence going forward.
 
-### Anti-Pattern 5: Hand-port handler targeting the public API origin
-**What people do:** a hand-port calls `api.linear.app` / `api.stripe.com` because that is the documented API.
-**Why it's wrong:** the first-party session cookie is scoped to the app's own origin, not the separate API subdomain — the call would be unauthenticated, and `executeBoundSpec`'s origin-pin rejects the cross-origin target (`RECIPE_ORIGIN_MISMATCH`).
-**Do this instead:** target the app's OWN first-party origin + its internal/persisted-query endpoints (the verified github/slack/notion handler pattern; the test asserts no api-subdomain appears).
+### Anti-Pattern 3: Treating the Cookie Fix as "Just Flip a Boolean"
 
----
+**What people do:** Change the cookie branch to always redirect whenever a cookie is present, without re-checking the default-locale case or the loop-safety invariant.
+**Why it's wrong:** `en`'s `subPath` is `""` in this project's locale scheme (`LOCALE_SUBPATHS.en === ''`, `angular.json`'s `sourceLocale.subPath === ''`). A blind "always redirect to `/{cookieLocale}/`" would produce `res.redirect(302, '/en/')` when the cookie says `en`, and `/en/` is not a real subPath in this build's output — that would 404. The fix must special-case `cookieVal === defaultLocale` to still fall through to `next()` (already at the correct root), exactly as Pattern 2 shows.
+**Instead:** Preserve the three-way branch: (1) cookie says default locale -> `next()`; (2) cookie says a valid non-default supported locale -> active redirect; (3) no usable cookie -> fall through to existing Accept-Language-header logic. Also explicitly re-verify (and update, not silently break) the existing test at `tests/server-accept-language.test.js:81-85`, which currently encodes the pre-fix "cookie short-circuits" behavior as the expected/passing result for the `cookie=de, header=ja` case.
 
-## 8. Integration Points
+## Integration Points
 
-### External sources
+### External Services
 
-| Source | Integration pattern | Notes / gotchas |
-|--------|---------------------|------------------|
-| OpenTabs repo (`github.com/opentabs-dev/opentabs`, MIT) | vendor a **pinned snapshot** under `vendor/opentabs-snapshot/` (`PIN.md` = SHA + MIT); codegen reads metadata files only | `gh api repos/opentabs-dev/opentabs/...` confirmed working; op shape = `defineTool({name,displayName,description,summary,group,input:zod,output,handle})`; plugin shape = `package.json.opentabs.{urlPatterns,homepage}` + `src/index.ts` class. NEVER vendor/ship `dist/` runtime (Wall 1) |
-| `@opentabs-dev/plugin-sdk` | reference only (for the `defineTool`/`ToolDefinition` shape the codegen parses) | NOT a runtime dependency of FSB |
+None. This entire milestone's scope (i18n completeness audit, drift gate, cookie-redirect fix) is internal-repo tooling with zero new third-party services, npm dependencies, or external APIs. This matches the codebase's explicit stated preference across every relevant existing script (`verify-hreflang.mjs`: "Zero new npm dependencies"; `accept-language.js`: "Zero new dependencies — inline cookie parse + Node stdlib only").
 
-### Internal boundaries (★NEW / ◆MOD, real file paths)
+### Internal Boundaries
 
-| Boundary | Communication | State |
-|----------|---------------|-------|
-| `codegen-opentabs.mjs` → `catalog/descriptors/*.json` | writes JSON (committed) | **★NEW** |
-| `package-extension.mjs` → `recipe-index.generated.js` | existing `readJsonDir` + inline IIFE (`:51-89`) | **◆MOD** (one added call) |
-| `verify-catalog-crosscheck.mjs` → CI | `validate:extension` → `ci/all-green` | **★NEW** (mirror `verify-recipe-path-guard.mjs` wiring) |
-| `capability-search.js` ← `FsbRecipeIndex.descriptors` | indexes all descriptors (`:135-178`) | **UNCHANGED** + **◆MOD** add `getDescriptorBySlug` export (`:402`) |
-| `capability-catalog.js resolve()` ← descriptor index | typeof-guarded `_getDescriptor` → T3/T2 (`:285-360`) | **◆MOD** + `HEAD_HANDLER_MODULES` += ports (`:215-219`) |
-| `catalog/handlers/<app>.js` → `registerHandler` | self-register at load + `seedHeadHandlers()` | **★NEW** ~15-30 (shape = `github.js`) |
-| `background.js` importScripts | load handlers after catalog, before `seedHeadHandlers()` (`:191-197`) | **◆MOD** |
-| `service-denylist.json` ← (data) | loaded by `service-denylist.js` at boot (`background.js:213-222`) | **◆MOD data**; `service-denylist.js` code UNCHANGED |
-| `network-capture.js` ← `discovery-seeds.json` | reads endpoint hints in `startSession`/synthesizer | **◆MOD small** + **★NEW data** |
+| Boundary | Communication | Notes |
+|----------|-----------------|-------|
+| `verify-translation-drift.mjs` (new) ↔ `src/locale/*.xlf` | Direct filesystem read, regex-based XML parse (no XML library dependency, matching existing script style) | Must read the locale registry's `LOCALES`/`SOURCE_LOCALE` to derive the target-locale list dynamically, not hardcode it (avoids reproducing WARNING-01) |
+| `verify-translation-drift.mjs` (new) ↔ `ci.yml` `website` job | New named step, inserted into the existing linear step sequence | See Suggested Build Order for exact insertion point |
+| Full-page audit script (new, temporary) ↔ showcase pages/components | Either static-analysis (walk `.html` templates + cross-reference `i18n` attributes against XLIFF ids, similar to how `lint:i18n`'s eslint rule already inspects templates) or post-build inspection of `dist/showcase-angular/browser/{locale}/**` prerendered HTML | Recommend static-analysis-first (cheaper, no build required) since the goal is finding gaps in marking/translation coverage, not verifying rendered pixel output; the existing `verify-hreflang.mjs` precedent shows post-build HTML inspection is also an available pattern in this repo if the audit needs to verify what's actually rendered per-locale, not just what's marked |
+| `accept-language.js` (modified) ↔ `server.js` mount point | Unchanged — same `app.use(createAcceptLanguageMiddleware({...}))` call, same position (line 175, before `express.static` at line 182) | The fix is entirely internal to the middleware factory's returned function; the mount contract (options shape: `supported`, `defaultLocale`, `cookieName`) does not change |
+| `lint:i18n` (modified) ↔ `stats/` page components | Remove `--ignore-pattern "src/app/pages/stats/**"` from the `lint:i18n` npm script once stats-page translation work lands | Must land AFTER the stats page's own translation work is complete (see Suggested Build Order), not before, or `lint:i18n` will immediately hard-fail CI on pre-existing untranslated stats-page markup |
 
-### Invariants the integration must not move (verified against source)
+## Suggested Build Order
 
-- **INV-01:** the 2 tools stay OUTSIDE `TOOL_REGISTRY`; frozen non-trigger registry hash unmoved. BREADTH adds DATA + DEPTH adds handlers behind the SAME 2 tools — **no new MCP tool**, no schema change.
-- **INV-02:** both front doors keep calling the SAME `FsbCapabilityRouter.invoke` (`capability-router.js:654`); hand-ports register into the SAME catalog both doors read. No autopilot-only path.
-- **INV-03:** typed reasons (`RECIPE_DOM_FALLBACK_PENDING`, `RECIPE_LEARN_PENDING`, `RECIPE_CONSENT_BLOCKED`) byte-equal across all 7 providers (surface verbatim via the `/^RECIPE_.+$/` passthrough — NO `errors.ts` edit).
-- **INV-04:** the `agent-loop.js` setTimeout iterator untouched — invoke stays a single bounded async op.
-- **Wall 1:** descriptors are closed-vocab DATA; codegen NEVER emits a forbidden field name; `verify-recipe-path-guard.mjs` stays green (new catalog code stays dynamic-code-free even in comments).
-- **Wall 2:** every credentialed call still goes through `capability-fetch.js executeBoundSpec` in the MAIN world with the active-tab origin-pin; hand-ports are `executeBoundSpec`-only; CDP capture stays discovery-only.
+This directly answers the "audit the existing gap first, then add the permanent drift gate" sequencing concern from the milestone context. The dependency chain is:
 
----
-
-## 9. Phase Build Order (from Phase 35) — DENYLIST-FIRST, category-batched
-
-> Phases continue from v0.9.99's Phase 34. Ordering principle: **denylist before reach** (no sensitive app reachable before its category is covered), **pipeline before content** (codegen + no-dead-entry resolution before importing at scale), **breadth before depth** within a category, **discovery seeding alongside breadth**. Each phase keeps the existing surface green (INV-01..04 + Walls 1/2).
-
-| # | Phase | Scope | Touches (★NEW / ◆MOD) | Gates / invariant watch |
-|---|-------|-------|----------------------|-------------------------|
-| **35** | **Denylist Expansion (LANDS FIRST) + provenance scaffold** | Expand `service-denylist.json` denied+sensitive to cover ALL banking/payments/health/ToS-hostile origins across the 119 BEFORE anything imports. Vendor `vendor/opentabs-snapshot/` + `PIN.md` (MIT). Scaffold `catalog/descriptors/_provenance.json`. | ◆MOD `service-denylist.json`; ★NEW `vendor/opentabs-snapshot/`, `_provenance.json` | denylist host-pattern matches `service-denylist.js` loader; classify(sensitive) covers finance/health/social; nothing else reachable yet. **No INV touched.** |
-| **36** | **Codegen pipeline + no-dead-entry resolution** | `codegen-opentabs.mjs` (metadata→descriptor; zod→JSON-Schema; side-effect static-scan + escalate-to-write); `verify-catalog-crosscheck.mjs`. ◆MOD `capability-catalog.js` descriptor-only→T3/T2; ◆MOD `capability-search.js` `getDescriptorBySlug`. **Smoke on ONE non-sensitive category** (productivity: airtable/asana/clickup) to prove pipeline + the no-`RECIPE_NOT_FOUND`-for-searchable-slug harness assertion. | ★NEW `codegen-opentabs.mjs`, `verify-catalog-crosscheck.mjs`; ◆MOD catalog/search | search-eval harness re-passes (recall@k, wrong-invoke=0) on smoke corpus; every searchable slug resolves non-null; recipe-path guard PASS; INV-01 hash unmoved |
-| **37** | **Breadth A — Dev / Productivity** (non-sensitive) | Codegen + ship descriptors for linear, jira, confluence, clickup, asana, airtable, vercel, circleci, bitbucket, docker-hub, cloudflare, datadog(read), amplitude, … + discovery seeds. | ◆MOD generated index; ★NEW descriptors + seeds | crosscheck CI green; eval harness green on growing corpus; T3/T2 fallback verified |
-| **38** | **Breadth B — Comms / Social / Content** (sensitivity-screened) | Descriptors for discord, bluesky, reddit-extra, chatgpt, claude, etc. **Only after Phase 35 denylist covers any sensitive social origins.** Per-app sensitivity check before inclusion. | ★NEW descriptors + seeds | denylist-coverage assertion for this batch; eval harness green |
-| **39** | **Breadth C — Commerce / Travel / Misc** (sensitivity-screened) | Descriptors for booking, airbnb, bestbuy, costco, craigslist, dominos, chipotle, calendly, etc. Screen out / deny payment-bearing flows. | ★NEW descriptors + seeds | denylist-coverage assertion; payment-flow ops fail-closed (T3 DOM or denied) |
-| **40** | **Depth 1 — top hand-ports (read)** | Hand-port ~8-12 highest-value READ heads as T1a/T1b (linear.issues.list, jira.search, datadog.query, vercel.deployments, …): own origin, executeBoundSpec-only, HEAD_HANDLER_MODULES + importScripts. | ★NEW `catalog/handlers/*.js`; ◆MOD `capability-catalog.js`, `background.js` | head-handler tests (origin-separation, no api-subdomain, no token logging); router parity; INV-02 (both doors hit registered handlers) |
-| **41** | **Depth 2 — remaining hand-ports + guarded writes** | ~7-18 more heads incl. write ops that **fail-closed to DOM fallback** until live-captured (the `github.issues.create` pattern). Per-handler `[ASSUMED-ENDPOINT]` → human_needed live-UAT. | ★NEW handlers; ◆MOD catalog/background | guarded-write never stamps success; live-capture UAT recorded (not fabricated); INV-03 typed reasons byte-stable |
-| **42** | **Discovery seeding hardening + tail learn** | Finalize `discovery-seeds.json` for all non-hand-ported origins; ◆MOD `network-capture.js` to read endpoint hints; verify a seeded origin learns a T2 recipe via promote-after-replay (consent-gated). | ★NEW/◆MOD `discovery-seeds.json`; ◆MOD `network-capture.js` | discovery gate keeps sensitive-confirm; synthesizer caps to declarative-executable; learned T2 outranks descriptor-T3 next visit |
-| **43** | **Catalog-scale + milestone gate** | Measure index build/restore + generated-file parse at ~2,523 descriptors (split descriptors file if needed); final eval harness; 7-provider parity; full `npm test` EXIT 0; provenance/attribution complete (MIT). | ◆MOD (possible `descriptor-index.generated.js` split) | INV-01..04 all green; Walls 1/2 guards green; search performant at scale; milestone CI gate closed |
-
-**Category-batch dependency rationale:**
-- **35 (denylist) strictly first** — opt-out Auto makes the denylist the only floor; no category with a sensitive app imports before its origins are denied/sensitive-flagged.
-- **36 (pipeline) before any real import** — the no-dead-entry resolution + crosscheck guard must exist before 2,523 descriptors land, or the first batch ships dead/unsafe entries.
-- **37-39 (breadth) least-sensitive → most-sensitive** so denylist coverage is proven incrementally; each batch carries a denylist-coverage assertion.
-- **40-41 (depth) after breadth** — hand-ports upgrade the hot subset already discoverable from breadth; writes fail-closed until live-verified.
-- **42 (discovery) after breadth + depth** — seeds the tail that neither breadth-T3 nor depth-T1a covers with the API fast path via learning.
-- **43 (scale gate) last** — full-corpus performance + parity + provenance close, mirroring the v0.9.99 Phase-32 milestone-gate posture.
-
-**MV3-survivability across the build:** none of these phases touch the `agent-loop.js` setTimeout iterator (INV-04). Invoke stays a single bounded async op; codegen is build-time only; the catalog/search/network-capture edits are additive SW-module changes loaded via the existing `importScripts` chain.
-
----
+1. **Full-page completeness audit (temporary/diagnostic script or manual walkthrough).** Goal: enumerate every genuinely-untranslated-but-marked-translated string across all pages (lattice, phantom-stream, prometheus, home, mobile nav, stats, and anything else added since v0.9.63), not just the 5 units from commit `6d3ad363`. This step must run and complete BEFORE the permanent drift gate is wired into CI as hard-fail, because:
+   - The audit will very likely surface MORE than the 5 known-drifted units (the milestone's own goal statement — "every translatable string on every showcase page" — is broader than one commit's blast radius).
+   - If the permanent gate is wired hard-fail before this pre-existing debt is resolved, CI goes red immediately on the first commit that includes the new gate, for reasons unrelated to that commit (the classic "gate discovers pre-existing debt it didn't cause" problem).
+2. **Resync all units found in step 1** across the 5 target locale files (the 5 units from `6d3ad363` at minimum, plus whatever the broader audit finds). This includes the stats-page translation work (currently `lint:i18n`-ignored) since that's explicitly named as in-scope this milestone.
+3. **Un-ignore the stats page in `lint:i18n`** only after step 2's stats-page translation work is actually complete — removing `--ignore-pattern "src/app/pages/stats/**"` from `showcase/angular/package.json`'s `lint:i18n` script is itself a small, separate, ordered change that must come after the stats-page strings are marked and translated, not before.
+4. **Add `verify-translation-drift.mjs`** (Pattern 1) and wire it into `ci.yml`'s `website` job now that the tree is drift-free — it will pass on first wiring instead of immediately failing on residual debt from steps 1-3.
+   - Insertion point in `ci.yml`: after the "Verify ng extract-i18n produces no diff (CI-02)" step and before "Build Angular showcase" — this mirrors the existing ordering logic (cheap static-analysis / text-comparison gates run before the expensive `ng build` step) and matches the audit trail's own documented gate order (`verify-locale-sync → lint:i18n → extract-i18n-clean → ng build → verify:hreflang → verify-bundle-budgets`); the new gate slots in as `verify-locale-sync → lint:i18n → extract-i18n-clean → verify-translation-drift → ng build → verify:hreflang → verify-bundle-budgets`.
+5. **WARNING-02 cookie-redirect fix (Pattern 2)** has no dependency on steps 1-4 and can be built in parallel / any order relative to them — it touches a completely different file (`accept-language.js`) and a completely different concern (runtime redirect behavior, not build-time translation content). Sequence it wherever convenient in the phase/plan breakdown; it does not need to wait on the audit or the drift gate.
+6. **Retire or demote the audit script from step 1** once steps 1-4 are done. It served its purpose (finding and closing the gap); keeping it around as a stale, unmaintained "second i18n checker" that can silently diverge from the real permanent gate (`verify-translation-drift.mjs`) is the exact risk named in Anti-Pattern 2. Either delete it, or explicitly demote it to a manual/occasional `npm run audit:i18n` script with a comment clarifying it is NOT a CI gate and NOT guaranteed to stay in sync with `verify-translation-drift.mjs`'s logic.
 
 ## Sources
 
-- FSB substrate (read live, this repo, branch `automation`, 2026-06-23): `extension/utils/capability-catalog.js` (resolve/REGISTRY/HEAD_HANDLER_MODULES/seedHeadHandlers/registerHandler), `extension/utils/capability-router.js` (invoke/_evaluateConsent/tier dispatch/_deriveSideEffectClass), `extension/utils/capability-search.js` (buildIndex/deriveSideEffect/catalogVersion/getRecipeBySlug/restore), `extension/utils/consent-policy-store.js`, `extension/utils/service-denylist.js` (isDenied/classify/load), `extension/utils/network-capture.js` (startSession/consent gate/endpoint), `extension/background.js` (importScripts load order :191-222), `scripts/package-extension.mjs` (readJsonDir/generated IIFE/handler copy :41-115), `catalog/handlers/github.js` (T1a shape + self-register + guarded-write), `catalog/descriptors/*.json` (descriptor shape), `extension/config/service-denylist.json` (denylist data shape) — **HIGH**
-- FSB framing/invariants: `.planning/PROJECT.md` (v1.0.0 milestone, INV-01..04, Walls 1/2, "port + learn not clone"), `.planning/STATE.md` (Phase 26-34 decision log, tier vocabulary, opt-out-Auto Phase-30 note) — **HIGH**
-- v0.9.99 substrate architecture (preserved on-disk): [ARCHITECTURE-v0.9.99-CAPABILITY-CATALOG.md](ARCHITECTURE-v0.9.99-CAPABILITY-CATALOG.md) — the tiered-runtime/MAIN-world-fetch/consent-gate design this milestone integrates with — **HIGH**
-- OpenTabs op metadata (read live via authenticated `gh api repos/opentabs-dev/opentabs/...`): `plugins/airtable/{package.json (opentabs.urlPatterns/homepage), src/index.ts (plugin class + ToolDefinition[]), src/tools/list-records.ts (apiGet read op), src/tools/update-cell.ts (apiPost write op)}`; 119 plugin dirs confirmed (`plugins/` dir count); `defineTool({name,displayName,description,summary,group,input:zod,output,handle})` shape — **HIGH**
-- OpenTabs license: MIT (repo `LICENSE`); attribution already in FSB README Acknowledgements — **HIGH**
+All findings in this document are verified directly against this repository's own source files and git history (internal-architecture research, not external-ecosystem research):
+
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/PROJECT.md` (milestone goal, target features, key context, WARNING-02 history across 5+ milestone mentions)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/package.json` (existing `lint:i18n` script, confirmed `stats/**` ignore-pattern currently present)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/angular.json` (`i18n.locales` block, `i18nMissingTranslation: error` build option, `sourceLocale.subPath` = `""`)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/scripts/verify-locale-sync.mjs` (confirmed scope: registry-parity only, no content diffing)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/scripts/verify-hreflang.mjs` (existing script style/conventions precedent)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/server.js` (middleware mount order, lines 171-179; static-serving setup)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/src/middleware/accept-language.js` (full source of the WARNING-02 bug, cookie-branch logic)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/server/src/utils/locale-constants.js` and Angular's `.ts` mirror (locale registry single-source-of-truth)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/tests/server-accept-language.test.js` (42-assertion existing test coverage, including the exact assertion that must flip under the WARNING-02 fix)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.github/workflows/ci.yml` (exact `website` job step order — this is the literal insertion point for the new gate)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/phases/v0.9.63-INTEGRATION-CHECK.md` (original WARNING-01/WARNING-02/WARNING-03 audit findings, E2E flow traces, requirements integration map)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/milestones/v0.9.63-*.md` and `.planning/MILESTONES.md` (audit trail confirming WARNING-02 was deliberately deferred as a design lock, not an oversight)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/.planning/milestones/v0.9.69-phases/275-privacy-policy-cws-listing-ci-guard-integration-smoke/275-SUMMARY.md` (confirms `extract-i18n-clean` is not a literal npm script name — it's shorthand for the CI shell pipeline)
+- `/Users/lakshman/conductor/workspaces/fsb/san-antonio/showcase/angular/src/locale/messages*.xlf` (direct file inspection: confirmed 996/996 `state="translated"` in every target file today, proving the structural gate is fully green while semantic drift silently exists)
+- Git commit `6d3ad363619a731336ffb5f4480a92346339201a` (`chore(i18n): sync messages.xlf with showcase copy refinements`) — directly diffed both as raw git-stat (247/247) and as an id-keyed trans-unit comparison (5 real changes), which is the basis for this document's central framing correction
+- XLIFF 1.2 specification (OASIS, `urn:oasis:names:tc:xliff:document:1.2`) — background on the `<source>`/`<target>` mirroring convention that Pattern 1's diff logic exploits; general industry knowledge of TMS "source drift" / "fuzzy match invalidation" conventions (Phrase, Lokalise, Crowdin all implement variants of this), offered as context for why this pattern is a recognized approach rather than an ad hoc invention — MEDIUM confidence on the general industry-convention claim (not verified against those specific vendors' docs in this session), HIGH confidence on everything else in this document since it was verified directly against this repo's own files
 
 ---
-*Architecture research for: Full App Catalog (OpenTabs Parity) — integration into FSB's v0.9.99 tiered capability substrate*
-*Researched: 2026-06-23*
+*Architecture research for: Angular-i18n showcase site — translation-completeness verification and drift-detection CI gate design*
+*Researched: 2026-07-07*

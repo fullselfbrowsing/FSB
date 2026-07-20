@@ -9,7 +9,7 @@
  *   future refactor that renames or alters the algorithm fails CI loud.
  *
  * (Suite B, the agentHistoryRing sparkline ring-buffer guard, was removed
- * when the Phase 274 redesign trimmed the /stats tab list to 6 views and
+ * when the Stats redesign trimmed the /stats tab list and
  * dropped 'fsb-agents-running' -- the ring buffer it guarded no longer
  * exists in stats-page.component.ts.)
  *
@@ -36,6 +36,8 @@ const path = require('path');
 
 const SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/stats/github-stats.service.ts');
 const COMPONENT_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/stats/stats-page.component.ts');
+const COMPONENT_HTML_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/stats/stats-page.component.html');
+const COMPONENT_SCSS_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/stats/stats-page.component.scss');
 const GLOBE_SERVICE_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/core/globe/globe-visualization.service.ts');
 const SITEMAPS_PATH = path.join(__dirname, '..', 'showcase/angular/src/app/pages/sitemaps/sitemaps-page.component.ts');
 
@@ -209,7 +211,11 @@ function commitPunchcardLocal(commits) {
 
 {
   let src = '';
+  let html = '';
+  let scss = '';
   try { src = fs.readFileSync(COMPONENT_PATH, 'utf8'); } catch { /* swallow */ }
+  try { html = fs.readFileSync(COMPONENT_HTML_PATH, 'utf8'); } catch { /* swallow */ }
+  try { scss = fs.readFileSync(COMPONENT_SCSS_PATH, 'utf8'); } catch { /* swallow */ }
   const setViewStart = src.indexOf('  setView(');
   const setViewEnd = src.indexOf('  onTabsEnter', setViewStart);
   const setViewBlock = setViewStart >= 0 && setViewEnd > setViewStart
@@ -246,13 +252,13 @@ function commitPunchcardLocal(commits) {
     destroyBlock.includes('this.cancelPendingViewRedraw();'),
     'ngOnDestroy() does not call cancelPendingViewRedraw()');
 
-  // Review-fix guards -- globe lifecycle hardening + fan-picker state.
-  const rateStart = src.indexOf('  private applyRateLimit(');
-  const rateEnd = src.indexOf('  private scheduleViewRedraw', rateStart);
-  const rateBlock = rateStart >= 0 && rateEnd > rateStart ? src.slice(rateStart, rateEnd) : '';
-  check('stats globe: applyRateLimit stops a running globe before the ready template unmounts',
-    rateBlock.includes('this.stopGlobe?.();') && rateBlock.includes('this.stopGlobe = undefined;'),
-    'applyRateLimit() does not tear down the globe rAF loop');
+  // Review-fix guards -- selected-source state owns visualization teardown.
+  const sourceStart = src.indexOf('  private onSourceState(');
+  const sourceEnd = src.indexOf('  private scheduleViewRedraw', sourceStart);
+  const sourceBlock = sourceStart >= 0 && sourceEnd > sourceStart ? src.slice(sourceStart, sourceEnd) : '';
+  check('stats globe: a selected source becoming unavailable tears down its visualization',
+    sourceBlock.includes('if (!this.isViewRenderable) this.teardownVisualization();'),
+    'onSourceState() does not tear down an unrenderable selected view');
 
   const redrawStart = src.indexOf('  private redrawChart(');
   const redrawEnd = src.indexOf('  private buildGlobeRegions', redrawStart);
@@ -260,9 +266,9 @@ function commitPunchcardLocal(commits) {
   check('stats globe: redrawChart keeps the running globe when regions are unchanged',
     /if\s*\(this\.stopGlobe\s*&&\s*key\s*===\s*this\.lastGlobeKey\)\s*return;/.test(redrawBlock),
     'redrawChart() lacks the stopGlobe && key === lastGlobeKey early return');
-  check('stats globe: globe signature key derives from popular_regions',
-    redrawBlock.includes('JSON.stringify(this.latestFsbHeadline?.popular_regions ?? [])'),
-    'redrawChart() key is not JSON.stringify(latestFsbHeadline?.popular_regions ?? [])');
+  check('stats globe: globe signature key derives from popular_regions and motion preference',
+    /JSON\.stringify\(\{[\s\S]*regions:\s*this\.latestFsbHeadline\?\.popular_regions\s*\?\?\s*\[\][\s\S]*reducedMotion:\s*this\.prefersReducedMotion/.test(redrawBlock),
+    'redrawChart() globe key does not include popular_regions + reducedMotion');
   check('stats globe: no unconditional globe teardown ahead of the fsb-active-now branch',
     redrawBlock.indexOf("selectedView === 'fsb-active-now'") !== -1 &&
       redrawBlock.indexOf("selectedView === 'fsb-active-now'") < redrawBlock.indexOf('this.stopGlobe?.();'),
@@ -273,6 +279,104 @@ function commitPunchcardLocal(commits) {
   check('stats tabs: reselecting the active view clears pulse/frozen state',
     /if\s*\(this\.selectedView\s*===\s*id\)\s*\{[^}]*this\.tabPulse\s*=\s*false;[^}]*this\.frozenView\s*=\s*null;[^}]*\}/.test(src),
     'setView() early-return leaves tabPulse/frozenView sticky');
+
+  check('stats charts: constructor failures become a view-scoped Unavailable state',
+    /chartRenderErrorView\s*===\s*this\.selectedView/.test(src) &&
+      /new\s+this\.ChartCtor\([\s\S]*catch\s*\([^)]*\)[\s\S]*chartRenderErrorView\s*=\s*this\.selectedView/.test(src),
+    'chart constructor errors are not connected to the selected view state');
+  check('stats charts: a later view/data redraw can clear a render error',
+    /clearChartRenderError\(id\)/.test(setViewBlock) &&
+      /clearChartRenderError\(this\.selectedView\)/.test(sourceBlock),
+    'render errors are sticky and cannot be retried after a view/data change');
+  check('stats charts: non-Chart views remain independent of Chart.js failures',
+    /requiresChartLibrary[\s\S]*stars-cumulative[\s\S]*commits-cumulative[\s\S]*fsb-tokens[\s\S]*fsb-popular-mcp/.test(src) &&
+      !/requiresChartLibrary[\s\S]{0,500}issues-open-vs-closed/.test(src),
+    'requiresChartLibrary unexpectedly includes the SVG/globe views');
+
+  const viewsBlock = src.match(/readonly\s+views[^=]*=\s*\[([\s\S]*?)\];/);
+  const viewIds = viewsBlock
+    ? [...viewsBlock[1].matchAll(/\bid:\s*'([^']+)'/g)].map((match) => match[1])
+    : [];
+  check('stats tabs: picker exposes exactly the five supported views',
+    JSON.stringify(viewIds) === JSON.stringify([
+      'stars-cumulative',
+      'commits-cumulative',
+      'fsb-active-now',
+      'fsb-tokens',
+      'fsb-popular-mcp',
+    ]),
+    `expected five supported views, got ${JSON.stringify(viewIds)}`);
+  check('stats tabs: picker uses the five short labels',
+    Boolean(viewsBlock) &&
+      viewsBlock[1].includes('stats.view.cumulativeStars:Stars') &&
+      viewsBlock[1].includes('stats.view.cumulativeCommits:Commits') &&
+      viewsBlock[1].includes('SHOWCASE_STATS_FSB_VIEW_ACTIVE:Active now') &&
+      viewsBlock[1].includes('SHOWCASE_STATS_FSB_VIEW_TOKENS:Tokens') &&
+      viewsBlock[1].includes('SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP:Popular') &&
+      !/:Cumulative|:Popular MCP clients|:Active agents|reported/i.test(viewsBlock[1]),
+    'picker labels are not Stars, Commits, Active now, Tokens, Popular');
+  check('stats issues: retired view and Sankey implementation are absent',
+    !src.includes('issues-open-vs-closed') &&
+      !src.includes('issuesSankey') &&
+      !html.includes('headline-dot') &&
+      !scss.includes('.sankey-svg'),
+    'retired Issues/Sankey or headline separator markup remains');
+
+  check('stats FSB summary: redundant aggregate status pill is absent',
+    !html.includes('class="stats-fsb-status"') &&
+      !scss.includes('.stats-fsb-status') &&
+      !src.includes('fsbSummaryStatusTitle'),
+    'FSB aggregate metrics / Live status pill remains visible');
+  check('stats FSB summary: stale active snapshots are not labelled right now',
+    /@if\s*\(isFsbActiveSnapshotCurrent\)[\s\S]*SHOWCASE_STATS_FSB_HEADLINE_ACTIVE/.test(html),
+    'active-right-now copy is not gated on a current active snapshot');
+  check('stats FSB metrics: averages use reporting users without visible reported copy',
+    src.includes('avg_agents_per_reporting_user') &&
+      src.includes('reportingUsers > 0') &&
+      src.includes('avg/reporting user') &&
+      src.includes('tokens (24h)') &&
+      html.includes('tokens (24h)') &&
+      !/\$localize`[^`]*reported/i.test(src) &&
+      !/>\s*reported/i.test(html),
+    'visible Stats copy still contains the reported qualifier');
+  check('stats FSB metrics: agent-days use only the active-v2 history',
+    src.includes('agent_days_since_active_v2') &&
+      !/formattedFsbAgentDays[\s\S]{0,300}(?:agent_days_lifetime|total_agents_lifetime)/.test(src) &&
+      html.includes('agent-days since active v2'),
+    'headline still renders a corrupt lifetime active-agent aggregate');
+
+  check('stats tabs: fan selection restores focus to the disclosure button',
+    /\(click\)="selectFanView\(opt\.id\)"/.test(html) &&
+      /selectFanView\([^)]*\)[\s\S]{0,220}activeViewButton\?\.nativeElement\.focus\(\)/.test(src),
+    'fan option activation can leave focus on a hidden button');
+
+  check('stats globe: region values have an accessible fallback list',
+    html.includes("[attr.aria-describedby]=\"accessibleGlobeData.length ? 'stats-globe-data' : null\"") &&
+      html.includes('id="stats-globe-data"') &&
+      /get\s+accessibleGlobeData\(\)[\s\S]*popular_regions/.test(src),
+    'globe canvas lacks a described region/count list');
+
+  check('stats tabs: grid fallback covers narrow-tablet widths before clipping',
+    /@media\s*\(max-width:\s*8(?:0|1|2)0px\)\s*\{[\s\S]*\.stats-tab-fan-left[\s\S]*grid-template-columns/.test(scss),
+    'fan grid fallback still starts at a phone-only breakpoint');
+  check('stats tabs: both mobile fan rows use a 2/2 grid',
+    /\.stats-tab-fan-left\s+\.stats-tab-fan-track\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(scss) &&
+      /\.stats-tab-fan-right\s+\.stats-tab-fan-track\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(scss),
+    'mobile fan rows are not both configured as two equal columns');
+  check('stats tabs: mobile fan labels wrap in flow without truncation',
+    /\.stats-tab-option-layer\s*\{[\s\S]*?display:\s*grid;[\s\S]*?max-height:\s*0;/.test(scss) &&
+      /\.stats-tab-fan-left,\s*\n\s*\.stats-tab-fan-right\s*\{[\s\S]*?position:\s*static;/.test(scss) &&
+      /\.stats-tab-fan-item\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?text-overflow:\s*clip;[\s\S]*?white-space:\s*normal;/.test(scss),
+    'mobile fan labels can still be clipped at narrow widths or high text zoom');
+  check('stats headline: wrappers are transparent and pills own the chrome',
+    /\.stats-tab-metrics,\s*\n\.stats-headline\s*\{[\s\S]*?padding:\s*0;[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/.test(scss) &&
+      /\.headline-cell\s*\{[\s\S]*?min-height:\s*2\.25rem;[\s\S]*?padding:\s*0\.35rem\s+0\.7rem;[\s\S]*?border-radius:\s*999px;/.test(scss),
+    'headline chrome is still on a large wrapper instead of compact pills');
+  check('stats headline: compact pills use small type and no interactive cue',
+    /\.headline-cell\s+strong\s*\{[\s\S]*?font-size:\s*1rem;/.test(scss) &&
+      /\.headline-cell\s*\{[\s\S]*?font-size:\s*0\.7[2-5]rem;/.test(scss) &&
+      /\.headline-cell\s*\{[\s\S]*?cursor:\s*default;/.test(scss),
+    'headline pills do not match the compact, neutral metric treatment');
 }
 
 // -----------------------------------------------------------------------------
@@ -298,6 +402,10 @@ function commitPunchcardLocal(commits) {
   check('globe service: setupGlobe body no longer re-seeds its own PRNG',
     !/const\s+random\s*=\s*createSeededRandom\(719\);/.test(gsrc),
     'setupGlobe() still constructs an internal createSeededRandom(719)');
+  check('globe service: reduced-motion mode draws without scheduling a recurring frame',
+    /if\s*\(animate\)\s*rafId\s*=\s*window\.requestAnimationFrame\(draw\)/.test(gsrc) &&
+      /redrawStatic\s*=\s*\(\)\s*=>\s*draw\(performance\.now\(\)\)/.test(gsrc),
+    'setupGlobe() lacks a static animate=false rendering path');
   check('sitemaps globe: source file readable',
     ssrc.length > 0,
     `could not read ${SITEMAPS_PATH}`);

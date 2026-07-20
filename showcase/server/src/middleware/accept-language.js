@@ -1,9 +1,12 @@
 // Phase 267 / ROUTE-03 -- Accept-Language auto-detection middleware.
+// Phase 56 / WARNING-02 -- cookie-directed redirect for returning visitors.
 //
 // On bare `GET /`, parse the browser's Accept-Language header, pick the best
-// matching supported locale, and 302-redirect to its subpath. Cookie wins
-// (existing `fsb-locale` short-circuits). Bots (no header) and EN-preferring
-// users fall through to the EN root.
+// matching supported locale, and 302-redirect to its subpath. A valid
+// non-default `fsb-locale` cookie wins by redirecting to that locale's
+// subpath; the default-locale cookie (`en`) falls through to the EN root
+// (never `/en/`, which 404s). Bots (no header) and EN-preferring browsers
+// also fall through. Loop-safe: only `/` is gated (`req.path !== '/'` → next).
 //
 // Zero new dependencies -- inline cookie parse + Node stdlib only.
 
@@ -81,6 +84,16 @@ function parseCookieHeader(rawCookieHeader, name) {
   return null;
 }
 
+function getQuerySuffix(req) {
+  const rawUrl = (req && typeof req.originalUrl === 'string')
+    ? req.originalUrl
+    : (req && typeof req.url === 'string')
+      ? req.url
+      : '';
+  const queryStart = rawUrl.indexOf('?');
+  return queryStart >= 0 ? rawUrl.slice(queryStart) : '';
+}
+
 function createAcceptLanguageMiddleware(options) {
   const supported = options && Array.isArray(options.supported) ? options.supported : [];
   const defaultLocale = (options && options.defaultLocale) || 'en';
@@ -93,8 +106,14 @@ function createAcceptLanguageMiddleware(options) {
       if (req.path !== '/') return next();
 
       const cookieVal = parseCookieHeader(req.headers && req.headers.cookie, cookieName);
-      if (cookieVal && (supportedSet.has(cookieVal) || cookieVal === defaultLocale)) {
-        return next();
+      if (cookieVal) {
+        // Default locale cookie: serve EN root (never redirect to /en/).
+        if (cookieVal === defaultLocale) return next();
+        // Valid non-default picker cookie: redirect to that locale's subpath.
+        if (supportedSet.has(cookieVal)) {
+          return res.redirect(302, '/' + cookieVal + '/' + getQuerySuffix(req));
+        }
+        // Unknown cookie value: ignore and fall through to Accept-Language.
       }
 
       const best = pickBestLocale(req.headers && req.headers['accept-language'], supported);

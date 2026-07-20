@@ -1959,6 +1959,7 @@ class FSBWebSocket {
     if (!task) {
       this.send('ext:task-complete', {
         success: false,
+        errorCode: 'dashboard_task_missing',
         error: 'No task provided',
         elapsed: 0,
         taskRunId: '',
@@ -1976,6 +1977,7 @@ class FSBWebSocket {
       if (hasRunning) {
         this.send('ext:task-complete', {
           success: false,
+          errorCode: 'dashboard_task_already_running',
           error: 'Another task is already running',
           elapsed: 0,
           taskRunId: '',
@@ -2031,6 +2033,7 @@ class FSBWebSocket {
       if (!tabId) {
         this.send('ext:task-complete', {
           success: false,
+          errorCode: 'dashboard_task_no_usable_tab',
           error: 'No usable browser tab found for automation',
           elapsed: 0,
           taskRunId: '',
@@ -2065,6 +2068,7 @@ class FSBWebSocket {
           // task actually finishes.
           this.send('ext:task-complete', {
             success: false,
+            errorCode: 'dashboard_task_start_failed',
             error: (result && result.error) || 'Failed to start automation',
             elapsed: 0,
             taskRunId: '',
@@ -2078,6 +2082,7 @@ class FSBWebSocket {
     } catch (err) {
       this.send('ext:task-complete', {
         success: false,
+        errorCode: 'dashboard_task_start_exception',
         error: err.message,
         elapsed: 0,
         taskRunId: '',

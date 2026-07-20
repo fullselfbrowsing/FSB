@@ -3,7 +3,7 @@
  *
  * Phase 272 / v0.9.69 telemetry pipeline. Reads fsbUsageData rows produced by
  * Phase 271's MCPMetricsRecorder, aggregates by (mcp_client, model) within a
- * watermarked 5-minute window, and POSTs 9-field allowlisted events to the
+ * watermarked 5-minute window, and POSTs versioned 10-field events to the
  * server every 5 minutes via chrome.alarms. Survives MV3 service-worker
  * eviction because the queue + watermark + alarm all live in chrome.storage.
  *
@@ -17,7 +17,7 @@
  *       enqueue events, POST queue, clear sent / re-enqueue failed. Honors
  *       opt-out live (re-reads on every call). NEVER throws.
  *   - enqueue(event)                  -> Promise<void>
- *       Append a partial event to fsbTelemetryQueue. Assembles the full 9-field
+ *       Append a partial event to fsbTelemetryQueue. Assembles the full event
  *       payload internally if `event_type === 'install_announce'` (or any
  *       partial input) so background.js callers do NOT construct the shape.
  *       Mints event_id at enqueue time so retries share the ID (server INSERT
@@ -29,9 +29,10 @@
  *
  * Hard constraints (CONTEXT D-decisions + threat register):
  *   - The aggregation MUST copy only mcp_client, model, tokens_in, tokens_out,
- *     ts from fsbUsageData rows. The 9-field payload allowlist (event_id,
+ *     ts from fsbUsageData rows. The payload allowlist (event_id,
  *     install_uuid, ts_minute, mcp_client, model, tokens_in, tokens_out,
- *     active_agent_count, event_type) is the ENTIRE shape. Static-grep gate
+ *     active_agent_count, event_type, active_count_version) is the ENTIRE
+ *     versioned shape. Static-grep gate
  *     at tests/telemetry-payload-allowlist.test.js + runtime test section 9
  *     both enforce. NEVER spread `...row` or `Object.assign` row fields.
  *   - Forbidden identifiers in source (outside comments): tool, cost_usd,
@@ -70,15 +71,22 @@ var USAGE_DATA_KEY = 'fsbUsageData';
 // Queue + retry caps per CONTEXT specifics.
 var MAX_QUEUE_LENGTH = 200;
 var MAX_ATTEMPTS_PER_EVENT = 5;
+var MAX_ACTIVE_AGENT_COUNT = 64;
+var MAX_TOKEN_COUNT = 10000000;
+var MAX_AGGREGATE_CHUNKS = 50;
+var MAX_WIRE_EVENTS = 50;
+var MAX_WIRE_BYTES = 30 * 1024;
+var ACTIVE_COUNT_VERSION = 2;
 var STALE_DROP_MS = 86400000; // 24h in ms (24*60*60*1000).
 
 // Periodic ts_minute resolution (BEAT-05): one minute, in ms.
 var ONE_MINUTE_MS = 60000;
 
-// The exact 9-key payload allowlist. Order is alphabetical for the test's
+// The exact payload allowlist. Order is alphabetical for the test's
 // Object.keys().sort() comparison.
 var ALLOWED_EVENT_KEYS = Object.freeze([
   'active_agent_count',
+  'active_count_version',
   'event_id',
   'event_type',
   'install_uuid',
@@ -88,6 +96,24 @@ var ALLOWED_EVENT_KEYS = Object.freeze([
   'tokens_out',
   'ts_minute'
 ]);
+
+var MCP_CLIENT_LABELS = {
+  'claude': 'Claude',
+  'claude-code': 'Claude',
+  'codex': 'Codex',
+  'chatgpt': 'ChatGPT',
+  'perplexity': 'Perplexity',
+  'windsurf': 'Windsurf',
+  'cursor': 'Cursor',
+  'antigravity': 'Antigravity',
+  'opencode': 'OpenCode',
+  'openclaw': 'OpenClaw',
+  'openclaw 🦀': 'OpenClaw 🦀',
+  'grok': 'Grok',
+  'gemini': 'Gemini',
+  'hermes': 'Hermes',
+  'unknown': 'unknown'
+};
 
 // ---------------------------------------------------------------------------
 // Test seams (Node CommonJS injection points)
@@ -169,29 +195,91 @@ function _mintEventId() {
       return globalThis.crypto.randomUUID();
     }
   } catch (_e) { /* fall through */ }
-  // Last-resort fallback: time + random. The event_id is opaque to the
-  // server; it only needs uniqueness within the install + dedup window.
-  return 'fallback-' + _now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  // Last-resort RFC 4122 v4-shaped fallback. The server validates UUID shape,
+  // so an opaque `fallback-*` identifier would poison the whole batch.
+  var seed = _now();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(ch) {
+    var randomNibble = (Math.random() * 16 + (seed % 16)) % 16 | 0;
+    seed = Math.floor(seed / 16);
+    return (ch === 'x' ? randomNibble : (randomNibble & 0x3) | 0x8).toString(16);
+  });
 }
 
 function _coerceActiveAgentCount(raw) {
   // BEAT-09 contract: default 0 if missing or non-numeric or negative.
-  // Floor truncates any drift from a future contributor passing a float.
+  // Floor floats and clamp stale legacy mirrors to the registry's hard cap so
+  // every fallback value remains valid at the server boundary.
   if (typeof raw === 'number' && isFinite(raw) && raw >= 0) {
-    return Math.floor(raw);
+    return Math.min(MAX_ACTIVE_AGENT_COUNT, Math.floor(raw));
   }
   return 0;
 }
 
-async function _readActiveAgentCount(storage) {
-  // Best-effort read. A storage failure here yields 0 (the safe default per
-  // BEAT-09); the collector never throws because of counter unavailability.
-  if (!storage) return 0;
+function _normalizeMcpClient(raw) {
+  if (typeof raw !== 'string') return 'unknown';
+  var trimmed = raw.trim();
+  if (!trimmed) return 'unknown';
+  return MCP_CLIENT_LABELS[trimmed.toLowerCase()] || 'unknown';
+}
+
+function _normalizeModel(raw) {
+  if (typeof raw !== 'string') return 'unknown';
+  var trimmed = raw.trim();
+  return trimmed ? trimmed.slice(0, 128) : 'unknown';
+}
+
+function _utf8ByteLength(text) {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(text).byteLength;
+  }
+  return unescape(encodeURIComponent(text)).length;
+}
+
+async function _readActiveAgentSnapshot(storage) {
+  // background.js publishes the independent wake-up bootstrap promise before
+  // it starts restoring unrelated automation/session state. Waiting for it
+  // here prevents an alarm that fires during hydration from observing either
+  // the registry's transient empty Map or the stale compatibility mirror.
+  try {
+    var registryReady = (typeof globalThis !== 'undefined')
+      ? globalThis.fsbAgentRegistryReady
+      : null;
+    if (registryReady && typeof registryReady.then === 'function') {
+      await registryReady;
+    }
+  } catch (_e) { /* bootstrap is best-effort; use the live instance if any */ }
+
+  // The live registry is authoritative. Its Map is reconciled against open
+  // tabs on service-worker wake, so lifecycle paths that bypass an explicit
+  // agent:release cannot leave this count inflated. Refresh the old storage
+  // key for compatibility with older extension contexts.
+  try {
+    var registry = (typeof globalThis !== 'undefined')
+      ? globalThis.fsbAgentRegistryInstance
+      : null;
+    if (registry && typeof registry.getActiveAgentCount === 'function') {
+      var registryCount = _coerceActiveAgentCount(registry.getActiveAgentCount());
+      if (storage && typeof storage.set === 'function') {
+        try {
+          var reconciled = {};
+          reconciled[ACTIVE_AGENTS_KEY] = registryCount;
+          await storage.set(reconciled);
+        } catch (_e) { /* best-effort compatibility mirror */ }
+      }
+      return { count: registryCount, version: ACTIVE_COUNT_VERSION };
+    }
+  } catch (_e) { /* fall through to the compatibility mirror */ }
+
+  // Backward-compatible fallback for startup/test contexts without a hydrated
+  // registry. The local-storage mirror may predate lifecycle reconciliation,
+  // so its count is carried only as protocol v0; the server quarantines it
+  // from every active-agent aggregate. A storage failure yields zero/v0.
+  if (!storage) return { count: 0, version: 0 };
   try {
     var data = await storage.get([ACTIVE_AGENTS_KEY]);
-    return _coerceActiveAgentCount(data && data[ACTIVE_AGENTS_KEY]);
+    return { count: _coerceActiveAgentCount(data && data[ACTIVE_AGENTS_KEY]), version: 0 };
   } catch (_e) {
-    return 0;
+    return { count: 0, version: 0 };
   }
 }
 
@@ -275,10 +363,10 @@ function _applyAttemptsCap(queue) {
 }
 
 // ---------------------------------------------------------------------------
-// Event assembly (the 9-key allowlist gate, in code)
+// Event assembly (the versioned allowlist gate, in code)
 // ---------------------------------------------------------------------------
 //
-// Build the canonical 9-field event from a (client, model, tokens_in,
+// Build the canonical event from a (client, model, tokens_in,
 // tokens_out) tuple + ambient fields (install_uuid, active_agent_count).
 // The literal object expression below is the in-code expression of the
 // payload allowlist -- if a future contributor wants to add a field, they
@@ -288,25 +376,24 @@ function _applyAttemptsCap(queue) {
 function _buildEvent(input) {
   // Defensive coercion. Every field reaches its allowlisted value or a
   // typed default; no row reference escapes this site.
-  var mcpClientLabel = (typeof input.mcp_client === 'string' && input.mcp_client.length > 0)
-    ? input.mcp_client
-    : 'unknown';
-  var modelLabel = (typeof input.model === 'string' && input.model.length > 0)
-    ? input.model
-    : 'unknown';
+  var mcpClientLabel = _normalizeMcpClient(input.mcp_client);
+  var modelLabel = _normalizeModel(input.model);
   var tokensInSum = (typeof input.tokens_in === 'number' && isFinite(input.tokens_in) && input.tokens_in >= 0)
-    ? Math.floor(input.tokens_in)
+    ? Math.min(MAX_TOKEN_COUNT, Math.floor(input.tokens_in))
     : 0;
   var tokensOutSum = (typeof input.tokens_out === 'number' && isFinite(input.tokens_out) && input.tokens_out >= 0)
-    ? Math.floor(input.tokens_out)
+    ? Math.min(MAX_TOKEN_COUNT, Math.floor(input.tokens_out))
     : 0;
   var activeAgentCount = _coerceActiveAgentCount(input.active_agent_count);
+  var activeCountVersion = input.active_count_version === ACTIVE_COUNT_VERSION
+    ? ACTIVE_COUNT_VERSION
+    : 0;
   var installUuid = (typeof input.install_uuid === 'string' && input.install_uuid.length > 0)
     ? input.install_uuid
     : '';
   var eventType = (input.event_type === 'install_announce') ? 'install_announce' : 'periodic';
 
-  // ALL NINE FIELDS, EXPLICITLY. No spread. No extras. No tool / cost_usd /
+  // ALL VERSIONED FIELDS, EXPLICITLY. No spread. No extras. No tool / cost_usd /
   // pricing_confidence / token_source / prompt / href / etc.
   return {
     event_id: _mintEventId(),
@@ -317,8 +404,79 @@ function _buildEvent(input) {
     tokens_in: tokensInSum,
     tokens_out: tokensOutSum,
     active_agent_count: activeAgentCount,
-    event_type: eventType
+    event_type: eventType,
+    active_count_version: activeCountVersion
   };
+}
+
+// Build the minimum number of server-valid events needed to represent one
+// five-minute (client, model) aggregate without losing tokens. `_buildEvent`
+// deliberately clamps direct/untrusted callers at MAX_TOKEN_COUNT; aggregate
+// totals are trusted collector arithmetic, so split them before that boundary
+// and preserve their exact integer sums across independently retryable events.
+function _buildAggregateEvents(input) {
+  var maxAggregateTokens = MAX_TOKEN_COUNT * MAX_AGGREGATE_CHUNKS;
+  var totalIn = (typeof input.tokens_in === 'number' && isFinite(input.tokens_in) && input.tokens_in >= 0)
+    ? Math.min(maxAggregateTokens, Math.floor(input.tokens_in))
+    : 0;
+  var totalOut = (typeof input.tokens_out === 'number' && isFinite(input.tokens_out) && input.tokens_out >= 0)
+    ? Math.min(maxAggregateTokens, Math.floor(input.tokens_out))
+    : 0;
+  var chunkCount = Math.max(
+    1,
+    Math.ceil(totalIn / MAX_TOKEN_COUNT),
+    Math.ceil(totalOut / MAX_TOKEN_COUNT)
+  );
+  var remainingIn = totalIn;
+  var remainingOut = totalOut;
+  var events = [];
+  for (var i = 0; i < chunkCount; i++) {
+    var chunkIn = Math.min(MAX_TOKEN_COUNT, remainingIn);
+    var chunkOut = Math.min(MAX_TOKEN_COUNT, remainingOut);
+    events.push(_buildEvent({
+      install_uuid: input.install_uuid,
+      mcp_client: input.mcp_client,
+      model: input.model,
+      tokens_in: chunkIn,
+      tokens_out: chunkOut,
+      active_agent_count: input.active_agent_count,
+      active_count_version: input.active_count_version,
+      event_type: input.event_type
+    }));
+    remainingIn -= chunkIn;
+    remainingOut -= chunkOut;
+  }
+  return events;
+}
+
+function _projectWireEvent(src) {
+  return {
+    event_id: src.event_id,
+    install_uuid: src.install_uuid,
+    ts_minute: src.ts_minute,
+    mcp_client: _normalizeMcpClient(src.mcp_client),
+    model: _normalizeModel(src.model),
+    tokens_in: (typeof src.tokens_in === 'number' && isFinite(src.tokens_in) && src.tokens_in >= 0)
+      ? Math.min(MAX_TOKEN_COUNT, Math.floor(src.tokens_in)) : 0,
+    tokens_out: (typeof src.tokens_out === 'number' && isFinite(src.tokens_out) && src.tokens_out >= 0)
+      ? Math.min(MAX_TOKEN_COUNT, Math.floor(src.tokens_out)) : 0,
+    active_agent_count: _coerceActiveAgentCount(src.active_agent_count),
+    event_type: src.event_type === 'install_announce' ? 'install_announce' : 'periodic',
+    active_count_version: src.active_count_version === ACTIVE_COUNT_VERSION ? ACTIVE_COUNT_VERSION : 0
+  };
+}
+
+function _selectWireBatch(queue) {
+  var sourceEvents = [];
+  var wireEvents = [];
+  for (var i = 0; i < queue.length && wireEvents.length < MAX_WIRE_EVENTS; i++) {
+    var projected = _projectWireEvent(queue[i]);
+    var candidate = wireEvents.concat([projected]);
+    if (_utf8ByteLength(JSON.stringify({ events: candidate })) > MAX_WIRE_BYTES) break;
+    sourceEvents.push(queue[i]);
+    wireEvents.push(projected);
+  }
+  return { sourceEvents: sourceEvents, wireEvents: wireEvents };
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +551,7 @@ async function _advanceWatermark(storage, valueMs) {
  *
  * Two calling patterns:
  *  (a) Periodic-aggregation path (internal): _runFlush() builds a fully-formed
- *      9-field event via _buildEvent() and passes it in. enqueue() persists.
+ *      versioned event via _buildEvent() and passes it in. enqueue() persists.
  *  (b) install_announce path (external from background.js onInstalled): caller
  *      passes only `{ event_type: 'install_announce' }`. enqueue() resolves
  *      install_uuid via fsbInstallIdentity + reads active_agent_count + fills
@@ -421,7 +579,7 @@ function enqueue(input) {
         }
       } catch (_e) { /* identity unavailable -> empty install_uuid */ }
 
-      var activeAgentCount = await _readActiveAgentCount(storage);
+      var activeAgentSnapshot = await _readActiveAgentSnapshot(storage);
 
       // If caller supplied a fully-formed event (periodic path), preserve its
       // ambient fields. Otherwise default to install_announce / unknown.
@@ -432,7 +590,8 @@ function enqueue(input) {
         model: partial.model,
         tokens_in: partial.tokens_in,
         tokens_out: partial.tokens_out,
-        active_agent_count: activeAgentCount,
+        active_agent_count: activeAgentSnapshot.count,
+        active_count_version: activeAgentSnapshot.version,
         event_type: partial.event_type
       });
 
@@ -524,19 +683,22 @@ async function _runFlush() {
 
     // Step 2: aggregate MCP rows since watermark + enqueue per-group events.
     var agg = await _aggregateMcpRowsSinceWatermark(storage);
-    var activeAgentCount = await _readActiveAgentCount(storage);
+    var activeAgentSnapshot = await _readActiveAgentSnapshot(storage);
     for (var i = 0; i < agg.groups.length; i++) {
       var g = agg.groups[i];
-      var ev = _buildEvent({
+      var aggregateEvents = _buildAggregateEvents({
         install_uuid: installUuid,
         mcp_client: g.mcp_client,
         model: g.model,
         tokens_in: g.tokens_in,
         tokens_out: g.tokens_out,
-        active_agent_count: activeAgentCount,
+        active_agent_count: activeAgentSnapshot.count,
+        active_count_version: activeAgentSnapshot.version,
         event_type: 'periodic'
       });
-      queue.push(ev);
+      for (var aggregateEventIndex = 0; aggregateEventIndex < aggregateEvents.length; aggregateEventIndex++) {
+        queue.push(aggregateEvents[aggregateEventIndex]);
+      }
     }
     // Phase 260524-62w / PRESENCE-01 -- presence heartbeat for idle-but-alive
     // installs. When _aggregateMcpRowsSinceWatermark produced zero groups (no
@@ -568,7 +730,7 @@ async function _runFlush() {
     //   - mcp_client:'unknown'    -- MCP_CLIENT_ALLOWLIST in routes/telemetry.js line 47..51
     //   - model:null              -- routes/telemetry.js line 87..91 allows null/undefined
     //   - tokens_in/out:0         -- routes/telemetry.js line 92..97 requires Number.isInteger >=0
-    //   - active_agent_count:     -- reuse the already-resolved variable from line above
+    //   - active_agent_count:     -- reuse the already-resolved snapshot from above
     //                                so we do NOT issue an extra storage.get() round-trip.
     //
     // Idempotency: when agg.groups.length >= 1 we SKIP this block. The
@@ -588,7 +750,8 @@ async function _runFlush() {
         model: null,
         tokens_in: 0,
         tokens_out: 0,
-        active_agent_count: activeAgentCount,
+        active_agent_count: activeAgentSnapshot.count,
+        active_count_version: activeAgentSnapshot.version,
         event_type: 'periodic'
       });
       queue.push(beat);
@@ -621,7 +784,16 @@ async function _runFlush() {
     // Snapshot the queue for the POST body. The queue object reference is
     // re-read after the POST so concurrent enqueue() calls (which the lock
     // serializes against) cannot lose events.
-    var snapshot = queue.slice();
+    var selectedBatch = _selectWireBatch(queue);
+    var snapshot = selectedBatch.sourceEvents;
+    var wireEvents = selectedBatch.wireEvents;
+    // A normalized event fits comfortably below 30 KiB. If a tampered legacy
+    // queue entry cannot fit, discard only that poisoned head entry so it does
+    // not block every later heartbeat forever.
+    if (snapshot.length === 0) {
+      await _writeQueue(storage, queue.slice(1));
+      return;
+    }
     var snapshotIds = Object.create(null);
     for (var s = 0; s < snapshot.length; s++) snapshotIds[snapshot[s].event_id] = true;
 
@@ -639,22 +811,6 @@ async function _runFlush() {
     // _runFlush. The projection is read-only over `snapshot`: the
     // in-memory queue retains `attempts` (and any future internal
     // bookkeeping) so _bumpAttempts continues to function on POST failure.
-    var wireEvents = [];
-    for (var w = 0; w < snapshot.length; w++) {
-      var src = snapshot[w];
-      wireEvents.push({
-        event_id:           src.event_id,
-        install_uuid:       src.install_uuid,
-        ts_minute:          src.ts_minute,
-        mcp_client:         src.mcp_client,
-        model:              src.model,
-        tokens_in:          src.tokens_in,
-        tokens_out:         src.tokens_out,
-        active_agent_count: src.active_agent_count,
-        event_type:         src.event_type
-      });
-    }
-
     var ok = false;
     var status = 0;
     try {
@@ -773,11 +929,21 @@ if (typeof module !== 'undefined' && module.exports) {
     USAGE_DATA_KEY: USAGE_DATA_KEY,
     MAX_QUEUE_LENGTH: MAX_QUEUE_LENGTH,
     MAX_ATTEMPTS_PER_EVENT: MAX_ATTEMPTS_PER_EVENT,
+    MAX_ACTIVE_AGENT_COUNT: MAX_ACTIVE_AGENT_COUNT,
+    MAX_TOKEN_COUNT: MAX_TOKEN_COUNT,
+    MAX_AGGREGATE_CHUNKS: MAX_AGGREGATE_CHUNKS,
+    MAX_WIRE_EVENTS: MAX_WIRE_EVENTS,
+    MAX_WIRE_BYTES: MAX_WIRE_BYTES,
+    ACTIVE_COUNT_VERSION: ACTIVE_COUNT_VERSION,
     STALE_DROP_MS: STALE_DROP_MS,
     ALLOWED_EVENT_KEYS: ALLOWED_EVENT_KEYS,
     _setStorageShim: _setStorageShim,
     _setFetchShim: _setFetchShim,
     _setIdentityShim: _setIdentityShim,
-    _buildEvent: _buildEvent
+    _mintEventId: _mintEventId,
+    _buildEvent: _buildEvent,
+    _buildAggregateEvents: _buildAggregateEvents,
+    _selectWireBatch: _selectWireBatch,
+    _utf8ByteLength: _utf8ByteLength
   };
 }

@@ -113,6 +113,18 @@ check('service: clears interval in stop() (clearInterval call)',
 check('service: pauses interval when document.hidden is true',
   /document\.hidden/.test(serviceCode),
   'no document.hidden check');
+check('service: resets both singleton subjects to loading on every start',
+  /this\.headline\$\.next\(\{\s*kind:\s*'loading'\s*\}\)/.test(serviceCode) &&
+    /this\.series\$\.next\(\{\s*kind:\s*'loading'\s*\}\)/.test(serviceCode),
+  'start() does not reset retained singleton snapshots');
+check('service: aborts in-flight fetches and guards route generations',
+  /new\s+AbortController\(\)/.test(serviceCode) &&
+    /this\.generation\s*\+=\s*1/.test(serviceCode) &&
+    /controller\.abort\(\)/.test(serviceCode),
+  'AbortController/generation lifecycle guard missing');
+check('service: preserves prior successful data as explicitly stale on refresh failure',
+  /kind:\s*'stale'/.test(serviceCode) && /fetchedAt:\s*previous\.fetchedAt/.test(serviceCode),
+  'stale last-known-good transition missing');
 
 // ---- ETag round-trip ----
 check('service: sends If-None-Match header for ETag round-trip',
@@ -169,20 +181,32 @@ check('types: exports DatasetState type',
 
 // Headline interface includes the 10 required fields:
 const REQUIRED_HEADLINE_FIELDS = [
-  'active_users_now', 'active_agents_now', 'active_agents_bucket',
-  'total_users', 'total_agents_lifetime', 'tokens_total_lifetime',
+  'generated_at', 'aggregate_as_of_day', 'aggregate_updated_at',
+  'active_users_now', 'active_agents_now', 'active_agents_reporting_users_now',
+  'active_agents_coverage', 'active_agents_bucket', 'active_count_version',
+  'active_history_since', 'active_history_complete', 'active_metric_semantics',
+  'total_users', 'users_365d', 'total_agents_lifetime', 'agent_days_lifetime',
+  'agent_days_since_active_v2', 'tokens_total_lifetime',
   'tokens_24h', 'popular_mcp_clients', 'popular_agents', 'popular_regions',
-  'avg_agents_per_user',
+  'avg_agents_per_user', 'avg_agents_per_reporting_user',
+  'aggregate_active_reporting_installs', 'aggregate_active_coverage',
 ];
 for (const f of REQUIRED_HEADLINE_FIELDS) {
   check(`types: FSBTelemetryHeadline includes ${f}`,
-    new RegExp(`${f}\\s*:`).test(typesText), `${f} field missing`);
+    new RegExp(`${f}\\??\\s*:`).test(typesText), `${f} field missing`);
 }
 
 // Series interface includes the 3 windows:
 for (const w of ['d30', 'd90', 'd365']) {
   check(`types: FSBTelemetrySeries includes ${w} window`,
     new RegExp(`${w}\\s*:`).test(typesText), `${w} field missing`);
+}
+for (const f of [
+  'reported_agent_daily_peak_sum', 'active_reporting_installs',
+  'active_coverage', 'active_data_state', 'active_metric_semantics',
+]) {
+  check(`types: active series contract includes ${f}`,
+    new RegExp(`${f}\\??\\s*:`).test(typesText), `${f} field missing`);
 }
 
 // =============================================================================

@@ -147,7 +147,7 @@ check('install_uuid POST body parameter present',
   /install_uuid/.test(html),
   'install_uuid body key missing in curl recipe');
 check('aggregated metrics link to /stats',
-  /<a href="\/stats">\/stats<\/a>/.test(html),
+  /<a\s+routerLink="\/stats"[^>]*>\/stats<\/a>/.test(html),
   'link to /stats missing');
 check('GDPR Article 17 attribution',
   /GDPR.*Article 17/i.test(html),

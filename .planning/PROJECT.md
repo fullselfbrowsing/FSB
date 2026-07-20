@@ -10,32 +10,33 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Last completed:** v1.1.0 T1 App Execution Expansion -- milestone gate met and archived 2026-06-30, with artifacts refreshed 2026-07-01. FSB now has a verified T1 readiness surface across all 2,314 descriptors, 1,267 executable T1-ready rows, 556 guarded fail-closed rows, and explicit terminal-state accounting for the remaining bridge-needed, UAT-needed, blocked-policy, and degraded/discovery-pending catalog tail.
+**Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
+
+> **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
+> localized the dashboard and removed its `lint:i18n` exclusion. The v1.2.0
+> scope statements below remain historical; the current policy is
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
 
 **Recent shipping cadence:**
+- v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution
 - v1.0.0 Full App Catalog (OpenTabs Parity) -- archived 2026-06-29; T1 expansion debt carried into v1.1.0
-- v0.12.0 PhantomStream Package Migration -- completed 2026-06-17; live Chrome-extension UAT user-gated
-- v0.11.0 Trigger Tool (Reactive DOM Monitoring) -- completed 2026-06-17; release user-gated
-- v0.10.0 Autopilot via Lattice SDK -- shipped 2026-06-15
-- v0.9.69 Anonymous Telemetry Pipeline + Showcase Dashboard Streaming Fix -- shipped 2026-05-14
-- v0.9.63 Showcase i18n -- shipped 2026-05-13
-- v0.9.62 Implicit Visual Session Contract -- shipped 2026-05-11
-- v0.9.61 FSB Skill (OpenClaw) -- shipped 2026-05-08
-- v0.9.60 Multi-Agent Tab Concurrency (MCP 0.8.0) -- shipped 2026-05-08
-- v0.9.50 Autopilot Refinement (MCP-Parity) -- shipped 2026-05-03
-- v0.9.49 Remote Control Rebrand & Showcase Metrics Wire-up -- shipped 2026-05-02
-- v0.9.48 Angular 20 Migration -- shipped 2026-05-02
-- v0.9.47 Workspace Reorganization -- shipped 2026-05-02
-- v0.9.46 Site Discoverability (SEO + GEO) -- shipped 2026-05-02
 
-**Version:** MCP server package prepared at `fsb-mcp-server@0.10.0`; final npm publish is user-gated. Extension/showcase version bump remains outside this milestone unless separately requested.
 
-**CI:** PRs to `main` gated by `ci / all-green` status check (extension + mcp + showcase jobs).
+## Current Milestone: v1.2.0 Showcase i18n Completeness
 
-## Current Milestone
+**Goal:** Close the translation gap that reopened after v0.9.63 shipped -- full, drift-free coverage across all six supported locales (en, es, de, ja, zh-CN, zh-TW) for every showcase marketing page plus the stats page, the long-deferred locale-cookie redirect bug, and a CI gate that catches future drift automatically.
 
-No active milestone is currently defined. Start the next cycle with `$gsd-new-milestone` after choosing the next product goal.
+**Target features:**
+- Full-page audit: verify every translatable string on every showcase page (lattice, phantom-stream, prometheus, home, mobile nav, and other surfaces added since v0.9.63) is genuinely translated in all 5 non-English locales, not just marked with an `i18n` attribute.
+- Resync the trans-units whose English source actually changed in commit `6d3ad363` ("chore(i18n): sync messages.xlf with showcase copy refinements") across all 5 translated locale files (es/de/ja/zh-CN/zh-TW). Research corrected the initial estimate: only 5 of the 247 touched trans-unit blocks have real `<source>` text drift (`agents.meta.description`, `agents.schema.software.description`, `home.meta.description`, `support.faq.q.tools.a`, `support.schema.faq.tools.a`) -- the other 242 are harmless `<context-group><linenumber>` churn. The full-page audit phase (below) may surface additional drift beyond this one commit's blast radius.
+- Bring the stats page into full translation and drop it from the `lint:i18n` ignore-pattern in `showcase/angular/package.json` (dashboard stays excluded -- app surface, not marketing content, out of scope for this milestone).
+- Fix WARNING-02 (carried since v0.9.63): picker-set `fsb-locale` cookie no longer short-circuits the bare-`/` Accept-Language redirect for returning fresh-tab/shared-link visitors.
+- New CI drift-detection gate: fail the build if `messages.xlf` source content changes without a corresponding update to all 5 translated locale files.
+
+**Key context:** Supported locales are fixed (en source + es/de/ja/zh-CN/zh-TW) -- not up for debate, carried over from v0.9.63's `LocaleService` + locale-constants module. Builds on existing tooling: `lint:i18n` eslint check, `verify-locale-sync.mjs`, `ng extract-i18n`. This is the second attempt at closing this exact gap -- v0.9.63 left dashboard + WARNING-02 as accepted debt that then sat untouched through 6+ subsequent milestones (v0.9.69, v0.10.0, v0.11.0, v0.12.0, v1.0.0, v1.1.0).
+
+**Progress:** Phase 52 (Full-Page Translation Completeness Audit) complete 2026-07-08 -- `audit-translation-completeness.mjs` confirms the true drift/gap scope across all 12 current routes and 5 locales: 5 drifted trans-units (matches the corrected estimate, superseding the original "247" figure), 54 orphaned ids/locale, and the `translations.stats-274.*.json` artifacts traced as 15/21 keys already merged into live XLIFF per locale (6 missing, 0 stale). This is the authoritative scope Phases 53-55 inherit.
 
 ## Last Milestone: v1.1.0 T1 App Execution Expansion
 
@@ -415,7 +416,7 @@ Carry-forward backlog candidates:
 
 ### Active
 
-(Milestone v1.1.0 T1 App Execution Expansion -- requirements and roadmap defined on 2026-06-29; phases continue from v1.0.0's Phase 43 -> start at Phase 44. v1.0.0 Full App Catalog is archived with 2,314 searchable descriptors, 26 T1/T1b descriptors, and 2,288 DOM/discovery-tail descriptors carried forward as explicit T1 expansion work.)
+(Milestone v1.2.0 Showcase i18n Completeness -- requirements and roadmap to be defined; phases continue from v1.1.0's Phase 51 -> start at Phase 52. v1.1.0 T1 App Execution Expansion is archived; this milestone returns to the showcase-site i18n surface last touched in v0.9.63.)
 
 ### Validated (v0.9.99)
 
@@ -680,4 +681,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-29 -- v1.0.0 Full App Catalog archived; v1.1.0 T1 App Execution Expansion started. Phases continue at 44.*
+*Last updated: 2026-07-08 -- Phase 52 (Full-Page Translation Completeness Audit) complete. Next: Phase 53 (Trans-Unit Resync, Stats Translation & Transcreation Review).*

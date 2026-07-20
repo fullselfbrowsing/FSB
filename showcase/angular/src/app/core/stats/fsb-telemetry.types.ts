@@ -5,43 +5,68 @@
 //
 // The FSB public-stats server endpoint is mounted at /api/public-stats and
 // has no rate limiter (it is server-cached with a 30 s memo + 60 s
-// Cache-Control). Even so, we keep the `rate-limited` variant of
-// DatasetState<T> verbatim so any consumer that already handles the
-// GitHubStatsService union shape continues to type-check unchanged --
-// FSBTelemetryService simply never EMITS that variant.
+// Cache-Control).
 
 /**
  * Headline response shape from GET /api/public-stats/global.
  *
- * Five fields come from SQLite rollups (telemetry_rollups_daily +
- * telemetry_global_aggregates -- Phase 273 housekeeper output), two from
- * the in-memory active-tracker (5-min users window, 10-min agent-sum
- * window), one bucketised display label, one derived ratio, and two arrays
- * of k-anonymity-filtered labels.
+ * Retained aggregates come from SQLite rollups, while the active values are a
+ * request-time snapshot of installs seen in the preceding ten minutes. Active
+ * agent totals include only installs that supplied a trusted v2 registry count.
  */
 export interface FSBTelemetryHeadline {
-  /** Count of distinct install_uuids the server has seen in the last 5 minutes. */
+  /** Request-time active snapshot timestamp. */
+  generated_at: string;
+  /** Latest aggregate UTC day, or null while aggregate tables are empty. */
+  aggregate_as_of_day: string | null;
+  /** Last aggregate update timestamp, or null before the first housekeeper run. */
+  aggregate_updated_at: string | null;
+  /** Distinct installs with any telemetry event in the current 10-minute cohort. */
   active_users_now: number;
-  /** Sum of latest active_agent_count across UUIDs seen in last 10 minutes. */
+  /** Sum of trusted v2 registry counts within that same 10-minute cohort. */
   active_agents_now: number;
+  /** Active installs in the cohort that supplied a trusted v2 agent count. */
+  active_agents_reporting_users_now?: number;
+  /** active_agents_reporting_users_now / active_users_now. */
+  active_agents_coverage?: number;
   /** Bucketised label for active_agents_now; one of '0'|'1'|'2-4'|'5-8'|'9-16'|'17-32'|'33+'. */
   active_agents_bucket: string;
-  /** COUNT(DISTINCT install_uuid) FROM telemetry_rollups_daily. */
+  /** Schema version for trusted active-agent accounting. */
+  active_count_version?: number;
+  /** First retained UTC day whose active counts use v2 accounting. */
+  active_history_since?: string | null;
+  /** False because known-corrupt pre-v2 history is intentionally excluded. */
+  active_history_complete?: boolean;
+  /** Explicit contract for interpreting the request-time active snapshot. */
+  active_metric_semantics?: 'reported_registry_count_v2';
+  /** Deprecated compatibility alias for users_365d; not a lifetime count. */
   total_users: number;
-  /** SUM(max_active_agents) FROM telemetry_rollups_daily. */
-  total_agents_lifetime: number;
+  /** Distinct installs represented in the retained 365-day rollup window. */
+  users_365d: number;
+  /** Deprecated unavailable field; anonymous telemetry cannot count lifetime agents. */
+  total_agents_lifetime: number | null;
+  /** Unavailable because known-corrupt pre-v2 history is excluded. */
+  agent_days_lifetime: number | null;
+  /** Cumulative agent-days only across trusted active-count-v2 rows. */
+  agent_days_since_active_v2?: number | null;
   /** SUM(tokens_in_sum + tokens_out_sum) over all-time global aggregates. */
   tokens_total_lifetime: number;
   /** Same sum, scoped to the last 24 hours. */
   tokens_24h: number;
-  /** Latest day's popular_mcp_json from the housekeeper; k>=5 floor already applied. */
+  /** Latest day's allowlisted MCP-client aggregate; the current display floor is 1. */
   popular_mcp_clients: Array<{ label: string; uniq: number }>;
-  /** Latest day's popular_agent_json from the housekeeper; k>=5 floor already applied. */
+  /** Latest day's agent-label aggregate (currently empty until agent rollups exist). */
   popular_agents: Array<{ label: string; uniq: number }>;
-  /** Latest day's popular_region_json from the housekeeper; k>=5 floor already applied (stricter than the k>=2 floor used for popular_mcp_clients/popular_agents). Labels are coarse country/US-state codes (e.g. 'US-CA', 'DE') or 'unknown'/'Other'. */
+  /** Latest day's coarse region aggregate with a k>=5 floor. */
   popular_regions: Array<{ label: string; uniq: number }>;
-  /** active_agents_now / active_users_now, rounded to 1 decimal; 0 when denom is 0. */
+  /** Compatibility alias for avg_agents_per_reporting_user. */
   avg_agents_per_user: number;
+  /** active_agents_now / active_agents_reporting_users_now. */
+  avg_agents_per_reporting_user?: number;
+  /** Installs in the latest daily aggregate that supplied a trusted v2 count. */
+  aggregate_active_reporting_installs?: number;
+  /** Trusted active reporters divided by all installs in the latest daily aggregate. */
+  aggregate_active_coverage?: number;
 }
 
 /**
@@ -56,7 +81,16 @@ export interface FSBTelemetrySeriesPoint {
   day_utc: string;
   unique_installs: number;
   tokens: number;
-  agents_active: number;
+  /** Deprecated ambiguous field; always null for the repaired v2 contract. */
+  agents_active: number | null;
+  /** Sum of per-install daily peak registry counts; this is not concurrency. */
+  reported_agent_daily_peak_sum?: number | null;
+  /** Installs for the day that supplied a trusted v2 registry count. */
+  active_reporting_installs?: number;
+  /** Trusted active reporters divided by all installs represented that day. */
+  active_coverage?: number;
+  /** Whether the day's v2 count is usable and fully covered. */
+  active_data_state?: 'ready' | 'partial' | 'unavailable';
 }
 
 /**
@@ -64,11 +98,22 @@ export interface FSBTelemetrySeriesPoint {
  *
  * Three windows. Each array is sorted ascending by `day_utc`. The arrays
  * are server-rendered against `telemetry_global_aggregates`, which the
- * housekeeper updates hourly with k>=5 anonymity protection already
- * applied to the popular_* fields (those are not part of this series).
+ * housekeeper updates hourly. Popular-label privacy floors are unrelated to
+ * these numeric series and are only present on the headline endpoint.
  */
 export interface FSBTelemetrySeries {
-  /** Last 30 days (server-side `WHERE day_utc >= date('now', '-30 days')`). */
+  /** Time at which this response was assembled. */
+  generated_at: string;
+  /** Latest aggregate UTC day, or null while aggregate tables are empty. */
+  aggregate_as_of_day: string | null;
+  /** Last aggregate update timestamp, or null before the first housekeeper run. */
+  aggregate_updated_at: string | null;
+  active_count_version?: number;
+  active_history_since?: string | null;
+  active_history_complete?: boolean;
+  /** Explicitly identifies the series as sums of per-install daily peaks. */
+  active_metric_semantics?: 'sum_of_per_install_daily_peaks';
+  /** Exactly today plus the previous 29 UTC calendar days. */
   d30: FSBTelemetrySeriesPoint[];
   /** Last 90 days. */
   d90: FSBTelemetrySeriesPoint[];
@@ -79,14 +124,13 @@ export interface FSBTelemetrySeries {
 /**
  * Per-dataset state emitted by the service's BehaviorSubjects.
  *
- * Mirror of github-stats.types DatasetState<T> -- the `rate-limited` variant
- * is preserved verbatim so cross-service consumers (e.g. the stats-page
- * onDatasetUpdate switch) share one union shape. FSBTelemetryService
- * itself never emits `rate-limited` because the server endpoint is
- * server-cached, not rate-limited.
+ * Mirror of github-stats.types DatasetState<T>. A failed refresh after a prior
+ * success emits `stale` with the last usable snapshot; an initial failure emits
+ * `error`.
  */
 export type DatasetState<T> =
   | { kind: 'loading' }
   | { kind: 'ready'; data: T; fetchedAt: number }
-  | { kind: 'rate-limited'; resetAt: number }
+  | { kind: 'partial'; data: T; fetchedAt: number; message: string }
+  | { kind: 'stale'; data: T; fetchedAt: number; message: string }
   | { kind: 'error'; message: string };

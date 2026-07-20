@@ -3,10 +3,10 @@
  *
  * Three layers of asserts:
  *
- *   1. SOURCE: messages.xlf has >= 12 SHOWCASE_STATS_FSB_* trans-units.
- *      All 5 non-en messages.{lang}.xlf files have a <target state="translated">
- *      block for EVERY new ID (no missing translations means the build can pass
- *      with i18nMissingTranslation: error).
+ *   1. SOURCE: messages.xlf contains every FSB Stats message used by the
+ *      current page. All 5 non-en messages.{lang}.xlf files have a
+ *      <target state="translated"> block for EVERY extracted ID (no missing
+ *      translations means the build can pass with i18nMissingTranslation: error).
  *   2. BUILD: `npm --prefix showcase/angular run build --silent` exits 0
  *      and `npm --prefix showcase/angular run verify:hreflang` exits 0.
  *   3. CRAWLER INVARIANT (Easter-egg posture): /stats does NOT appear in
@@ -44,6 +44,15 @@ console.log('--- showcase-build-smoke (STATS-05 + STATS-06) ---');
 
 const SOURCE_XLF_PATH = path.join(ROOT, 'showcase/angular/src/locale/messages.xlf');
 const sourceXlf = fs.readFileSync(SOURCE_XLF_PATH, 'utf8');
+const RETIRED_STATS_ISSUES_IDS = [
+  'stats.view.issues',
+  'stats.metric.open',
+  'stats.metric.closed',
+  'stats.chart.issuesSankey.aria',
+  'stats.chart.issuesSankey.opened',
+  'stats.chart.issuesSankey.closed',
+  'stats.chart.issuesSankey.stillOpen',
+];
 
 // Extract every SHOWCASE_STATS_FSB_* id from source.
 const sourceIdRe = /<trans-unit id="(SHOWCASE_STATS_FSB_[^"]+)" datatype="html">/g;
@@ -53,8 +62,26 @@ while ((m = sourceIdRe.exec(sourceXlf)) !== null) {
   sourceIds.push(m[1]);
 }
 
-check('source: messages.xlf has >= 12 SHOWCASE_STATS_FSB_ trans-units',
-  sourceIds.length >= 12, `got ${sourceIds.length}`);
+const REQUIRED_SOURCE_IDS = [
+  'SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND',
+  'SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND',
+  'SHOWCASE_STATS_FSB_GLOBE_ANNOTATION',
+  'SHOWCASE_STATS_FSB_GLOBE_EMPTY',
+  'SHOWCASE_STATS_FSB_HEADLINE_ACTIVE',
+  'SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS',
+  'SHOWCASE_STATS_FSB_HEADLINE_ARIA',
+  'SHOWCASE_STATS_FSB_HEADLINE_TOKENS',
+  'SHOWCASE_STATS_FSB_HEADLINE_TOTAL',
+  'SHOWCASE_STATS_FSB_VIEW_ACTIVE',
+  'SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP',
+  'SHOWCASE_STATS_FSB_VIEW_TOKENS',
+];
+const missingSourceIds = REQUIRED_SOURCE_IDS.filter((id) => !sourceIds.includes(id));
+check('source: messages.xlf contains every current FSB Stats message',
+  missingSourceIds.length === 0, `missing ${missingSourceIds.join(', ')}`);
+check('source: retired Issues/Sankey Stats messages are absent',
+  RETIRED_STATS_ISSUES_IDS.every((id) => !sourceXlf.includes(`<trans-unit id="${id}"`)),
+  'one or more retired Issues/Sankey translation units remain');
 
 // Each non-en locale must have a <target state="translated"> block for every
 // SHOWCASE_STATS_FSB_* id in the source.
@@ -70,6 +97,9 @@ for (const lang of LOCALES) {
   // Quick sanity: target-language attribute is set.
   check(`${lang}: target-language="${lang}" attribute present`,
     targetXlf.includes(`target-language="${lang}"`), 'attribute missing');
+  check(`${lang}: retired Issues/Sankey Stats messages are absent`,
+    RETIRED_STATS_ISSUES_IDS.every((id) => !targetXlf.includes(`<trans-unit id="${id}"`)),
+    'one or more retired Issues/Sankey translation units remain');
 
   // For each source id, check the target file has a <trans-unit id="${id}"> AND
   // that the corresponding block contains <target state="translated">.
@@ -212,12 +242,22 @@ if (!SKIP_BUILD) {
   const distRoot = path.join(ROOT, 'showcase/dist/showcase-angular/browser');
   const statsPath = path.join(distRoot, 'stats');
   const statsIndexPath = path.join(distRoot, 'stats', 'index.html');
+  const csrShellPath = path.join(distRoot, 'index.csr.html');
   check('showcase dist/ has NO /stats prerendered directory',
     !fs.existsSync(statsPath),
     `found at ${statsPath}`);
   check('showcase dist/ has NO /stats/index.html',
     !fs.existsSync(statsIndexPath),
     `found at ${statsIndexPath}`);
+  check('showcase dist/ includes the dedicated CSR shell',
+    fs.existsSync(csrShellPath),
+    `missing ${csrShellPath}`);
+  if (fs.existsSync(csrShellPath)) {
+    const csrShell = fs.readFileSync(csrShellPath, 'utf8');
+    check('CSR shell does not embed the prerendered Home component',
+      !csrShell.includes('<app-home-page'),
+      'index.csr.html contains prerendered Home markup');
+  }
 }
 
 console.log(`\n=== showcase-build-smoke results: ${passed} passed, ${failed} failed ===`);

@@ -1,6 +1,6 @@
 <div class="stats-shell">
   <div class="stats-glow-bg" aria-hidden="true"></div>
-  <a routerLink="/" class="stats-back-btn" i18n-aria-label="@@stats.back.aria" aria-label="Go back">
+  <a routerLink="/" class="stats-back-btn" i18n-aria-label="@@stats.back.aria" aria-label="Go to home">
     <i class="ph ph-arrow-left"></i>
   </a>
 
@@ -11,68 +11,128 @@
           <h1><span i18n="@@stats.header.title">Stats</span> <span class="muted" i18n="@@stats.header.muted">for nerds</span></h1>
           <p class="stats-sub" i18n="@@stats.header.subtitle">Live signals from <code [attr.translate]="'no'">fullselfbrowsing/FSB</code>.</p>
         </div>
-        <span class="stats-live-badge" role="status" i18n-aria-label="@@stats.live.aria" aria-label="Live data" i18n="@@stats.live.label">Live</span>
+        <span class="stats-live-badge" [class.is-live]="viewState.kind === 'ready'"
+              [class.is-partial]="viewState.kind === 'partial'"
+              [class.is-stale]="viewState.kind === 'stale'" [attr.title]="stateBadgeTitle"
+              [attr.aria-label]="stateBadgeTitle" role="status">
+          @switch (viewState.kind) {
+            @case ('ready') { <span i18n="@@stats.live.label">Live</span> }
+            @case ('partial') { <span i18n="@@stats.status.partial">Partial</span> }
+            @case ('stale') { <span i18n="@@stats.status.stale">Stale</span> }
+            @case ('loading') { <span i18n="@@stats.status.loadingLabel">Loading</span> }
+            @case ('error') { <span i18n="@@stats.status.unavailableLabel">Unavailable</span> }
+          }
+        </span>
       </header>
 
       <div class="stats-headline-row">
-        <div class="stats-tab-metrics" role="status" aria-live="polite" i18n-aria-label="@@stats.tabMetrics.aria" aria-label="Current tab metrics">
-          @for (metric of tabMetrics; track trackByMetric($index, metric)) {
-            <span class="headline-cell"><strong>{{ metric.value }}</strong> <span>{{ metric.label }}</span></span>
+        @if (isViewRenderable) {
+          <div class="stats-tab-metrics" role="status" aria-live="polite" i18n-aria-label="@@stats.tabMetrics.aria" aria-label="Current tab metrics">
+            @for (metric of tabMetrics; track trackByMetric($index, metric)) {
+              <span class="headline-cell"><strong>{{ metric.value }}</strong> <span>{{ metric.label }}</span></span>
+            }
+          </div>
+        }
+        <div class="stats-fsb-summary">
+          @if (hasFsbHeadlineSnapshot) {
+            <div class="stats-headline" role="status" aria-live="polite"
+                 aria-label="FSB aggregate metrics"
+                 i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
+              @if (isFsbActiveSnapshotCurrent) {
+                <span class="headline-cell">
+                  <strong>{{ formattedFsbActive }}</strong>
+                  <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
+                </span>
+              }
+              <span class="headline-cell">
+                <strong>{{ formattedFsbTotal }}</strong>
+                <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">users (365d)</span>
+              </span>
+              @if (hasFsbAgentDaysSinceActiveV2) {
+                <span class="headline-cell">
+                  <strong>{{ formattedFsbAgentDays }}</strong>
+                  <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS">agent-days since active v2</span>
+                </span>
+              }
+              <span class="headline-cell">
+                <strong>{{ formattedFsbTokens }}</strong>
+                <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (24h)</span>
+              </span>
+            </div>
           }
-        </div>
-        <div class="stats-headline" role="status" aria-live="polite"
-             aria-label="Live FSB metrics"
-             i18n-aria-label="@@SHOWCASE_STATS_FSB_HEADLINE_ARIA">
-          <span class="headline-cell">
-            <strong>{{ formattedFsbActive }}</strong>
-            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
-          </span>
-          <span class="headline-dot" aria-hidden="true">·</span>
-          <span class="headline-cell">
-            <strong>{{ formattedFsbTotal }}</strong>
-            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">total users</span>
-          </span>
-          <span class="headline-dot" aria-hidden="true">·</span>
-          <span class="headline-cell">
-            <strong>{{ formattedFsbTokens }}</strong>
-            <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (last 24h)</span>
-          </span>
         </div>
       </div>
 
-      <div class="chart-card" [class.chart-card-bare]="selectedView === 'fsb-active-now'" [attr.data-state]="viewState">
-        @if (viewState === 'loading') {
+      <div class="chart-card" [class.chart-card-bare]="selectedView === 'fsb-active-now'" [attr.data-state]="viewState.kind">
+        @if (viewState.kind === 'loading') {
           <div class="skeleton" aria-busy="true" aria-live="polite">
             <span class="sr-only" i18n="@@stats.loading.sr">Loading stats...</span>
           </div>
         }
-        @if (viewState === 'ready') {
+        @if (isViewRenderable) {
+          @if (viewState.kind === 'stale') {
+            <div class="stale-notice" role="status" aria-live="polite">
+              <i class="ph ph-warning-circle" aria-hidden="true"></i>
+              <span i18n="@@stats.stale.notice">This view is showing the last available snapshot while fresh data is unavailable.</span>
+            </div>
+          }
+          @if (viewState.kind === 'partial') {
+            <div class="stale-notice partial-notice" role="status" aria-live="polite">
+              <i class="ph ph-info" aria-hidden="true"></i>
+              <span i18n="@@stats.partial.notice">This view is usable, but some reporting or historical coverage is incomplete.</span>
+            </div>
+          }
           <div class="chart-mount" [class.chart-mount-hidden]="selectedView === 'fsb-active-now'">
-            <canvas #chartCanvas></canvas>
+            <canvas #chartCanvas role="img" [attr.aria-label]="chartAriaLabel"
+                    [attr.aria-describedby]="accessibleChartData.length ? 'stats-chart-data' : null">
+              <span>{{ chartAriaLabel }}</span>
+            </canvas>
+            @if (accessibleChartData.length) {
+              <div id="stats-chart-data" class="sr-only">
+                <p>{{ chartAriaLabel }}</p>
+                <ul>
+                  @for (datum of accessibleChartData; track datum.label) {
+                    <li>{{ datum.label }}: {{ datum.value }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (isMcpEmpty) {
+              <p class="chart-empty" role="status" i18n="@@stats.mcp.empty">No MCP client data yet.</p>
+            }
           </div>
           <div class="globe-panel" [class.active]="selectedView === 'fsb-active-now'">
-            <div class="globe-mount"><canvas #globeCanvas class="stats-globe-canvas" aria-hidden="true"></canvas></div>
+            <div class="globe-mount">
+              <canvas #globeCanvas class="stats-globe-canvas" role="img"
+                      [attr.aria-label]="globeAriaLabel"
+                      [attr.aria-describedby]="accessibleGlobeData.length ? 'stats-globe-data' : null"></canvas>
+              @if (accessibleGlobeData.length) {
+                <div id="stats-globe-data" class="sr-only">
+                  <p>{{ globeAriaLabel }}</p>
+                  <ul>
+                    @for (datum of accessibleGlobeData; track datum.label) {
+                      <li>{{ datum.label }}: {{ datum.value }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
             <p class="globe-annotation">
               <i class="ph ph-info" aria-hidden="true"></i>
               @if (hasPlottableRegions) {
-                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Each lit node is live activity, clustered by region.</span>
+                <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Regional distribution from today's hourly aggregate.</span>
               } @else {
                 <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_EMPTY">Not enough anonymous activity yet to break down by region — check back soon.</span>
+              }
+              @if (regionAggregateState === 'partial') {
+                <span i18n="@@stats.globe.partial">The regional aggregate is not available yet.</span>
+              } @else if (regionAggregateState === 'stale') {
+                <span i18n="@@stats.globe.stale">The regional breakdown is older than two hours.</span>
               }
             </p>
           </div>
         }
-        @if (viewState === 'rate-limited') {
-          <div class="rate-card" role="status">
-            <h3 i18n="@@stats.rate.title">GitHub rate-limited</h3>
-            <p i18n="@@stats.rate.body">
-              Retrying at
-              <strong>{{ rateLimitedUntil | date:'HH:mm' }}</strong>.
-              The unauthenticated API allows 60 requests / hour / IP - we'll be back shortly.
-            </p>
-          </div>
-        }
-        @if (viewState === 'error') {
+        @if (viewState.kind === 'error') {
           <div class="error-card" role="alert">
             <h3 i18n="@@stats.error.title">Could not load stats</h3>
             <p><span>{{ errorMessage || fallbackErrorMessage }}</span> <span i18n="@@stats.error.retry">The page retries automatically every 5 minutes.</span></p>
@@ -81,28 +141,32 @@
       </div>
 
       <div class="stats-tab-dock">
-        <div class="stats-tab-wrap" role="tablist" i18n-aria-label="@@stats.view.aria" aria-label="Stats view"
+        <div class="stats-tab-wrap" role="group" i18n-aria-label="@@stats.view.aria" aria-label="Stats view"
              (mouseenter)="onTabsEnter()" (mouseleave)="onTabsLeave()">
-          <div class="stats-tab-fan stats-tab-fan-left" [class.open]="fanOpen">
-            <div class="stats-tab-fan-track">
-              @for (opt of fanItemsLeft; track trackByView($index, opt)) {
-                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
-                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
-              }
+          <div id="stats-view-options" class="stats-tab-option-layer">
+            <div class="stats-tab-fan stats-tab-fan-left" [class.open]="fanOpen">
+              <div class="stats-tab-fan-track">
+                @for (opt of fanItemsLeft; track trackByView($index, opt)) {
+                  <button type="button" class="stats-tab-fan-item"
+                          [style.--dy]="opt.dy + 'px'" (click)="selectFanView(opt.id)">{{ opt.label }}</button>
+                }
+              </div>
+            </div>
+            <div class="stats-tab-fan stats-tab-fan-right" [class.open]="fanOpen">
+              <div class="stats-tab-fan-track">
+                @for (opt of fanItemsRight; track trackByView($index, opt)) {
+                  <button type="button" class="stats-tab-fan-item"
+                          [style.--dy]="opt.dy + 'px'" (click)="selectFanView(opt.id)">{{ opt.label }}</button>
+                }
+              </div>
             </div>
           </div>
-          <button type="button" role="tab" aria-selected="true" [attr.aria-expanded]="fanOpen"
-                  class="stats-tab-active" [class.stats-tab-pulse]="tabPulse" (click)="onTabsToggle()">
+          <button #activeViewButton type="button" [attr.aria-expanded]="fanOpen"
+                  aria-controls="stats-view-options" [attr.aria-label]="viewPickerAriaLabel"
+                  class="stats-tab-active" [class.stats-tab-pulse]="tabPulse"
+                  (click)="onTabsToggle()" (keydown)="onViewPickerKeydown($event)">
             {{ activeViewLabel }}
           </button>
-          <div class="stats-tab-fan stats-tab-fan-right" [class.open]="fanOpen">
-            <div class="stats-tab-fan-track">
-              @for (opt of fanItemsRight; track trackByView($index, opt)) {
-                <button type="button" role="tab" aria-selected="false" class="stats-tab-fan-item"
-                        [style.--dy]="opt.dy + 'px'" (click)="setView(opt.id)">{{ opt.label }}</button>
-              }
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -112,6 +176,7 @@
     <div class="container">
       <div class="footer-bottom">
         <p i18n="@@stats.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
+        <app-language-picker [mode]="'text'" />
         <p i18n="@@stats.footer.version"><span class="version-tag" [attr.translate]="'no'">▽{{ appVersion }}</span></p>
       </div>
     </div>
