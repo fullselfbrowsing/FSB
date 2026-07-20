@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-06-PLAN.md
-last_updated: "2026-07-20T22:44:58.300Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 06 complete; exact two-provider evidence projection and browser-safe compatibility green
+stopped_at: Completed 64-07-PLAN.md
+last_updated: "2026-07-20T23:37:10.745Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 07 complete; generic cold-first owned-server lease and exact-once lifecycle green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 48
-  percent: 91
+  completed_plans: 49
+  percent: 92
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 7 of 13
+Plan: 8 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 06 complete; exact two-provider evidence projection and browser-safe compatibility green
+Last activity: 2026-07-20 -- Phase 64 Plan 07 complete; generic cold-first owned-server lease and exact-once lifecycle green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -49,7 +49,7 @@ Last activity: 2026-07-20 -- Phase 64 Plan 06 complete; exact two-provider evide
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (6/13) |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (7/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
 Coverage: 51/51 v0.9.91 requirements mapped, 48/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
@@ -211,6 +211,10 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Keep local provider evidence and browser evidence asymmetric. — Local doctor may expose bounded executable/version facts, while browser inventory and durable compatibility storage receive only closed availability/status facts.
 - [Phase 64]: Require exact Claude Code/OpenCode registry and matrix membership before collecting or projecting evidence. — Roster corruption fails closed to canonical unsupported rows and cannot inject, omit, reorder, or case-vary provider authority.
 - [Phase 64]: Ship OpenCode compatibility as observational data only while Codex remains unshipped. — Compatibility cannot select or recommend a provider, mutate settings, mark state dirty, grant spawn, or retain auth/billing/topology/native evidence.
+- [Phase 64]: Keep owned-topology execution cold first and attach only after exact lease re-verification. — An already-selected task never changes process after warming, while topology, generation, process identity, secret presence, and authenticated health must all authorize a later attach.
+- [Phase 64]: Retain only random owned-server secret bytes and materialize password/header strings transiently. — Only the reviewed server and selected attach spawn env plus bounded health request require the raw value; every mutable call object is scrubbed afterward.
+- [Phase 64]: Release each attach lease only after task tree and runtime cleanup, with token-fenced idle teardown. — Reference counts protect active task sessions, stale idle callbacks cannot stop renewed work, and task cleanup always precedes server reclamation.
+- [Phase 64]: Coalesce health, exit, idle, and daemon-close cleanup through one exact-once server stop. — Retiring leases become non-attachable immediately and no replacement server can warm until the proven old tree and volatile secret settle.
 
 ### Pending Todos
 
@@ -224,9 +228,7 @@ No active blocker.
 
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
-Phase 60 resolved the static inline-agent/profile and Windows shell-free resolution questions in source and deterministic tests. Their genuine installed-CLI corroboration remains in the deferred Phase 60 UAT ledger. One later research item remains:
-
-- OpenCode HTTP-server-vs-spawn shape (Phase 64) — `opencode serve` + `run --attach` may be a cheaper reuse path than cold spawn.
+Phase 60 resolved the static inline-agent/profile and Windows shell-free resolution questions in source and deterministic tests. Their genuine installed-CLI corroboration remains in the deferred Phase 60 UAT ledger. Phase 64 Plan 07 resolved the remaining OpenCode server-shape item with cold-first execution plus an FSB-owned, authenticated `opencode serve` lease for later exact-identity attaches.
 
 ## Deferred Items
 
@@ -257,13 +259,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T22:44:58.300Z
-Stopped at: Completed 64-06-PLAN.md
+Last session: 2026-07-20T23:37:10.739Z
+Stopped at: Completed 64-07-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute 64-07-PLAN.md next. Implement the generic cold-first and FSB-owned OpenCode server lifecycle, including exact lease identity, transient secret delivery, readiness, attach fallback, idle shutdown, recovery, and all accumulated milestone-end UAT items.
+Execute 64-08-PLAN.md next. Interpret the closed policy attestations through the shared verifier, preserve the replay fence, require clean exit and task-tree settlement before terminal results, and retain all accumulated milestone-end UAT items.
 
 ## Performance Metrics
 
@@ -287,3 +289,4 @@ Execute 64-07-PLAN.md next. Implement the generic cold-first and FSB-owned OpenC
 | Phase 64 P04 | 36 min | 3 tasks | 4 files |
 | Phase 64 P05 | 41 min | 1 task | 9 files |
 | Phase 64 P06 | 38 min | 2 tasks | 13 files |
+| Phase 64 P07 | 48 min | 3 tasks | 2 files |

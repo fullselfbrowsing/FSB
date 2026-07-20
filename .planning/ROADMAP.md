@@ -213,7 +213,7 @@
 
 **Wave 6** *(parallel; blocked on Wave 5, with the server lifecycle also directly bound to Wave 3 runtime state)*
 - [x] 64-06-PLAN.md — Project the exact roster into bounded inventory/doctor evidence and the browser-safe Claude/OpenCode compatibility plane.
-- [ ] 64-07-PLAN.md — Implement the generic cold-first, FSB-owned-server lease, health, fallback, idle, and recovery lifecycle.
+- [x] 64-07-PLAN.md — Implement the generic cold-first, FSB-owned-server lease, health, fallback, idle, and recovery lifecycle.
 
 **Wave 7** *(parallel; each blocked on its Wave 6 dependency)*
 - [ ] 64-08-PLAN.md — Interpret closed attestation descriptors through the shared verifier, enforce no replay, and gate results on clean exit/tree settlement.
@@ -255,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 6/13 | In Progress | — |
+| 64. OpenCode Adapter | 7/13 | In Progress | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones
