@@ -122,8 +122,16 @@ try {
     'agent-providers',
     'opencode-detect.ts',
   );
+  const supervisorPath = path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'spawn-supervisor.ts',
+  );
   const profileSource = fs.readFileSync(profilePath, 'utf8');
   const detectorSource = fs.readFileSync(detectorPath, 'utf8');
+  const supervisorSource = fs.readFileSync(supervisorPath, 'utf8');
   for (const sourceFlag of [
     'OPENCODE_DISABLE_PROJECT_CONFIG',
     'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
@@ -153,6 +161,14 @@ try {
   assert(profileSource.includes('OWNED_SERVER_BASIC_PASSWORD_SECRET_REF'));
   assert(detectorSource.includes("OPENCODE_PROFILE_VERSION = '1.14.25'"));
   assert(detectorSource.includes('shell: false'));
+  assert(supervisorSource.includes('verifyPolicyAttestation'));
+  assert(supervisorSource.includes("descriptor.source === 'process_json'"));
+  assert(supervisorSource.includes("descriptor.source === 'owned_server_json'"));
+  assert(!/from ['"].*opencode-(?:profile|detect|stream)/.test(supervisorSource));
+  assert(!/(?:adapterId|spec\.adapterId)\s*===\s*(?:OPENCODE_ADAPTER_ID|['"]opencode['"])/.test(
+    supervisorSource,
+  ));
+  assert(!/(?:verify|check|reduce)OpenCodePolicy/.test(supervisorSource));
 
   for (const forbidden of [
     '--model',

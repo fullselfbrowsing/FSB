@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const { PassThrough, Writable } = require('node:stream');
@@ -33,6 +34,60 @@ function startRequest(adapterId, task, id) {
 
 function normalizedEvent(type, payload = {}, sessionId = 'session_topology_fixture') {
   return { type, sessionId, payload };
+}
+
+function jsonClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function documentDigest(value) {
+  return createHash('sha256').update(JSON.stringify(value), 'utf8').digest('hex');
+}
+
+function cleanPolicyDocuments() {
+  const permission = [
+    { permission: '*', action: 'deny', pattern: '*' },
+    { permission: 'external_directory', pattern: '*', action: 'deny' },
+    { permission: 'external_directory', pattern: '/fixture/data/tool-output/*', action: 'deny' },
+    { permission: 'fsb_*', action: 'allow', pattern: '*' },
+  ];
+  return {
+    config: {
+      share: 'disabled',
+      autoupdate: false,
+      default_agent: 'fsb',
+      plugin: [],
+      command: {},
+      instructions: [],
+      agent: { fsb: { mode: 'primary' } },
+      mcp: { fsb: { type: 'remote', url: 'http://127.0.0.1:7226/mcp', enabled: true, oauth: false } },
+    },
+    agent: {
+      name: 'fsb',
+      mode: 'primary',
+      description: 'fixture FSB policy',
+      prompt: 'fixture shipped prompt digest source',
+      steps: 40,
+      permission,
+      tools: ['fsb_search_capabilities', 'fsb_invoke_capability'],
+      resolvedModel: 'fixture-provider/fixture-model',
+    },
+  };
+}
+
+function policyAssertions(document, kind) {
+  const assertions = [
+    { kind: 'exact_keys', path: [], keys: Object.keys(document) },
+    { kind: 'document_sha256', path: [], sha256: documentDigest(document) },
+    { kind: 'absent', path: ['model'] },
+  ];
+  if (kind === 'agent') {
+    assertions.push(
+      { kind: 'all_strings_prefix', path: ['tools'], prefixRef: 'fsb_mcp_tool_prefix' },
+      { kind: 'nonempty_string', path: ['resolvedModel'] },
+    );
+  }
+  return assertions;
 }
 
 async function* parseNormalizedLines(stream) {
@@ -82,7 +137,7 @@ function makeChild(role, pid, controls) {
     },
     final(callback) {
       callback();
-      if (role === 'owned_server') return;
+      if (role === 'owned_server' || role === 'policy_preflight') return;
       const finish = () => {
         if (controls.zeroEventRoles.has(role)) {
           close({ code: 1, signal: null });
@@ -117,6 +172,14 @@ function makeChild(role, pid, controls) {
     if (role === 'owned_server') {
       for (const chunk of controls.readinessChunks) stdout.write(chunk);
       if (controls.closeServerBeforeReadiness) close({ code: 1, signal: null });
+      return;
+    }
+    if (role === 'policy_preflight') {
+      const output = controls.preflightOutputs.shift();
+      if (!output || output.timeout) return;
+      if (output.stderr) stderr.write(output.stderr);
+      stdout.write(output.body);
+      close(output.exit ?? { code: 0, signal: null });
     }
   });
   return child;
@@ -137,8 +200,12 @@ function processSpec(role, adapterId, context) {
       FSB_TEST_PROCESS_ROLE: role,
     },
     spawnSecretEnvBindings: [],
-    stdin: role === 'owned_server' ? 'none' : 'task',
-    stdout: role === 'owned_server' ? 'bounded_readiness' : 'agent_jsonl',
+    stdin: role === 'owned_server' || role === 'policy_preflight' ? 'none' : 'task',
+    stdout: role === 'owned_server'
+      ? 'bounded_readiness'
+      : role === 'policy_preflight'
+        ? 'bounded_json'
+        : 'agent_jsonl',
   };
   if (role === 'owned_server') {
     return {
@@ -160,10 +227,62 @@ function processSpec(role, adapterId, context) {
       argv: ['run', '--attach', { runtimeRef: 'owned_server_endpoint' }],
     };
   }
+  if (role === 'policy_preflight') {
+    return { ...common, argv: ['debug', 'policy-fixture'] };
+  }
   return { ...common, argv: [role] };
 }
 
-function makeAdapter(adapterId, topologyKind) {
+function makePolicyAttestations(adapterId, context, controls) {
+  const clean = cleanPolicyDocuments();
+  const expected = controls.expectedPolicyDocuments;
+  const processDocuments = controls.processPolicyDocuments;
+  controls.preflightOutputs.push(...processDocuments.map((document, index) => ({
+    body: controls.rawPreflightBodies[index] ?? JSON.stringify(document),
+    timeout: controls.timeoutPreflightIndex === index,
+    exit: controls.preflightExits[index],
+    stderr: controls.preflightStderr[index],
+  })));
+  return [
+    {
+      source: 'process_json',
+      process: processSpec('policy_preflight', adapterId, context),
+      maxBytes: controls.attestationMaxBytes,
+      timeoutMs: 5000,
+      assertions: policyAssertions(expected.config, 'config'),
+    },
+    {
+      source: 'process_json',
+      process: {
+        ...processSpec('policy_preflight', adapterId, context),
+        argv: ['debug', 'agent', 'fsb'],
+      },
+      maxBytes: controls.attestationMaxBytes,
+      timeoutMs: 5000,
+      assertions: policyAssertions(expected.agent, 'agent'),
+    },
+    {
+      source: 'owned_server_json',
+      method: 'GET',
+      path: '/config',
+      secretRef: 'owned_server_basic_password',
+      maxBytes: controls.attestationMaxBytes,
+      timeoutMs: 5000,
+      assertions: policyAssertions(clean.config, 'config'),
+    },
+    {
+      source: 'owned_server_json',
+      method: 'GET',
+      path: '/agent',
+      secretRef: 'owned_server_basic_password',
+      maxBytes: controls.attestationMaxBytes,
+      timeoutMs: 5000,
+      assertions: policyAssertions(clean.agent, 'agent'),
+    },
+  ];
+}
+
+function makeAdapter(adapterId, topologyKind, controls) {
   return Object.freeze({
     async detect() {
       const command = `/fixture/bin/${adapterId}`;
@@ -176,6 +295,9 @@ function makeAdapter(adapterId, topologyKind) {
       };
     },
     async buildSpawn(_task, context) {
+      const attestations = controls.policyEnabled
+        ? makePolicyAttestations(adapterId, context, controls)
+        : [];
       if (topologyKind === 'direct') {
         return {
           adapterId,
@@ -184,7 +306,7 @@ function makeAdapter(adapterId, topologyKind) {
             kind: 'direct',
             task: processSpec('direct_task', adapterId, context),
           },
-          attestations: [],
+          attestations,
         };
       }
       return {
@@ -206,7 +328,7 @@ function makeAdapter(adapterId, topologyKind) {
             generation: 'daemon_generation',
           },
         },
-        attestations: [],
+        attestations,
       };
     },
     parseEvents: parseNormalizedLines,
@@ -227,6 +349,7 @@ function makeHarness(supervisorModule, options = {}) {
     'owned-server-secret-fixture-material-0001',
     'utf8',
   );
+  const cleanPolicy = cleanPolicyDocuments();
   const controls = {
     spawnFailureRoles: new Set(),
     stdinFailureRoles: new Set(),
@@ -242,6 +365,27 @@ function makeHarness(supervisorModule, options = {}) {
     healthGate: null,
     holdTaskRoles: new Set(),
     pendingTaskCompletions: new Map(),
+    policyEnabled: options.policyEnabled === true,
+    expectedPolicyDocuments: cleanPolicy,
+    processPolicyDocuments: options.processPolicyDocuments
+      ? options.processPolicyDocuments.map(jsonClone)
+      : [jsonClone(cleanPolicy.config), jsonClone(cleanPolicy.agent)],
+    serverPolicyDocuments: options.serverPolicyDocuments
+      ? {
+          '/config': jsonClone(options.serverPolicyDocuments['/config']),
+          '/agent': jsonClone(options.serverPolicyDocuments['/agent']),
+        }
+      : {
+          '/config': jsonClone(cleanPolicy.config),
+          '/agent': jsonClone(cleanPolicy.agent),
+        },
+    rawPreflightBodies: options.rawPreflightBodies ?? [],
+    timeoutPreflightIndex: options.timeoutPreflightIndex ?? null,
+    preflightExits: options.preflightExits ?? [],
+    preflightStderr: options.preflightStderr ?? [],
+    preflightOutputs: [],
+    attestationMaxBytes: options.attestationMaxBytes ?? 128 * 1024,
+    serverPolicyResponseFactory: options.serverPolicyResponseFactory ?? null,
   };
   const spawnCalls = [];
   const emitted = [];
@@ -261,8 +405,8 @@ function makeHarness(supervisorModule, options = {}) {
 
   const adapters = new Map([
     // Deliberately inverted: topology shape, not provider identity, must select behavior.
-    ['claude-code', makeAdapter('claude-code', 'owned_server')],
-    ['opencode', makeAdapter('opencode', 'direct')],
+    ['claude-code', makeAdapter('claude-code', 'owned_server', controls)],
+    ['opencode', makeAdapter('opencode', 'direct', controls)],
   ]);
   const registry = {
     require(id) {
@@ -426,8 +570,20 @@ function makeHarness(supervisorModule, options = {}) {
         authorizationAtCall: requestOptions.headers.Authorization,
       });
       if (controls.healthGate) await controls.healthGate.promise;
-      if (controls.healthResponse instanceof Error) throw controls.healthResponse;
-      return controls.healthResponse;
+      if (requestOptions.path === '/global/health') {
+        if (controls.healthResponse instanceof Error) throw controls.healthResponse;
+        return controls.healthResponse;
+      }
+      if (controls.serverPolicyResponseFactory) {
+        return controls.serverPolicyResponseFactory(requestOptions);
+      }
+      const document = controls.serverPolicyDocuments[requestOptions.path];
+      if (document === undefined) throw new Error('unexpected policy route');
+      return {
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: Buffer.from(JSON.stringify(document)),
+      };
     },
     wallNow: (() => { let now = 1000; return () => ++now; })(),
     monotonicNow: (() => { let now = 0; return () => ++now; })(),
@@ -996,6 +1152,201 @@ async function runLeaseLifecycle(supervisorModule) {
   }
 }
 
+async function runPolicyAttestation(supervisorModule) {
+  {
+    const task = 'POLICY_TASK_CANARY_must_only_reach_selected_stdin';
+    const harness = makeHarness(supervisorModule, { policyEnabled: true });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', task, 'ext-policy-clean'),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'succeeded');
+    assert.deepEqual(
+      harness.spawnCalls.map((call) => call.role),
+      ['policy_preflight', 'policy_preflight', 'owned_server', 'cold_task'],
+      'both bounded process descriptors pass before one server and one selected task child',
+    );
+    const preflights = harness.spawnCalls.filter((call) => call.role === 'policy_preflight');
+    assert.equal(preflights.length, 2);
+    for (const call of preflights) {
+      assert.equal(call.options.shell, false);
+      assert.equal(call.options.env.FSB_TEST_PROCESS_ROLE, 'policy_preflight');
+      assert.equal(call.passwordAtSpawn, undefined);
+      assert.equal(Buffer.concat(call.child.stdinBytes).length, 0);
+      assert.equal(JSON.stringify([call.argv, call.options.env]).includes(task), false);
+    }
+    const taskCalls = harness.spawnCalls.filter((call) => (
+      call.role === 'cold_task' || call.role === 'attach_task' || call.role === 'direct_task'
+    ));
+    assert.equal(taskCalls.length, 1);
+    assert.equal(Buffer.concat(taskCalls[0].child.stdinBytes).toString('utf8'), task);
+    assert.deepEqual(
+      harness.httpCalls.map((call) => call.options.path),
+      ['/global/health', '/config', '/agent'],
+      'owned-server policy descriptors run only after authenticated health',
+    );
+    for (const call of harness.httpCalls) {
+      assert.equal(call.options.method, 'GET');
+      assert.equal(call.options.hostname, '127.0.0.1');
+      assert.equal(Object.hasOwn(call.options.headers, 'Authorization'), false);
+    }
+    const started = harness.emitted.filter((event) => event.event === 'delegation.started');
+    assert.equal(started.length, 1);
+    assert.deepEqual(Object.keys(started[0].payload).sort(), [
+      'adapterId',
+      'delegationId',
+      'profileVersion',
+    ]);
+    await harness.supervisor.close();
+  }
+
+  const contaminationCases = [
+    ['plugin', (config) => { config.plugin = ['poison-plugin']; }],
+    ['mcp', (config) => { config.mcp.external = { enabled: true }; }],
+    ['command', (config) => { config.command.poison = { template: 'secret' }; }],
+    ['instruction', (config) => { config.instructions = ['POISON_INSTRUCTION']; }],
+    ['skill', (config) => { config.skills = ['POISON_SKILL']; }],
+    ['agent', (config) => { config.agent.poison = { mode: 'primary' }; }],
+    ['tool', (_config, agent) => { agent.tools.push('bash'); }],
+    ['permission-order', (_config, agent) => { agent.permission.reverse(); }],
+    ['model-override', (_config, agent) => { agent.model = 'poison/model'; }],
+    ['wrong-prompt', (_config, agent) => { agent.prompt = 'wrong prompt'; }],
+    ['subagent', (_config, agent) => { agent.mode = 'subagent'; }],
+    ['no-model', (_config, agent) => { agent.resolvedModel = ''; }],
+  ];
+  for (const [label, poison] of contaminationCases) {
+    const documents = cleanPolicyDocuments();
+    poison(documents.config, documents.agent);
+    const harness = makeHarness(supervisorModule, {
+      policyEnabled: true,
+      processPolicyDocuments: [documents.config, documents.agent],
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `policy poison ${label}`, `ext-policy-poison-${label}`),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed', `${label} fails closed`);
+    assert.equal(
+      harness.spawnCalls.some((call) => ['owned_server', 'cold_task', 'attach_task'].includes(call.role)),
+      false,
+      `${label} grants neither server nor task authority`,
+    );
+    assert.equal(harness.emitted.length, 0, `${label} emits no delegation.started`);
+    assert.equal(
+      harness.spawnCalls.some((call) => Buffer.concat(call.child.stdinBytes).length > 0),
+      false,
+      `${label} writes no task bytes`,
+    );
+    await harness.supervisor.close();
+  }
+
+  for (const [label, options] of [
+    ['malformed-json', { rawPreflightBodies: ['{"share":'] }],
+    ['prototype-poison', { rawPreflightBodies: ['{"__proto__":{"polluted":true}}'] }],
+    ['oversize', {
+      attestationMaxBytes: 256,
+      rawPreflightBodies: ['x'.repeat(257)],
+    }],
+    ['nonzero', { preflightExits: [{ code: 1, signal: null }] }],
+  ]) {
+    const harness = makeHarness(supervisorModule, { policyEnabled: true, ...options });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', `bounded policy ${label}`, `ext-policy-${label}`),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed', `${label} is rejected`);
+    assert.equal(harness.spawnCalls.some((call) => call.role === 'cold_task'), false);
+    assert.equal(harness.emitted.length, 0);
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      policyEnabled: true,
+      timeoutPreflightIndex: 0,
+    });
+    const operation = harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'bounded policy timeout', 'ext-policy-timeout'),
+      harness.emit,
+    );
+    await waitFor(
+      () => harness.spawnCalls.some((call) => call.role === 'policy_preflight'),
+      'policy timeout probe spawn',
+    );
+    await harness.advanceClock(5000);
+    const terminal = await bounded(operation, 'policy timeout terminal');
+    assert.equal(terminal.status, 'failed');
+    assert.equal(harness.spawnCalls.some((call) => call.role === 'cold_task'), false);
+    assert.equal(harness.emitted.length, 0);
+    await harness.supervisor.close();
+  }
+
+  {
+    const serverDocuments = cleanPolicyDocuments();
+    const canaries = [
+      'RAW_POLICY_BODY_CANARY',
+      'PASSWORD_POLICY_CANARY',
+      'AUTHORIZATION_POLICY_CANARY',
+    ];
+    serverDocuments.agent.raw = canaries.join(':');
+    const harness = makeHarness(supervisorModule, {
+      policyEnabled: true,
+      serverPolicyDocuments: {
+        '/config': serverDocuments.config,
+        '/agent': serverDocuments.agent,
+      },
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'server policy poison', 'ext-policy-server-poison'),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.deepEqual(
+      harness.spawnCalls.map((call) => call.role),
+      ['policy_preflight', 'policy_preflight', 'owned_server'],
+      'server attestation failure retires the server before any task child',
+    );
+    assert.equal(harness.emitted.length, 0);
+    assert.equal(
+      harness.terminationCalls.filter((call) => call.entry.role === 'provider_server').length,
+      1,
+    );
+    const retained = JSON.stringify({ terminal, emitted: harness.emitted, journal: [...harness.journal.values()] });
+    for (const canary of canaries) assert.equal(retained.includes(canary), false);
+    await harness.supervisor.close();
+  }
+
+  {
+    let getterCalls = 0;
+    const harness = makeHarness(supervisorModule, {
+      policyEnabled: true,
+      serverPolicyResponseFactory() {
+        const response = {
+          statusCode: 200,
+          headers: { 'content-type': 'application/json' },
+        };
+        Object.defineProperty(response, 'body', {
+          enumerable: true,
+          get() {
+            getterCalls += 1;
+            return Buffer.from('{}');
+          },
+        });
+        return response;
+      },
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'accessor policy poison', 'ext-policy-accessor'),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(getterCalls, 0, 'response accessors are rejected without invocation');
+    assert.equal(harness.spawnCalls.some((call) => call.role === 'cold_task'), false);
+    assert.equal(harness.emitted.length, 0);
+    await harness.supervisor.close();
+  }
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
@@ -1009,7 +1360,15 @@ async function main() {
   if (!section || section === 'lease-lifecycle') {
     await runLeaseLifecycle(supervisorModule);
   }
-  if (section && !['selection-replay', 'owned-health', 'lease-lifecycle'].includes(section)) {
+  if (!section || section === 'policy-attestation') {
+    await runPolicyAttestation(supervisorModule);
+  }
+  if (section && ![
+    'selection-replay',
+    'owned-health',
+    'lease-lifecycle',
+    'policy-attestation',
+  ].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }
   console.log('mcp-opencode-server-topology.test.js: PASS');
