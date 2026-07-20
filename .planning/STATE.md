@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-02-PLAN.md
-last_updated: "2026-07-20T19:50:02Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 02 complete; closed topology and attestation contract green
+stopped_at: Completed 64-03-PLAN.md
+last_updated: "2026-07-20T20:26:54.569Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 03 complete; role-aware runtime journal and private-artifact boundary green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 44
-  percent: 39
+  completed_plans: 45
+  percent: 85
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 3 of 13
+Plan: 4 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 02 complete; closed topology and attestation contract green
+Last activity: 2026-07-20 -- Phase 64 Plan 03 complete; role-aware runtime journal and private-artifact boundary green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -197,6 +197,10 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Reconstruct and recursively freeze the closed direct/owned-server topology before the supervisor reads adapter output. — Roles, streams, runtime references, bindings, lifecycle policy, and attestations remain provider-neutral data rather than callbacks or adapter-id branches.
 - [Phase 64]: Keep fixed environment data serializable and spawn secrets opaque. — The sole Basic-password binding names a supervisor-owned reference and is legal only on the owned server and attach task; raw secret values have no contract field.
 - [Phase 64]: Interpret policy evidence through one bounded own-data verifier and a closed assertion grammar. — Provider-native JSON, arbitrary prefixes, accessors, inherited records, cycles, and unbounded input cannot cross the attestation boundary.
+- [Phase 64]: Use delegation and provider_server as the only durable runtime roles. — Task work and daemon infrastructure share one exact journal while only confirmed stale delegations create lost-run dispositions.
+- [Phase 64]: Normalize exact version-1 Claude journals in memory without rewriting them on read. — Legacy recovery remains byte-compatible while every new mutation emits the closed version-2 role-aware schema.
+- [Phase 64]: Derive private paths from four closed logical artifact kinds inside the minted run directory. — Callers cannot persist arbitrary cleanup paths, and the full contained graph is mode/symlink/foreign-node validated before mutation or removal.
+- [Phase 64]: Persist fixed public environment and proven process identity only. — Secret bindings, resolved spawn environments, raw credentials, Authorization headers, and credential-shaped values remain structurally outside durable runtime state.
 
 ### Pending Todos
 
@@ -243,13 +247,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T19:50:02Z
-Stopped at: Completed 64-02-PLAN.md
+Last session: 2026-07-20T20:26:54.563Z
+Stopped at: Completed 64-03-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute 64-03-PLAN.md next. Keep secret-bearing environment values out of every persisted journal/artifact, keep OpenCode production registration and compatibility exposure absent until Plan 05, and keep every accumulated live UAT item pending until the single milestone-end sweep.
+Execute 64-04-PLAN.md next. Build the exact OpenCode 1.14.25 retained detection, private policy, effective-attestation declarations, and server/attach secret-binding descriptors against the closed runtime boundary; keep transient secret values out of durable state, keep production registration and compatibility exposure absent until Plan 05, and keep every accumulated live UAT item pending until the single milestone-end sweep.
 
 ## Performance Metrics
 
@@ -269,3 +273,4 @@ Execute 64-03-PLAN.md next. Keep secret-bearing environment values out of every 
 | Phase 63 P12 | 34min | 2 tasks | 1 files |
 | Phase 64 P01 | 30 min | 1 task | 9 files |
 | Phase 64 P02 | 27 min | 1 task | 7 files |
+| Phase 64 P03 | 32 min | 1 task | 3 files |
