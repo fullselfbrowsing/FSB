@@ -8,6 +8,7 @@
 
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -15,7 +16,10 @@ const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
 const adapterSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'adapter.ts');
+const policySourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'policy-attestation.ts');
+const supervisorSourcePath = path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts');
 const adapterBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'adapter.js');
+const policyBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'policy-attestation.js');
 const registryBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'registry.js');
 const platformsBuildPath = path.join(repoRoot, 'mcp', 'build', 'platforms.js');
 const mcpRoot = path.join(repoRoot, 'mcp');
@@ -30,25 +34,142 @@ function expectRegistryError(fn, ErrorType, code) {
   });
 }
 
+function sha256(value) {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function assertRecursivelyFrozen(value, label, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  assert.ok(Object.isFrozen(value), `${label} is recursively frozen`);
+  for (const child of Object.values(value)) assertRecursivelyFrozen(child, label, seen);
+}
+
+function processSpec(role, overrides = {}) {
+  const defaults = {
+    role,
+    command: '/fixture/opencode',
+    argv: ['--pure'],
+    cwd: '/fixture/work',
+    privateFiles: ['/fixture/run/opencode.json'],
+    fixedEnv: { XDG_CONFIG_HOME: '/fixture/run/config' },
+    spawnSecretEnvBindings: [],
+    stdin: role.endsWith('_task') ? 'task' : 'none',
+    stdout: role.endsWith('_task') ? 'agent_jsonl' : 'bounded_json',
+  };
+  return { ...defaults, ...overrides };
+}
+
+function directSpawn(overrides = {}) {
+  return {
+    adapterId: 'claude-code',
+    profileVersion: '2.1.177',
+    topology: {
+      kind: 'direct',
+      task: processSpec('direct_task', {
+        command: '/fixture/claude',
+        argv: ['-p'],
+        privateFiles: ['/fixture/run/mcp-config.json'],
+        fixedEnv: { FSB_AGENT_PROFILE: '2.1.177' },
+      }),
+    },
+    attestations: [],
+    ...overrides,
+  };
+}
+
+function ownedServerSpawn(overrides = {}) {
+  const binding = {
+    envKey: 'OPENCODE_SERVER_PASSWORD',
+    secretRef: 'owned_server_basic_password',
+  };
+  const processAttestation = {
+    source: 'process_json',
+    process: processSpec('policy_preflight', {
+      argv: ['--pure', 'debug', 'config'],
+    }),
+    maxBytes: 16 * 1024,
+    timeoutMs: 2_000,
+    assertions: [
+      { kind: 'exact_keys', path: [], keys: ['enabled', 'model', 'prompt', 'tools'] },
+      { kind: 'exact_scalar', path: ['enabled'], value: true },
+      { kind: 'absent', path: ['providerCredential'] },
+      { kind: 'string_sha256', path: ['prompt'], sha256: sha256('static prompt') },
+      { kind: 'document_sha256', path: ['model'], sha256: sha256(JSON.stringify({ resolved: true })) },
+      { kind: 'nonempty_string', path: ['model', 'name'] },
+      { kind: 'all_strings_prefix', path: ['tools'], prefixRef: 'fsb_mcp_tool_prefix' },
+    ],
+  };
+  const serverAttestation = {
+    source: 'owned_server_json',
+    method: 'GET',
+    path: '/config',
+    secretRef: 'owned_server_basic_password',
+    maxBytes: 16 * 1024,
+    timeoutMs: 2_000,
+    assertions: [
+      { kind: 'exact_scalar', path: ['healthy'], value: true },
+    ],
+  };
+  return {
+    adapterId: 'opencode',
+    profileVersion: '1.14.25',
+    topology: {
+      kind: 'owned_server',
+      server: processSpec('owned_server', {
+        argv: ['--pure', 'serve'],
+        spawnSecretEnvBindings: [binding],
+        stdout: 'bounded_readiness',
+      }),
+      coldTask: processSpec('cold_task', {
+        argv: ['--pure', 'run'],
+      }),
+      attachTask: processSpec('attach_task', {
+        argv: ['--pure', 'run', { runtimeRef: 'owned_server_endpoint' }],
+        spawnSecretEnvBindings: [binding],
+      }),
+      readiness: {
+        linePrefix: 'opencode server listening on http://127.0.0.1:',
+        maxBytes: 4 * 1024,
+        timeoutMs: 5_000,
+      },
+      idle: { timeoutMs: 5 * 60 * 1_000 },
+      runtimeRefs: {
+        endpoint: 'owned_server_endpoint',
+        generation: 'daemon_generation',
+      },
+    },
+    attestations: [processAttestation, serverAttestation],
+    ...overrides,
+  };
+}
+
 async function main() {
   assert.ok(fs.existsSync(adapterBuildPath), 'compiled adapter contract exists');
+  assert.ok(fs.existsSync(policyBuildPath), 'compiled policy attestation verifier exists');
   assert.ok(fs.existsSync(registryBuildPath), 'compiled adapter registry exists');
 
   const adapterModule = await import(pathToFileURL(adapterBuildPath).href);
+  const policyModule = await import(pathToFileURL(policyBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
   const { PLATFORMS } = await import(pathToFileURL(platformsBuildPath).href);
 
   const {
     CLAUDE_CODE_ADAPTER_ID,
+    OPENCODE_SERVER_PASSWORD_ENV_KEY,
+    OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
     TASK_ONLY_CAPABILITIES,
     freezeSpawnSpec,
   } = adapterModule;
+  const { verifyPolicyAttestation } = policyModule;
   const {
     AdapterRegistryError,
     createAdapterRegistry,
   } = registryModule;
 
   assert.equal(CLAUDE_CODE_ADAPTER_ID, 'claude-code');
+  assert.equal(OPENCODE_SERVER_PASSWORD_ENV_KEY, 'OPENCODE_SERVER_PASSWORD');
+  assert.equal(OWNED_SERVER_BASIC_PASSWORD_SECRET_REF, 'owned_server_basic_password');
   assert.equal(PLATFORMS['claude-code'].flag, 'claude-code', 'platform id remains canonical');
 
   const detection = Object.freeze({
@@ -110,11 +231,173 @@ async function main() {
   }, TypeError);
 
   assert.ok(Object.isFrozen(immutableSpec), 'spawn spec is immutable');
-  assert.ok(Object.isFrozen(immutableSpec.argv), 'spawn argv is immutable');
-  assert.ok(Object.isFrozen(immutableSpec.privateFiles), 'private file references are immutable');
-  assert.ok(Object.isFrozen(immutableSpec.fixedEnv), 'fixed environment additions are immutable');
-  assert.throws(() => immutableSpec.argv.push('--unexpected'), TypeError);
+  assert.equal(immutableSpec.topology.kind, 'direct', 'legacy Claude data projects to direct topology');
+  assert.deepEqual(immutableSpec.topology.task.argv, ['-p']);
+  assert.deepEqual(immutableSpec.topology.task.fixedEnv, { FSB_AGENT_PROFILE: '2.1.177' });
+  assert.deepEqual(immutableSpec.topology.task.spawnSecretEnvBindings, []);
+  assert.deepEqual(immutableSpec.attestations, []);
+  assertRecursivelyFrozen(immutableSpec, 'Claude direct spawn spec');
+  assert.throws(() => immutableSpec.topology.task.argv.push('--unexpected'), TypeError);
   assert.equal(JSON.stringify(immutableSpec).includes(task.text), false, 'task text is absent from spec');
+
+  const mutableOwned = ownedServerSpawn();
+  const immutableOwned = freezeSpawnSpec(mutableOwned);
+  assert.equal(immutableOwned.topology.kind, 'owned_server');
+  assert.deepEqual(immutableOwned.topology.server.spawnSecretEnvBindings, [{
+    envKey: 'OPENCODE_SERVER_PASSWORD',
+    secretRef: 'owned_server_basic_password',
+  }]);
+  assert.deepEqual(immutableOwned.topology.coldTask.spawnSecretEnvBindings, []);
+  assert.deepEqual(immutableOwned.topology.attachTask.spawnSecretEnvBindings, [{
+    envKey: 'OPENCODE_SERVER_PASSWORD',
+    secretRef: 'owned_server_basic_password',
+  }]);
+  assert.equal(immutableOwned.attestations[0].source, 'process_json');
+  assert.equal(immutableOwned.attestations[1].source, 'owned_server_json');
+  assertRecursivelyFrozen(immutableOwned, 'owned-server spawn spec');
+  mutableOwned.topology.server.argv.push('--mutated');
+  mutableOwned.topology.readiness.linePrefix = 'mutated';
+  mutableOwned.attestations[0].assertions[0].keys.push('mutated');
+  assert.deepEqual(immutableOwned.topology.server.argv, ['--pure', 'serve']);
+  assert.match(immutableOwned.topology.readiness.linePrefix, /^opencode server listening/);
+  assert.deepEqual(immutableOwned.attestations[0].assertions[0].keys, [
+    'enabled', 'model', 'prompt', 'tools',
+  ]);
+
+  const taskCanary = 'TASK_CANARY_contract_boundary_0001';
+  const passwordCanary = 'PASSWORD_CANARY_contract_boundary_0001';
+  assert.equal(JSON.stringify(immutableOwned).includes(taskCanary), false);
+  assert.equal(JSON.stringify(immutableOwned).includes(passwordCanary), false);
+  const invalidSpawnSpecs = [
+    directSpawn({ extra: taskCanary }),
+    directSpawn({
+      topology: {
+        kind: 'direct',
+        task: processSpec('direct_task', {
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+          }],
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      topology: {
+        ...ownedServerSpawn().topology,
+        coldTask: processSpec('cold_task', {
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+          }],
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      topology: {
+        ...ownedServerSpawn().topology,
+        server: processSpec('owned_server', {
+          fixedEnv: { OPENCODE_SERVER_PASSWORD: passwordCanary },
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+          }],
+          stdout: 'bounded_readiness',
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      topology: {
+        ...ownedServerSpawn().topology,
+        attachTask: processSpec('attach_task', {
+          argv: ['--pure', 'run', { runtimeRef: 'owned_server_endpoint' }],
+          spawnSecretEnvBindings: [{ envKey: 'ARBITRARY_PASSWORD', secretRef: 'arbitrary' }],
+        }),
+      },
+    }),
+    ownedServerSpawn({
+      attestations: [{
+        ...ownedServerSpawn().attestations[0],
+        process: processSpec('policy_preflight', {
+          spawnSecretEnvBindings: [{
+            envKey: 'OPENCODE_SERVER_PASSWORD',
+            secretRef: 'owned_server_basic_password',
+          }],
+        }),
+      }],
+    }),
+    ownedServerSpawn({
+      attestations: [{
+        ...ownedServerSpawn().attestations[1],
+        path: 'http://127.0.0.1/unsafe',
+      }],
+    }),
+    ownedServerSpawn({
+      attestations: [{
+        ...ownedServerSpawn().attestations[0],
+        assertions: [{ kind: 'exact_scalar', path: ['model'], value: 'string forbidden' }],
+      }],
+    }),
+    ownedServerSpawn({
+      attestations: [{
+        ...ownedServerSpawn().attestations[0],
+        assertions: [{ kind: 'all_strings_prefix', path: ['tools'], prefix: 'arbitrary_' }],
+      }],
+    }),
+  ];
+  for (const invalid of invalidSpawnSpecs) {
+    assert.throws(() => freezeSpawnSpec(invalid), TypeError, 'closed spawn grammar rejects invalid data');
+  }
+
+  let getterTouched = false;
+  const accessorSpec = directSpawn();
+  Object.defineProperty(accessorSpec.topology.task.fixedEnv, 'ACCESSOR', {
+    enumerable: true,
+    get() {
+      getterTouched = true;
+      return taskCanary;
+    },
+  });
+  assert.throws(() => freezeSpawnSpec(accessorSpec), TypeError);
+  assert.equal(getterTouched, false, 'spawn validation never invokes accessors');
+  const inheritedSpec = Object.create({ resolver: () => passwordCanary });
+  Object.assign(inheritedSpec, directSpawn());
+  assert.throws(() => freezeSpawnSpec(inheritedSpec), TypeError);
+
+  const cleanDocument = {
+    enabled: true,
+    model: { resolved: true, name: 'provider/model' },
+    prompt: 'static prompt',
+    tools: ['fsb_click', 'fsb_read'],
+  };
+  const assertions = immutableOwned.attestations[0].assertions;
+  const passed = verifyPolicyAttestation(cleanDocument, assertions);
+  assert.deepEqual(passed, { pass: true, reason: 'passed' });
+  assertRecursivelyFrozen(passed, 'passing attestation verdict');
+  const failed = verifyPolicyAttestation({ ...cleanDocument, tools: ['fsb_read', 'shell'] }, assertions);
+  assert.deepEqual(failed, { pass: false, reason: 'assertion_failed', assertionIndex: 6 });
+  assertRecursivelyFrozen(failed, 'failing attestation verdict');
+  const malformed = Object.create({ enabled: true });
+  Object.assign(malformed, cleanDocument);
+  assert.deepEqual(
+    verifyPolicyAttestation(malformed, assertions),
+    { pass: false, reason: 'invalid_document' },
+  );
+  let documentGetterTouched = false;
+  const accessorDocument = { ...cleanDocument };
+  Object.defineProperty(accessorDocument, 'prompt', {
+    enumerable: true,
+    get() {
+      documentGetterTouched = true;
+      return passwordCanary;
+    },
+  });
+  assert.deepEqual(
+    verifyPolicyAttestation(accessorDocument, assertions),
+    { pass: false, reason: 'invalid_document' },
+  );
+  assert.equal(documentGetterTouched, false, 'attestation verifier never invokes accessors');
+  assert.equal(JSON.stringify(passed).includes(passwordCanary), false);
+  assert.equal(JSON.stringify(failed).includes(passwordCanary), false);
 
   const registry = createAdapterRegistry([{ id: 'claude-code', adapter: fakeAdapter }]);
   assert.strictEqual(registry.require('claude-code'), fakeAdapter, 'exact canonical lookup succeeds');
@@ -162,6 +445,8 @@ async function main() {
   );
 
   const adapterSource = fs.readFileSync(adapterSourcePath, 'utf8');
+  const policySource = fs.readFileSync(policySourcePath, 'utf8');
+  const supervisorSource = fs.readFileSync(supervisorSourcePath, 'utf8');
   const interfaceMatch = adapterSource.match(
     /export interface AgentProviderAdapter\s*\{([\s\S]*?)\n\}/,
   );
@@ -176,6 +461,12 @@ async function main() {
   for (const forbidden of ['start', 'stop', 'close', 'init', 'dispose', 'spawn']) {
     assert.equal(signatures.includes(forbidden), false, `interface excludes ${forbidden}`);
   }
+  assert.match(supervisorSource, /from ['"]\.\/protocol-drift\.js['"]/, 'supervisor imports shared drift contract');
+  assert.doesNotMatch(supervisorSource, /from ['"]\.\/claude-stream\.js['"]/, 'supervisor does not import a provider parser');
+  assert.doesNotMatch(supervisorSource, /from ['"][^'"]*opencode[^'"]*['"]/, 'supervisor has no OpenCode import');
+  assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]opencode['"]/, 'supervisor has no OpenCode id branch');
+  assert.doesNotMatch(policySource, /claude|opencode/i, 'shared verifier is provider-neutral');
+  assert.doesNotMatch(policySource, /callback|resolver|template/i, 'shared verifier has no executable extension seam');
 
   const shippedAgent = JSON.parse(fs.readFileSync(shippedAgentPath, 'utf8'));
   assert.deepEqual(Object.keys(shippedAgent).sort(), [

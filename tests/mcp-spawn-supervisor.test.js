@@ -20,10 +20,10 @@ const registryBuildPath = path.join(
   'agent-providers',
   'registry.js',
 );
-const claudeStreamBuildPath = path.join(
+const protocolDriftBuildPath = path.join(
   mcpBuildRoot,
   'agent-providers',
-  'claude-stream.js',
+  'protocol-drift.js',
 );
 
 function startRequest(payload, overrides = {}) {
@@ -218,21 +218,31 @@ function makeHarness(supervisorModule, options = {}) {
       return Object.freeze({
         adapterId: 'claude-code',
         profileVersion,
-        command,
-        argv: Object.freeze([
-          '-p',
-          '--strict-mcp-config',
-          '--mcp-config', context.privateMcpConfigPath,
-          '--output-format', 'stream-json',
-        ]),
-        cwd: '/fixture/workspace',
-        privateFiles: Object.freeze([context.privateMcpConfigPath]),
-        fixedEnv: Object.freeze({
-          FSB_AGENT_ADAPTER: 'claude-code',
-          FSB_AGENT_PROFILE: profileVersion,
-          FSB_DELEGATION_ID: context.delegationId,
-          FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
+        topology: Object.freeze({
+          kind: 'direct',
+          task: Object.freeze({
+            role: 'direct_task',
+            command,
+            argv: Object.freeze([
+              '-p',
+              '--strict-mcp-config',
+              '--mcp-config', context.privateMcpConfigPath,
+              '--output-format', 'stream-json',
+            ]),
+            cwd: '/fixture/workspace',
+            privateFiles: Object.freeze([context.privateMcpConfigPath]),
+            fixedEnv: Object.freeze({
+              FSB_AGENT_ADAPTER: 'claude-code',
+              FSB_AGENT_PROFILE: profileVersion,
+              FSB_DELEGATION_ID: context.delegationId,
+              FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
+            }),
+            spawnSecretEnvBindings: Object.freeze([]),
+            stdin: 'task',
+            stdout: 'agent_jsonl',
+          }),
         }),
+        attestations: Object.freeze([]),
       });
     },
     parseEvents(stream) {
@@ -1419,7 +1429,7 @@ async function runFailureBarrierTests(supervisorModule) {
   }
 }
 
-async function runTypedDriftDetailTests(supervisorModule, claudeStreamModule) {
+async function runTypedDriftDetailTests(supervisorModule, protocolDriftModule) {
   const expectedByReason = Object.freeze({
     configuration_surface: 'known_event_shape',
     duplicate_init: 'single_init_session',
@@ -1439,7 +1449,7 @@ async function runTypedDriftDetailTests(supervisorModule, claudeStreamModule) {
   const forbiddenCanary = 'TOP_SECRET_DRIFT_CANARY_prompt_session_token_path_provider_output';
 
   for (const [reason, expected] of Object.entries(expectedByReason)) {
-    const drift = new claudeStreamModule.AgentProtocolDriftError(
+    const drift = new protocolDriftModule.AgentProtocolDriftError(
       reason,
       7,
       [`message.content.${forbiddenCanary}`],
@@ -2000,7 +2010,7 @@ async function runRouteLossStatusTests(supervisorModule) {
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
-  const claudeStreamModule = await import(pathToFileURL(claudeStreamBuildPath).href);
+  const protocolDriftModule = await import(pathToFileURL(protocolDriftBuildPath).href);
   assert.equal(supervisorModule.DELEGATION_TASK_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_STDERR_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_ACTIVE_STATUS_LIMIT, 64);
@@ -2014,7 +2024,7 @@ async function main() {
   await runStatusBoundsTest(supervisorModule);
   await runHappyPathTest(supervisorModule);
   await runFailureBarrierTests(supervisorModule);
-  await runTypedDriftDetailTests(supervisorModule, claudeStreamModule);
+  await runTypedDriftDetailTests(supervisorModule, protocolDriftModule);
   await runCancelAndShutdownTests(supervisorModule);
   await runSetupCancellationRaceTests(supervisorModule);
   await runStdinLifecycleTests(supervisorModule);
