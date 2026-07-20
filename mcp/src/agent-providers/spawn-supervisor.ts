@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   execFile as nodeExecFile,
   spawn as nodeSpawn,
@@ -6,6 +6,7 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { request as nodeHttpRequest } from 'node:http';
 import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 import type {
@@ -21,7 +22,9 @@ import type {
 } from './adapter.js';
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  OPENCODE_SERVER_PASSWORD_ENV_KEY,
   OPENCODE_ADAPTER_ID,
+  OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
   freezeSpawnSpec,
 } from './adapter.js';
 import {
@@ -69,6 +72,10 @@ const HOLD_EXPIRY_MS = 5 * 60 * 1000;
 const PROCESS_TRANSITION_GRACE_MS = 500;
 const PROCESS_TRANSITION_POLL_MS = 25;
 const PROCESS_STATUS_LIMIT_BYTES = 2 * 1024 * 1024;
+const OWNED_SERVER_SECRET_BYTES = 32;
+const OWNED_SERVER_HEALTH_LIMIT_BYTES = 16 * 1024;
+const OWNED_SERVER_HEALTH_PATH = '/global/health';
+const OWNED_SERVER_BASIC_USERNAME = 'opencode';
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const PROVIDER_KEY_NAMES = Object.freeze([
@@ -223,6 +230,27 @@ export type AgentSpawnDependency = (
   options: SpawnInvocationOptions,
 ) => ChildProcessWithoutNullStreams;
 
+export interface OwnedServerHttpRequestOptions {
+  readonly hostname: '127.0.0.1';
+  readonly port: number;
+  readonly path: string;
+  readonly method: 'GET';
+  readonly timeout: number;
+  readonly maximumBytes: number;
+  readonly agent: false;
+  readonly headers: Record<string, string>;
+}
+
+export interface OwnedServerHttpResponse {
+  readonly statusCode: number;
+  readonly headers: Readonly<Record<string, string | readonly string[] | undefined>>;
+  readonly body: Buffer;
+}
+
+export type OwnedServerHttpRequestDependency = (
+  options: OwnedServerHttpRequestOptions,
+) => Promise<OwnedServerHttpResponse>;
+
 export interface SpawnSupervisorCloseResult {
   readonly cancelled: number;
   readonly failed: number;
@@ -250,6 +278,8 @@ export interface SpawnSupervisorDependencies {
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
   readonly spawn?: AgentSpawnDependency;
+  readonly randomBytes?: (size: number) => Buffer;
+  readonly requestOwnedServer?: OwnedServerHttpRequestDependency;
   readonly wallNow?: () => number;
   readonly monotonicNow?: () => number;
   readonly wait?: (milliseconds: number) => Promise<void>;
@@ -333,8 +363,11 @@ type OwnedServerTopology = Extract<SpawnSpec['topology'], { readonly kind: 'owne
 
 interface OwnedServerLease {
   readonly topologyKey: string;
+  readonly configurationDigest: string;
   readonly endpoint: string;
   readonly profileVersion: string;
+  readonly secretRef: typeof OWNED_SERVER_BASIC_PASSWORD_SECRET_REF;
+  readonly healthTimeoutMs: number;
   readonly entry: ActiveJournalEntry;
   readonly child: ChildProcessWithoutNullStreams;
   readonly supervisedChild: SupervisedChild;
@@ -355,6 +388,63 @@ function defaultSpawn(
   options: SpawnInvocationOptions,
 ): ChildProcessWithoutNullStreams {
   return nodeSpawn(command, [...argv], options) as ChildProcessWithoutNullStreams;
+}
+
+function defaultOwnedServerHttpRequest(
+  options: OwnedServerHttpRequestOptions,
+): Promise<OwnedServerHttpResponse> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (): void => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('activation_failed'));
+    };
+    const request = nodeHttpRequest({
+      hostname: options.hostname,
+      port: options.port,
+      path: options.path,
+      method: options.method,
+      timeout: options.timeout,
+      agent: options.agent,
+      headers: options.headers,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      response.on('data', (chunk: Buffer | string) => {
+        if (settled) return;
+        const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf8');
+        bytes += value.length;
+        if (bytes > options.maximumBytes) {
+          response.destroy();
+          request.destroy();
+          fail();
+          return;
+        }
+        chunks.push(Buffer.from(value));
+      });
+      response.once('aborted', fail);
+      response.once('error', fail);
+      response.once('end', () => {
+        if (settled) return;
+        settled = true;
+        const contentType = response.headers['content-type'];
+        resolve(Object.freeze({
+          statusCode: response.statusCode ?? 0,
+          headers: Object.freeze({
+            ...(contentType === undefined ? {} : { 'content-type': contentType }),
+          }),
+          body: Buffer.concat(chunks),
+        }));
+      });
+    });
+    request.once('timeout', () => {
+      request.destroy();
+      fail();
+    });
+    request.once('error', fail);
+    request.end();
+  });
 }
 
 function defaultWait(milliseconds: number): Promise<void> {
@@ -755,10 +845,13 @@ function containsSensitiveValue(serialized: string, values: readonly string[]): 
 class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   readonly handleExtRequest: ExtRequestHandler;
 
+  private readonly dependencies: SpawnSupervisorDependencies;
   private readonly activeRuns = new Map<string, DelegationRun>();
   private readonly completedRuns = new Map<string, RunTerminalResult>();
   private readonly entriesByPid = new Map<number, JournalEntry>();
   private readonly spawnChild: AgentSpawnDependency;
+  private readonly randomSecretBytes: (size: number) => Buffer;
+  private readonly requestOwnedServer: OwnedServerHttpRequestDependency;
   private readonly cwd: string;
   private readonly platform: NodeJS.Platform;
   private readonly environment: NodeJS.ProcessEnv;
@@ -774,6 +867,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly clearScheduled: NonNullable<SpawnSupervisorDependencies['clearScheduled']>;
   private ownedServerLease: OwnedServerLease | null = null;
   private ownedServerWarmPromise: Promise<OwnedServerLease | null> | null = null;
+  private readonly ownedServerSecrets = new Map<string, Buffer>();
   private restartLosses: readonly DelegationRestartLoss[] = Object.freeze([]);
   private readonly routeLosses = new Map<string, DelegationRouteLoss>();
   private readonly terminationGrace: number;
@@ -783,11 +877,20 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private degraded = false;
   private closePromise: Promise<SpawnSupervisorCloseResult> | null = null;
 
-  constructor(private readonly dependencies: SpawnSupervisorDependencies) {
+  constructor(dependencies: SpawnSupervisorDependencies) {
+    const sanitizedEnvironment = { ...(dependencies.environment ?? process.env) };
+    for (const key of PROVIDER_KEY_NAMES) delete sanitizedEnvironment[key];
+    delete sanitizedEnvironment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
+    this.dependencies = Object.freeze({
+      ...dependencies,
+      environment: Object.freeze(sanitizedEnvironment),
+    });
     this.spawnChild = dependencies.spawn ?? defaultSpawn;
+    this.randomSecretBytes = dependencies.randomBytes ?? randomBytes;
+    this.requestOwnedServer = dependencies.requestOwnedServer ?? defaultOwnedServerHttpRequest;
     this.cwd = dependencies.cwd ?? process.cwd();
     this.platform = dependencies.platform ?? process.platform;
-    this.environment = { ...(dependencies.environment ?? process.env) };
+    this.environment = { ...sanitizedEnvironment };
     this.wallNow = dependencies.wallNow ?? (() => Date.now());
     this.monotonicNow = dependencies.monotonicNow ?? (() => performance.now());
     this.wait = dependencies.wait ?? defaultWait;
@@ -991,6 +1094,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           detection,
           spec.topology,
           spec.profileVersion,
+          this.configurationDigest(spec),
         );
         process = selection.process;
         argv = selection.argv;
@@ -1036,7 +1140,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         env: environment,
       });
       run.replayClosed = true;
-      const child = this.spawnChild(process.command, argv, options);
+      const child = process.spawnSecretEnvBindings.length === 0
+        ? this.spawnChild(process.command, argv, options)
+        : this.spawnWithSecretBindings(process, argv, options);
       run.child = child;
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
         throw new Error('spawn_failed');
@@ -1199,6 +1305,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   }
 
   private requireOwnedServerTopology(topology: OwnedServerTopology): void {
+    const serverBinding = topology.server.spawnSecretEnvBindings;
+    const attachBinding = topology.attachTask.spawnSecretEnvBindings;
     if (
       topology.server.role !== 'owned_server'
       || topology.server.stdin !== 'none'
@@ -1210,6 +1318,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || topology.attachTask.role !== 'attach_task'
       || topology.attachTask.stdin !== 'task'
       || topology.attachTask.stdout !== 'agent_jsonl'
+      || serverBinding.length !== 1
+      || serverBinding[0].envKey !== OPENCODE_SERVER_PASSWORD_ENV_KEY
+      || serverBinding[0].secretRef !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
+      || attachBinding.length !== 1
+      || attachBinding[0].envKey !== serverBinding[0].envKey
+      || attachBinding[0].secretRef !== serverBinding[0].secretRef
     ) throw new Error('adapter_unavailable');
     const serverArgv = directProcessArguments(topology.server);
     const coldArgv = directProcessArguments(topology.coldTask);
@@ -1218,9 +1332,26 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     }
   }
 
-  private topologyKey(topology: OwnedServerTopology, profileVersion: string): string {
+  private configurationDigest(spec: SpawnSpec): string {
+    const serialized = safeJson(spec.attestations.map((attestation) => ({
+      source: attestation.source,
+      ...(attestation.source === 'owned_server_json'
+        ? { method: attestation.method, path: attestation.path }
+        : {}),
+      assertions: attestation.assertions,
+    })));
+    if (!serialized) throw new Error('adapter_unavailable');
+    return createHash('sha256').update(serialized, 'utf8').digest('hex');
+  }
+
+  private topologyKey(
+    topology: OwnedServerTopology,
+    profileVersion: string,
+    configurationDigest: string,
+  ): string {
     const serialized = safeJson({
       profileVersion,
+      configurationDigest,
       server: {
         command: topology.server.command,
         argv: topology.server.argv,
@@ -1232,7 +1363,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       readiness: topology.readiness,
     });
     if (!serialized) throw new Error('adapter_unavailable');
-    return serialized;
+    return createHash('sha256').update(serialized, 'utf8').digest('hex');
   }
 
   private resolveProcessArguments(process: ProcessSpec, endpoint: string | null): readonly string[] {
@@ -1258,9 +1389,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     },
     topology: OwnedServerTopology,
     profileVersion: string,
+    configurationDigest: string,
   ): Promise<Readonly<{ process: ProcessSpec; argv: readonly string[] }>> {
     this.requireOwnedServerTopology(topology);
-    const topologyKey = this.topologyKey(topology, profileVersion);
+    const topologyKey = this.topologyKey(topology, profileVersion, configurationDigest);
     const lease = await this.verifiedOwnedServerLease(topologyKey);
     if (lease) {
       return Object.freeze({
@@ -1274,14 +1406,27 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       argv: this.resolveProcessArguments(topology.coldTask, null),
     });
     if (!this.ownedServerLease) {
-      await this.ensureOwnedServer(run, detection, topology, topologyKey).catch(() => null);
+      await this.ensureOwnedServer(
+        run,
+        detection,
+        topology,
+        topologyKey,
+        configurationDigest,
+      ).catch(() => null);
     }
     return selection;
   }
 
   private async verifiedOwnedServerLease(topologyKey: string): Promise<OwnedServerLease | null> {
     const lease = this.ownedServerLease;
-    if (!lease || lease.topologyKey !== topologyKey || lease.entry.generation !== this.generation) {
+    const secret = lease ? this.ownedServerSecrets.get(lease.secretRef) : null;
+    if (
+      !lease
+      || lease.topologyKey !== topologyKey
+      || lease.entry.generation !== this.generation
+      || !secret
+      || secret.length < OWNED_SERVER_SECRET_BYTES
+    ) {
       return null;
     }
     let inspection: ProcessInspection;
@@ -1300,6 +1445,17 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || inspection.process.processGroupId !== lease.entry.processGroupId
       || inspection.process.processStartIdentity !== lease.entry.processStartIdentity
     ) return null;
+    try {
+      await this.requireOwnedServerHealth(
+        lease.endpoint,
+        lease.secretRef,
+        lease.profileVersion,
+        lease.healthTimeoutMs,
+      );
+    } catch {
+      await this.stopOwnedServerLease().catch(() => undefined);
+      return null;
+    }
     return lease;
   }
 
@@ -1309,10 +1465,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   ): NodeJS.ProcessEnv {
     const environment = { ...this.environment };
     for (const key of PROVIDER_KEY_NAMES) delete environment[key];
+    delete environment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
     for (const [key, value] of Object.entries(fixedEnv)) environment[key] = value;
     environment.FSB_AGENT_ARGV_SIGNATURE = argvSignature;
     for (const key of PROVIDER_KEY_NAMES) delete environment[key];
-    return Object.freeze(environment);
+    delete environment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
+    return environment;
   }
 
   private async resolveActivation(
@@ -1505,6 +1663,132 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     });
   }
 
+  private mintOwnedServerSecret(
+    secretRef: typeof OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
+  ): void {
+    if (this.ownedServerSecrets.has(secretRef)) throw new Error('adapter_unavailable');
+    const generated = this.randomSecretBytes(OWNED_SERVER_SECRET_BYTES);
+    if (
+      !Buffer.isBuffer(generated)
+      || generated.length < OWNED_SERVER_SECRET_BYTES
+      || generated.length > 256
+    ) throw new Error('adapter_unavailable');
+    const retained = Buffer.from(generated);
+    generated.fill(0);
+    this.ownedServerSecrets.set(secretRef, retained);
+  }
+
+  private clearOwnedServerSecret(secretRef: string): void {
+    const secret = this.ownedServerSecrets.get(secretRef);
+    if (secret) secret.fill(0);
+    this.ownedServerSecrets.delete(secretRef);
+  }
+
+  private spawnWithSecretBindings(
+    process: ProcessSpec,
+    argv: readonly string[],
+    options: SpawnInvocationOptions,
+  ): ChildProcessWithoutNullStreams {
+    const binding = process.spawnSecretEnvBindings[0];
+    if (
+      process.spawnSecretEnvBindings.length !== 1
+      || !binding
+      || binding.envKey !== OPENCODE_SERVER_PASSWORD_ENV_KEY
+      || binding.secretRef !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF
+    ) throw new Error('adapter_unavailable');
+    const secret = this.ownedServerSecrets.get(binding.secretRef);
+    if (!secret || secret.length < OWNED_SERVER_SECRET_BYTES) {
+      throw new Error('adapter_unavailable');
+    }
+    let password: string | null = secret.toString('base64url');
+    try {
+      options.env[binding.envKey] = password;
+      return this.spawnChild(process.command, argv, options);
+    } finally {
+      options.env[binding.envKey] = '';
+      delete options.env[binding.envKey];
+      password = null;
+    }
+  }
+
+  private async requireOwnedServerHealth(
+    endpoint: string,
+    secretRef: typeof OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
+    expectedVersion: string,
+    timeoutMs: number,
+  ): Promise<void> {
+    const secret = this.ownedServerSecrets.get(secretRef);
+    if (!secret || secret.length < OWNED_SERVER_SECRET_BYTES) {
+      throw new Error('activation_failed');
+    }
+    const parsed = new URL(endpoint);
+    const port = Number(parsed.port);
+    if (
+      parsed.protocol !== 'http:'
+      || parsed.hostname !== '127.0.0.1'
+      || parsed.pathname !== '/'
+      || parsed.search !== ''
+      || parsed.hash !== ''
+      || parsed.username !== ''
+      || parsed.password !== ''
+      || !Number.isSafeInteger(port)
+      || port < 1
+      || port > 65_535
+    ) throw new Error('activation_failed');
+
+    let password: string | null = secret.toString('base64url');
+    const credentialBytes = Buffer.from(
+      `${OWNED_SERVER_BASIC_USERNAME}:${password}`,
+      'utf8',
+    );
+    let authorization: string | null = `Basic ${credentialBytes.toString('base64')}`;
+    credentialBytes.fill(0);
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: authorization,
+    };
+    const requestOptions: OwnedServerHttpRequestOptions = {
+      hostname: '127.0.0.1',
+      port,
+      path: OWNED_SERVER_HEALTH_PATH,
+      method: 'GET',
+      timeout: timeoutMs,
+      maximumBytes: OWNED_SERVER_HEALTH_LIMIT_BYTES,
+      agent: false,
+      headers,
+    };
+    try {
+      const response = await this.requestOwnedServer(requestOptions);
+      const contentType = response.headers['content-type'];
+      if (
+        response.statusCode !== 200
+        || typeof contentType !== 'string'
+        || !/^application\/json(?:\s*;.*)?$/i.test(contentType)
+        || !Buffer.isBuffer(response.body)
+        || response.body.length > OWNED_SERVER_HEALTH_LIMIT_BYTES
+      ) throw new Error('activation_failed');
+      const body = Buffer.from(response.body);
+      try {
+        const document = JSON.parse(body.toString('utf8')) as unknown;
+        if (
+          !isPlainRecord(document)
+          || !exactKeys(document, ['healthy', 'version'])
+          || document.healthy !== true
+          || document.version !== expectedVersion
+        ) throw new Error('activation_failed');
+      } finally {
+        body.fill(0);
+      }
+    } catch {
+      throw new Error('activation_failed');
+    } finally {
+      headers.Authorization = '';
+      delete headers.Authorization;
+      authorization = null;
+      password = null;
+    }
+  }
+
   private ensureOwnedServer(
     run: DelegationRun,
     detection: AdapterDetection & {
@@ -1514,12 +1798,19 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     },
     topology: OwnedServerTopology,
     topologyKey: string,
+    configurationDigest: string,
   ): Promise<OwnedServerLease | null> {
     if (this.ownedServerLease?.topologyKey === topologyKey) {
       return Promise.resolve(this.ownedServerLease);
     }
     if (this.ownedServerWarmPromise) return this.ownedServerWarmPromise;
-    const operation = this.startOwnedServer(run, detection, topology, topologyKey);
+    const operation = this.startOwnedServer(
+      run,
+      detection,
+      topology,
+      topologyKey,
+      configurationDigest,
+    );
     this.ownedServerWarmPromise = operation;
     void operation.finally(() => {
       if (this.ownedServerWarmPromise === operation) this.ownedServerWarmPromise = null;
@@ -1536,8 +1827,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     },
     topology: OwnedServerTopology,
     topologyKey: string,
+    configurationDigest: string,
   ): Promise<OwnedServerLease | null> {
     const process = topology.server;
+    const binding = process.spawnSecretEnvBindings[0];
+    if (!binding) return null;
+    const secretRef = binding.secretRef;
     const argv = this.resolveProcessArguments(process, null);
     const serverId = `provider_server_${randomBytes(16).toString('base64url')}`;
     const runtimeFingerprint = this.uniqueFingerprint();
@@ -1551,6 +1846,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     let child: ChildProcessWithoutNullStreams | null = null;
     let supervisedChild: SupervisedChild | null = null;
     try {
+      this.mintOwnedServerSecret(secretRef);
       const prepared = await this.dependencies.runtimeFiles.prepareRun({
         role: 'provider_server',
         delegationId: serverId,
@@ -1574,7 +1870,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         cwd: process.cwd,
         env: environment,
       });
-      child = this.spawnChild(process.command, argv, options);
+      child = this.spawnWithSecretBindings(process, argv, options);
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
         throw new Error('spawn_failed');
       }
@@ -1607,12 +1903,28 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       entry = active;
       this.entriesByPid.set(supervisedChild.pid, active);
       const endpoint = await readiness;
+      await this.requireOwnedServerHealth(
+        endpoint,
+        secretRef,
+        detection.profileVersion,
+        topology.readiness.timeoutMs,
+      );
+      const retained = await this.dependencies.inspector.inspect(active);
+      if (
+        retained.classification !== 'confirmed'
+        || retained.process.pid !== active.pid
+        || retained.process.processGroupId !== active.processGroupId
+        || retained.process.processStartIdentity !== active.processStartIdentity
+      ) throw new Error('activation_failed');
       if (!this.accepting) throw new Error('daemon_shutdown');
       child.stdout.resume();
       const lease = Object.freeze({
         topologyKey,
+        configurationDigest,
         endpoint,
         profileVersion: detection.profileVersion,
+        secretRef,
+        healthTimeoutMs: topology.readiness.timeoutMs,
         entry: active,
         child,
         supervisedChild,
@@ -1636,6 +1948,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         }
       }
       if (supervisedChild) this.entriesByPid.delete(supervisedChild.pid);
+      this.clearOwnedServerSecret(secretRef);
       return null;
     }
   }
@@ -1748,6 +2061,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     } catch (error) {
       this.ownedServerLease = lease;
       throw error;
+    } finally {
+      this.clearOwnedServerSecret(lease.secretRef);
     }
   }
 
