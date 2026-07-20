@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: ready_to_plan
-stopped_at: Phase 63 complete (12/12) — ready to discuss Phase 999.1
-last_updated: 2026-07-20T12:17:23.222Z
-last_activity: 2026-07-20
+status: executing
+stopped_at: Phase 64 UI-SPEC approved
+last_updated: "2026-07-20T18:23:52.894Z"
+last_activity: 2026-07-20 -- Phase 64 planning complete
 progress:
   total_phases: 18
   completed_phases: 7
-  total_plans: 40
+  total_plans: 53
   completed_plans: 42
   percent: 39
 ---
@@ -35,8 +35,8 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 Phase: 999.1
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-20
+Status: Ready to execute
+Last activity: 2026-07-20 -- Phase 64 planning complete
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -237,9 +237,9 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T12:01:50.509Z
-Stopped at: Completed 63-12-PLAN.md
-Resume file: None
+Last session: 2026-07-20T13:59:01.860Z
+Stopped at: Phase 64 UI-SPEC approved
+Resume file: .planning/phases/64-opencode-adapter/64-UI-SPEC.md
 
 ## Next Actions
 

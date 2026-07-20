@@ -192,9 +192,42 @@
 **Success Criteria** (what must be TRUE):
   1. An OpenCode adapter (`mcp/src/agent-providers/opencode.ts`) implements the `AgentProviderAdapter` contract with `caps.serverMode = true`; the supervisor either spawns `opencode run` cold OR attaches to a running `opencode serve` per the adapter's `buildSpawn` output — and the Phase 60 contract handles both without any hardcoded spawn-vs-attach branch outside the adapter.
   2. The OpenCode adapter ships a pinned agent definition (equivalent to Claude Code's `--agents fsb`) using OpenCode's `agent create` / `agents` config surface, keyed to a version pinned during phase spike, so tool boundaries and system-prompt intent are identical across the two adapters.
-  3. A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-<pinned-version>/` proves the adapter's event schema in CI without a live CLI; the Phase 62 drift-smoke job includes OpenCode from the first commit of this phase, and unknown event types raise `agent_protocol_drift` with the adapter id `opencode`.
+  3. A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-<pinned-version>/` proves the adapter's event schema in CI without a live CLI; the Phase 62 drift-smoke job includes OpenCode from the first commit of this phase, and unknown event types raise `agent_protocol_drift` with the adapter id `opencode`. Planning-document commits do not count as implementation commits: Plan 64-01 has exactly one implementation task/commit containing the complete parser, fixture, native negative corpus, and generalized drift gate; every later plan depends on it transitively, and Plan 64-05 exposes adapter/registry/matrix/bijection atomically.
   4. A user with OpenCode installed can pick "OpenCode" as their provider in the side panel and observe the delegation UX (streaming feed, kill switch that reclaims tabs, post-run summary, SW-eviction survival) work identically to Claude Code — with no adapter-specific side-panel branches.
-**Plans**: TBD
+**Plans**: 13 plans
+
+**Wave 1**
+- [ ] 64-01-PLAN.md — Land the complete strict parser, honest 1.14.25 fixture, native negative corpus, and generalized adapter-native Phase 62 CI drift gate as the sole first implementation commit.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 64-02-PLAN.md — Freeze the exact five-method provider-neutral topology/attestation seam and the public fixed-env versus transient secret-binding contract.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 64-03-PLAN.md — Version the exact delegation/provider-server runtime journal and private-artifact boundary with legacy recovery and structural secret non-retention preserved.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 64-04-PLAN.md — Build exact OpenCode 1.14.25 retained detection, private policy, effective-attestation declarations, and exact server/attach secret-binding descriptors.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 64-05-PLAN.md — Atomically compose and expose the production adapter, registry row, compatibility row, and exact parser/fixture/native-drift bijection.
+
+**Wave 6** *(parallel; blocked on Wave 5, with the server lifecycle also directly bound to Wave 3 runtime state)*
+- [ ] 64-06-PLAN.md — Project the exact roster into bounded inventory/doctor evidence and the browser-safe Claude/OpenCode compatibility plane.
+- [ ] 64-07-PLAN.md — Implement the generic cold-first, FSB-owned-server lease, health, fallback, idle, and recovery lifecycle.
+
+**Wave 7** *(parallel; each blocked on its Wave 6 dependency)*
+- [ ] 64-08-PLAN.md — Interpret closed attestation descriptors through the shared verifier, enforce no replay, and gate results on clean exit/tree settlement.
+- [ ] 64-09-PLAN.md — Generalize canonical extension preflight, consent, trust, and background-authoritative provider routing.
+
+**Wave 8** *(parallel; each blocked on its Wave 7 dependency)*
+- [ ] 64-10-PLAN.md — Generalize durable event/controller hydration and safe per-adapter drift diagnostics.
+- [ ] 64-11-PLAN.md — Promote the existing OpenCode Providers row from safe evidence with honest auth/billing and no visible layout change.
+
+**Wave 9** *(blocked on Waves 7-8 completion)*
+- [ ] 64-12-PLAN.md — Project OpenCode through the existing delegated consent/side-panel/feed/summary UI with no provider-specific branch.
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 64-13-PLAN.md — Wire exact validation/root/CI/security/full-suite gates and the still-pending three-row human-UAT ledger.
 
 ### Phase 65: Codex Adapter
 **Goal**: Task-mode delegation coverage extends to OpenAI Codex with correct auth-state disclosure (ChatGPT OAuth vs API key vs unauthenticated) so users know which billing bucket a run will hit before starting; `caps.chatMode: false` across all v0.9.91 adapters confirms task-mode-only scope for the milestone.
@@ -222,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 0/0 | Not started | — |
+| 64. OpenCode Adapter | 0/13 | Planned | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones
