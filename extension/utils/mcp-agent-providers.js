@@ -14,8 +14,10 @@
     codex: true
   };
   var FSB_SHIPPED_COMPATIBILITY_LABELS = {
-    'claude-code': 'Claude Code'
+    'claude-code': 'Claude Code',
+    opencode: 'OpenCode'
   };
+  var FSB_SHIPPED_COMPATIBILITY_ROSTER = ['claude-code', 'opencode'];
   var ALLOWED_SUBMAPS = {
     clicked: true,
     connected: true,
@@ -149,13 +151,14 @@
         || !Number.isSafeInteger(record.checkedAt)
         || record.checkedAt < 0) return null;
     var values = denseDataArray(record.adapters, FSB_COMPATIBILITY_MAX_ADAPTERS);
-    if (!values) return null;
-    var ids = {};
+    if (!values || values.length !== FSB_SHIPPED_COMPATIBILITY_ROSTER.length) return null;
     var adapters = [];
     for (var index = 0; index < values.length; index += 1) {
       var row = parseCompatibilityRow(values[index]);
-      if (!row || Object.prototype.hasOwnProperty.call(ids, row.adapterId)) return null;
-      setOwnEnumerable(ids, row.adapterId, true);
+      var expectedId = FSB_SHIPPED_COMPATIBILITY_ROSTER[index];
+      if (!row
+          || row.adapterId !== expectedId
+          || row.displayLabel !== FSB_SHIPPED_COMPATIBILITY_LABELS[expectedId]) return null;
       adapters.push(row);
     }
     return {
@@ -241,7 +244,7 @@
     });
     envelope.clicked = cloneMap(ownEnumerableDataValue(source, 'clicked'));
     envelope.connected = normalizeConnected(ownEnumerableDataValue(source, 'connected'));
-    envelope.installed = cloneMap(ownEnumerableDataValue(source, 'installed'));
+    envelope.installed = normalizeInstalled(ownEnumerableDataValue(source, 'installed'));
     var compatibilityDescriptor;
     try {
       compatibilityDescriptor = Object.getOwnPropertyDescriptor(source, 'compatibility');
@@ -337,20 +340,18 @@
     if (!isPlainObject(platforms)) return {};
     var installed = {};
     Object.keys(platforms).forEach(function(clientId) {
-      var record = platforms[clientId];
-      if (!isPlainObject(record)) return;
+      var record = ownDataRecord(
+        ownEnumerableDataValue(platforms, clientId),
+        ['detected', 'checkedAt']
+      );
+      if (!record) return;
       if (typeof record.detected !== 'boolean') return;
-      if (!(record.configPath === null || typeof record.configPath === 'string')) return;
-      if (typeof record.checkedAt !== 'number' || !Number.isFinite(record.checkedAt)) return;
+      if (!Number.isSafeInteger(record.checkedAt) || record.checkedAt < 0) return;
 
       var normalized = {
         detected: record.detected,
-        configPath: record.configPath,
         checkedAt: record.checkedAt
       };
-      if (typeof record.version === 'string') {
-        normalized.version = record.version;
-      }
       setOwnEnumerable(installed, clientId, normalized);
     });
     return installed;
