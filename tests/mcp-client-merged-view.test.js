@@ -208,8 +208,8 @@ async function main() {
   assert.doesNotMatch(aliasesSource, /gemini\s*:/, 'Gemini has no alias-table row');
 
   const clickedCursor = { count: 2, firstClickedAt: 10, lastClickedAt: 20, source: 'fan' };
-  const installedVscode = { detected: true, configPath: '/tmp/code', checkedAt: 30 };
-  const staleCodex = { detected: false, configPath: null, version: '0.142.5', checkedAt: 1 };
+  const installedVscode = { detected: true, checkedAt: 30 };
+  const staleCodex = { detected: false, checkedAt: 1 };
   const connectedClaude = { name: 'Anthropic Claude', version: '2.1.177', lastSeenAt: 40 };
   const connectedUnknown = { name: 'Novel_Agent', version: '9.0.0', lastSeenAt: 41 };
   const liveClaude = {
@@ -313,7 +313,7 @@ async function main() {
     "fsbAgentProviders": {
       "clicked": {},
       "installed": {
-        "__proto__": { "detected": true, "configPath": null, "checkedAt": 42 }
+        "__proto__": { "detected": true, "checkedAt": 42 }
       },
       "connected": {
         "__proto__": { "name": "__proto__", "version": "1.0.0", "lastSeenAt": 43 }
@@ -334,7 +334,7 @@ async function main() {
     raw: false,
     displayName: '__proto__',
     clicked: null,
-    installed: { detected: true, configPath: null, checkedAt: 42 },
+    installed: { detected: true, checkedAt: 42 },
     connected: null,
     live: null
   }, '__proto__ installed evidence remains a complete merged row');
@@ -351,7 +351,7 @@ async function main() {
   const reconnectHarness = createHarness({
     fsbAgentProviders: {
       clicked: { codex: { count: 1 } },
-      installed: { codex: { detected: true, configPath: null, checkedAt: 50 } },
+      installed: { codex: { detected: true, checkedAt: 50 } },
       connected: {
         codexcli: { name: 'Codex CLI', version: '0.2', lastSeenAt: 52 }
       }
@@ -362,7 +362,7 @@ async function main() {
   reconnectHarness.storage.replace({
     fsbAgentProviders: {
       clicked: { codex: { count: 1 } },
-      installed: { codex: { detected: true, configPath: null, checkedAt: 50 } },
+      installed: { codex: { detected: true, checkedAt: 50 } },
       connected: {
         codexcli: { name: 'OpenAI Codex', version: '0.3', lastSeenAt: 60 }
       }
@@ -389,7 +389,7 @@ async function main() {
   const rawHarness = createHarness({
     fsbAgentProviders: {
       clicked: { cursor: { count: 1 } },
-      installed: { cursor: { detected: true, configPath: null, checkedAt: 70 } },
+      installed: { cursor: { detected: true, checkedAt: 70 } },
       connected: {
         empty: { name: '___', version: '1', lastSeenAt: 71 },
         gemini: { name: 'Gemini CLI', version: '2', lastSeenAt: 72 }

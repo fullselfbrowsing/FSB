@@ -258,9 +258,16 @@ async function main() {
 
   __configureClientInventoryForTests({
     platform: 'linux',
-    platforms: { 'claude-code': fakePlatform() },
+    platforms: { 'claude-code': fakePlatform(), opencode: fakePlatform() },
     now: () => 1_783_900_000_000,
-    execFile: (_file, _args, _options, callback) => callback(null, 'Claude Code 2.1.177', '')
+    execFile: (_file, _args, _options, callback) => callback(null, 'Claude Code 2.1.177', ''),
+    detectOpenCode: async () => ({
+      installed: false,
+      version: null,
+      authState: 'unknown',
+      binary: null,
+      profileVersion: null
+    })
   });
 
   let registerPayload;
@@ -276,9 +283,11 @@ async function main() {
       platforms: {
         'claude-code': {
           detected: true,
-          configPath: null,
-          checkedAt: 1_783_900_000_000,
-          version: '2.1.177'
+          checkedAt: 1_783_900_000_000
+        },
+        opencode: {
+          detected: false,
+          checkedAt: 1_783_900_000_000
         }
       }
     }, 'one register payload carries both optional initialize identity and installed inventory');
@@ -378,8 +387,9 @@ async function main() {
     'legacy payload creates no synthetic identity');
 
   const systemInventory = {
-    'claude-code': { detected: true, configPath: null, checkedAt: 1_783_900_001_000, version: '2.1.178' },
-    cursor: { detected: false, configPath: null, checkedAt: 1_783_900_001_000 }
+    'claude-code': { detected: true, checkedAt: 1_783_900_001_000 },
+    opencode: { detected: false, checkedAt: 1_783_900_001_000 },
+    cursor: { detected: false, checkedAt: 1_783_900_001_000 }
   };
   const inventoryBridge = loadInventoryBridge(providers);
   assert.deepEqual(clone(await inventoryBridge._routeMessage(
@@ -419,7 +429,8 @@ async function main() {
     'cache-only inventory preserves the current closed expiry envelope');
   const claude = queryResponse.clients['claude-code'];
   assert.equal(claude.clicked.source, 'fan');
-  assert.equal(claude.installed.version, '2.1.178');
+  assert.equal(claude.installed.detected, true);
+  assert.deepEqual(Object.keys(claude.installed), ['detected', 'checkedAt']);
   assert.equal(claude.connected.version, '2.1.178');
   assert.equal(claude.live.agentId, reconnect.agentId);
   assert.deepEqual(claude.compatibility, {
