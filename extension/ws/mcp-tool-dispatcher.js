@@ -523,13 +523,45 @@ function _peekLastKnownMcpClientLabel(agentId) {
   return _agentClientLabelCache.size === 0 ? null : Object.fromEntries(_agentClientLabelCache);
 }
 
-function canonicalizeVisualSessionTaskParams(tool, params) {
+function canonicalizeVisualSessionOwnershipToken(payload, sessionTabId, hasExplicitTabId) {
+  if (hasExplicitTabId || !payload || typeof payload !== 'object') return payload;
+
+  const reg = (typeof globalThis !== 'undefined') ? globalThis.fsbAgentRegistryInstance : null;
+  const agentId = payload.agentId;
+  const ownershipToken = payload.ownershipToken;
+  if (!reg || typeof agentId !== 'string' || !agentId ||
+      typeof ownershipToken !== 'string' || !ownershipToken ||
+      typeof reg.getAgentTabs !== 'function' ||
+      typeof reg.isOwnedBy !== 'function' ||
+      typeof reg.getTabMetadata !== 'function') {
+    return payload;
+  }
+
+  const ownedTabIds = reg.getAgentTabs(agentId);
+  const tokenProvesCurrentAgentOwnership = Array.isArray(ownedTabIds) && ownedTabIds.some((tabId) => (
+    Number.isFinite(tabId) && reg.isOwnedBy(tabId, agentId, ownershipToken)
+  ));
+  if (!tokenProvesCurrentAgentOwnership || getRegistryOwner(reg, sessionTabId) !== agentId) {
+    return payload;
+  }
+
+  const sessionMetadata = reg.getTabMetadata(sessionTabId);
+  const sessionOwnershipToken = sessionMetadata && sessionMetadata.ownershipToken;
+  if (typeof sessionOwnershipToken !== 'string' || !sessionOwnershipToken) return payload;
+
+  return {
+    ...payload,
+    ownershipToken: sessionOwnershipToken
+  };
+}
+
+function canonicalizeVisualSessionTaskParams(tool, params, payload) {
   if (!MCP_VISUAL_SESSION_TASK_STATUS_TOOLS.has(tool)) {
-    return { params };
+    return { params, payload };
   }
 
   const sessionToken = boundedString(params?.session_token || params?.sessionToken, 200);
-  if (!sessionToken) return { params };
+  if (!sessionToken) return { params, payload };
 
   const resolver = typeof globalThis !== 'undefined'
     ? globalThis.resolveMcpVisualSessionTabId
@@ -557,7 +589,7 @@ function canonicalizeVisualSessionTaskParams(tool, params) {
 
   // A missing token still follows the existing callback path so callers keep
   // receiving the canonical visual_session_not_found response.
-  if (!Number.isFinite(sessionTabId) || sessionTabId <= 0) return { params };
+  if (!Number.isFinite(sessionTabId) || sessionTabId <= 0) return { params, payload };
 
   const explicitTabIds = [params?.tabId, params?.tab_id].filter(Number.isFinite);
   if (explicitTabIds.some((tabId) => tabId !== sessionTabId)) {
@@ -575,7 +607,8 @@ function canonicalizeVisualSessionTaskParams(tool, params) {
       ...params,
       tabId: sessionTabId,
       tab_id: sessionTabId
-    }
+    },
+    payload: canonicalizeVisualSessionOwnershipToken(payload, sessionTabId, explicitTabIds.length > 0)
   };
 }
 
@@ -589,9 +622,10 @@ async function dispatchMcpToolRoute({ tool, params = {}, client = null, tab = nu
     return createMcpRouteError(tool, route.routeFamily, MCP_ROUTE_RECOVERY_HINT);
   }
 
-  const canonicalized = canonicalizeVisualSessionTaskParams(tool, params);
+  const canonicalized = canonicalizeVisualSessionTaskParams(tool, params, payload);
   if (canonicalized.error) return canonicalized.error;
   params = canonicalized.params;
+  payload = canonicalized.payload;
 
   // Phase 240 D-06 / D-07: inline ownership gate. Sync; no await between gate
   // check and route.handler invocation. Same microtask discipline.

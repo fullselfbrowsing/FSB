@@ -527,16 +527,28 @@ async function runVisualSessionTokenOwnershipCase(dispatcher, groups) {
     },
     isOwnedBy(tabId, agentId, ownershipToken) {
       if (tabId === 9) return agentId === 'agent-owner' && ownershipToken === 'owner-token-9';
-      if (tabId === 10) return agentId === 'agent-intruder' && ownershipToken === 'intruder-token-10';
+      if (tabId === 10) return agentId === 'agent-owner' && ownershipToken === 'owner-token-10';
+      if (tabId === 11) return agentId === 'agent-intruder' && ownershipToken === 'intruder-token-11';
       return false;
     },
     getOwner(tabId) {
       if (tabId === 9) return 'agent-owner';
-      if (tabId === 10) return 'agent-intruder';
+      if (tabId === 10) return 'agent-owner';
+      if (tabId === 11) return 'agent-intruder';
       return null;
     },
-    getTabMetadata() {
-      return { incognito: false, windowId: 1 };
+    getAgentTabs(agentId) {
+      if (agentId === 'agent-owner') return [9, 10];
+      if (agentId === 'agent-intruder') return [11];
+      return null;
+    },
+    getTabMetadata(tabId) {
+      const tokens = {
+        9: 'owner-token-9',
+        10: 'owner-token-10',
+        11: 'intruder-token-11'
+      };
+      return { incognito: false, windowId: 1, ownershipToken: tokens[tabId] };
     },
     getAgentWindowId() {
       return 1;
@@ -577,7 +589,8 @@ async function runVisualSessionTokenOwnershipCase(dispatcher, groups) {
     { tool: 'fail_task', params: { reason: 'Unrecoverable' } }
   ];
   const ownerPayload = { agentId: 'agent-owner', ownershipToken: 'owner-token-9' };
-  const intruderPayload = { agentId: 'agent-intruder', ownershipToken: 'intruder-token-10' };
+  const ownerOtherTabPayload = { agentId: 'agent-owner', ownershipToken: 'owner-token-10' };
+  const intruderPayload = { agentId: 'agent-intruder', ownershipToken: 'intruder-token-11' };
 
   try {
     for (const testCase of toolCases) {
@@ -595,6 +608,22 @@ async function runVisualSessionTokenOwnershipCase(dispatcher, groups) {
       'only terminal token-backed lifecycle tools reach task-memory recording');
     assert(outcomeCalls.every(call => call.params.tabId === 9 && call.params.tab_id === 9),
       'token-only terminal outcomes are attributed to the authoritative tab');
+
+    for (const testCase of toolCases) {
+      const response = await dispatcher.dispatchMcpToolRoute({
+        tool: testCase.tool,
+        params: { ...testCase.params, session_token: 'session-token-9' },
+        payload: ownerOtherTabPayload
+      });
+      assert(response?.tool === testCase.tool,
+        `${testCase.tool} translates another current same-agent tab token to the session tab`);
+    }
+    assert(handlerCalls.length === toolCases.length * 2,
+      'same-agent cross-tab tokens reach every token-backed lifecycle handler');
+    assert(outcomeCalls.length === 6,
+      'same-agent cross-tab tokens record all three terminal outcomes');
+    assert(outcomeCalls.every(call => call.params.tabId === 9 && call.params.tab_id === 9),
+      'translated token-only outcomes remain attributed to the authoritative tab');
 
     const matchingExplicit = await dispatcher.dispatchMcpToolRoute({
       tool: 'complete_task',
@@ -629,6 +658,14 @@ async function runVisualSessionTokenOwnershipCase(dispatcher, groups) {
     });
     assert(staleOwnership?.errorCode === 'TAB_NOT_OWNED',
       'same-agent calls with a stale ownership token are rejected');
+
+    const explicitWrongOwnership = await dispatcher.dispatchMcpToolRoute({
+      tool: 'complete_task',
+      params: { summary: 'Explicit wrong token', session_token: 'session-token-9', tab_id: 9 },
+      payload: ownerOtherTabPayload
+    });
+    assert(explicitWrongOwnership?.errorCode === 'TAB_NOT_OWNED',
+      'explicit tab calls never translate an ownership token from another tab');
 
     const spoofedTab = await dispatcher.dispatchMcpToolRoute({
       tool: 'complete_task',
