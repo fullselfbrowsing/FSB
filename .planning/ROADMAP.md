@@ -206,7 +206,7 @@
 - [x] 64-03-PLAN.md — Version the exact delegation/provider-server runtime journal and private-artifact boundary with legacy recovery and structural secret non-retention preserved.
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 64-04-PLAN.md — Build exact OpenCode 1.14.25 retained detection, private policy, effective-attestation declarations, and exact server/attach secret-binding descriptors.
+- [x] 64-04-PLAN.md — Build exact OpenCode 1.14.25 retained detection, private policy, effective-attestation declarations, and exact server/attach secret-binding descriptors.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 64-05-PLAN.md — Atomically compose and expose the production adapter, registry row, compatibility row, and exact parser/fixture/native-drift bijection.
@@ -255,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 3/13 | In Progress | — |
+| 64. OpenCode Adapter | 4/13 | In Progress | — |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones
