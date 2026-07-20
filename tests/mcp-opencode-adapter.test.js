@@ -13,6 +13,7 @@ const adapterBuildPath = path.join(buildRoot, 'adapter.js');
 const compatibilityBuildPath = path.join(buildRoot, 'compatibility.js');
 const opencodeDetectBuildPath = path.join(buildRoot, 'opencode-detect.js');
 const opencodeProfileBuildPath = path.join(buildRoot, 'opencode-profile.js');
+const policyAttestationBuildPath = path.join(buildRoot, 'policy-attestation.js');
 const opencodeStreamBuildPath = path.join(buildRoot, 'opencode-stream.js');
 const protocolDriftBuildPath = path.join(buildRoot, 'protocol-drift.js');
 const registryBuildPath = path.join(buildRoot, 'registry.js');
@@ -900,6 +901,231 @@ async function runProfilePolicy() {
   }
 }
 
+async function runAttestation() {
+  const fsbPolicy = JSON.parse(fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'ai', 'agents', 'fsb.json'),
+    'utf8',
+  ));
+  const profileModule = await import(pathToFileURL(opencodeProfileBuildPath).href);
+  const policyModule = await import(pathToFileURL(policyAttestationBuildPath).href);
+  const {
+    OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS,
+    OPENCODE_RESOLVED_FSB_PERMISSION_RULES,
+    buildOpenCodeProfile,
+  } = profileModule;
+  const { verifyPolicyAttestation } = policyModule;
+  const { context, runtime } = openCodeProfileFixture();
+  const profile = buildOpenCodeProfile(
+    { text: 'TASK_CANARY_attestation_64_04_0001' },
+    context,
+    runtime,
+  );
+  const { attestations } = profile.spawnSpec;
+
+  assert.deepEqual(OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS, [
+    'agent "fsb" not found. Falling back to default agent',
+    'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
+  ]);
+  assertRecursivelyFrozen(OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS, 'fallback sentinels');
+  assert.deepEqual(OPENCODE_RESOLVED_FSB_PERMISSION_RULES, [
+    { permission: '*', action: 'allow', pattern: '*' },
+    { permission: 'doom_loop', action: 'ask', pattern: '*' },
+    { permission: 'external_directory', pattern: '*', action: 'ask' },
+    {
+      permission: 'external_directory',
+      pattern: '/fixture/native-data/opencode/tool-output/*',
+      action: 'allow',
+    },
+    { permission: 'question', action: 'deny', pattern: '*' },
+    { permission: 'plan_enter', action: 'deny', pattern: '*' },
+    { permission: 'plan_exit', action: 'deny', pattern: '*' },
+    { permission: 'read', pattern: '*', action: 'allow' },
+    { permission: 'read', pattern: '*.env', action: 'ask' },
+    { permission: 'read', pattern: '*.env.*', action: 'ask' },
+    { permission: 'read', pattern: '*.env.example', action: 'allow' },
+    { permission: '*', action: 'deny', pattern: '*' },
+    { permission: 'external_directory', pattern: '*', action: 'deny' },
+    {
+      permission: 'external_directory',
+      pattern: '/fixture/native-data/opencode/tool-output/*',
+      action: 'deny',
+    },
+    { permission: 'fsb_*', action: 'allow', pattern: '*' },
+  ]);
+  assertRecursivelyFrozen(OPENCODE_RESOLVED_FSB_PERMISSION_RULES, 'resolved permission rules');
+
+  assert.equal(attestations.length, 4);
+  assert.deepEqual(attestations.map((descriptor) => descriptor.source), [
+    'process_json',
+    'process_json',
+    'owned_server_json',
+    'owned_server_json',
+  ]);
+  const [coldConfig, coldAgent, serverConfig, serverAgent] = attestations;
+  const prefix = ['/fixture/runtime/opencode-entry.js', '--pure', '--log-level', 'ERROR'];
+  assert.deepEqual(coldConfig.process.argv, [...prefix, 'debug', 'config']);
+  assert.deepEqual(coldAgent.process.argv, [...prefix, 'debug', 'agent', 'fsb']);
+  for (const descriptor of [coldConfig, coldAgent]) {
+    assert.equal(descriptor.process.role, 'policy_preflight');
+    assert.equal(descriptor.process.stdin, 'none');
+    assert.equal(descriptor.process.stdout, 'bounded_json');
+    assert.deepEqual(descriptor.process.spawnSecretEnvBindings, []);
+    assert.deepEqual(
+      descriptor.process.fixedEnv,
+      profile.spawnSpec.topology.coldTask.fixedEnv,
+    );
+    assert.equal(descriptor.maxBytes, 128 * 1024);
+    assert.equal(descriptor.timeoutMs, 5_000);
+  }
+  assert.deepEqual(serverConfig, {
+    source: 'owned_server_json',
+    method: 'GET',
+    path: '/config',
+    secretRef: 'owned_server_basic_password',
+    maxBytes: coldConfig.maxBytes,
+    timeoutMs: coldConfig.timeoutMs,
+    assertions: coldConfig.assertions,
+  });
+  assert.deepEqual(serverAgent, {
+    source: 'owned_server_json',
+    method: 'GET',
+    path: '/agent',
+    secretRef: 'owned_server_basic_password',
+    maxBytes: coldAgent.maxBytes,
+    timeoutMs: coldAgent.timeoutMs,
+    assertions: coldAgent.assertions,
+  });
+  assertRecursivelyFrozen(attestations, 'OpenCode attestations');
+
+  const config = JSON.parse(profile.privateArtifacts[0].contents);
+  const agent = {
+    name: 'fsb',
+    mode: 'primary',
+    description: fsbPolicy.description,
+    prompt: fsbPolicy.prompt,
+    steps: 40,
+    permission: clone(OPENCODE_RESOLVED_FSB_PERMISSION_RULES),
+    tools: ['fsb_navigate', 'fsb_snapshot'],
+    resolvedModel: 'native/default-model',
+  };
+  for (const descriptor of [coldConfig, serverConfig]) {
+    assert.deepEqual(verifyPolicyAttestation(config, descriptor.assertions), {
+      pass: true,
+      reason: 'passed',
+    });
+  }
+  for (const descriptor of [coldAgent, serverAgent]) {
+    assert.deepEqual(verifyPolicyAttestation(agent, descriptor.assertions), {
+      pass: true,
+      reason: 'passed',
+    });
+  }
+
+  const configPoisons = [];
+  for (const [key, value] of [
+    ['plugin', ['poison-plugin']],
+    ['command', { poison: { template: 'unsafe' } }],
+    ['instructions', ['poison-instruction.md']],
+    ['skills', { paths: ['/poison-skill'] }],
+    ['provider', { poison: {} }],
+    ['model', 'poison/model'],
+    ['permission', { '*': 'allow' }],
+  ]) {
+    const poisoned = clone(config);
+    poisoned[key] = value;
+    configPoisons.push(poisoned);
+  }
+  {
+    const poisoned = clone(config);
+    poisoned.mcp.poison = {
+      type: 'remote',
+      url: 'http://127.0.0.1:9999/mcp',
+      enabled: true,
+      oauth: false,
+    };
+    configPoisons.push(poisoned);
+  }
+  {
+    const poisoned = clone(config);
+    poisoned.agent.poison = { mode: 'primary', permission: { '*': 'allow' } };
+    configPoisons.push(poisoned);
+  }
+  for (const poisoned of configPoisons) {
+    const verdict = verifyPolicyAttestation(poisoned, coldConfig.assertions);
+    assert.equal(verdict.pass, false, 'poisoned config fails closed');
+  }
+
+  const agentPoisons = [];
+  for (const mutate of [
+    (value) => { value.name = 'renamed'; },
+    (value) => { value.mode = 'subagent'; },
+    (value) => { value.prompt = 'poison prompt'; },
+    (value) => { value.description = 'poison description'; },
+    (value) => { value.model = 'poison/model'; },
+    (value) => { value.resolvedModel = ''; },
+    (value) => { value.tools = []; },
+    (value) => { value.tools = ['fsb_navigate', 'bash']; },
+    (value) => { value.permission.push({ permission: 'bash', action: 'allow', pattern: '*' }); },
+    (value) => { value.permission.splice(13, 1); },
+    (value) => { value.permission.reverse(); },
+  ]) {
+    const poisoned = clone(agent);
+    mutate(poisoned);
+    agentPoisons.push(poisoned);
+  }
+  for (const poisoned of agentPoisons) {
+    const verdict = verifyPolicyAttestation(poisoned, coldAgent.assertions);
+    assert.equal(verdict.pass, false, 'poisoned agent fails closed');
+  }
+
+  const accessorAgent = clone(agent);
+  let accessorTouched = false;
+  Object.defineProperty(accessorAgent, 'prompt', {
+    enumerable: true,
+    get() {
+      accessorTouched = true;
+      return fsbPolicy.prompt;
+    },
+  });
+  assert.deepEqual(verifyPolicyAttestation(accessorAgent, coldAgent.assertions), {
+    pass: false,
+    reason: 'invalid_document',
+  });
+  assert.equal(accessorTouched, false);
+  assert.equal(
+    verifyPolicyAttestation(Object.assign(Object.create({ poison: true }), agent), coldAgent.assertions).pass,
+    false,
+  );
+  const cyclicAgent = clone(agent);
+  cyclicAgent.cycle = cyclicAgent;
+  assert.equal(verifyPolicyAttestation(cyclicAgent, coldAgent.assertions).pass, false);
+  const oversizeAgent = clone(agent);
+  oversizeAgent.resolvedModel = 'x'.repeat(1024 * 1024 + 1);
+  assert.equal(verifyPolicyAttestation(oversizeAgent, coldAgent.assertions).pass, false);
+  assert.equal(verifyPolicyAttestation('{malformed', coldAgent.assertions).pass, false);
+
+  const serialized = JSON.stringify(profile);
+  for (const forbidden of [
+    'PASSWORD_CANARY_attestation_64_04_0001',
+    'Authorization',
+    'Basic ',
+    'checkOpenCodePolicy',
+    'verifyOpenCodePolicy',
+    'reduceOpenCodePolicy',
+  ]) assert.equal(serialized.includes(forbidden), false, `${forbidden} is absent`);
+  assert.deepEqual(Object.keys(profileModule).sort(), [
+    'OPENCODE_AGENT_FALLBACK_WARNING_SENTINELS',
+    'OPENCODE_FIXED_ISOLATION_ENV_KEYS',
+    'OPENCODE_PROFILE_VERSION',
+    'OPENCODE_RESOLVED_FSB_PERMISSION_RULES',
+    'OPENCODE_TASK_LIMIT_BYTES',
+    'SHIPPED_FSB_DESCRIPTION_SHA256',
+    'SHIPPED_FSB_PROMPT_SHA256',
+    'buildOpenCodeProfile',
+    'buildOpenCodeSpawnSpec',
+  ]);
+}
+
 async function run() {
   const argv = process.argv.slice(2);
   assert.equal(argv.length, 2);
@@ -918,6 +1144,11 @@ async function run() {
   if (argv[1] === 'profile-policy') {
     await runProfilePolicy();
     console.log('mcp-opencode-adapter.test.js: profile-policy PASS');
+    return;
+  }
+  if (argv[1] === 'attestation') {
+    await runAttestation();
+    console.log('mcp-opencode-adapter.test.js: attestation PASS');
     return;
   }
   assert.fail(`unknown section: ${argv[1]}`);

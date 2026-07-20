@@ -108,6 +108,78 @@ try {
   }
   fs.chmodSync(unreadableFile, 0o600);
 
+  const profilePath = path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'opencode-profile.ts',
+  );
+  const detectorPath = path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'opencode-detect.ts',
+  );
+  const profileSource = fs.readFileSync(profilePath, 'utf8');
+  const detectorSource = fs.readFileSync(detectorPath, 'utf8');
+  for (const sourceFlag of [
+    'OPENCODE_DISABLE_PROJECT_CONFIG',
+    'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
+    'OPENCODE_DISABLE_EXTERNAL_SKILLS',
+    'OPENCODE_DISABLE_AUTOUPDATE',
+    'OPENCODE_DISABLE_LSP_DOWNLOAD',
+    'OPENCODE_TEST_HOME',
+    'OPENCODE_TEST_MANAGED_CONFIG_DIR',
+    'XDG_CONFIG_HOME',
+  ]) assert(profileSource.includes(sourceFlag), `${sourceFlag} is source-pinned`);
+  assert(profileSource.includes("'--pure'"));
+  assert(profileSource.includes("'--log-level'"));
+  assert(profileSource.includes("'ERROR'"));
+  assert(profileSource.includes("'--hostname', '127.0.0.1'"));
+  assert(profileSource.includes("'--port', '0'"));
+  assert(profileSource.includes("'--mdns', 'false'"));
+  assert(profileSource.includes("'--attach'"));
+  assert(profileSource.includes("'owned_server_endpoint'"));
+  assert(profileSource.includes("path: '/config'"));
+  assert(profileSource.includes("path: '/agent'"));
+  assert(profileSource.includes("prefixRef: 'fsb_mcp_tool_prefix'"));
+  assert(profileSource.includes('SHIPPED_FSB_PROMPT_SHA256'));
+  assert(profileSource.includes("'*': 'deny'"));
+  assert(profileSource.includes("'fsb_*': 'allow'"));
+  assert(profileSource.indexOf("'*': 'deny'") < profileSource.indexOf("'fsb_*': 'allow'"));
+  assert(profileSource.includes('OPENCODE_SERVER_PASSWORD_ENV_KEY'));
+  assert(profileSource.includes('OWNED_SERVER_BASIC_PASSWORD_SECRET_REF'));
+  assert(detectorSource.includes("OPENCODE_PROFILE_VERSION = '1.14.25'"));
+  assert(detectorSource.includes('shell: false'));
+
+  for (const forbidden of [
+    '--model',
+    '--continue',
+    '--session',
+    '--fork',
+    '--share',
+    '--file',
+    '--command',
+    '--print-logs',
+    '--password',
+  ]) assert(!profileSource.includes(forbidden), `${forbidden} is absent from OpenCode profile`);
+  for (const forbiddenPattern of [
+    /\bHOME\s*:/,
+    /\bXDG_DATA_HOME\b/,
+    /\bXDG_STATE_HOME\b/,
+    /\bXDG_CACHE_HOME\b/,
+    /\bOPENCODE_SERVER_PASSWORD\s*:/,
+    /\b(?:ANTHROPIC|OPENAI|GOOGLE|GEMINI)_[A-Z_]*KEY\b/,
+    /\bAuthorization\b/,
+    /\bBasic\s+/,
+    /process\.env/,
+    /from ['"]node:(?:child_process|http|https|net|tls)['"]/,
+    /export function (?:check|verify|reduce)OpenCode/,
+    /adapterId\s*===\s*['"]opencode['"]/,
+  ]) assert(!forbiddenPattern.test(profileSource), `${forbiddenPattern} is absent from OpenCode profile`);
+
   console.log('agent-provider-forbidden-flags: all assertions passed');
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });
