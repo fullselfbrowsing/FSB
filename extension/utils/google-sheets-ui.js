@@ -3,6 +3,7 @@
 
   var MAX_READ_ROWS = 50;
   var MAX_READ_COLUMNS = 26;
+  var MAX_READ_CELLS = 100;
   var MAX_UI_CELLS = 10000;
   var MAX_CLEAR_CELLS = 100;
   var MAX_CHUNK_CELLS = 5000;
@@ -294,6 +295,7 @@
     limits: Object.freeze({
       maxReadRows: MAX_READ_ROWS,
       maxReadColumns: MAX_READ_COLUMNS,
+      maxReadCells: MAX_READ_CELLS,
       maxUiCells: MAX_UI_CELLS,
       maxClearCells: MAX_CLEAR_CELLS,
       maxChunkCells: MAX_CHUNK_CELLS,

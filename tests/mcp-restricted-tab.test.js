@@ -28,6 +28,7 @@ function assertDeepEqual(actual, expected, msg) {
 
 const repoRoot = path.resolve(__dirname, '..');
 const dispatcherRelativePath = 'extension/ws/mcp-tool-dispatcher.js';
+const spreadsheetRedaction = require(path.join(repoRoot, 'extension/utils/spreadsheet-record-redaction.js'));
 const expectedRecoveryTools = ['navigate', 'open_tab', 'switch_tab', 'list_tabs'];
 const restrictedUrls = [
   'chrome://newtab/',
@@ -382,6 +383,63 @@ async function runResolverAwareRouteCases(dispatcher) {
   }
 }
 
+async function runSpreadsheetRecorderCase(dispatcher) {
+  console.log('\n--- resolved Google Sheets reads use shape-only session records ---');
+
+  if (!dispatcher || typeof dispatcher.dispatchMcpMessageRoute !== 'function') return;
+  const sheetId = 'private-sheet-id-for-recorder-test';
+  const sentinel = 'PRIVATE_SHEET_CELL_VALUE';
+  const tabsById = {
+    [RESOLVER_TAB_A]: {
+      id: RESOLVER_TAB_A,
+      url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`,
+      active: true,
+      windowId: 1
+    }
+  };
+  const { client } = installResolverAwareGlobals({
+    tabsById,
+    activeTabId: RESOLVER_TAB_A,
+    resolverResult: { tabId: RESOLVER_TAB_A, ownershipToken: null, skipGate: false }
+  });
+  client._handleReadPage = async () => ({ success: true, text: sentinel, charCount: sentinel.length });
+
+  const recorded = [];
+  global.fsbMcpSessionRecorder = { recordDispatch(entry) { recorded.push(entry); } };
+  global.FsbSpreadsheetRecordRedaction = spreadsheetRedaction;
+
+  const response = await dispatcher.dispatchMcpMessageRoute({
+    type: 'mcp:read-page',
+    payload: { agentId: 'agent-sheets', tab_id: RESOLVER_TAB_A, full: true },
+    client,
+    mcpMsgId: 'sheets-read-page'
+  });
+  const serializedRecord = JSON.stringify(recorded[0] || {});
+  assert(response?.text === sentinel, 'Sheets redaction does not alter the public read_page response');
+  assert(recorded.length === 1, 'resolved Sheets read produces one diagnostic session record');
+  assert(!serializedRecord.includes(sentinel) && !serializedRecord.includes(sheetId),
+    'resolved Sheets session record contains no cell text or spreadsheet id');
+  assert(recorded[0]?.response?.shape?.valueCount === 0,
+    'resolved Sheets read persists only response shape metadata');
+  assert(!serializedRecord.includes('spreadsheetTarget') && !serializedRecord.includes('targetOriginResolved'),
+    'private target-classification flags are omitted from the persisted record');
+
+  recorded.length = 0;
+  global.FsbSpreadsheetRecordRedaction = null;
+  const fallbackResponse = await dispatcher.dispatchMcpMessageRoute({
+    type: 'mcp:read-page',
+    payload: { agentId: 'agent-sheets', tab_id: RESOLVER_TAB_A, full: true },
+    client,
+    mcpMsgId: 'sheets-read-page-no-redactor'
+  });
+  assert(fallbackResponse?.text === sentinel, 'missing-redactor fallback still returns the tool result');
+  assert(recorded.length === 0, 'missing-redactor fallback drops the resolved Sheets record');
+
+  delete global.fsbMcpSessionRecorder;
+  delete global.FsbSpreadsheetRecordRedaction;
+  clearResolverAwareGlobals();
+}
+
 async function runErrorMapperCase() {
   console.log('\n--- mapped MCP error messaging ---');
 
@@ -407,6 +465,7 @@ async function run() {
   const dispatcher = loadDispatcher();
   await runDispatcherRouteCases(dispatcher);
   await runResolverAwareRouteCases(dispatcher);
+  await runSpreadsheetRecorderCase(dispatcher);
   await runErrorMapperCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

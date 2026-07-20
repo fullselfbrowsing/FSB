@@ -20,14 +20,16 @@ function recorder(method) {
   };
 }
 
-function bridgeHarness(spreadsheetRedactor = redaction) {
+function bridgeHarness(spreadsheetRedactor = redaction, chromeOverride) {
   const entries = [];
   const context = {
     console,
+    URL,
     fsbMcpSessionRecorder: {
       recordAction(entry) { entries.push(entry); }
     },
     FsbSpreadsheetRecordRedaction: spreadsheetRedactor,
+    chrome: chromeOverride,
     resolveMcpClientLabel() { return 'test-client'; },
     globalThis: null
   };
@@ -269,7 +271,334 @@ test('real bridge fillsheet and readsheet payloads are shape-only before recordA
   assertNoContent(readRecorded);
 });
 
-test('bridge drops every spreadsheet alias when the shared redactor is unavailable', () => {
+test('real bridge strips Google Sheets document URLs from navigate and open_tab records', () => {
+  const cases = [
+    {
+      tool: 'navigate',
+      url: `https://docs.google.com/spreadsheets/d/${ID}/edit?title=${SENTINEL}#gid=0`
+    },
+    {
+      tool: 'open_tab',
+      url: `http://docs.google.com/spreadsheets/d/${ID}/edit?range=${encodeURIComponent(RANGE)}#${SENTINEL}`
+    }
+  ];
+  const harness = bridgeHarness();
+
+  for (const fixture of cases) {
+    harness.client._recordMcpSessionAction({
+      tool: fixture.tool,
+      params: { url: fixture.url },
+      agentId: 'agent:navigation',
+      visualSession: { visualReason: `Open ${SENTINEL}`, client: 'test-client', isFinal: true }
+    }, {
+      success: true,
+      url: fixture.url,
+      spreadsheetId: ID,
+      title: SENTINEL
+    }, 12);
+  }
+
+  assert.equal(harness.entries.length, 2);
+  for (let index = 0; index < cases.length; index++) {
+    const recorded = harness.entries[index];
+    assert.equal(recorded.tool, cases[index].tool);
+    assert.deepEqual(recorded.params, {
+      operation: cases[index].tool,
+      shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+    });
+    assert.deepEqual(recorded.payload.params, recorded.params);
+    assert.deepEqual(recorded.payload.visualSession, { isFinal: true });
+    assert.deepEqual(recorded.response, {
+      success: true,
+      shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+    });
+    assertNoContent(recorded);
+  }
+});
+
+test('real bridge strips Google Sheets document URLs discovered in tab responses', () => {
+  const sheetsUrl = `https://docs.google.com/spreadsheets/d/${ID}/edit?title=${SENTINEL}#gid=0`;
+  const cases = [
+    {
+      tool: 'switch_tab',
+      params: { tabId: 12 },
+      response: { success: true, tabId: 12, url: sheetsUrl, title: SENTINEL }
+    },
+    {
+      tool: 'close_tab',
+      params: { tabId: 12, allow_active: true },
+      response: {
+        success: true,
+        tabId: 12,
+        closed: true,
+        change_report: {
+          url: { before: sheetsUrl, after: null, changed: true },
+          title_changed: false
+        }
+      }
+    },
+    {
+      tool: 'navigate',
+      params: { url: 'https://example.com/redirect-to-sheet' },
+      response: {
+        success: true,
+        url: 'https://example.com/redirect-to-sheet',
+        title: SENTINEL,
+        change_report: {
+          url: { before: 'https://example.com/redirect-to-sheet', after: sheetsUrl, changed: true }
+        }
+      }
+    }
+  ];
+  const harness = bridgeHarness();
+
+  for (const fixture of cases) {
+    harness.client._recordMcpSessionAction({
+      tool: fixture.tool,
+      params: fixture.params,
+      agentId: 'agent:response-navigation',
+      visualSession: { visualReason: `Open ${SENTINEL}`, client: 'test-client', isFinal: true }
+    }, fixture.response, 12);
+  }
+
+  assert.equal(harness.entries.length, cases.length);
+  for (let index = 0; index < cases.length; index++) {
+    const recorded = harness.entries[index];
+    assert.equal(recorded.tool, cases[index].tool);
+    assert.deepEqual(recorded.params, {
+      operation: cases[index].tool,
+      shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+    });
+    assert.deepEqual(recorded.payload.params, recorded.params);
+    assert.deepEqual(recorded.payload.visualSession, { isFinal: true });
+    assert.deepEqual(recorded.response, {
+      success: true,
+      shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+    });
+    assertNoContent(recorded);
+  }
+});
+
+test('non-Sheets navigation URLs and lookalike hosts remain unchanged', () => {
+  const cases = [
+    {
+      tool: 'navigate',
+      url: `https://example.com/path/${ID}?value=${SENTINEL}#keep`
+    },
+    {
+      tool: 'open_tab',
+      url: `https://docs.google.com.evil.test/spreadsheets/d/${ID}/edit?value=${SENTINEL}`
+    }
+  ];
+
+  for (const fixture of cases) {
+    const source = {
+      client: 'test-client',
+      tool: fixture.tool,
+      params: { url: fixture.url },
+      payload: { tool: fixture.tool, params: { url: fixture.url }, agentId: 'agent:navigation' },
+      response: { success: true, url: fixture.url },
+      success: true,
+      tabId: 12
+    };
+    assert.strictEqual(redaction.sanitizeEntry(source), source);
+  }
+});
+
+test('non-Sheets tab response URLs and lookalike hosts remain unchanged', () => {
+  const cases = [
+    {
+      client: 'test-client',
+      tool: 'switch_tab',
+      params: { tabId: 12 },
+      payload: { tool: 'switch_tab', params: { tabId: 12 }, agentId: 'agent:navigation' },
+      response: { success: true, url: `https://example.com/${ID}?value=${SENTINEL}`, title: SENTINEL },
+      success: true,
+      tabId: 12
+    },
+    {
+      client: 'test-client',
+      tool: 'close_tab',
+      params: { tabId: 12 },
+      payload: { tool: 'close_tab', params: { tabId: 12 }, agentId: 'agent:navigation' },
+      response: {
+        success: true,
+        change_report: {
+          url: {
+            before: `https://docs.google.com.evil.test/spreadsheets/d/${ID}/edit?value=${SENTINEL}`,
+            after: null,
+            changed: true
+          }
+        }
+      },
+      success: true,
+      tabId: 12
+    }
+  ];
+
+  for (const source of cases) {
+    assert.strictEqual(redaction.sanitizeEntry(source), source);
+  }
+});
+
+test('generic actions and page reads on Google Sheets targets are shape-only', () => {
+  const sheetsUrl = `https://docs.google.com/spreadsheets/d/${ID}/edit?range=${encodeURIComponent(RANGE)}#gid=0`;
+  const cases = [
+    {
+      method: 'recordAction',
+      source: {
+        client: 'test-client',
+        tool: 'click',
+        params: { selector: `[aria-label="${SENTINEL}"]` },
+        payload: {
+          tool: 'click',
+          params: { selector: `[aria-label="${SENTINEL}"]` },
+          agentId: 'agent:generic-action',
+          visualSession: { visualReason: SENTINEL, isFinal: false }
+        },
+        response: { success: true, text: SENTINEL, value: `=${SENTINEL}!A1` },
+        success: true,
+        tabId: 12,
+        requireTargetOrigin: true,
+        targetOriginResolved: true,
+        spreadsheetTarget: true
+      }
+    },
+    {
+      method: 'recordAction',
+      source: {
+        client: 'test-client',
+        tool: 'get_text',
+        params: { selector: '#selected-cell' },
+        payload: { tool: 'get_text', params: { selector: '#selected-cell' }, agentId: 'agent:generic-action' },
+        response: { success: true, text: SENTINEL, value: SENTINEL },
+        success: true,
+        tabId: 12,
+        requireTargetOrigin: true,
+        targetOriginResolved: true,
+        spreadsheetTarget: true
+      }
+    },
+    {
+      method: 'recordDispatch',
+      source: {
+        client: 'test-client',
+        tool: 'mcp:read-page',
+        requestPayload: { agentId: 'agent:generic-read', tab_id: 12, params: { selector: SENTINEL } },
+        response: { success: true, text: `${SENTINEL} ${RANGE}`, charCount: 99 },
+        success: true,
+        dispatcher_route: 'message',
+        tabId: 12,
+        requireTargetOrigin: true,
+        targetOriginResolved: true,
+        spreadsheetTarget: true
+      }
+    },
+    {
+      method: 'recordDispatch',
+      source: {
+        client: 'test-client',
+        tool: 'mcp:get-dom',
+        requestPayload: { agentId: 'agent:generic-read', tab_id: 12, params: { maxElements: 50 } },
+        response: { success: true, structuredDOM: { elements: [{ text: SENTINEL, value: RANGE }] } },
+        success: true,
+        dispatcher_route: 'message',
+        tabId: 12,
+        requireTargetOrigin: true,
+        targetOriginResolved: true,
+        spreadsheetTarget: true
+      }
+    },
+    {
+      method: 'recordDispatch',
+      source: {
+        client: 'test-client',
+        tool: 'mcp:get-page-snapshot',
+        requestPayload: { agentId: 'agent:snapshot', tab_id: 12, params: {} },
+        response: { success: true, url: sheetsUrl, snapshot: `${SENTINEL} ${RANGE}` },
+        success: true,
+        dispatcher_route: 'message'
+      }
+    }
+  ];
+
+  for (const fixture of cases) {
+    const sink = recorder(fixture.method);
+    assert.equal(redaction.recordSafely(sink.target, fixture.method, fixture.source), true);
+    assert.equal(sink.entries.length, 1);
+    const recorded = sink.entries[0];
+    assert.equal(recorded.tool, fixture.source.tool);
+    assert.equal((recorded.params || recorded.requestPayload.params).operation, fixture.source.tool);
+    assert.deepEqual(recorded.response, {
+      success: true,
+      shape: { rowCount: 0, columnCount: 0, valueCount: 0 }
+    });
+    assert.equal(Object.prototype.hasOwnProperty.call(recorded, 'requireTargetOrigin'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(recorded, 'targetOriginResolved'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(recorded, 'spreadsheetTarget'), false);
+    assertNoContent(recorded);
+  }
+});
+
+test('real bridge reduces resolved tab URLs to private target booleans', async () => {
+  const sheetsUrl = `https://docs.google.com/spreadsheets/d/${ID}/edit#gid=0`;
+  const harness = bridgeHarness(redaction, {
+    tabs: {
+      async get(tabId) {
+        if (tabId === 1) return { id: tabId, url: sheetsUrl };
+        if (tabId === 2) return { id: tabId, url: `https://docs.google.com.evil.test/spreadsheets/d/${ID}/edit` };
+        throw new Error('tab unavailable');
+      }
+    }
+  });
+
+  const sheetsTarget = await harness.client._resolveMcpSessionRecordTarget(1);
+  const lookalikeTarget = await harness.client._resolveMcpSessionRecordTarget(2);
+  const unresolvedTarget = await harness.client._resolveMcpSessionRecordTarget(3);
+  assert.deepEqual({ ...sheetsTarget }, { targetOriginResolved: true, spreadsheetTarget: true });
+  assert.deepEqual({ ...lookalikeTarget }, { targetOriginResolved: true, spreadsheetTarget: false });
+  assert.deepEqual({ ...unresolvedTarget }, { targetOriginResolved: false, spreadsheetTarget: false });
+  assert.equal(JSON.stringify(sheetsTarget).includes(ID), false);
+
+  harness.client._recordMcpSessionAction({
+    tool: 'click',
+    params: { selector: '#selected-cell' },
+    agentId: 'agent:resolved-bridge'
+  }, { success: true, text: SENTINEL }, 1, sheetsTarget);
+  assert.equal(harness.entries.length, 1);
+  assertNoContent(harness.entries[0]);
+});
+
+test('content-bearing records fail closed when target origin resolution is unavailable', () => {
+  const source = {
+    client: 'test-client',
+    tool: 'mcp:read-page',
+    requestPayload: { agentId: 'agent:unresolved', params: {} },
+    response: { success: true, text: SENTINEL },
+    success: true,
+    requireTargetOrigin: true,
+    targetOriginResolved: false,
+    spreadsheetTarget: false
+  };
+  const sink = recorder('recordDispatch');
+  assert.equal(redaction.recordSafely(sink.target, 'recordDispatch', source), false);
+  assert.equal(sink.entries.length, 0);
+
+  const explicitSheets = {
+    ...source,
+    response: {
+      success: true,
+      url: `https://docs.google.com/spreadsheets/d/${ID}/edit`,
+      text: SENTINEL
+    }
+  };
+  const sanitized = recorder('recordDispatch');
+  assert.equal(redaction.recordSafely(sanitized.target, 'recordDispatch', explicitSheets), true);
+  assert.equal(sanitized.entries.length, 1);
+  assertNoContent(sanitized.entries[0]);
+});
+
+test('bridge drops spreadsheet aliases and Sheets navigation when the shared redactor is unavailable', () => {
   const harness = bridgeHarness(null);
   for (const tool of ['fill_sheet', 'read_sheet', 'fillsheet', 'readsheet']) {
     harness.client._recordMcpSessionAction({
@@ -278,15 +607,72 @@ test('bridge drops every spreadsheet alias when the shared redactor is unavailab
       agentId: 'agent:wire'
     }, { success: true, data: SENTINEL }, 8);
   }
+  for (const tool of ['navigate', 'open_tab']) {
+    harness.client._recordMcpSessionAction({
+      tool,
+      params: { url: `https://docs.google.com/spreadsheets/d/${ID}/edit?value=${SENTINEL}#gid=0` },
+      agentId: 'agent:wire'
+    }, { success: true, data: SENTINEL }, 8);
+  }
+  harness.client._recordMcpSessionAction({
+    tool: 'switch_tab',
+    params: { tabId: 8 },
+    agentId: 'agent:wire'
+  }, {
+    success: true,
+    url: `https://docs.google.com/spreadsheets/d/${ID}/edit?value=${SENTINEL}`,
+    title: SENTINEL
+  }, 8);
+  harness.client._recordMcpSessionAction({
+    tool: 'close_tab',
+    params: { tabId: 8 },
+    agentId: 'agent:wire'
+  }, {
+    success: true,
+    change_report: {
+      url: {
+        before: `https://docs.google.com/spreadsheets/d/${ID}/edit?value=${SENTINEL}`,
+        after: null,
+        changed: true
+      }
+    }
+  }, 8);
+  harness.client._recordMcpSessionAction({
+    tool: 'navigate',
+    params: { url: 'https://example.com/redirect-to-sheet' },
+    agentId: 'agent:wire'
+  }, {
+    success: true,
+    change_report: {
+      url: {
+        before: 'https://example.com/redirect-to-sheet',
+        after: `https://docs.google.com/spreadsheets/d/${ID}/edit?value=${SENTINEL}`,
+        changed: true
+      }
+    }
+  }, 8);
   assert.equal(harness.entries.length, 0);
 
+  const nonSheetsTarget = { targetOriginResolved: true, spreadsheetTarget: false };
   harness.client._recordMcpSessionAction({
     tool: 'click',
     params: { selector: '#safe' },
     agentId: 'agent:wire'
-  }, { success: true }, 8);
-  assert.equal(harness.entries.length, 1);
+  }, { success: true }, 8, nonSheetsTarget);
+  harness.client._recordMcpSessionAction({
+    tool: 'navigate',
+    params: { url: `https://example.com/${ID}?value=${SENTINEL}` },
+    agentId: 'agent:wire'
+  }, { success: true }, 8, nonSheetsTarget);
+  harness.client._recordMcpSessionAction({
+    tool: 'switch_tab',
+    params: { tabId: 8 },
+    agentId: 'agent:wire'
+  }, { success: true, url: `https://example.com/${ID}?value=${SENTINEL}` }, 8, nonSheetsTarget);
+  assert.equal(harness.entries.length, 3);
   assert.equal(harness.entries[0].tool, 'click');
+  assert.equal(harness.entries[1].params.url, `https://example.com/${ID}?value=${SENTINEL}`);
+  assert.equal(harness.entries[2].response.url, `https://example.com/${ID}?value=${SENTINEL}`);
 });
 
 test('unknown gsheets slugs are recognized and fail closed without retaining the raw slug', () => {
@@ -319,6 +705,6 @@ test('both recording hooks call the shared ingress sanitizer and fail closed for
     < background.indexOf("importScripts('ws/mcp-tool-dispatcher.js')"));
   assert.match(dispatcher, /spreadsheetInvoke[\s\S]*recordSafely\([\s\S]*'recordDispatch'/);
   assert.match(bridge, /spreadsheetTool[\s\S]*recordSafely\([\s\S]*'recordAction'/);
-  assert.match(dispatcher, /if \(!spreadsheetInvoke\)[\s\S]*recordDispatch\(sessionRecordEntry\)/);
-  assert.match(bridge, /if \(!spreadsheetTool\)[\s\S]*recordAction\(sessionRecordEntry\)/);
+  assert.match(dispatcher, /if \(!spreadsheetRecord && !unresolvedRecordTarget\)[\s\S]*recordDispatch\(sessionRecordEntry\)/);
+  assert.match(bridge, /if \(!spreadsheetTool && !unresolvedRecordTarget\)[\s\S]*recordAction\(sessionRecordEntry\)/);
 });

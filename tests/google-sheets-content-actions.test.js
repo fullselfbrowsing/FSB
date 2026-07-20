@@ -22,6 +22,7 @@ function sheetsDomHarness(options = {}) {
   let pasteCalls = 0;
   let deleteCalls = 0;
   let insertCalls = 0;
+  const keyCalls = [];
   const nameBox = options.missingNameBox ? null : {
     value: selectedAddress,
     textContent: selectedAddress,
@@ -35,6 +36,7 @@ function sheetsDomHarness(options = {}) {
   const trusted = { success: true, method: 'debuggerAPI' };
   const tools = {
     async keyPress(params) {
+      keyCalls.push({ ...params });
       if (typeof options.keyPress === 'function') {
         const override = await options.keyPress(params, { selectedAddress, cells });
         if (override) return override;
@@ -51,7 +53,7 @@ function sheetsDomHarness(options = {}) {
         }
         if (nameBox) nameBox.value = selectedAddress;
       }
-      if (params.key === 'v' && params.ctrlKey) pasteCalls++;
+      if (params.key === 'v' && (params.ctrlKey || params.metaKey)) pasteCalls++;
       if (params.key === '=' && (params.ctrlKey || params.metaKey) && params.altKey) insertCalls++;
       if (params.key === 'Delete') {
         deleteCalls++;
@@ -89,6 +91,10 @@ function sheetsDomHarness(options = {}) {
     __tools: tools,
     document,
     navigator: {
+      platform: options.platform || 'Linux x86_64',
+      userAgentData: options.userAgentDataPlatform
+        ? { platform: options.userAgentDataPlatform }
+        : undefined,
       clipboard: {
         async writeText(text) {
           if (options.clipboardError) throw options.clipboardError;
@@ -125,6 +131,7 @@ function sheetsDomHarness(options = {}) {
   return {
     api: context.__sheetsInternals,
     cells,
+    keyCalls,
     get pasteCalls() { return pasteCalls; },
     get deleteCalls() { return deleteCalls; },
     get insertCalls() { return insertCalls; }
@@ -190,6 +197,22 @@ test('legacy CSV conversion and read transpose reuse the shared value helpers', 
   assert.deepEqual(values, [['name', 'note'], ['Ada', 'hello, world'], ['Bob', 'quote "inside"']]);
   assert.equal(ui.valuesToCsv(values), 'name,note\nAda,"hello, world"\nBob,"quote ""inside"""');
   assert.deepEqual(ui.transpose([['a', 'b'], ['c', 'd']]), [['a', 'c'], ['b', 'd']]);
+});
+
+test('DOM reads reject ranges whose cell-by-cell waits exceed the capability timeout budget', async () => {
+  assert.equal(ui.limits.maxReadCells, 100);
+
+  const oversized = sheetsDomHarness();
+  const rejected = await oversized.api.sheetsReadValues('A1:Z50', 'ROWS');
+  assert.equal(rejected.code, 'RECIPE_DOM_FALLBACK_PENDING');
+  assert.equal(rejected.reason, 'ui-read-range-limit-exceeded');
+  assert.equal(oversized.keyCalls.length, 0);
+
+  const bounded = sheetsDomHarness();
+  const accepted = await bounded.api.sheetsReadValues('A1:J10', 'ROWS');
+  assert.equal(accepted.success, true);
+  assert.equal(accepted.data.values.length, 10);
+  assert.equal(accepted.data.values[0].length, 10);
 });
 
 test('append boundaries and clear readback fail closed when UI state is ambiguous', () => {
@@ -271,6 +294,26 @@ test('DOM fallback requires trusted keys, confirmed addresses, and a real formul
   assert.equal(read.code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
   assert.equal(read.reason, 'formula-bar-unavailable');
   assert.equal(noFormula.api.sheetsSpreadsheetMetadata().code, 'GOOGLE_SHEETS_SESSION_UNAVAILABLE');
+});
+
+test('DOM fallback uses Command on macOS and Control on other platforms', async () => {
+  const mac = sheetsDomHarness({ platform: 'MacIntel', userAgentDataPlatform: 'macOS' });
+  assert.equal((await mac.api.sheetsUpdateValues('A1', [['mac']], 'RAW')).success, true);
+  const macSelect = mac.keyCalls.find(call => call.key === 'a');
+  const macPaste = mac.keyCalls.find(call => call.key === 'v');
+  assert.equal(macSelect.metaKey, true);
+  assert.equal(macSelect.ctrlKey, undefined);
+  assert.equal(macPaste.metaKey, true);
+  assert.equal(macPaste.ctrlKey, undefined);
+
+  const windows = sheetsDomHarness({ platform: 'Win32', userAgentDataPlatform: 'Windows' });
+  assert.equal((await windows.api.sheetsUpdateValues('A1', [['windows']], 'RAW')).success, true);
+  const windowsSelect = windows.keyCalls.find(call => call.key === 'a');
+  const windowsPaste = windows.keyCalls.find(call => call.key === 'v');
+  assert.equal(windowsSelect.ctrlKey, true);
+  assert.equal(windowsSelect.metaKey, undefined);
+  assert.equal(windowsPaste.ctrlKey, true);
+  assert.equal(windowsPaste.metaKey, undefined);
 });
 
 test('DOM append scans a rectangular table and clear verifies actual readback', async () => {

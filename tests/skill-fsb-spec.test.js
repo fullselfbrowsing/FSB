@@ -60,7 +60,7 @@ const nameMatch = fm.match(/^name:\s*(\S.*?)\s*$/m);
 check(nameMatch && nameMatch[1] === 'fsb', 'frontmatter name === fsb');
 
 const versionMatch = fm.match(/^version:\s*(\S+)\s*$/m);
-check(versionMatch && versionMatch[1] === '0.9.90', 'frontmatter version === 0.9.90');
+check(versionMatch && versionMatch[1] === '0.9.91', 'frontmatter version === 0.9.91');
 
 // requires.bins must include node and npx
 const binsMatch = fm.match(/bins:\s*\[([^\]]*)\]/);

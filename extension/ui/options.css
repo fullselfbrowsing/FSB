@@ -1978,6 +1978,25 @@ textarea.form-input {
 
 /* Print Styles */
 @media print {
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+  }
+
+  .dashboard-container {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .dashboard-main {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .dashboard-header,
   .dashboard-sidebar,
   .save-bar,
@@ -1986,7 +2005,11 @@ textarea.form-input {
   }
   
   .dashboard-content {
+    display: block;
+    min-height: 0;
+    overflow: visible;
     padding: 0;
+    margin-left: 0 !important;
   }
   
   .form-card,

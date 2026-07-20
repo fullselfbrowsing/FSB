@@ -1,4 +1,4 @@
-// FSB v0.9.90 - Modern Dashboard Control Panel Script
+// FSB v0.9.91 - Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
@@ -37,7 +37,11 @@ const defaultSettings = {
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
-  fsbChangeReportsEnabled: true
+  fsbChangeReportsEnabled: true,
+  // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
+  // independently of Autopilot history.
+  fsbMcpSessionRecordingEnabled: true,
+  fsbMcpSessionRetentionDays: 30
 };
 
 let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
@@ -59,6 +63,15 @@ function clampAgentCapValue(value, fallbackValue) {
   if (raw < 1) return 1;
   if (raw > 64) return 64;
   return raw;
+}
+
+function clampMcpSessionRetentionDays(value) {
+  let days = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(days)) days = defaultSettings.fsbMcpSessionRetentionDays;
+  days = Math.floor(days);
+  if (days < 1) return 1;
+  if (days > 365) return 365;
+  return days;
 }
 
 async function resolveRecommendedAgentCap() {
@@ -242,6 +255,8 @@ function cacheElements() {
   elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
+  elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
+  elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
   elements.animatedActionHighlights = document.getElementById('animatedActionHighlights');
   elements.showSidepanelProgress = document.getElementById('showSidepanelProgress');
@@ -348,7 +363,9 @@ function setupEventListeners() {
     elements.enableLogin,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
-    elements.sttProvider
+    elements.sttProvider,
+    elements.fsbMcpSessionRecordingEnabled,
+    elements.fsbMcpSessionRetentionDays
   ];
 
   formInputs.forEach(input => {
@@ -1503,6 +1520,15 @@ function loadSettings() {
       elements.fsbChangeReportsEnabled.checked = settings.fsbChangeReportsEnabled ?? true;
     }
 
+    if (elements.fsbMcpSessionRecordingEnabled) {
+      elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
+    }
+    if (elements.fsbMcpSessionRetentionDays) {
+      const retentionDays = clampMcpSessionRetentionDays(settings.fsbMcpSessionRetentionDays);
+      elements.fsbMcpSessionRetentionDays.value = String(retentionDays);
+      refreshStepper(elements.fsbMcpSessionRetentionDays);
+    }
+
     // Credential Manager
     if (elements.enableLogin) {
       elements.enableLogin.checked = settings.enableLogin ?? false;
@@ -1682,7 +1708,9 @@ function saveSettings() {
     })(),
     // Phase 245 D-07: persist Action Change Reports toggle. Default true so
     // builds where the user has never visited the toggle still emit reports.
-    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true
+    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
+    fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
+    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
   };
   
   chrome.storage.local.set(settings, () => {

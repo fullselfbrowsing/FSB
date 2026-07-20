@@ -1136,11 +1136,12 @@ const TOOL_REGISTRY = [
 
   {
     name: 'complete_task',
-    description: 'Signal that the task is fully complete. ONLY call this when the user\'s requested task has been fully achieved -- all data collected, all entries made, all actions performed. Include a summary of what was accomplished. Provide session_token only when completing a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-lifecycle semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task is fully complete. ONLY call this when the user\'s requested task has been fully achieved -- all data collected, all entries made, all actions performed. Include a summary of what was accomplished, but never include passwords, tokens, API keys, or sensitive form values. Provide tab_id when more than one tab/session could be active so the local task memory is associated exactly. Provide session_token only when completing a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-lifecycle semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         summary: { type: 'string', description: 'Summary of what was accomplished (e.g. "Found 50 Tesla internships and added them to Google Sheet with title, department, location columns")' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         session_token: {
           type: 'string',
           description: 'Optional token returned by start_visual_session. Provide this only when finalizing a client-owned visual session.'
@@ -1158,13 +1159,14 @@ const TOOL_REGISTRY = [
 
   {
     name: 'partial_task',
-    description: 'Signal that the task is partially complete because useful work was completed but an external blocker prevents the final step. Use this instead of fail_task when the user can still benefit from the completed work, especially for auth/manual handoff blockers after research, drafting, or data entry is already done. Auth/manual blockers include login required, no saved credentials, user skipped login, credentials failed, and manual approval, MFA, or external verification. Preserve three things clearly: what you completed, the exact blocker, and the manual next step the user should take. If the runtime offers one saved-credential or operator-prompt attempt, let that single attempt happen first; call partial_task only after that attempt is unavailable, skipped, exhausted, or fails. Provide session_token only when finalizing a client-owned visual session created by start_visual_session. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task is partially complete because useful work was completed but an external blocker prevents the final step. Use this instead of fail_task when the user can still benefit from the completed work, especially for auth/manual handoff blockers after research, drafting, or data entry is already done. Auth/manual blockers include login required, no saved credentials, user skipped login, credentials failed, and manual approval, MFA, or external verification. Preserve three things clearly: what you completed, the exact blocker, and the manual next step the user should take, but never include passwords, tokens, API keys, or sensitive form values. If the runtime offers one saved-credential or operator-prompt attempt, let that single attempt happen first; call partial_task only after that attempt is unavailable, skipped, exhausted, or fails. Provide tab_id when more than one tab/session could be active. Provide session_token only when finalizing a client-owned visual session created by start_visual_session. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         summary: { type: 'string', description: 'Summary of the useful work that was completed before the blocker was hit' },
         blocker: { type: 'string', description: 'What prevented the final step from being completed (e.g. "Messaging requires login", "Manual approval required")' },
         next_step: { type: 'string', description: 'Manual next step the user can take to finish manually or resume later. Include this for auth or approval blockers.' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         reason: {
           type: 'string',
           description: 'Optional machine-readable blocker category. Keep it narrow and stable for blocked/manual-handoff outcomes.',
@@ -1187,11 +1189,12 @@ const TOOL_REGISTRY = [
 
   {
     name: 'fail_task',
-    description: 'Signal that the task cannot be completed. Include the reason why. Call this instead of just stopping when you encounter an unrecoverable problem. Provide session_token only when ending a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-failure semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
+    description: 'Signal that the task cannot be completed. Include the reason why, but never include passwords, tokens, API keys, or sensitive form values. Call this instead of just stopping when you encounter an unrecoverable problem. Provide tab_id when more than one tab/session could be active. Provide session_token only when ending a client-owned visual session created by start_visual_session; otherwise omit it and keep the normal task-failure semantics. Multi-agent: agent-scoped tabs; cross-agent reject with TAB_NOT_OWNED; cap configurable (default 8, 1-64).',
     inputSchema: {
       type: 'object',
       properties: {
         reason: { type: 'string', description: 'Why the task cannot be completed (e.g. "Page requires login", "Data not found on page")' },
+        tab_id: { type: 'integer', description: 'Optional target tab id used to associate this outcome with the correct local MCP replay session.' },
         session_token: {
           type: 'string',
           description: 'Optional token returned by start_visual_session. Provide this only when failing a client-owned visual session.'

@@ -38,6 +38,16 @@ Use this package when you want your AI client to drive the browser directly whil
 
 > **PhantomStream (FSB v0.12.0):** the dashboard live-preview and remote-control relay are now powered by the published `@full-self-browsing/phantom-stream` package on the extension and showcase side. This is an internal capture/renderer/transport change — the MCP tool schemas, routes, and bridge contracts in this server are unchanged.
 
+### What's New In v0.11.0
+
+This is the terminal task-outcome handoff release. Full details live in `CHANGELOG.md`.
+
+- `complete_task`, `partial_task`, and `fail_task` are now callable MCP tools rather than shared-registry schemas without a server bridge route.
+- The new `mcp:task-status` bridge message preserves agent ownership context and optional `tab_id` while handing a client-authored terminal summary to the extension's local MCP task memory.
+- Terminal outcome calls serialize behind pending browser mutations, so the summary cannot overtake the final action it describes.
+- A confirmed `fail_task` response remains `success:false` as task data but is returned as a normal MCP tool acknowledgement rather than a transport error.
+- **Compatibility:** `fsb-mcp-server` 0.11.0 requires FSB extension 0.9.91 or newer for `mcp:task-status`. Upgrade the extension and restart the MCP host together.
+
 ### What's New In v0.10.0
 
 This is the trigger watchers release. Full details live in `CHANGELOG.md`.
@@ -576,7 +586,8 @@ npm --prefix mcp run serve
 
 Release checks should verify:
 
-- `mcp/src/version.ts` and `mcp/package.json` agree.
+- `mcp/package.json`, `mcp/package-lock.json`, `mcp/server.json`, and `mcp/src/version.ts` agree.
+- `mcp/CHANGELOG.md` and the current release instructions describe that same package version.
 - `mcp/README.md` tool counts match the registered runtime surface.
 - `mcp/src/tools/schema-bridge.ts` still loads the generated `ai/tool-definitions.cjs`.
 - Root tests still cover route contracts and setup guidance.
@@ -590,7 +601,9 @@ The build command copies `extension/ai/tool-definitions.js` into `mcp/ai/tool-de
 
 ### Versioning
 
-The MCP package has its own version (`0.10.0`) because it is published independently from the extension release (`0.9.90`). When extension bridge contracts change, update both the MCP version metadata and the compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+The MCP package has its own version (`0.11.0`) because it is published independently from the extension release (`0.9.91`). When extension bridge contracts change, update all MCP version metadata plus the changelog and compatibility notes in this README. When only website or extension UI text changes, the MCP version usually does not need to move.
+
+Compatibility for this release: MCP 0.11.0 requires extension 0.9.91 or newer for the `mcp:task-status` route used by `complete_task`, `partial_task`, and `fail_task`. An older extension does not recognize those terminal lifecycle messages; update the extension before using these tools. Other 0.10.0 tool routes remain additive and unchanged.
 
 Contract-sensitive changes should be covered by tests before publishing:
 
@@ -602,14 +615,15 @@ Contract-sensitive changes should be covered by tests before publishing:
 - vault redaction boundaries
 - multi-agent contract: `agent_id` capture, ownership gate, configurable cap, ownership tokens, `back` tool
 - trigger contract: `trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`, blocking/detached reporting, and local browser-open limits
+- terminal task-outcome contract: `mcp:task-status`, agent/ownership context, serialized lifecycle ordering, and `fail_task` acknowledgement semantics
 
-### Releasing 0.10.0
+### Releasing 0.11.0
 
-This 0.10.0 build is release-prep ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
+This 0.11.0 build is release-prep ready. The actual `npm publish` is a USER action via the existing tag-driven release workflow; autonomous mode does not run it.
 
 To publish:
 
-- Preferred: run the user's tag-driven release workflow (`git tag v0.10.0 && git push origin v0.10.0`); the workflow handles `npm publish` from a clean working tree.
+- Preferred: run the MCP-only tag workflow (`git tag mcp-v0.11.0 && git push origin mcp-v0.11.0`); the workflow handles `npm publish` from a clean working tree. Repository milestone tags such as `v0.11.0` do not publish the MCP package.
 - Manual fallback: from the release branch, `cd mcp && npm publish` after confirming `npm whoami`, `npm --prefix mcp run build` exit 0, and the MCP smoke/parity/schema gates exit 0.
 
 Do not run `npm publish` from autonomous mode.

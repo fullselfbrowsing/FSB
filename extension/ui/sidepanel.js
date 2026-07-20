@@ -1,4 +1,4 @@
-// Side Panel Script for FSB v0.9.90 - Persistent UI
+// Side Panel Script for FSB v0.9.91 - Persistent UI
 
 // Phase 243 plan 03 (UI-02): the sidepanel's surface id (matches the
 // legacy:sidepanel agent synthesized by ensureLegacySidepanelAgent below).

@@ -231,6 +231,7 @@ function buildClientHarness(options = {}) {
     setInterval: timers.setInterval,
     clearInterval: timers.clearInterval,
     dispatchMcpMessageRoute: options.dispatchMcpMessageRoute || (async () => ({ success: true })),
+    dispatchMcpToolRoute: options.dispatchMcpToolRoute || (async () => ({ success: true })),
     globalThis: {}
   };
   context.globalThis = context;
@@ -383,6 +384,37 @@ async function runAgentActionDeprecationCase() {
   assertEqual(dispatchCalls.length, 0, 'no agent action reaches the dispatch path');
 }
 
+async function runTaskStatusRouteCase() {
+  console.log('\n--- A7: mcp:task-status preserves agent ownership context ---');
+
+  const routeCalls = [];
+  const harness = buildClientHarness({
+    async dispatchMcpToolRoute(input) {
+      routeCalls.push(input);
+      return { success: true, tool: input.tool, status: 'completed' };
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+  const payload = {
+    tool: 'complete_task',
+    params: { summary: 'Finished locally', tab_id: 22 },
+    agentId: 'agent-task-status',
+    ownershipToken: 'owner-token-22',
+    connectionId: 'connection-task-status'
+  };
+
+  const result = await client._routeMessage('mcp:task-status', payload, 'msg-task-status');
+  assertEqual(routeCalls.length, 1, 'task status dispatches through the direct tool route exactly once');
+  assertEqual(routeCalls[0].tool, 'complete_task', 'task status preserves the public lifecycle tool name');
+  assertEqual(routeCalls[0].params.tab_id, 22, 'public snake_case tab_id remains available to the recorder');
+  assertEqual(routeCalls[0].params.tabId, 22, 'bridge adds camelCase tabId for the ownership gate');
+  assertEqual(routeCalls[0].payload.agentId, 'agent-task-status', 'agent identity remains top-level for the ownership gate');
+  assertEqual(routeCalls[0].payload.ownershipToken, 'owner-token-22', 'ownership token remains top-level for the ownership gate');
+  assertEqual(routeCalls[0].client, client, 'task status dispatch carries the active bridge client');
+  assertDeepEqual(result, { success: true, tool: 'complete_task', status: 'completed' },
+    'task status response passes through unchanged');
+}
+
 // ---------------------------------------------------------------------------
 // Part B -- fsbDispatchInternalMessage wrapper (extracted from background.js)
 // ---------------------------------------------------------------------------
@@ -515,7 +547,9 @@ function runSourceContractCase() {
     'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {',
     'chrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);',
     'function fsbDispatchInternalMessage(request) {',
-    'globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;'
+    'globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;',
+    'function resolveMcpVisualSessionTabId(sessionToken) {',
+    'globalThis.resolveMcpVisualSessionTabId = resolveMcpVisualSessionTabId;'
   ];
   for (const snippet of backgroundSnippets) {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
@@ -534,6 +568,7 @@ async function run() {
   await runSendMessageFallbackCase();
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
+  await runTaskStatusRouteCase();
   await runWrapperBehaviorCases();
   runSourceContractCase();
 

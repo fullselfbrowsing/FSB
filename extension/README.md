@@ -1,6 +1,6 @@
 # FSB Chrome Extension
 
-`extension/` is the unpacked Chrome extension package for FSB v0.9.90. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
+`extension/` is the unpacked Chrome extension package for FSB v0.9.91. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
 
 ## Load Unpacked
 

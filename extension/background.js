@@ -1,4 +1,4 @@
-// Background service worker for FSB v0.9.90
+// Background service worker for FSB v0.9.91
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
@@ -73,17 +73,20 @@ try { importScripts('utils/mcp-pricing.js'); } catch (e) { console.error('[FSB] 
 // (it calls fsbMcpPricing) and AFTER mcp-tool-dispatcher.js (dispatcher hooks
 // call globalThis.fsbMcpMetricsRecorder).
 try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-metrics-recorder.js:', e.message); }
-// Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher and
-// the metrics recorder: the dispatcher's finally-block sibling hooks call
-// globalThis.fsbMcpSessionRecorder lazily, and this placement keeps the
-// global ready before any WS dispatch can fire.
+// Session history owns the shared local-storage mutation chain. Load it before
+// the MCP recorder so startup redaction can serialize with every history/log
+// writer instead of racing a stale read-modify-write snapshot.
+importScripts('utils/automation-logger.js');
+// Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher,
+// metrics recorder, and automation logger: the dispatcher's finally-block
+// sibling hooks resolve the recorder lazily, while recorder startup can use the
+// logger's storage mutation chain before any WS dispatch fires.
 try { importScripts('utils/mcp-session-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-recorder.js:', e.message); }
 // Phase 272 / v0.9.69 -- TelemetryCollector. Loaded AFTER mcp-metrics-recorder
 // (collector reads the rows the recorder writes to fsbUsageData). The alarm
 // handler in chrome.alarms.onAlarm + the install_announce setTimeout in
 // chrome.runtime.onInstalled are wired below.
 try { importScripts('utils/telemetry-collector.js'); } catch (e) { console.error('[FSB] Failed to load telemetry-collector.js:', e.message); }
-importScripts('utils/automation-logger.js');
 importScripts('utils/analytics.js');
 importScripts('utils/keyboard-emulator.js');
 importScripts('utils/site-explorer.js');
@@ -900,6 +903,15 @@ function getMcpVisualSessionManager() {
   return mcpVisualSessionManager;
 }
 
+function resolveMcpVisualSessionTabId(sessionToken) {
+  const token = String(sessionToken || '').trim();
+  if (!token) return null;
+  const session = getMcpVisualSessionManager().getSession(token);
+  return session && Number.isFinite(session.tabId) && session.tabId > 0
+    ? Number(session.tabId)
+    : null;
+}
+
 function getMcpVisualSessionFinalClearDelayMs() {
   const delay = Number(MCP_VISUAL_SESSION_FINAL_CLEAR_DELAY_MS);
   return Number.isFinite(delay) && delay > 0 ? delay : 3200;
@@ -1704,6 +1716,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.handleStartMcpVisualSession = handleStartMcpVisualSession;
   globalThis.handleEndMcpVisualSession = handleEndMcpVisualSession;
   globalThis.handleMcpVisualSessionTaskStatus = handleMcpVisualSessionTaskStatus;
+  globalThis.resolveMcpVisualSessionTabId = resolveMcpVisualSessionTabId;
 }
 
 /**
@@ -15840,6 +15853,21 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // MCP replay recorder idle + retention alarms. The recorder owns the
+  // fsbMcpSession: namespace so open sessions survive service-worker
+  // eviction and daily MCP-only pruning has one durable wake-up path.
+  if (globalThis.fsbMcpSessionRecorder
+      && alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(globalThis.fsbMcpSessionRecorder.FSB_MCP_SESSION_ALARM_PREFIX)) {
+    try {
+      await globalThis.fsbMcpSessionRecorder.handleAlarm(alarm);
+    } catch (err) {
+      console.warn('[FSB MCP] session recorder alarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
   // Phase 256 Plan 03 -- visual-session sliding-window death-timer alarm.
   // Alarm names of the form 'mcpVisualDeath:<tabId>' route to the lifecycle
   // helper which deletes the storage entry and sends the v0.9.36 clear

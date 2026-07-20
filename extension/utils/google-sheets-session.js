@@ -4,6 +4,8 @@
   var SHEETS_ORIGIN = 'https://docs.google.com';
   var SHEETS_API_BASE = 'https://sheets.googleapis.com/v4';
   var REQUEST_TIMEOUT_MS = 15000;
+  var MAX_GET_VALUES_CELLS = 100000;
+  var MAX_RESPONSE_BODY_BYTES = 5 * 1024 * 1024;
   var SPREADSHEET_ID_RE = /^[A-Za-z0-9_-]{10,200}$/;
   var SHEETS_URL_RE = /^\/spreadsheets\/d\/([A-Za-z0-9_-]{10,200})(?:\/|$)/;
   var MUTATIONS = { updateValues: true, appendValues: true, clearValues: true };
@@ -12,6 +14,9 @@
     GOOGLE_SHEETS_ACTIVE_TAB_REQUIRED: 'Open the target spreadsheet in the agent-owned Google Sheets tab.',
     GOOGLE_SHEETS_TARGET_MISMATCH: 'The requested spreadsheet does not match the agent-owned Google Sheets tab.',
     GOOGLE_SHEETS_SESSION_UNAVAILABLE: 'The signed-in Google Sheets page session is unavailable.',
+    GOOGLE_SHEETS_INVALID_ARGUMENT: 'A Google Sheets request argument is invalid.',
+    GOOGLE_SHEETS_REQUEST_TOO_LARGE: 'The Google Sheets request is too large.',
+    GOOGLE_SHEETS_RESPONSE_TOO_LARGE: 'The Google Sheets API response was too large.',
     RECIPE_DOM_FALLBACK_PENDING: 'The requested Sheets operation is not safely available through the UI fallback.',
     RECOVERY_AMBIGUOUS: 'The Sheets mutation may have taken effect. It was not retried.'
   };
@@ -68,6 +73,62 @@
         if (!isFinite(status)) { status = Number(failure && failure.result && failure.result.error && failure.result.error.code); }
         return isFinite(status) ? status : 0;
       }
+      function byteLength(value) {
+        var text = String(value || '');
+        if (typeof TextEncoder !== 'undefined') { return new TextEncoder().encode(text).byteLength; }
+        return unescape(encodeURIComponent(text)).length;
+      }
+      function splitRangeAddress(value) {
+        var input = String(value || '').trim();
+        var bang = -1;
+        var quoted = false;
+        for (var index = 0; index < input.length; index++) {
+          if (input[index] === "'") {
+            if (quoted && input[index + 1] === "'") { index++; continue; }
+            quoted = !quoted;
+          } else if (input[index] === '!' && !quoted) {
+            bang = index;
+          }
+        }
+        return quoted ? '' : (bang === -1 ? input : input.slice(bang + 1));
+      }
+      function columnNumber(value) {
+        var column = String(value || '').toUpperCase();
+        if (!/^[A-Z]{1,3}$/.test(column)) { return 0; }
+        var number = 0;
+        for (var index = 0; index < column.length; index++) {
+          number = number * 26 + column.charCodeAt(index) - 64;
+        }
+        return number <= 18278 ? number : 0;
+      }
+      function validateGetValuesRange(value) {
+        var range = String(value || '').trim();
+        if (!range || range.length > 500) {
+          return { code: 'GOOGLE_SHEETS_INVALID_ARGUMENT', reason: 'invalid-get-values-range' };
+        }
+        var address = splitRangeAddress(range).replace(/\$/g, '');
+        var match = address.match(/^([A-Za-z]+)(\d+)(?::([A-Za-z]+)(\d+))?$/);
+        if (!match) {
+          return {
+            code: /^[A-Za-z]+(?::[A-Za-z]+)?$/.test(address)
+              ? 'GOOGLE_SHEETS_REQUEST_TOO_LARGE'
+              : 'GOOGLE_SHEETS_INVALID_ARGUMENT',
+            reason: 'get-values-range-must-be-bounded'
+          };
+        }
+        var startColumn = columnNumber(match[1]);
+        var endColumn = columnNumber(match[3] || match[1]);
+        var startRow = Number(match[2]);
+        var endRow = Number(match[4] || match[2]);
+        if (!startColumn || !endColumn || !Number.isSafeInteger(startRow) || !Number.isSafeInteger(endRow) ||
+            startRow < 1 || endRow > 10000000 || endColumn < startColumn || endRow < startRow) {
+          return { code: 'GOOGLE_SHEETS_INVALID_ARGUMENT', reason: 'invalid-get-values-range' };
+        }
+        var cells = (endColumn - startColumn + 1) * (endRow - startRow + 1);
+        return cells > 100000
+          ? { code: 'GOOGLE_SHEETS_REQUEST_TOO_LARGE', reason: 'get-values-range-limit-exceeded', cells: cells }
+          : null;
+      }
       function responseData(response) {
         if (response && response.result && typeof response.result === 'object') { return response.result; }
         if (response && typeof response.body === 'string' && response.body) {
@@ -106,6 +167,8 @@
       if (operation === 'getSpreadsheet') {
         params.fields = 'spreadsheetId,properties(title,locale,timeZone),sheets(properties(sheetId,title,index,sheetType,gridProperties))';
       } else if (operation === 'getValues') {
+        var rangeError = validateGetValuesRange(args.range);
+        if (rangeError) { return error(rangeError.code, rangeError); }
         path += '/values/' + encode(args.range);
         if (args.majorDimension) { params.majorDimension = args.majorDimension; }
         if (args.valueRenderOption) { params.valueRenderOption = args.valueRenderOption; }
@@ -208,10 +271,24 @@
           requestSent: true
         });
       }
+      var data;
+      var serialized;
+      if (response && typeof response.body === 'string' && byteLength(response.body) > 5 * 1024 * 1024) {
+        serialized = null;
+      } else {
+        data = responseData(response);
+        try { serialized = JSON.stringify(data); } catch (_serializationError) { serialized = null; }
+      }
+      if (serialized === null || byteLength(serialized) > 5 * 1024 * 1024) {
+        return error(mutating ? 'RECOVERY_AMBIGUOUS' : 'GOOGLE_SHEETS_RESPONSE_TOO_LARGE', {
+          reason: 'page-gapi-response-limit-exceeded',
+          requestSent: true
+        });
+      }
       return {
         success: true,
         status: responseStatus,
-        data: responseData(response),
+        data: data,
         transport: 'page-client'
       };
     })();
@@ -377,7 +454,9 @@
   session.constants = Object.freeze({
     origin: SHEETS_ORIGIN,
     apiBaseUrl: SHEETS_API_BASE,
-    requestTimeoutMs: REQUEST_TIMEOUT_MS
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    maxGetValuesCells: MAX_GET_VALUES_CELLS,
+    maxResponseBodyBytes: MAX_RESPONSE_BODY_BYTES
   });
   Object.freeze(session);
   global.FsbGoogleSheetsSession = session;

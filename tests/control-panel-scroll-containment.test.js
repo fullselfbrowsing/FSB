@@ -8,9 +8,9 @@ const repoRoot = path.resolve(__dirname, '..');
 const css = fs.readFileSync(path.join(repoRoot, 'extension', 'ui', 'options.css'), 'utf8');
 const html = fs.readFileSync(path.join(repoRoot, 'extension', 'ui', 'control_panel.html'), 'utf8');
 
-function getCssRule(selector) {
+function getCssRule(selector, source = css) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(escaped + '\\s*\\{([\\s\\S]*?)\\}', 'm'));
+  const match = source.match(new RegExp(escaped + '\\s*\\{([\\s\\S]*?)\\}', 'm'));
   return match ? match[1] : '';
 }
 
@@ -50,7 +50,26 @@ assert(/overflow-y\s*:\s*auto\s*;/.test(contentRule),
 assert(/overscroll-behavior\s*:\s*contain\s*;/.test(contentRule),
   'dashboard content contains wheel/trackpad scroll chaining at its edges');
 
-assert(/<section[^>]*id=["']branding["'][\s\S]*?▽0\.9\.90[\s\S]*?<\/section>/.test(html),
+const printStart = css.indexOf('@media print');
+const printEnd = css.indexOf('/* ==========================================', printStart);
+const printCss = css.slice(printStart, printEnd);
+assert(printStart >= 0 && printEnd > printStart, 'print stylesheet block exists');
+assert(/html\s*,\s*body\s*\{[\s\S]*?height\s*:\s*auto\s*;[\s\S]*?overflow\s*:\s*visible\s*;/.test(printCss),
+  'print restores document-root height and overflow');
+
+const printContainerRule = getCssRule('.dashboard-container', printCss);
+assert(/height\s*:\s*auto\s*;/.test(printContainerRule) && /overflow\s*:\s*visible\s*;/.test(printContainerRule),
+  'print lets the dashboard container grow across pages');
+
+const printMainRule = getCssRule('.dashboard-main', printCss);
+assert(/display\s*:\s*block\s*;/.test(printMainRule) && /overflow\s*:\s*visible\s*;/.test(printMainRule),
+  'print removes the clipped main flex scrollport');
+
+const printContentRule = getCssRule('.dashboard-content', printCss);
+assert(/display\s*:\s*block\s*;/.test(printContentRule) && /overflow\s*:\s*visible\s*;/.test(printContentRule),
+  'print lets settings content flow beyond one viewport');
+
+assert(/<section[^>]*id=["']branding["'][\s\S]*?▽\d+\.\d+\.\d+[\s\S]*?<\/section>/.test(html),
   'version footer remains present at the end of the control panel content');
 
 console.log('PASS control panel scroll containment guard');

@@ -404,6 +404,62 @@ test('MAIN-world bridge builds only fixed Sheets requests and uses no supplied t
   }
 });
 
+test('MAIN-world bridge rejects unbounded and oversized getValues ranges before request dispatch', async () => {
+  const previous = globalThis.gapi;
+  const restoreLocation = installPageLocation();
+  let calls = 0;
+  globalThis.gapi = { client: { request() { calls++; return Promise.resolve({ status: 200, result: {} }); } } };
+  try {
+    const unbounded = await sessionModule.pageClientOperation({
+      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A:ZZZ' }
+    });
+    assert.equal(unbounded.code, 'GOOGLE_SHEETS_REQUEST_TOO_LARGE');
+    assert.equal(unbounded.reason, 'get-values-range-must-be-bounded');
+
+    const oversized = await sessionModule.pageClientOperation({
+      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A1:ZZ100000' }
+    });
+    assert.equal(oversized.code, 'GOOGLE_SHEETS_REQUEST_TOO_LARGE');
+    assert.equal(oversized.reason, 'get-values-range-limit-exceeded');
+
+    const malformed = await sessionModule.pageClientOperation({
+      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'not a range' }
+    });
+    assert.equal(malformed.code, 'GOOGLE_SHEETS_INVALID_ARGUMENT');
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.gapi = previous;
+    restoreLocation();
+  }
+});
+
+test('MAIN-world bridge refuses to clone responses larger than five MiB', async () => {
+  const previous = globalThis.gapi;
+  const restoreLocation = installPageLocation();
+  globalThis.gapi = {
+    client: {
+      request() {
+        return Promise.resolve({
+          status: 200,
+          result: { range: 'A1', values: [['x'.repeat(5 * 1024 * 1024)]] }
+        });
+      }
+    }
+  };
+  try {
+    const out = await sessionModule.pageClientOperation({
+      operation: 'getValues', spreadsheetId: ID, timeoutMs: 100, args: { range: 'A1' }
+    });
+    assert.equal(out.code, 'GOOGLE_SHEETS_RESPONSE_TOO_LARGE');
+    assert.equal(out.reason, 'page-gapi-response-limit-exceeded');
+    assert.equal(out.requestSent, true);
+    assert.equal(out.data, undefined);
+  } finally {
+    globalThis.gapi = previous;
+    restoreLocation();
+  }
+});
+
 test('MAIN-world bridge re-pins location immediately before the page request', async () => {
   const previous = globalThis.gapi;
   const restoreLocation = installPageLocation(OTHER_ID);

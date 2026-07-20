@@ -16,6 +16,7 @@ export type MCPMessageType =
   | 'mcp:list-triggers'       // List persisted trigger snapshots
   | 'mcp:start-visual-session' // MCP-owned visible lifecycle start
   | 'mcp:end-visual-session'   // MCP-owned visible lifecycle end
+  | 'mcp:task-status'          // Client-authored complete/partial/fail summary
   | 'mcp:execute-action'      // Manual: execute a single browser action
   | 'mcp:go-back'             // Phase 242 D-01: ownership-gated single-step browser-history back
   | 'mcp:get-dom'             // Read DOM snapshot

@@ -66,12 +66,115 @@ const KnowledgeGraph = (function () {
   // ---------------------------------------------------------------
   // Data consolidation -- free-floating sites, color-coded by category
   // ---------------------------------------------------------------
+  function normalizeSiteIdentity(value) {
+    if (value === undefined || value === null) return '';
+    var identity = String(value).trim().toLowerCase();
+    identity = identity.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+    identity = identity.replace(/^\/\//, '');
+    identity = identity.split(/[/?#]/)[0];
+    identity = identity.replace(/^www\./, '');
+    identity = identity.replace(/\.+$/, '');
+    return identity;
+  }
+
+  function patternIdentityStartsInDottedSuffix(source, startIndex) {
+    if (startIndex >= 2 && source.slice(startIndex - 2, startIndex) === '\\.') return true;
+
+    var openGroups = [];
+    var inCharacterClass = false;
+    for (var si = 0; si < startIndex; si++) {
+      var character = source.charAt(si);
+      if (character === '\\') {
+        si++;
+        continue;
+      }
+      if (character === '[') {
+        inCharacterClass = true;
+        continue;
+      }
+      if (character === ']' && inCharacterClass) {
+        inCharacterClass = false;
+        continue;
+      }
+      if (inCharacterClass) continue;
+      if (character === '(') openGroups.push(si);
+      if (character === ')' && openGroups.length > 0) openGroups.pop();
+    }
+
+    for (var gi = 0; gi < openGroups.length; gi++) {
+      var groupStart = openGroups[gi];
+      if (groupStart >= 2 && source.slice(groupStart - 2, groupStart) === '\\.') return true;
+    }
+    return false;
+  }
+
+  function patternSiteIdentities(pattern) {
+    if (!pattern || typeof pattern.source !== 'string') return [];
+    var identities = [];
+    var matcher = /[a-z0-9-]+(?:\\\.[a-z0-9-]+)+/gi;
+    var match;
+    while ((match = matcher.exec(pattern.source)) !== null) {
+      // In /amazon\.(com|...|com\.au)/, com.au is only an alternation
+      // suffix attached to "amazon.". Treating it as a complete hostname
+      // would make every .com.au task look like a built-in Amazon site.
+      if (patternIdentityStartsInDottedSuffix(pattern.source, match.index)) continue;
+      var identity = normalizeSiteIdentity(match[0].replace(/\\\./g, '.'));
+      if (identity && identities.indexOf(identity) === -1) identities.push(identity);
+    }
+    return identities;
+  }
+
+  function identityMatchesKnownSite(identity, knownIdentity) {
+    return identity === knownIdentity || identity.slice(-(knownIdentity.length + 1)) === '.' + knownIdentity;
+  }
+
+  function guideMatchesIdentity(guide, identity) {
+    if (!guide || !identity || !Array.isArray(guide.patterns)) return false;
+    var candidates = [identity, 'https://' + identity + '/', 'http://www.' + identity + '/'];
+    for (var pi = 0; pi < guide.patterns.length; pi++) {
+      var pattern = guide.patterns[pi];
+      if (!pattern || typeof pattern.test !== 'function') continue;
+      var patternIdentities = patternSiteIdentities(pattern);
+      for (var ii = 0; ii < patternIdentities.length; ii++) {
+        if (identityMatchesKnownSite(identity, patternIdentities[ii])) return true;
+      }
+      var originalLastIndex = pattern.lastIndex;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        pattern.lastIndex = 0;
+        if (pattern.test(candidates[ci])) {
+          pattern.lastIndex = originalLastIndex;
+          return true;
+        }
+      }
+      pattern.lastIndex = originalLastIndex;
+    }
+    return false;
+  }
+
   function buildKnowledgeGraphData(detailLevel) {
     if (typeof getSiteGuidesByCategory !== 'function') return { nodes: [], links: [] };
 
     var grouped = getSiteGuidesByCategory();
     var nodes = [];
     var links = [];
+    // Duplicate detection must not depend on which nodes the selected detail
+    // level happens to render. Build identities from every guide up front.
+    var guideRegistry = [];
+    var existingLabels = {};
+    Object.keys(grouped).forEach(function (categoryName) {
+      (grouped[categoryName] || []).forEach(function (guide) {
+        guideRegistry.push(guide);
+        var identity = normalizeSiteIdentity(guide && guide.site);
+        if (identity) existingLabels[identity] = true;
+        var patterns = (guide && guide.patterns) || [];
+        for (var pi = 0; pi < patterns.length; pi++) {
+          var patternIdentities = patternSiteIdentities(patterns[pi]);
+          for (var ii = 0; ii < patternIdentities.length; ii++) {
+            existingLabels[patternIdentities[ii]] = true;
+          }
+        }
+      });
+    });
 
     // Root node
     nodes.push({
@@ -174,30 +277,22 @@ const KnowledgeGraph = (function () {
     // nodes (their own pseudo-category). One tier only, same as built-in sites
     // stopping at one tier below their category.
     if (_taskMemories.length > 0) {
-      // Collect existing site labels to avoid duplicates (category nodes reuse
-      // type 'site' too, so exclude those via isCat)
-      var existingLabels = {};
-      for (var n = 0; n < nodes.length; n++) {
-        if (nodes[n].type === 'site' && !nodes[n].isCat) {
-          existingLabels[nodes[n].label.toLowerCase()] = true;
-        }
-      }
-
       // Group task memories by domain
       var domainMap = {};
       for (var mi = 0; mi < _taskMemories.length; mi++) {
         var tm = _taskMemories[mi];
         var tmDomain = (tm.typeData && tm.typeData.session && tm.typeData.session.domain) ||
                        (tm.metadata && tm.metadata.domain) || '';
-        if (!tmDomain) continue;
-        if (!domainMap[tmDomain]) {
-          domainMap[tmDomain] = { selectors: [] };
+        var tmIdentity = normalizeSiteIdentity(tmDomain);
+        if (!tmIdentity) continue;
+        if (!domainMap[tmIdentity]) {
+          domainMap[tmIdentity] = { label: tmIdentity, selectors: [] };
         }
         var tmLearned = (tm.typeData && tm.typeData.learned) || {};
         if (tmLearned.selectors) {
           for (var s = 0; s < tmLearned.selectors.length; s++) {
-            if (domainMap[tmDomain].selectors.indexOf(tmLearned.selectors[s]) === -1) {
-              domainMap[tmDomain].selectors.push(tmLearned.selectors[s]);
+            if (domainMap[tmIdentity].selectors.indexOf(tmLearned.selectors[s]) === -1) {
+              domainMap[tmIdentity].selectors.push(tmLearned.selectors[s]);
             }
           }
         }
@@ -209,8 +304,12 @@ const KnowledgeGraph = (function () {
       var taskStartIdx = nCat; // continue golden-angle indexing after categories
       var tTotal = nCat + taskDomains.length;
       for (var ti = 0; ti < taskDomains.length; ti++) {
-        var tdName = taskDomains[ti];
-        if (existingLabels[tdName.toLowerCase()]) continue;
+        var tdIdentity = taskDomains[ti];
+        var isKnownGuide = existingLabels[tdIdentity] === true;
+        for (var gi = 0; !isKnownGuide && gi < guideRegistry.length; gi++) {
+          isKnownGuide = guideMatchesIdentity(guideRegistry[gi], tdIdentity);
+        }
+        if (isKnownGuide) continue;
 
         var tsId = 'task-site:' + ti;
         var tsIdx = taskStartIdx + ti;
@@ -222,10 +321,10 @@ const KnowledgeGraph = (function () {
         var tsy = R_CAT * Math.cos(tPhi);
         var tsz = R_CAT * Math.sin(tPhi) * Math.sin(tTheta);
 
-        var domData = domainMap[tdName];
+        var domData = domainMap[tdIdentity];
         nodes.push({
           id: tsId,
-          label: tdName,
+          label: domData.label,
           fullLabel: 'Task-Discovered',
           depth: 1,
           type: 'task-site',
@@ -610,7 +709,7 @@ const KnowledgeGraph = (function () {
   }
 
   function getFitZoom(state, detailLevel) {
-    var defaultZoom = getDefaultZoom(state.container, detailLevel);
+    var defaultZoom = getDefaultZoom(state && state.container, detailLevel);
     if (!state || detailLevel !== 'full' || !state.canvas || !state.nodes || state.nodes.length === 0) {
       return defaultZoom;
     }
@@ -648,6 +747,13 @@ const KnowledgeGraph = (function () {
     var fitZoom = Math.min((w / 2 - marginX) / halfGraphW, (h / 2 - marginY) / halfGraphH);
     var minZoom = w >= 760 && h >= 460 ? 0.6 : 0.42;
     return Math.max(minZoom, Math.min(defaultZoom, fitZoom));
+  }
+
+  function getAutomaticZoom(state) {
+    if (!state) return 1;
+    return state.detailLevel === 'full'
+      ? getFitZoom(state, state.detailLevel)
+      : getDefaultZoom(state.container, state.detailLevel);
   }
 
   function easeOutCubic(t) {
@@ -968,12 +1074,19 @@ const KnowledgeGraph = (function () {
 
     _state = state;
     container._knowledgeGraphState = state;
+    if (!state.userZoomed) state.zoom = getAutomaticZoom(state);
 
     // Handle resize -- re-sync canvas buffer to CSS layout
     state._syncCanvasSize = syncCanvasSize;
     state._resizeHandler = function () {
       syncCanvasSize();
-      if (!state.userZoomed) state.zoom = getDefaultZoom(container, state.detailLevel);
+      if (!state.userZoomed) {
+        if (state.zoomAnimId) {
+          cancelAnimationFrame(state.zoomAnimId);
+          state.zoomAnimId = null;
+        }
+        state.zoom = getAutomaticZoom(state);
+      }
     };
     window.addEventListener('resize', state._resizeHandler);
 
@@ -1011,7 +1124,7 @@ const KnowledgeGraph = (function () {
     _state.links = data.links;
     if (level === 'full') {
       _state.userZoomed = false;
-      animateZoomTo(_state, getFitZoom(_state, level), 650);
+      animateZoomTo(_state, getAutomaticZoom(_state), 650);
     } else if (!_state.userZoomed) {
       animateZoomTo(_state, getDefaultZoom(_state.container, level), 420);
     }

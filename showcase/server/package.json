@@ -1,6 +1,6 @@
 {
   "name": "fsb-server",
-  "version": "0.9.90",
+  "version": "0.9.91",
   "description": "FSB Background Agents backend server with result storage and dashboard",
   "main": "server.js",
   "scripts": {

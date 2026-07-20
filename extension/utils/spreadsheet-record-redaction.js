@@ -14,6 +14,14 @@
     fillsheet: true,
     readsheet: true
   });
+  var SHEETS_NAVIGATION_TOOLS = Object.freeze({
+    navigate: true,
+    open_tab: true,
+    switch_tab: true,
+    close_tab: true
+  });
+  var SHEETS_DOCUMENT_PATH = /^\/spreadsheets\/d\/[^/]+(?:\/|$)/;
+  var SAFE_OPERATION = /^[a-z0-9:_-]{1,80}$/i;
   var SAFE_ERROR_CODE = /^(?:GOOGLE_SHEETS|RECIPE)_[A-Z0-9_]{1,64}$/;
   var SAFE_EXACT_ERROR_CODES = Object.freeze({ RECOVERY_AMBIGUOUS: true });
 
@@ -21,16 +29,53 @@
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   }
 
+  function isGoogleSheetsDocumentUrl(value) {
+    if (typeof value !== 'string' || value.length === 0) { return false; }
+    if (typeof URL !== 'function') { return true; }
+    try {
+      var parsed = new URL(value);
+      return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+        parsed.hostname === 'docs.google.com' && SHEETS_DOCUMENT_PATH.test(parsed.pathname);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function hasGoogleSheetsDocumentUrl(entry, payload) {
+    var params = object(entry.params || payload.params);
+    var response = object(entry.response);
+    var changeReport = object(response.change_report);
+    var changeReportUrl = object(changeReport.url);
+    var candidates = [
+      params.url,
+      response.url,
+      changeReportUrl.before,
+      changeReportUrl.after
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      if (isGoogleSheetsDocumentUrl(candidates[i])) { return true; }
+    }
+    return false;
+  }
+
   function classify(entry) {
     if (!entry || typeof entry !== 'object') { return null; }
+    var payload = object(entry.requestPayload || entry.payload);
     if (LEGACY_TOOLS[entry.tool]) {
       return { operation: entry.tool, actionShape: true };
     }
-    var payload = object(entry.requestPayload || entry.payload);
     if (entry.tool === 'mcp:capabilities-invoke' && typeof payload.slug === 'string' && payload.slug.indexOf('gsheets.') === 0) {
       return {
         operation: KNOWN_CAPABILITIES[payload.slug] ? payload.slug : 'gsheets.unknown',
         actionShape: false
+      };
+    }
+    if (entry.spreadsheetTarget === true || hasGoogleSheetsDocumentUrl(entry, payload)) {
+      return {
+        operation: typeof entry.tool === 'string' && SAFE_OPERATION.test(entry.tool)
+          ? entry.tool
+          : 'sheets.unknown',
+        actionShape: Object.prototype.hasOwnProperty.call(entry, 'payload') || SHEETS_NAVIGATION_TOOLS[entry.tool] === true
       };
     }
     return null;
@@ -207,7 +252,15 @@
   function recordSafely(recorder, method, entry) {
     if (!recorder || typeof recorder[method] !== 'function') { return false; }
     try {
-      recorder[method](sanitizeEntry(entry));
+      var sanitized = sanitizeEntry(entry);
+      // Content-bearing recorder hooks must prove their resolved target origin.
+      // If the hook could not do so and the entry carries no direct Sheets
+      // evidence that this module can sanitize, omit the diagnostic record.
+      if (entry && entry.requireTargetOrigin === true &&
+          entry.targetOriginResolved !== true && sanitized === entry) {
+        return false;
+      }
+      recorder[method](sanitized);
       return true;
     } catch (_e) {
       // Recording is diagnostic-only. A sanitization failure drops the entry.

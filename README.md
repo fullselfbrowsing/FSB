@@ -1,4 +1,4 @@
-# FSB v0.9.90 Full Self Browsing
+# FSB v0.9.91 Full Self Browsing
 
 <div align="center">
 
@@ -9,7 +9,7 @@
 </picture>
 
 ![FSB](https://img.shields.io/badge/FSB-Full_Self_Browsing-000000?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-0.9.90-0078D4?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.91-0078D4?style=for-the-badge)
 ![Manifest V3](https://img.shields.io/badge/Manifest_V3-Chrome-34A853?style=for-the-badge&logo=googlechrome&logoColor=white)
 ![License](https://img.shields.io/badge/license-BSL_1.1-F5C518?style=for-the-badge)
 
@@ -32,7 +32,7 @@
 
 FSB (Full Self Browsing) is an open source Chrome extension for AI powered browser automation. Describe a task in plain English; FSB reads the live DOM, builds a plan, executes browser actions, verifies results, and reports progress through the popup, side panel, or MCP.
 
-> FSB v0.9.90 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
+> FSB v0.9.91 is functional and production ready for supervised automation. Browser automation can still behave unpredictably on complex or sensitive sites, so monitor actions and test on non critical pages first.
 
 ### Why DOM First
 

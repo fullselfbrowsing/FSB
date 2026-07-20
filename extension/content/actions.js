@@ -1599,6 +1599,15 @@ function sheetsTrustedKey(result, reason) {
   return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', reason || 'trusted-keyboard-unavailable');
 }
 
+function sheetsPrimaryModifier() {
+  const platform = `${navigator.userAgentData?.platform || ''} ${navigator.platform || ''}`;
+  return /mac|iphone|ipad|ipod/i.test(platform) ? { metaKey: true } : { ctrlKey: true };
+}
+
+function sheetsPrimaryShortcut(key, extra = {}) {
+  return { key, ...sheetsPrimaryModifier(), ...extra };
+}
+
 async function sheetsNavigate(reference, settleMs = 80) {
   const nameBox = sheetsNameBox();
   if (!nameBox) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'name-box-unavailable');
@@ -1607,7 +1616,7 @@ async function sheetsNavigate(reference, settleMs = 80) {
     nameBox.click();
     await sheetsDelay(25);
     const selected = sheetsTrustedKey(
-      await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true }),
+      await tools.keyPress(sheetsPrimaryShortcut('a', { useDebuggerAPI: true })),
       'name-box-select-not-trusted'
     );
     if (!selected.success) return selected;
@@ -1658,7 +1667,9 @@ async function sheetsReadValues(range, majorDimension) {
   if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
   const parsed = sheetsUi.parseA1Range(range);
   if (!parsed || parsed.columnOnly) return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-read-requires-bounded-a1-range');
-  if (parsed.rows > sheetsUi.limits.maxReadRows || parsed.columns > sheetsUi.limits.maxReadColumns) {
+  if (parsed.rows > sheetsUi.limits.maxReadRows ||
+      parsed.columns > sheetsUi.limits.maxReadColumns ||
+      parsed.rows * parsed.columns > sheetsUi.limits.maxReadCells) {
     return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-read-range-limit-exceeded');
   }
   try {
@@ -1727,7 +1738,7 @@ async function sheetsPasteEncoded(parsed, encoded, startRow) {
     }
     mutationStarted = true;
     try {
-      const pasted = await tools.keyPress({ key: 'v', ctrlKey: true, useDebuggerAPI: true });
+      const pasted = await tools.keyPress(sheetsPrimaryShortcut('v', { useDebuggerAPI: true }));
       if (!pasted || pasted.success !== true || pasted.method !== 'debuggerAPI') {
         return sheetsError('RECOVERY_AMBIGUOUS', 'ui-paste-outcome-unknown', mutationStarted);
       }
@@ -1881,7 +1892,7 @@ async function sheetsRenameSpreadsheet(title) {
     titleInput.click();
     await sheetsDelay(80);
     if (typeof titleInput.select === 'function') titleInput.select();
-    else await tools.keyPress({ key: 'a', ctrlKey: true, useDebuggerAPI: true });
+    else await tools.keyPress(sheetsPrimaryShortcut('a', { useDebuggerAPI: true }));
     await tools.typeWithKeys({ text: String(title), clearFirst: false, delay: 8 });
     await tools.keyPress({ key: 'Enter', useDebuggerAPI: true });
     await sheetsDelay(180);
