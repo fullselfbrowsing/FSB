@@ -15,6 +15,20 @@
     'opencode',
     'codex'
   ]);
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('../utils/delegation-providers.js');
+  }
+  if (!delegationProviders
+      || typeof delegationProviders.ids !== 'function'
+      || typeof delegationProviders.get !== 'function'
+      || typeof delegationProviders.isShippedId !== 'function') {
+    throw new Error('canonical delegation providers are unavailable');
+  }
+  var SHIPPED_AGENT_PROVIDER_SET = createProviderSet(delegationProviders.ids());
   var COMPATIBILITY_UNSUPPORTED_REASONS = Object.freeze({
     binary_not_found: true,
     version_missing: true,
@@ -298,7 +312,7 @@
     var hasCheckedAt = Number.isSafeInteger(checkedAt) && checkedAt >= 0;
     var checkedText = formatCompatibilityCheckedText(checkedAt, formatAbsoluteDateTime);
 
-    if (providerId !== 'claude-code') {
+    if (!hasOwn(SHIPPED_AGENT_PROVIDER_SET, providerId)) {
       return createCompatibilityDisplayModel(
         COMPATIBILITY_UNSUPPORTED_MODEL,
         hasCheckedAt ? checkedText : null

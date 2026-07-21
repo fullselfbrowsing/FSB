@@ -154,6 +154,7 @@ const MCP_BRIDGE_PAIRING_COPY = Object.freeze({
 let providerSettingsModelLoadTimer = null;
 let providerSettingsLoadGeneration = 0;
 let delegationTrustClearPending = false;
+let delegationTrustClearProviderId = '';
 
 // Initialize analytics
 let analytics = null;
@@ -418,50 +419,118 @@ function ensureDelegationTrustControl() {
   section.appendChild(status);
   elements.agentProviderDetails.appendChild(section);
   elements.delegationTrustSection = section;
+  elements.delegationTrustCopy = copy;
   elements.delegationTrustClearBtn = button;
   elements.delegationTrustStatus = status;
 }
 
+function getCanonicalDelegationProvider(providerId) {
+  const helper = (typeof globalThis !== 'undefined')
+    ? globalThis.FsbDelegationProviders
+    : null;
+  const get = getOwnDataValue(helper, 'get');
+  if (typeof get !== 'function' || typeof providerId !== 'string') return null;
+  let metadata;
+  try {
+    metadata = get.call(helper, providerId);
+  } catch (_error) {
+    return null;
+  }
+  const id = getOwnDataValue(metadata, 'id');
+  const label = getOwnDataValue(metadata, 'label');
+  const billingKind = getOwnDataValue(metadata, 'billingKind');
+  if (id !== providerId
+      || typeof label !== 'string'
+      || !label
+      || (billingKind !== 'subscription' && billingKind !== 'unknown')) return null;
+  return { id, label, billingKind };
+}
+
+function getShippedDelegationProviderIds() {
+  const helper = (typeof globalThis !== 'undefined')
+    ? globalThis.FsbDelegationProviders
+    : null;
+  const ids = getOwnDataValue(helper, 'ids');
+  if (typeof ids !== 'function') return [];
+  let values;
+  try {
+    values = ids.call(helper);
+  } catch (_error) {
+    return [];
+  }
+  if (!Array.isArray(values)) return [];
+  const shipped = [];
+  const seen = Object.create(null);
+  for (let index = 0; index < values.length; index += 1) {
+    const provider = getCanonicalDelegationProvider(values[index]);
+    if (!provider || Object.prototype.hasOwnProperty.call(seen, provider.id)) return [];
+    seen[provider.id] = true;
+    shipped.push(provider.id);
+  }
+  return shipped;
+}
+
 function renderDelegationTrustControl() {
   if (!elements.delegationTrustSection) return;
-  const visible = providerPanelState.providerKind === 'agent'
-    && providerPanelState.agentProviderId === 'claude-code';
+  const provider = providerPanelState.providerKind === 'agent'
+    ? getCanonicalDelegationProvider(providerPanelState.agentProviderId)
+    : null;
+  const visible = !!provider;
   elements.delegationTrustSection.hidden = !visible;
   if (!visible) {
-    delegationTrustClearPending = false;
-    if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = false;
+    if (elements.delegationTrustClearBtn) {
+      elements.delegationTrustClearBtn.disabled = delegationTrustClearPending;
+    }
     if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = '';
+    return;
+  }
+  if (elements.delegationTrustCopy) {
+    elements.delegationTrustCopy.textContent =
+      `Require confirmation before ${provider.label} starts another delegated browser task.`;
+  }
+  if (elements.delegationTrustClearBtn) {
+    elements.delegationTrustClearBtn.textContent = `Restore confirmation for ${provider.label}`;
+    elements.delegationTrustClearBtn.disabled = delegationTrustClearPending;
+  }
+  if (delegationTrustClearPending
+      && delegationTrustClearProviderId !== provider.id
+      && elements.delegationTrustStatus) {
+    elements.delegationTrustStatus.textContent = '';
   }
 }
 
 async function clearDelegationTrust() {
-  if (delegationTrustClearPending
-      || providerPanelState.providerKind !== 'agent'
-      || providerPanelState.agentProviderId !== 'claude-code') return;
+  if (delegationTrustClearPending || providerPanelState.providerKind !== 'agent') return;
+  const provider = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+  if (!provider) return;
   delegationTrustClearPending = true;
+  delegationTrustClearProviderId = provider.id;
   if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = true;
   if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = 'Restoring confirmation…';
   try {
     const result = await chrome.runtime.sendMessage({
       type: 'FSB_DELEGATION_CLEAR_TRUST',
-      providerId: 'claude-code'
+      providerId: provider.id
     });
     if (!result
         || result.ok !== true
-        || result.providerId !== 'claude-code'
+        || result.providerId !== provider.id
         || result.trusted !== false) {
       throw new Error('delegation trust clear was rejected');
     }
-    if (elements.delegationTrustStatus) {
-      elements.delegationTrustStatus.textContent = 'Confirmation restored for Claude Code';
+    const selected = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+    if (selected && selected.id === provider.id && elements.delegationTrustStatus) {
+      elements.delegationTrustStatus.textContent = `Confirmation restored for ${provider.label}`;
     }
   } catch (_error) {
-    if (elements.delegationTrustStatus) {
+    const selected = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+    if (selected && selected.id === provider.id && elements.delegationTrustStatus) {
       elements.delegationTrustStatus.textContent = 'Could not restore confirmation. Try again.';
     }
   } finally {
     delegationTrustClearPending = false;
-    if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = false;
+    delegationTrustClearProviderId = '';
+    renderDelegationTrustControl();
   }
 }
 
@@ -537,7 +606,7 @@ function copyProviderDataRecord(value) {
 
 function projectStaleProviderCompatibility(clients) {
   const projected = copyProviderClientMap(clients) || Object.create(null);
-  Object.keys(projected).forEach((providerId) => {
+  getShippedDelegationProviderIds().forEach((providerId) => {
     const row = getOwnDataValue(projected, providerId);
     const compatibility = getOwnDataValue(row, 'compatibility');
     const status = getOwnDataValue(compatibility, 'status');
@@ -559,10 +628,17 @@ function projectStaleProviderCompatibility(clients) {
 }
 
 function getProviderCompatibilityCheckedAt(clients) {
-  const row = getOwnDataValue(clients, 'claude-code');
-  const compatibility = getOwnDataValue(row, 'compatibility');
-  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
-  return Number.isSafeInteger(checkedAt) && checkedAt >= 0 ? checkedAt : null;
+  const providerIds = getShippedDelegationProviderIds();
+  if (!providerIds.length) return null;
+  let earliest = null;
+  for (const providerId of providerIds) {
+    const row = getOwnDataValue(clients, providerId);
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    if (!Number.isSafeInteger(checkedAt) || checkedAt < 0) return null;
+    earliest = earliest === null ? checkedAt : Math.min(earliest, checkedAt);
+  }
+  return earliest;
 }
 
 function getProviderStorageCompatibilityCheckedAt(change) {
@@ -640,15 +716,17 @@ function mergeProviderCompatibilityProjection(currentClients, projectedClients) 
 }
 
 function hasDegradedProviderCompatibility(clients) {
-  const row = getOwnDataValue(clients, 'claude-code');
-  const compatibility = getOwnDataValue(row, 'compatibility');
-  const status = getOwnDataValue(compatibility, 'status');
-  const reason = getOwnDataValue(compatibility, 'reason');
-  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
-  return status === 'degraded'
-    && (reason === 'newer_than_tested_range' || reason === 'evidence_stale')
-    && Number.isSafeInteger(checkedAt)
-    && checkedAt >= 0;
+  return getShippedDelegationProviderIds().some((providerId) => {
+    const row = getOwnDataValue(clients, providerId);
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const status = getOwnDataValue(compatibility, 'status');
+    const reason = getOwnDataValue(compatibility, 'reason');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    return status === 'degraded'
+      && (reason === 'newer_than_tested_range' || reason === 'evidence_stale')
+      && Number.isSafeInteger(checkedAt)
+      && checkedAt >= 0;
+  });
 }
 
 function getCompatibilityRefreshFailureMessage(clients) {
