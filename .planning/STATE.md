@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-08-PLAN.md
-last_updated: "2026-07-21T00:33:26.635Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 08 complete; effective policy, task-once replay fence, and post-cleanup result barrier green
+stopped_at: Completed 64-09-PLAN.md
+last_updated: "2026-07-21T01:26:00.187Z"
+last_activity: 2026-07-21 -- Phase 64 Plan 09 complete; canonical provider authorization and immutable routing green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 50
-  percent: 94
+  completed_plans: 51
+  percent: 96
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 9 of 13
+Plan: 10 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 08 complete; effective policy, task-once replay fence, and post-cleanup result barrier green
+Last activity: 2026-07-21 -- Phase 64 Plan 09 complete; canonical provider authorization and immutable routing green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -49,7 +49,7 @@ Last activity: 2026-07-20 -- Phase 64 Plan 08 complete; effective policy, task-o
 | 61 | Delegation UX & SW-Eviction Persistence | UX-01..06, LIFE-01..04 | Complete (2026-07-15; UAT deferred to milestone end) |
 | 62 | CI Drift-Smoke Gate & Doctor Extensions | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Complete (2026-07-16; UAT deferred to milestone end) |
 | 63 | Native-Messaging Host | NATIVE-01, NATIVE-02, NATIVE-03, NATIVE-04 | Complete (2026-07-20; UAT deferred to milestone end) |
-| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (7/13) |
+| 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (9/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
 Coverage: 51/51 v0.9.91 requirements mapped, 48/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
@@ -218,6 +218,10 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Require generic effective-policy attestation before task authority — Process and owned-server evidence use only closed descriptors and the shared verifier; raw documents, credentials, headers, model values, and stderr remain transient.
 - [Phase 64]: Make selected task-child spawn the permanent replay boundary — One role-checked writer sends the exact task plus EOF once; every later failure cleans up and settles without cold fallback.
 - [Phase 64]: Publish a normalized result only after independent cleanup truth — Parser EOF, clean stderr, code 0/no signal, task-tree settlement, and runtime removal must all corroborate the private candidate before it becomes observable.
+- [Phase 64]: Canonicalize only the exact shipped Claude Code and OpenCode records; keep Codex dormant and outside authorization. — One frozen exact provider table prevents browser authorization, compatibility, identity, and billing metadata from drifting apart.
+- [Phase 64]: Reread background-owned selection before trust mutation and challenge consumption; keep side-panel start requests provider-free. — Only saved settings may select the adapter, so stale or attacker-supplied client intent cannot acquire provider authority.
+- [Phase 64]: Bind a frozen canonical provider context only after request-bound started identity matches and controller start persists. — Events and final settlement retain accepted identity and honest billing even when settings change later.
+- [Phase 64]: Reconstruct evicted-run provider context only from validated persisted provider and init metadata. — Current settings and daemon presentation fields cannot relabel or expand an already accepted run.
 
 ### Pending Todos
 
@@ -262,13 +266,13 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T00:32:19.821Z
-Stopped at: Completed 64-08-PLAN.md
+Last session: 2026-07-21T01:26:00.180Z
+Stopped at: Completed 64-09-PLAN.md
 Resume file: None
 
 ## Next Actions
 
-Execute 64-08-PLAN.md next. Interpret the closed policy attestations through the shared verifier, preserve the replay fence, require clean exit and task-tree settlement before terminal results, and retain all accumulated milestone-end UAT items.
+Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and safe per-adapter drift diagnostics while preserving the canonical accepted-run provider context established in Plan 09.
 
 ## Performance Metrics
 
@@ -294,3 +298,4 @@ Execute 64-08-PLAN.md next. Interpret the closed policy attestations through the
 | Phase 64 P06 | 38 min | 2 tasks | 13 files |
 | Phase 64 P07 | 48 min | 3 tasks | 2 files |
 | Phase 64 P08 | 49 min | 3 tasks | 6 files |
+| Phase 64 P09 | 42 min | 3 tasks | 14 files |
