@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -89,6 +90,7 @@ globalThis.document = {
 };
 
 const Feed = require('../extension/ui/delegation-feed.js');
+const DelegationProviders = require('../extension/utils/delegation-providers.js');
 
 const DELEGATION_ID = 'delegation_fixture';
 
@@ -394,6 +396,77 @@ const panelSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.js')
 const htmlSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.html'), 'utf8');
 const cssSource = fs.readFileSync(path.join(root, 'extension/ui/sidepanel.css'), 'utf8');
 
+const delegationProviderScript = '  <script src="../utils/delegation-providers.js"></script>\n';
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+assert.equal((htmlSource.match(/src="\.\.\/utils\/delegation-providers\.js"/g) || []).length, 1,
+  'side panel loads the canonical delegation provider helper exactly once');
+assert(htmlSource.indexOf('../utils/delegation-providers.js') < htmlSource.indexOf('delegation-feed.js')
+    && htmlSource.indexOf('delegation-feed.js') < htmlSource.indexOf('sidepanel.js'),
+  'canonical provider identity loads before both side-panel consumers');
+assert.equal(sha256(htmlSource.replace(delegationProviderScript, '')),
+  '6185330e1d4d978f049684e469f8e8cd842f55086d338685358f9b4e5a7f19ba',
+  'the nonvisual helper dependency is the only side-panel HTML delta');
+assert.equal(sha256(cssSource),
+  '88cdcf60a6a8e5087a3f910e158d5ebb8c81c513c674d19c064a04625b2c16bb',
+  'OpenCode adds no delegated side-panel CSS');
+
+{
+  const context = { FsbDelegationProviders: DelegationProviders };
+  vm.createContext(context);
+  [
+    '_delegationHasExactKeys',
+    '_delegationOwnDataValue',
+    '_delegationCanonicalProvider',
+    '_delegationValidPreflightResponse',
+    '_delegationValidConsentResponse',
+    '_delegationValidTrustResponse'
+  ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
+
+  for (const provider of DelegationProviders.list()) {
+    assert.equal(context._delegationValidPreflightResponse({
+      ok: true, kind: 'agent', providerId: provider.id, providerLabel: provider.label
+    }), true, provider.label + ' preflight identity is accepted');
+    assert.equal(context._delegationValidConsentResponse({
+      ok: true,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      trusted: false,
+      challengeId: 'dch_provider_identity',
+      expiresAt: 12345
+    }), true, provider.label + ' consent identity is accepted');
+    assert.equal(context._delegationValidTrustResponse({
+      ok: true, providerId: provider.id, trusted: true
+    }, provider.id), true, provider.label + ' trust identity is accepted');
+  }
+  assert.equal(context._delegationValidPreflightResponse({
+    ok: true, kind: 'agent', providerId: 'opencode', providerLabel: 'Claude Code'
+  }), false, 'mismatched preflight identity fails closed');
+  assert.equal(context._delegationValidConsentResponse({
+    ok: true,
+    providerId: 'opencode',
+    providerLabel: 'Claude Code',
+    trusted: false,
+    challengeId: 'dch_mismatch',
+    expiresAt: 12345
+  }), false, 'mismatched consent identity fails closed');
+  assert.equal(context._delegationValidTrustResponse({
+    ok: true, providerId: 'claude-code', trusted: true
+  }, 'opencode'), false, 'trust response cannot switch the consent provider');
+
+  let accessorReads = 0;
+  const accessorResponse = { ok: true, kind: 'agent', providerId: 'opencode' };
+  Object.defineProperty(accessorResponse, 'providerLabel', {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return 'OpenCode';
+    }
+  });
+  assert.equal(context._delegationValidPreflightResponse(accessorResponse), false,
+    'provider identity accessors fail closed');
+  assert.equal(accessorReads, 0, 'provider identity accessors are never invoked');
+}
+
 assert(!/innerHTML|insertAdjacentHTML|\.href\s*=|\.src\s*=|setAttribute\(['"](?:href|src|style|on\w+)/.test(feedSource),
   'delegation renderer has no HTML, URL, inline-style, or handler sink');
 assert(feedSource.includes('textContent') && feedSource.includes('createTextNode'),
@@ -464,13 +537,8 @@ assert(reducedMotionCss.includes('.status-dot.running')
 console.log('\n--- Phase 61 consent and human-control contract ---');
 
 [
-  'Let ' + 'Claude Code' + ' control this browser?',
-  'Claude Code may drive FSB browser tools for this task.',
   'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
-  'Allow & start ' + 'Claude Code',
   'Back to message',
-  'Trust ' + 'Claude Code' + ' for future runs',
-  'This turns off confirmation for future ' + 'Claude Code' + ' runs on this browser. You can restore confirmation in Providers.',
   'Delegate a browser task',
   'Choose an agent provider, describe the outcome, and FSB will run it in a background tab.',
   'Take control',
@@ -487,14 +555,11 @@ console.log('\n--- Phase 61 consent and human-control contract ---');
   'Agent run ended after daemon restart',
   'The previous agent process was stopped and was not reattached. Start a new task when the local service is ready.',
   'Start a new task',
-  'Pair this browser before starting Claude Code',
   'FSB can reach the local agent service, but this browser has not been paired with it. Open provider setup, pair this browser, then try this message again.',
   'The selected provider does not support agents that control browser tabs. Choose a supported agent provider, then try this message again.',
   'Choose another provider',
   'Agent could not resume control',
-  'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.',
   'Agent could not finish this task',
-  'Claude Code stopped before the task was complete. Review the error details, then try the same message again.',
   'FSB accepted this run but could not save it, and Stop is not confirmed.',
   'Your original message is still here. Retry Stop to finish cleanup.',
   'Finish the pending agent cleanup in its original tab and conversation before starting another task. Your message was kept.',
@@ -535,6 +600,74 @@ assert(consentRenderSource.includes('heading.tabIndex = -1')
   'consent focus lands programmatically on its heading');
 assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panelSource),
   'Escape follows the same non-starting consent back path');
+
+{
+  function renderConsent(provider) {
+    const run = new TestNode('section');
+    const stateCard = new TestNode('div');
+    const feed = new TestNode('div');
+    const control = new TestNode('div');
+    const context = {
+      document: globalThis.document,
+      _delegationUiState: {
+        mode: 'ready',
+        providerId: provider.id,
+        providerLabel: provider.label,
+        pendingStart: false,
+        pendingTrust: false,
+        errorCode: null
+      },
+      _delegationRunStopControls: [],
+      _clearDelegationElapsedTimer() {},
+      _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
+      _clearDelegationNode(node) { while (node.firstChild) node.removeChild(node.firstChild); },
+      _restoreLegacyStopControl() {},
+      _delegationElement(tag, className, textValue) {
+        const node = new TestNode(tag);
+        node.className = className || '';
+        if (textValue !== undefined) node.textContent = textValue;
+        return node;
+      },
+      _delegationAction(label, className, handler) {
+        const button = new TestNode('button');
+        button.className = 'delegation-action' + (className ? ' ' + className : '');
+        button.textContent = label;
+        button.addEventListener('click', handler);
+        return button;
+      },
+      _renderDelegationInlineError() {},
+      _allowDelegationFromConsent() {},
+      _backToDelegationMessage() {},
+      _setDelegationHeaderStatus() {},
+      _setDelegationComposerLocked() {}
+    };
+    vm.createContext(context);
+    vm.runInContext(consentRenderSource, context);
+    context._renderDelegationConsent({ focusHeading: true });
+    return { stateCard, control };
+  }
+
+  const claudeConsent = renderConsent(DelegationProviders.get('claude-code'));
+  const openCodeConsent = renderConsent(DelegationProviders.get('opencode'));
+  assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].textContent,
+    'Let OpenCode control this browser?');
+  assert(openCodeConsent.stateCard.textContent.includes(
+    'OpenCode may drive FSB browser tools for this task.'));
+  assert(openCodeConsent.stateCard.textContent.includes('Trust OpenCode for future runs'));
+  assert(openCodeConsent.stateCard.textContent.includes(
+    'This turns off confirmation for future OpenCode runs on this browser. You can restore confirmation in Providers.'));
+  assert.deepEqual(findAll(openCodeConsent.stateCard, 'button').map((button) => button.textContent),
+    ['Allow & start OpenCode', 'Back to message']);
+  assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].focusCount, 1,
+    'OpenCode consent retains the existing focused heading');
+  assert.deepEqual(
+    findAll(openCodeConsent.stateCard, 'button').map((button) => button.className),
+    findAll(claudeConsent.stateCard, 'button').map((button) => button.className),
+    'Claude and OpenCode consent reuse identical actions and classes'
+  );
+  assert.equal(openCodeConsent.control.classList.contains('hidden'), true,
+    'consent retains the existing hidden control bar');
+}
 
 console.log('\n--- Phase 61 stop, recovery, and hydration contract ---');
 
@@ -998,6 +1131,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       };
       const context = {
         DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+        FsbDelegationProviders: DelegationProviders,
         _delegationComposerEditRevision: 0,
         _delegationUiState: state,
         chatInput,
@@ -1024,6 +1158,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       vm.createContext(context);
       [
         '_delegationHasExactKeys',
+        '_delegationOwnDataValue',
+        '_delegationCanonicalProvider',
         '_delegationValidPreflightResponse',
         '_delegationValidConsentResponse',
         '_beginDelegationPreflightIntent',
@@ -1093,6 +1229,48 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(needsConsent.state.challengeId, 'challenge_native_wake');
     assert.equal(needsConsent.state.challengeExpiresAt, 12345);
     assert.equal(needsConsent.announcementCalls, 0);
+
+    const openCodeReady = {
+      ok: true,
+      kind: 'agent',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode'
+    };
+    const openCodeConsent = await runSettlementScenario(openCodeReady, {
+      ok: true,
+      providerId: 'opencode',
+      providerLabel: 'OpenCode',
+      trusted: false,
+      challengeId: 'challenge_opencode_wake',
+      expiresAt: 12345
+    });
+    assert.deepEqual(openCodeConsent.starts, []);
+    assert.deepEqual(openCodeConsent.consentRenders, [{ focusHeading: true }]);
+    assert.equal(openCodeConsent.state.providerId, 'opencode');
+    assert.equal(openCodeConsent.state.providerLabel, 'OpenCode');
+    assert.equal(openCodeConsent.state.challengeId, 'challenge_opencode_wake');
+    assert.deepEqual(openCodeConsent.commands, [{
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Keep this task unsent',
+      intentId: 'intent_native_wake_table'
+    }, {
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Keep this task unsent'
+    }], 'OpenCode reuses one provider-free preflight/consent path');
+
+    const mismatchedConsent = await runSettlementScenario(openCodeReady, {
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: false,
+      challengeId: 'challenge_identity_switch',
+      expiresAt: 12345
+    });
+    assert.deepEqual(mismatchedConsent.starts, [], 'mismatched consent cannot start');
+    assert.equal(mismatchedConsent.consentRenders.length, 0,
+      'mismatched consent cannot create a prompt');
+    assert.equal(mismatchedConsent.failures.length, 1,
+      'mismatched consent converges through one existing failure surface');
 
     const failureCases = [
       {
@@ -1349,29 +1527,36 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const starts = [];
     const state = {
       mode: 'consent', pendingTrust: false, pendingStart: false,
-      errorCode: null, challengeId: 'dch_fixture'
+      errorCode: null, challengeId: 'dch_fixture',
+      providerId: 'opencode', providerLabel: 'OpenCode'
     };
     const context = {
+      FsbDelegationProviders: DelegationProviders,
       _delegationUiState: state,
       _renderDelegationConsent() {},
       _sendDelegationCommand(message) {
         commands.push(clone(message));
         return new Promise((resolve) => { resolveTrust = resolve; });
       },
-      _delegationValidTrustResponse: () => true,
       async _beginDelegationStart(challengeId) { starts.push(challengeId); }
     };
     vm.createContext(context);
+    [
+      '_delegationHasExactKeys',
+      '_delegationOwnDataValue',
+      '_delegationCanonicalProvider',
+      '_delegationValidTrustResponse'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
     vm.runInContext(extractNamedFunction(panelSource, '_allowDelegationFromConsent'), context);
     const pending = context._allowDelegationFromConsent({ checked: true });
     assert.deepEqual(commands, [{
       type: 'FSB_DELEGATION_SET_TRUST',
       challengeId: 'dch_fixture',
-      providerId: 'claude-code',
+      providerId: 'opencode',
       trusted: true
     }]);
     assert.equal(starts.length, 0, 'checked trust does not start before trust authority succeeds');
-    resolveTrust({ ok: true, providerId: 'claude-code', trusted: true });
+    resolveTrust({ ok: true, providerId: 'opencode', trusted: true });
     await pending;
     assert.deepEqual(starts, [null], 'trusted flow starts separately with a null caller challenge');
 

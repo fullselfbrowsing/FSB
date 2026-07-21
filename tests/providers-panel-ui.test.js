@@ -87,6 +87,16 @@ const JS = read('extension/ui/options.js');
 const DELEGATION_PROVIDERS = require('../extension/utils/delegation-providers.js');
 const PROVIDERS = require('../extension/ui/providers-panel.js');
 
+const delegationTrustMountSource = extractFunction(JS, 'ensureDelegationTrustControl');
+const delegationTrustRenderSource = extractFunction(JS, 'renderDelegationTrustControl');
+const delegationTrustClearSource = extractFunction(JS, 'clearDelegationTrust');
+assert.doesNotMatch(delegationTrustMountSource, /Claude Code|OpenCode|claude-code|opencode/,
+  'the trust control mount has no provider-specific placeholder');
+assert.match(delegationTrustRenderSource, /provider\.label/,
+  'the existing trust control copy is driven by canonical selected-provider metadata');
+assert.doesNotMatch(delegationTrustClearSource, /['"](?:claude-code|opencode)['"]/,
+  'clear trust contains no fixed provider id');
+
 console.log('Providers panel UI: canonical route and static roster');
 
 assert.match(HTML, /data-section="providers"/);
