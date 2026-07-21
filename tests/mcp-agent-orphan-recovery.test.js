@@ -1992,6 +1992,89 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
     assert.deepEqual(runtime.remaining(), [ambiguousServer]);
   }
 
+  for (const crashState of ['prepared', 'active']) {
+    const state = tempRoot(`policy-preflight-${crashState}`);
+    try {
+      const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
+      const delegationId = `policy_preflight_crash_${crashState}_0001`;
+      const prepared = await runtime.prepareRun(rolePreparedInput(runtime, {
+        role: 'policy_preflight',
+        delegationId,
+        argvSignature: `argv_signature_policy_${crashState}_0001`,
+        envFingerprint: `env_fingerprint_policy_${crashState}_0001`,
+      }));
+      const entry = crashState === 'active'
+        ? await runtime.activateRun({
+            role: 'policy_preflight',
+            delegationId,
+            pid: 45001,
+            processGroupId: 45001,
+            startedAt: 1100,
+            processStartIdentity: 'policy-start-45001',
+          })
+        : prepared.entry;
+      assert.equal(entry.role, 'policy_preflight');
+      assert.equal(entry.state, crashState);
+      assert.deepEqual(runtime.readJournal().journal.entries, [entry]);
+      assert.equal(fs.existsSync(prepared.runDirectory), true);
+      assert.equal(fs.existsSync(prepared.opencodeConfigPath), true);
+
+      let inspections = 0;
+      const terminationCalls = [];
+      const result = await createAgentStartupRecovery({
+        runtimeFiles: runtime,
+        inspector: {
+          async inspect(candidate) {
+            assert.deepEqual(candidate, entry);
+            inspections += 1;
+            return inspections === 1
+              ? confirmedInspection({
+                  pid: 45001,
+                  processGroupId: 45001,
+                  processStartIdentity: 'policy-start-45001',
+                })
+              : staleInspection;
+          },
+        },
+        terminator: {
+          async stop(candidate, child, options) {
+            terminationCalls.push({ candidate, child, options });
+          },
+        },
+        terminationGrace: 25,
+      }).recover();
+
+      assert.deepEqual(result, {
+        confirmedKilled: 1,
+        staleCleared: 0,
+        ambiguousFailClosed: 0,
+        spawnAvailable: true,
+        profiles: [{
+          role: 'policy_preflight',
+          adapterId: 'opencode',
+          profileVersion: '1.14.25',
+          confirmedKilled: 1,
+          staleCleared: 0,
+          ambiguousFailClosed: 0,
+        }],
+        restartLosses: [],
+      });
+      assert.equal(terminationCalls.length, 1);
+      assert.deepEqual(terminationCalls[0], {
+        candidate: entry,
+        child: null,
+        options: { grace: 25 },
+      });
+      assert.equal(inspections, 2);
+      assert.deepEqual(runtime.readJournal().journal.entries, []);
+      assert.equal(fs.existsSync(prepared.runDirectory), false);
+      assert.equal(fs.existsSync(runtime.recoveryPath), false,
+        'infrastructure preflight recovery does not record delegation restart loss');
+    } finally {
+      state.cleanup();
+    }
+  }
+
   {
     const prepared = journalEntry(processTreeModule, 'prepared', {
       delegationId: 'delegation_fixture_0002',
