@@ -2928,5 +2928,5 @@ check(uat6201.includes('pending until a human reviews the comparison during the 
   && fixtureManifest.liveCapturePending === true,
   'genuine capture comparison and schema-derived fixture provenance remain pending');
 
-console.log(`\n=== Phase 61-63 contract results: ${passed} passed, ${failed} failed ===`);
+console.log(`\n=== Phase 61-64 contract results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);
