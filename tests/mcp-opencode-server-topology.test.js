@@ -3,6 +3,8 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { PassThrough, Writable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
@@ -1584,6 +1586,256 @@ async function runPolicyAttestation(supervisorModule) {
   }
 }
 
+function productionAgentDocument(config, opencodeDataRoot) {
+  const shipped = config.agent.fsb;
+  const truncationGlob = path.join(opencodeDataRoot, 'tool-output', '*');
+  return {
+    name: 'fsb',
+    mode: 'primary',
+    description: shipped.description,
+    prompt: shipped.prompt,
+    steps: 40,
+    permission: [
+      { permission: '*', action: 'allow', pattern: '*' },
+      { permission: 'doom_loop', action: 'ask', pattern: '*' },
+      { permission: 'external_directory', pattern: '*', action: 'ask' },
+      { permission: 'external_directory', pattern: truncationGlob, action: 'allow' },
+      { permission: 'question', action: 'deny', pattern: '*' },
+      { permission: 'plan_enter', action: 'deny', pattern: '*' },
+      { permission: 'plan_exit', action: 'deny', pattern: '*' },
+      { permission: 'read', pattern: '*', action: 'allow' },
+      { permission: 'read', pattern: '*.env', action: 'ask' },
+      { permission: 'read', pattern: '*.env.*', action: 'ask' },
+      { permission: 'read', pattern: '*.env.example', action: 'allow' },
+      { permission: '*', action: 'deny', pattern: '*' },
+      { permission: 'external_directory', pattern: '*', action: 'deny' },
+      { permission: 'external_directory', pattern: truncationGlob, action: 'deny' },
+      { permission: 'fsb_*', action: 'allow', pattern: '*' },
+    ],
+    tools: ['fsb_search_capabilities', 'fsb_invoke_capability'],
+    resolvedModel: 'fixture-provider/fixture-model',
+  };
+}
+
+function productionProcessRole(argv) {
+  if (argv.includes('debug')) return 'policy_preflight';
+  if (argv.includes('serve')) return 'owned_server';
+  if (argv.includes('--attach')) return 'attach_task';
+  return 'cold_task';
+}
+
+function makeProductionChild(role, pid, onFinal) {
+  const child = new EventEmitter();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  let closed = false;
+  const close = (exit = { code: 0, signal: null }) => {
+    if (closed) return;
+    closed = true;
+    if (!stdout.readableEnded) stdout.end();
+    if (!stderr.readableEnded) stderr.end();
+    setImmediate(() => child.emit('close', exit.code, exit.signal));
+  };
+  const stdin = new Writable({
+    write(_chunk, _encoding, callback) { setImmediate(callback); },
+    final(callback) {
+      callback();
+      if (onFinal) setImmediate(() => onFinal({ stdout, stderr, close }));
+    },
+  });
+  Object.assign(child, { pid, stdin, stdout, stderr, close, get closed() { return closed; } });
+  queueMicrotask(() => {
+    child.emit('spawn');
+    if (role === 'owned_server') {
+      stdout.write('opencode server listening on http://127.0.0.1:43123\n');
+    }
+  });
+  return child;
+}
+
+async function runProductionComposition(supervisorModule) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-opencode-production-'));
+  const runtimeRoot = path.join(tempRoot, 'agent-runtime');
+  const nativeDataHome = path.join(tempRoot, 'native-data');
+  const opencodeDataRoot = path.join(nativeDataHome, 'opencode');
+  const fixture = fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'fixtures',
+    'agent-streams',
+    'opencode-1.14.25',
+    'contract-stream.jsonl',
+  ));
+  const command = '/fixture/bin/opencode';
+  const spawnCalls = [];
+  const childrenBySignature = new Map();
+  const serverDocuments = new Map();
+  const emitted = [];
+  let nextPid = 61000;
+
+  const inspector = {
+    async inspect(entry) {
+      const child = childrenBySignature.get(entry.argvSignature);
+      if (!child || child.closed) return { classification: 'stale' };
+      return {
+        classification: 'confirmed',
+        process: {
+          pid: child.pid,
+          parentPid: 1,
+          processGroupId: child.pid,
+          processStartIdentity: `production-${child.pid}`,
+          descendants: [],
+        },
+      };
+    },
+  };
+  const terminator = {
+    async stop(entry, supervisedChild) {
+      const child = supervisedChild
+        ? [...childrenBySignature.values()].find((candidate) => candidate.pid === supervisedChild.pid)
+        : childrenBySignature.get(entry.argvSignature);
+      if (child && !child.closed) child.close({ code: null, signal: 'SIGTERM' });
+      if (supervisedChild) await supervisedChild.closed;
+    },
+  };
+
+  const supervisor = supervisorModule.createProductionSpawnSupervisor({
+    endpoint: 'http://127.0.0.1:7226/mcp',
+    cwd: repoRoot,
+    platform: 'linux',
+    runtimeRootPath: runtimeRoot,
+    environment: {
+      PATH: '/fixture/bin',
+      HOME: tempRoot,
+      XDG_DATA_HOME: nativeDataHome,
+      XDG_STATE_HOME: path.join(tempRoot, 'native-state'),
+      SAFE_VALUE: 'retained',
+    },
+    processSeams: {
+      openCodeDetect: async () => ({
+        installed: true,
+        version: '1.14.25',
+        authState: 'unknown',
+        profileVersion: '1.14.25',
+        binary: { command, realPath: command, argvPrefix: [] },
+      }),
+      inspector,
+      terminator,
+      spawn(commandValue, argv, options) {
+        assert.equal(commandValue, command);
+        const role = productionProcessRole(argv);
+        const configPath = path.join(options.env.XDG_CONFIG_HOME, 'opencode', 'opencode.json');
+        assert.equal(fs.existsSync(configPath), true, `${role} config exists before spawn`);
+        assert.equal(fs.existsSync(options.env.OPENCODE_TEST_HOME), true);
+        assert.equal(fs.existsSync(options.env.OPENCODE_TEST_MANAGED_CONFIG_DIR), true);
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const agent = productionAgentDocument(config, opencodeDataRoot);
+        const runtimeId = path.basename(path.dirname(options.env.XDG_CONFIG_HOME));
+        const onFinal = role === 'policy_preflight'
+          ? ({ stdout, close }) => {
+              stdout.write(JSON.stringify(argv.at(-1) === 'config' ? config : agent));
+              close();
+            }
+          : role === 'owned_server'
+            ? null
+            : ({ stdout, close }) => {
+                stdout.write(fixture);
+                close();
+              };
+        const child = makeProductionChild(role, ++nextPid, onFinal);
+        childrenBySignature.set(options.env.FSB_AGENT_ARGV_SIGNATURE, child);
+        spawnCalls.push({ role, runtimeId, argv: [...argv], child });
+        if (role === 'owned_server') {
+          serverDocuments.set('/config', config);
+          serverDocuments.set('/agent', agent);
+        }
+        return child;
+      },
+    },
+    networkSeams: {
+      async requestOwnedServer(options) {
+        if (options.path === '/global/health') {
+          return {
+            statusCode: 200,
+            headers: { 'content-type': 'application/json' },
+            body: Buffer.from(JSON.stringify({ healthy: true, version: '1.14.25' })),
+          };
+        }
+        const document = serverDocuments.get(options.path);
+        assert(document, `owned server policy document ${options.path} exists`);
+        return {
+          statusCode: 200,
+          headers: { 'content-type': 'application/json' },
+          body: Buffer.from(JSON.stringify(document)),
+        };
+      },
+    },
+    terminationGrace: 25,
+  });
+
+  try {
+    const recovery = await supervisor.recover();
+    assert.equal(recovery.spawnAvailable, true);
+    const first = await supervisor.handleExtRequest(
+      startRequest('opencode', 'production composition cold task', 'ext-production-cold'),
+      (event) => emitted.push(event),
+    );
+    assert.equal(first.status, 'succeeded');
+    assert.deepEqual(
+      spawnCalls.map((call) => call.role),
+      ['policy_preflight', 'policy_preflight', 'owned_server', 'cold_task'],
+    );
+    const coldStarted = emitted.find((event) => event.event === 'delegation.started');
+    const coldCall = spawnCalls.find((call) => call.role === 'cold_task');
+    const serverCall = spawnCalls.find((call) => call.role === 'owned_server');
+    assert.equal(coldCall.runtimeId, coldStarted.payload.delegationId);
+    const warmJournal = JSON.parse(fs.readFileSync(
+      path.join(runtimeRoot, 'agent-orphans.json'),
+      'utf8',
+    ));
+    assert.deepEqual(warmJournal.entries.map((entry) => entry.role), ['provider_server']);
+    assert.equal(warmJournal.entries[0].delegationId, serverCall.runtimeId);
+
+    const second = await supervisor.handleExtRequest(
+      startRequest('opencode', 'production composition warm task', 'ext-production-attach'),
+      (event) => emitted.push(event),
+    );
+    assert.equal(second.status, 'succeeded');
+    assert.deepEqual(
+      spawnCalls.map((call) => call.role),
+      [
+        'policy_preflight',
+        'policy_preflight',
+        'owned_server',
+        'cold_task',
+        'policy_preflight',
+        'policy_preflight',
+        'attach_task',
+      ],
+    );
+    assert.equal(spawnCalls.filter((call) => call.role === 'owned_server').length, 1);
+    assert.equal(spawnCalls.at(-1).argv.includes('http://127.0.0.1:43123'), true);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'agent-orphans.json'), 'utf8')).entries.length,
+      1,
+      'task and policy runtimes are removed while the warm server remains owned',
+    );
+
+    await supervisor.close();
+    const closedJournal = JSON.parse(fs.readFileSync(
+      path.join(runtimeRoot, 'agent-orphans.json'),
+      'utf8',
+    ));
+    assert.deepEqual(closedJournal.entries, []);
+    const remainingDirectories = fs.readdirSync(runtimeRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory());
+    assert.deepEqual(remainingDirectories, []);
+  } finally {
+    await supervisor.close().catch(() => undefined);
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   const sectionIndex = process.argv.indexOf('--section');
   const section = sectionIndex >= 0 ? process.argv[sectionIndex + 1] : null;
@@ -1606,6 +1858,9 @@ async function main() {
   if (!section || section === 'terminal-barrier') {
     await runTerminalBarrier(supervisorModule);
   }
+  if (!section || section === 'production-composition') {
+    await runProductionComposition(supervisorModule);
+  }
   if (section && ![
     'selection-replay',
     'owned-health',
@@ -1613,6 +1868,7 @@ async function main() {
     'policy-attestation',
     'task-once',
     'terminal-barrier',
+    'production-composition',
   ].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }

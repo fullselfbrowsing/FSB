@@ -12,7 +12,9 @@ import {
   type ProcessArgument,
   type ProcessRole,
   type ProcessSpec,
+  type SpawnPrivateRuntime,
   type SpawnContext,
+  type SpawnRuntimeScope,
   type SpawnSecretEnvBinding,
   type SpawnSpec,
 } from './adapter.js';
@@ -84,6 +86,18 @@ const CONTEXT_KEYS = Object.freeze([
   'privateMcpConfigPath',
   'runtimeFiles',
 ]);
+const CONTEXT_KEYS_WITH_SCOPES = Object.freeze([...CONTEXT_KEYS, 'runtimeScopes']);
+const RUNTIME_SCOPE_KEYS = Object.freeze([
+  'role',
+  'runtimeId',
+  'privateMcpConfigPath',
+  'runtimeFiles',
+]);
+const RUNTIME_SCOPE_ORDER = Object.freeze([
+  'delegation',
+  'provider_server',
+  'policy_preflight',
+] as const);
 
 const DETECTION_KEYS = Object.freeze([
   'installed',
@@ -112,6 +126,12 @@ export interface OpenCodeProfileRuntime {
 export interface OpenCodeProfile {
   readonly privateArtifacts: readonly RuntimePrivateArtifact[];
   readonly spawnSpec: SpawnSpec;
+}
+
+export interface OpenCodeRoleRuntimes {
+  readonly delegation: OpenCodeProfileRuntime;
+  readonly provider_server: OpenCodeProfileRuntime;
+  readonly policy_preflight: OpenCodeProfileRuntime;
 }
 
 type OwnDataRecord = Readonly<Record<string, unknown>>;
@@ -266,10 +286,16 @@ interface ValidatedContext {
   readonly command: string;
   readonly argvPrefix: readonly string[];
   readonly cwd: string;
+  readonly runtimeScopes: readonly SpawnRuntimeScope[] | null;
 }
 
 function validateContext(ctx: SpawnContext): ValidatedContext {
-  const context = exactRecord(ctx, CONTEXT_KEYS, 'spawn context');
+  const hasRuntimeScopes = Object.hasOwn(ctx, 'runtimeScopes');
+  const context = exactRecord(
+    ctx,
+    hasRuntimeScopes ? CONTEXT_KEYS_WITH_SCOPES : CONTEXT_KEYS,
+    'spawn context',
+  );
   if (ownValue(context, 'adapterId') !== OPENCODE_ADAPTER_ID) {
     throw new Error('OpenCode profile requires the canonical adapter id');
   }
@@ -300,10 +326,55 @@ function validateContext(ctx: SpawnContext): ValidatedContext {
   ) throw new Error('OpenCode profile requires daemon-minted runtime identity');
   absolutePath(ownValue(context, 'privateMcpConfigPath'), 'private MCP config path');
   ownDenseArray(ownValue(context, 'runtimeFiles'), 'runtime files', 8);
+  let runtimeScopes: readonly SpawnRuntimeScope[] | null = null;
+  if (hasRuntimeScopes) {
+    const input = ownDenseArray(ownValue(context, 'runtimeScopes'), 'runtime scopes', 3);
+    if (input.length !== RUNTIME_SCOPE_ORDER.length) {
+      throw new Error('OpenCode runtime scopes are invalid');
+    }
+    const runtimeIds = new Set<string>();
+    runtimeScopes = Object.freeze(input.map((_entry, index) => {
+      const scope = exactRecord(
+        arrayValue(input, index),
+        RUNTIME_SCOPE_KEYS,
+        'runtime scope',
+      );
+      const role = ownValue(scope, 'role');
+      if (role !== RUNTIME_SCOPE_ORDER[index]) {
+        throw new Error('OpenCode runtime scopes are invalid');
+      }
+      const runtimeId = boundedString(ownValue(scope, 'runtimeId'), 'runtime id');
+      if (!/^[A-Za-z0-9_-]{8,128}$/.test(runtimeId) || runtimeIds.has(runtimeId)) {
+        throw new Error('OpenCode runtime scopes are invalid');
+      }
+      runtimeIds.add(runtimeId);
+      const runtimeFiles = ownDenseArray(
+        ownValue(scope, 'runtimeFiles'),
+        'runtime scope files',
+        8,
+      ).map((_path, pathIndex) => absolutePath(
+        arrayValue(
+          ownValue(scope, 'runtimeFiles') as readonly unknown[],
+          pathIndex,
+        ),
+        'runtime scope file',
+      ));
+      return Object.freeze({
+        role,
+        runtimeId,
+        privateMcpConfigPath: absolutePath(
+          ownValue(scope, 'privateMcpConfigPath'),
+          'runtime scope MCP config path',
+        ),
+        runtimeFiles: Object.freeze(runtimeFiles),
+      }) as SpawnRuntimeScope;
+    }));
+  }
   return Object.freeze({
     command,
     argvPrefix: Object.freeze(argvPrefix),
     cwd: absolutePath(ownValue(context, 'cwd'), 'working directory'),
+    runtimeScopes,
   });
 }
 
@@ -334,7 +405,7 @@ function validateEndpoint(value: unknown): string {
 
 function validateRuntime(
   value: OpenCodeProfileRuntime,
-  ctx: SpawnContext,
+  expectedRuntimeFiles: readonly string[],
 ): OpenCodeProfileRuntime {
   const runtime = exactRecord(value, RUNTIME_CONTEXT_KEYS, 'profile runtime');
   const opencodeConfigRoot = absolutePath(
@@ -364,12 +435,7 @@ function validateRuntime(
     || opencodeManagedConfigPath !== join(runDirectory, 'managed-config')
   ) throw new Error('OpenCode private runtime graph is invalid');
 
-  const contextRecord = exactRecord(ctx, CONTEXT_KEYS, 'spawn context');
-  const runtimeFiles = ownDenseArray(
-    ownValue(contextRecord, 'runtimeFiles'),
-    'runtime files',
-    8,
-  );
+  const runtimeFiles = ownDenseArray(expectedRuntimeFiles, 'runtime files', 8);
   const expectedFiles = [opencodeConfigPath, opencodeTestHomePath, opencodeManagedConfigPath];
   if (
     runtimeFiles.length !== expectedFiles.length
@@ -624,13 +690,16 @@ function policyProcess(
 
 function policyAttestations(
   context: ValidatedContext,
-  runtime: OpenCodeProfileRuntime,
+  processRuntime: OpenCodeProfileRuntime,
+  serverRuntime: OpenCodeProfileRuntime,
   prefix: readonly string[],
   privateFiles: readonly string[],
   fixedEnv: Readonly<Record<string, string>>,
 ): readonly AttestationDescriptor[] {
-  const config = configAssertions(runtime);
-  const agent = agentAssertions(runtime);
+  const processConfig = configAssertions(processRuntime);
+  const processAgent = agentAssertions(processRuntime);
+  const serverConfig = configAssertions(serverRuntime);
+  const serverAgent = agentAssertions(serverRuntime);
   const maxBytes = 128 * 1024;
   const timeoutMs = 5_000;
   return Object.freeze([
@@ -645,7 +714,7 @@ function policyAttestations(
       ),
       maxBytes,
       timeoutMs,
-      assertions: config,
+      assertions: processConfig,
     }),
     Object.freeze({
       source: 'process_json' as const,
@@ -658,7 +727,7 @@ function policyAttestations(
       ),
       maxBytes,
       timeoutMs,
-      assertions: agent,
+      assertions: processAgent,
     }),
     Object.freeze({
       source: 'owned_server_json' as const,
@@ -667,7 +736,7 @@ function policyAttestations(
       secretRef: OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
       maxBytes,
       timeoutMs,
-      assertions: config,
+      assertions: serverConfig,
     }),
     Object.freeze({
       source: 'owned_server_json' as const,
@@ -676,7 +745,7 @@ function policyAttestations(
       secretRef: OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
       maxBytes,
       timeoutMs,
-      assertions: agent,
+      assertions: serverAgent,
     }),
   ]);
 }
@@ -727,15 +796,60 @@ export function buildOpenCodeProfile(
   task: AgentTask,
   ctx: SpawnContext,
   runtimeInput: OpenCodeProfileRuntime,
+  roleRuntimesInput?: OpenCodeRoleRuntimes,
 ): OpenCodeProfile {
   const taskText = validateTask(task);
   const context = validateContext(ctx);
-  const runtime = validateRuntime(runtimeInput, ctx);
-  const fixedEnv = fixedEnvironment(runtime);
-  const privateFiles = Object.freeze([
-    runtime.opencodeConfigPath,
-    runtime.opencodeTestHomePath,
-    runtime.opencodeManagedConfigPath,
+  let delegationRuntime: OpenCodeProfileRuntime;
+  let providerServerRuntime: OpenCodeProfileRuntime;
+  let policyPreflightRuntime: OpenCodeProfileRuntime;
+  let privateRuntimes: readonly SpawnPrivateRuntime[] | null = null;
+  if (context.runtimeScopes) {
+    const roleRuntimes = exactRecord(
+      roleRuntimesInput,
+      RUNTIME_SCOPE_ORDER,
+      'role runtimes',
+    );
+    const validated = RUNTIME_SCOPE_ORDER.map((role, index) => validateRuntime(
+      ownValue(roleRuntimes, role) as OpenCodeProfileRuntime,
+      context.runtimeScopes![index].runtimeFiles,
+    ));
+    [delegationRuntime, providerServerRuntime, policyPreflightRuntime] = validated;
+    privateRuntimes = Object.freeze(context.runtimeScopes.map((scope, index) => {
+      const runtime = validated[index];
+      return Object.freeze({
+        role: scope.role,
+        runtimeId: scope.runtimeId,
+        privateFiles: Object.freeze([
+          runtime.opencodeConfigPath,
+          runtime.opencodeTestHomePath,
+          runtime.opencodeManagedConfigPath,
+        ]),
+        privateArtifacts: privateArtifacts(runtime),
+      });
+    }));
+  } else {
+    delegationRuntime = validateRuntime(runtimeInput, ctx.runtimeFiles);
+    providerServerRuntime = delegationRuntime;
+    policyPreflightRuntime = delegationRuntime;
+  }
+  const delegationFixedEnv = fixedEnvironment(delegationRuntime);
+  const providerServerFixedEnv = fixedEnvironment(providerServerRuntime);
+  const policyPreflightFixedEnv = fixedEnvironment(policyPreflightRuntime);
+  const delegationPrivateFiles = Object.freeze([
+    delegationRuntime.opencodeConfigPath,
+    delegationRuntime.opencodeTestHomePath,
+    delegationRuntime.opencodeManagedConfigPath,
+  ]);
+  const providerServerPrivateFiles = Object.freeze([
+    providerServerRuntime.opencodeConfigPath,
+    providerServerRuntime.opencodeTestHomePath,
+    providerServerRuntime.opencodeManagedConfigPath,
+  ]);
+  const policyPreflightPrivateFiles = Object.freeze([
+    policyPreflightRuntime.opencodeConfigPath,
+    policyPreflightRuntime.opencodeTestHomePath,
+    policyPreflightRuntime.opencodeManagedConfigPath,
   ]);
   const prefix = Object.freeze([
     ...context.argvPrefix,
@@ -772,24 +886,24 @@ export function buildOpenCodeProfile(
         command: context.command,
         argv: serverArgv,
         cwd: context.cwd,
-        privateFiles,
-        fixedEnv,
+        privateFiles: providerServerPrivateFiles,
+        fixedEnv: providerServerFixedEnv,
       }),
       coldTask: processSpec({
         role: 'cold_task',
         command: context.command,
         argv: coldArgv,
         cwd: context.cwd,
-        privateFiles,
-        fixedEnv,
+        privateFiles: delegationPrivateFiles,
+        fixedEnv: delegationFixedEnv,
       }),
       attachTask: processSpec({
         role: 'attach_task',
         command: context.command,
         argv: attachArgv,
         cwd: context.cwd,
-        privateFiles,
-        fixedEnv,
+        privateFiles: delegationPrivateFiles,
+        fixedEnv: delegationFixedEnv,
       }),
       readiness: {
         linePrefix: 'opencode server listening on http://127.0.0.1:',
@@ -802,9 +916,17 @@ export function buildOpenCodeProfile(
         generation: 'daemon_generation',
       },
     },
-    attestations: policyAttestations(context, runtime, prefix, privateFiles, fixedEnv),
+    attestations: policyAttestations(
+      context,
+      policyPreflightRuntime,
+      providerServerRuntime,
+      prefix,
+      policyPreflightPrivateFiles,
+      policyPreflightFixedEnv,
+    ),
+    ...(privateRuntimes ? { privateRuntimes } : {}),
   });
-  const artifacts = privateArtifacts(runtime);
+  const artifacts = privateArtifacts(delegationRuntime);
   const profile = Object.freeze({ privateArtifacts: artifacts, spawnSpec });
   if (!taskAbsent(taskText, profile)) {
     throw new Error('Agent task crossed the OpenCode stdin-only boundary');

@@ -55,6 +55,30 @@ export interface SpawnContext {
   readonly cwd: string;
   readonly privateMcpConfigPath: string;
   readonly runtimeFiles: readonly string[];
+  /** Optional role-scoped runtime graphs minted by the supervisor. */
+  readonly runtimeScopes?: readonly SpawnRuntimeScope[];
+}
+
+export type SpawnRuntimeRole = 'delegation' | 'provider_server' | 'policy_preflight';
+
+export interface SpawnRuntimeScope {
+  readonly role: SpawnRuntimeRole;
+  readonly runtimeId: string;
+  readonly privateMcpConfigPath: string;
+  readonly runtimeFiles: readonly string[];
+}
+
+export type SpawnPrivateArtifact =
+  | Readonly<{ kind: 'mcp_config'; endpoint: string }>
+  | Readonly<{ kind: 'opencode_config'; contents: string }>
+  | Readonly<{ kind: 'opencode_test_home' }>
+  | Readonly<{ kind: 'opencode_managed_config' }>;
+
+export interface SpawnPrivateRuntime {
+  readonly role: SpawnRuntimeRole;
+  readonly runtimeId: string;
+  readonly privateFiles: readonly string[];
+  readonly privateArtifacts: readonly SpawnPrivateArtifact[];
 }
 
 export const OPENCODE_SERVER_PASSWORD_ENV_KEY = 'OPENCODE_SERVER_PASSWORD' as const;
@@ -189,6 +213,7 @@ export interface SpawnSpec {
   readonly profileVersion: string;
   readonly topology: SpawnTopology;
   readonly attestations: readonly AttestationDescriptor[];
+  readonly privateRuntimes?: readonly SpawnPrivateRuntime[];
 }
 
 export type AgentEventType =
@@ -239,6 +264,8 @@ const MAX_PROCESS_ARGUMENTS = 256;
 const MAX_PRIVATE_FILES = 128;
 const MAX_FIXED_ENV_ENTRIES = 128;
 const MAX_ATTESTATIONS = 32;
+const MAX_PRIVATE_RUNTIMES = 3;
+const MAX_PRIVATE_ARTIFACTS = 4;
 const MAX_ASSERTIONS = 128;
 const MAX_PATH_SEGMENTS = 32;
 const MAX_ATTESTATION_BYTES = 1024 * 1024;
@@ -664,6 +691,75 @@ function cloneAttestations(value: unknown): readonly AttestationDescriptor[] {
   )));
 }
 
+function clonePrivateArtifact(value: unknown): SpawnPrivateArtifact {
+  const base = ownDataRecord(value, 'private runtime artifact');
+  const kind = ownValue(base, 'kind');
+  if (kind === 'mcp_config') {
+    const record = exactRecord(value, ['kind', 'endpoint'], 'MCP runtime artifact');
+    return Object.freeze({
+      kind,
+      endpoint: boundedString(ownValue(record, 'endpoint'), 'MCP runtime endpoint'),
+    });
+  }
+  if (kind === 'opencode_config') {
+    const record = exactRecord(value, ['kind', 'contents'], 'OpenCode config artifact');
+    const contents = boundedString(ownValue(record, 'contents'), 'OpenCode config artifact');
+    if (Buffer.byteLength(contents, 'utf8') > 128 * 1024) {
+      invalidContract('OpenCode config artifact');
+    }
+    return Object.freeze({ kind, contents });
+  }
+  if (kind === 'opencode_test_home' || kind === 'opencode_managed_config') {
+    exactRecord(value, ['kind'], 'OpenCode directory artifact');
+    return Object.freeze({ kind });
+  }
+  invalidContract('private runtime artifact kind');
+}
+
+function clonePrivateRuntimes(value: unknown): readonly SpawnPrivateRuntime[] {
+  const input = ownDataArray(value, 'private runtimes', MAX_PRIVATE_RUNTIMES);
+  const roles = new Set<SpawnRuntimeRole>();
+  const runtimeIds = new Set<string>();
+  const result = input.map((_entry, index): SpawnPrivateRuntime => {
+    const record = exactRecord(
+      arrayValue(input, index, 'private runtimes'),
+      ['role', 'runtimeId', 'privateFiles', 'privateArtifacts'],
+      'private runtime',
+    );
+    const role = ownValue(record, 'role');
+    if (role !== 'delegation' && role !== 'provider_server' && role !== 'policy_preflight') {
+      invalidContract('private runtime role');
+    }
+    const typedRole = role as SpawnRuntimeRole;
+    const runtimeId = boundedString(ownValue(record, 'runtimeId'), 'private runtime id');
+    if (
+      !/^[A-Za-z0-9_-]{8,128}$/.test(runtimeId)
+      || roles.has(typedRole)
+      || runtimeIds.has(runtimeId)
+    ) invalidContract('private runtime identity');
+    roles.add(typedRole);
+    runtimeIds.add(runtimeId);
+    const artifacts = ownDataArray(
+      ownValue(record, 'privateArtifacts'),
+      'private runtime artifacts',
+      MAX_PRIVATE_ARTIFACTS,
+    );
+    return Object.freeze({
+      role: typedRole,
+      runtimeId,
+      privateFiles: cloneStringArray(
+        ownValue(record, 'privateFiles'),
+        'private runtime files',
+        MAX_PRIVATE_FILES,
+      ),
+      privateArtifacts: Object.freeze(artifacts.map((_artifact, artifactIndex) => (
+        clonePrivateArtifact(arrayValue(artifacts, artifactIndex, 'private runtime artifacts'))
+      ))),
+    });
+  });
+  return Object.freeze(result);
+}
+
 function cloneTopology(value: unknown): SpawnTopology {
   const base = ownDataRecord(value, 'spawn topology');
   const kind = ownValue(base, 'kind');
@@ -748,17 +844,23 @@ export function freezeSpawnSpec(spec: Readonly<{
 export function freezeSpawnSpec(spec: unknown): SpawnSpec {
   const base = ownDataRecord(spec, 'spawn spec');
   if (Object.hasOwn(base, 'topology')) {
+    const hasPrivateRuntimes = Object.hasOwn(base, 'privateRuntimes');
     const record = exactRecord(
       spec,
-      ['adapterId', 'profileVersion', 'topology', 'attestations'],
+      hasPrivateRuntimes
+        ? ['adapterId', 'profileVersion', 'topology', 'attestations', 'privateRuntimes']
+        : ['adapterId', 'profileVersion', 'topology', 'attestations'],
       'spawn spec',
     );
-    return Object.freeze({
+    const frozen = {
       adapterId: cloneAdapterId(ownValue(record, 'adapterId')),
       profileVersion: boundedString(ownValue(record, 'profileVersion'), 'profile version'),
       topology: cloneTopology(ownValue(record, 'topology')),
       attestations: cloneAttestations(ownValue(record, 'attestations')),
-    });
+    };
+    return Object.freeze(hasPrivateRuntimes
+      ? { ...frozen, privateRuntimes: clonePrivateRuntimes(ownValue(record, 'privateRuntimes')) }
+      : frozen);
   }
   const legacy = exactRecord(spec, [
     'adapterId',

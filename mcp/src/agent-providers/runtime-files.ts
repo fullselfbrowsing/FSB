@@ -42,7 +42,11 @@ const SECRET_VALUE_PATTERNS = Object.freeze([
   /\b(?:AUTHORIZATION|PASSWORD|RAW_SECRET|SECRET|TOKEN)_CANARY(?:_|\b)/i,
 ]);
 
-const RUNTIME_ROLES = Object.freeze(['delegation', 'provider_server'] as const);
+const RUNTIME_ROLES = Object.freeze([
+  'delegation',
+  'provider_server',
+  'policy_preflight',
+] as const);
 const PRIVATE_ARTIFACT_KINDS = Object.freeze([
   'mcp_config',
   'opencode_config',
@@ -415,11 +419,15 @@ function isAbsoluteBoundedPath(value: unknown): value is string {
 }
 
 function isRuntimeRole(value: unknown): value is RuntimeRole {
-  return value === 'delegation' || value === 'provider_server';
+  return value === 'delegation'
+    || value === 'provider_server'
+    || value === 'policy_preflight';
 }
 
 function isAllowedRoleAdapter(role: RuntimeRole, adapterId: unknown): adapterId is AgentProviderId {
-  if (role === 'provider_server') return adapterId === OPENCODE_ADAPTER_ID;
+  if (role === 'provider_server' || role === 'policy_preflight') {
+    return adapterId === OPENCODE_ADAPTER_ID;
+  }
   return adapterId === CLAUDE_CODE_ADAPTER_ID || adapterId === OPENCODE_ADAPTER_ID;
 }
 
@@ -1123,7 +1131,10 @@ export class AgentRuntimeFiles {
   }
 
   removeRecoveredRun(entry: JournalEntry): Promise<void> {
-    if ((!isPreparedEntry(entry) && !isActiveEntry(entry)) || entry.role !== 'provider_server') {
+    if (
+      (!isPreparedEntry(entry) && !isActiveEntry(entry))
+      || entry.role === 'delegation'
+    ) {
       return Promise.reject(
         new RuntimeFilesError('invalid_runtime_input', 'Recovered runtime state is invalid'),
       );
@@ -1582,7 +1593,7 @@ class JournalStartupRecovery implements AgentStartupRecovery {
     entry: JournalEntry,
     restartLosses: readonly AgentRestartLossDisposition[],
   ): Promise<readonly AgentRestartLossDisposition[]> {
-    if (entry.role === 'provider_server') {
+    if (entry.role !== 'delegation') {
       return this.dependencies.runtimeFiles.removeRecoveredRun(entry).then(() => restartLosses);
     }
     const recoveredAt = this.dependencies.now();

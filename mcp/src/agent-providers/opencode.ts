@@ -10,14 +10,18 @@ import {
 } from './adapter.js';
 import { createOpenCodeDetector } from './opencode-detect.js';
 import {
+  buildOpenCodeProfile,
   buildOpenCodeSpawnSpec,
   type OpenCodeProfileRuntime,
 } from './opencode-profile.js';
+import type { SpawnRuntimeRole, SpawnRuntimeScope } from './adapter.js';
 import { parseOpenCodeEvents } from './opencode-stream.js';
 
 export type OpenCodeDetectionDependency = () => Promise<AdapterDetection>;
 export type OpenCodeProfileRuntimeDependency = (
   context: SpawnContext,
+  role?: SpawnRuntimeRole,
+  scope?: SpawnRuntimeScope,
 ) => OpenCodeProfileRuntime;
 export type OpenCodeParserDependency = (
   stream: NodeJS.ReadableStream,
@@ -79,7 +83,28 @@ export function createOpenCodeAdapter(
     },
 
     async buildSpawn(task: AgentTask, ctx: SpawnContext): Promise<SpawnSpec> {
-      return buildOpenCodeSpawnSpec(task, ctx, resolveProfileRuntime(ctx));
+      const scopes = ctx.runtimeScopes;
+      if (!scopes) {
+        return buildOpenCodeSpawnSpec(task, ctx, resolveProfileRuntime(ctx));
+      }
+      const scopeByRole = new Map(scopes.map((scope) => [scope.role, scope]));
+      const delegation = scopeByRole.get('delegation');
+      const providerServer = scopeByRole.get('provider_server');
+      const policyPreflight = scopeByRole.get('policy_preflight');
+      if (!delegation || !providerServer || !policyPreflight) {
+        throw new TypeError('OpenCode profile runtime scopes are unavailable');
+      }
+      const delegationRuntime = resolveProfileRuntime(ctx, 'delegation', delegation);
+      return buildOpenCodeProfile(
+        task,
+        ctx,
+        delegationRuntime,
+        {
+          delegation: delegationRuntime,
+          provider_server: resolveProfileRuntime(ctx, 'provider_server', providerServer),
+          policy_preflight: resolveProfileRuntime(ctx, 'policy_preflight', policyPreflight),
+        },
+      ).spawnSpec;
     },
 
     parseEvents(stream: NodeJS.ReadableStream): AsyncIterable<AgentEvent> {

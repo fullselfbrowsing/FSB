@@ -7,7 +7,7 @@ import {
 } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { request as nodeHttpRequest } from 'node:http';
-import { isAbsolute } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { z } from 'zod';
 import type {
@@ -18,6 +18,9 @@ import type {
   AttestationDescriptor,
   ChildExit,
   ProcessSpec,
+  SpawnPrivateRuntime,
+  SpawnRuntimeRole,
+  SpawnRuntimeScope,
   SpawnSecretEnvBinding,
   SpawnSpec,
   SupervisedChild,
@@ -35,7 +38,10 @@ import {
   freezeAgentEvent,
   type AgentProtocolDriftReason,
 } from './protocol-drift.js';
-import type { AgentProviderRegistry } from './registry.js';
+import type {
+  AgentProviderRegistry,
+  ProductionAdapterRegistryDependencies,
+} from './registry.js';
 import { createProductionAdapterRegistry } from './registry.js';
 import type {
   ActiveJournalEntry,
@@ -295,6 +301,7 @@ export interface SpawnSupervisorDependencies {
   readonly wait?: (milliseconds: number) => Promise<void>;
   readonly mintDelegationId?: () => string;
   readonly mintFingerprint?: () => string;
+  readonly mintRuntimeId?: (role: Exclude<SpawnRuntimeRole, 'delegation'>) => string;
   readonly mintGeneration?: () => string;
   readonly signalProcessGroup?: (
     negativeProcessGroupId: number,
@@ -318,6 +325,16 @@ export interface ProductionSpawnSupervisorOptions {
   readonly environment?: NodeJS.ProcessEnv;
   readonly terminationGrace?: number;
   readonly onDegraded?: SpawnSupervisorDependencies['onDegraded'];
+  readonly runtimeRootPath?: string;
+  readonly processSeams?: Readonly<{
+    openCodeDetect?: ProductionAdapterRegistryDependencies['openCodeDetect'];
+    spawn?: AgentSpawnDependency;
+    inspector?: ProcessInspector;
+    terminator?: ProcessTreeTerminator;
+  }>;
+  readonly networkSeams?: Readonly<{
+    requestOwnedServer?: OwnedServerHttpRequestDependency;
+  }>;
 }
 
 interface RunTerminalResult {
@@ -913,6 +930,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly wait: (milliseconds: number) => Promise<void>;
   private readonly mintDelegationId: () => string;
   private readonly mintFingerprint: () => string;
+  private readonly mintRuntimeId: (role: Exclude<SpawnRuntimeRole, 'delegation'>) => string;
   private readonly generation: string;
   private readonly signalProcessGroup: NonNullable<SpawnSupervisorDependencies['signalProcessGroup']>;
   private readonly inspectProcessGroupStatus: ProcessGroupStatusInspector;
@@ -952,6 +970,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ?? (() => `delegation_${randomBytes(16).toString('base64url')}`);
     this.mintFingerprint = dependencies.mintFingerprint
       ?? (() => randomBytes(32).toString('base64url'));
+    this.mintRuntimeId = dependencies.mintRuntimeId
+      ?? ((role) => `${role}_${randomBytes(16).toString('base64url')}`);
     this.generation = (dependencies.mintGeneration ?? randomUUID)();
     this.signalProcessGroup = dependencies.signalProcessGroup
       ?? ((negativeProcessGroupId, signal) => process.kill(negativeProcessGroupId, signal));
@@ -1124,6 +1144,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
 
       const runtimeFingerprint = this.uniqueFingerprint();
       const paths = this.dependencies.runtimeFiles.pathsFor(run.delegationId);
+      const runtimeScopes = Object.freeze([
+        this.runtimeScope('delegation', run.delegationId),
+        this.runtimeScope('provider_server', this.uniqueRuntimeId('provider_server')),
+        this.runtimeScope('policy_preflight', this.uniqueRuntimeId('policy_preflight')),
+      ]);
+      if (new Set(runtimeScopes.map((scope) => scope.runtimeId)).size !== runtimeScopes.length) {
+        throw new Error('Unable to mint private runtime identity');
+      }
       run.runtimeOwned = true;
       const declaredSpec = await run.adapter.buildSpawn({ text: run.task }, {
         adapterId: run.adapterId,
@@ -1133,10 +1161,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         cwd: this.cwd,
         privateMcpConfigPath: paths.mcpConfigPath,
         runtimeFiles: [paths.mcpConfigPath],
+        runtimeScopes,
       });
       this.throwIfStopped(run);
       const spec = freezeSpawnSpec(declaredSpec);
-      this.validateSpawnSpec(run, detection, spec);
+      this.validateSpawnSpec(run, detection, spec, runtimeScopes);
       let process: ProcessSpec;
       let argv: readonly string[];
       if (spec.topology.kind === 'direct') {
@@ -1150,7 +1179,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           spec.attestations,
           'process_json',
           null,
-          runtimeFingerprint,
+          spec.privateRuntimes,
         );
         this.throwIfStopped(run);
         const selection = await this.selectOwnedServerTask(
@@ -1160,6 +1189,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           spec.profileVersion,
           this.configurationDigest(spec),
           spec.attestations,
+          spec.privateRuntimes,
         );
         process = selection.process;
         argv = selection.argv;
@@ -1167,6 +1197,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.throwIfStopped(run);
       const argvSignature = createArgvSignature(process.command, argv);
       const createdAt = this.wallNow();
+      const delegationRuntime = this.privateRuntime(spec, 'delegation');
       const prepared = process.role === 'direct_task'
         ? await this.dependencies.runtimeFiles.prepareRun({
             delegationId: run.delegationId,
@@ -1190,9 +1221,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
             fixedEnv: process.fixedEnv,
             envFingerprint: runtimeFingerprint,
             generation: this.generation,
-            privateArtifacts: Object.freeze([]),
+            privateArtifacts: delegationRuntime?.privateArtifacts ?? Object.freeze([]),
           });
       run.entry = prepared.entry;
+      run.runtimeOwned = true;
       this.throwIfStopped(run);
 
       const environment = this.createEnvironment(process.fixedEnv, argvSignature);
@@ -1333,6 +1365,40 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     return value;
   }
 
+  private uniqueRuntimeId(role: Exclude<SpawnRuntimeRole, 'delegation'>): string {
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const value = this.mintRuntimeId(role);
+      if (
+        DELEGATION_ID_PATTERN.test(value)
+        && value !== this.ownedServerLease?.entry.delegationId
+        && !this.activeRuns.has(value)
+        && !this.completedRuns.has(value)
+      ) return value;
+    }
+    throw new Error('Unable to mint private runtime identity');
+  }
+
+  private runtimeScope(role: SpawnRuntimeRole, runtimeId: string): SpawnRuntimeScope {
+    const paths = this.dependencies.runtimeFiles.pathsFor(runtimeId);
+    return Object.freeze({
+      role,
+      runtimeId,
+      privateMcpConfigPath: paths.mcpConfigPath,
+      runtimeFiles: Object.freeze([
+        paths.opencodeConfigPath,
+        paths.opencodeTestHomePath,
+        paths.opencodeManagedConfigPath,
+      ]),
+    });
+  }
+
+  private privateRuntime(
+    spec: SpawnSpec,
+    role: SpawnRuntimeRole,
+  ): SpawnPrivateRuntime | null {
+    return spec.privateRuntimes?.find((runtime) => runtime.role === role) ?? null;
+  }
+
   private requireDirectProcess(spec: SpawnSpec): ProcessSpec {
     if (
       !spec
@@ -1351,6 +1417,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     run: DelegationRun,
     detection: AdapterDetection & { binary: NonNullable<AdapterDetection['binary']> },
     spec: SpawnSpec,
+    runtimeScopes: readonly SpawnRuntimeScope[],
   ): void {
     const topologyProcesses = spec.topology.kind === 'direct'
       ? [spec.topology.task]
@@ -1359,6 +1426,28 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       attestation.source === 'process_json' ? [attestation.process] : []
     ));
     const processes = [...topologyProcesses, ...attestationProcesses];
+    const privateRuntimes = spec.privateRuntimes ?? Object.freeze([]);
+    if (privateRuntimes.length > 0) {
+      if (
+        privateRuntimes.length !== runtimeScopes.length
+        || privateRuntimes.some((runtime, index) => (
+          runtime.role !== runtimeScopes[index].role
+          || runtime.runtimeId !== runtimeScopes[index].runtimeId
+          || JSON.stringify(runtime.privateFiles) !== JSON.stringify(runtimeScopes[index].runtimeFiles)
+          || runtime.privateArtifacts.length === 0
+        ))
+        || processes.some((process) => {
+          const role: SpawnRuntimeRole = process.role === 'owned_server'
+            ? 'provider_server'
+            : process.role === 'policy_preflight'
+              ? 'policy_preflight'
+              : 'delegation';
+          const runtime = privateRuntimes.find((candidate) => candidate.role === role);
+          return !runtime
+            || JSON.stringify(process.privateFiles) !== JSON.stringify(runtime.privateFiles);
+        })
+      ) throw new Error('adapter_unavailable');
+    }
     if (
       spec.adapterId !== run.adapterId
       || spec.profileVersion !== detection.profileVersion
@@ -1374,6 +1463,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     const serialized = safeJson({
       topology: spec.topology,
       attestations: spec.attestations,
+      privateRuntimes,
     });
     const sensitive = [run.task, ...PROVIDER_KEY_NAMES.map((name) => this.environment[name] ?? '')];
     if (!serialized || containsSensitiveValue(serialized, sensitive)) {
@@ -1468,6 +1558,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     profileVersion: string,
     configurationDigest: string,
     attestations: readonly AttestationDescriptor[],
+    privateRuntimes: readonly SpawnPrivateRuntime[] | undefined,
   ): Promise<Readonly<{ process: ProcessSpec; argv: readonly string[] }>> {
     this.requireOwnedServerTopology(topology);
     const topologyKey = this.topologyKey(topology, profileVersion, configurationDigest);
@@ -1491,6 +1582,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         topologyKey,
         configurationDigest,
         attestations,
+        privateRuntimes,
       );
     } catch (error) {
       if (error instanceof PolicyAttestationFailure) throw error;
@@ -1585,18 +1677,17 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     descriptors: readonly AttestationDescriptor[],
     source: AttestationDescriptor['source'],
     endpoint: string | null,
-    runtimeFingerprint: string | null,
+    privateRuntimes: readonly SpawnPrivateRuntime[] | undefined,
   ): Promise<void> {
     for (const descriptor of descriptors) {
       if (descriptor.source !== source) continue;
       try {
         let document: unknown;
         if (descriptor.source === 'process_json') {
-          if (runtimeFingerprint === null) throw new PolicyAttestationFailure();
           document = await this.executeProcessJsonAttestation(
             run,
             descriptor,
-            runtimeFingerprint,
+            privateRuntimes?.find((runtime) => runtime.role === 'policy_preflight') ?? null,
           );
         } else if (descriptor.source === 'owned_server_json') {
           if (endpoint === null) throw new PolicyAttestationFailure();
@@ -1620,7 +1711,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private async executeProcessJsonAttestation(
     run: DelegationRun,
     descriptor: Extract<AttestationDescriptor, { source: 'process_json' }>,
-    runtimeFingerprint: string,
+    privateRuntime: SpawnPrivateRuntime | null,
   ): Promise<unknown> {
     const process = descriptor.process;
     const argv = directProcessArguments(process);
@@ -1635,6 +1726,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     ) throw new PolicyAttestationFailure();
 
     const argvSignature = createArgvSignature(process.command, argv);
+    const runtimeFingerprint = this.uniqueFingerprint();
     const environment = this.createEnvironment(process.fixedEnv, argvSignature);
     environment.FSB_AGENT_FINGERPRINT = runtimeFingerprint;
     const options: SpawnInvocationOptions = Object.freeze({
@@ -1646,24 +1738,31 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       env: environment,
     });
     const createdAt = this.wallNow();
-    let entry: JournalEntry = Object.freeze({
-      state: 'prepared' as const,
-      role: 'delegation' as const,
-      delegationId: run.delegationId,
-      adapterId: run.adapterId,
-      profileVersion: run.profileVersion,
-      createdAt,
-      binaryRealPath: process.command,
-      argvSignature,
-      fixedEnv: process.fixedEnv,
-      envFingerprint: runtimeFingerprint,
-      generation: this.generation,
-    });
+    const runtimeId = privateRuntime?.runtimeId ?? this.uniqueRuntimeId('policy_preflight');
+    let entry: JournalEntry | null = null;
     let child: ChildProcessWithoutNullStreams | null = null;
     let supervisedChild: SupervisedChild | null = null;
     let body: Buffer | null = null;
     let treeStopAttempted = false;
+    let treeSettled = false;
+    let runtimePrepared = false;
+    let runtimeRemoved = false;
     try {
+      const prepared = await this.dependencies.runtimeFiles.prepareRun({
+        role: 'policy_preflight',
+        delegationId: runtimeId,
+        adapterId: run.adapterId,
+        profileVersion: run.profileVersion,
+        createdAt,
+        binaryRealPath: process.command,
+        argvSignature,
+        fixedEnv: process.fixedEnv,
+        envFingerprint: runtimeFingerprint,
+        generation: this.generation,
+        privateArtifacts: privateRuntime?.privateArtifacts ?? Object.freeze([]),
+      });
+      entry = prepared.entry;
+      runtimePrepared = true;
       child = this.spawnChild(process.command, argv, options);
       if (!Number.isSafeInteger(child.pid) || (child.pid ?? 0) < 1) {
         throw new PolicyAttestationFailure();
@@ -1688,14 +1787,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         throw new PolicyAttestationFailure();
       }
       const identity = await this.resolveActivation(entry as PreparedJournalEntry, supervisedChild.pid);
-      entry = Object.freeze({
-        ...entry,
-        state: 'active' as const,
+      entry = await this.dependencies.runtimeFiles.activateRun({
+        role: 'policy_preflight',
+        delegationId: runtimeId,
         pid: supervisedChild.pid,
         processGroupId: identity.process.processGroupId,
         startedAt: Math.max(createdAt, this.wallNow()),
         processStartIdentity: identity.process.processStartIdentity,
-      }) as ActiveJournalEntry;
+      });
       this.entriesByPid.set(supervisedChild.pid, entry);
       const [boundedBody, discardedStderr, exit] = await this.withDeadline(
         Promise.all([stdout, stderr, observed.closed]),
@@ -1712,10 +1811,16 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           supervisedChild,
           { grace: this.terminationGrace },
         );
+        treeSettled = true;
       } catch {
         this.markDegraded('tree_unsettled');
         throw new TreeUnsettledError();
       }
+      await this.dependencies.runtimeFiles.removeRun({
+        delegationId: runtimeId,
+        role: 'policy_preflight',
+      });
+      runtimeRemoved = true;
       return this.parseJsonDocument(body);
     } catch (error) {
       if (!treeStopAttempted && entry && supervisedChild) {
@@ -1726,16 +1831,40 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
             supervisedChild,
             { grace: this.terminationGrace },
           );
+          treeSettled = true;
         } catch {
           this.markDegraded('tree_unsettled');
           throw new TreeUnsettledError();
+        }
+      }
+      if (runtimePrepared && treeSettled && !runtimeRemoved) {
+        try {
+          await this.dependencies.runtimeFiles.removeRun({
+            delegationId: runtimeId,
+            role: 'policy_preflight',
+          });
+          runtimeRemoved = true;
+        } catch {
+          this.markDegraded('runtime_cleanup_failed');
+        }
+      } else if (runtimePrepared && !supervisedChild) {
+        try {
+          await this.dependencies.runtimeFiles.removeRun({
+            delegationId: runtimeId,
+            role: 'policy_preflight',
+          });
+          runtimeRemoved = true;
+        } catch {
+          this.markDegraded('runtime_cleanup_failed');
         }
       }
       if (error instanceof TreeUnsettledError) throw error;
       throw new PolicyAttestationFailure();
     } finally {
       if (body) body.fill(0);
-      if (supervisedChild) this.entriesByPid.delete(supervisedChild.pid);
+      if (supervisedChild && (!runtimePrepared || runtimeRemoved)) {
+        this.entriesByPid.delete(supervisedChild.pid);
+      }
     }
   }
 
@@ -2262,6 +2391,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topologyKey: string,
     configurationDigest: string,
     attestations: readonly AttestationDescriptor[],
+    privateRuntimes: readonly SpawnPrivateRuntime[] | undefined,
   ): Promise<OwnedServerLease | null> {
     const retained = this.ownedServerLease;
     if (
@@ -2289,6 +2419,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         topologyKey,
         configurationDigest,
         attestations,
+        privateRuntimes,
       );
     })();
     this.ownedServerWarmPromise = operation;
@@ -2311,13 +2442,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     topologyKey: string,
     configurationDigest: string,
     attestations: readonly AttestationDescriptor[],
+    privateRuntimes: readonly SpawnPrivateRuntime[] | undefined,
   ): Promise<OwnedServerLease | null> {
     const process = topology.server;
     const binding = process.spawnSecretEnvBindings[0];
     if (!binding) return null;
     const secretRef = binding.secretRef;
     const argv = this.resolveProcessArguments(process, null);
-    const serverId = `provider_server_${randomBytes(16).toString('base64url')}`;
+    const providerRuntime = privateRuntimes?.find(
+      (runtime) => runtime.role === 'provider_server',
+    ) ?? null;
+    const serverId = providerRuntime?.runtimeId
+      ?? `provider_server_${randomBytes(16).toString('base64url')}`;
     const runtimeFingerprint = this.uniqueFingerprint();
     const fixedEnv = Object.freeze({
       ...process.fixedEnv,
@@ -2341,7 +2477,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         fixedEnv,
         envFingerprint: runtimeFingerprint,
         generation: this.generation,
-        privateArtifacts: Object.freeze([]),
+        privateArtifacts: providerRuntime?.privateArtifacts ?? Object.freeze([]),
       });
       entry = prepared.entry;
       const environment = this.createEnvironment(fixedEnv, argvSignature);
@@ -2404,7 +2540,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         attestations,
         'owned_server_json',
         endpoint,
-        null,
+        privateRuntimes,
       );
       if (!this.accepting) throw new Error('daemon_shutdown');
       child.stdout.resume();
@@ -3078,11 +3214,23 @@ export function createProductionSpawnSupervisor(
   options: ProductionSpawnSupervisorOptions,
 ): SpawnSupervisor {
   const platform = options.platform ?? process.platform;
-  const runtimeFiles = createAgentRuntimeFiles({ platform });
-  const inspector = createProcessInspector({ platform });
+  const runtimeFiles = createAgentRuntimeFiles({
+    platform,
+    ...(options.runtimeRootPath ? { rootPath: options.runtimeRootPath } : {}),
+  });
+  const inspector = options.processSeams?.inspector ?? createProcessInspector({ platform });
   const inspectProcessGroupStatus = createProcessGroupStatusInspector(platform);
-  const terminator = createProcessTreeTerminator({ platform, inspector });
+  const terminator = options.processSeams?.terminator
+    ?? createProcessTreeTerminator({ platform, inspector });
   const generation = randomUUID();
+  const environment = options.environment ?? process.env;
+  const dataHome = environment.XDG_DATA_HOME;
+  const home = environment.HOME;
+  const opencodeDataRoot = typeof dataHome === 'string' && isAbsolute(dataHome)
+    ? join(dataHome, 'opencode')
+    : typeof home === 'string' && isAbsolute(home)
+      ? join(home, '.local', 'share', 'opencode')
+      : null;
   const startupRecovery = createAgentStartupRecovery({
     runtimeFiles,
     inspector,
@@ -3094,6 +3242,21 @@ export function createProductionSpawnSupervisor(
 
   let supervisor: SpawnSupervisor | null = null;
   const registry = createProductionAdapterRegistry({
+    openCodeDetect: options.processSeams?.openCodeDetect,
+    resolveOpenCodeProfileRuntime: (_context, _role, scope) => {
+      if (!scope || scope.runtimeFiles.length !== 3 || !opencodeDataRoot) {
+        throw new TypeError('OpenCode production runtime graph is unavailable');
+      }
+      const [opencodeConfigPath, opencodeTestHomePath, opencodeManagedConfigPath] = scope.runtimeFiles;
+      return Object.freeze({
+        fsbMcpEndpoint: options.endpoint,
+        opencodeConfigRoot: dirname(dirname(opencodeConfigPath)),
+        opencodeConfigPath,
+        opencodeTestHomePath,
+        opencodeManagedConfigPath,
+        opencodeDataRoot,
+      });
+    },
     kill: async (child, killOptions) => {
       const entry = supervisor?.journalEntryForChild(child) ?? null;
       if (!entry) throw new TreeUnsettledError();
@@ -3112,6 +3275,10 @@ export function createProductionSpawnSupervisor(
     ...(options.cwd ? { cwd: options.cwd } : {}),
     platform,
     ...(options.environment ? { environment: options.environment } : {}),
+    ...(options.processSeams?.spawn ? { spawn: options.processSeams.spawn } : {}),
+    ...(options.networkSeams?.requestOwnedServer
+      ? { requestOwnedServer: options.networkSeams.requestOwnedServer }
+      : {}),
     terminationGrace: options.terminationGrace,
     onDegraded: options.onDegraded,
   });

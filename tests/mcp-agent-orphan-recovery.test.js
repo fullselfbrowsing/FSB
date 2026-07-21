@@ -146,7 +146,11 @@ async function runRuntimeFilesTests(runtimeModule) {
   assert.equal(AGENT_RUNTIME_DIRECTORY_MODE, 0o700);
   assert.equal(AGENT_RUNTIME_FILE_MODE, 0o600);
   assert.equal(AGENT_RUNTIME_JOURNAL_VERSION, 2);
-  assert.deepEqual(AGENT_RUNTIME_ROLES, ['delegation', 'provider_server']);
+  assert.deepEqual(AGENT_RUNTIME_ROLES, [
+    'delegation',
+    'provider_server',
+    'policy_preflight',
+  ]);
   assert.deepEqual(AGENT_RUNTIME_PRIVATE_ARTIFACT_KINDS, [
     'mcp_config',
     'opencode_config',
