@@ -20,6 +20,8 @@ const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
 const PHASE63_CONTEXT_PATH = `${PHASE63_DIR}/63-CONTEXT.md`;
 const PHASE63_RESEARCH_PATH = `${PHASE63_DIR}/63-RESEARCH.md`;
 const PHASE63_UI_SPEC_PATH = `${PHASE63_DIR}/63-UI-SPEC.md`;
+const PHASE64_DIR = '.planning/phases/64-opencode-adapter';
+const PHASE64_UAT_PATH = `${PHASE64_DIR}/64-HUMAN-UAT.md`;
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
@@ -171,6 +173,165 @@ function checkEvidence(label, rows) {
 
 function decodeXml(value) {
   return value.replace(/&amp;/g, '&').trim();
+}
+
+const PHASE64_UAT_DISCLAIMER = 'No fixture, fake process or HTTP server, source inspection, DOM harness, screenshot, or automated result is live provenance; none may check or promote a scenario.';
+
+function phase64UatViolations(source) {
+  const violations = [];
+  const requireContract = (condition, message) => {
+    if (!condition) violations.push(message);
+  };
+
+  requireContract(/^phase: 64$/m.test(source)
+    && /^status: human_needed$/m.test(source)
+    && /^deferred_until: milestone-end$/m.test(source)
+    && /^deferred_by: user$/m.test(source)
+    && /^results_recorded: false$/m.test(source)
+    && /^live_checks: 3$/m.test(source),
+  'frontmatter is the exact unexecuted three-check milestone-end queue');
+  requireContract(source.includes(PHASE64_UAT_DISCLAIMER),
+    'synthetic and automated evidence is explicitly barred from live provenance');
+  requireContract(source.includes('External side-effect caution:'),
+    'the ledger carries an explicit external side-effect caution');
+  for (const sensitiveKind of [
+    'task text',
+    'credentials',
+    'model metadata',
+    'raw events',
+    'local paths',
+    'port or endpoint',
+    'Basic secret',
+  ]) {
+    requireContract(source.includes(sensitiveKind),
+      `sanitization policy prohibits retaining ${sensitiveKind}`);
+  }
+
+  const headings = Array.from(
+    source.matchAll(/^### \[([^\]]*)\] (UAT64-\d{2})\b[^\n]*$/gm),
+    (match) => ({ marker: match[1], id: match[2] }),
+  );
+  const expectedHeadings = Array.from({ length: 3 }, (_, index) => ({
+    marker: ' ',
+    id: `UAT64-${String(index + 1).padStart(2, '0')}`,
+  }));
+  requireContract(JSON.stringify(headings) === JSON.stringify(expectedHeadings),
+    'ledger contains exactly three ordered unchecked UAT ids');
+
+  const blocks = source.split(/^### \[ \] /m).slice(1);
+  requireContract(blocks.length === 3,
+    'each UAT64 heading owns exactly one scenario block');
+  for (const block of blocks) {
+    const id = (block.match(/^(UAT64-\d{2})\b/) || [null, 'unknown'])[1];
+    requireContract(exactOccurrences(block, 'status: human_needed') === 1,
+      `${id} remains status human_needed exactly once`);
+    requireContract(exactOccurrences(block, 'result: pending') === 1,
+      `${id} remains result pending exactly once`);
+    requireContract(/^evidence:[ \t]*\n[ \t]*\nreferences:/m.test(block),
+      `${id} keeps evidence empty`);
+    requireContract(/^prerequisites:\s+\S+/m.test(block)
+      && /^steps:\s*$/m.test(block)
+      && /^expected:\s+\S+/m.test(block)
+      && /^\d+\. /m.test(block),
+    `${id} retains prerequisites, ordered steps, and expected results`);
+  }
+  requireContract(exactOccurrences(source, 'status: human_needed') === 4
+    && exactOccurrences(source, 'result: pending') === 3
+    && exactOccurrences(source, 'evidence:') === 3,
+  'status, result, and evidence field counts are exact');
+  requireContract(!/^### \[[^ ]\] UAT64-/m.test(source)
+    && !/^status:\s*(?:complete|green|passed)\b/im.test(source)
+    && !/^result:\s*(?!pending\s*$)\S+/im.test(source)
+    && !/^evidence:[ \t]+\S+/m.test(source)
+    && !/^evidence:[ \t]*\n(?![ \t]*\nreferences:)/m.test(source),
+  'no scenario is checked, completed, nonpending, or evidence-populated');
+  requireContract(!/(?:https?:\/\/|localhost|127\.0\.0\.1|\/Users\/|[A-Za-z]:\\)/.test(source),
+    'ledger retains no endpoint or absolute local path value');
+
+  const scenarioTokens = [
+    ['UAT64-01', [
+      'genuine authenticated OpenCode-to-browser delegation',
+      'real account',
+      'existing default model',
+      'kill switch',
+      'completed terminal',
+      'Billing: Not reported',
+    ]],
+    ['UAT64-02', [
+      'installed OpenCode 1.14.25',
+      'Providers',
+      'Supported',
+      'keyboard',
+      'screen reader',
+      'one shared live region',
+    ]],
+    ['UAT64-03', [
+      'cold',
+      'FSB-owned attach',
+      'same provider-neutral feed',
+      'same terminal summary',
+      'fresh task',
+      'no replay',
+    ]],
+  ];
+  for (let index = 0; index < scenarioTokens.length; index += 1) {
+    const [id, tokens] = scenarioTokens[index];
+    const block = blocks[index] || '';
+    for (const token of tokens) {
+      requireContract(block.toLowerCase().includes(token.toLowerCase()),
+        `${id} retains genuine scenario coverage: ${token}`);
+    }
+  }
+
+  return Object.freeze(violations);
+}
+
+function phase64RemoveScenario(source, id) {
+  const start = source.indexOf(`### [ ] ${id}`);
+  if (start < 0) return source;
+  const next = source.indexOf('\n### [ ] ', start + 1);
+  const gate = source.indexOf('\n## Gate policy', start + 1);
+  const end = next >= 0 ? next : gate;
+  return end >= 0 ? source.slice(0, start) + source.slice(end + 1) : source.slice(0, start);
+}
+
+function runPhase64UatLedgerContract() {
+  console.log('\n--- Phase 64 milestone-end human UAT ledger ---');
+
+  check(exists(PHASE64_UAT_PATH), 'Phase 64 human UAT ledger exists');
+  if (!exists(PHASE64_UAT_PATH)) return;
+
+  const source = read(PHASE64_UAT_PATH);
+  const violations = phase64UatViolations(source);
+  check(violations.length === 0,
+    `Phase 64 ledger satisfies every honesty rule${violations.length ? `: ${violations.join('; ')}` : ''}`);
+
+  const firstScenarioStart = source.indexOf('### [ ] UAT64-01');
+  const secondScenarioStart = source.indexOf('\n### [ ] UAT64-02');
+  const firstScenario = source.slice(firstScenarioStart, secondScenarioStart);
+  const gateIndex = source.indexOf('\n## Gate policy');
+  const negativeFixtures = Object.freeze({
+    'checked heading': source.replace('### [ ] UAT64-01', '### [x] UAT64-01'),
+    'completed status': source.replace(
+      '### [ ] UAT64-01',
+      '### [ ] UAT64-01',
+    ).replace('status: human_needed\nresult: pending', 'status: complete\nresult: pending'),
+    'nonpending result': source.replace('result: pending', 'result: passed'),
+    'populated evidence': source.replace('evidence:\n\nreferences:', 'evidence: synthetic-pass\n\nreferences:'),
+    'missing scenario': phase64RemoveScenario(source, 'UAT64-02'),
+    'duplicate scenario': source.slice(0, gateIndex) + `\n${firstScenario}` + source.slice(gateIndex),
+    'extra scenario': source.slice(0, gateIndex)
+      + '\n### [ ] UAT64-04 — synthetic extra\n\nstatus: human_needed\nresult: pending\n\nprerequisites: none\n\nsteps:\n\n1. none\n\nexpected: none\n\nevidence:\n\nreferences: none.\n'
+      + source.slice(gateIndex),
+    'synthetic promotion': source.replace(
+      PHASE64_UAT_DISCLAIMER,
+      'A schema fixture is live provenance and may check or promote a scenario.',
+    ),
+  });
+  for (const [label, candidate] of Object.entries(negativeFixtures)) {
+    check(phase64UatViolations(candidate).length > 0,
+      `Phase 64 honesty parser rejects ${label}`);
+  }
 }
 
 function runPhase63UatLedgerContract() {
@@ -667,18 +828,28 @@ const sectionArgs = process.argv.slice(2);
 if (sectionArgs.length > 0) {
   if (sectionArgs.length !== 2
       || sectionArgs[0] !== '--section'
-      || !['phase63-uat-ledger', 'phase63-final-contract'].includes(sectionArgs[1])) {
-    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract]');
+      || ![
+        'phase63-uat-ledger',
+        'phase63-final-contract',
+        'phase64-uat-ledger',
+      ].includes(sectionArgs[1])) {
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger]');
     process.exit(2);
   }
-  runPhase63UatLedgerContract();
-  if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
-  console.log(`\n=== Phase 63 focused contract results: ${passed} passed, ${failed} failed ===`);
+  if (sectionArgs[1] === 'phase64-uat-ledger') {
+    runPhase64UatLedgerContract();
+  } else {
+    runPhase63UatLedgerContract();
+    if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
+  }
+  const phaseLabel = sectionArgs[1].startsWith('phase64') ? '64' : '63';
+  console.log(`\n=== Phase ${phaseLabel} focused contract results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
 runPhase63UatLedgerContract();
 runPhase63FinalContract();
+runPhase64UatLedgerContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.
