@@ -26,6 +26,13 @@
   var MAX_ALLOWED_TOOLS = 16;
   var MAX_TOOL_COUNT_ROWS = 128;
   var MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('./delegation-providers.js');
+  }
 
   var ENTRY_KEYS = [
     'delegationId', 'detail', 'init', 'kind', 'metrics', 'retry', 'sequence',
@@ -240,9 +247,12 @@
 
   function _normalizeClient(value) {
     if (value === null || value === undefined) return null;
-    if (!_isPlainRecord(value)) return null;
-    if (value.id !== 'claude-code' || value.label !== 'Claude Code') return null;
-    return { id: 'claude-code', label: 'Claude Code' };
+    if (!_hasExactKeys(value, CLIENT_KEYS)
+        || !delegationProviders
+        || typeof delegationProviders.get !== 'function') return null;
+    var metadata = delegationProviders.get(value.id);
+    if (!metadata || value.label !== metadata.label) return null;
+    return { id: metadata.id, label: metadata.label };
   }
 
   function _normalizeAllowedTools(value) {
@@ -322,7 +332,10 @@
     var name = _value(context, payload, 'toolName', 'tool_name');
     if (typeof name !== 'string' || name.length === 0) name = 'unknown';
     switch (type) {
-      case 'init': return 'Claude Code connected';
+      case 'init': {
+        var client = _normalizeClient(_value(context, payload, 'client'));
+        return (client ? client.label : 'Agent') + ' connected';
+      }
       case 'tool_use': return 'Tool started: ' + name;
       case 'tool_result': return 'Tool finished: ' + name;
       case 'retry': return 'Retrying agent request';
@@ -465,9 +478,9 @@
   function _assertValidInit(value) {
     if (!_hasExactKeys(value, INIT_KEYS)) _corrupt('init payload shape is invalid');
     if (value.client !== null) {
-      if (!_hasExactKeys(value.client, CLIENT_KEYS)
-        || value.client.id !== 'claude-code'
-        || value.client.label !== 'Claude Code') _corrupt('init client is invalid');
+      if (!_hasExactKeys(value.client, CLIENT_KEYS) || !_normalizeClient(value.client)) {
+        _corrupt('init client is invalid');
+      }
     }
     ['profileVersion', 'model', 'sessionId'].forEach(function(field) {
       if (value[field] !== null

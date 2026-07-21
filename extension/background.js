@@ -1407,9 +1407,10 @@ let fsbDelegationConnectionObserverInstalled = false;
 let fsbDelegationConnectionTail = Promise.resolve();
 let fsbDelegationConnectionEpoch = 0;
 const fsbDelegationActiveIds = new Set();
-const fsbDelegationProfiles = new Map();
+const fsbDelegationRunContexts = new Map();
 const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:';
 const FSB_DELEGATION_GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const FSB_DELEGATION_PROFILE_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
 const FSB_DELEGATION_STATUS_ACTIVE_LIMIT = 64;
 const FSB_DELEGATION_STATUS_LOSS_LIMIT = 128;
@@ -1420,6 +1421,41 @@ function fsbDelegationHasExactKeys(value, expected) {
   const sortedExpected = expected.slice().sort();
   return actual.length === sortedExpected.length
     && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function fsbDelegationCreateRunContext(providerId, profileVersion) {
+  const canonical = globalThis.FsbDelegationProviders;
+  const metadata = canonical && typeof canonical.get === 'function'
+    ? canonical.get(providerId)
+    : null;
+  if (!metadata
+      || typeof profileVersion !== 'string'
+      || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(profileVersion)) return null;
+  return Object.freeze({
+    providerId: metadata.id,
+    label: metadata.label,
+    profileVersion,
+    billingKind: metadata.billingKind
+  });
+}
+
+function fsbDelegationRunContextFromSnapshot(snapshot) {
+  if (!snapshot
+      || typeof snapshot !== 'object'
+      || !snapshot.provider
+      || typeof snapshot.provider !== 'object'
+      || !Array.isArray(snapshot.entries)) return null;
+  const initEntry = snapshot.entries.find((entry) => (
+    entry && entry.init && entry.init.client && typeof entry.init.profileVersion === 'string'
+  ));
+  if (!initEntry
+      || snapshot.provider.id !== initEntry.init.client.id
+      || snapshot.provider.label !== initEntry.init.client.label) return null;
+  const context = fsbDelegationCreateRunContext(
+    snapshot.provider.id,
+    initEntry.init.profileVersion
+  );
+  return context && context.label === snapshot.provider.label ? context : null;
 }
 
 function fsbDelegationStatusIsCanonical(value) {
@@ -1930,13 +1966,21 @@ function fsbDelegationTerminalCode(value) {
 
 async function fsbSettleDelegationFromFinal(delegationId, finalResult, transportError) {
   const controller = globalThis.fsbDelegationControllerInstance;
-  if (!controller) return;
-  let snapshot;
-  try { snapshot = controller.getSnapshot(delegationId); } catch (_error) { return; }
-  if (!snapshot || snapshot.terminal) {
-    fsbDelegationProfiles.delete(delegationId);
+  if (!controller) {
+    fsbDelegationRunContexts.delete(delegationId);
     return;
   }
+  let snapshot;
+  try { snapshot = controller.getSnapshot(delegationId); } catch (_error) {
+    fsbDelegationRunContexts.delete(delegationId);
+    return;
+  }
+  if (!snapshot || snapshot.terminal) {
+    fsbDelegationRunContexts.delete(delegationId);
+    return;
+  }
+  const runContext = fsbDelegationRunContexts.get(delegationId) || null;
+  if (!runContext) return;
 
   let code = transportError && transportError.code
     ? fsbDelegationTerminalCode(transportError.code)
@@ -1960,16 +2004,16 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
         timestamp: Date.now(),
         terminalCode: code,
         treeSettled: !transportError && code !== 'tree_unsettled',
-        client: { id: 'claude-code', label: 'Claude Code' },
-        profileVersion: fsbDelegationProfiles.get(delegationId) || null,
-        billingKind: 'unknown'
+        client: { id: runContext.providerId, label: runContext.label },
+        profileVersion: runContext.profileVersion,
+        billingKind: runContext.billingKind
       }
     });
   } catch (_error) {
     // A streamed result or concurrent Stop may already have settled the exact
     // record. The controller remains the only terminal authority either way.
   } finally {
-    fsbDelegationProfiles.delete(delegationId);
+    fsbDelegationRunContexts.delete(delegationId);
   }
 }
 
@@ -1988,10 +2032,13 @@ async function fsbDelegationStartCommand(request) {
     return fsbDelegationFailure('preflight_failed', null);
   }
   if (!authority.result.ok
-      || authority.result.kind !== 'agent'
-      || authority.result.providerId !== 'claude-code') {
+      || authority.result.kind !== 'agent') {
     return fsbDelegationFailure('preflight_failed', null);
   }
+  const selectedProvider = globalThis.FsbDelegationProviders.get(
+    authority.result.providerId
+  );
+  if (!selectedProvider) return fsbDelegationFailure('preflight_failed', null);
 
   let taskDigest;
   try {
@@ -1999,12 +2046,12 @@ async function fsbDelegationStartCommand(request) {
   } catch (_error) {
     return fsbDelegationFailure('invalid_request', null);
   }
-  const trusted = await globalThis.FsbDelegationConsent.getTrusted('claude-code');
+  const trusted = await globalThis.FsbDelegationConsent.getTrusted(selectedProvider.id);
   let challengeId = request.challengeId;
   if (trusted) {
     if (challengeId !== null) return fsbDelegationFailure('consent_invalid', null);
     const issued = await globalThis.FsbDelegationConsent.issueChallenge({
-      providerId: 'claude-code',
+      providerId: selectedProvider.id,
       taskDigest
     });
     if (!issued || issued.ok !== true) return fsbDelegationFailure('consent_required', null);
@@ -2027,7 +2074,7 @@ async function fsbDelegationStartCommand(request) {
 
   const consumed = await globalThis.FsbDelegationConsent.consumeChallenge({
     challengeId,
-    providerId: 'claude-code',
+    providerId: selectedProvider.id,
     taskDigest
   });
   if (!consumed || consumed.ok !== true) {
@@ -2054,15 +2101,39 @@ async function fsbDelegationStartCommand(request) {
   try {
     finalPromise = mcpBridgeClient.sendExtRequest(
       'delegate.start',
-      { adapterId: 'claude-code', task: request.task },
+      { adapterId: selectedProvider.id, task: request.task },
       {
-        onEvent(eventName, payload) {
+        async onEvent(eventName, payload) {
           if (eventName !== 'delegation.started') return;
           if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
-              || payload.adapterId !== 'claude-code'
-              || typeof payload.delegationId !== 'string') {
-            rejectAccepted(new Error('missing server delegation id'));
-            return;
+              || payload.adapterId !== selectedProvider.id
+              || typeof payload.delegationId !== 'string'
+              || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)) {
+            const error = new Error('missing server delegation id');
+            rejectAccepted(error);
+            throw error;
+          }
+          const runContext = fsbDelegationCreateRunContext(
+            selectedProvider.id,
+            payload.profileVersion
+          );
+          if (!runContext || fsbDelegationRunContexts.has(payload.delegationId)) {
+            const error = new Error('delegation run context is invalid');
+            rejectAccepted(error);
+            throw error;
+          }
+          try {
+            await controller.start({
+              delegationId: payload.delegationId,
+              provider: { id: runContext.providerId, label: runContext.label },
+              profileVersion: payload.profileVersion,
+              connection: 'connected'
+            });
+            fsbDelegationRunContexts.set(payload.delegationId, runContext);
+          } catch (error) {
+            fsbDelegationRunContexts.delete(payload.delegationId);
+            rejectAccepted(error);
+            throw error;
           }
           resolveAccepted(payload.delegationId);
         }
@@ -2092,7 +2163,10 @@ async function fsbDelegationStartCommand(request) {
     await fsbReconcileDelegationSnapshots(controller, [acceptedSnapshot]);
   }
   const snapshot = controller.getSnapshot(delegationId);
-  if (!snapshot) return fsbDelegationFailure('start_rejected', null);
+  if (!snapshot) {
+    fsbDelegationRunContexts.delete(delegationId);
+    return fsbDelegationFailure('start_rejected', null);
+  }
   return { ok: true, snapshot };
 }
 
@@ -2194,14 +2268,14 @@ function fsbHandleDelegationCommand(request) {
 }
 
 function fsbDelegationEventContext(delegationId, event) {
-  const profileVersion = fsbDelegationProfiles.get(delegationId) || null;
-  const context = {
+  const runContext = fsbDelegationRunContexts.get(delegationId) || null;
+  if (!runContext) return null;
+  return {
     timestamp: Date.now(),
-    client: { id: 'claude-code', label: 'Claude Code' },
-    profileVersion,
-    billingKind: event && event.type === 'result' ? 'subscription' : 'unknown'
+    client: { id: runContext.providerId, label: runContext.label },
+    profileVersion: runContext.profileVersion,
+    billingKind: runContext.billingKind
   };
-  return context;
 }
 
 async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
@@ -2215,25 +2289,15 @@ async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
   if (bridgeEvent.event === 'delegation.started') {
     const payload = bridgeEvent.payload;
     if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
-        || payload.adapterId !== 'claude-code'
+        || !globalThis.FsbDelegationProviders.get(payload.adapterId)
         || typeof payload.delegationId !== 'string'
-        || typeof payload.profileVersion !== 'string') {
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)
+        || typeof payload.profileVersion !== 'string'
+        || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(payload.profileVersion)) {
       throw new Error('delegation.started payload is invalid');
     }
-    fsbDelegationProfiles.set(payload.delegationId, payload.profileVersion);
-    try {
-      await controller.start({
-        delegationId: payload.delegationId,
-        provider: { id: 'claude-code', label: 'Claude Code' },
-        profileVersion: payload.profileVersion,
-        connection: 'connected'
-      });
-    } catch (error) {
-      if (fsbDelegationProfiles.get(payload.delegationId) === payload.profileVersion) {
-        fsbDelegationProfiles.delete(payload.delegationId);
-      }
-      throw error;
-    }
+    // Request-bound onEvent acceptance validates this adapter against the
+    // saved selection and commits controller state before resolving Start.
     return;
   }
 
@@ -2244,11 +2308,19 @@ async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
       || !fsbDelegationHasExactKeys(payload.event, ['payload', 'sessionId', 'type'])) {
     throw new Error('delegation.event payload is invalid');
   }
-  await controller.acceptEvent({
-    delegationId: payload.delegationId,
-    event: payload.event,
-    context: fsbDelegationEventContext(payload.delegationId, payload.event)
-  });
+  const context = fsbDelegationEventContext(payload.delegationId, payload.event);
+  if (!context) throw new Error('delegation run context is unavailable');
+  try {
+    await controller.acceptEvent({
+      delegationId: payload.delegationId,
+      event: payload.event,
+      context
+    });
+  } finally {
+    if (payload.event.type === 'terminal') {
+      fsbDelegationRunContexts.delete(payload.delegationId);
+    }
+  }
 }
 
 function fsbObserveDelegationConnection(connection) {
@@ -2369,10 +2441,15 @@ async function bootstrapDelegationController() {
     }
     const controller = globalThis.fsbDelegationControllerInstance;
     const hydratedSnapshots = await controller.hydrate();
-    hydratedSnapshots.forEach((snapshot) => fsbDelegationActiveIds.add(snapshot.delegationId));
+    hydratedSnapshots.forEach((snapshot) => {
+      fsbDelegationActiveIds.add(snapshot.delegationId);
+      const runContext = fsbDelegationRunContextFromSnapshot(snapshot);
+      if (runContext) fsbDelegationRunContexts.set(snapshot.delegationId, runContext);
+    });
     controller.subscribe((runtimeEvent) => {
       if (runtimeEvent.snapshot.terminal) {
         fsbDelegationActiveIds.delete(runtimeEvent.snapshot.delegationId);
+        fsbDelegationRunContexts.delete(runtimeEvent.snapshot.delegationId);
       } else {
         fsbDelegationActiveIds.add(runtimeEvent.snapshot.delegationId);
       }
@@ -2418,6 +2495,7 @@ async function bootstrapDelegationController() {
         && typeof globalThis.fsbAgentRegistryInstance.quarantineAuthority === 'function') {
       globalThis.fsbAgentRegistryInstance.quarantineAuthority();
     }
+    fsbDelegationRunContexts.clear();
     fsbDelegationBootPromise = null;
     throw error;
   });

@@ -949,7 +949,7 @@ function buildDriftSettlementHarness(options = {}) {
   const reporterCalls = [];
   const settlementCalls = [];
   const snapshots = new Map();
-  const profiles = new Map();
+  const runContexts = new Map();
   const controller = {
     getSnapshot(delegationId) {
       if (options.snapshotThrows === true) throw new Error('snapshot failed');
@@ -977,7 +977,7 @@ function buildDriftSettlementHarness(options = {}) {
   const sandbox = {
     FsbAgentProtocolDriftDiagnostics: diagnostics,
     fsbDelegationControllerInstance: controller,
-    fsbDelegationProfiles: profiles,
+    fsbDelegationRunContexts: runContexts,
     Date: { now: () => 4242 },
     Map,
     Set,
@@ -1001,14 +1001,24 @@ function buildDriftSettlementHarness(options = {}) {
     seenLimit: sandbox.__seenLimit,
     reporterCalls,
     settlementCalls,
-    profiles,
+    profiles: runContexts,
     activate(delegationId, profileVersion = '2.1.177') {
       snapshots.set(delegationId, { delegationId, terminal: null });
-      profiles.set(delegationId, profileVersion);
+      runContexts.set(delegationId, Object.freeze({
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion,
+        billingKind: 'subscription'
+      }));
     },
     resetActive(delegationId, profileVersion = '2.1.177') {
       snapshots.set(delegationId, { delegationId, terminal: null });
-      profiles.set(delegationId, profileVersion);
+      runContexts.set(delegationId, Object.freeze({
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion,
+        billingKind: 'subscription'
+      }));
     }
   };
 }
@@ -1085,7 +1095,7 @@ async function runDriftSettlementCases() {
         treeSettled: true,
         client: { id: 'claude-code', label: 'Claude Code' },
         profileVersion: '2.1.177',
-        billingKind: 'unknown'
+        billingKind: 'subscription'
       }
     }, 'controller terminal input remains byte-for-shape unchanged');
     assertEqual(harness.profiles.has(delegationId), false,

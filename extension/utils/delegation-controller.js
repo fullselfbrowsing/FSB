@@ -12,8 +12,13 @@
 
   var SNAPSHOT_VERSION = 1;
   var RUNTIME_EVENT_TYPE = 'FSB_DELEGATION_UPDATED';
-  var PROVIDER_ID = 'claude-code';
-  var PROVIDER_LABEL = 'Claude Code';
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('./delegation-providers.js');
+  }
   var WALL_CLOCK_TIMEOUT_MS = 45 * 60 * 1000;
   var EVENT_SILENCE_TIMEOUT_MS = 120 * 1000;
   var HOLD_LEASE_MS = 5 * 60 * 1000;
@@ -121,10 +126,20 @@
 
   function _closedProvider(value) {
     if (value === null) return null;
-    if (value && value.id === PROVIDER_ID) {
-      return { id: PROVIDER_ID, label: PROVIDER_LABEL };
-    }
-    return null;
+    if (!_hasExactKeys(value, ['id', 'label'])
+        || !delegationProviders
+        || typeof delegationProviders.get !== 'function') return null;
+    var metadata = delegationProviders.get(value.id);
+    return metadata && metadata.label === value.label
+      ? { id: metadata.id, label: metadata.label }
+      : null;
+  }
+
+  function _defaultProvider() {
+    var metadata = delegationProviders && typeof delegationProviders.get === 'function'
+      ? delegationProviders.get('claude-code')
+      : null;
+    return metadata ? { id: metadata.id, label: metadata.label } : null;
   }
 
   function _summaryState(state) {
@@ -188,9 +203,8 @@
   function _providerFromEntries(entries) {
     for (var i = 0; i < entries.length; i++) {
       var init = entries[i] && entries[i].init;
-      if (init && init.client && init.client.id === PROVIDER_ID) {
-        return { id: PROVIDER_ID, label: PROVIDER_LABEL };
-      }
+      var provider = init && init.client ? _closedProvider(init.client) : null;
+      if (provider) return provider;
     }
     return null;
   }
@@ -1049,8 +1063,13 @@
         throw _error('delegation_start_in_progress', 'another provisional start is active');
       }
       provisional = { delegationId: delegationId };
+      var acceptedProvider = _closedProvider(input.provider || _defaultProvider());
+      if (!acceptedProvider) {
+        provisional = null;
+        throw _error('unsupported_provider', 'a canonical provider is required');
+      }
       var record = _newRecord(delegationId, {
-        provider: input.provider || { id: PROVIDER_ID, label: PROVIDER_LABEL },
+        provider: acceptedProvider,
         state: 'starting',
         connection: _hasOwn(VALID_CONNECTIONS, input.connection) ? input.connection : 'connected',
         hydrated: true
@@ -1067,7 +1086,7 @@
             {
               timestamp: record.startedAt,
               state: 'starting',
-              client: { id: PROVIDER_ID, label: PROVIDER_LABEL },
+              client: { id: acceptedProvider.id, label: acceptedProvider.label },
               profileVersion: input.profileVersion === undefined ? null : input.profileVersion,
               model: null,
               allowedTools: []
