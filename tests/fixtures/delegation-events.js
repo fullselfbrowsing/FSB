@@ -5,6 +5,12 @@ const pidCanary = 424242;
 const argvCanary = '--delegation-argv-canary';
 const envCanary = 'DELEGATION_ENV_CANARY_61_02';
 const taskCanary = 'DELEGATION_TASK_CANARY_61_02';
+const versionCanary = 'DELEGATION_VERSION_CANARY_64_10';
+const pathCanary = '/tmp/DELEGATION_PATH_CANARY_64_10';
+const endpointCanary = 'http://127.0.0.1:65535/DELEGATION_ENDPOINT_CANARY_64_10';
+const modelCanary = 'DELEGATION_MODEL_CANARY_64_10';
+const authCanary = 'DELEGATION_AUTH_CANARY_64_10';
+const rawNativeCanary = 'DELEGATION_RAW_NATIVE_CANARY_64_10';
 
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -13,14 +19,19 @@ function deepFreeze(value) {
   return value;
 }
 
+const canonicalClients = deepFreeze({
+  claudeCode: { id: 'claude-code', label: 'Claude Code' },
+  openCode: { id: 'opencode', label: 'OpenCode' },
+});
+
 const baseContext = deepFreeze({
   delegationId: 'delegation_fixture_01',
   sequence: 1,
   timestamp: 1700000000000,
   state: 'running',
-  client: { id: 'claude-code', label: 'Claude Code' },
+  client: canonicalClients.claudeCode,
   profileVersion: '2.1.177',
-  model: 'synthetic-model',
+  model: null,
   sessionId: 'synthetic-session-01',
   allowedTools: [
     'mcp__fsb__search_capabilities',
@@ -34,7 +45,7 @@ const initEvent = deepFreeze({
   payload: {
     type: 'system',
     subtype: 'init',
-    model: 'synthetic-model',
+    model: modelCanary,
     tools: [
       'mcp__fsb__search_capabilities',
       'mcp__fsb__invoke_capability',
@@ -118,6 +129,32 @@ const resultEvent = deepFreeze({
     usage: { input_tokens: 10, output_tokens: 20 },
     cost_usd: 999,
     rawResult: secretCanary,
+  },
+});
+
+const hostileOpenCodeResultEvent = deepFreeze({
+  type: 'result',
+  sessionId: 'synthetic-opencode-session-01',
+  payload: {
+    subtype: 'success',
+    is_error: false,
+    num_turns: 3,
+    duration_ms: 4321,
+    usage: { input_tokens: 30, output_tokens: 40 },
+    billingKind: 'api',
+    billing_kind: 'subscription',
+    usd: 987.65,
+    cost_usd: 123.45,
+    model: modelCanary,
+    auth: authCanary,
+    endpoint: endpointCanary,
+    server: { port: 65535, secret: secretCanary },
+    topology: { kind: 'owned_server', path: pathCanary },
+    version: versionCanary,
+    rawNativeEvent: { jsonl: rawNativeCanary },
+    task: taskCanary,
+    argv: [argvCanary],
+    env: { SECRET: envCanary },
   },
 });
 
@@ -205,6 +242,13 @@ module.exports = deepFreeze({
   argvCanary,
   envCanary,
   taskCanary,
+  versionCanary,
+  pathCanary,
+  endpointCanary,
+  modelCanary,
+  authCanary,
+  rawNativeCanary,
+  canonicalClients,
   baseContext,
   initEvent,
   toolUseEvent,
@@ -213,6 +257,7 @@ module.exports = deepFreeze({
   retryEvent,
   unknownRetryEvent,
   resultEvent,
+  hostileOpenCodeResultEvent,
   failedResultEvent,
   stateEvent,
   terminalEvent,

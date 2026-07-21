@@ -174,7 +174,7 @@ function project(store, event, overrides = {}) {
     assert.deepStrictEqual(entry.init, {
       client: { id: 'claude-code', label: 'Claude Code' },
       profileVersion: '2.1.177',
-      model: 'synthetic-model',
+      model: null,
       sessionId: 'synthetic-session-01',
       allowedTools: [
         'mcp__fsb__search_capabilities',
@@ -187,6 +187,59 @@ function project(store, event, overrides = {}) {
     assert(!JSON.stringify(entry).includes(fixtures.secretCanary));
     assert(Object.isFrozen(entry));
     assert(Object.isFrozen(entry.init));
+    assert(Object.isFrozen(entry.init.client));
+  });
+
+  await test('projects only exact immutable canonical Claude and OpenCode clients', async () => {
+    const store = freshStore();
+    const mutableClient = { id: 'opencode', label: 'OpenCode' };
+    const openCode = project(store, fixtures.initEvent, {
+      client: mutableClient,
+      profileVersion: '1.14.25',
+      sessionId: 'synthetic-opencode-session-01',
+      model: null,
+    });
+    mutableClient.id = 'claude-code';
+    mutableClient.label = 'forged after projection';
+    assert.deepStrictEqual(openCode.init.client, fixtures.canonicalClients.openCode);
+    assert.strictEqual(openCode.init.profileVersion, '1.14.25');
+    assert.strictEqual(openCode.init.model, null);
+    assert(Object.isFrozen(openCode.init.client));
+
+    const invalidClients = [
+      { id: 'opencode', label: 'Claude Code' },
+      { id: 'codex', label: 'Codex' },
+      { id: 'OpenCode', label: 'OpenCode' },
+      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+      Object.create(null, {
+        id: { enumerable: true, value: 'opencode' },
+        label: { enumerable: true, value: 'OpenCode' },
+      }),
+    ];
+    for (const client of invalidClients) {
+      await expectCode(
+        () => project(store, fixtures.initEvent, { client }),
+        'delegation_persistence_failed',
+      );
+    }
+
+    let accessorReads = 0;
+    const accessorClient = { id: 'opencode' };
+    Object.defineProperty(accessorClient, 'label', {
+      enumerable: true,
+      get() {
+        accessorReads += 1;
+        return 'OpenCode';
+      },
+    });
+    await expectCode(
+      () => project(store, fixtures.initEvent, { client: accessorClient }),
+      'delegation_persistence_failed',
+    );
+    assert.strictEqual(accessorReads, 0, 'client accessors are rejected without invocation');
+
+    const noClient = project(store, fixtures.initEvent, { client: null });
+    assert.strictEqual(noClient.init.client, null);
   });
 
   await test('projects exact running and terminal tool-call fields', () => {
@@ -244,7 +297,7 @@ function project(store, event, overrides = {}) {
     assert(!JSON.stringify([retry, unknown]).includes('provider_private_retry_class'));
   });
 
-  await test('projects honest closed metrics without fabricated subscription USD', () => {
+  await test('projects honest closed metrics without fabricated subscription USD', async () => {
     const store = freshStore();
     const entry = project(store, fixtures.resultEvent, {
       sequence: 7,
@@ -281,20 +334,75 @@ function project(store, event, overrides = {}) {
     assert.strictEqual(entry.tool, null);
     assert.strictEqual(entry.retry, null);
 
-    const api = project(store, fixtures.resultEvent, {
+    await expectCode(
+      () => project(store, fixtures.resultEvent, {
+        sequence: 8,
+        billingKind: 'api',
+        usd: 0.0125,
+      }),
+      'delegation_persistence_failed',
+    );
+    const subscription = project(store, fixtures.resultEvent, {
       sequence: 8,
-      billingKind: 'api',
+      billingKind: 'subscription',
       usd: 0.0125,
     });
-    assert.strictEqual(api.metrics.usd, 0.0125);
+    assert.strictEqual(subscription.metrics.billingKind, 'subscription');
+    assert.strictEqual(subscription.metrics.usd, null);
     const failed = project(store, fixtures.failedResultEvent, { sequence: 9 });
     assert.strictEqual(failed.state, 'running',
       'error result also waits for explicit post-cleanup terminal evidence');
     assert.strictEqual(failed.metrics.inputTokens, null);
     assert.strictEqual(failed.metrics.outputTokens, null);
     assert.strictEqual(failed.metrics.totalTokens, null);
-    assert.strictEqual(failed.metrics.billingKind, 'unknown');
+    assert.strictEqual(failed.metrics.billingKind, 'subscription');
     assert.strictEqual(failed.metrics.usd, null);
+
+    const openCode = project(store, fixtures.hostileOpenCodeResultEvent, {
+      sequence: 10,
+      client: fixtures.canonicalClients.openCode,
+      profileVersion: '1.14.25',
+      sessionId: 'synthetic-opencode-session-01',
+      billingKind: 'unknown',
+      usd: 654.32,
+    });
+    assert.deepStrictEqual(openCode.metrics, {
+      inputTokens: 30,
+      outputTokens: 40,
+      totalTokens: 70,
+      turns: 3,
+      durationMs: 4321,
+      billingKind: 'unknown',
+      usd: null,
+      toolCalls: [],
+    });
+    const serializedOpenCode = JSON.stringify(openCode);
+    for (const canary of [
+      fixtures.secretCanary,
+      fixtures.taskCanary,
+      fixtures.argvCanary,
+      fixtures.envCanary,
+      fixtures.versionCanary,
+      fixtures.pathCanary,
+      fixtures.endpointCanary,
+      fixtures.modelCanary,
+      fixtures.authCanary,
+      fixtures.rawNativeCanary,
+    ]) {
+      assert(!serializedOpenCode.includes(canary), `${canary} is absent from OpenCode metrics`);
+    }
+
+    for (const hostileBillingKind of ['subscription', 'api']) {
+      await expectCode(
+        () => project(store, fixtures.hostileOpenCodeResultEvent, {
+          client: fixtures.canonicalClients.openCode,
+          profileVersion: '1.14.25',
+          billingKind: hostileBillingKind,
+          usd: 999,
+        }),
+        'delegation_persistence_failed',
+      );
+    }
   });
 
   await test('state rows never parse presentation strings as machine data', () => {
@@ -486,6 +594,53 @@ function project(store, event, overrides = {}) {
       () => store.project({ type: 'state', sessionId: 's', payload: [], }, context()),
       'delegation_persistence_failed',
     );
+    await expectCode(
+      () => project(store, fixtures.initEvent, { rawNativeEvent: fixtures.rawNativeCanary }),
+      'delegation_persistence_failed',
+    );
+    await expectCode(
+      () => project(store, fixtures.initEvent, { task: fixtures.taskCanary }),
+      'delegation_persistence_failed',
+    );
+    await expectCode(
+      () => project(store, fixtures.initEvent, { model: fixtures.modelCanary }),
+      'delegation_persistence_failed',
+    );
+
+    let contextAccessorReads = 0;
+    const accessorContext = context();
+    Object.defineProperty(accessorContext, 'rawNativeEvent', {
+      enumerable: true,
+      get() {
+        contextAccessorReads += 1;
+        return fixtures.rawNativeCanary;
+      },
+    });
+    await expectCode(
+      () => store.project(fixtures.initEvent, accessorContext),
+      'delegation_persistence_failed',
+    );
+    assert.strictEqual(contextAccessorReads, 0,
+      'unknown context accessors are rejected without invocation');
+
+    let eventAccessorReads = 0;
+    const accessorEvent = {
+      type: 'init',
+      sessionId: 'synthetic-session-01',
+    };
+    Object.defineProperty(accessorEvent, 'payload', {
+      enumerable: true,
+      get() {
+        eventAccessorReads += 1;
+        return {};
+      },
+    });
+    await expectCode(
+      () => store.project(accessorEvent, context()),
+      'delegation_persistence_failed',
+    );
+    assert.strictEqual(eventAccessorReads, 0,
+      'normalized event accessors are rejected without invocation');
   });
 
   await test('append assigns one monotonic sequence inside serialized storage turns', async () => {
@@ -545,6 +700,39 @@ function project(store, event, overrides = {}) {
     }
   });
 
+  await test('append snapshots mutable canonical context before asynchronous storage work', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const mutableClient = { id: 'opencode', label: 'OpenCode' };
+      const mutableContext = {
+        timestamp: fixtures.baseContext.timestamp,
+        state: 'starting',
+        client: mutableClient,
+        profileVersion: '1.14.25',
+        model: null,
+        sessionId: 'synthetic-opencode-session-01',
+        allowedTools: [],
+      };
+      const append = store.appendBeforeFanout(
+        'delegation_mutable_context_01',
+        fixtures.initEvent,
+        mutableContext,
+      );
+      mutableClient.id = 'claude-code';
+      mutableClient.label = 'Claude Code';
+      mutableContext.profileVersion = 'mutated-after-call';
+      mutableContext.allowedTools.push('hostile_after_call');
+      const entry = await append;
+      assert.deepStrictEqual(entry.init.client, fixtures.canonicalClients.openCode);
+      assert.strictEqual(entry.init.profileVersion, '1.14.25');
+      assert.deepStrictEqual(entry.init.allowedTools, []);
+      assert(Object.isFrozen(entry.init.client));
+    } finally {
+      mock.restore();
+    }
+  });
+
   await test('storage rejection is typed and never fabricates a persisted entry', async () => {
     const mock = installSessionStorage();
     try {
@@ -554,6 +742,33 @@ function project(store, event, overrides = {}) {
         store.appendBeforeFanout(fixtures.baseContext.delegationId, fixtures.initEvent, context()),
         'delegation_persistence_failed',
       );
+      assert.strictEqual(mock.data[storageKey(store)], undefined);
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('unknown or raw-native append context fails before any storage write', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      for (const hostileContext of [
+        { ...context(), task: fixtures.taskCanary },
+        { ...context(), rawNativeEvent: { jsonl: fixtures.rawNativeCanary } },
+        { ...context(), endpoint: fixtures.endpointCanary },
+        { ...context(), path: fixtures.pathCanary },
+        { ...context(), auth: fixtures.authCanary },
+      ]) {
+        await expectCode(
+          store.appendBeforeFanout(
+            fixtures.baseContext.delegationId,
+            fixtures.initEvent,
+            hostileContext,
+          ),
+          'delegation_persistence_failed',
+        );
+      }
+      assert.strictEqual(mock.setCalls, 0);
       assert.strictEqual(mock.data[storageKey(store)], undefined);
     } finally {
       mock.restore();
@@ -712,6 +927,83 @@ function project(store, event, overrides = {}) {
       assert.deepStrictEqual(ledgers[0].entries.map((entry) => entry.kind), ['init', 'tool-call']);
       assert(Object.isFrozen(ledgers));
       assert(Object.isFrozen(ledgers[0].entries));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('legacy Claude envelopes remain readable while new projection omits provider model values', async () => {
+    const bootstrap = freshStore();
+    const legacyInit = jsonClone(project(bootstrap, fixtures.initEvent));
+    legacyInit.init.model = 'legacy-claude-model';
+    const legacy = fixtures.makePersistedEnvelope([legacyInit]);
+    const mock = installSessionStorage({ [storageKey(bootstrap)]: legacy });
+    try {
+      const store = freshStore();
+      const ledgers = await store.hydrateNonterminal();
+      assert.deepStrictEqual(ledgers, [legacy]);
+      assert.strictEqual(ledgers[0].entries[0].init.model, 'legacy-claude-model');
+
+      const projected = project(store, fixtures.initEvent, {
+        model: null,
+        client: fixtures.canonicalClients.claudeCode,
+      });
+      assert.strictEqual(projected.init.model, null);
+      assert(!JSON.stringify(projected).includes(fixtures.modelCanary));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('OpenCode result stays nonterminal through hydration until an explicit failed terminal', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const delegationId = 'delegation_opencode_result_before_terminal';
+      const openCodeContext = {
+        timestamp: fixtures.baseContext.timestamp,
+        client: fixtures.canonicalClients.openCode,
+        profileVersion: '1.14.25',
+        billingKind: 'unknown',
+      };
+      await store.appendBeforeFanout(delegationId, fixtures.initEvent, {
+        ...openCodeContext,
+        state: 'starting',
+        sessionId: 'synthetic-opencode-session-01',
+        model: null,
+        allowedTools: [],
+      });
+      await store.appendBeforeFanout(delegationId, fixtures.hostileOpenCodeResultEvent, {
+        ...openCodeContext,
+        timestamp: fixtures.baseContext.timestamp + 1,
+        state: 'completed',
+        usd: 999,
+      });
+
+      store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated.length, 1);
+      assert.strictEqual(hydrated[0].terminal, false);
+      assert.strictEqual(hydrated[0].terminalCode, null);
+      assert.strictEqual(hydrated[0].entries.at(-1).kind, 'result');
+      assert.strictEqual(hydrated[0].entries.at(-1).state, 'running');
+      assert.strictEqual(hydrated[0].entries.at(-1).metrics.billingKind, 'unknown');
+      assert.strictEqual(hydrated[0].entries.at(-1).metrics.usd, null);
+
+      await store.markCleanupPending(delegationId, {
+        code: 'agent_failed',
+        cancellationConfirmed: true,
+        agentId: 'agent-opencode-terminal-01',
+      });
+      const terminal = await store.markTerminal(delegationId, {
+        code: 'agent_failed',
+        event: { type: 'terminal', sessionId: null, payload: {} },
+        context: { timestamp: fixtures.baseContext.timestamp + 2 },
+      });
+      assert.strictEqual(terminal.terminal, true);
+      assert.strictEqual(terminal.terminalCode, 'agent_failed');
+      assert.strictEqual(terminal.entries.at(-1).state, 'failed');
+      assert.strictEqual((await freshStore().hydrateNonterminal()).length, 0);
     } finally {
       mock.restore();
     }
