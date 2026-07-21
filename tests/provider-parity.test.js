@@ -37,6 +37,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The 7 providers -- copied verbatim from tool-definitions-parity.test.js:37
 // (confirmed against universal-provider.js PROVIDER_CONFIGS).
 const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
+const SHIPPED_AGENT_IDS = ['claude-code', 'opencode'];
 
 // The two capability tools that MUST stay out-of-registry (INV-01) and therefore
 // can never appear in any provider's formatted tool envelope.
@@ -88,7 +89,7 @@ const backgroundSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'back
 async function run() {
   // -------------------------------------------------------------------------
   // (0) Phase 61 provider namespace parity. The seven BYOK ids remain the only
-  // API surface, while the first executable agent provider requires the exact
+  // API surface, while each shipped agent provider requires its exact
   // authoritative kind/id pair. A latent agent choice under API kind is inert.
   // -------------------------------------------------------------------------
   console.log('\n--- (0) API and delegated provider namespaces remain disjoint (INV-03 / UX-01) ---');
@@ -118,7 +119,7 @@ async function run() {
     'execution modes, API providers, and executable agent ids remain disjoint namespaces');
 
   for (const modelProvider of PROVIDER_KEYS) {
-    for (const storedAgentId of ['', 'claude-code']) {
+    for (const storedAgentId of ['', ...SHIPPED_AGENT_IDS]) {
       const apiInput = {
         providerKind: 'api',
         agentProviderId: storedAgentId,
@@ -149,13 +150,15 @@ async function run() {
       bridgeState: {
         status: 'connected', connected: true, pairingStatus: 'paired',
         delegationConnection: { state: 'connected' }
-      }
+      },
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
     });
-    check(result.ok === (candidate === 'claude-code')
-        && (candidate === 'claude-code'
-          ? result.kind === 'agent' && result.providerId === 'claude-code'
+    const isShippedAgent = SHIPPED_AGENT_IDS.includes(candidate);
+    check(result.ok === isShippedAgent
+        && (isShippedAgent
+          ? result.kind === 'agent' && result.providerId === candidate
           : result.code === 'unsupported_provider'),
-    (candidate || 'empty') + ': only the exact Phase 60 Claude agent pair is executable');
+    (candidate || 'empty') + ': only an exact shipped agent provider pair is executable');
   }
 
   const sendHandler = sourceBetween(
