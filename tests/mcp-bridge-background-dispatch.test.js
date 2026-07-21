@@ -703,6 +703,230 @@ function buildDelegationCommandHarness(options = {}) {
   };
 }
 
+function buildDelegationProviderRoutingHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const calls = [];
+  const startRequests = [];
+  const controllerStarts = [];
+  const acceptedEvents = [];
+  const snapshots = new Map();
+  let bridgeObserver = null;
+  let inboundAuthorityReady = true;
+  let delegationAuthorityReady = true;
+  const providerConfig = {
+    providerKind: 'agent',
+    agentProviderId: options.providerId || 'claude-code',
+    modelProvider: 'xai'
+  };
+  const compatibilityClients = {
+    'claude-code': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+    },
+    opencode: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+    }
+  };
+
+  const hydratedSnapshots = (options.hydratedSnapshots || []).map(toPlainObject);
+  hydratedSnapshots.forEach((snapshot) => snapshots.set(snapshot.delegationId, snapshot));
+  const controller = {
+    async hydrate() { return hydratedSnapshots; },
+    subscribe() {},
+    async start(input) {
+      controllerStarts.push(toPlainObject(input));
+      const snapshot = {
+        delegationId: input.delegationId,
+        provider: toPlainObject(input.provider),
+        terminal: null
+      };
+      snapshots.set(input.delegationId, snapshot);
+      return { ok: true, snapshot };
+    },
+    getSnapshot(delegationId) {
+      return snapshots.get(delegationId) || null;
+    },
+    async reconcile(input) {
+      return snapshots.get(input.delegationId) || null;
+    },
+    async refreshActiveTab() {},
+    async acceptEvent(input) {
+      acceptedEvents.push(toPlainObject(input));
+      if (input.event.type === 'terminal') {
+        const snapshot = snapshots.get(input.delegationId);
+        if (snapshot) snapshot.terminal = { code: input.context.terminalCode };
+      }
+      return { ok: true };
+    }
+  };
+  const registry = {
+    listAgents() { return []; },
+    getAgentForDelegation() { return null; },
+    listDelegationMappings() { return []; },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() {}
+  };
+  const consent = {
+    async getTrusted(providerId) {
+      calls.push(['getTrusted', providerId]);
+      if (options.getTrustedGate) await options.getTrustedGate.promise;
+      return options.trusted === true;
+    },
+    async issueChallenge(input) {
+      calls.push(['issueChallenge', toPlainObject(input)]);
+      return { ok: true, challengeId: 'dch_internal', expiresAt: 999999 };
+    },
+    async consumeChallenge(input) {
+      calls.push(['consumeChallenge', toPlainObject(input)]);
+      return options.consumeResult || { ok: true };
+    },
+    async getTrustedEnvelope() { return false; }
+  };
+  const mcpBridgeClient = {
+    isConnected: true,
+    getState() {
+      return {
+        connected: true,
+        status: 'connected',
+        pairingStatus: 'paired',
+        delegationConnection: { state: 'connected' }
+      };
+    },
+    getDelegationConnectionSnapshot() { return { state: 'connected' }; },
+    setInboundAuthorityReady(value) {
+      inboundAuthorityReady = value === true;
+      return inboundAuthorityReady;
+    },
+    isInboundAuthorityReady() { return inboundAuthorityReady; },
+    setDelegationAuthorityReady(value) {
+      delegationAuthorityReady = value === true;
+      return delegationAuthorityReady;
+    },
+    isDelegationAuthorityReady() { return delegationAuthorityReady; },
+    addEventObserver(observer) { bridgeObserver = observer; },
+    addDelegationConnectionObserver() {},
+    retainDelegationHeartbeat() {},
+    releaseDelegationHeartbeat() {},
+    sendExtRequest(method, payload, requestOptions = {}) {
+      calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+      if (method === 'delegate.status') {
+        return Promise.resolve({
+          generation: 'generation_provider_routing',
+          active: Array.from(snapshots.values())
+            .filter((snapshot) => !snapshot.terminal)
+            .map((snapshot) => ({ delegationId: snapshot.delegationId, state: 'running' })),
+          restartLosses: [],
+          routeLosses: []
+        });
+      }
+      if (method !== 'delegate.start') return Promise.reject(new Error('unexpected transport method'));
+      const final = deferred();
+      startRequests.push({
+        id: `ext_provider_route_${startRequests.length + 1}`,
+        payload: toPlainObject(payload),
+        options: requestOptions,
+        final
+      });
+      return final.promise;
+    }
+  };
+  const context = {
+    chrome: {
+      storage: {
+        local: { async get() { return { ...providerConfig }; } },
+        session: { async get() { return {}; }, async set() {}, async remove() {} }
+      },
+      runtime: { async sendMessage() {} },
+      tabs: { async query() { return []; }, async get() { return null; } }
+    },
+    FsbDelegationProviders: delegationProviders,
+    FsbDelegationPreflight: require(path.join(
+      __dirname, '..', 'extension', 'utils', 'delegation-preflight.js'
+    )),
+    FsbMcpAgentProviders: {
+      async getMergedClients() {
+        calls.push(['getMergedClients']);
+        return compatibilityClients;
+      }
+    },
+    FsbDelegationConsent: consent,
+    FsbDelegationController: { create() { return controller; } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge() {},
+    mcpBridgeClient,
+    crypto: require('node:crypto').webcrypto,
+    TextEncoder,
+    Uint8Array,
+    Map,
+    Set,
+    Object,
+    Array,
+    Promise,
+    Date,
+    Number,
+    Error,
+    JSON,
+    console,
+    setTimeout,
+    clearTimeout
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\n`
+      + 'this.__delegationCommand = fsbHandleDelegationCommand;\n'
+      + 'this.__delegationBoot = bootstrapDelegationController;\n'
+      + 'this.__runContexts = typeof fsbDelegationRunContexts !== \'undefined\' '
+      + '? fsbDelegationRunContexts : fsbDelegationProfiles;',
+    context,
+    { filename: 'background.js#delegation-provider-routing' }
+  );
+
+  async function emit(request, eventName, payload) {
+    const bridgeEvent = {
+      id: request.id,
+      method: 'delegate.start',
+      event: eventName,
+      payload
+    };
+    try {
+      await bridgeObserver(bridgeEvent);
+      if (typeof request.options.onEvent === 'function') {
+        await request.options.onEvent(eventName, payload);
+      }
+      return null;
+    } catch (error) {
+      request.final.reject(error);
+      return error;
+    }
+  }
+
+  return {
+    command: context.__delegationCommand,
+    boot: context.__delegationBoot,
+    contexts: context.__runContexts,
+    calls,
+    startRequests,
+    controllerStarts,
+    acceptedEvents,
+    setProviderId(providerId) { providerConfig.agentProviderId = providerId; },
+    async waitForStartRequest(index = 0) {
+      for (let attempt = 0; attempt < 20 && !startRequests[index]; attempt++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      return startRequests[index] || null;
+    },
+    emitStarted(request, payload) { return emit(request, 'delegation.started', payload); },
+    emitDelegationEvent(request, payload) { return emit(request, 'delegation.event', payload); },
+    async resolveFinal(request, value) {
+      request.final.resolve(value);
+      await new Promise((resolve) => setImmediate(resolve));
+      await flushMicrotasks();
+    }
+  };
+}
+
 function extractDriftSettlementSource(backgroundSource) {
   const startMarker = 'const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;';
   const endMarker = '\nasync function fsbDelegationStartCommand(request) {';
@@ -2085,6 +2309,197 @@ async function runDelegationAuthorityCases() {
   }
 }
 
+async function runDelegationProviderRoutingCases() {
+  console.log('\n--- B11: accepted delegation provider routing is immutable ---');
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'claude-code' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Claude provider-free task',
+      challengeId: 'dch_claude'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'Claude authoritative start reaches one daemon request');
+    if (request) {
+      assertDeepEqual(request.payload, {
+        adapterId: 'claude-code', task: 'Claude provider-free task'
+      }, 'delegate.start sends only the selected canonical adapter id and task');
+      await harness.emitStarted(request, {
+        adapterId: 'claude-code',
+        delegationId: 'delegation_claude_route',
+        profileVersion: 'profile-claude'
+      });
+      const result = await pending;
+      assertEqual(result.ok, true, 'matching Claude acceptance starts exactly one run');
+      const context = harness.contexts.get('delegation_claude_route');
+      assertDeepEqual(context, {
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion: 'profile-claude',
+        billingKind: 'subscription'
+      }, 'accepted Claude run stores only canonical immutable metadata');
+      assertEqual(Object.isFrozen(context), true, 'accepted Claude run metadata is deeply frozen');
+
+      harness.setProviderId('opencode');
+      await harness.emitDelegationEvent(request, {
+        delegationId: 'delegation_claude_route',
+        event: { type: 'result', sessionId: null, payload: {} }
+      });
+      assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+        timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+        client: { id: 'claude-code', label: 'Claude Code' },
+        profileVersion: 'profile-claude',
+        billingKind: 'subscription'
+      }, 'later events ignore changed settings and use only accepted Claude context');
+      await harness.resolveFinal(request, { status: 'succeeded' });
+      assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+        timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+        terminalCode: 'completed',
+        treeSettled: true,
+        client: { id: 'claude-code', label: 'Claude Code' },
+        profileVersion: 'profile-claude',
+        billingKind: 'subscription'
+      }, 'Claude final settlement retains subscription billing from accepted context');
+      assertEqual(harness.contexts.has('delegation_claude_route'), false,
+        'terminal settlement always clears accepted Claude context');
+    } else {
+      await pending;
+    }
+  }
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'OpenCode provider-free task',
+      challengeId: 'dch_opencode'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'OpenCode authoritative start reaches one daemon request');
+    if (request) {
+      assertDeepEqual(request.payload, {
+        adapterId: 'opencode', task: 'OpenCode provider-free task'
+      }, 'OpenCode delegate.start payload is exact and canonical');
+      await harness.emitStarted(request, {
+        adapterId: 'opencode',
+        delegationId: 'delegation_opencode_route',
+        profileVersion: 'profile-opencode'
+      });
+      const result = await pending;
+      assertEqual(result.ok, true, 'matching OpenCode acceptance starts exactly one run');
+      assertDeepEqual(harness.contexts.get('delegation_opencode_route'), {
+        providerId: 'opencode',
+        label: 'OpenCode',
+        profileVersion: 'profile-opencode',
+        billingKind: 'unknown'
+      }, 'accepted OpenCode context never inherits Claude identity or billing');
+      harness.setProviderId('claude-code');
+      await harness.emitDelegationEvent(request, {
+        delegationId: 'delegation_opencode_route',
+        event: { type: 'result', sessionId: null, payload: {} }
+      });
+      assertEqual(harness.acceptedEvents.at(-1).context.billingKind, 'unknown',
+        'OpenCode result billing remains unknown after a settings change');
+      assertDeepEqual(harness.acceptedEvents.at(-1).context.client,
+        { id: 'opencode', label: 'OpenCode' },
+        'OpenCode event identity remains canonical after a settings change');
+      await harness.resolveFinal(request, { status: 'failed', terminal: { code: 'agent_failed' } });
+      assertEqual(harness.acceptedEvents.at(-1).context.billingKind, 'unknown',
+        'OpenCode terminal billing remains unknown');
+      assertEqual(harness.contexts.has('delegation_opencode_route'), false,
+        'terminal settlement always clears accepted OpenCode context');
+    } else {
+      const result = await pending;
+      assertEqual(result.ok, true, 'OpenCode must not be rejected before daemon routing');
+    }
+  }
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Reject mismatched acceptance',
+      challengeId: 'dch_mismatch'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'mismatch case reaches one selected OpenCode request');
+    if (request) {
+      await harness.emitStarted(request, {
+        adapterId: 'claude-code',
+        delegationId: 'delegation_mismatch_route',
+        profileVersion: 'profile-mismatch'
+      });
+      const result = await pending;
+      assertDeepEqual(result, { ok: false, code: 'start_rejected', snapshot: null },
+        'mismatched started adapter fails before controller persistence');
+      assertEqual(harness.controllerStarts.length, 0,
+        'mismatched started adapter never reaches controller start');
+      assertEqual(harness.contexts.has('delegation_mismatch_route'), false,
+        'mismatched started adapter leaves no accepted context');
+    } else {
+      await pending;
+    }
+  }
+
+  {
+    const trustGate = deferred();
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'claude-code',
+      getTrustedGate: trustGate
+    });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Selection changes before consume',
+      challengeId: 'dch_provider_change'
+    });
+    await flushMicrotasks();
+    harness.setProviderId('opencode');
+    trustGate.resolve();
+    const result = await pending;
+    assertDeepEqual(result, { ok: false, code: 'provider_changed', snapshot: null },
+      'selection change before consume returns the bounded provider-changed result');
+    assertEqual(harness.calls.some((call) => call[0] === 'consumeChallenge'), false,
+      'selection change cannot consume the original provider challenge');
+    assertEqual(harness.startRequests.length, 0,
+      'selection change before consume cannot send delegate.start');
+  }
+
+  {
+    const hydrated = {
+      delegationId: 'delegation_hydrated_open',
+      provider: { id: 'opencode', label: 'OpenCode' },
+      terminal: null,
+      entries: [{
+        init: {
+          client: { id: 'opencode', label: 'OpenCode' },
+          profileVersion: 'profile-hydrated-open'
+        }
+      }]
+    };
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'claude-code',
+      hydratedSnapshots: [hydrated]
+    });
+    await harness.boot();
+    const syntheticRequest = {
+      id: 'ext_hydrated_open',
+      options: {},
+      final: deferred()
+    };
+    await harness.emitDelegationEvent(syntheticRequest, {
+      delegationId: hydrated.delegationId,
+      event: { type: 'result', sessionId: null, payload: {} }
+    });
+    assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+      timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+      client: { id: 'opencode', label: 'OpenCode' },
+      profileVersion: 'profile-hydrated-open',
+      billingKind: 'unknown'
+    }, 'eviction-style hydration restores context only from accepted persisted metadata');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Part C -- source-contract pins
 // ---------------------------------------------------------------------------
@@ -2312,6 +2727,9 @@ function runSourceContractCase() {
   );
   assert(!/request\.(?:trusted|consent|consentGranted|agentId)/.test(delegatedStart),
     'delegated start never reads caller trust, consent, or agent identity');
+  assert(delegatedStart.includes("fsbDelegationHasExactKeys(request, ['challengeId', 'task', 'type'])")
+      && !/request\.(?:providerId|adapterId|providerLabel|billingKind)/.test(delegatedStart),
+    'delegated start request remains exact and provider-free');
   assert(delegatedStart.indexOf('consumeChallenge') < delegatedStart.indexOf("sendExtRequest(\n      'delegate.start'"),
     'challenge consumption precedes delegate.start transport');
   assert(delegatedStart.indexOf('resolveAccepted(payload.delegationId)')
@@ -2321,9 +2739,12 @@ function runSourceContractCase() {
     delegationComposition.indexOf("if (bridgeEvent.event === 'delegation.started') {"),
     delegationComposition.indexOf("if (bridgeEvent.event !== 'delegation.event') return;")
   );
-  assert(startedObserver.includes('await controller.start({')
-      && startedObserver.includes('profileVersion: payload.profileVersion'),
-    'started observer durably commits the canonical profile row before request acceptance');
+  assert(delegationComposition.includes('const fsbDelegationRunContexts = new Map()')
+      && !delegationComposition.includes('fsbDelegationProfiles'),
+    'background owns one accepted-run metadata map instead of a profile-only map');
+  assert(delegatedStart.includes('await controller.start({')
+      && delegatedStart.includes('profileVersion: payload.profileVersion'),
+    'request-bound started acceptance durably commits canonical metadata before resolving');
   const controllerStart = controllerSource.slice(
     controllerSource.indexOf('function start(input) {'),
     controllerSource.indexOf('function acceptEvent(input) {')
@@ -2440,6 +2861,7 @@ async function run() {
   await runDelegationLateConnectFenceCase();
   await runPairingRuntimeActionCases();
   await runDelegationAuthorityCases();
+  await runDelegationProviderRoutingCases();
   runSourceContractCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
