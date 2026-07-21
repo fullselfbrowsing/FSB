@@ -13,9 +13,11 @@ const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const aliasesPath = path.join(repoRoot, 'extension', 'utils', 'mcp-client-aliases.js');
+const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const providersPath = path.join(repoRoot, 'extension', 'utils', 'mcp-agent-providers.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
 const aliasesSource = fs.readFileSync(aliasesPath, 'utf8');
+const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
 const providersSource = fs.readFileSync(providersPath, 'utf8');
 const backgroundSource = fs.readFileSync(backgroundPath, 'utf8');
 
@@ -109,7 +111,7 @@ function createRuntimeHarness(initial, options = {}) {
     return { clients, refreshOutcome: 'unavailable', compatibilityExpiresAt: null };
   };
   vm.runInNewContext(
-    `${aliasesSource}\n${providersSource}\n${extractBackgroundRouter()}\n` +
+    `${delegationProvidersSource}\n${aliasesSource}\n${providersSource}\n${extractBackgroundRouter()}\n` +
       `const FSB_INTERNAL_DISPATCH_TIMEOUT_MS = 20000;\n${extractInternalDispatcher()}\n` +
       'this.__runtimeHandler = fsbHandleRuntimeMessage;\n' +
       'this.__internalDispatch = fsbDispatchInternalMessage;',
@@ -144,7 +146,7 @@ function createHarness(initial) {
     Promise
   };
   context.globalThis = context;
-  vm.runInNewContext(`${aliasesSource}\n${providersSource}`, context, {
+  vm.runInNewContext(`${delegationProvidersSource}\n${aliasesSource}\n${providersSource}`, context, {
     filename: 'mcp-client-merged-view-harness.js'
   });
   return {
