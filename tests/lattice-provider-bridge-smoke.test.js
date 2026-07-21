@@ -620,9 +620,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 61 Plan 06 composes preflight, consent, event-store, and controller
   // modules in the service worker -> 315. Phase 62 Plan 04 loads the protocol
   // drift diagnostics pre-throttle -> 316. Phase 63 Plan 08 loads the native
-  // wake controller -> 317.
+  // wake controller -> 317. Phase 64 Plan 09 loads the canonical delegation
+  // provider helper -> 318.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 317, 'background.js importScripts count = 317 (including the Phase 63 native wake controller)');
+  passAssertEqual(importScriptsCount, 318, 'background.js importScripts count = 318 (including the Phase 64 delegation provider helper)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -660,8 +661,9 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 61 Plan 06 adds four delegation composition call sites -> 311.
   // Phase 62 Plan 04 adds the protocol drift diagnostics call site -> 312.
   // Phase 63 Plan 08 adds the native wake controller call site -> 313.
+  // Phase 64 Plan 09 adds the canonical delegation provider helper -> 314.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 313, 'background.js importScripts() call sites = 313 (including the Phase 63 native wake controller)');
+  passAssertEqual(importScriptsCallSites, 314, 'background.js importScripts() call sites = 314 (including the Phase 64 delegation provider helper)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
