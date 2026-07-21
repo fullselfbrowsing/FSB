@@ -124,7 +124,14 @@ function makeChild(role, pid, controls) {
   const send = (events, exit = { code: 0, signal: null }) => {
     if (closed) return;
     for (const event of events) stdout.write(`${JSON.stringify(event)}\n`);
-    close(exit);
+    stdout.end();
+    stderr.end();
+    const exitGate = controls.taskExitGates.get(role);
+    if (exitGate) {
+      void exitGate.promise.then(() => close(exit));
+    } else {
+      close(exit);
+    }
   };
 
   const stdin = new Writable({
@@ -373,6 +380,10 @@ function makeHarness(supervisorModule, options = {}) {
     holdTaskRoles: new Set(),
     pendingTaskCompletions: new Map(),
     taskStderrChunks: new Map(),
+    taskExitGates: new Map(),
+    taskTerminationGate: null,
+    taskRemoveGate: null,
+    taskRemoveStarted: 0,
     policyEnabled: options.policyEnabled === true,
     expectedPolicyDocuments: cleanPolicy,
     processPolicyDocuments: options.processPolicyDocuments
@@ -476,6 +487,10 @@ function makeHarness(supervisorModule, options = {}) {
     async removeRun(input) {
       const role = typeof input === 'string' ? 'delegation' : input.role;
       const id = typeof input === 'string' ? input : input.delegationId;
+      if (role === 'delegation' && controls.taskRemoveGate) {
+        controls.taskRemoveStarted += 1;
+        await controls.taskRemoveGate.promise;
+      }
       journal.delete(`${role}:${id}`);
       activePids.delete(`${role}:${id}`);
       lifecycleEvents.push(`remove:${role}:${id}`);
@@ -507,6 +522,9 @@ function makeHarness(supervisorModule, options = {}) {
     async stop(entry, supervisedChild) {
       terminationCalls.push({ entry, supervisedChild });
       lifecycleEvents.push(`stop:${entry.role}:${entry.delegationId}`);
+      if (entry.role === 'delegation' && controls.taskTerminationGate) {
+        await controls.taskTerminationGate.promise;
+      }
       if (!supervisedChild) return;
       const child = children.get(supervisedChild.pid);
       if (child && !child.closed) child.close({ code: null, signal: 'SIGTERM' });
@@ -1284,6 +1302,93 @@ async function runTaskOnce(supervisorModule) {
   }
 }
 
+function resultEventsForRequest(harness, requestId) {
+  return harness.emitted.filter((event) => (
+    event.id === requestId && event.payload?.event?.type === 'result'
+  ));
+}
+
+async function runTerminalBarrier(supervisorModule) {
+  for (const fixture of [
+    { label: 'direct', adapterId: 'opencode', role: 'direct_task' },
+    { label: 'cold', adapterId: 'claude-code', role: 'cold_task' },
+    { label: 'attach', adapterId: 'claude-code', role: 'attach_task', seed: true },
+  ]) {
+    const harness = makeHarness(supervisorModule);
+    if (fixture.seed) {
+      const seed = await harness.supervisor.handleExtRequest(
+        startRequest('claude-code', 'terminal barrier attach seed', 'ext-terminal-seed'),
+        harness.emit,
+      );
+      assert.equal(seed.status, 'succeeded');
+    }
+
+    const exitGate = deferred();
+    const terminationGate = deferred();
+    const removeGate = deferred();
+    harness.controls.taskExitGates.set(fixture.role, exitGate);
+    harness.controls.taskTerminationGate = terminationGate;
+    harness.controls.taskRemoveGate = removeGate;
+    const requestId = `ext-terminal-${fixture.label}`;
+    let settlements = 0;
+    const operation = harness.supervisor.handleExtRequest(
+      startRequest(fixture.adapterId, `${fixture.label} terminal barrier`, requestId),
+      harness.emit,
+    ).then((terminal) => {
+      settlements += 1;
+      return terminal;
+    });
+    await waitFor(
+      () => harness.spawnCalls.filter((call) => call.role === fixture.role)
+        .at(-1)?.child.stdout.readableEnded === true,
+      `${fixture.label} parser EOF`,
+    );
+    assert.equal(
+      resultEventsForRequest(harness, requestId).length,
+      0,
+      `${fixture.label} parser EOF retains its result candidate`,
+    );
+    assert.equal(settlements, 0, `${fixture.label} parser EOF cannot settle`);
+
+    exitGate.resolve();
+    await waitFor(
+      () => harness.lifecycleEvents.some((event) => event.startsWith('stop:delegation:')),
+      `${fixture.label} clean exit`,
+    );
+    assert.equal(
+      resultEventsForRequest(harness, requestId).length,
+      0,
+      `${fixture.label} clean exit retains its result candidate`,
+    );
+
+    terminationGate.resolve();
+    await waitFor(
+      () => harness.controls.taskRemoveStarted === 1,
+      `${fixture.label} tree settlement`,
+    );
+    assert.equal(
+      resultEventsForRequest(harness, requestId).length,
+      0,
+      `${fixture.label} tree settlement retains its result candidate`,
+    );
+    assert.equal(settlements, 0, `${fixture.label} waits for runtime removal`);
+
+    removeGate.resolve();
+    const terminal = await bounded(operation, `${fixture.label} terminal barrier`);
+    assert.equal(terminal.status, 'succeeded');
+    assert.equal(settlements, 1, `${fixture.label} settles once`);
+    assert.equal(
+      resultEventsForRequest(harness, requestId).length,
+      1,
+      `${fixture.label} publishes exactly one result after all gates`,
+    );
+    harness.controls.taskExitGates.delete(fixture.role);
+    harness.controls.taskTerminationGate = null;
+    harness.controls.taskRemoveGate = null;
+    await harness.supervisor.close();
+  }
+}
+
 async function runPolicyAttestation(supervisorModule) {
   {
     const task = 'POLICY_TASK_CANARY_must_only_reach_selected_stdin';
@@ -1498,12 +1603,16 @@ async function main() {
   if (!section || section === 'task-once') {
     await runTaskOnce(supervisorModule);
   }
+  if (!section || section === 'terminal-barrier') {
+    await runTerminalBarrier(supervisorModule);
+  }
   if (section && ![
     'selection-replay',
     'owned-health',
     'lease-lifecycle',
     'policy-attestation',
     'task-once',
+    'terminal-barrier',
   ].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }

@@ -45,6 +45,24 @@ async function run() {
       event: 'delegation.event',
       payload: { type: 'assistant', text: 'bounded progress' },
     },
+    {
+      id: 'delegate-start-1',
+      type: 'ext:event',
+      event: 'delegation.event',
+      payload: {
+        delegationId: 'delegation_server_0001',
+        event: { type: 'result', sessionId: 'session_contract_0001', payload: { is_error: false } },
+      },
+    },
+    {
+      id: 'delegate-start-1',
+      type: 'ext:response',
+      payload: {
+        delegationId: 'delegation_server_0001',
+        status: 'succeeded',
+        terminal: { type: 'result' },
+      },
+    },
   ];
 
   for (const frame of validFrames) {
@@ -172,6 +190,27 @@ async function run() {
     ),
     'one central task writer is guarded by run state and the selected process role',
   );
+  const consumeEventsSource = supervisorSource.slice(
+    supervisorSource.indexOf('private consumeEvents('),
+    supervisorSource.indexOf('private async drainStderr('),
+  );
+  assert(
+    !consumeEventsSource.includes('publishOrBuffer(run, run.resultEvent'),
+    'parser EOF retains the result candidate privately',
+  );
+  const executeRunSource = supervisorSource.slice(
+    supervisorSource.indexOf('private async executeRun('),
+    supervisorSource.indexOf('private throwIfStopped('),
+  );
+  assert(
+    executeRunSource.includes('this.emitNormalizedEvent(run, resultEvent);'),
+    'the supervisor owns one explicit post-cleanup result publication point',
+  );
+  assert(
+    executeRunSource.lastIndexOf('await this.terminateAndCleanup(run);')
+      < executeRunSource.indexOf('this.emitNormalizedEvent(run, resultEvent);'),
+    'verified task-tree and runtime cleanup precede result publication',
+  );
   const startedEmitterSource = supervisorSource.slice(
     supervisorSource.indexOf('private emitStarted('),
     supervisorSource.indexOf('private emitNormalizedEvent('),
@@ -234,8 +273,8 @@ async function run() {
   const delegationSequence = validFrames.filter((frame) => frame.id === 'delegate-start-1');
   assert.deepStrictEqual(
     delegationSequence.map((frame) => frame.type === 'ext:event' ? frame.event : frame.method),
-    ['delegate.start', 'delegation.started', 'delegation.event'],
-    'delegation contract exposes its server id before normalized events',
+    ['delegate.start', 'delegation.started', 'delegation.event', 'delegation.event', undefined],
+    'delegation contract exposes its server id, progress, one result, then one final response',
   );
 
   for (const code of expectedErrorCodes) {

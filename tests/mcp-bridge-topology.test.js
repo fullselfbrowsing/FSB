@@ -1588,21 +1588,35 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         event: 'delegation.event',
         payload: { type: 'assistant', text: 'progress' },
       });
-      await waitFor(() => messages.length === 4, 'selected relay ordered events', 1000, 10);
+      pending[0].emit({
+        id: request.id,
+        type: 'ext:event',
+        event: 'delegation.event',
+        payload: {
+          delegationId,
+          event: {
+            type: 'result',
+            sessionId: 'session_bridge_result_0001',
+            payload: { is_error: false },
+          },
+        },
+      });
+      await waitFor(() => messages.length === 5, 'selected relay ordered events', 1000, 10);
       assertEqual(messages[1]?.event, 'delegation.started', 'selected relay forwards the early server id first');
       assertEqual(messages[1]?.payload?.delegationId, delegationId, 'relayed early event carries the server-minted id');
       assertEqual(messages[2]?.event, 'delegation.event', 'selected relay forwards normalized init without settling');
       assertEqual(messages[3]?.event, 'delegation.event', 'selected relay forwards multiple normalized events while pending');
+      assertEqual(messages[4]?.payload?.event?.type, 'result', 'selected relay forwards one authoritative result before final');
       assertEqual(hub.activeExtRequests.size, 1, 'events do not settle the selected relay route');
 
       pending[0].resolve({
         delegationId,
-        status: 'completed',
+        status: 'succeeded',
         terminal: { type: 'result', isError: false },
       });
-      await waitFor(() => messages.length === 5, 'selected relay response', 1000, 10);
-      assertEqual(messages[4]?.payload?.delegationId, delegationId, 'first capable relay supplies one correlated final response');
-      assertEqual(messages[4]?.payload?.status, 'completed', 'relayed final response carries domain completion status');
+      await waitFor(() => messages.length === 6, 'selected relay response', 1000, 10);
+      assertEqual(messages[5]?.payload?.delegationId, delegationId, 'first capable relay supplies one correlated final response');
+      assertEqual(messages[5]?.payload?.status, 'succeeded', 'relayed final response follows the authoritative result');
       assertEqual(hub.activeExtRequests.size, 0, 'first relay final deletes hub reverse route');
 
       firstRelay.hubConnection.send(JSON.stringify({
@@ -1617,7 +1631,7 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         payload: { target: 'duplicate' },
       }));
       await sleep(20);
-      assertEqual(messages.length, 5, 'late event and duplicate final from selected relay are dropped');
+      assertEqual(messages.length, 6, 'late event and duplicate final from selected relay are dropped');
 
       extension.send(JSON.stringify({
         id: 'relay-cancel',
@@ -1625,9 +1639,9 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         method: 'delegate.cancel',
         payload: { delegationId },
       }));
-      await waitFor(() => messages.length === 6, 'selected relay cancel response', 1000, 10);
-      assertEqual(messages[5]?.payload?.delegationId, delegationId, 'relayed cancel uses the early server-minted id');
-      assertEqual(messages[5]?.payload?.status, 'already_terminal', 'relayed cancel remains idempotent after terminal settlement');
+      await waitFor(() => messages.length === 7, 'selected relay cancel response', 1000, 10);
+      assertEqual(messages[6]?.payload?.delegationId, delegationId, 'relayed cancel uses the early server-minted id');
+      assertEqual(messages[6]?.payload?.status, 'already_terminal', 'relayed cancel remains idempotent after terminal settlement');
       assertEqual(secondInvocations, 0, 'relayed cancel stays on the first capable relay without replay');
 
       extension.send(JSON.stringify({
@@ -1643,7 +1657,7 @@ async function runRelayReverseRouting(WebSocketBridge, auth) {
         event: 'delegation.started',
         payload: { delegationId: 'delegation_relay_route_lost', adapterId: 'claude-code', profileVersion: '1' },
       });
-      await waitFor(() => messages.length === 7, 'extension-close relay started event', 1000, 10);
+      await waitFor(() => messages.length === 8, 'extension-close relay started event', 1000, 10);
       extension.close();
       await waitFor(() => hub.activeExtRequests.size === 0, 'extension-close route cleanup', 1000, 10);
       assertEqual(hub.activeExtRequests.size, 0, 'extension close clears its active reverse route');

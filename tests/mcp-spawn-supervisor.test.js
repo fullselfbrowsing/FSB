@@ -109,9 +109,10 @@ function makeChild(options = {}) {
   const stdinBytes = [];
   let stdinEndCount = 0;
   let closed = false;
+  let closePending = false;
   let stdin = null;
 
-  const close = (exit = { code: 0, signal: null }) => {
+  const finalizeClose = (exit) => {
     if (closed) return;
     closed = true;
     if (stdin && !stdin.destroyed) {
@@ -124,6 +125,15 @@ function makeChild(options = {}) {
     if (!stdout.readableEnded) stdout.end();
     if (!stderr.readableEnded) stderr.end();
     setImmediate(() => child.emit('close', exit.code, exit.signal));
+  };
+  const close = (exit = { code: 0, signal: null }) => {
+    if (closed || closePending) return;
+    if (options.closeGate) {
+      closePending = true;
+      void options.closeGate.promise.then(() => finalizeClose(exit));
+      return;
+    }
+    finalizeClose(exit);
   };
   const send = (events, exit = { code: 0, signal: null }, stderrValue = '') => {
     for (const event of events) {
@@ -356,6 +366,7 @@ function makeHarness(supervisorModule, options = {}) {
     async stop(entry, supervisedChild, stopOptions) {
       order.push('terminate');
       terminationCalls.push({ entry, child: supervisedChild, options: stopOptions });
+      if (options.terminateGate) await options.terminateGate.promise;
       if (options.terminateError) {
         throw Object.assign(new Error('fixture unsettled tree'), { code: 'tree_unsettled' });
       }
@@ -1262,6 +1273,158 @@ async function runHappyPathTest(supervisorModule) {
   }
 }
 
+function emittedResults(harness) {
+  return harness.emitted.filter((event) => event.payload?.event?.type === 'result');
+}
+
+async function runTerminalResultBarrierTests(supervisorModule) {
+  {
+    const exitGate = deferred();
+    const terminateGate = deferred();
+    const removeGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      childOptions: { closeGate: exitGate },
+      terminateGate,
+      removeGate,
+    });
+    let settlements = 0;
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'three-gate terminal result barrier' }),
+      harness.emit,
+    ).then((terminal) => {
+      settlements += 1;
+      return terminal;
+    });
+    await waitFor(
+      () => harness.spawnCalls[0]?.child.stdout.readableEnded === true,
+      'result candidate parser EOF',
+    );
+    assert.equal(emittedResults(harness).length, 0, 'parser EOF keeps the candidate private');
+    assert.equal(settlements, 0, 'parser EOF cannot settle delegate.start');
+
+    exitGate.resolve();
+    await waitFor(() => harness.terminationCalls.length === 1, 'clean child exit barrier');
+    assert.equal(emittedResults(harness).length, 0, 'clean exit keeps the candidate private');
+    assert.equal(settlements, 0, 'clean exit cannot settle before tree verification');
+
+    terminateGate.resolve();
+    await waitFor(() => harness.counters.remove === 1, 'verified task-tree barrier');
+    assert.equal(emittedResults(harness).length, 0, 'tree settlement keeps the candidate private');
+    assert.equal(settlements, 0, 'tree settlement cannot settle before runtime removal');
+
+    removeGate.resolve();
+    const terminal = await startPromise;
+    assert.equal(terminal.status, 'succeeded');
+    assert.equal(settlements, 1, 'the clean path settles once');
+    assert.equal(emittedResults(harness).length, 1, 'the clean path publishes one result');
+    assert(
+      harness.order.indexOf(`remove:${terminal.delegationId}`)
+        < harness.order.lastIndexOf('emit:delegation.event'),
+      'runtime removal precedes public result publication',
+    );
+  }
+
+  for (const fixture of [
+    {
+      name: 'provider is_error',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: true }),
+      ],
+      exit: { code: 0, signal: null },
+      options: {},
+    },
+    {
+      name: 'nonzero exit',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: false }),
+      ],
+      exit: { code: 7, signal: null },
+      options: {},
+    },
+    {
+      name: 'signal exit',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: false }),
+      ],
+      exit: { code: null, signal: 'SIGTERM' },
+      options: {},
+    },
+    {
+      name: 'stderr fallback drift',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: false }),
+      ],
+      exit: { code: 0, signal: null },
+      options: { stderrValue: 'agent "fsb" not found. Falling back to default agent' },
+    },
+    {
+      name: 'tree unsettled',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: false }),
+      ],
+      exit: { code: 0, signal: null },
+      options: { terminateError: true },
+    },
+    {
+      name: 'runtime cleanup failure',
+      events: [
+        normalizedEvent('init', { tools: ['mcp__fsb'] }),
+        normalizedEvent('result', { is_error: false }),
+      ],
+      exit: { code: 0, signal: null },
+      options: { removeError: true },
+    },
+  ]) {
+    const harness = makeHarness(supervisorModule, {
+      ...fixture.options,
+      onStdinEnd: (controls) => controls.send(fixture.events, fixture.exit,
+        fixture.options.stderrValue ?? ''),
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: `${fixture.name} result discard` }),
+      harness.emit,
+    );
+    assert.notEqual(terminal.status, 'succeeded', `${fixture.name} is non-success`);
+    assert.equal(emittedResults(harness).length, 0, `${fixture.name} publishes no result`);
+  }
+
+  {
+    let controls = null;
+    const exitGate = deferred();
+    const harness = makeHarness(supervisorModule, {
+      childOptions: { closeGate: exitGate },
+      onStdinEnd: (childControls) => {
+        controls = childControls;
+        childControls.send([
+          normalizedEvent('init', { tools: ['mcp__fsb'] }),
+          normalizedEvent('result', { is_error: false }),
+        ]);
+      },
+    });
+    const startPromise = harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'candidate cancellation discard' }),
+      harness.emit,
+    );
+    await waitFor(() => controls?.stdout.readableEnded === true, 'candidate before cancellation');
+    const delegationId = harness.emitted.find((event) => event.event === 'delegation.started')
+      ?.payload.delegationId;
+    const cancelPromise = harness.supervisor.handleExtRequest(
+      cancelRequest(delegationId),
+      harness.emit,
+    );
+    exitGate.resolve();
+    const [cancelled, terminal] = await Promise.all([cancelPromise, startPromise]);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(terminal.status, 'cancelled');
+    assert.equal(emittedResults(harness).length, 0, 'cancellation discards a parsed candidate');
+  }
+}
+
 async function runFailureBarrierTests(supervisorModule) {
   {
     const sentinel = 'agent "fsb" not found. Falling back to default agent';
@@ -2048,6 +2211,7 @@ async function main() {
   await runPosixLifecycleRaceTests(supervisorModule);
   await runStatusBoundsTest(supervisorModule);
   await runHappyPathTest(supervisorModule);
+  await runTerminalResultBarrierTests(supervisorModule);
   await runFailureBarrierTests(supervisorModule);
   await runTypedDriftDetailTests(supervisorModule, protocolDriftModule);
   await runCancelAndShutdownTests(supervisorModule);
