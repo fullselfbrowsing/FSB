@@ -1913,17 +1913,94 @@ async function fsbDelegationClearTrustCommand(request) {
 
 const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;
 const fsbAgentProtocolDriftSeenDelegationIds = new Set();
+const FSB_AGENT_PROTOCOL_DRIFT_DETAIL_KEYS = Object.freeze([
+  'adapterId', 'eventIndex', 'expected', 'issuePaths', 'profileVersion', 'reason'
+]);
+const FSB_AGENT_PROTOCOL_DRIFT_LEGACY_KEYS = Object.freeze([
+  'adapterId', 'expected', 'observed'
+]);
 
-function fsbReportAgentProtocolDriftOnce(delegationId, finalResult) {
+function fsbReadExactAgentProtocolDriftRecord(value, expectedKeys) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== expectedKeys.length) return null;
+    const record = Object.create(Object.prototype);
+    for (const key of expectedKeys) {
+      if (!keys.includes(key)) return null;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      record[key] = descriptor.value;
+    }
+    return keys.every((key) => typeof key === 'string' && expectedKeys.includes(key))
+      ? record
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbReadAgentProtocolDriftDataProperty(value, key) {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+    return { value: descriptor.value };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbProjectAgentProtocolDriftDetail(finalResult) {
+  try {
+    const terminalProperty = fsbReadAgentProtocolDriftDataProperty(finalResult, 'terminal');
+    const terminal = terminalProperty && terminalProperty.value;
+    const codeProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'code');
+    const detailProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'detail');
+    if (!codeProperty
+        || codeProperty.value !== 'agent_protocol_drift'
+        || !detailProperty) return null;
+
+    const detail = detailProperty.value;
+    const current = fsbReadExactAgentProtocolDriftRecord(
+      detail,
+      FSB_AGENT_PROTOCOL_DRIFT_DETAIL_KEYS
+    );
+    if (current) return current;
+
+    const legacy = fsbReadExactAgentProtocolDriftRecord(
+      detail,
+      FSB_AGENT_PROTOCOL_DRIFT_LEGACY_KEYS
+    );
+    const profileProperty = fsbReadAgentProtocolDriftDataProperty(terminal, 'profileVersion');
+    if (!legacy
+        || !profileProperty) return null;
+    const projected = Object.create(Object.prototype);
+    projected.adapterId = legacy.adapterId;
+    projected.profileVersion = profileProperty.value;
+    projected.reason = legacy.observed;
+    projected.expected = legacy.expected;
+    projected.eventIndex = 1;
+    projected.issuePaths = Array.from([]);
+    return projected;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbReportAgentProtocolDriftOnce(delegationId, finalResult, runContext) {
   try {
     if (typeof delegationId !== 'string'
         || delegationId.length === 0
         || fsbAgentProtocolDriftSeenDelegationIds.has(delegationId)
-        || !finalResult
-        || typeof finalResult !== 'object'
-        || !finalResult.terminal
-        || typeof finalResult.terminal !== 'object'
-        || finalResult.terminal.code !== 'agent_protocol_drift') {
+        || !runContext
+        || typeof runContext !== 'object') {
       return false;
     }
 
@@ -1932,8 +2009,11 @@ function fsbReportAgentProtocolDriftOnce(delegationId, finalResult) {
     const report = diagnostics && diagnostics.reportAgentProtocolDrift;
     if (typeof validate !== 'function' || typeof report !== 'function') return false;
 
-    const safeDetail = validate.call(diagnostics, finalResult.terminal.detail);
-    if (!safeDetail) return false;
+    const projected = fsbProjectAgentProtocolDriftDetail(finalResult);
+    const safeDetail = projected && validate.call(diagnostics, projected);
+    if (!safeDetail
+        || safeDetail.adapterId !== runContext.providerId
+        || safeDetail.profileVersion !== runContext.profileVersion) return false;
 
     if (fsbAgentProtocolDriftSeenDelegationIds.size >= FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT) {
       const oldest = fsbAgentProtocolDriftSeenDelegationIds.values().next();
@@ -1992,10 +2072,6 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
   }
   if (!code) code = 'agent_failed';
 
-  if (code === 'agent_protocol_drift') {
-    fsbReportAgentProtocolDriftOnce(delegationId, finalResult);
-  }
-
   try {
     await controller.acceptEvent({
       delegationId,
@@ -2009,6 +2085,9 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
         billingKind: runContext.billingKind
       }
     });
+    if (code === 'agent_protocol_drift') {
+      fsbReportAgentProtocolDriftOnce(delegationId, finalResult, runContext);
+    }
   } catch (_error) {
     // A streamed result or concurrent Stop may already have settled the exact
     // record. The controller remains the only terminal authority either way.
