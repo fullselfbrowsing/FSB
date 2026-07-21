@@ -132,6 +132,47 @@ try {
   const profileSource = fs.readFileSync(profilePath, 'utf8');
   const detectorSource = fs.readFileSync(detectorPath, 'utf8');
   const supervisorSource = fs.readFileSync(supervisorPath, 'utf8');
+  const adapterSource = fs.readFileSync(path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'adapter.ts',
+  ), 'utf8');
+  const policySource = fs.readFileSync(path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'policy-attestation.ts',
+  ), 'utf8');
+  const runtimeSource = fs.readFileSync(path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'runtime-files.ts',
+  ), 'utf8');
+  const providerContractSource = fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'mcp-agent-provider-contract.test.js',
+  ), 'utf8');
+  const topologyTestSource = fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'mcp-opencode-server-topology.test.js',
+  ), 'utf8');
+  const eventStoreTestSource = fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'delegation-event-store.test.js',
+  ), 'utf8');
+  const providersUiTestSource = fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'providers-panel-ui.test.js',
+  ), 'utf8');
   for (const sourceFlag of [
     'OPENCODE_DISABLE_PROJECT_CONFIG',
     'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
@@ -169,6 +210,86 @@ try {
     supervisorSource,
   ));
   assert(!/(?:verify|check|reduce)OpenCodePolicy/.test(supervisorSource));
+
+  const adapterInterface = (adapterSource.match(
+    /export interface AgentProviderAdapter \{([\s\S]*?)\n\}/,
+  ) || [null, ''])[1];
+  assert.deepEqual(
+    Array.from(adapterInterface.matchAll(/^\s{2}([A-Za-z]+)\(/gm), (match) => match[1]),
+    ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+    'agent-provider adapter surface remains exactly five methods',
+  );
+  assert(!/callback|resolver|template/i.test(policySource),
+    'shared attestation verifier exposes no executable provider callback seam');
+  assert(!/(?:pgrep|lsof|ps aux|process[-_ ]?name|discover(?:y|Existing).*server)/i.test(
+    supervisorSource,
+  ), 'supervisor contains no user-process or existing-server discovery mechanism');
+  assert(supervisorSource.includes('run.replayClosed = true'));
+  assert(supervisorSource.includes('!run.replayClosed'));
+  assert(supervisorSource.indexOf('run.replayClosed = true')
+    < supervisorSource.indexOf('this.spawnChild('));
+  assert(!/OPENCODE_SERVER_PASSWORD/.test(runtimeSource),
+    'runtime journal grammar cannot name or retain the OpenCode server password');
+
+  assert(adapterSource.includes('key === OPENCODE_SERVER_PASSWORD_ENV_KEY'));
+  assert(adapterSource.includes("ownValue(binding, 'envKey') !== OPENCODE_SERVER_PASSWORD_ENV_KEY"));
+  assert(adapterSource.includes("ownValue(binding, 'secretRef') !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF"));
+  assert(profileSource.includes("input.role === 'owned_server' || input.role === 'attach_task'"));
+  assert(profileSource.includes('? SERVER_SECRET_BINDING'));
+  assert(supervisorSource.includes('options.env[binding.envKey] = password'));
+  assert(supervisorSource.includes("delete options.env[binding.envKey]"));
+  assert(supervisorSource.includes("headers.Authorization = ''"));
+  assert(supervisorSource.includes('delete headers.Authorization'));
+  assert(supervisorSource.includes('credentialBytes.fill(0)'));
+  assert(supervisorSource.includes('secret.fill(0)'));
+
+  for (const secretProof of [
+    'fixedEnv: { OPENCODE_SERVER_PASSWORD: passwordCanary }',
+    "fixedEnv: { SAFE_VALUE: `Basic ${passwordCanary}` }",
+    "spawnSecretEnvBindings: [{ envKey: 'ARBITRARY_PASSWORD', secretRef: 'arbitrary' }]",
+    'JSON.stringify(immutableOwned).includes(passwordCanary)',
+    'JSON.stringify(passed).includes(passwordCanary)',
+    'JSON.stringify(failed).includes(passwordCanary)',
+    'runtime cleanup does not gain arbitrary recursive deletion authority',
+  ]) assert(providerContractSource.includes(secretProof), `provider contract retains ${secretProof}`);
+  for (const transientProof of [
+    'server spawn environment is scrubbed immediately after spawn returns',
+    'cold task receives no server password',
+    'inherited password is scrubbed from cold task environment',
+    'transient Basic header is scrubbed after the direct HTTP call',
+    'attach spawn environment is scrubbed immediately after spawn returns',
+    'raw credentials are not serialized',
+    'server stdin receives no task bytes',
+    'creates no fallback task child',
+  ]) assert(topologyTestSource.includes(transientProof), `topology contract retains ${transientProof}`);
+  for (const browserProof of [
+    'secretCanary',
+    'taskCanary',
+    'argvCanary',
+    'envCanary',
+    'pathCanary',
+    'endpointCanary',
+    'rawNativeCanary',
+  ]) assert(eventStoreTestSource.includes(browserProof), `browser projection rejects ${browserProof}`);
+  assert(providersUiTestSource.includes(
+    'provider rendering contains no native version, path, topology, secret, model, or continuation field',
+  ));
+
+  const controlPanelSource = fs.readFileSync(path.join(
+    repoRoot,
+    'extension',
+    'ui',
+    'control_panel.html',
+  ), 'utf8');
+  const sidepanelSource = fs.readFileSync(path.join(
+    repoRoot,
+    'extension',
+    'ui',
+    'sidepanel.html',
+  ), 'utf8');
+  const helperTag = '<script src="../utils/delegation-providers.js"></script>';
+  assert.equal(controlPanelSource.split(helperTag).length - 1, 1);
+  assert.equal(sidepanelSource.split(helperTag).length - 1, 1);
 
   for (const forbidden of [
     '--model',

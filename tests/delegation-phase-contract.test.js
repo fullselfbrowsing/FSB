@@ -22,6 +22,38 @@ const PHASE63_RESEARCH_PATH = `${PHASE63_DIR}/63-RESEARCH.md`;
 const PHASE63_UI_SPEC_PATH = `${PHASE63_DIR}/63-UI-SPEC.md`;
 const PHASE64_DIR = '.planning/phases/64-opencode-adapter';
 const PHASE64_UAT_PATH = `${PHASE64_DIR}/64-HUMAN-UAT.md`;
+const PHASE64_VALIDATION_PATH = `${PHASE64_DIR}/64-VALIDATION.md`;
+
+const PHASE64_NEW_ROOT_COMMANDS = Object.freeze([
+  'node tests/phase64-full-tests-harness.test.js',
+  'node tests/mcp-opencode-adapter.test.js',
+  'node tests/mcp-opencode-server-topology.test.js',
+]);
+
+const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
+  'node tests/agent-provider-forbidden-flags.test.js',
+  'node tests/delegation-routing.test.js',
+  'node tests/delegation-consent.test.js',
+  'node tests/delegation-event-store.test.js',
+  'node tests/delegation-controller.test.js',
+  'node tests/delegation-sidepanel-ui.test.js',
+  'node tests/delegation-phase-contract.test.js',
+  'node tests/mcp-bridge-topology.test.js',
+  'node tests/mcp-reverse-channel-contract.test.js',
+  'node tests/mcp-bridge-background-dispatch.test.js',
+  'node tests/agent-protocol-drift-diagnostics.test.js',
+  'node tests/mcp-agent-provider-contract.test.js',
+  'node tests/mcp-adapter-compatibility.test.js',
+  'node tests/mcp-agent-drift-smoke.test.js',
+  'node tests/mcp-agent-stream-fixture.test.js',
+  'node tests/mcp-spawn-supervisor.test.js',
+  'node tests/mcp-agent-orphan-recovery.test.js',
+  'node tests/mcp-diagnostics-status.test.js',
+  'node tests/mcp-client-inventory.test.js',
+  'node tests/mcp-agent-providers-storage.test.js',
+  'node tests/providers-panel-logic.test.js',
+  'node tests/providers-panel-ui.test.js',
+]);
 
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
@@ -332,6 +364,189 @@ function runPhase64UatLedgerContract() {
     check(phase64UatViolations(candidate).length > 0,
       `Phase 64 honesty parser rejects ${label}`);
   }
+}
+
+function phase64PlanGraph() {
+  const planNames = fs.readdirSync(path.join(ROOT, PHASE64_DIR))
+    .filter((name) => /^64-\d{2}-PLAN\.md$/.test(name))
+    .sort((left, right) => left.localeCompare(right));
+  const plans = planNames.map((name) => {
+    const source = read(`${PHASE64_DIR}/${name}`);
+    const plan = (name.match(/^64-(\d{2})-/) || [null, null])[1];
+    const wave = Number((source.match(/^wave:\s*(\d+)$/m) || [null, NaN])[1]);
+    const dependencyBlock = (source.match(/^depends_on:\s*\n([\s\S]*?)^files_modified:/m)
+      || [null, ''])[1];
+    const dependencies = Array.from(
+      dependencyBlock.matchAll(/^\s+- ["']64-(\d{2})["']\s*$/gm),
+      (match) => match[1],
+    );
+    const tasks = Array.from(source.matchAll(/<name>(64-\d{2}-\d{2}):/g), (match) => match[1]);
+    const commands = Array.from(
+      source.matchAll(/<automated>([\s\S]*?)<\/automated>/g),
+      (match) => decodeXml(match[1]),
+    );
+    return Object.freeze({ name, plan, wave, dependencies, tasks, commands, source });
+  });
+  return Object.freeze({ planNames, plans });
+}
+
+function phase64TransitivelyDepends(plansById, planId, targetId, seen = new Set()) {
+  if (planId === targetId) return true;
+  if (seen.has(planId)) return false;
+  seen.add(planId);
+  const plan = plansById.get(planId);
+  return Boolean(plan && plan.dependencies.some((dependency) => (
+    phase64TransitivelyDepends(plansById, dependency, targetId, seen)
+  )));
+}
+
+function phase64HtmlSources() {
+  const result = [];
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolutePath);
+      if (entry.isFile() && entry.name.endsWith('.html')) {
+        result.push(fs.readFileSync(absolutePath, 'utf8'));
+      }
+    }
+  };
+  visit(path.join(ROOT, 'extension'));
+  return result;
+}
+
+function runPhase64WiringContract() {
+  console.log('\n--- Phase 64 first-task, atomic-exposure, runner, root, and CI contract ---');
+
+  const { planNames, plans } = phase64PlanGraph();
+  equal(planNames, Array.from({ length: 13 }, (_, index) =>
+    `64-${String(index + 1).padStart(2, '0')}-PLAN.md`),
+  'Phase 64 retains the exact thirteen-plan roster');
+  const plansById = new Map(plans.map((plan) => [plan.plan, plan]));
+  const firstPlan = plansById.get('01');
+  check(firstPlan?.wave === 1
+      && firstPlan.dependencies.length === 0
+      && JSON.stringify(firstPlan.tasks) === JSON.stringify(['64-01-01'])
+      && plans.filter((plan) => plan.wave === 1).length === 1,
+  '64-01-01 is the sole Wave-1 and first implementation task');
+  check(plans.filter((plan) => plan.plan !== '01').every((plan) => (
+    phase64TransitivelyDepends(plansById, plan.plan, '01')
+  )), 'every later Phase 64 plan depends transitively on Plan 01');
+  for (const firstCommitToken of [
+    'first-commit-drift-gate',
+    'mcp-agent-stream-fixture.test.js',
+    'mcp-agent-drift-smoke.test.js',
+    'schema-derived-contract',
+    'native negative cases',
+    'existing Phase 62 CI',
+  ]) {
+    check(firstPlan?.source.includes(firstCommitToken),
+      `first task retains parser/fixture/native/CI proof: ${firstCommitToken}`);
+  }
+
+  const exposurePlan = plansById.get('05');
+  check(JSON.stringify(exposurePlan?.tasks) === JSON.stringify(['64-05-01']),
+    'Plan 05 retains one atomic production-exposure task');
+  for (const exposureToken of [
+    'mcp/src/agent-providers/opencode.ts',
+    'mcp/src/agent-providers/registry.ts',
+    'mcp/src/agent-providers/compatibility.ts',
+    'tests/mcp-agent-drift-smoke.test.js',
+    'fixture/parser/matrix/drift bijection',
+  ]) {
+    check(exposurePlan?.source.includes(exposureToken),
+      `Plan 05 atomically owns production exposure: ${exposureToken}`);
+  }
+  check(plans.every((plan) => plan.commands.length === plan.tasks.length),
+    'every Phase 64 task has exactly one automated command');
+  check(plans.every((plan) => plan.commands.every((command) => (
+    !command.includes('npm --prefix mcp run build')
+  ))), 'no Phase 64 automated command contains a bare MCP build');
+  check(plans.every((plan) => !/^\s+- mcp\/build\//m.test(plan.source)),
+    'no Phase 64 plan owns a generated mcp/build file');
+
+  check(exists('scripts/run-phase64-full-tests.mjs'), 'Phase 64 focused runner exists');
+  if (exists('scripts/run-phase64-full-tests.mjs')) {
+    const runner = read('scripts/run-phase64-full-tests.mjs');
+    check(exactOccurrences(runner, "'--commands-json'") === 1
+        && runner.includes('run-mcp-build-preserving-workspace.mjs')
+        && runner.includes('shell: false')
+        && !runner.includes('npm --prefix mcp run build'),
+    'focused runner delegates one shell-free closed matrix to the existing build preserver');
+    for (const suite of [
+      'tests/mcp-opencode-adapter.test.js',
+      'tests/mcp-agent-stream-fixture.test.js',
+      'tests/mcp-agent-drift-smoke.test.js',
+      'tests/mcp-opencode-server-topology.test.js',
+      'tests/mcp-agent-provider-contract.test.js',
+      'tests/mcp-adapter-compatibility.test.js',
+      'tests/mcp-spawn-supervisor.test.js',
+      'tests/mcp-agent-orphan-recovery.test.js',
+      'tests/mcp-reverse-channel-contract.test.js',
+      'tests/mcp-bridge-topology.test.js',
+      'tests/mcp-client-inventory.test.js',
+      'tests/mcp-diagnostics-status.test.js',
+      'tests/mcp-agent-providers-storage.test.js',
+      'tests/delegation-consent.test.js',
+      'tests/delegation-routing.test.js',
+      'tests/delegation-controller.test.js',
+      'tests/delegation-event-store.test.js',
+      'tests/agent-protocol-drift-diagnostics.test.js',
+      'tests/providers-panel-logic.test.js',
+      'tests/providers-panel-ui.test.js',
+      'tests/delegation-sidepanel-ui.test.js',
+      'tests/agent-provider-forbidden-flags.test.js',
+      'tests/delegation-phase-contract.test.js',
+    ]) {
+      check(runner.includes(suite), `focused runner covers ${suite}`);
+    }
+  }
+
+  const packageJson64 = JSON.parse(read('package.json'));
+  const rootCommands64 = packageJson64.scripts.test.split(' && ');
+  for (const command of [...PHASE64_NEW_ROOT_COMMANDS, ...PHASE64_RETAINED_ROOT_COMMANDS]) {
+    check(rootCommands64.filter((candidate) => candidate === command).length === 1,
+      `${command} appears exactly once in the serial root chain`);
+  }
+  check(rootCommands64.indexOf('node tests/phase60-full-tests-harness.test.js')
+      < rootCommands64.indexOf('node tests/phase64-full-tests-harness.test.js')
+      && rootCommands64.indexOf('node tests/phase64-full-tests-harness.test.js')
+        < rootCommands64.indexOf('node tests/delegation-routing.test.js'),
+  'Phase 64 preservation harness occupies the protected pre-delegation slot');
+  check(rootCommands64.indexOf('npm --prefix mcp run build')
+      < rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js')
+      && rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js')
+        < rootCommands64.indexOf('node tests/mcp-agent-drift-smoke.test.js')
+      && rootCommands64.indexOf('node tests/mcp-spawn-supervisor.test.js')
+        < rootCommands64.indexOf('node tests/mcp-opencode-server-topology.test.js')
+      && rootCommands64.indexOf('node tests/mcp-opencode-server-topology.test.js')
+        < rootCommands64.indexOf('node tests/mcp-agent-orphan-recovery.test.js'),
+  'the two OpenCode suites retain their dependency-aware post-build root order');
+  check(rootCommands64.filter((command) => command === 'npm --prefix mcp run build').length === 1,
+    'root tests retain one MCP build boundary');
+
+  const ci64 = read('.github/workflows/ci.yml');
+  check(exactOccurrences(ci64, 'name: Phase 64 OpenCode contract (sole Linux root invocation)') === 1
+      && exactOccurrences(ci64, 'run: npm test') === 1
+      && !ci64.includes('run: node scripts/run-phase64-full-tests.mjs'),
+  'CI retains one source-pinned Linux root invocation without a duplicate focused run');
+  check(exactOccurrences(ci64, 'name: Phase 62 adapter drift smoke') === 1
+      && exactOccurrences(ci64, 'run: node tests/mcp-agent-drift-smoke.test.js') === 1,
+  'CI retains exactly one generalized adapter drift-smoke step');
+  const allGreenStart64 = ci64.indexOf('  all-green:');
+  const allGreen64 = allGreenStart64 < 0 ? '' : ci64.slice(allGreenStart64);
+  check(/needs:\s*\[[^\]]*extension[^\]]*mcp-smoke[^\]]*\]/.test(allGreen64),
+    'all-green still depends on the root and direct drift-smoke jobs');
+
+  const htmlSources = phase64HtmlSources();
+  check(htmlSources.reduce((count, source) => (
+    count + exactOccurrences(source, '<script src="../utils/delegation-providers.js"></script>')
+  ), 0) === 2
+      && exactOccurrences(read('extension/ui/control_panel.html'),
+        '<script src="../utils/delegation-providers.js"></script>') === 1
+      && exactOccurrences(read('extension/ui/sidepanel.html'),
+        '<script src="../utils/delegation-providers.js"></script>') === 1,
+  'only the two reviewed local HTML contexts load the canonical provider helper');
 }
 
 function runPhase63UatLedgerContract() {
@@ -832,12 +1047,14 @@ if (sectionArgs.length > 0) {
         'phase63-uat-ledger',
         'phase63-final-contract',
         'phase64-uat-ledger',
+        'phase64-validation',
       ].includes(sectionArgs[1])) {
-    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger]');
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger|phase64-validation]');
     process.exit(2);
   }
-  if (sectionArgs[1] === 'phase64-uat-ledger') {
+  if (sectionArgs[1].startsWith('phase64-')) {
     runPhase64UatLedgerContract();
+    if (sectionArgs[1] === 'phase64-validation') runPhase64WiringContract();
   } else {
     runPhase63UatLedgerContract();
     if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
@@ -850,6 +1067,7 @@ if (sectionArgs.length > 0) {
 runPhase63UatLedgerContract();
 runPhase63FinalContract();
 runPhase64UatLedgerContract();
+runPhase64WiringContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.
