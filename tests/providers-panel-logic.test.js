@@ -12,17 +12,27 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
+const delegationProvidersPath = path.join(
+  repoRoot,
+  'extension',
+  'utils',
+  'delegation-providers.js'
+);
 const helperPath = path.join(repoRoot, 'extension', 'ui', 'providers-panel.js');
 const optionsPath = path.join(repoRoot, 'extension', 'ui', 'options.js');
 const controlPanelPath = path.join(repoRoot, 'extension', 'ui', 'control_panel.html');
 const packagePath = path.join(repoRoot, 'package.json');
+const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
 const helperSource = fs.readFileSync(helperPath, 'utf8');
 const optionsSource = fs.readFileSync(optionsPath, 'utf8');
 const controlPanelSource = fs.readFileSync(controlPanelPath, 'utf8');
 const packageSource = fs.readFileSync(packagePath, 'utf8');
 
+delete globalThis.FsbDelegationProviders;
 delete globalThis.FSBProvidersPanel;
+delete require.cache[require.resolve(delegationProvidersPath)];
 delete require.cache[require.resolve(helperPath)];
+const delegationProviders = require(delegationProvidersPath);
 const providers = require(helperPath);
 
 function clone(value) {
@@ -83,6 +93,9 @@ async function main() {
 
   const classicContext = { Object, Array, Number };
   classicContext.globalThis = classicContext;
+  vm.runInNewContext(delegationProvidersSource, classicContext, {
+    filename: 'delegation-providers.js'
+  });
   vm.runInNewContext(helperSource, classicContext, { filename: 'providers-panel.js' });
   assert.equal(Object.isFrozen(classicContext.FSBProvidersPanel), true,
     'classic-script execution assigns one frozen global namespace');
@@ -480,12 +493,36 @@ async function main() {
       formatAbsolute
     ), null, `${providerId} receives no compatibility model`);
   }
-  for (const providerId of ['opencode', 'codex']) {
+  for (const providerId of delegationProviders.ids()) {
     assert.deepEqual(providers.getCompatibilityDisplayModel(
       providerId,
       compatibilityRow('supported', 'within_tested_range'),
       formatAbsolute
-    ), unsupportedCompatibility, `${providerId} remains Unsupported until its adapter ships`);
+    ), supportedCompatibility, `${providerId} maps fresh validated evidence to Supported`);
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      providerId,
+      compatibilityRow('degraded', 'newer_than_tested_range'),
+      formatAbsolute
+    ), degradedNewerCompatibility, `${providerId} maps newer evidence to Degraded`);
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      providerId,
+      compatibilityRow('degraded', 'evidence_stale'),
+      formatAbsolute
+    ), degradedStaleCompatibility, `${providerId} maps stale evidence to Degraded`);
+    for (const reason of unsupportedReasons) {
+      assert.deepEqual(providers.getCompatibilityDisplayModel(
+        providerId,
+        compatibilityRow('unsupported', reason),
+        formatAbsolute
+      ), unsupportedCompatibility, `${providerId}/${reason} maps to Unsupported`);
+    }
+  }
+  for (const providerId of ['codex']) {
+    assert.deepEqual(providers.getCompatibilityDisplayModel(
+      providerId,
+      compatibilityRow('supported', 'within_tested_range'),
+      formatAbsolute
+    ), unsupportedCompatibility, `${providerId} remains Unsupported while its adapter is unshipped`);
   }
 
   let rowAccessorCalls = 0;
@@ -579,6 +616,10 @@ async function main() {
     label: 'Not reported',
     help: 'Claude Code does not report an auth state that FSB can safely read.'
   }, 'Claude auth display remains exact and does not infer a state');
+  assert.deepEqual(providers.getAgentAuthDisplay('opencode'), {
+    label: 'Not reported',
+    help: 'The CLI has not reported its account type.'
+  }, 'OpenCode auth remains exact Not reported with the approved generic help');
   assert.equal(providers.getAgentAuthDisplay('xai'), null,
     'API providers receive no agent auth display model');
   assert.notEqual(providers.getAgentAuthDisplay('claude-code'),
@@ -595,6 +636,84 @@ async function main() {
   assert.doesNotMatch(compatibilityMapperSource,
     /(?:split\s*\(\s*['"]\.['"]|localeCompare|parseInt|parseFloat)/,
     'UI compatibility mapping contains no version-comparison primitive');
+  assert.doesNotMatch(compatibilityMapperSource,
+    /providerId\s*[!=]==?\s*['"](?:claude-code|opencode)['"]/,
+    'UI compatibility mapping has no provider-specific Claude/OpenCode state branch');
+  assert.match(helperSource, /FsbDelegationProviders/,
+    'UI compatibility membership comes from the canonical delegation provider helper');
+
+  const providerProjectionSource = [
+    extractFunction(optionsSource, 'function getOwnDataValue('),
+    extractFunction(optionsSource, 'function isProviderDataRecord('),
+    extractFunction(optionsSource, 'function copyProviderClientMap('),
+    extractFunction(optionsSource, 'function copyProviderDataRecord('),
+    extractFunction(optionsSource, 'function projectStaleProviderCompatibility('),
+    extractFunction(optionsSource, 'function getProviderCompatibilityCheckedAt('),
+    extractFunction(optionsSource, 'function hasDegradedProviderCompatibility('),
+    extractFunction(optionsSource, 'function getCompatibilityRefreshFailureMessage(')
+  ].join('\n');
+  assert.match(providerProjectionSource, /getShippedDelegationProviderIds\(\)/,
+    'expiry and degraded-summary logic iterate the exact shipped provider roster');
+  assert.doesNotMatch(providerProjectionSource, /getOwnDataValue\(clients, 'claude-code'\)/,
+    'expiry and degraded-summary logic contain no Claude-only client lookup');
+
+  const projectionContext = {
+    Object,
+    Array,
+    Number,
+    getShippedDelegationProviderIds: () => delegationProviders.ids()
+  };
+  projectionContext.globalThis = projectionContext;
+  vm.runInNewContext(
+    `${providerProjectionSource}\n`
+      + 'this.getCheckedAt = getProviderCompatibilityCheckedAt;\n'
+      + 'this.projectStale = projectStaleProviderCompatibility;\n'
+      + 'this.failureMessage = getCompatibilityRefreshFailureMessage;',
+    projectionContext,
+    { filename: 'options.js#provider-compatibility-roster' }
+  );
+  const dualCompatibility = {
+    'claude-code': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 2000 }
+    },
+    opencode: {
+      compatibility: { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 1000 }
+    }
+  };
+  assert.equal(projectionContext.getCheckedAt(dualCompatibility), 1000,
+    'compatibility expiry uses the earliest exact shipped-provider timestamp');
+  assert.equal(projectionContext.getCheckedAt({ opencode: dualCompatibility.opencode }), null,
+    'compatibility expiry fails closed when one shipped provider row is absent');
+  assert.equal(
+    projectionContext.failureMessage(dualCompatibility),
+    'Compatibility data could not be refreshed. Cached support is now Degraded.',
+    'an OpenCode degraded row selects the exact cached-support failure copy'
+  );
+  const staleProjection = projectionContext.projectStale({
+    'claude-code': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
+    },
+    opencode: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
+    },
+    codex: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
+    },
+    xai: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
+    }
+  });
+  for (const providerId of delegationProviders.ids()) {
+    assert.deepEqual(clone(staleProjection[providerId].compatibility), {
+      status: 'degraded', reason: 'evidence_stale', checkedAt: 3000
+    }, `${providerId} support downgrades through the shared shipped roster`);
+  }
+  assert.deepEqual(clone(staleProjection.codex.compatibility), {
+    status: 'supported', reason: 'within_tested_range', checkedAt: 3000
+  }, 'the unshipped Codex row is not granted a compatibility transition');
+  assert.deepEqual(clone(staleProjection.xai.compatibility), {
+    status: 'supported', reason: 'within_tested_range', checkedAt: 3000
+  }, 'API rows are outside shipped-agent compatibility transitions');
 
   for (const authState of ['subscription', ' SUBSCRIPTION ', { mode: 'subscription' }]) {
     assert.deepEqual(providers.getBillingLabel(authState), {
@@ -684,23 +803,24 @@ async function main() {
     extractFunction(optionsSource, 'function renderDelegationTrustControl()'),
     extractFunction(optionsSource, 'async function clearDelegationTrust()')
   ].join('\n');
-  assert.match(optionsSource, /Restore confirmation for Claude Code/,
-    'Providers exposes the exact restore-confirmation action');
-  assert.match(optionsSource, /Confirmation restored for Claude Code/,
-    'Providers reports the exact authoritative clear success');
-  assert.match(optionsSource,
-    /chrome\.runtime\.sendMessage\(\{\s*type: 'FSB_DELEGATION_CLEAR_TRUST',\s*providerId: 'claude-code'\s*\}\)/,
-    'Providers sends only the exact authority-reducing clear command');
+  assert.match(trustControlSource, /getCanonicalDelegationProvider\(/,
+    'trust reset resolves the selected provider through canonical metadata');
+  assert.doesNotMatch(trustControlSource, /['"]claude-code['"]/,
+    'trust reset has no Claude-only provider literal');
+  assert.match(trustControlSource,
+    /type: 'FSB_DELEGATION_CLEAR_TRUST',[\s\S]*providerId: provider\.id/,
+    'Providers sends only the exact selected canonical provider id');
   assert.doesNotMatch(trustControlSource, /chrome\.storage|localStorage|markUnsavedChanges|saveSettings/,
     'restore confirmation never reads trust storage or joins Save Settings');
   assert.match(trustControlSource,
-    /providerPanelState\.providerKind === 'agent'[\s\S]*providerPanelState\.agentProviderId === 'claude-code'/,
-    'restore confirmation is visible only for the canonical Claude agent pair');
+    /providerPanelState\.providerKind[\s\S]*providerPanelState\.agentProviderId/,
+    'restore confirmation remains bound to the selected agent pair');
 
-  function makeTrustControlHarness(sendMessage) {
-    const state = { providerKind: 'agent', agentProviderId: 'claude-code' };
+  function makeTrustControlHarness(sendMessage, providerId = 'claude-code') {
+    const state = { providerKind: 'agent', agentProviderId: providerId };
     const elements = {
       delegationTrustSection: { hidden: true },
+      delegationTrustCopy: { textContent: '' },
       delegationTrustClearBtn: { disabled: false },
       delegationTrustStatus: { textContent: '' }
     };
@@ -708,6 +828,7 @@ async function main() {
       providerPanelState: state,
       elements,
       chrome: { runtime: { sendMessage } },
+      getCanonicalDelegationProvider(id) { return delegationProviders.get(id); },
       Promise,
       Error
     };
@@ -731,6 +852,10 @@ async function main() {
     harness.render();
     assert.equal(harness.elements.delegationTrustSection.hidden, false,
       'canonical Claude details show restore confirmation');
+    assert.equal(harness.elements.delegationTrustCopy.textContent,
+      'Require confirmation before Claude Code starts another delegated browser task.');
+    assert.equal(harness.elements.delegationTrustClearBtn.textContent,
+      'Restore confirmation for Claude Code');
     const first = harness.clear();
     const duplicate = harness.clear();
     assert.equal(sent.length, 1, 'pending clicks dedupe to one clear command');
@@ -756,6 +881,27 @@ async function main() {
     harness.render();
     assert.equal(harness.elements.delegationTrustSection.hidden, true,
       'future unsupported agent details do not render the Claude trust control');
+  }
+
+  {
+    const sent = [];
+    const harness = makeTrustControlHarness(async (request) => {
+      sent.push(clone(request));
+      return { ok: true, providerId: 'opencode', trusted: false };
+    }, 'opencode');
+    harness.render();
+    assert.equal(harness.elements.delegationTrustSection.hidden, false,
+      'canonical OpenCode details expose the same restore-confirmation control');
+    assert.equal(harness.elements.delegationTrustCopy.textContent,
+      'Require confirmation before OpenCode starts another delegated browser task.');
+    assert.equal(harness.elements.delegationTrustClearBtn.textContent,
+      'Restore confirmation for OpenCode');
+    await harness.clear();
+    assert.deepEqual(sent, [{
+      type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'opencode'
+    }], 'OpenCode trust reset sends only its canonical provider id');
+    assert.equal(harness.elements.delegationTrustStatus.textContent,
+      'Confirmation restored for OpenCode');
   }
 
   {

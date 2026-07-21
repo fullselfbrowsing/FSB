@@ -665,11 +665,33 @@ async function main() {
       reason: 'within_tested_range',
       checkedAt
     }, 'snapshot-only OpenCode compatibility ships from its validated daemon row');
+    for (const providerId of ['claude-code', 'opencode']) {
+      assert.deepEqual(providersPanel.getCompatibilityDisplayModel(
+        providerId,
+        merged[providerId],
+        (value) => `absolute:${value}`
+      ), {
+        label: 'Supported',
+        icon: 'fa-circle-check',
+        className: 'compatibility-badge--supported',
+        detail: "This CLI is within FSB's fixture-tested compatibility range.",
+        checkedText: `Checked absolute:${checkedAt}`
+      }, `${providerId} safe storage projection reaches the shared Supported view model`);
+    }
     assert.deepEqual(merged.codex.compatibility, {
       status: 'unsupported',
       reason: 'adapter_unshipped',
       checkedAt
     }, 'snapshot-only Codex compatibility remains closed until its adapter ships');
+    assert.equal(
+      providersPanel.getCompatibilityDisplayModel(
+        'codex',
+        merged.codex,
+        (value) => `absolute:${value}`
+      ).label,
+      'Unsupported',
+      'Codex remains fail-closed Unsupported in the Providers view model'
+    );
     for (const providerId of providersPanel.AGENT_PROVIDER_IDS) {
       assert.deepEqual({
         clicked: merged[providerId].clicked,
