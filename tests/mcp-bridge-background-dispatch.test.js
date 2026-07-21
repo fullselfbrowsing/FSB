@@ -614,11 +614,11 @@ function buildDelegationCommandHarness(options = {}) {
     },
     async writeTrustFromChallenge(input) {
       calls.push(['writeTrustFromChallenge', toPlainObject(input)]);
-      return options.writeTrustResult || { ok: true, providerId: 'claude-code', trusted: true };
+      return options.writeTrustResult || { ok: true, providerId: input.providerId, trusted: true };
     },
     async clearTrusted(input) {
       calls.push(['clearTrusted', toPlainObject(input)]);
-      return options.clearTrustResult || { ok: true, providerId: 'claude-code', trusted: false };
+      return options.clearTrustResult || { ok: true, providerId: input.providerId, trusted: false };
     }
   };
   const context = {
@@ -696,7 +696,11 @@ function buildDelegationCommandHarness(options = {}) {
     context,
     { filename: 'background.js#delegation-composition' }
   );
-  return { command: context.__delegationCommand, calls };
+  return {
+    command: context.__delegationCommand,
+    calls,
+    setProviderId(providerId) { providerConfig.agentProviderId = providerId; }
+  };
 }
 
 function extractDriftSettlementSource(backgroundSource) {
@@ -1905,6 +1909,24 @@ async function runDelegationAuthorityCases() {
       providerConfig: { agentProviderId: 'opencode' }
     });
     const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'OpenCode-bound consent task'
+    });
+    assertEqual(result.providerId, 'opencode',
+      'consent returns the exact authoritative OpenCode provider');
+    assertEqual(result.providerLabel, 'OpenCode',
+      'consent returns only the canonical OpenCode label');
+    assertDeepEqual(harness.calls.find((call) => call[0] === 'issueChallenge')[1], {
+      providerId: 'opencode',
+      taskDigest: harness.calls.find((call) => call[0] === 'issueChallenge')[1].taskDigest
+    }, 'challenge issuance binds the authoritative OpenCode id and task digest only');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
       type: 'FSB_DELEGATION_PREFLIGHT',
       task: 'Use OpenCode for this task'
     });
@@ -1914,6 +1936,57 @@ async function runDelegationAuthorityCases() {
       providerId: 'opencode',
       providerLabel: 'OpenCode'
     }, 'background preflight authorizes OpenCode from saved settings and compatibility');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const first = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'opencode'
+    });
+    const second = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'opencode'
+    });
+    assertDeepEqual(first, { ok: true, providerId: 'opencode', trusted: false },
+      'OpenCode clear returns the exact authority-reducing result');
+    assertDeepEqual(second, first, 'OpenCode clear remains idempotent');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: 'dch_fixture',
+      providerId: 'opencode',
+      trusted: true
+    });
+    assertDeepEqual(result, { ok: true, providerId: 'opencode', trusted: true },
+      'OpenCode trust grant returns the exact authoritative provider');
+    assertDeepEqual(harness.calls.map((call) => call[0]), [
+      'getMergedClients', 'writeTrustFromChallenge'
+    ], 'selection/preflight recheck precedes provider-local trust mutation');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    harness.setProviderId('claude-code');
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: 'dch_fixture',
+      providerId: 'opencode',
+      trusted: true
+    });
+    assertDeepEqual(result, { ok: false, code: 'trust_provider_changed' },
+      'saved-provider change fails before challenge trust authority is consumed');
+    assertEqual(harness.calls.some((call) => call[0] === 'writeTrustFromChallenge'), false,
+      'provider-changed trust grant never reaches the challenge mutation primitive');
   }
 
   {

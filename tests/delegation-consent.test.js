@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
+const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const modulePath = path.join(repoRoot, 'extension', 'utils', 'delegation-consent.js');
 const source = fs.readFileSync(modulePath, 'utf8');
 const storageKey = 'fsbDelegationConsentChallenges';
@@ -72,8 +73,11 @@ function installChrome(harness, localHarness) {
 }
 
 function loadFresh() {
+  delete globalThis.FsbDelegationProviders;
   delete globalThis.FsbDelegationConsent;
+  delete require.cache[require.resolve(delegationProvidersPath)];
   delete require.cache[require.resolve(modulePath)];
+  require(delegationProvidersPath);
   return require(modulePath);
 }
 
@@ -88,8 +92,13 @@ function getOnlyRecord(harness) {
   return envelope.challenges[keys[0]];
 }
 
-async function issue(consent, taskDigest = digest('open a background tab'), ttlMs = 60_000) {
-  return consent.issueChallenge({ providerId: 'claude-code', taskDigest, ttlMs });
+async function issue(
+  consent,
+  taskDigest = digest('open a background tab'),
+  ttlMs = 60_000,
+  providerId = 'claude-code'
+) {
+  return consent.issueChallenge({ providerId, taskDigest, ttlMs });
 }
 
 async function main() {
@@ -175,13 +184,29 @@ async function main() {
     taskDigest
   }), { ok: false, code: 'challenge_not_found' });
 
-  const providerMismatch = await issue(consent, digest('provider mismatch'));
+  const providerMismatch = await issue(
+    consent,
+    digest('provider mismatch'),
+    60_000,
+    'opencode'
+  );
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: providerMismatch.challengeId,
-    providerId: 'codex',
+    providerId: 'claude-code',
     taskDigest: digest('provider mismatch')
   }), { ok: false, code: 'challenge_provider_mismatch' });
-  assert.equal(harness.values.has(storageKey), false, 'provider mismatch burns the exact challenge');
+  assert.equal(harness.values.has(storageKey), true,
+    'cross-provider mismatch cannot consume authority for the bound provider');
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: providerMismatch.challengeId,
+    providerId: 'opencode',
+    taskDigest: digest('provider mismatch')
+  }), {
+    ok: true,
+    challengeId: providerMismatch.challengeId,
+    providerId: 'opencode',
+    taskDigest: digest('provider mismatch')
+  }, 'the originally bound provider can still consume after a cross-provider attempt');
 
   const taskMismatch = await issue(consent, digest('task one'));
   assert.deepEqual(await consent.consumeChallenge({
@@ -244,7 +269,7 @@ async function main() {
     { ok: false, code: 'challenge_storage_corrupt' });
   assert.equal(({}).polluted, undefined);
   harness.values.clear();
-  for (const providerId of ['', 'Claude-Code', '__proto__', 'constructor', 'anthropic']) {
+  for (const providerId of ['', 'Claude-Code', 'codex', '__proto__', 'constructor', 'anthropic']) {
     assert.deepEqual(await consent.issueChallenge({ providerId, taskDigest }),
       { ok: false, code: 'invalid_challenge_request' });
   }
@@ -305,8 +330,32 @@ async function main() {
   assert.deepEqual(localHarness.values.get(consent.TRUST_STORAGE_KEY), {
     v: 1,
     providers: { 'claude-code': true }
-  }, 'trust is a separate versioned provider-local envelope');
+  }, 'legacy Claude-only trust remains a valid provider-local envelope');
   assert.equal(await consent.getTrusted('claude-code'), true);
+
+  const openCodeTrustChallenge = await issue(
+    consent,
+    digest('enable independent OpenCode trust'),
+    60_000,
+    'opencode'
+  );
+  assert.deepEqual(await consent.writeTrustFromChallenge({
+    challengeId: openCodeTrustChallenge.challengeId,
+    providerId: 'opencode',
+    trusted: true
+  }), { ok: true, providerId: 'opencode', trusted: true });
+  assert.deepEqual(localHarness.values.get(consent.TRUST_STORAGE_KEY), {
+    v: 1,
+    providers: { 'claude-code': true, opencode: true }
+  }, 'Claude and OpenCode trust entries coexist independently');
+  assert.equal(await consent.getTrusted('opencode'), true);
+  assert.deepEqual(await consent.clearTrusted({ providerId: 'opencode' }), {
+    ok: true, providerId: 'opencode', trusted: false
+  });
+  assert.equal(await consent.getTrusted('opencode'), false,
+    'clearing OpenCode restores only OpenCode confirmation');
+  assert.equal(await consent.getTrusted('claude-code'), true,
+    'clearing OpenCode cannot copy or clear Claude trust');
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: trustChallenge.challengeId,
     providerId: 'claude-code',
@@ -461,6 +510,8 @@ async function main() {
   assert.doesNotMatch(source, /consentGranted/);
   assert.doesNotMatch(source, /\bsetTrusted\b/);
   assert.doesNotMatch(source, /\btaskText\b|\bprompt\b|apiKey|password|credential/);
+  assert.doesNotMatch(source, /CANONICAL_PROVIDER_ID/,
+    'consent derives its exact shipped ids from the canonical provider helper');
 
   delete globalThis.chrome;
   console.log('delegation-consent.test.js: PASS');
