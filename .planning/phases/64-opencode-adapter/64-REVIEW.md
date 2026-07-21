@@ -1,6 +1,6 @@
 ---
 phase: 64-opencode-adapter
-reviewed: 2026-07-21T12:08:42Z
+reviewed: 2026-07-21T12:52:02Z
 depth: standard
 files_reviewed: 66
 files_reviewed_list:
@@ -71,76 +71,55 @@ files_reviewed_list:
   - tests/providers-panel-logic.test.js
   - tests/providers-panel-ui.test.js
 findings:
-  critical: 1
-  warning: 3
+  critical: 0
+  warning: 0
   info: 0
-  total: 4
-status: issues_found
+  total: 0
+status: clean
 ---
 
 # Phase 64: Code Review Report
 
-**Reviewed:** 2026-07-21T12:08:42Z
+**Reviewed:** 2026-07-21T12:52:02Z
 
 **Depth:** standard
 
 **Files Reviewed:** 66
 
-**Status:** issues found
+**Status:** clean
+
+## Summary
+
+The iteration-2 standard-depth review is clean at implementation HEAD `122bdd1c`. The exact original 66-file Phase 64 scope was re-reviewed against the phase context, research, validation, UI, security, and deferred-UAT contracts. The review concentrated additional call-chain analysis on the four iteration-1 fixes in commits `9935b7ce`, `20208cb1`, `5dd6e120`, and `122bdd1c`, including their production composition and lifecycle behavior rather than relying only on the added tests.
+
+CR-01 and WR-01/02/03 are genuinely resolved. Role-scoped OpenCode config graphs are materialized under the journal identity for each delegation, owned server, and policy probe before the corresponding process starts. Native OpenCode token metrics survive parser-to-store projection. The pinned provider credential/discovery roster is absent from process preflights, owned-server, cold-task, and attach-task environments while operational and native-sign-in roots remain available. Detached policy probes now have durable prepared/active journal states and startup recovery without false delegation restart-loss records.
+
+No Critical, Warning, or Info findings remain. No regression introduced by the fixes was found.
 
 ## Narrative Findings (AI reviewer)
 
-### Critical Issues
+None.
 
-#### CR-01: The production supervisor cannot construct or materialize an OpenCode runtime
+## Fixed-Finding Disposition
 
-**File:** `mcp/src/agent-providers/opencode.ts:71-83`; `mcp/src/agent-providers/spawn-supervisor.ts:1125-1194`, `mcp/src/agent-providers/spawn-supervisor.ts:2320-2345`, `mcp/src/agent-providers/spawn-supervisor.ts:3095-3102`; `mcp/src/agent-providers/opencode-profile.ts:367-377`; `mcp/src/agent-providers/runtime-files.ts:767-775`, `mcp/src/agent-providers/runtime-files.ts:1190-1201`
+| Original finding | Disposition |
+|---|---|
+| CR-01 — production runtime composition | **Closed.** The five-method adapter returns closed role-scoped declarations; production supplies exact role runtimes; real `AgentRuntimeFiles` prepares the three required artifacts before preflight/server/task spawn; task and server identities align with their journal paths; cold, warm attach, and cleanup are exercised through the production registry. |
+| WR-01 — OpenCode token persistence | **Closed.** The event store falls back from Claude-style `usage` to normalized OpenCode `tokens`, and the pinned parser fixture persists 18 input, 11 output, and 29 total tokens through the durable projection. |
+| WR-02 — inherited provider credentials | **Closed.** The deterministic 142-name OpenCode 1.14.25 credential/discovery boundary is source-pinned and scrubbed before every child role; poison canaries cover the full roster across process probes, server, cold, and attach calls while `PATH`, `HOME`, and XDG data/state/cache roots remain available. |
+| WR-03 — preflight crash recovery | **Closed.** Policy probes prepare a distinct `policy_preflight` runtime before spawn, activate it after process identity is confirmed, remove it only after tree settlement, and recover both prepared and active crash windows as infrastructure without emitting a lost-delegation disposition. |
 
-**Issue:** Every production OpenCode `delegate.start` fails before a child can spawn. `createProductionSpawnSupervisor` builds the production registry without `resolveOpenCodeProfileRuntime`, so the OpenCode adapter uses `unavailableProfileRuntime` and throws from `buildSpawn`. Supplying only that callback would still leave the path broken: the supervisor supplies the Claude-shaped one-file runtime context, while the profile requires the exact OpenCode config/test-home/managed-config triplet; `buildOpenCodeSpawnSpec` discards the profile's `privateArtifacts`; both delegation and owned-server `prepareRun` calls pass an empty artifact list even though runtime validation requires the exact three OpenCode artifacts; and process-json policy probes run before any private files are prepared. The owned server also receives a new `serverId`, but its fixed paths were derived from the task delegation id, while `AgentRuntimeFiles` requires paths derived from the journal entry's own id. The current composition therefore has no lifecycle-valid owner for either task or warm-server runtime files.
+## Verification Context
 
-The focused tests mask the production break. `tests/mcp-opencode-adapter.test.js:737-815` injects the missing resolver, and `tests/mcp-opencode-server-topology.test.js:425-498` uses fake adapters plus a fake runtime store that neither validates nor materializes the real private artifacts. No test starts OpenCode through the real `createProductionSpawnSupervisor` composition.
-
-**Fix:** Keep the exact five adapter methods, but extend the closed declarative result of `buildSpawn` so it carries role-scoped private-runtime declarations/artifacts. Have the production supervisor mint the task and provider-server runtime graphs before their respective policy probes or spawns, pass the exact role-specific paths in each spawn context, persist/materialize the required artifacts under the same ids used by their journal entries, and remove them in lifecycle order. Add a production-composition test using the real registry and `AgentRuntimeFiles` with only process/network seams stubbed; it must cover cold execution, warm attach, preflight ordering, and cleanup.
-
-### Warnings
-
-#### WR-01: Real OpenCode result token counts are dropped before persistence and UI projection
-
-**File:** `mcp/src/agent-providers/opencode-stream.ts:484-499`; `extension/utils/delegation-event-store.js:520-548`; `tests/fixtures/delegation-events.js:135-158`; `tests/delegation-event-store.test.js:361-378`
-
-**Issue:** The OpenCode parser emits token counters in `payload.tokens` with `total`, `input`, `output`, `reasoning`, and cache fields. The event store reads only Claude-style `payload.usage.input_tokens`, `output_tokens`, and `total_tokens`, so a genuine successful OpenCode result persists `null` input/output/total metrics and the delegated feed cannot display the counters the parser collected. The OpenCode event-store fixture does not exercise the native normalized shape: despite its name, it supplies Claude-style `usage`, `num_turns`, and `duration_ms`, which makes the test pass while the production boundary loses data.
-
-**Fix:** Define one provider-neutral normalized result metric shape and have both parsers emit it, or explicitly project the closed OpenCode `tokens` shape in the event store. Add an integration assertion that feeds the actual `parseOpenCodeEvents` output from the pinned Phase 64 stream fixture through the event store/controller and verifies the persisted token totals.
-
-#### WR-02: The spawn environment still inherits provider credentials that OpenCode can use as an API-key fallback
-
-**File:** `mcp/src/agent-providers/spawn-supervisor.ts:91-95`, `mcp/src/agent-providers/spawn-supervisor.ts:934-941`, `mcp/src/agent-providers/spawn-supervisor.ts:1880-1891`; `tests/mcp-spawn-supervisor.test.js:1233`
-
-**Issue:** The supervisor copies the daemon environment and removes only `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GEMINI_API_KEY`. The pinned OpenCode 1.14.25 provider implementation recognizes additional inherited credential and provider-discovery variables, including AWS profiles/keys/web-identity/container credentials and other provider-specific tokens. Those values survive into the policy probes, owned server, cold task, and attach task. A default model can therefore resolve through a shell credential rather than the user's retained OpenCode sign-in, silently changing account/provider and billing authority despite the phase's explicit no-provider-API-key-fallback contract. The current test only loops over the same three-name list and cannot catch this drift.
-
-**Fix:** For the pinned profile, establish a reviewed closed environment boundary that removes every upstream-recognized provider credential/discovery variable while retaining only the operational and XDG data/state variables OpenCode needs for its native sign-in. Add poison-canary tests for each denied credential family across preflight, server, cold, and attach spawns, and source-pin the deny roster to the exact upstream profile.
-
-#### WR-03: Detached policy-preflight process groups are not durably recoverable after a daemon crash
-
-**File:** `mcp/src/agent-providers/spawn-supervisor.ts:1637-1661`, `mcp/src/agent-providers/spawn-supervisor.ts:1667-1699`, `mcp/src/agent-providers/spawn-supervisor.ts:1720-1739`
-
-**Issue:** Each process-json policy attestation is spawned as a detached process group. The supervisor synthesizes a journal entry only in memory and records it in `entriesByPid`; it never calls `AgentRuntimeFiles.prepareRun` or `activateRun`. Normal success, timeout, and error paths attempt termination, but a daemon crash after spawn leaves no durable entry for startup recovery to inspect and kill. The bounded policy timeout does not help once the supervising daemon is gone, so an OpenCode preflight tree can outlive its owner and retain the private environment.
-
-**Fix:** Give detached policy probes a distinct durable runtime role and journal their prepare/activate/remove transitions, avoiding delegation-id collisions with the eventual task, or execute them through a non-detached lifecycle primitive that cannot outlive the supervisor. Add a crash-window recovery test from both post-spawn/pre-activation and active-preflight states.
-
-### Info
-
-No informational findings.
-
-## Verification Notes
-
-This was a standard-depth source review of the exact 66-file Phase 64 scope. The phase context, research, validation contract, and UI contract were used as review constraints. Focused tests and harnesses were inspected for false positives and missing production composition, but no test suite, build, authenticated OpenCode run, browser session, visual check, or human UAT was rerun as part of this review. The milestone-end genuine authenticated OpenCode-to-browser case remains correctly deferred; it cannot compensate for CR-01 because the production path currently fails before spawn.
-
-Only this review artifact was created. Existing source, generated output, deletions, and unrelated working-tree changes were not modified.
+- `git diff --check 00d1090a..122bdd1c` passed for the implementation/test files changed by the four fixes.
+- `node scripts/run-phase64-full-tests.mjs` passed with exit code 0 and both preservation markers. It rebuilt the MCP package through the guarded wrapper, ran the 25-command Phase 64 matrix, and preserved the pre-existing workspace identity.
+- The focused matrix included the real production-registry/`AgentRuntimeFiles` OpenCode composition, adapter/profile contracts, owned-server topology, supervisor, orphan recovery, stream fixture, compatibility, reverse channel, browser routing, event store (34/34), controller (41/41), Providers UI, side-panel UI, forbidden-source gates, and Phase 64 closure contract (106/106).
+- The authenticated OpenCode-to-browser, live Providers accessibility, and genuine cold-versus-attach scenarios remain honestly `human_needed` in `64-HUMAN-UAT.md`; no synthetic test was treated as live provenance.
+- The existing 402 user-owned planning deletions, four unrelated modified generated files, and three orchestrator-owned untracked review/fix snapshots were left untouched. Only this review artifact was updated, and no commit was created.
 
 ---
 
-_Reviewed: 2026-07-21T12:08:42Z_
+_Reviewed: 2026-07-21T12:52:02Z_
 
 _Reviewer: Codex (`gsd-code-reviewer`)_
 
