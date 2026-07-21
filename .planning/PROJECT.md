@@ -10,7 +10,7 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 ## Current State
 
-**Active milestone progress:** Phases 57-63 are complete (45/51 requirements). Phase 63 verified 4/4 roadmap success criteria with all 30 validation rows green at a fresh fingerprint — focused matrix, no-argument all-kinds review verification, and the guarded full repository suite (132 suites, 0 failures); its eight live install/Chrome/accessibility scenarios join the prior 34 in the user-directed milestone-end UAT sweep. Phase 999.1 (mcp-tool-gaps-click-heuristics) is next per roadmap, then the OpenCode/Codex adapter phases.
+**Active milestone progress:** Phases 57-64 are complete (48/51 requirements). Phase 64 verified 4/4 roadmap success criteria, 66/66 plan truths, 36/36 key links, MULTI-01..03, and all ten registered HIGH/CRITICAL threats; its guarded 25-command matrix and repository test process are green after a clean code-review fix loop. Three genuine OpenCode account/process/browser/accessibility scenarios join the prior 42 in the user-directed milestone-end UAT sweep. Phase 65 (Codex Adapter) is the final implementation phase in v0.9.91; backlog Phase 999.1 remains outside this milestone.
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
@@ -32,7 +32,8 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 - **Delegation UX + persistence (Phase 61 complete)** -- the side panel has consent, live streaming progress, background-tab ownership, Take Control, Stop/reclaim, honest usage, 20-second liveness, and service-worker-eviction recovery. Eight genuine consent/theme/handoff/stream/endurance/POSIX/restart checks remain pending.
 - **Drift gate + compatibility doctor (Phase 62 complete)** -- one daemon-owned compatibility matrix feeds offline production-parser CI, doctor text/JSON, authenticated durable browser projection, protocol-drift diagnostics, and non-mutating Providers compatibility states. Three genuine installed/rendered/accessibility checks remain pending.
 - **Native wake path (Phase 63 complete)** -- the optional native-messaging host wakes or attaches only to `serve` through exact one-shot framing, exact-owned cross-platform registration, read-only diagnostics, and a background-authoritative wake UI with doctor fallback; it never spawns agent CLIs, and the Phase 59 channel-gate files are byte-identical to the phase base. Eight genuine install/Chrome/accessibility checks remain pending.
-- **Multi-agent adapters** -- extend the stable `AgentProviderAdapter` contract to OpenCode and Codex; Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
+- **OpenCode adapter (Phase 64 complete)** -- the unchanged five-method `AgentProviderAdapter` now drives both cold `opencode run` tasks and verified attaches to an FSB-owned `opencode serve`; exact 1.14.25 private policy, schema-derived JSONL fixture, first-commit drift coverage, transient server authentication, role-aware crash recovery, provider-neutral browser persistence, and honest unknown billing are all verified. Three genuine live scenarios remain pending.
+- **Codex adapter (Phase 65 next)** -- complete the stable adapter roster with hermetic `codex exec --json`, source-pinned fixture/drift coverage, and honest ChatGPT OAuth versus API-key versus unauthenticated disclosure. Gemini remains explicitly deferred until a live help capture and fixture pin exist. Task-mode only for v0.9.91.
 
 **Key context:**
 - The spawn channel is security-critical (RCE-adjacent): extension-origin gating + shared secret + explicit consent tiers required. Bridge already rejects untrusted browser origins (`tests/mcp-bridge-topology.test.js`).
@@ -730,4 +731,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-20 -- Phase 63 Native-Messaging Host automated work complete; 42 live scenarios remain deferred to milestone end. Next: Phase 999.1 mcp-tool-gaps-click-heuristics, then the OpenCode/Codex adapters.*
+*Last updated: 2026-07-21 -- Phase 64 OpenCode Adapter deterministically complete; 45 live scenarios remain deferred to the milestone-end sweep. Next: Phase 65 Codex Adapter.*
