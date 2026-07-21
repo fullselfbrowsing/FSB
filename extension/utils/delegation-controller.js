@@ -94,13 +94,30 @@
 
   function _isPlainRecord(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    var proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
+    try {
+      var proto = Object.getPrototypeOf(value);
+      return proto === Object.prototype || proto === null;
+    } catch (_errorIgnored) {
+      return false;
+    }
   }
 
   function _hasExactKeys(value, keys) {
     if (!_isPlainRecord(value)) return false;
-    var actual = Object.keys(value).sort();
+    var actual;
+    try {
+      actual = Reflect.ownKeys(value);
+      for (var keyIndex = 0; keyIndex < actual.length; keyIndex += 1) {
+        if (typeof actual[keyIndex] !== 'string') return false;
+        var descriptor = Object.getOwnPropertyDescriptor(value, actual[keyIndex]);
+        if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return false;
+      }
+      actual = actual.slice().sort();
+    } catch (_errorIgnored) {
+      return false;
+    }
     var expected = keys.slice().sort();
     if (actual.length !== expected.length) return false;
     for (var i = 0; i < expected.length; i++) {
@@ -124,22 +141,88 @@
     return value;
   }
 
+  function _copyOwnDataValue(value, depth, budget) {
+    if (value === null || typeof value !== 'object') return { ok: true, value: value };
+    if (depth > 4 || budget.count >= 512) return { ok: false, value: null };
+    var keys;
+    var isArray = Array.isArray(value);
+    try {
+      var proto = Object.getPrototypeOf(value);
+      if ((!isArray && proto !== Object.prototype && proto !== null)
+        || (isArray && proto !== Array.prototype)) return { ok: false, value: null };
+      keys = Reflect.ownKeys(value);
+    } catch (_errorIgnored) {
+      return { ok: false, value: null };
+    }
+    if (isArray) {
+      if (keys.length !== value.length + 1 || keys[keys.length - 1] !== 'length') {
+        return { ok: false, value: null };
+      }
+      var arrayCopy = [];
+      for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex += 1) {
+        if (keys[arrayIndex] !== String(arrayIndex)) return { ok: false, value: null };
+        var arrayDescriptor = Object.getOwnPropertyDescriptor(value, String(arrayIndex));
+        if (!arrayDescriptor
+          || arrayDescriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(arrayDescriptor, 'value')) {
+          return { ok: false, value: null };
+        }
+        budget.count += 1;
+        var arrayItem = _copyOwnDataValue(arrayDescriptor.value, depth + 1, budget);
+        if (!arrayItem.ok) return arrayItem;
+        arrayCopy.push(arrayItem.value);
+      }
+      return { ok: true, value: arrayCopy };
+    }
+    var recordCopy = proto === null ? Object.create(null) : {};
+    for (var index = 0; index < keys.length; index += 1) {
+      var key = keys[index];
+      if (typeof key !== 'string') return { ok: false, value: null };
+      var descriptor;
+      try { descriptor = Object.getOwnPropertyDescriptor(value, key); }
+      catch (_descriptorError) { return { ok: false, value: null }; }
+      if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        return { ok: false, value: null };
+      }
+      budget.count += 1;
+      var item = _copyOwnDataValue(descriptor.value, depth + 1, budget);
+      if (!item.ok) return item;
+      recordCopy[key] = item.value;
+    }
+    return { ok: true, value: recordCopy };
+  }
+
+  function _copyOwnDataRecord(value) {
+    if (value === null || value === undefined) return {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    try {
+      if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    } catch (_errorIgnored) {
+      return null;
+    }
+    var copied;
+    try { copied = _copyOwnDataValue(value, 0, { count: 0 }); }
+    catch (_copyError) { return null; }
+    return copied.ok ? copied.value : null;
+  }
+
   function _closedProvider(value) {
-    if (value === null) return null;
+    try {
+      if (!value || Object.getPrototypeOf(value) !== Object.prototype) return null;
+    } catch (_errorIgnored) {
+      return null;
+    }
     if (!_hasExactKeys(value, ['id', 'label'])
         || !delegationProviders
         || typeof delegationProviders.get !== 'function') return null;
-    var metadata = delegationProviders.get(value.id);
-    return metadata && metadata.label === value.label
-      ? { id: metadata.id, label: metadata.label }
+    var id = Object.getOwnPropertyDescriptor(value, 'id').value;
+    var label = Object.getOwnPropertyDescriptor(value, 'label').value;
+    var metadata = delegationProviders.get(id);
+    return metadata && metadata.label === label
+      ? _deepFreeze({ id: metadata.id, label: metadata.label })
       : null;
-  }
-
-  function _defaultProvider() {
-    var metadata = delegationProviders && typeof delegationProviders.get === 'function'
-      ? delegationProviders.get('claude-code')
-      : null;
-    return metadata ? { id: metadata.id, label: metadata.label } : null;
   }
 
   function _summaryState(state) {
@@ -201,12 +284,21 @@
   }
 
   function _providerFromEntries(entries) {
+    var accepted = null;
     for (var i = 0; i < entries.length; i++) {
       var init = entries[i] && entries[i].init;
-      var provider = init && init.client ? _closedProvider(init.client) : null;
-      if (provider) return provider;
+      if (!init || init.client === null || init.client === undefined) continue;
+      var provider = _closedProvider(init.client);
+      if (!provider) {
+        throw _error('delegation_ledger_corrupt', 'persisted provider identity is invalid');
+      }
+      if (accepted
+        && (accepted.id !== provider.id || accepted.label !== provider.label)) {
+        throw _error('delegation_ledger_corrupt', 'persisted provider identity changed');
+      }
+      accepted = provider;
     }
-    return null;
+    return accepted;
   }
 
   function _latestSummary(entries) {
@@ -346,9 +438,16 @@
 
   function _newRecord(delegationId, options) {
     options = options || {};
+    var provider = _closedProvider(options.provider);
+    var providerMetadata = provider
+      && delegationProviders
+      && typeof delegationProviders.get === 'function'
+      ? delegationProviders.get(provider.id)
+      : null;
     return {
       delegationId: delegationId,
-      provider: _closedProvider(options.provider),
+      provider: provider,
+      providerBillingKind: providerMetadata ? providerMetadata.billingKind : null,
       state: _hasOwn(VALID_STATES, options.state) ? options.state : 'starting',
       connection: _hasOwn(VALID_CONNECTIONS, options.connection) ? options.connection : 'connected',
       entries: Array.isArray(options.entries) ? options.entries.slice() : [],
@@ -557,6 +656,48 @@
       }, delay));
     }
 
+    function _eventContextForRecord(record, value) {
+      var context = _copyOwnDataRecord(value);
+      if (!context) {
+        throw _error('invalid_delegation_event', 'event context must be an exact own-data record');
+      }
+      var hasClient = Object.prototype.hasOwnProperty.call(context, 'client')
+        && context.client !== null
+        && context.client !== undefined;
+      var claimedProvider = hasClient ? _closedProvider(context.client) : null;
+      if (hasClient && !claimedProvider) {
+        throw _error('unsupported_provider', 'event provider identity is invalid');
+      }
+      if (record.provider && claimedProvider
+        && (record.provider.id !== claimedProvider.id
+          || record.provider.label !== claimedProvider.label)) {
+        throw _error('unsupported_provider', 'event provider identity changed');
+      }
+      var acceptedProvider = record.provider || claimedProvider;
+      var billingKind = record.providerBillingKind;
+      if (!billingKind && acceptedProvider) {
+        var metadata = delegationProviders.get(acceptedProvider.id);
+        billingKind = metadata ? metadata.billingKind : null;
+      }
+      if (Object.prototype.hasOwnProperty.call(context, 'billingKind')
+        && context.billingKind !== undefined
+        && billingKind
+        && context.billingKind !== billingKind) {
+        throw _error('unsupported_provider', 'event billing identity changed');
+      }
+      if (acceptedProvider) {
+        context.client = _deepFreeze({
+          id: acceptedProvider.id,
+          label: acceptedProvider.label
+        });
+      }
+      if (billingKind) context.billingKind = billingKind;
+      if (!Number.isSafeInteger(context.timestamp) || context.timestamp < 0) {
+        context.timestamp = now();
+      }
+      return Object.freeze(context);
+    }
+
     function _applyEntry(record, entry, options) {
       options = options || {};
       var expected = record.entries.length + 1;
@@ -565,12 +706,25 @@
         || entry.sequence !== expected) {
         throw _error('delegation_ledger_corrupt', 'canonical entry sequence or identity is invalid');
       }
+      var entryProvider = entry.init && entry.init.client
+        ? _closedProvider(entry.init.client)
+        : null;
+      if (entry.init && entry.init.client && !entryProvider) {
+        throw _error('delegation_ledger_corrupt', 'canonical entry provider is invalid');
+      }
+      if (record.provider && entryProvider
+        && (record.provider.id !== entryProvider.id
+          || record.provider.label !== entryProvider.label)) {
+        throw _error('delegation_ledger_corrupt', 'canonical entry provider changed');
+      }
       record.entries.push(entry);
       if (options.deferTerminalState !== true) record.state = entry.state;
       var summary = _summaryFromEntry(entry);
       if (summary) record.summary = summary;
-      if (!record.provider && entry.init && entry.init.client) {
-        record.provider = _closedProvider(entry.init.client);
+      if (!record.provider && entryProvider) {
+        record.provider = entryProvider;
+        var metadata = delegationProviders.get(entryProvider.id);
+        record.providerBillingKind = metadata ? metadata.billingKind : null;
       }
       if (options.refreshSilence !== false) _refreshSilence(record, entry.timestamp);
       if (options.notify === false) return null;
@@ -589,7 +743,12 @@
         canonicalEntry = await eventStore.appendBeforeFanout(
           record.delegationId,
           { type: 'state', sessionId: null, payload: {} },
-          { timestamp: now(), state: state, title: title, detail: detail || null }
+          _eventContextForRecord(record, {
+            timestamp: now(),
+            state: state,
+            title: title,
+            detail: detail || null
+          })
         );
       } catch (error) {
         return _failPersistence(record, error);
@@ -1049,8 +1208,17 @@
       _requireHydrated();
       input = input || {};
       var delegationId = _requireId(input.delegationId);
+      var acceptedProvider = _closedProvider(input.provider);
+      if (!acceptedProvider) {
+        throw _error('unsupported_provider', 'a canonical provider is required');
+      }
       if (records.has(delegationId)) {
         var existing = records.get(delegationId);
+        if (!existing.provider
+          || existing.provider.id !== acceptedProvider.id
+          || existing.provider.label !== acceptedProvider.label) {
+          throw _error('unsupported_provider', 'delegation provider identity changed');
+        }
         if (existing.startPromise) return existing.startPromise;
         existing.startPromise = Promise.resolve(_deepFreeze({
           ok: true,
@@ -1063,11 +1231,6 @@
         throw _error('delegation_start_in_progress', 'another provisional start is active');
       }
       provisional = { delegationId: delegationId };
-      var acceptedProvider = _closedProvider(input.provider || _defaultProvider());
-      if (!acceptedProvider) {
-        provisional = null;
-        throw _error('unsupported_provider', 'a canonical provider is required');
-      }
       var record = _newRecord(delegationId, {
         provider: acceptedProvider,
         state: 'starting',
@@ -1130,8 +1293,12 @@
       try { delegationId = _requireId(input.delegationId); } catch (error) { return Promise.reject(error); }
       var record = records.get(delegationId);
       if (!record) return Promise.reject(_error('unknown_delegation', 'delegation is not registered'));
-      var context = _isPlainRecord(input.context) ? Object.assign({}, input.context) : {};
-      if (!Number.isSafeInteger(context.timestamp) || context.timestamp < 0) context.timestamp = now();
+      var context;
+      try {
+        context = _eventContextForRecord(record, input.context);
+      } catch (error) {
+        return Promise.reject(error);
+      }
       return _enqueue(record, async function() {
         if (record.terminal || record.terminalPromise) {
           throw _error('delegation_already_terminal', 'delegation is already terminal');
