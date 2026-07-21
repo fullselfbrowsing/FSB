@@ -1246,9 +1246,12 @@ async function runTaskOnce(supervisorModule) {
       harness.emit,
     );
     assert.equal(terminal.status, 'failed', `${fixture.role} fallback warning fails closed`);
+    const expectedRoles = fixture.role === 'cold_task'
+      ? ['owned_server', 'cold_task']
+      : [fixture.role];
     assert.deepEqual(
       harness.spawnCalls.slice(before).map((call) => call.role),
-      [fixture.role],
+      expectedRoles,
       `${fixture.role} sentinel creates no fallback task child`,
     );
     const taskCall = harness.spawnCalls.at(-1);

@@ -81,6 +81,10 @@ const OWNED_SERVER_SECRET_BYTES = 32;
 const OWNED_SERVER_HEALTH_LIMIT_BYTES = 16 * 1024;
 const OWNED_SERVER_HEALTH_PATH = '/global/health';
 const OWNED_SERVER_BASIC_USERNAME = 'opencode';
+const TASK_STDERR_FALLBACK_SENTINELS = Object.freeze([
+  'agent "fsb" not found. Falling back to default agent',
+  'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
+] as const);
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const PROVIDER_KEY_NAMES = Object.freeze([
@@ -362,6 +366,7 @@ interface DelegationRun {
   routeSignal: AbortSignal | null;
   routeAbortListener: (() => void) | null;
   replayClosed: boolean;
+  taskWriteStarted: boolean;
   ownedServerLease: OwnedServerLease | null;
 }
 
@@ -1088,6 +1093,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       routeSignal: context?.signal ?? null,
       routeAbortListener: null,
       replayClosed: false,
+      taskWriteStarted: false,
       ownedServerLease: null,
     };
     this.activeRuns.set(delegationId, run);
@@ -1216,7 +1222,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.entriesByPid.set(supervisedChild.pid, prepared.entry);
       run.streams = {
         parser: this.consumeEvents(run, child.stdout),
-        stderr: this.drainStderr(child.stderr),
+        stderr: this.drainStderr(child.stderr, true),
         closed: observed.closed,
       };
       await observed.ready;
@@ -1243,7 +1249,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (run.parserError) throw run.parserError;
       run.state = 'running';
       run.resolveSetup();
-      await this.writeTask(child, run.task);
+      await this.writeTask(run, process, child);
       await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
       if (run.stopRequested) return;
       if (run.parserError) throw run.parserError;
@@ -1934,13 +1940,45 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     })();
   }
 
-  private async drainStderr(stream: NodeJS.ReadableStream): Promise<void> {
-    let retainedBytes = 0;
-    for await (const chunk of stream as AsyncIterable<Buffer | string>) {
-      const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, 'utf8');
-      retainedBytes = Math.min(STDERR_LIMIT_BYTES, retainedBytes + bytes);
+  private async drainStderr(
+    stream: NodeJS.ReadableStream,
+    detectTaskFallback = false,
+  ): Promise<void> {
+    const sentinels = detectTaskFallback
+      ? TASK_STDERR_FALLBACK_SENTINELS.map((value) => Buffer.from(value, 'utf8'))
+      : [];
+    const retainedLimit = sentinels.reduce(
+      (maximum, sentinel) => Math.max(maximum, sentinel.length - 1),
+      0,
+    );
+    let retained = Buffer.alloc(0);
+    try {
+      for await (const chunk of stream as AsyncIterable<Buffer | string>) {
+        const value = Buffer.isBuffer(chunk) ? Buffer.from(chunk) : Buffer.from(chunk, 'utf8');
+        try {
+          for (let offset = 0; offset < value.length; offset += 4096) {
+            const block = value.subarray(offset, Math.min(value.length, offset + 4096));
+            const candidate = Buffer.concat([retained, block]);
+            try {
+              if (sentinels.some((sentinel) => candidate.indexOf(sentinel) >= 0)) {
+                throw new Error('agent_protocol_drift');
+              }
+              retained.fill(0);
+              retained = retainedLimit > 0
+                ? Buffer.from(candidate.subarray(Math.max(0, candidate.length - retainedLimit)))
+                : Buffer.alloc(0);
+            } finally {
+              candidate.fill(0);
+            }
+          }
+        } finally {
+          value.fill(0);
+        }
+      }
+    } finally {
+      retained.fill(0);
+      for (const sentinel of sentinels) sentinel.fill(0);
     }
-    void retainedBytes;
   }
 
   private publishOrBuffer(run: DelegationRun, event: AgentEvent, serialized: string): void {
@@ -1994,7 +2032,20 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     for (const event of events) this.emitNormalizedEvent(run, event);
   }
 
-  private async writeTask(child: ChildProcessWithoutNullStreams, task: string): Promise<void> {
+  private async writeTask(
+    run: DelegationRun,
+    process: ProcessSpec,
+    child: ChildProcessWithoutNullStreams,
+  ): Promise<void> {
+    if (
+      !run.replayClosed
+      || run.taskWriteStarted
+      || run.child !== child
+      || process.stdin !== 'task'
+      || process.stdout !== 'agent_jsonl'
+      || !['direct_task', 'cold_task', 'attach_task'].includes(process.role)
+    ) throw new Error('stdin_failed');
+    run.taskWriteStarted = true;
     await new Promise<void>((resolve, reject) => {
       let writeCallbackDone = false;
       let drainDone = true;
@@ -2050,7 +2101,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       child.stdin.once('close', onClose);
       child.stdin.once('finish', onFinish);
       try {
-        const accepted = child.stdin.write(task, 'utf8', (error?: Error | null) => {
+        const accepted = child.stdin.write(run.task, 'utf8', (error?: Error | null) => {
           if (error) {
             fail(true);
             return;
