@@ -1002,22 +1002,26 @@ function buildDriftSettlementHarness(options = {}) {
     reporterCalls,
     settlementCalls,
     profiles: runContexts,
-    activate(delegationId, profileVersion = '2.1.177') {
+    activate(delegationId, profileVersion = '2.1.177', providerId = 'claude-code') {
+      const provider = delegationProviders.get(providerId);
+      if (!provider) throw new Error('test provider is invalid');
       snapshots.set(delegationId, { delegationId, terminal: null });
       runContexts.set(delegationId, Object.freeze({
-        providerId: 'claude-code',
-        label: 'Claude Code',
+        providerId: provider.id,
+        label: provider.label,
         profileVersion,
-        billingKind: 'subscription'
+        billingKind: provider.billingKind
       }));
     },
-    resetActive(delegationId, profileVersion = '2.1.177') {
+    resetActive(delegationId, profileVersion = '2.1.177', providerId = 'claude-code') {
+      const provider = delegationProviders.get(providerId);
+      if (!provider) throw new Error('test provider is invalid');
       snapshots.set(delegationId, { delegationId, terminal: null });
       runContexts.set(delegationId, Object.freeze({
-        providerId: 'claude-code',
-        label: 'Claude Code',
+        providerId: provider.id,
+        label: provider.label,
         profileVersion,
-        billingKind: 'subscription'
+        billingKind: provider.billingKind
       }));
     }
   };
@@ -1025,15 +1029,18 @@ function buildDriftSettlementHarness(options = {}) {
 
 function driftFinal(detail = {
   adapterId: 'claude-code',
+  profileVersion: '2.1.177',
+  reason: 'invalid_json',
   expected: 'bounded_jsonl',
-  observed: 'invalid_json'
+  eventIndex: 7,
+  issuePaths: ['message.content.0.type']
 }) {
   return {
     status: 'failed',
     terminal: {
       type: 'diagnostic',
       code: 'agent_protocol_drift',
-      profileVersion: '2.1.177',
+      profileVersion: detail.profileVersion || '2.1.177',
       detail
     }
   };
@@ -1080,7 +1087,12 @@ async function runDriftSettlementCases() {
     assertEqual(harness.reporterCalls.length, 1,
       'first authoritative valid drift final invokes the reporter once');
     assertDeepEqual(harness.reporterCalls[0], {
-      adapterId: 'claude-code', expected: 'bounded_jsonl', observed: 'invalid_json'
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
+      expected: 'bounded_jsonl',
+      eventIndex: 7,
+      issuePaths: ['message.content.0.type']
     }, 'reporter receives only the exact sanitized drift detail');
     assert(!JSON.stringify(harness.reporterCalls).includes(delegationId),
       'delegation id never enters diagnostic context');
@@ -1116,8 +1128,11 @@ async function runDriftSettlementCases() {
     harness.activate('delegation_malformed');
     await harness.settle('delegation_malformed', driftFinal({
       adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
       expected: 'bounded_jsonl',
-      observed: 'invalid_json',
+      eventIndex: 7,
+      issuePaths: ['shape'],
       providerOutput: 'prompt=session-token-/private/path'
     }), null);
     assertEqual(harness.reporterCalls.length, 0,
@@ -1134,6 +1149,77 @@ async function runDriftSettlementCases() {
       'non-drift final never invokes the drift reporter');
     assertEqual(harness.settlementCalls.at(-1).context.terminalCode, 'agent_failed',
       'non-drift final retains its existing controller code');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const openCodeId = 'delegation_drift_opencode';
+    harness.activate(openCodeId, '1.14.25', 'opencode');
+    await harness.settle(openCodeId, driftFinal({
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      reason: 'invalid_order',
+      expected: 'known_event_shape',
+      eventIndex: 4097,
+      issuePaths: ['part.state', 'messageID']
+    }), null);
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      reason: 'invalid_order',
+      expected: 'known_event_shape',
+      eventIndex: 4097,
+      issuePaths: ['part.state', 'messageID']
+    }, 'matching accepted OpenCode context reports its exact safe detail');
+    assertEqual(harness.settlementCalls[0].context.client.id, 'opencode',
+      'OpenCode drift terminal retains the accepted provider identity');
+    assertEqual(harness.settlementCalls[0].context.billingKind, 'unknown',
+      'OpenCode drift terminal retains unknown billing');
+
+    for (const [delegationId, detail] of [
+      ['delegation_drift_provider_mismatch', {
+        adapterId: 'claude-code',
+        profileVersion: '1.14.25',
+        reason: 'invalid_json',
+        expected: 'bounded_jsonl',
+        eventIndex: 1,
+        issuePaths: []
+      }],
+      ['delegation_drift_profile_mismatch', {
+        adapterId: 'opencode',
+        profileVersion: '1.14.26',
+        reason: 'invalid_order',
+        expected: 'known_event_shape',
+        eventIndex: 1,
+        issuePaths: []
+      }]
+    ]) {
+      harness.activate(delegationId, '1.14.25', 'opencode');
+      await harness.settle(delegationId, driftFinal(detail), null);
+    }
+    assertEqual(harness.reporterCalls.length, 1,
+      'cross-provider and changed-profile details never report');
+    assertEqual(harness.settlementCalls.length, 3,
+      'diagnostic identity mismatch cannot block authoritative terminal settlement');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const delegationId = 'delegation_drift_legacy_wire';
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal({
+      adapterId: 'claude-code',
+      expected: 'bounded_jsonl',
+      observed: 'invalid_json'
+    }), null);
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
+      expected: 'bounded_jsonl',
+      eventIndex: 1,
+      issuePaths: []
+    }, 'compact MCP drift tuples upgrade to the closed browser detail without raw data');
   }
 
   {
