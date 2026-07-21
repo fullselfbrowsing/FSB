@@ -519,9 +519,16 @@
 
   function _projectMetrics(payload, context) {
     var usage = payload && _isPlainRecord(payload.usage) ? payload.usage : {};
-    var inputTokens = _nonnegativeIntegerOrNull(_value(context, usage, 'inputTokens', 'input_tokens'));
-    var outputTokens = _nonnegativeIntegerOrNull(_value(context, usage, 'outputTokens', 'output_tokens'));
-    var totalTokens = _nonnegativeIntegerOrNull(_value(context, usage, 'totalTokens', 'total_tokens'));
+    var tokens = payload && _isPlainRecord(payload.tokens) ? payload.tokens : {};
+    var inputValue = _value(context, usage, 'inputTokens', 'input_tokens');
+    var outputValue = _value(context, usage, 'outputTokens', 'output_tokens');
+    var totalValue = _value(context, usage, 'totalTokens', 'total_tokens');
+    if (inputValue === undefined) inputValue = _value(null, tokens, 'input');
+    if (outputValue === undefined) outputValue = _value(null, tokens, 'output');
+    if (totalValue === undefined) totalValue = _value(null, tokens, 'total');
+    var inputTokens = _nonnegativeIntegerOrNull(inputValue);
+    var outputTokens = _nonnegativeIntegerOrNull(outputValue);
+    var totalTokens = _nonnegativeIntegerOrNull(totalValue);
     if (totalTokens === null && inputTokens !== null && outputTokens !== null) {
       var sum = inputTokens + outputTokens;
       totalTokens = Number.isSafeInteger(sum) ? sum : null;

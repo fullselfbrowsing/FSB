@@ -479,6 +479,9 @@ function terminalState(code) {
         { timestamp: 1720000000002, state: 'completed' },
       ));
       assert.strictEqual(openCodeResult.state, 'running');
+      assert.strictEqual(openCodeResult.metrics.inputTokens, 30);
+      assert.strictEqual(openCodeResult.metrics.outputTokens, 40);
+      assert.strictEqual(openCodeResult.metrics.totalTokens, 70);
       assert.strictEqual(openCodeResult.metrics.billingKind, 'unknown');
       assert.strictEqual(openCodeResult.metrics.usd, null);
       assert.strictEqual(controller.getSnapshot(openCodeId).terminal, null);

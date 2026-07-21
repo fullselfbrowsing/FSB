@@ -138,9 +138,15 @@ const hostileOpenCodeResultEvent = deepFreeze({
   payload: {
     subtype: 'success',
     is_error: false,
-    num_turns: 3,
-    duration_ms: 4321,
-    usage: { input_tokens: 30, output_tokens: 40 },
+    turns: 3,
+    durationMs: 4321,
+    tokens: {
+      total: 70,
+      input: 30,
+      output: 40,
+      reasoning: 5,
+      cache: { read: 2, write: 1 },
+    },
     billingKind: 'api',
     billing_kind: 'subscription',
     usd: 987.65,
