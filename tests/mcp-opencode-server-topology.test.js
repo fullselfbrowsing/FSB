@@ -1672,6 +1672,20 @@ async function runProductionComposition(supervisorModule) {
   const serverDocuments = new Map();
   const emitted = [];
   let nextPid = 61000;
+  const deniedEnvironment = Object.fromEntries(
+    supervisorModule.DELEGATION_PROVIDER_KEY_NAMES.map((key, index) => [
+      key,
+      `provider_poison_${String(index).padStart(4, '0')}_must_not_cross`,
+    ]),
+  );
+  const operationalEnvironment = {
+    PATH: '/fixture/bin',
+    HOME: tempRoot,
+    XDG_DATA_HOME: nativeDataHome,
+    XDG_STATE_HOME: path.join(tempRoot, 'native-state'),
+    XDG_CACHE_HOME: path.join(tempRoot, 'native-cache'),
+    SAFE_VALUE: 'retained',
+  };
 
   const inspector = {
     async inspect(entry) {
@@ -1705,11 +1719,8 @@ async function runProductionComposition(supervisorModule) {
     platform: 'linux',
     runtimeRootPath: runtimeRoot,
     environment: {
-      PATH: '/fixture/bin',
-      HOME: tempRoot,
-      XDG_DATA_HOME: nativeDataHome,
-      XDG_STATE_HOME: path.join(tempRoot, 'native-state'),
-      SAFE_VALUE: 'retained',
+      ...deniedEnvironment,
+      ...operationalEnvironment,
     },
     processSeams: {
       openCodeDetect: async () => ({
@@ -1744,7 +1755,13 @@ async function runProductionComposition(supervisorModule) {
               };
         const child = makeProductionChild(role, ++nextPid, onFinal);
         childrenBySignature.set(options.env.FSB_AGENT_ARGV_SIGNATURE, child);
-        spawnCalls.push({ role, runtimeId, argv: [...argv], child });
+        spawnCalls.push({
+          role,
+          runtimeId,
+          argv: [...argv],
+          environment: { ...options.env },
+          child,
+        });
         if (role === 'owned_server') {
           serverDocuments.set('/config', config);
           serverDocuments.set('/agent', agent);
@@ -1815,6 +1832,48 @@ async function runProductionComposition(supervisorModule) {
     );
     assert.equal(spawnCalls.filter((call) => call.role === 'owned_server').length, 1);
     assert.equal(spawnCalls.at(-1).argv.includes('http://127.0.0.1:43123'), true);
+    assert.equal(supervisorModule.DELEGATION_PROVIDER_KEY_NAMES.length, 142);
+    const supervisorSource = fs.readFileSync(
+      path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts'),
+      'utf8',
+    );
+    assert.match(supervisorSource, /OpenCode v1\.14\.25/);
+    assert.match(supervisorSource, /3c85719fea0ee83389c814d7abbf1f98c5c6f0f1/);
+    assert.match(supervisorSource, /packages\/opencode\/test\/tool\/fixtures\/models-api\.json/);
+    assert.deepEqual(
+      supervisorModule.DELEGATION_PROVIDER_KEY_NAMES,
+      [...supervisorModule.DELEGATION_PROVIDER_KEY_NAMES].sort(),
+      'the OpenCode v1.14.25 deny roster remains deterministic and source-reviewable',
+    );
+    for (const familyCanary of [
+      'ANTHROPIC_API_KEY',
+      'AWS_PROFILE',
+      'AWS_WEB_IDENTITY_TOKEN_FILE',
+      'AWS_CONTAINER_CREDENTIALS_FULL_URI',
+      'CLOUDFLARE_API_TOKEN',
+      'GITLAB_TOKEN',
+      'GOOGLE_APPLICATION_CREDENTIALS',
+      'OPENCODE_AUTH_CONTENT',
+      'OPENCODE_CONFIG_CONTENT',
+    ]) {
+      assert.equal(
+        supervisorModule.DELEGATION_PROVIDER_KEY_NAMES.includes(familyCanary),
+        true,
+        `${familyCanary} remains in the pinned deny roster`,
+      );
+    }
+    for (const call of spawnCalls) {
+      for (const key of supervisorModule.DELEGATION_PROVIDER_KEY_NAMES) {
+        assert.equal(
+          Object.hasOwn(call.environment, key),
+          false,
+          `${key} is scrubbed from ${call.role}`,
+        );
+      }
+      for (const [key, value] of Object.entries(operationalEnvironment)) {
+        assert.equal(call.environment[key], value, `${key} is retained for ${call.role}`);
+      }
+    }
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'agent-orphans.json'), 'utf8')).entries.length,
       1,
