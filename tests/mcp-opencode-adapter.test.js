@@ -1278,6 +1278,14 @@ async function run() {
     console.log('MULTI-03 provenance: schema-derived-contract; liveCapturePending: true');
     return;
   }
+  if (argv[1] === 'adapter') {
+    await runDetection();
+    await runProfilePolicy();
+    await runAttestation();
+    await runComposition();
+    console.log('mcp-opencode-adapter.test.js: adapter PASS');
+    return;
+  }
   if (argv[1] === 'detection') {
     await runDetection();
     console.log('mcp-opencode-adapter.test.js: detection PASS');

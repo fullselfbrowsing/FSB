@@ -173,7 +173,12 @@ function fixtureEnvironment(fixture, commands, extra = {}) {
 }
 
 function assertFixtureIdentity(fixture) {
-  assert.deepEqual(snapshotFixture(fixture.root), fixture.before);
+  const indexPath = path.join(fixture.root, '.git/index');
+  const indexStat = lstatSync(indexPath);
+  const immediateIndex = hashFields([indexStat.mode & 0o7777, readFileSync(indexPath)]);
+  assert.equal(immediateIndex, fixture.before.index, 'raw Git index bytes/mode changed');
+  const after = snapshotFixture(fixture.root);
+  assert.deepEqual({ ...after, index: fixture.before.index }, fixture.before);
 }
 
 function runFixture(label, commands, options = {}) {
@@ -248,7 +253,7 @@ function assertRunnerSourceContract() {
     "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'first-commit-drift-gate']",
     "['node', 'tests/mcp-agent-stream-fixture.test.js']",
     "['node', 'tests/mcp-agent-drift-smoke.test.js']",
-    "['node', 'tests/mcp-opencode-adapter.test.js']",
+    "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'adapter']",
     "['node', 'tests/mcp-opencode-server-topology.test.js']",
     "['node', 'tests/mcp-agent-provider-contract.test.js']",
     "['node', 'tests/mcp-adapter-compatibility.test.js']",
@@ -288,7 +293,7 @@ async function main() {
     stderr: /command 1 could not be spawned/,
   });
   runFixture('wrapper spawn-error settlement', [[process.execPath, '-e', 'process.exit(0)']], {
-    env: { FSB_PHASE64_TEST_WRAPPER_PATH: path.join(os.tmpdir(), 'absent-phase64-wrapper') },
+    env: { FSB_PHASE64_TEST_EXECUTABLE: path.join(os.tmpdir(), 'absent-phase64-executable') },
     stderr: /guarded Phase 64 matrix could not be spawned/,
   });
   if (process.platform !== 'win32') {

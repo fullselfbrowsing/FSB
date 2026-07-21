@@ -26,7 +26,7 @@ const PHASE64_VALIDATION_PATH = `${PHASE64_DIR}/64-VALIDATION.md`;
 
 const PHASE64_NEW_ROOT_COMMANDS = Object.freeze([
   'node tests/phase64-full-tests-harness.test.js',
-  'node tests/mcp-opencode-adapter.test.js',
+  'node tests/mcp-opencode-adapter.test.js --section adapter',
   'node tests/mcp-opencode-server-topology.test.js',
 ]);
 
@@ -514,8 +514,8 @@ function runPhase64WiringContract() {
         < rootCommands64.indexOf('node tests/delegation-routing.test.js'),
   'Phase 64 preservation harness occupies the protected pre-delegation slot');
   check(rootCommands64.indexOf('npm --prefix mcp run build')
-      < rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js')
-      && rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js')
+      < rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter')
+      && rootCommands64.indexOf('node tests/mcp-opencode-adapter.test.js --section adapter')
         < rootCommands64.indexOf('node tests/mcp-agent-drift-smoke.test.js')
       && rootCommands64.indexOf('node tests/mcp-spawn-supervisor.test.js')
         < rootCommands64.indexOf('node tests/mcp-opencode-server-topology.test.js')

@@ -30,7 +30,7 @@ jobs:
         run: npm --prefix showcase/angular install --no-audit --no-fund
       - name: Validate extension (manifest + JS syntax)
         run: npm run validate:extension
-      - name: Phase 63 native-host contract (sole Linux root invocation)
+      - name: Phase 64 OpenCode contract (sole Linux root invocation)
         run: npm test
 
   mcp-smoke:
