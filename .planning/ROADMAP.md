@@ -216,7 +216,7 @@
 - [x] 64-07-PLAN.md — Implement the generic cold-first, FSB-owned-server lease, health, fallback, idle, and recovery lifecycle.
 
 **Wave 7** *(parallel; each blocked on its Wave 6 dependency)*
-- [ ] 64-08-PLAN.md — Interpret closed attestation descriptors through the shared verifier, enforce no replay, and gate results on clean exit/tree settlement.
+- [x] 64-08-PLAN.md — Interpret closed attestation descriptors through the shared verifier, enforce no replay, and gate results on clean exit/tree settlement.
 - [ ] 64-09-PLAN.md — Generalize canonical extension preflight, consent, trust, and background-authoritative provider routing.
 
 **Wave 8** *(parallel; each blocked on its Wave 7 dependency)*
@@ -255,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 7/13 | In Progress | — |
+| 64. OpenCode Adapter | 8/13 | In Progress|  |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones

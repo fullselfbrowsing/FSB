@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-07-PLAN.md
-last_updated: "2026-07-20T23:37:10.745Z"
-last_activity: 2026-07-20 -- Phase 64 Plan 07 complete; generic cold-first owned-server lease and exact-once lifecycle green
+stopped_at: Completed 64-08-PLAN.md
+last_updated: "2026-07-21T00:33:26.635Z"
+last_activity: 2026-07-20 -- Phase 64 Plan 08 complete; effective policy, task-once replay fence, and post-cleanup result barrier green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 49
-  percent: 92
+  completed_plans: 50
+  percent: 94
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 8 of 13
+Plan: 9 of 13
 Status: Ready to execute
-Last activity: 2026-07-20 -- Phase 64 Plan 07 complete; generic cold-first owned-server lease and exact-once lifecycle green
+Last activity: 2026-07-20 -- Phase 64 Plan 08 complete; effective policy, task-once replay fence, and post-cleanup result barrier green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -215,6 +215,9 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Retain only random owned-server secret bytes and materialize password/header strings transiently. — Only the reviewed server and selected attach spawn env plus bounded health request require the raw value; every mutable call object is scrubbed afterward.
 - [Phase 64]: Release each attach lease only after task tree and runtime cleanup, with token-fenced idle teardown. — Reference counts protect active task sessions, stale idle callbacks cannot stop renewed work, and task cleanup always precedes server reclamation.
 - [Phase 64]: Coalesce health, exit, idle, and daemon-close cleanup through one exact-once server stop. — Retiring leases become non-attachable immediately and no replacement server can warm until the proven old tree and volatile secret settle.
+- [Phase 64]: Require generic effective-policy attestation before task authority — Process and owned-server evidence use only closed descriptors and the shared verifier; raw documents, credentials, headers, model values, and stderr remain transient.
+- [Phase 64]: Make selected task-child spawn the permanent replay boundary — One role-checked writer sends the exact task plus EOF once; every later failure cleans up and settles without cold fallback.
+- [Phase 64]: Publish a normalized result only after independent cleanup truth — Parser EOF, clean stderr, code 0/no signal, task-tree settlement, and runtime removal must all corroborate the private candidate before it becomes observable.
 
 ### Pending Todos
 
@@ -259,8 +262,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-20T23:37:10.739Z
-Stopped at: Completed 64-07-PLAN.md
+Last session: 2026-07-21T00:32:19.821Z
+Stopped at: Completed 64-08-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -290,3 +293,4 @@ Execute 64-08-PLAN.md next. Interpret the closed policy attestations through the
 | Phase 64 P05 | 41 min | 1 task | 9 files |
 | Phase 64 P06 | 38 min | 2 tasks | 13 files |
 | Phase 64 P07 | 48 min | 3 tasks | 2 files |
+| Phase 64 P08 | 49 min | 3 tasks | 6 files |
