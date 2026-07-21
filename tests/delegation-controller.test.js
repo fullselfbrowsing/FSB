@@ -8,6 +8,9 @@ const STORE_PATH = path.join(__dirname, '..', 'extension', 'utils', 'delegation-
 const CONTROLLER_PATH = path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js');
 const REGISTRY_PATH = path.join(__dirname, '..', 'extension', 'utils', 'agent-registry.js');
 
+const CLAUDE_PROVIDER = Object.freeze({ id: 'claude-code', label: 'Claude Code' });
+const OPENCODE_PROVIDER = Object.freeze({ id: 'opencode', label: 'OpenCode' });
+
 let passed = 0;
 let failed = 0;
 
@@ -219,7 +222,7 @@ function supervisorStatus(generation, active = [], restartLosses = [], routeLoss
 async function seedRunningLedger(store, controllerModule, delegationId) {
   const controller = controllerModule.create(makeDeps(store).deps);
   await controller.hydrate();
-  await controller.start({ delegationId });
+  await controller.start(startInput(delegationId));
   await controller.acceptEvent(eventInput(delegationId, fixtures.initEvent, {
     timestamp: 1720000000000,
     state: 'running',
@@ -230,6 +233,10 @@ async function seedRunningLedger(store, controllerModule, delegationId) {
 
 function eventInput(delegationId, event, context = {}) {
   return { delegationId, event, context };
+}
+
+function startInput(delegationId, extra = {}) {
+  return { delegationId, provider: CLAUDE_PROVIDER, ...extra };
 }
 
 async function acceptSuccessfulFinal(controller, delegationId, timestamp) {
@@ -338,7 +345,163 @@ function terminalState(code) {
       ]);
       await expectCode(() => controller.subscribe(() => {}), 'delegation_not_hydrated');
       await controller.hydrate();
-      await expectCode(() => controller.start({ delegationId: 'short' }), 'invalid_delegation_id');
+      await expectCode(() => controller.start(startInput('short')), 'invalid_delegation_id');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('start accepts only exact canonical provider pairs and captures an immutable copy', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const controller = controllerModule.create(makeDeps(store).deps);
+      await controller.hydrate();
+
+      await expectCode(
+        () => controller.start({ delegationId: 'delegation_missing_provider_6410' }),
+        'unsupported_provider',
+      );
+      for (const [index, provider] of [
+        null,
+        { id: 'opencode', label: 'Open Code' },
+        { id: 'OpenCode', label: 'OpenCode' },
+        { id: 'codex', label: 'Codex' },
+        { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+        Object.assign(Object.create(null), OPENCODE_PROVIDER),
+      ].entries()) {
+        await expectCode(
+          () => controller.start({
+            delegationId: `delegation_invalid_provider_${index}_6410`,
+            provider,
+          }),
+          'unsupported_provider',
+        );
+      }
+
+      let getterCalls = 0;
+      const accessorProvider = {};
+      Object.defineProperties(accessorProvider, {
+        id: { enumerable: true, get() { getterCalls += 1; return 'opencode'; } },
+        label: { enumerable: true, get() { getterCalls += 1; return 'OpenCode'; } },
+      });
+      await expectCode(
+        () => controller.start({
+          delegationId: 'delegation_accessor_provider_6410',
+          provider: accessorProvider,
+        }),
+        'unsupported_provider',
+      );
+      assert.strictEqual(getterCalls, 0, 'provider validation never invokes caller accessors');
+
+      const mutableProvider = { id: 'opencode', label: 'OpenCode' };
+      const starting = controller.start({
+        delegationId: 'delegation_mutable_provider_6410',
+        provider: mutableProvider,
+        profileVersion: 'opencode-profile-6410',
+      });
+      mutableProvider.id = 'claude-code';
+      mutableProvider.label = 'Claude Code';
+      const started = await starting;
+      assert.deepStrictEqual(started.snapshot.provider, OPENCODE_PROVIDER);
+      assert(Object.isFrozen(started.snapshot.provider));
+      assert.deepStrictEqual(started.snapshot.entries[0].init.client, OPENCODE_PROVIDER);
+      assert.strictEqual(started.snapshot.entries[0].init.profileVersion, 'opencode-profile-6410');
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('concurrent Claude and OpenCode runs append durably and hydrate silently without relabeling', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      await controller.hydrate();
+      const claudeId = 'delegation_concurrent_claude_6410';
+      const openCodeId = 'delegation_concurrent_opencode_6410';
+      await Promise.all([
+        controller.start(startInput(claudeId, { profileVersion: 'claude-profile-6410' })),
+        controller.start({
+          delegationId: openCodeId,
+          provider: OPENCODE_PROVIDER,
+          profileVersion: 'opencode-profile-6410',
+        }),
+      ]);
+
+      const delivered = [];
+      controller.subscribe((event) => delivered.push(event));
+      const write = storage.deferWrites();
+      let appendSettled = false;
+      const appending = controller.acceptEvent(eventInput(openCodeId, fixtures.initEvent, {
+        timestamp: 1720000000001,
+        state: 'running',
+        profileVersion: 'opencode-profile-6410',
+      })).then((entry) => {
+        appendSettled = true;
+        return entry;
+      });
+      await write.started;
+      await Promise.resolve();
+      assert.strictEqual(appendSettled, false);
+      assert.strictEqual(controller.getSnapshot(openCodeId).entries.length, 1);
+      assert.strictEqual(delivered.length, 0, 'OpenCode fanout waits for the durable append');
+      write.resolve();
+      assert.strictEqual((await appending).sequence, 2);
+      assert.strictEqual(delivered.length, 1);
+
+      await controller.acceptEvent(eventInput(claudeId, fixtures.initEvent, {
+        timestamp: 1720000000001,
+        state: 'running',
+        profileVersion: 'claude-profile-6410',
+      }));
+      assert.deepStrictEqual(controller.getSnapshot(claudeId).provider, CLAUDE_PROVIDER);
+      assert.deepStrictEqual(controller.getSnapshot(openCodeId).provider, OPENCODE_PROVIDER);
+      assert.deepStrictEqual(controller.getSnapshot(claudeId).entries.map((entry) => entry.sequence), [1, 2]);
+      assert.deepStrictEqual(controller.getSnapshot(openCodeId).entries.map((entry) => entry.sequence), [1, 2]);
+
+      modules = freshModules();
+      controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 2);
+      const restoredById = new Map(restored.map((snapshot) => [snapshot.delegationId, snapshot]));
+      assert.deepStrictEqual(restoredById.get(claudeId).provider, CLAUDE_PROVIDER);
+      assert.deepStrictEqual(restoredById.get(openCodeId).provider, OPENCODE_PROVIDER);
+      assert.strictEqual(restoredById.get(claudeId).entries[0].init.profileVersion, 'claude-profile-6410');
+      assert.strictEqual(restoredById.get(openCodeId).entries[0].init.profileVersion, 'opencode-profile-6410');
+      let replayed = 0;
+      controller.subscribe(() => { replayed += 1; });
+      assert.strictEqual(replayed, 0, 'hydration never replays persisted announcements');
+
+      const openCodeResult = await controller.acceptEvent(eventInput(
+        openCodeId,
+        fixtures.hostileOpenCodeResultEvent,
+        { timestamp: 1720000000002, state: 'completed' },
+      ));
+      assert.strictEqual(openCodeResult.state, 'running');
+      assert.strictEqual(openCodeResult.metrics.billingKind, 'unknown');
+      assert.strictEqual(openCodeResult.metrics.usd, null);
+      assert.strictEqual(controller.getSnapshot(openCodeId).terminal, null);
+      assert.strictEqual(controller.getSnapshot(claudeId).entries.length, 2);
+
+      await controller.acceptEvent(eventInput(openCodeId, fixtures.terminalEvent, {
+        timestamp: 1720000000003,
+        terminalCode: 'agent_failed',
+        treeSettled: true,
+      }));
+      await acceptSuccessfulFinal(controller, claudeId, 1720000000004);
+      assert.deepStrictEqual(controller.getSnapshot(openCodeId).terminal, {
+        code: 'agent_failed',
+        releasedTabCount: 0,
+      });
+      assert.deepStrictEqual(controller.getSnapshot(claudeId).terminal, {
+        code: 'completed',
+        releasedTabCount: 0,
+      });
+      assert.strictEqual(
+        JSON.stringify(storage.data).includes(fixtures.rawNativeCanary),
+        false,
+      );
     } finally {
       storage.restore();
     }
@@ -356,10 +519,9 @@ function terminalState(code) {
       controller.subscribe((event) => delivered.push(event));
       const deferred = storage.deferWrites();
       let settled = false;
-      const accepting = controller.start({
-        delegationId: id,
+      const accepting = controller.start(startInput(id, {
         profileVersion: 'profile-v61-start',
-      }).then((result) => {
+      })).then((result) => {
         settled = true;
         return result;
       });
@@ -405,10 +567,9 @@ function terminalState(code) {
       const controller = controllerModule.create(makeDeps(store).deps);
       await controller.hydrate();
       const id = 'delegation_prototype_connection_6104';
-      const started = await controller.start({
-        delegationId: id,
+      const started = await controller.start(startInput(id, {
         connection: 'constructor',
-      });
+      }));
       assert.strictEqual(started.snapshot.connection, 'connected',
         'prototype property names cannot enter the start connection enum');
       const reconciled = await controller.reconcile({
@@ -431,7 +592,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_start_eviction_gap';
-      await controller.start({ delegationId: id, profileVersion: 'profile-v61-eviction' });
+      await controller.start(startInput(id, { profileVersion: 'profile-v61-eviction' }));
 
       modules = freshModules();
       harness = makeRecoveryDeps(modules.store);
@@ -467,7 +628,7 @@ function terminalState(code) {
       controller.subscribe(() => { listenerCalls += 1; order.push('listener'); });
       storage.rejectWrites();
       await expectCode(
-        controller.start({ delegationId: id, profileVersion: 'profile-v61-unavailable' }),
+        controller.start(startInput(id, { profileVersion: 'profile-v61-unavailable' })),
         'delegation_persistence_failed',
       );
       assert.deepStrictEqual(order, ['cancel']);
@@ -494,7 +655,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_late_persistence_failure';
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       const delivered = [];
       controller.subscribe((event) => delivered.push(event));
@@ -569,7 +730,7 @@ function terminalState(code) {
       let harness = makeDeps(modules.store, { registry, cancel });
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-persistence-retry' });
 
@@ -638,7 +799,7 @@ function terminalState(code) {
       });
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: registered.agentId });
       await controller.acceptEvent(eventInput(id, fixtures.resultEvent, {
         timestamp: 1720000000100,
@@ -829,7 +990,7 @@ function terminalState(code) {
       const controller = controllerModule.create(deps);
       await controller.hydrate();
       const id = `delegation_${code}`;
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       let delivered = 0;
       controller.subscribe(() => { delivered += 1; });
       await expectCode(
@@ -866,7 +1027,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-reload-proof' });
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       await controller.acceptEvent(eventInput(id, fixtures.toolUseEvent, {
@@ -907,7 +1068,7 @@ function terminalState(code) {
       let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, fixtures.baseContext));
       storage.clear();
 
@@ -969,7 +1130,7 @@ function terminalState(code) {
       const controller = controllerModule.create(makeDeps(store).deps);
       await controller.hydrate();
       const id = fixtures.baseContext.delegationId;
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       let goodCalls = 0;
       controller.subscribe(() => { throw new Error('bad subscriber'); });
       controller.subscribe(() => { goodCalls += 1; });
@@ -1009,7 +1170,7 @@ function terminalState(code) {
 
       for (const [index, item] of cases.entries()) {
         const id = `delegation_terminal_${index}`;
-        await controller.start({ delegationId: id });
+        await controller.start(startInput(id));
         const entry = await controller.acceptEvent(eventInput(id, fixtures.terminalEvent, {
           timestamp: 1720000000100 + index,
           terminalCode: item.input,
@@ -1047,8 +1208,8 @@ function terminalState(code) {
       const controller = controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_start_stop_race';
-      const firstStart = controller.start({ delegationId: id });
-      const duplicateStart = controller.start({ delegationId: id });
+      const firstStart = controller.start(startInput(id));
+      const duplicateStart = controller.start(startInput(id));
       assert.strictEqual(firstStart, duplicateStart);
       const firstStop = controller.stop({ delegationId: id });
       const duplicateStop = controller.stop({ delegationId: id });
@@ -1081,7 +1242,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       const finalFirstId = 'delegation_final_first';
-      await controller.start({ delegationId: finalFirstId });
+      await controller.start(startInput(finalFirstId));
       const streamedResult = await controller.acceptEvent(eventInput(finalFirstId, fixtures.resultEvent, {
         timestamp: 1720000000200,
         state: 'completed',
@@ -1117,7 +1278,7 @@ function terminalState(code) {
       );
 
       const stopFirstId = 'delegation_stop_first';
-      await controller.start({ delegationId: stopFirstId });
+      await controller.start(startInput(stopFirstId));
       await controller.acceptEvent(eventInput(stopFirstId, fixtures.initEvent, {
         ...fixtures.baseContext,
         timestamp: 1720000000300,
@@ -1179,7 +1340,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       const delayedId = 'delegation_delayed_cleanup';
-      await controller.start({ delegationId: delayedId });
+      await controller.start(startInput(delayedId));
       await controller.bindRegisteredAgent({ delegationId: delayedId, agentId: 'agent-delayed' });
       const streamed = await controller.acceptEvent(eventInput(delayedId, fixtures.resultEvent, {
         timestamp: 1720000000600,
@@ -1200,7 +1361,7 @@ function terminalState(code) {
       assert.strictEqual(controller.getSnapshot(delayedId).summary.state, 'completed');
 
       const failedId = 'delegation_cleanup_failure';
-      await controller.start({ delegationId: failedId });
+      await controller.start(startInput(failedId));
       await controller.bindRegisteredAgent({ delegationId: failedId, agentId: 'agent-cleanup-failed' });
       await controller.acceptEvent(eventInput(failedId, fixtures.resultEvent, {
         timestamp: 1720000000700,
@@ -1241,7 +1402,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       const finalId = 'delegation_final_beats_timeout';
-      await controller.start({ delegationId: finalId });
+      await controller.start(startInput(finalId));
       await controller.acceptEvent(eventInput(finalId, fixtures.initEvent, {}));
       await clock.tick(119999);
       await controller.acceptEvent(eventInput(finalId, fixtures.resultEvent, {
@@ -1263,7 +1424,7 @@ function terminalState(code) {
       );
 
       const silenceId = 'delegation_silence_timeout';
-      await controller.start({ delegationId: silenceId });
+      await controller.start(startInput(silenceId));
       await controller.acceptEvent(eventInput(silenceId, fixtures.initEvent, {}));
       await clock.tick(120000);
       assert.deepStrictEqual(controller.getSnapshot(silenceId).terminal, {
@@ -1276,7 +1437,7 @@ function terminalState(code) {
       );
 
       const wallId = 'delegation_wall_timeout';
-      await controller.start({ delegationId: wallId });
+      await controller.start(startInput(wallId));
       await controller.acceptEvent(eventInput(wallId, fixtures.initEvent, {}));
       for (let index = 0; index < 22; index += 1) {
         await clock.tick(119000);
@@ -1400,8 +1561,8 @@ function terminalState(code) {
       const firstId = 'delegation_parallel_first';
       const secondId = 'delegation_parallel_second';
       await Promise.all([
-        controller.start({ delegationId: firstId }),
-        controller.start({ delegationId: secondId }),
+        controller.start(startInput(firstId)),
+        controller.start({ delegationId: secondId, provider: OPENCODE_PROVIDER }),
       ]);
       await controller.acceptEvent(eventInput(firstId, fixtures.initEvent, {}));
       await controller.acceptEvent(eventInput(secondId, fixtures.initEvent, {}));
@@ -1414,6 +1575,8 @@ function terminalState(code) {
 
       const firstBeforeStop = controller.getSnapshot(firstId);
       const secondAfterTimeout = controller.getSnapshot(secondId);
+      assert.deepStrictEqual(firstBeforeStop.provider, CLAUDE_PROVIDER);
+      assert.deepStrictEqual(secondAfterTimeout.provider, OPENCODE_PROVIDER);
       assert.strictEqual(firstBeforeStop.state, 'running');
       assert.strictEqual(firstBeforeStop.terminal, null);
       assert.deepStrictEqual(firstBeforeStop.entries.map((entry) => entry.sequence), [1, 2, 3]);
@@ -1507,7 +1670,7 @@ function terminalState(code) {
       const controller = controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_hold_resume_success';
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
       const bound = await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-61-02' });
       assert.strictEqual(bound.ok, true);
@@ -1601,7 +1764,7 @@ function terminalState(code) {
       const controller = controllerModule.create(deps);
       await controller.hydrate();
       const id = 'delegation_active_tab_authority';
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: mappedAgentId });
 
@@ -1694,7 +1857,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       async function ready(id) {
-        await controller.start({ delegationId: id });
+        await controller.start(startInput(id));
         await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
         await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
       }
@@ -1794,7 +1957,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       async function readyAndHold(id) {
-        await controller.start({ delegationId: id });
+        await controller.start(startInput(id));
         await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
         await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
         const held = await controller.takeControl({ delegationId: id });
@@ -1866,7 +2029,7 @@ function terminalState(code) {
       let controller = controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_tree_unsettled_stop';
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-tree-unsettled' });
 
@@ -1938,7 +2101,7 @@ function terminalState(code) {
       const controller = controllerModule.create(harness.deps);
       await controller.hydrate();
       const id = 'delegation_route_loss_cleanup';
-      await controller.start({ delegationId: id });
+      await controller.start(startInput(id));
       await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
       await controller.bindRegisteredAgent({ delegationId: id, agentId: 'agent-route-loss' });
 
@@ -1998,7 +2161,7 @@ function terminalState(code) {
         });
         const controller = controllerModule.create(harness.deps);
         await controller.hydrate();
-        await controller.start({ delegationId: id });
+        await controller.start(startInput(id));
         await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
 
         if (item.finalPath) {
@@ -2094,7 +2257,7 @@ function terminalState(code) {
       await controller.hydrate();
 
       async function ready(id) {
-        await controller.start({ delegationId: id });
+        await controller.start(startInput(id));
         await controller.acceptEvent(eventInput(id, fixtures.initEvent, {}));
         await controller.bindRegisteredAgent({ delegationId: id, agentId: `agent-${id}` });
         await controller.reconcile({
@@ -2255,7 +2418,7 @@ function terminalState(code) {
       const seed = modules.controllerModule.create(makeDeps(modules.store).deps);
       await seed.hydrate();
       for (const id of Object.values(ids)) {
-        await seed.start({ delegationId: id });
+        await seed.start(startInput(id));
         await seed.acceptEvent(eventInput(id, fixtures.initEvent, {
           timestamp: 1720000000000,
           state: 'running',
@@ -2435,7 +2598,7 @@ function terminalState(code) {
       const seed = modules.controllerModule.create(makeDeps(modules.store).deps);
       await seed.hydrate();
       for (const id of Object.values(ids)) {
-        await seed.start({ delegationId: id });
+        await seed.start(startInput(id));
         await seed.acceptEvent(eventInput(id, fixtures.initEvent, {
           timestamp: 1720000000000,
           state: 'running',
