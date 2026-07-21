@@ -13,6 +13,7 @@ const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 const aliasesPath = path.join(repoRoot, 'extension', 'utils', 'mcp-client-aliases.js');
+const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const providersPath = path.join(repoRoot, 'extension', 'utils', 'mcp-agent-providers.js');
 const registryPath = require.resolve('../extension/utils/agent-registry.js');
 const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
@@ -106,10 +107,13 @@ function installChrome({ local, session, localOptions, sessionOptions, tabs } = 
 }
 
 function freshProviders() {
+  delete globalThis.FsbDelegationProviders;
   delete globalThis.FsbMcpClientAliases;
   delete globalThis.FsbMcpAgentProviders;
+  try { delete require.cache[require.resolve(delegationProvidersPath)]; } catch (_e) { /* fresh */ }
   try { delete require.cache[require.resolve(aliasesPath)]; } catch (_e) { /* fresh */ }
   try { delete require.cache[require.resolve(providersPath)]; } catch (_e) { /* fresh */ }
+  require(delegationProvidersPath);
   require(aliasesPath);
   require(providersPath);
   return globalThis.FsbMcpAgentProviders;
@@ -144,11 +148,12 @@ function loadBridgeHarness() {
     dispatchMcpMessageRoute: async () => ({ success: true })
   };
   context.globalThis = context;
+  const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
   const aliasesSource = fs.readFileSync(aliasesPath, 'utf8');
   const providersSource = fs.readFileSync(providersPath, 'utf8');
   const bridgeSource = fs.readFileSync(bridgePath, 'utf8');
   vm.runInNewContext(
-    `${aliasesSource}\n${providersSource}\n${bridgeSource}\nthis.__bridgeClient = mcpBridgeClient;`,
+    `${delegationProvidersSource}\n${aliasesSource}\n${providersSource}\n${bridgeSource}\nthis.__bridgeClient = mcpBridgeClient;`,
     context,
     { filename: 'mcp-agent-providers-bridge-harness.js' }
   );
@@ -160,6 +165,63 @@ function tick() {
 }
 
 async function main() {
+  assert.equal(fs.existsSync(delegationProvidersPath), true,
+    'canonical delegation provider helper exists');
+  {
+    delete globalThis.FsbDelegationProviders;
+    delete require.cache[require.resolve(delegationProvidersPath)];
+    const canonical = require(delegationProvidersPath);
+    assert.equal(canonical, globalThis.FsbDelegationProviders,
+      'UMD and CommonJS expose one canonical helper');
+    assert.equal(Object.isFrozen(canonical), true, 'canonical helper API is frozen');
+    assert.deepEqual(Object.keys(canonical).sort(), [
+      'get', 'ids', 'isShippedId', 'list', 'validate'
+    ], 'canonical helper exposes only closed lookup/copy/roster validators');
+    assert.deepEqual(canonical.ids(), ['claude-code', 'opencode']);
+    assert.deepEqual(canonical.list(), [
+      { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
+      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' }
+    ]);
+    const firstRoster = canonical.list();
+    const secondRoster = canonical.list();
+    assert.notEqual(firstRoster, secondRoster, 'provider roster is defensively copied');
+    assert.equal(Object.isFrozen(firstRoster), true, 'provider roster is frozen');
+    assert.equal(Object.isFrozen(firstRoster[0]), true, 'provider metadata is deeply frozen');
+    assert.notEqual(canonical.get('opencode'), canonical.get('opencode'),
+      'individual provider metadata is defensively copied');
+    assert.deepEqual(canonical.validate({
+      id: 'opencode', label: 'OpenCode', billingKind: 'unknown'
+    }), { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' });
+
+    let getterReads = 0;
+    const accessorRecord = {};
+    Object.defineProperty(accessorRecord, 'id', {
+      enumerable: true,
+      get() { getterReads++; return 'opencode'; }
+    });
+    Object.defineProperties(accessorRecord, {
+      label: { enumerable: true, value: 'OpenCode' },
+      billingKind: { enumerable: true, value: 'unknown' }
+    });
+    for (const invalid of [
+      { id: 'codex', label: 'Codex', billingKind: 'unknown' },
+      { id: 'OpenCode', label: 'OpenCode', billingKind: 'unknown' },
+      { id: 'opencode', label: 'Claude Code', billingKind: 'unknown' },
+      { id: 'opencode', label: 'OpenCode', billingKind: 'subscription' },
+      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown', extra: true },
+      Object.assign(Object.create({ inherited: true }), {
+        id: 'opencode', label: 'OpenCode', billingKind: 'unknown'
+      }),
+      accessorRecord
+    ]) {
+      assert.equal(canonical.validate(invalid), null,
+        'non-canonical metadata fails closed');
+    }
+    assert.equal(getterReads, 0, 'metadata validation never invokes accessors');
+    assert.equal(canonical.get('codex'), null, 'Codex remains outside the shipped roster');
+    assert.equal(canonical.isShippedId('OpenCode'), false, 'provider ids are case exact');
+  }
+
   assert.equal(fs.existsSync(providersPath), true, 'provider storage helper exists');
 
   {

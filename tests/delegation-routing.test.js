@@ -8,7 +8,9 @@ const vm = require('node:vm');
 const repoRoot = path.resolve(__dirname, '..');
 const enginePath = path.join(repoRoot, 'extension', 'ai', 'engine-config.js');
 const configPath = path.join(repoRoot, 'extension', 'config', 'config.js');
+const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const preflightPath = path.join(repoRoot, 'extension', 'utils', 'delegation-preflight.js');
+const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
 const preflightSource = fs.readFileSync(preflightPath, 'utf8');
 
 function clone(value) {
@@ -23,6 +25,10 @@ function bridgeState(overrides = {}) {
     delegationConnection: { state: 'connected' },
     ...overrides
   };
+}
+
+function supportedCompatibility(checkedAt = 100) {
+  return { status: 'supported', reason: 'within_tested_range', checkedAt };
 }
 
 async function main() {
@@ -120,7 +126,9 @@ async function main() {
 
   const classicContext = { Object };
   classicContext.globalThis = classicContext;
-  vm.runInNewContext(preflightSource, classicContext, { filename: 'delegation-preflight.js' });
+  vm.runInNewContext(`${delegationProvidersSource}\n${preflightSource}`, classicContext, {
+    filename: 'delegation-preflight.js'
+  });
   const preflight = classicContext.FsbDelegationPreflight;
   assert.ok(preflight);
   assert.equal(Object.isFrozen(preflight), true);
@@ -164,7 +172,8 @@ async function main() {
     providerKind: 'agent',
     agentProviderId: 'claude-code',
     modelProvider: 'anthropic',
-    bridgeState: bridgeState()
+    bridgeState: bridgeState(),
+    compatibility: supportedCompatibility()
   };
   assert.deepEqual(clone(preflight.check(readyInput)), {
     ok: true,
@@ -200,24 +209,52 @@ async function main() {
     providerLabel: 'Claude Code'
   });
 
+  assert.deepEqual(clone(preflight.check({
+    ...readyInput,
+    agentProviderId: 'opencode'
+  })), {
+    ok: true,
+    kind: 'agent',
+    providerId: 'opencode',
+    providerLabel: 'OpenCode'
+  }, 'OpenCode enters delegated mode only with canonical compatibility evidence');
+
+  for (const compatibility of [
+    undefined,
+    { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+    { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 },
+    { status: 'supported', reason: 'within_tested_range', checkedAt: 100, extra: true },
+    Object.assign(Object.create({ status: 'supported' }), {
+      reason: 'within_tested_range', checkedAt: 100
+    })
+  ]) {
+    const result = clone(preflight.check({ ...readyInput, compatibility }));
+    assert.equal(result.ok, false, 'missing, stale, unsupported, or malformed evidence fails closed');
+    assert.equal(result.code, 'unsupported_provider');
+  }
+
   for (const agentProviderId of [
-    '', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex', 'anthropic', '__proto__', 'constructor'
+    '', 'Claude-Code', 'CLAUDE-CODE', 'OpenCode', 'OPENCode', 'codex', 'anthropic', '__proto__', 'constructor'
   ]) {
     const result = clone(preflight.check({
       providerKind: 'agent',
       agentProviderId,
       modelProvider: 'xai',
-      bridgeState: bridgeState()
+      bridgeState: bridgeState(),
+      compatibility: supportedCompatibility()
     }));
     assert.equal(result.ok, false, `${agentProviderId || 'empty'} cannot enter delegated mode`);
     assert.equal(result.code, 'unsupported_provider');
   }
   for (const input of [
     {},
-    { providerKind: 'delegated', agentProviderId: 'claude-code', modelProvider: 'xai' },
+    { providerKind: 'delegated', agentProviderId: 'claude-code', modelProvider: 'xai', compatibility: supportedCompatibility() },
     { providerKind: 'api', agentProviderId: '', modelProvider: 'claude-code' },
-    { providerKind: 'agent', agentProviderId: 'xai', modelProvider: 'xai' },
-    Object.create({ providerKind: 'agent', agentProviderId: 'claude-code', modelProvider: 'xai' })
+    { providerKind: 'agent', agentProviderId: 'xai', modelProvider: 'xai', compatibility: supportedCompatibility() },
+    Object.create({
+      providerKind: 'agent', agentProviderId: 'claude-code', modelProvider: 'xai',
+      compatibility: supportedCompatibility()
+    })
   ]) {
     const result = clone(preflight.check(input));
     assert.equal(result.ok, false, 'namespace confusion and inherited authority fail closed');
@@ -234,7 +271,8 @@ async function main() {
     if (!result.ok) dispositionCodes.add(result.code);
   }
   dispositionCodes.add(clone(preflight.check({
-    providerKind: 'agent', agentProviderId: 'codex', modelProvider: 'xai', bridgeState: bridgeState()
+    providerKind: 'agent', agentProviderId: 'codex', modelProvider: 'xai',
+    bridgeState: bridgeState(), compatibility: supportedCompatibility()
   })).code);
   assert.deepEqual([...dispositionCodes].sort(), [
     'agent_offline', 'agent_unpaired', 'unsupported_provider'

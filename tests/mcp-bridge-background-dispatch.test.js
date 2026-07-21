@@ -30,6 +30,10 @@ const path = require('path');
 const util = require('util');
 const vm = require('vm');
 
+const delegationProviders = require(path.join(
+  __dirname, '..', 'extension', 'utils', 'delegation-providers.js'
+));
+
 let passed = 0;
 let failed = 0;
 
@@ -527,6 +531,7 @@ function buildCompatibilityRefreshHarness(options = {}) {
   const context = {
     mcpBridgeClient: bridge,
     FsbMcpAgentProviders: providers,
+    FsbDelegationProviders: delegationProviders,
     fsbAgentRegistryInstance: registry,
     Promise,
     Object,
@@ -623,6 +628,20 @@ function buildDelegationCommandHarness(options = {}) {
       tabs: { async query() { return []; } }
     },
     FsbDelegationPreflight: preflight,
+    FsbDelegationProviders: delegationProviders,
+    FsbMcpAgentProviders: {
+      async getMergedClients() {
+        calls.push(['getMergedClients']);
+        return options.compatibilityClients || {
+          'claude-code': {
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+          },
+          opencode: {
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+          }
+        };
+      }
+    },
     FsbDelegationConsent: consent,
     FsbDelegationController: { create() { throw new Error('controller must not boot in authority-only cases'); } },
     FsbDelegationEventStore: {},
@@ -1035,6 +1054,30 @@ async function runWrapperBehaviorCases() {
 
 async function runCompatibilityRefreshCases() {
   console.log('\n--- B1: Phase 62 bounded compatibility refresh orchestration ---');
+
+  {
+    const harness = buildCompatibilityRefreshHarness({
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 500 }
+        },
+        opencode: {
+          id: 'opencode',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+        },
+        codex: {
+          id: 'codex',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1 }
+        }
+      }
+    });
+    const result = await harness.readCached();
+    assertEqual(result.compatibilityExpiresAt, 900_100,
+      'compatibility expiry uses the earliest exact shipped-provider row and ignores dormant Codex');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+      'expiry projection cannot write compatibility or provider selection');
+  }
 
   {
     const harness = buildCompatibilityRefreshHarness();
@@ -1853,7 +1896,24 @@ async function runDelegationAuthorityCases() {
       providerId: 'claude-code',
       providerLabel: 'Claude Code'
     }, 'preflight returns only the pure closed agent disposition');
-    assertEqual(harness.calls.length, 0, 'preflight performs no consent/controller/transport mutation');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getMergedClients'],
+      'preflight reads compatibility without consent/controller/transport mutation');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Use OpenCode for this task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      kind: 'agent',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode'
+    }, 'background preflight authorizes OpenCode from saved settings and compatibility');
   }
 
   {
@@ -2007,14 +2067,27 @@ function runSourceContractCase() {
     'background.js never self-sends the pairing reload action');
 
   const orderedImports = [
+    "importScripts('utils/delegation-providers.js')",
     "importScripts('utils/delegation-preflight.js')",
     "importScripts('utils/delegation-consent.js')",
     "importScripts('utils/delegation-event-store.js')",
     "importScripts('utils/delegation-controller.js')"
   ].map((token) => backgroundSource.indexOf(token));
-  assert(orderedImports.every((index) => index >= 0), 'background loads all four delegation modules');
+  assert(orderedImports.every((index) => index >= 0),
+    'background loads the provider helper and all delegation modules');
   assert(orderedImports.every((index, position) => position === 0 || orderedImports[position - 1] < index),
-    'delegation modules load once in dependency order');
+    'provider helper and delegation modules load once in dependency order');
+  const providerHelperImport = orderedImports[0];
+  for (const consumer of [
+    "importScripts('utils/mcp-agent-providers.js')",
+    "importScripts('utils/delegation-preflight.js')",
+    "importScripts('utils/delegation-consent.js')",
+    "importScripts('utils/delegation-event-store.js')",
+    "importScripts('utils/delegation-controller.js')"
+  ]) {
+    assert(providerHelperImport < backgroundSource.indexOf(consumer),
+      `canonical provider helper loads before ${consumer}`);
+  }
   const nativeWakeImport = "importScripts('utils/native-host-wake.js')";
   const nativeWakeImportIndex = backgroundSource.indexOf(nativeWakeImport);
   const bridgeImportIndex = backgroundSource.indexOf("importScripts('ws/mcp-bridge-client.js')");
