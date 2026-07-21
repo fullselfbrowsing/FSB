@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-09-PLAN.md
-last_updated: "2026-07-21T01:26:00.187Z"
-last_activity: 2026-07-21 -- Phase 64 Plan 09 complete; canonical provider authorization and immutable routing green
+stopped_at: Completed 64-10-PLAN.md
+last_updated: "2026-07-21T10:28:33.307Z"
+last_activity: 2026-07-21 -- Phase 64 Plan 10 complete; durable provider lifecycle and drift diagnostics green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 51
-  percent: 96
+  completed_plans: 52
+  percent: 39
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 10 of 13
+Plan: 11 of 13
 Status: Ready to execute
-Last activity: 2026-07-21 -- Phase 64 Plan 09 complete; canonical provider authorization and immutable routing green
+Last activity: 2026-07-21 -- Phase 64 Plan 10 complete; durable provider lifecycle and drift diagnostics green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -222,6 +222,10 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Reread background-owned selection before trust mutation and challenge consumption; keep side-panel start requests provider-free. — Only saved settings may select the adapter, so stale or attacker-supplied client intent cannot acquire provider authority.
 - [Phase 64]: Bind a frozen canonical provider context only after request-bound started identity matches and controller start persists. — Events and final settlement retain accepted identity and honest billing even when settings change later.
 - [Phase 64]: Reconstruct evicted-run provider context only from validated persisted provider and init metadata. — Current settings and daemon presentation fields cannot relabel or expand an already accepted run.
+- [Phase 64]: Accept only exact canonical Claude Code or OpenCode own-data pairs at durable boundaries — Reconstruct frozen copies and derive later identity solely from persisted init metadata.
+- [Phase 64]: Keep every normalized result in running state until an explicit authoritative terminal — Candidate results cannot hydrate or settle as fabricated success or failure.
+- [Phase 64]: Mirror adapter-specific drift vocabularies in a bounded six-field browser projection — Throttle each shipped adapter independently and report only after terminal persistence succeeds.
+- [Phase 64]: Upgrade compact MCP drift tuples at the background boundary with immutable accepted-run context — Preserve the wire contract while preventing provider relabeling or duplicate diagnostics.
 
 ### Pending Todos
 
@@ -266,8 +270,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T01:26:00.180Z
-Stopped at: Completed 64-09-PLAN.md
+Last session: 2026-07-21T10:28:33.302Z
+Stopped at: Completed 64-10-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -299,3 +303,4 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 64 P07 | 48 min | 3 tasks | 2 files |
 | Phase 64 P08 | 49 min | 3 tasks | 6 files |
 | Phase 64 P09 | 42 min | 3 tasks | 14 files |
+| Phase 64 P10 | 31 min | 3 tasks | 9 files |
