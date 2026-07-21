@@ -9619,11 +9619,11 @@
         <target state="translated">Aktuell</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">19,20</context>
+          <context context-type="linenumber">18,19</context>
         </context-group>
         <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">69,70</context>
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">238</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.status.partial" datatype="html">
@@ -9631,23 +9631,11 @@
         <target state="translated">Teilweise</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">20,21</context>
+          <context context-type="linenumber">19,20</context>
         </context-group>
         <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">70,71</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.status.stale" datatype="html">
-        <source>Stale</source>
-        <target state="translated">Veraltet</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">21,22</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">71,72</context>
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">239</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.status.loadingLabel" datatype="html">
@@ -9655,11 +9643,11 @@
         <target state="translated">Wird geladen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">22,23</context>
+          <context context-type="linenumber">20,21</context>
         </context-group>
         <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">72,73</context>
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">240</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.status.unavailableLabel" datatype="html">
@@ -9667,11 +9655,11 @@
         <target state="translated">Nicht verfügbar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">23,26</context>
+          <context context-type="linenumber">21,24</context>
         </context-group>
         <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">73,75</context>
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">241</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.tabMetrics.aria" datatype="html">
@@ -9679,7 +9667,7 @@
         <target state="translated">Kennzahlen des aktuellen Tabs</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">30,31</context>
+          <context context-type="linenumber">28,29</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ARIA" datatype="html">
@@ -9687,11 +9675,7 @@
         <target state="translated">Aggregierte FSB-Metriken</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">38,39</context>
-        </context-group>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">66,68</context>
+          <context context-type="linenumber">37,38</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_ACTIVE" datatype="html">
@@ -9699,7 +9683,7 @@
         <target state="translated">jetzt aktiv</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">43,45</context>
+          <context context-type="linenumber">42,45</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOTAL" datatype="html">
@@ -9707,7 +9691,7 @@
         <target state="translated">Nutzer (365 T.)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">49,51</context>
+          <context context-type="linenumber">48,50</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS" datatype="html">
@@ -9715,7 +9699,7 @@
         <target state="translated">Agententage seit Active v2</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">54,56</context>
+          <context context-type="linenumber">53,56</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_HEADLINE_TOKENS" datatype="html">
@@ -9723,7 +9707,7 @@
         <target state="translated">Token (24 Std.)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">59,62</context>
+          <context context-type="linenumber">58,61</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.loading.sr" datatype="html">
@@ -9731,23 +9715,7 @@
         <target state="translated">Statistiken werden geladen ...</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">83,85</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.stale.notice" datatype="html">
-        <source>This view is showing the last available snapshot while fresh data is unavailable.</source>
-        <target state="translated">Diese Ansicht zeigt den letzten verfügbaren Stand, solange keine aktuellen Daten verfügbar sind.</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">90,92</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.partial.notice" datatype="html">
-        <source>This view is usable, but some reporting or historical coverage is incomplete.</source>
-        <target state="translated">Diese Ansicht ist nutzbar, aber die Berichts- oder Verlaufsabdeckung ist teilweise unvollständig.</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">96,98</context>
+          <context context-type="linenumber">69,71</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.mcp.empty" datatype="html">
@@ -9755,7 +9723,7 @@
         <target state="translated">Noch keine MCP-Client-Daten vorhanden.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">115,117</context>
+          <context context-type="linenumber">103,105</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_ANNOTATION" datatype="html">
@@ -9763,7 +9731,7 @@
         <target state="translated">Regionale Verteilung aus dem heutigen Stundenaggregat.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">137,139</context>
+          <context context-type="linenumber">125,127</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_GLOBE_EMPTY" datatype="html">
@@ -9771,23 +9739,7 @@
         <target state="translated">Noch nicht genügend anonyme Aktivität für eine Aufschlüsselung nach Region – schau bald wieder vorbei.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">139,141</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.globe.partial" datatype="html">
-        <source>The regional aggregate is not available yet.</source>
-        <target state="translated">Das regionale Aggregat ist noch nicht verfügbar.</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">142,143</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.globe.stale" datatype="html">
-        <source>The regional breakdown is older than two hours.</source>
-        <target state="translated">Die regionale Aufschlüsselung ist älter als zwei Stunden.</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">144,146</context>
+          <context context-type="linenumber">127,130</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.title" datatype="html">
@@ -9795,7 +9747,7 @@
         <target state="translated">Statistiken konnten nicht geladen werden</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">151,152</context>
+          <context context-type="linenumber">134,135</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.retry" datatype="html">
@@ -9803,7 +9755,7 @@
         <target state="translated">Die Seite versucht es automatisch alle 5 Minuten erneut.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">152,154</context>
+          <context context-type="linenumber">135,137</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.aria" datatype="html">
@@ -9811,7 +9763,7 @@
         <target state="translated">Statistikansicht</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">158,159</context>
+          <context context-type="linenumber">141,142</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.credit" datatype="html">
@@ -9819,7 +9771,7 @@
         <target state="translated">Erstellt von <x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>Lakshman Turlapati<x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">192,193</context>
+          <context context-type="linenumber">175,176</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.footer.version" datatype="html">
@@ -9827,7 +9779,7 @@
         <target state="translated"><x id="START_TAG_SPAN" ctype="x-span" equiv-text="&lt;span class=&quot;version-tag&quot; [attr.translate]=&quot;&apos;no&apos;&quot;&gt;"/>▽<x id="INTERPOLATION" equiv-text="{{ appVersion }}"/><x id="CLOSE_TAG_SPAN" ctype="x-span" equiv-text="&lt;/span&gt;"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.html</context>
-          <context context-type="linenumber">194,196</context>
+          <context context-type="linenumber">177,179</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.default" datatype="html">
@@ -9835,7 +9787,7 @@
         <target state="translated">Netzwerk- oder Analysefehler.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">123</context>
+          <context context-type="linenumber">140</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeStars" datatype="html">
@@ -9843,7 +9795,7 @@
         <target state="translated">Sterne</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">130</context>
+          <context context-type="linenumber">147</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.cumulativeCommits" datatype="html">
@@ -9851,7 +9803,7 @@
         <target state="translated">Änderungen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">132</context>
+          <context context-type="linenumber">148</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_ACTIVE" datatype="html">
@@ -9859,15 +9811,7 @@
         <target state="translated">Jetzt aktiv</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">128</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.metric.activeAgents" datatype="html">
-        <source>active agents</source>
-        <target state="translated">aktive Agenten</target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">333</context>
+          <context context-type="linenumber">149</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_TOKENS" datatype="html">
@@ -9875,7 +9819,7 @@
         <target state="translated">Token</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">134</context>
+          <context context-type="linenumber">150</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_VIEW_POPULAR_MCP" datatype="html">
@@ -9883,7 +9827,7 @@
         <target state="translated">Beliebt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">135</context>
+          <context context-type="linenumber">151</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.chartLibrary" datatype="html">
@@ -9891,7 +9835,7 @@
         <target state="translated">Die Diagrammbibliothek konnte nicht geladen werden.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">176</context>
+          <context context-type="linenumber">191</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.error.chartRender" datatype="html">
@@ -9899,35 +9843,27 @@
         <target state="translated">Das ausgewählte Diagramm konnte nicht dargestellt werden.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">183</context>
+          <context context-type="linenumber">198</context>
         </context-group>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">869</context>
-        </context-group>
-      </trans-unit>
-      <trans-unit id="stats.status.freshAt" datatype="html">
-        <source>Fresh snapshot checked <x id="checkedAt" equiv-text="formatted"/></source>
-        <target state="translated">Aktueller Stand geprüft am <x id="checkedAt" equiv-text="formatted"/></target>
-        <context-group purpose="location">
-          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">234</context>
+          <context context-type="linenumber">970</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.status.partialAt" datatype="html">
-        <source>Partial snapshot checked <x id="checkedAt" equiv-text="formatted"/></source>
-        <target state="translated">Teilweiser Stand geprüft am <x id="checkedAt" equiv-text="formatted"/></target>
+      <trans-unit id="stats.status.snapshotUnknownChecked" datatype="html">
+        <source>Latest snapshot update time unavailable; last checked <x id="checkedAt" equiv-text="checkedAt"/></source>
+        <target state="translated">Aktualisierungszeitpunkt der letzten Momentaufnahme nicht verfügbar; zuletzt geprüft: <x id="checkedAt" equiv-text="checkedAt"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">237</context>
+          <context context-type="linenumber">251</context>
         </context-group>
       </trans-unit>
-      <trans-unit id="stats.status.staleAt" datatype="html">
-        <source>Stale snapshot from <x id="fetchedAt" equiv-text="formatted"/></source>
-        <target state="translated">Veralteter Stand vom <x id="fetchedAt" equiv-text="formatted"/></target>
+      <trans-unit id="stats.status.snapshotAndChecked" datatype="html">
+        <source>Latest snapshot from <x id="snapshotAt" equiv-text="snapshotAt"/>; last checked <x id="checkedAt" equiv-text="checkedAt"/></source>
+        <target state="translated">Letzte Momentaufnahme vom <x id="snapshotAt" equiv-text="snapshotAt"/>; zuletzt geprüft: <x id="checkedAt" equiv-text="checkedAt"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">238</context>
+          <context context-type="linenumber">254</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.status.loading" datatype="html">
@@ -9935,7 +9871,7 @@
         <target state="translated">Ausgewählte Statistiken werden geladen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">241</context>
+          <context context-type="linenumber">257</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.status.unavailable" datatype="html">
@@ -9943,7 +9879,71 @@
         <target state="translated">Ausgewählte Statistiken nicht verfügbar</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">242</context>
+          <context context-type="linenumber">258</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.partial.unknownTime" datatype="html">
+        <source>Showing the latest available snapshot; its update time is unavailable. A fresh update is temporarily unavailable.</source>
+        <target state="translated">Die letzte verfügbare Momentaufnahme wird angezeigt; ihr Aktualisierungszeitpunkt ist nicht verfügbar. Eine aktuelle Aktualisierung ist vorübergehend nicht verfügbar.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">270</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.partial.notice" datatype="html">
+        <source>Showing the latest available snapshot from <x id="snapshotAt" equiv-text="snapshotAt"/>; a fresh update is temporarily unavailable.</source>
+        <target state="translated">Die letzte verfügbare Momentaufnahme vom <x id="snapshotAt" equiv-text="snapshotAt"/> wird angezeigt; eine aktuelle Aktualisierung ist vorübergehend nicht verfügbar.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">273</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.starsHistory" datatype="html">
+        <source>The latest star total is available. Exact dates are unavailable for some star changes.</source>
+        <target state="translated">Die neueste Gesamtzahl der Sterne ist verfügbar. Für einige Änderungen sind keine genauen Datumsangaben verfügbar.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">282</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.commitsHistory" datatype="html">
+        <source>Commit history is incomplete, so totals and the chart may omit older commits.</source>
+        <target state="translated">Der Commit-Verlauf ist unvollständig, daher können Gesamtwerte und Diagramm ältere Commits auslassen.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">289</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.githubRetry" datatype="html">
+        <source>GitHub refresh is delayed. This snapshot is still current, and another check is scheduled.</source>
+        <target state="translated">Die GitHub-Aktualisierung ist verzögert. Diese Momentaufnahme ist weiterhin aktuell, und eine weitere Prüfung ist geplant.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">307</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.activeCoverage" datatype="html">
+        <source>Agent totals include <x id="reporters" equiv-text="reporterCount"/> of <x id="activeUsers" equiv-text="activeUserCount"/> active users in this snapshot that reported an agent count.</source>
+        <target state="translated">Die Agent-Gesamtwerte umfassen <x id="reporters" equiv-text="reporterCount"/> von <x id="activeUsers" equiv-text="activeUserCount"/> aktiven Benutzern in dieser Momentaufnahme, die eine Agent-Anzahl gemeldet haben.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">327</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.regionsMissing" datatype="html">
+        <source>The regional aggregate is not available yet.</source>
+        <target state="translated">Das regionale Aggregat ist noch nicht verfügbar.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">334</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.quality.regionsDelayed" datatype="html">
+        <source>The regional breakdown is older than two hours.</source>
+        <target state="translated">Die regionale Aufschlüsselung ist älter als zwei Stunden.</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">340</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.stars.aria" datatype="html">
@@ -9951,7 +9951,7 @@
         <target state="translated">Kumulierte Repository-Sterne im Zeitverlauf</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">253</context>
+          <context context-type="linenumber">350</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.commits.aria" datatype="html">
@@ -9959,7 +9959,7 @@
         <target state="translated">Kumulierte Repository-Commits im Zeitverlauf</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">255</context>
+          <context context-type="linenumber">352</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.tokens.aria" datatype="html">
@@ -9967,7 +9967,7 @@
         <target state="translated">FSB-Token-Nutzung in den letzten 30 Tagen</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">257</context>
+          <context context-type="linenumber">354</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.mcp.aria" datatype="html">
@@ -9975,7 +9975,7 @@
         <target state="translated">Anteil der erfassten MCP-Clients</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">259</context>
+          <context context-type="linenumber">356</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.globe.aria" datatype="html">
@@ -9983,7 +9983,7 @@
         <target state="translated">Globus mit der heutigen stündlichen regionalen FSB-Verteilung</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">300</context>
+          <context context-type="linenumber">397</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalStars" datatype="html">
@@ -9991,7 +9991,7 @@
         <target state="translated">Sterne insgesamt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">309</context>
+          <context context-type="linenumber">406</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.last7Days" datatype="html">
@@ -9999,7 +9999,7 @@
         <target state="translated">letzte 7 Tage</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">310</context>
+          <context context-type="linenumber">407</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.totalCommits" datatype="html">
@@ -10007,7 +10007,7 @@
         <target state="translated">Commits insgesamt</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">322</context>
+          <context context-type="linenumber">414</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.last30Days" datatype="html">
@@ -10015,7 +10015,15 @@
         <target state="translated">letzte 30 Tage</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">326</context>
+          <context context-type="linenumber">418</context>
+        </context-group>
+      </trans-unit>
+      <trans-unit id="stats.metric.activeAgents" datatype="html">
+        <source>active agents</source>
+        <target state="translated">aktive Agenten</target>
+        <context-group purpose="location">
+          <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
+          <context context-type="linenumber">432</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.avgPerUser" datatype="html">
@@ -10023,7 +10031,7 @@
         <target state="translated">Durchschnitt/meldender Nutzer</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">335</context>
+          <context context-type="linenumber">436</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokensLifetime" datatype="html">
@@ -10031,7 +10039,7 @@
         <target state="translated">Token</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">341</context>
+          <context context-type="linenumber">446</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.tokens24h" datatype="html">
@@ -10039,7 +10047,7 @@
         <target state="translated">Token (24 Std.)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">342</context>
+          <context context-type="linenumber">447</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.trackedClients" datatype="html">
@@ -10047,7 +10055,7 @@
         <target state="translated">erfasste Clients</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">348</context>
+          <context context-type="linenumber">453</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.topNamed" datatype="html">
@@ -10055,7 +10063,7 @@
         <target state="translated">Am häufigsten: <x id="entityLabel" equiv-text="top.label"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">349</context>
+          <context context-type="linenumber">454</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.metric.topClient" datatype="html">
@@ -10063,7 +10071,7 @@
         <target state="translated">häufigster Client</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">349</context>
+          <context context-type="linenumber">454</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.view.currentAria" datatype="html">
@@ -10071,7 +10079,7 @@
         <target state="translated">Statistikansicht auswählen. Aktuelle Ansicht: <x id="viewLabel" equiv-text="this.activeViewLabel"/></target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">383</context>
+          <context context-type="linenumber">491</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.meta.title" datatype="html">
@@ -10079,7 +10087,7 @@
         <target state="translated">FSB · Statistiken</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">467</context>
+          <context context-type="linenumber">575</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.meta.description" datatype="html">
@@ -10087,7 +10095,7 @@
         <target state="translated">Aggregierte Live-Daten zur Verbreitung und Nutzung von FSB sowie zu Repository-Aktivitäten.</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">475</context>
+          <context context-type="linenumber">583</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeStars.legend" datatype="html">
@@ -10095,7 +10103,7 @@
         <target state="translated">Kumulative Sterne</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1106</context>
+          <context context-type="linenumber">1082</context>
         </context-group>
       </trans-unit>
       <trans-unit id="stats.chart.cumulativeCommits.legend" datatype="html">
@@ -10103,7 +10111,7 @@
         <target state="translated">Kumulative Commits</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1133</context>
+          <context context-type="linenumber">1103</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_TOKENS_LEGEND" datatype="html">
@@ -10111,7 +10119,7 @@
         <target state="translated">Token (letzte 30 Tage)</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1161</context>
+          <context context-type="linenumber">1131</context>
         </context-group>
       </trans-unit>
       <trans-unit id="SHOWCASE_STATS_FSB_CHART_POPULAR_MCP_LEGEND" datatype="html">
@@ -10119,7 +10127,7 @@
         <target state="translated">Beliebte MCP-Clients</target>
         <context-group purpose="location">
           <context context-type="sourcefile">src/app/pages/stats/stats-page.component.ts</context>
-          <context context-type="linenumber">1184</context>
+          <context context-type="linenumber">1154</context>
         </context-group>
       </trans-unit>
       <trans-unit id="support.hero.title" datatype="html">

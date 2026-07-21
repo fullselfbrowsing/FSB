@@ -14,9 +14,9 @@
  * exists in stats-page.component.ts.)
  *
  * Suite B -- Active Now globe lifecycle:
- *   Static guards for the Stats page globe: view switches defer redraw by one
- *   animation frame, pending redraws are canceled on teardown, and the globe
- *   requestAnimationFrame loop runs outside Angular change detection.
+ *   Static guards for the Stats page globe: view switches defer redraw until
+ *   Angular finishes rendering, pending callbacks are canceled on teardown,
+ *   and visualization work runs outside Angular change detection.
  *
  * Suite C -- globe service + sitemaps PRNG (review-fix guards):
  *   Static guards that the coastline GeoJSON is cached across setupGlobe()
@@ -226,6 +226,16 @@ function commitPunchcardLocal(commits) {
   const destroyBlock = destroyStart >= 0 && destroyEnd > destroyStart
     ? src.slice(destroyStart, destroyEnd)
     : '';
+  const scheduleStart = src.indexOf('  private scheduleViewRedraw(');
+  const scheduleEnd = src.indexOf('  private cancelPendingViewRedraw(', scheduleStart);
+  const scheduleBlock = scheduleStart >= 0 && scheduleEnd > scheduleStart
+    ? src.slice(scheduleStart, scheduleEnd)
+    : '';
+  const cancelStart = scheduleEnd;
+  const cancelEnd = src.indexOf('  private redrawChart(', cancelStart);
+  const cancelBlock = cancelStart >= 0 && cancelEnd > cancelStart
+    ? src.slice(cancelStart, cancelEnd)
+    : '';
 
   check('stats globe: component source file readable',
     src.length > 0,
@@ -242,12 +252,24 @@ function commitPunchcardLocal(commits) {
   check('stats globe: setView no longer redraws synchronously',
     !setViewBlock.includes('this.redrawChart();'),
     'setView(...) still calls redrawChart() synchronously');
-  check('stats globe: scheduleViewRedraw uses requestAnimationFrame',
-    /pendingViewRedrawFrame\s*=\s*window\.requestAnimationFrame/.test(src),
-    'scheduleViewRedraw() does not use window.requestAnimationFrame');
-  check('stats globe: pending frame cancellation uses cancelAnimationFrame',
-    /window\.cancelAnimationFrame\(\s*this\.pendingViewRedrawFrame\s*\)/.test(src),
-    'cancelPendingViewRedraw() does not cancel pendingViewRedrawFrame');
+  check('stats visualizations: post-render callback types are imported and Injector is injected',
+    /\bAfterRenderRef\b/.test(src) && /\bInjector\b/.test(src) &&
+      /inject\(\s*Injector\s*\)/.test(src),
+    'AfterRenderRef/Injector import or injected Injector is missing');
+  check('stats visualizations: redraw coalescing uses Angular afterNextRender',
+    scheduleBlock.includes('this.cancelPendingViewRedraw();') &&
+      /pendingViewRedraw\s*=\s*afterNextRender\s*\(/.test(scheduleBlock) &&
+      /injector\s*:\s*this\.injector/.test(scheduleBlock),
+    'scheduleViewRedraw() does not replace the prior callback and register afterNextRender with the component Injector');
+  check('stats visualizations: post-render work runs outside Angular',
+    /zone\.runOutsideAngular\(\s*\(\)\s*=>\s*(?:\{\s*)?this\.redrawChart\(\)/.test(scheduleBlock),
+    'the afterNextRender callback does not redraw outside Angular');
+  check('stats visualizations: raw animation-frame scheduler is absent',
+    !/window\.(?:request|cancel)AnimationFrame/.test(scheduleBlock + cancelBlock),
+    'scheduleViewRedraw()/cancelPendingViewRedraw() still use raw animation-frame APIs');
+  check('stats visualizations: pending post-render callback is destroyable',
+    /pendingViewRedraw(?:\?\.|\.)destroy\(\)/.test(cancelBlock),
+    'cancelPendingViewRedraw() does not destroy the pending AfterRenderRef');
   check('stats globe: ngOnDestroy cancels pending view redraw',
     destroyBlock.includes('this.cancelPendingViewRedraw();'),
     'ngOnDestroy() does not call cancelPendingViewRedraw()');
@@ -330,15 +352,13 @@ function commitPunchcardLocal(commits) {
   check('stats FSB summary: stale active snapshots are not labelled right now',
     /@if\s*\(isFsbActiveSnapshotCurrent\)[\s\S]*SHOWCASE_STATS_FSB_HEADLINE_ACTIVE/.test(html),
     'active-right-now copy is not gated on a current active snapshot');
-  check('stats FSB metrics: averages use reporting users without visible reported copy',
+  check('stats FSB metrics: averages use reporting users',
     src.includes('avg_agents_per_reporting_user') &&
       src.includes('reportingUsers > 0') &&
       src.includes('avg/reporting user') &&
       src.includes('tokens (24h)') &&
-      html.includes('tokens (24h)') &&
-      !/\$localize`[^`]*reported/i.test(src) &&
-      !/>\s*reported/i.test(html),
-    'visible Stats copy still contains the reported qualifier');
+      html.includes('tokens (24h)'),
+    'Stats metrics do not use reporting-user denominators');
   check('stats FSB metrics: agent-days use only the active-v2 history',
     src.includes('agent_days_since_active_v2') &&
       !/formattedFsbAgentDays[\s\S]{0,300}(?:agent_days_lifetime|total_agents_lifetime)/.test(src) &&

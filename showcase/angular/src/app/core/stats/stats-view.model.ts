@@ -5,6 +5,13 @@ import type {
   GitHubStarHistoryPoint,
   GitHubStarsStats,
 } from './github-stats.types';
+import type { DatasetAvailability } from './dataset-state.types';
+
+export const GITHUB_FRESHNESS_SLA_MS = 15 * 60 * 1000;
+export const ACTIVE_FRESHNESS_SLA_MS = 15 * 60 * 1000;
+export const AGGREGATE_FRESHNESS_SLA_MS = 2 * 60 * 60 * 1000;
+export const STATS_HARD_LIMIT_MS = 24 * 60 * 60 * 1000;
+export const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 export type StatsDataSource =
   | 'stars'
@@ -23,14 +30,12 @@ export type StatsSourceStateMap = Record<StatsDataSource, DatasetState<unknown>>
 
 export type StatsViewDataState =
   | { kind: 'loading' }
-  | { kind: 'ready'; fetchedAt: number }
-  | { kind: 'partial'; fetchedAt: number; message: string }
-  | { kind: 'stale'; fetchedAt: number; message: string }
+  | { kind: 'ready'; snapshotAt: number | null; checkedAt: number }
+  | { kind: 'partial'; snapshotAt: number | null; checkedAt: number; message: string }
   | { kind: 'error'; message: string };
 
-export interface StatsResponseFreshness {
+export interface StatsResponseFreshness extends DatasetAvailability {
   cacheState: 'fresh' | 'stale';
-  fetchedAt: number;
 }
 
 export function initialStatsSourceStates(): StatsSourceStateMap {
@@ -55,25 +60,44 @@ export function sourcesForStatsView(view: RenderedStatsView): readonly StatsData
   switch (view) {
     case 'stars-cumulative': return ['stars'];
     case 'commits-cumulative': return ['commits'];
-    // The headline numbers are request-time, but the globe is backed by the
-    // hourly regional aggregate. Both sources must be healthy before this
-    // compound view can call itself Live.
-    case 'fsb-active-now': return ['fsb-active', 'fsb-headline'];
+    // Regions are an optional visualization. Only the request-time active
+    // snapshot determines whether Active now is Live.
+    case 'fsb-active-now': return ['fsb-active'];
     case 'fsb-tokens': return ['fsb-headline', 'fsb-series'];
     case 'fsb-popular-mcp': return ['fsb-headline'];
   }
 }
 
+export function freshnessSlaForStatsView(view: RenderedStatsView): number {
+  switch (view) {
+    case 'stars-cumulative':
+    case 'commits-cumulative':
+      return GITHUB_FRESHNESS_SLA_MS;
+    case 'fsb-active-now':
+      return ACTIVE_FRESHNESS_SLA_MS;
+    case 'fsb-tokens':
+    case 'fsb-popular-mcp':
+      return AGGREGATE_FRESHNESS_SLA_MS;
+  }
+}
+
 export function selectedStatsViewState(
   view: RenderedStatsView,
-  states: StatsSourceStateMap
+  states: StatsSourceStateMap,
+  now = Date.now()
 ): StatsViewDataState {
-  return combineDatasetStates(sourcesForStatsView(view).map((source) => states[source]));
+  return combineDatasetStates(
+    sourcesForStatsView(view).map((source) => states[source]),
+    freshnessSlaForStatsView(view),
+    now
+  );
 }
 
 /** Combine only the sources used by the selected view. */
 export function combineDatasetStates(
-  states: readonly DatasetState<unknown>[]
+  states: readonly DatasetState<unknown>[],
+  freshnessSlaMs: number,
+  now = Date.now()
 ): StatsViewDataState {
   const error = states.find((state) => state.kind === 'error');
   if (error?.kind === 'error') return { kind: 'error', message: error.message };
@@ -82,69 +106,73 @@ export function combineDatasetStates(
   }
 
   const snapshots = states.filter(
-    (state): state is Extract<DatasetState<unknown>, { kind: 'ready' | 'partial' | 'stale' }> =>
-      state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale'
+    (state): state is Extract<DatasetState<unknown>, { kind: 'ready' }> =>
+      state.kind === 'ready'
   );
-  const fetchedAt = Math.min(...snapshots.map((state) => state.fetchedAt));
-  const stale = snapshots.find((state) => state.kind === 'stale');
-  if (stale?.kind === 'stale') {
-    return { kind: 'stale', fetchedAt, message: stale.message };
+  if (snapshots.some((state) =>
+    (state.availability.snapshotAt !== null &&
+      !Number.isFinite(state.availability.snapshotAt)) ||
+    !Number.isFinite(state.availability.checkedAt)
+  )) {
+    return { kind: 'error', message: 'Stats response is missing freshness metadata.' };
   }
-  const partial = snapshots.find((state) => state.kind === 'partial');
-  if (partial?.kind === 'partial') {
-    return { kind: 'partial', fetchedAt, message: partial.message };
+
+  const normalizedSnapshotTimes = snapshots.map((state) => {
+    const time = state.availability.snapshotAt;
+    return time === null || time > now + MAX_FUTURE_SKEW_MS ? null : time;
+  });
+  const knownSnapshotTimes = normalizedSnapshotTimes.flatMap((time) =>
+    time === null ? [] : [time]
+  );
+  const hasUnknownSnapshotTime = knownSnapshotTimes.length !== snapshots.length;
+  const snapshotAt = hasUnknownSnapshotTime ? null : Math.min(...knownSnapshotTimes);
+  const checkedAt = Math.min(...snapshots.map((state) => state.availability.checkedAt));
+  const ages = knownSnapshotTimes.map((time) => Math.max(0, now - time));
+  if (ages.some((age) => age > STATS_HARD_LIMIT_MS)) {
+    return {
+      kind: 'error',
+      message: 'The last usable snapshot is more than 24 hours old.',
+    };
   }
-  return { kind: 'ready', fetchedAt };
+  if (hasUnknownSnapshotTime || ages.some((age) => age > freshnessSlaMs)) {
+    return {
+      kind: 'partial',
+      snapshotAt,
+      checkedAt,
+      message: 'One or more required snapshots are outside the freshness window.',
+    };
+  }
+  return { kind: 'ready', snapshotAt, checkedAt };
 }
 
 export function aggregateDatasetState<T extends { aggregate_updated_at?: string | null }>(
   data: T,
-  checkedAt: number,
-  now = Date.now()
+  availability: DatasetAvailability
 ): DatasetState<T> {
   const aggregateUpdatedAt = Date.parse(data.aggregate_updated_at ?? '');
-  if (!Number.isFinite(aggregateUpdatedAt)) {
-    return {
-      kind: 'partial',
-      data,
-      fetchedAt: checkedAt,
-      message: 'Historical aggregates are not available yet.',
-    };
-  }
-  if (now - aggregateUpdatedAt > 2 * 60 * 60 * 1000) {
-    return {
-      kind: 'stale',
-      data,
-      fetchedAt: aggregateUpdatedAt,
-      message: 'Historical aggregates have not updated in over two hours.',
-    };
-  }
-  return { kind: 'ready', data, fetchedAt: aggregateUpdatedAt };
+  return {
+    kind: 'ready',
+    data,
+    availability: {
+      ...availability,
+      snapshotAt: Number.isFinite(aggregateUpdatedAt) ? aggregateUpdatedAt : null,
+    },
+  };
 }
 
-/** Downgrade a fresh request-time snapshot when v2 agent-count coverage is incomplete. */
+/** Use the request timestamp for Active now; reporting coverage is separate quality data. */
 export function activeSnapshotDatasetState<T extends {
-  active_users_now: number;
-  active_agents_reporting_users_now?: number;
-  active_count_version?: number;
-  active_metric_semantics?: string;
-}>(data: T, checkedAt: number): DatasetState<T> {
-  const activeUsers = Number(data.active_users_now);
-  const reportingUsers = Number(data.active_agents_reporting_users_now);
-  const hasV2Metadata = Number(data.active_count_version) >= 2 &&
-    data.active_metric_semantics === 'reported_registry_count_v2' &&
-    Number.isInteger(activeUsers) && activeUsers >= 0 &&
-    Number.isInteger(reportingUsers) && reportingUsers >= 0 &&
-    reportingUsers <= activeUsers;
-  if (!hasV2Metadata || reportingUsers < activeUsers) {
-    return {
-      kind: 'partial',
-      data,
-      fetchedAt: checkedAt,
-      message: 'Active-agent reporting coverage is incomplete.',
-    };
-  }
-  return { kind: 'ready', data, fetchedAt: checkedAt };
+  generated_at?: string | null;
+}>(data: T, availability: DatasetAvailability): DatasetState<T> {
+  const generatedAt = Date.parse(data.generated_at ?? '');
+  return {
+    kind: 'ready',
+    data,
+    availability: {
+      ...availability,
+      snapshotAt: Number.isFinite(generatedAt) ? generatedAt : availability.snapshotAt,
+    },
+  };
 }
 
 /**
@@ -173,12 +201,27 @@ export function rollingSevenDayStars(stats: GitHubStarsStats): number | null {
 /** Read authoritative cache freshness headers, including on HTTP 304. */
 export function statsResponseFreshness(headers: Pick<Headers, 'get'>): StatsResponseFreshness {
   const cacheState = headers.get('x-fsb-stats-cache');
-  const fetchedAtHeader = headers.get('x-fsb-stats-fetched-at');
-  const fetchedAt = Date.parse(fetchedAtHeader ?? '');
-  if ((cacheState !== 'fresh' && cacheState !== 'stale') || !Number.isFinite(fetchedAt)) {
+  const snapshotAt = Date.parse(headers.get('x-fsb-stats-fetched-at') ?? '');
+  const checkedAt = Date.parse(headers.get('x-fsb-stats-checked-at') ?? '');
+  const upstreamStatus = headers.get('x-fsb-stats-upstream-status')?.trim() ?? '';
+  const nextRetryHeader = headers.get('x-fsb-stats-next-retry-at');
+  const nextRetryAt = nextRetryHeader === null ? undefined : Date.parse(nextRetryHeader);
+  if (
+    (cacheState !== 'fresh' && cacheState !== 'stale') ||
+    !Number.isFinite(snapshotAt) ||
+    !Number.isFinite(checkedAt) ||
+    upstreamStatus.length === 0 ||
+    (nextRetryAt !== undefined && !Number.isFinite(nextRetryAt))
+  ) {
     throw new Error('Stats response is missing freshness metadata');
   }
-  return { cacheState, fetchedAt };
+  return {
+    cacheState,
+    snapshotAt,
+    checkedAt,
+    upstreamStatus,
+    ...(nextRetryAt === undefined ? {} : { nextRetryAt }),
+  };
 }
 
 export function normalizeGitHubStars(value: unknown): GitHubStarsStats {

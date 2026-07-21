@@ -151,22 +151,13 @@
   animation: stats-live-pulse 2.2s ease-in-out infinite;
 }
 
-.stats-live-badge.is-stale {
+.stats-live-badge.is-partial {
   color: #d97706;
   border-color: color-mix(in srgb, #d97706 45%, var(--border-color));
 }
 
-.stats-live-badge.is-stale::before {
-  background: #d97706;
-}
-
-.stats-live-badge.is-partial {
-  color: #2563eb;
-  border-color: color-mix(in srgb, #2563eb 45%, var(--border-color));
-}
-
 .stats-live-badge.is-partial::before {
-  background: #2563eb;
+  background: #d97706;
 }
 
 @keyframes stats-live-pulse {
@@ -291,7 +282,7 @@
   text-align: center;
 }
 
-.stale-notice {
+.stats-notice {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -305,19 +296,28 @@
   line-height: 1.45;
 }
 
-.stale-notice i {
+.stats-notice i {
   flex: 0 0 auto;
   color: #d97706;
   margin-top: 0.1rem;
 }
 
-.partial-notice {
+.quality-notice {
   border-color: color-mix(in srgb, #2563eb 38%, var(--border-color));
   background: color-mix(in srgb, #2563eb 9%, transparent);
 }
 
-.partial-notice i {
+.quality-notice i {
   color: #2563eb;
+}
+
+.retry-notice {
+  border-color: var(--border-color);
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+}
+
+.retry-notice i {
+  color: var(--text-muted);
 }
 
 .chart-mount canvas {

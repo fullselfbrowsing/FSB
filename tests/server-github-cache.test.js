@@ -14,7 +14,10 @@ const express = require(require.resolve('express', { paths: [SERVER_NM] }));
 const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'schema'));
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
 const createPublicStatsRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'public-stats'));
-const { GITHUB_CACHE_MAX_STALE_MS } = createPublicStatsRouter;
+const {
+  GITHUB_CACHE_FRESH_MS,
+  GITHUB_CACHE_MAX_STALE_MS,
+} = createPublicStatsRouter;
 
 let passed = 0;
 let failed = 0;
@@ -115,7 +118,10 @@ function rawGet(port, requestPath, headers = {}) {
   queries.upsertGithubCacheRow('commits', JSON.stringify([
     commit('a', new Date(now - 60 * 60 * 1000).toISOString()),
     commit('b', new Date(now - 40 * 24 * 60 * 60 * 1000).toISOString()),
-  ]), '"commits"', now, 200, 5000, 0);
+  ]), '"commits"', now, 200, 5000, 0, true, 1, now, null, {
+    branch: 'private-branch-cursor',
+    head_sha: 'private-head-cursor',
+  });
   primary.router._resetMemoForTest();
 
   const summaryResponse = await rawGet(primary.port, '/api/public-stats/github/repo-summary');
@@ -166,7 +172,7 @@ function rawGet(port, requestPath, headers = {}) {
       commitsBody.history_complete === true && commitsBody.history.at(-1).total === 2,
     commitsResponse.body);
   check('commit identity/message/sha fields do not escape',
-    !/(Private Name|private@example|large commit|commit-author|"sha")/.test(commitsResponse.body), commitsResponse.body);
+    !/(Private Name|private@example|large commit|commit-author|private-branch-cursor|private-head-cursor|"sha")/.test(commitsResponse.body), commitsResponse.body);
 
   const notModified = await rawGet(primary.port, '/api/public-stats/github/stars', {
     'If-None-Match': starsResponse.headers.etag,
@@ -190,11 +196,45 @@ function rawGet(port, requestPath, headers = {}) {
     lkg.headers['x-fsb-stats-upstream-status'] === '500' &&
       lkg.headers['x-fsb-stats-next-retry-at'] === new Date(now + 301000).toISOString(),
     JSON.stringify(lkg.headers));
-  check('failed refresh immediately marks LKG stale and reports the actual check time',
-    lkg.headers['x-fsb-stats-cache'] === 'stale' &&
+  check('failed refresh keeps a fresh LKG fresh and reports the actual check time',
+    lkg.headers['x-fsb-stats-cache'] === 'fresh' &&
       lkg.headers['x-fsb-stats-checked-at'] === new Date(now + 1000).toISOString() &&
       lkg.headers['x-fsb-stats-fetched-at'] === new Date(now).toISOString(),
     JSON.stringify(lkg.headers));
+
+  const failedNotModified = await rawGet(primary.port, '/api/public-stats/github/commits', {
+    'If-None-Match': lkg.headers.etag,
+  });
+  check('failed-refresh metadata survives a 304 response',
+    failedNotModified.statusCode === 304 && failedNotModified.body === '' &&
+      failedNotModified.headers['x-fsb-stats-cache'] === 'fresh' &&
+      failedNotModified.headers['x-fsb-stats-fetched-at'] === new Date(now).toISOString() &&
+      failedNotModified.headers['x-fsb-stats-checked-at'] === new Date(now + 1000).toISOString() &&
+      failedNotModified.headers['x-fsb-stats-upstream-status'] === '500' &&
+      failedNotModified.headers['x-fsb-stats-next-retry-at'] === new Date(now + 301000).toISOString(),
+    JSON.stringify(failedNotModified.headers));
+
+  const staleFetchedAt = now - GITHUB_CACHE_FRESH_MS - 1000;
+  queries.upsertGithubCacheRow(
+    'commits',
+    commitsResponse.body,
+    '"stale-commits"',
+    staleFetchedAt,
+    200,
+    5000,
+    0,
+    true,
+    1
+  );
+  primary.router._resetMemoForTest();
+  const staleUsable = await rawGet(primary.port, '/api/public-stats/github/commits');
+  check('snapshot older than 15 minutes remains usable but is classified stale',
+    staleUsable.statusCode === 200 &&
+      staleUsable.headers['x-fsb-stats-cache'] === 'stale' &&
+      staleUsable.headers['x-fsb-stats-fetched-at'] === new Date(staleFetchedAt).toISOString() &&
+      staleUsable.headers['x-fsb-stats-checked-at'] === new Date(staleFetchedAt).toISOString() &&
+      staleUsable.headers['x-fsb-stats-upstream-status'] === '200',
+    `${staleUsable.statusCode} ${JSON.stringify(staleUsable.headers)}`);
 
   // Route-time legacy normalization must not let an older repository summary
   // reduce a newer complete stargazer aggregate.

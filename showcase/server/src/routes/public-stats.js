@@ -400,7 +400,10 @@ function createPublicStatsRouter(db, queries) {
         fetchedAt: effectiveFetchedAt,
         checkedAt,
         upstreamStatus: refreshFailed ? row.lastErrorStatus : row.status,
-        cacheState: !refreshFailed && ageMs <= GITHUB_CACHE_FRESH_MS ? 'fresh' : 'stale',
+        // Freshness describes the age of the last usable snapshot. A failed
+        // retry is separate upstream-health metadata and must not make a
+        // still-current snapshot stale.
+        cacheState: ageMs <= GITHUB_CACHE_FRESH_MS ? 'fresh' : 'stale',
         nextRetryAt: row.nextRetryAt,
         payloadAsOf: typeof publicPayload.as_of === 'string' ? publicPayload.as_of : null,
       };

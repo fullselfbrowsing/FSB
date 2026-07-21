@@ -1,8 +1,12 @@
 // Types for the /stats Easter-egg page (quick task 260514-1nv).
 //
 // All shapes here are subsets of GitHub's public REST API responses (the only
-// fields we actually consume), plus pure-data aggregator outputs and a
-// per-dataset discriminated-union state. No I/O here -- types only.
+// fields we actually consume), plus pure-data aggregator outputs. No I/O
+// here -- types only.
+
+import type { DatasetState as SharedDatasetState } from './dataset-state.types';
+
+export type { DatasetAvailability } from './dataset-state.types';
 
 /** GitHub chart view identifiers supported by the stats helpers. */
 export type StatsViewId =
@@ -106,19 +110,5 @@ export interface WeeklyDelta {
   deltaPct: number | null;
 }
 
-/**
- * Per-dataset state emitted by the service's BehaviorSubjects.
- *
- * - `loading`: pre-first-fetch and during SSR. Component renders skeleton.
- * - `ready`:   normal happy-path; data is the parsed (or aggregated) payload.
- * - `partial`: usable snapshot whose historical series is known incomplete.
- * - `stale`:   a refresh failed after a prior success; data remains usable but
- *              consumers must label it stale rather than live.
- * - `error`:   first load failed and no usable snapshot exists.
- */
-export type DatasetState<T> =
-  | { kind: 'loading' }
-  | { kind: 'ready'; data: T; fetchedAt: number }
-  | { kind: 'partial'; data: T; fetchedAt: number; message: string }
-  | { kind: 'stale'; data: T; fetchedAt: number; message: string }
-  | { kind: 'error'; message: string };
+/** Shared transport state retained here as a compatibility export. */
+export type DatasetState<T> = SharedDatasetState<T>;

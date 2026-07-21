@@ -122,9 +122,11 @@ check('service: aborts in-flight fetches and guards route generations',
     /this\.generation\s*\+=\s*1/.test(serviceCode) &&
     /controller\.abort\(\)/.test(serviceCode),
   'AbortController/generation lifecycle guard missing');
-check('service: preserves prior successful data as explicitly stale on refresh failure',
-  /kind:\s*'stale'/.test(serviceCode) && /fetchedAt:\s*previous\.fetchedAt/.test(serviceCode),
-  'stale last-known-good transition missing');
+check('service: preserves prior successful data and records failed refresh metadata',
+  /data:\s*previous\.data/.test(serviceCode) &&
+    /availabilityAfterFailure\(previous\.availability,\s*err\)/.test(serviceCode) &&
+    /statsFailureMetadata\(err\)/.test(serviceCode),
+  'last-known-good availability transition missing');
 
 // ---- ETag round-trip ----
 check('service: sends If-None-Match header for ETag round-trip',

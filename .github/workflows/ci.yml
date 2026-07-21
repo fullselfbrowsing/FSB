@@ -70,6 +70,8 @@ jobs:
         run: npm --prefix showcase/angular run test:translation-tools
       - name: Reject English-copy and cross-locale-identical targets
         run: npm --prefix showcase/angular run verify:translation-quality
+      - name: Run Angular component tests
+        run: npm --prefix showcase/angular run test:ci
       - name: Verify ng extract-i18n produces no diff (CI-02)
         run: |
           mkdir -p /tmp/extract-check
