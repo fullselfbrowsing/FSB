@@ -1925,7 +1925,9 @@ async function runDelegationAuthorityCases() {
     assertEqual(result.ok, true, 'untrusted consent mints a background challenge');
     assertEqual(result.trusted, false, 'untrusted consent remains explicit');
     assertEqual(typeof result.challengeId, 'string', 'consent returns the background challenge id');
-    assertDeepEqual(harness.calls.map((call) => call[0]), ['getTrusted', 'issueChallenge'],
+    assertDeepEqual(harness.calls.map((call) => call[0]), [
+      'getMergedClients', 'getTrusted', 'issueChallenge'
+    ],
       'consent reads trust then mints exactly one task-bound challenge');
   }
 
@@ -1943,7 +1945,7 @@ async function runDelegationAuthorityCases() {
       challengeId: null,
       expiresAt: null
     }, 'trusted consent discloses no reusable challenge');
-    assertDeepEqual(harness.calls.map((call) => call[0]), ['getTrusted'],
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getMergedClients', 'getTrusted'],
       'trusted consent does not mint a caller-visible challenge');
   }
 

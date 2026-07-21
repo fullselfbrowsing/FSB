@@ -8,16 +8,30 @@
   var FSB_COMPATIBILITY_ADAPTER_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
   var FSB_COMPATIBILITY_SNAPSHOT_KEYS = ['schemaVersion', 'checkedAt', 'adapters'];
   var FSB_COMPATIBILITY_ROW_KEYS = ['adapterId', 'displayLabel', 'status', 'reason'];
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('./delegation-providers.js');
+  }
+  if (!delegationProviders
+      || typeof delegationProviders.ids !== 'function'
+      || typeof delegationProviders.get !== 'function') {
+    throw new Error('canonical delegation providers are unavailable');
+  }
   var FSB_COMPATIBILITY_AGENT_IDS = {
-    'claude-code': true,
-    opencode: true,
     codex: true
   };
-  var FSB_SHIPPED_COMPATIBILITY_LABELS = {
-    'claude-code': 'Claude Code',
-    opencode: 'OpenCode'
-  };
-  var FSB_SHIPPED_COMPATIBILITY_ROSTER = ['claude-code', 'opencode'];
+  var FSB_SHIPPED_COMPATIBILITY_LABELS = {};
+  var FSB_SHIPPED_COMPATIBILITY_ROSTER = delegationProviders.ids();
+  FSB_SHIPPED_COMPATIBILITY_ROSTER.forEach(function(providerId) {
+    var metadata = delegationProviders.get(providerId);
+    FSB_COMPATIBILITY_AGENT_IDS[providerId] = true;
+    FSB_SHIPPED_COMPATIBILITY_LABELS[providerId] = metadata.label;
+  });
+  Object.freeze(FSB_COMPATIBILITY_AGENT_IDS);
+  Object.freeze(FSB_SHIPPED_COMPATIBILITY_LABELS);
   var ALLOWED_SUBMAPS = {
     clicked: true,
     connected: true,

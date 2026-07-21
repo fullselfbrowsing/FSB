@@ -11,9 +11,13 @@
     'custom'
   ]);
   var API_PROVIDER_SET = createSet(API_PROVIDER_IDS);
-  var SUPPORTED_AGENT_PROVIDERS = Object.freeze({
-    'claude-code': 'Claude Code'
-  });
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('./delegation-providers.js');
+  }
   var MAX_PROVIDER_ID_LENGTH = 128;
 
   function createSet(values) {
@@ -49,12 +53,49 @@
   }
 
   function isSupportedAgentProvider(providerId) {
-    return Object.prototype.hasOwnProperty.call(SUPPORTED_AGENT_PROVIDERS, providerId);
+    return !!delegationProviders
+      && typeof delegationProviders.isShippedId === 'function'
+      && delegationProviders.isShippedId(providerId);
   }
 
   function providerLabel(providerId) {
-    if (isSupportedAgentProvider(providerId)) return SUPPORTED_AGENT_PROVIDERS[providerId];
+    var metadata = delegationProviders
+      && typeof delegationProviders.get === 'function'
+      ? delegationProviders.get(providerId)
+      : null;
+    if (metadata) return metadata.label;
     return providerId || 'Selected provider';
+  }
+
+  function canonicalCompatibility(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    var expected = ['status', 'reason', 'checkedAt'];
+    var record = {};
+    try {
+      var keys = Reflect.ownKeys(value);
+      if (keys.length !== expected.length) return null;
+      for (var index = 0; index < expected.length; index += 1) {
+        var key = expected[index];
+        var descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor
+            || !descriptor.enumerable
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+        record[key] = descriptor.value;
+      }
+      for (var keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+        if (typeof keys[keyIndex] !== 'string' || expected.indexOf(keys[keyIndex]) === -1) {
+          return null;
+        }
+      }
+    } catch (_error) {
+      return null;
+    }
+    return record.status === 'supported'
+      && record.reason === 'within_tested_range'
+      && Number.isSafeInteger(record.checkedAt)
+      && record.checkedAt >= 0
+      ? record
+      : null;
   }
 
   function failure(code, providerId) {
@@ -95,6 +136,9 @@
     }
     if (getOwnValue(bridgeState, 'pairingStatus') !== 'paired') {
       return failure('agent_unpaired', agentProviderId);
+    }
+    if (!canonicalCompatibility(getOwnValue(input, 'compatibility'))) {
+      return failure('unsupported_provider', agentProviderId);
     }
 
     return {

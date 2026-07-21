@@ -30,13 +30,14 @@ importScripts('utils/mcp-visual-session.js');
 importScripts('utils/mcp-visual-session-lifecycle.js');
 try { importScripts('utils/agent-cap-recommendation.js'); } catch (e) { console.error('[FSB] Failed to load agent-cap-recommendation.js:', e.message); }
 try { importScripts('utils/agent-registry.js'); } catch (e) { console.error('[FSB] Failed to load agent-registry.js:', e.message); }
+try { importScripts('utils/delegation-providers.js'); } catch (e) { console.error('[FSB] Failed to load delegation-providers.js:', e.message); }
+try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
+try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
 try { importScripts('utils/delegation-preflight.js'); } catch (e) { console.error('[FSB] Failed to load delegation-preflight.js:', e.message); }
 try { importScripts('utils/native-host-wake.js'); } catch (e) { console.error('[FSB] Failed to load native-host-wake.js:', e.message); }
 try { importScripts('utils/delegation-consent.js'); } catch (e) { console.error('[FSB] Failed to load delegation-consent.js:', e.message); }
 try { importScripts('utils/delegation-event-store.js'); } catch (e) { console.error('[FSB] Failed to load delegation-event-store.js:', e.message); }
 try { importScripts('utils/delegation-controller.js'); } catch (e) { console.error('[FSB] Failed to load delegation-controller.js:', e.message); }
-try { importScripts('utils/mcp-client-aliases.js'); } catch (e) { console.error('[FSB] Failed to load mcp-client-aliases.js:', e.message); }
-try { importScripts('utils/mcp-agent-providers.js'); } catch (e) { console.error('[FSB] Failed to load mcp-agent-providers.js:', e.message); }
 // Phase 246 plan 01: agent-scoped tab resolver. Pure helper; consumes
 // globalThis.fsbAgentRegistryInstance via getAgentTabs(agentId). Loaded
 // AFTER the registry and BEFORE the dispatcher / bridge-client so those
@@ -185,19 +186,27 @@ function fsbCopyCompatibilityDataRecord(value) {
 
 function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
   const maxAge = fsbCompatibilityOwnDataValue(providers, 'COMPATIBILITY_MAX_AGE_MS');
-  const row = fsbCompatibilityOwnDataValue(clients, 'claude-code');
-  const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
-  const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
-  const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
-  const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
-  if (status !== 'supported'
-      || reason !== 'within_tested_range'
-      || !Number.isSafeInteger(checkedAt)
-      || checkedAt < 0
+  const canonical = globalThis.FsbDelegationProviders;
+  if (!canonical
+      || typeof canonical.ids !== 'function'
       || !Number.isSafeInteger(maxAge)
-      || maxAge <= 0
-      || checkedAt > Number.MAX_SAFE_INTEGER - maxAge) return null;
-  return checkedAt + maxAge;
+      || maxAge <= 0) return null;
+  const expirations = [];
+  for (const providerId of canonical.ids()) {
+    const row = fsbCompatibilityOwnDataValue(clients, providerId);
+    const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
+    const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
+    const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
+    const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
+    if (status === 'supported'
+        && reason === 'within_tested_range'
+        && Number.isSafeInteger(checkedAt)
+        && checkedAt >= 0
+        && checkedAt <= Number.MAX_SAFE_INTEGER - maxAge) {
+      expirations.push(checkedAt + maxAge);
+    }
+  }
+  return expirations.length > 0 ? Math.min(...expirations) : null;
 }
 
 function fsbProjectStaleMcpClients(clients) {
@@ -1567,6 +1576,34 @@ async function fsbReadAuthoritativeProviderConfig() {
   };
 }
 
+async function fsbReadAuthoritativeProviderCompatibility(providerId) {
+  const canonical = globalThis.FsbDelegationProviders;
+  const providers = globalThis.FsbMcpAgentProviders;
+  if (!canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(providerId)
+      || !providers
+      || typeof providers.getMergedClients !== 'function') return null;
+  const registry = globalThis.fsbAgentRegistryInstance;
+  const liveRecords = registry && typeof registry.listAgents === 'function'
+    ? await Promise.resolve(registry.listAgents())
+    : [];
+  const clients = await providers.getMergedClients(liveRecords);
+  let rowDescriptor;
+  let compatibilityDescriptor;
+  try {
+    rowDescriptor = Object.getOwnPropertyDescriptor(clients, providerId);
+    if (!rowDescriptor || !Object.prototype.hasOwnProperty.call(rowDescriptor, 'value')) return null;
+    compatibilityDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, 'compatibility');
+  } catch (_error) {
+    return null;
+  }
+  return compatibilityDescriptor
+      && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
+    ? compatibilityDescriptor.value
+    : null;
+}
+
 function fsbDelegationBridgeState() {
   if (typeof mcpBridgeClient === 'undefined'
       || !mcpBridgeClient
@@ -1583,11 +1620,15 @@ function fsbDelegationBridgeState() {
 
 async function fsbDelegationPreflightResult() {
   const config = await fsbReadAuthoritativeProviderConfig();
+  const compatibility = config.providerKind === 'agent'
+    ? await fsbReadAuthoritativeProviderCompatibility(config.agentProviderId)
+    : null;
   const result = globalThis.FsbDelegationPreflight.check({
     providerKind: config.providerKind,
     agentProviderId: config.agentProviderId,
     modelProvider: config.modelProvider,
-    bridgeState: fsbDelegationBridgeState()
+    bridgeState: fsbDelegationBridgeState(),
+    compatibility
   });
   return { config, result };
 }
