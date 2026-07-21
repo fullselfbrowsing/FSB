@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-10-PLAN.md
-last_updated: "2026-07-21T10:28:33.307Z"
-last_activity: 2026-07-21 -- Phase 64 Plan 10 complete; durable provider lifecycle and drift diagnostics green
+stopped_at: Completed 64-11-PLAN.md
+last_updated: "2026-07-21T10:47:17.960Z"
+last_activity: 2026-07-21 -- Phase 64 Plan 11 complete; OpenCode Providers projection green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 52
+  completed_plans: 53
   percent: 39
 ---
 
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 11 of 13
+Plan: 12 of 13
 Status: Ready to execute
-Last activity: 2026-07-21 -- Phase 64 Plan 10 complete; durable provider lifecycle and drift diagnostics green
+Last activity: 2026-07-21 -- Phase 64 Plan 11 complete; OpenCode Providers projection green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -226,6 +226,9 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Keep every normalized result in running state until an explicit authoritative terminal — Candidate results cannot hydrate or settle as fabricated success or failure.
 - [Phase 64]: Mirror adapter-specific drift vocabularies in a bounded six-field browser projection — Throttle each shipped adapter independently and report only after terminal persistence succeeds.
 - [Phase 64]: Upgrade compact MCP drift tuples at the background boundary with immutable accepted-run context — Preserve the wire contract while preventing provider relabeling or duplicate diagnostics.
+- [Phase 64]: Use the canonical delegation-provider roster for exactly Claude Code and OpenCode compatibility — Avoid an OpenCode renderer branch and keep unshipped Codex fail-closed.
+- [Phase 64]: Compute UI expiry from the earliest valid shipped-row timestamp — Missing or malformed shipped evidence fails closed to unknown.
+- [Phase 64]: Keep the visible Providers section and CSS byte-identical — The sole HTML delta is the canonical helper script before the two existing consumers.
 
 ### Pending Todos
 
@@ -270,8 +273,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T10:28:33.302Z
-Stopped at: Completed 64-10-PLAN.md
+Last session: 2026-07-21T10:47:17.955Z
+Stopped at: Completed 64-11-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -304,3 +307,4 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 64 P08 | 49 min | 3 tasks | 6 files |
 | Phase 64 P09 | 42 min | 3 tasks | 14 files |
 | Phase 64 P10 | 31 min | 3 tasks | 9 files |
+| Phase 64 P11 | 13 min | 2 tasks | 6 files |
