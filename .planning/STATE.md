@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 64-11-PLAN.md
-last_updated: "2026-07-21T10:47:17.960Z"
-last_activity: 2026-07-21 -- Phase 64 Plan 11 complete; OpenCode Providers projection green
+stopped_at: Completed 64-12-PLAN.md
+last_updated: "2026-07-21T11:11:03.808Z"
+last_activity: 2026-07-21 -- Phase 64 Plan 12 complete; provider-neutral delegated UI and terminal barrier green
 progress:
   total_phases: 18
   completed_phases: 7
   total_plans: 53
-  completed_plans: 53
+  completed_plans: 54
   percent: 39
 ---
 
@@ -34,9 +34,9 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 12 of 13
+Plan: 13 of 13
 Status: Ready to execute
-Last activity: 2026-07-21 -- Phase 64 Plan 11 complete; OpenCode Providers projection green
+Last activity: 2026-07-21 -- Phase 64 Plan 12 complete; provider-neutral delegated UI and terminal barrier green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -229,6 +229,9 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Use the canonical delegation-provider roster for exactly Claude Code and OpenCode compatibility — Avoid an OpenCode renderer branch and keep unshipped Codex fail-closed.
 - [Phase 64]: Compute UI expiry from the earliest valid shipped-row timestamp — Missing or malformed shipped evidence fails closed to unknown.
 - [Phase 64]: Keep the visible Providers section and CSS byte-identical — The sole HTML delta is the canonical helper script before the two existing consumers.
+- [Phase 64]: Load the canonical provider helper before both side-panel consumers as the sole HTML change — Add no visible markup or CSS while enabling validated provider labels.
+- [Phase 64]: Bind consent and trust to an exact canonical provider identity while keeping start intent provider-free — Background-owned settings remain the only adapter selection authority.
+- [Phase 64]: Hide result and summary rows for every non-completed outcome — Only controller-authoritative completed terminal truth may present a persisted result candidate as success.
 
 ### Pending Todos
 
@@ -273,8 +276,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T10:47:17.955Z
-Stopped at: Completed 64-11-PLAN.md
+Last session: 2026-07-21T11:11:03.804Z
+Stopped at: Completed 64-12-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -308,3 +311,4 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 64 P09 | 42 min | 3 tasks | 14 files |
 | Phase 64 P10 | 31 min | 3 tasks | 9 files |
 | Phase 64 P11 | 13 min | 2 tasks | 6 files |
+| Phase 64 P12 | 14 min | 2 tasks | 7 files |
