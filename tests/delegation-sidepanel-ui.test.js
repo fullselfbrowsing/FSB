@@ -101,7 +101,7 @@ function entry(sequence, kind, payload) {
     sequence,
     timestamp: 1000 + sequence,
     kind,
-    state: kind === 'result' ? 'completed' : 'running',
+    state: 'running',
     title: 'presentation string that must not be parsed',
     detail: null,
     init: null,
@@ -288,6 +288,29 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   crossedIdentity.entries[0].init.client = { id: 'claude-code', label: 'Claude Code' };
   assert.equal(Feed.validateSnapshot(crossedIdentity), false,
     'snapshot and init provider identities cannot cross');
+
+  let providerAccessorReads = 0;
+  const accessorIdentity = { id: 'opencode' };
+  Object.defineProperty(accessorIdentity, 'label', {
+    enumerable: true,
+    get() {
+      providerAccessorReads += 1;
+      return 'OpenCode';
+    }
+  });
+  const accessorSnapshot = clone(openCode);
+  accessorSnapshot.provider = accessorIdentity;
+  assert.equal(Feed.validateSnapshot(accessorSnapshot), false,
+    'provider identity accessors fail closed at the feed boundary');
+  assert.equal(providerAccessorReads, 0, 'feed never invokes provider identity accessors');
+
+  const nativeCanary = 'native://secret:port/path/model/auth/version/task';
+  const nativeSnapshot = clone(openCode);
+  nativeSnapshot.rawProvider = { topology: nativeCanary };
+  const nativeContainer = new TestNode('div');
+  assert.equal(Feed.render(nativeContainer, nativeSnapshot, { hydrated: false }).ok, false);
+  assert(!nativeContainer.textContent.includes(nativeCanary),
+    'rejected native provider metadata never reaches feed text');
 }
 
 {
@@ -384,11 +407,15 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const openCodeContainer = new TestNode('div');
   const claude = canonicalProviderSnapshot('claude-code', 'Claude Code', 'subscription');
   const openCode = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
+  assert.equal(openCode.entries[3].state, 'running',
+    'the stored OpenCode result remains a nonterminal candidate');
   assert.equal(Feed.render(claudeContainer, claude, { hydrated: false }).ok, true);
   assert.equal(Feed.render(openCodeContainer, openCode, { hydrated: false }).ok, true);
   assert.deepEqual(domShape(openCodeContainer), domShape(claudeContainer),
     'Claude and OpenCode normalized inputs produce identical feed DOM structure');
   assert(openCodeContainer.textContent.includes('OpenCode'));
+  assert(openCodeContainer.textContent.includes('Outcomecompleted'),
+    'authoritative completed terminal truth controls the result presentation');
   assert(openCodeContainer.textContent.includes('BillingBilling not reported'),
     'OpenCode run summary uses the exact unknown-billing phrase');
   assert(!/Included in your subscription|\$\d|\bfree\b|\bunlimited\b/i.test(

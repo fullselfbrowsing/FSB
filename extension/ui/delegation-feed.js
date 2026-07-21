@@ -1,9 +1,18 @@
 (function(global) {
   'use strict';
 
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('../utils/delegation-providers.js');
+  }
+
   var SNAPSHOT_VERSION = 1;
   var ENTRY_VERSION = 1;
   var NOT_REPORTED = 'Not reported';
+  var BILLING_NOT_REPORTED = 'Billing not reported';
   var SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
   var VALID_STATES = Object.freeze({
     idle: true,
@@ -82,13 +91,54 @@
 
   function _hasExactKeys(value, keys) {
     if (!_isRecord(value)) return false;
-    var actual = Object.keys(value).sort();
+    var actual;
+    try { actual = Object.keys(value).sort(); }
+    catch (_error) { return false; }
     var expected = keys.slice().sort();
     if (actual.length !== expected.length) return false;
     for (var index = 0; index < expected.length; index++) {
       if (actual[index] !== expected[index]) return false;
     }
     return true;
+  }
+
+  function _ownDataValue(value, key) {
+    if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+      return undefined;
+    }
+    try {
+      var descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+        ? descriptor.value
+        : undefined;
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
+  function _canonicalIdentity(value) {
+    if (!_hasExactKeys(value, ['id', 'label'])) return null;
+    try {
+      if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    } catch (_error) {
+      return null;
+    }
+    var providerId = _ownDataValue(value, 'id');
+    var providerLabel = _ownDataValue(value, 'label');
+    var get = _ownDataValue(delegationProviders, 'get');
+    if (typeof providerId !== 'string'
+        || typeof providerLabel !== 'string'
+        || typeof get !== 'function') return null;
+    var metadata = null;
+    try { metadata = get.call(delegationProviders, providerId); }
+    catch (_error) { return null; }
+    var canonicalId = _ownDataValue(metadata, 'id');
+    var canonicalLabel = _ownDataValue(metadata, 'label');
+    var billingKind = _ownDataValue(metadata, 'billingKind');
+    if (canonicalId !== providerId
+        || canonicalLabel !== providerLabel
+        || (billingKind !== 'subscription' && billingKind !== 'unknown')) return null;
+    return { id: canonicalId, label: canonicalLabel, billingKind: billingKind };
   }
 
   function _isNullableString(value, max) {
@@ -104,9 +154,7 @@
   }
 
   function _validClient(value) {
-    return value === null || (_hasExactKeys(value, ['id', 'label'])
-      && value.id === 'claude-code'
-      && value.label === 'Claude Code');
+    return value === null || _canonicalIdentity(value) !== null;
   }
 
   function _validInit(value) {
@@ -278,9 +326,7 @@
         || VALID_STATES[snapshot.state] !== true
         || VALID_CONNECTIONS[snapshot.connection] !== true
         || typeof snapshot.hydrated !== 'boolean'
-        || !(snapshot.provider === null || (_hasExactKeys(snapshot.provider, ['id', 'label'])
-          && snapshot.provider.id === 'claude-code'
-          && snapshot.provider.label === 'Claude Code'))
+        || !_validClient(snapshot.provider)
         || !Array.isArray(snapshot.entries)
         || snapshot.entries.length > 2000
         || !_validSummary(snapshot.summary)
@@ -288,7 +334,15 @@
         || !_validHold(snapshot.hold)
         || !_validTerminal(snapshot.terminal)) return false;
     for (var index = 0; index < snapshot.entries.length; index++) {
-      if (!validateEntry(snapshot.entries[index], snapshot.delegationId, index + 1)) return false;
+      var entry = snapshot.entries[index];
+      if (!validateEntry(entry, snapshot.delegationId, index + 1)) return false;
+      if (snapshot.provider !== null
+          && entry.init
+          && entry.init.client !== null
+          && (_ownDataValue(snapshot.provider, 'id') !== _ownDataValue(entry.init.client, 'id')
+            || _ownDataValue(snapshot.provider, 'label') !== _ownDataValue(entry.init.client, 'label'))) {
+        return false;
+      }
     }
     return true;
   }
@@ -366,13 +420,16 @@
     article.appendChild(heading);
   }
 
-  function renderEntry(entry) {
+  function renderEntry(entry, options) {
     if (!validateEntry(entry)) return null;
+    options = options || {};
+    if (entry.kind === 'result' && options.authoritativeCompleted !== true) return null;
     var article = _element('article', 'delegation-entry delegation-entry-' + entry.kind);
-    var tone = _toneForEntry(entry);
+    var presentationState = entry.kind === 'result' ? 'completed' : entry.state;
+    var tone = entry.kind === 'result' ? _toneForState(presentationState) : _toneForEntry(entry);
     article.setAttribute('data-delegation-sequence', String(entry.sequence));
     article.setAttribute('data-delegation-kind', entry.kind);
-    _applyTone(article, entry.state, tone);
+    _applyTone(article, presentationState, tone);
 
     if (entry.kind === 'init') {
       _entryHeading(article, 'Agent initialized', tone);
@@ -416,7 +473,7 @@
     } else if (entry.kind === 'result') {
       _entryHeading(article, 'Result', tone);
       var resultList = _element('dl', 'delegation-definition-list delegation-result-grid');
-      _definition(resultList, 'Outcome', entry.state);
+      _definition(resultList, 'Outcome', presentationState);
       _definition(resultList, 'Input tokens', entry.metrics.inputTokens);
       _definition(resultList, 'Output tokens', entry.metrics.outputTokens);
       _definition(resultList, 'Total tokens', entry.metrics.totalTokens);
@@ -436,7 +493,7 @@
     if (summary.billingKind === 'api' && summary.usd !== null) {
       return '$' + Number(summary.usd).toFixed(4) + ' USD';
     }
-    return NOT_REPORTED;
+    return BILLING_NOT_REPORTED;
   }
 
   function renderSummary(summary) {
@@ -480,18 +537,34 @@
     while (container.firstChild) container.removeChild(container.firstChild);
   }
 
+  function _hasAuthoritativeCompletedTerminal(snapshot) {
+    if (snapshot.state !== 'completed'
+        || !snapshot.terminal
+        || snapshot.terminal.code !== 'completed'
+        || !snapshot.summary
+        || snapshot.summary.state !== 'completed') return false;
+    for (var index = 0; index < snapshot.entries.length; index++) {
+      if (snapshot.entries[index].kind === 'result') return true;
+    }
+    return false;
+  }
+
   function render(container, snapshot, options) {
     options = options || {};
     if (!container || typeof container.appendChild !== 'function' || !validateSnapshot(snapshot)) {
       return { ok: false, lastSequence: null, hydrated: options.hydrated === true };
     }
     _clear(container);
+    var authoritativeCompleted = _hasAuthoritativeCompletedTerminal(snapshot);
     for (var index = 0; index < snapshot.entries.length; index++) {
-      var row = renderEntry(snapshot.entries[index]);
+      if (snapshot.entries[index].kind === 'result' && !authoritativeCompleted) continue;
+      var row = renderEntry(snapshot.entries[index], {
+        authoritativeCompleted: authoritativeCompleted
+      });
       if (!row) return { ok: false, lastSequence: null, hydrated: options.hydrated === true };
       container.appendChild(row);
     }
-    if (snapshot.summary) {
+    if (snapshot.summary && authoritativeCompleted) {
       var summary = renderSummary(snapshot.summary);
       if (!summary) return { ok: false, lastSequence: null, hydrated: options.hydrated === true };
       container.appendChild(summary);
