@@ -1976,10 +1976,15 @@ async function runDelegationAuthorityCases() {
     const harness = buildDelegationCommandHarness({
       providerConfig: { agentProviderId: 'opencode' }
     });
+    const issued = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Selection changes after challenge issue'
+    });
+    harness.calls.length = 0;
     harness.setProviderId('claude-code');
     const result = await harness.command({
       type: 'FSB_DELEGATION_SET_TRUST',
-      challengeId: 'dch_fixture',
+      challengeId: issued.challengeId,
       providerId: 'opencode',
       trusted: true
     });

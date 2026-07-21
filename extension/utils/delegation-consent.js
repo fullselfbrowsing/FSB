@@ -6,8 +6,13 @@
   var PAYLOAD_VERSION = 1;
   var MAX_CHALLENGE_TTL_MS = 5 * 60 * 1000;
   var DEFAULT_CHALLENGE_TTL_MS = MAX_CHALLENGE_TTL_MS;
-  var CANONICAL_PROVIDER_ID = 'claude-code';
-  var PROVIDER_ID_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
+  var delegationProviders = global.FsbDelegationProviders;
+  if (!delegationProviders
+      && typeof module !== 'undefined'
+      && module.exports
+      && typeof require === 'function') {
+    delegationProviders = require('./delegation-providers.js');
+  }
   var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
   var SHA256_DIGEST_PATTERN = /^[0-9a-f]{64}$/;
   var CHALLENGE_ID_PATTERN = /^dch_([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
@@ -53,6 +58,12 @@
 
   function _resultError(code) {
     return { ok: false, code: code };
+  }
+
+  function _isCanonicalProviderId(providerId) {
+    return !!delegationProviders
+      && typeof delegationProviders.isShippedId === 'function'
+      && delegationProviders.isShippedId(providerId);
   }
 
   function _storageError(code) {
@@ -114,7 +125,7 @@
     if (typeof record.challengeId !== 'string' || record.challengeId !== storageKey) return false;
     var match = CHALLENGE_ID_PATTERN.exec(record.challengeId);
     if (!match || record.nonce !== match[1] || !UUID_PATTERN.test(record.nonce)) return false;
-    if (record.providerId !== CANONICAL_PROVIDER_ID) return false;
+    if (!_isCanonicalProviderId(record.providerId)) return false;
     if (typeof record.taskDigest !== 'string' || !SHA256_DIGEST_PATTERN.test(record.taskDigest)) return false;
     if (!Number.isFinite(record.issuedAt) || !Number.isFinite(record.expiresAt)) return false;
     if (record.issuedAt < 0 || record.expiresAt <= record.issuedAt) return false;
@@ -179,7 +190,7 @@
     }
     var providers = _emptyTrustProviders();
     Object.keys(raw.providers).forEach(function(providerId) {
-      if (providerId !== CANONICAL_PROVIDER_ID || raw.providers[providerId] !== true) {
+      if (!_isCanonicalProviderId(providerId) || raw.providers[providerId] !== true) {
         throw _storageError('trust_storage_corrupt');
       }
       providers[providerId] = true;
@@ -236,7 +247,7 @@
     if (!_isExactRequest(request, ['providerId', 'taskDigest', 'ttlMs'], ['providerId', 'taskDigest'])) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
-    if (request.providerId !== CANONICAL_PROVIDER_ID
+    if (!_isCanonicalProviderId(request.providerId)
         || typeof request.taskDigest !== 'string'
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
@@ -296,8 +307,7 @@
     }
     if (typeof request.challengeId !== 'string'
         || !CHALLENGE_ID_PATTERN.test(request.challengeId)
-        || typeof request.providerId !== 'string'
-        || !PROVIDER_ID_PATTERN.test(request.providerId)
+        || !_isCanonicalProviderId(request.providerId)
         || typeof request.taskDigest !== 'string'
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
@@ -310,20 +320,31 @@
           return _resultError('challenge_not_found');
         }
         var record = envelope.challenges[request.challengeId];
-        delete envelope.challenges[request.challengeId];
         var corruptSibling = Object.keys(envelope.challenges).some(function(key) {
+          if (key === request.challengeId) return false;
           return !_validateChallengeRecord(envelope.challenges[key], key);
         });
-        if (corruptSibling) envelope.challenges = _emptyChallenges();
-        await _writeEnvelope(envelope);
-
-        if (corruptSibling) return _resultError('challenge_storage_corrupt');
+        if (corruptSibling) {
+          envelope.challenges = _emptyChallenges();
+          await _writeEnvelope(envelope);
+          return _resultError('challenge_storage_corrupt');
+        }
         if (!_validateChallengeRecord(record, request.challengeId)) {
+          delete envelope.challenges[request.challengeId];
+          await _writeEnvelope(envelope);
           return _resultError('challenge_malformed');
         }
-        if (Date.now() >= record.expiresAt) return _resultError('challenge_expired');
+        if (Date.now() >= record.expiresAt) {
+          delete envelope.challenges[request.challengeId];
+          await _writeEnvelope(envelope);
+          return _resultError('challenge_expired');
+        }
         if (record.providerId !== request.providerId) return _resultError('challenge_provider_mismatch');
-        if (record.taskDigest !== request.taskDigest) return _resultError('challenge_task_mismatch');
+        delete envelope.challenges[request.challengeId];
+        await _writeEnvelope(envelope);
+        if (record.taskDigest !== request.taskDigest) {
+          return _resultError('challenge_task_mismatch');
+        }
         return {
           ok: true,
           challengeId: record.challengeId,
@@ -337,7 +358,7 @@
   }
 
   function getTrusted(providerId) {
-    if (providerId !== CANONICAL_PROVIDER_ID) return Promise.resolve(false);
+    if (!_isCanonicalProviderId(providerId)) return Promise.resolve(false);
     return _withChallengeLock(async function() {
       try {
         var envelope = await _readTrustEnvelope();
@@ -356,7 +377,7 @@
     )
         || typeof request.challengeId !== 'string'
         || !CHALLENGE_ID_PATTERN.test(request.challengeId)
-        || request.providerId !== CANONICAL_PROVIDER_ID
+        || !_isCanonicalProviderId(request.providerId)
         || request.trusted !== true) {
       return Promise.resolve(_resultError('invalid_trust_request'));
     }
@@ -379,8 +400,6 @@
           return _resultError('challenge_expired');
         }
         if (record.providerId !== request.providerId) {
-          record.trustWriteUsed = true;
-          await _writeEnvelope(challengeEnvelope);
           return _resultError('challenge_provider_mismatch');
         }
         if (record.trustWriteUsed === true) {
@@ -402,7 +421,7 @@
 
   function clearTrusted(request) {
     if (!_isExactRequest(request, ['providerId'], ['providerId'])
-        || request.providerId !== CANONICAL_PROVIDER_ID) {
+        || !_isCanonicalProviderId(request.providerId)) {
       return Promise.resolve(_resultError('invalid_trust_request'));
     }
     return _withChallengeLock(async function() {

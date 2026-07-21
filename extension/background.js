@@ -1824,9 +1824,14 @@ async function fsbDelegationConsentCommand(request) {
 async function fsbDelegationSetTrustCommand(request) {
   if (!fsbDelegationHasExactKeys(request, ['challengeId', 'providerId', 'trusted', 'type'])
       || typeof request.challengeId !== 'string'
-      || request.providerId !== 'claude-code'
       || request.trusted !== true) {
     return { ok: false, code: 'trust_challenge_invalid' };
+  }
+  const canonical = globalThis.FsbDelegationProviders;
+  if (!canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(request.providerId)) {
+    return { ok: false, code: 'unsupported_provider' };
   }
   let authority;
   try {
@@ -1850,20 +1855,23 @@ async function fsbDelegationSetTrustCommand(request) {
     trusted: true
   });
   return result && result.ok === true
-    ? { ok: true, providerId: 'claude-code', trusted: true }
+    ? { ok: true, providerId: request.providerId, trusted: true }
     : fsbDelegationTrustFailure(result && result.code);
 }
 
 async function fsbDelegationClearTrustCommand(request) {
+  const canonical = globalThis.FsbDelegationProviders;
   if (!fsbDelegationHasExactKeys(request, ['providerId', 'type'])
-      || request.providerId !== 'claude-code') {
+      || !canonical
+      || typeof canonical.isShippedId !== 'function'
+      || !canonical.isShippedId(request.providerId)) {
     return { ok: false, code: 'unsupported_provider' };
   }
   const result = await globalThis.FsbDelegationConsent.clearTrusted({
     providerId: request.providerId
   });
   return result && result.ok === true
-    ? { ok: true, providerId: 'claude-code', trusted: false }
+    ? { ok: true, providerId: request.providerId, trusted: false }
     : fsbDelegationTrustFailure(result && result.code);
 }
 
@@ -2003,6 +2011,18 @@ async function fsbDelegationStartCommand(request) {
     challengeId = issued.challengeId;
   } else if (typeof challengeId !== 'string' || challengeId.length === 0) {
     return fsbDelegationFailure('consent_required', null);
+  }
+
+  let currentAuthority;
+  try {
+    currentAuthority = await fsbDelegationPreflightResult();
+  } catch (_error) {
+    return fsbDelegationFailure('provider_changed', null);
+  }
+  if (!currentAuthority.result.ok
+      || currentAuthority.result.kind !== 'agent'
+      || currentAuthority.result.providerId !== authority.result.providerId) {
+    return fsbDelegationFailure('provider_changed', null);
   }
 
   const consumed = await globalThis.FsbDelegationConsent.consumeChallenge({
