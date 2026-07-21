@@ -68,6 +68,11 @@ Runtime defaults:
 - `DB_PATH=/data/fsb-data.db`
 - `NODE_ENV=production`
 
+Production should also provide `GITHUB_TOKEN` as a Fly secret. Use a
+fine-grained token owned by an FSB collaborator, restricted to the FSB
+repository with Metadata read and Contents read. The value is consumed only by
+the server-side Stats poller and is never sent to browsers.
+
 The production container is built in two stages. The first stage builds the Angular static output. The final stage installs server dependencies, copies the Express source, copies the Angular browser output into `public/`, and creates `/data` for SQLite persistence.
 
 ## Server Responsibilities

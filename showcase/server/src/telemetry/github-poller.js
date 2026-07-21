@@ -2,9 +2,10 @@
  * Server-side GitHub statistics poller.
  *
  * The browser never receives GitHub's raw REST responses. Each successful
- * poll writes a compact, allowlisted payload after the complete page walk has
- * finished. A failed request records status/backoff metadata without replacing
- * the last-known-good payload.
+ * poll writes a compact, allowlisted payload. Private cursors make the normal
+ * commit path incremental and let unchanged star totals skip identity walks.
+ * A failed request records status/backoff metadata without replacing the
+ * last-known-good commit payload or cursor.
  */
 'use strict';
 
@@ -377,7 +378,12 @@ async function fetchOnePage(url, accept, ifNoneMatch, fetchImpl) {
       try { await res.text(); } catch { /* socket cleanup only */ }
       return { status: res.status, body: undefined, etag: null, rlRemaining, rlReset, link, retryAfter };
     }
-    const body = await res.json();
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      return { status: 502, body: undefined, etag: null, rlRemaining, rlReset, link, retryAfter };
+    }
     return { status: 200, body, etag, rlRemaining, rlReset, link, retryAfter };
   } finally {
     clearTimeout(timeout);
@@ -410,11 +416,6 @@ function failureRetryAt(endpointId, queries, nowMs, rlRemaining, rlReset, retryA
   return nextRetryAt;
 }
 
-function recordFailure(endpointId, queries, nowMs, status, rlRemaining, rlReset, retryAfter = null) {
-  const nextRetryAt = failureRetryAt(endpointId, queries, nowMs, rlRemaining, rlReset, retryAfter);
-  queries.recordGithubCacheFailureRow(endpointId, nowMs, status, rlRemaining, rlReset, nextRetryAt);
-}
-
 function paginationKey(endpointId, event) {
   if (!isObject(event)) return null;
   if (endpointId === 'commits' && typeof event.sha === 'string') return `sha:${event.sha}`;
@@ -437,7 +438,7 @@ function parseCachedPayload(row) {
   try { return JSON.parse(row.payload); } catch { return null; }
 }
 
-function repoStarSnapshot(queries, nowMs, minimumFetchedAt = 0) {
+function repoSnapshot(queries, nowMs, minimumFetchedAt = 0) {
   const row = queries.getGithubCachePayload('repo-summary');
   if (
     !row || row.fetchedAt <= 0 || row.fetchedAt < minimumFetchedAt ||
@@ -445,7 +446,46 @@ function repoStarSnapshot(queries, nowMs, minimumFetchedAt = 0) {
   ) return null;
   const payload = parseCachedPayload(row);
   const total = isObject(payload) ? nonNegativeInteger(payload.stargazers_count) : null;
-  return total === null ? null : { total, fetchedAt: row.fetchedAt };
+  const branch = isObject(payload) && typeof payload.default_branch === 'string' && payload.default_branch.length > 0
+    ? payload.default_branch
+    : null;
+  return total === null || branch === null
+    ? null
+    : {
+        total,
+        branch,
+        fetchedAt: row.fetchedAt,
+        checkedAt: row.lastAttemptAt,
+        lastErrorStatus: row.lastErrorStatus,
+        status: row.status,
+      };
+}
+
+function repoStarSnapshot(queries, nowMs, minimumFetchedAt = 0) {
+  const snapshot = repoSnapshot(queries, nowMs, minimumFetchedAt);
+  return snapshot ? {
+    total: snapshot.total,
+    fetchedAt: snapshot.fetchedAt,
+    checkedAt: snapshot.checkedAt,
+    lastErrorStatus: snapshot.lastErrorStatus,
+    status: snapshot.status,
+  } : null;
+}
+
+function commitPollState(row) {
+  const state = row && row.pollState;
+  if (
+    !isObject(state) || typeof state.branch !== 'string' || state.branch.length === 0 ||
+    typeof state.head_sha !== 'string' || state.head_sha.length === 0
+  ) return null;
+  return { branch: state.branch, head_sha: state.head_sha };
+}
+
+function starPollState(row) {
+  const state = row && row.pollState;
+  return isObject(state) && Number.isFinite(state.last_full_scan_at) && state.last_full_scan_at > 0
+    ? { last_full_scan_at: state.last_full_scan_at }
+    : null;
 }
 
 function writeSuccessfulPayload(
@@ -458,7 +498,8 @@ function writeSuccessfulPayload(
   rlReset,
   queries,
   lastAttemptAt = fetchedAt,
-  nextRetryAt = null
+  nextRetryAt = null,
+  pollState = null
 ) {
   queries.upsertGithubCacheRow(
     endpointId,
@@ -471,7 +512,8 @@ function writeSuccessfulPayload(
     true,
     PAYLOAD_VERSION,
     lastAttemptAt,
-    nextRetryAt
+    nextRetryAt,
+    pollState
   );
 }
 
@@ -484,20 +526,386 @@ function tryStarsFallback(endpointId, queries, nowMs, status, rlRemaining, rlRes
   const snapshot = repoStarSnapshot(queries, nowMs, minimumFetchedAt);
   if (!snapshot) return false;
   const previous = parseCachedPayload(existing);
-  const payload = starsFromRepositoryCount(previous, snapshot.total, snapshot.fetchedAt);
-  writeSuccessfulPayload(
+  let payload;
+  try {
+    payload = starsFromRepositoryCount(previous, snapshot.total, snapshot.fetchedAt);
+  } catch {
+    payload = starsFromRepositoryCount(null, snapshot.total, snapshot.fetchedAt);
+  }
+  queries.upsertGithubCacheFailureSnapshotRow(
     endpointId,
-    payload,
-    null,
+    JSON.stringify(payload),
     snapshot.fetchedAt,
     status,
     rlRemaining,
     rlReset,
-    queries,
+    PAYLOAD_VERSION,
     nowMs,
-    nextRetryAt
+    nextRetryAt,
+    starPollState(existing)
   );
   return true;
+}
+
+function upstreamError(message, response = null, statusOverride = null) {
+  const error = new Error(message);
+  const responseStatus = response && Number.isInteger(response.status) ? response.status : 0;
+  error.httpStatus = Number.isInteger(statusOverride) ? statusOverride : responseStatus;
+  error.rlRemaining = response ? response.rlRemaining : null;
+  error.rlReset = response ? response.rlReset : null;
+  error.retryAfter = response ? response.retryAfter : null;
+  return error;
+}
+
+function responseOrThrow(response, message) {
+  if (response.status !== 200) throw upstreamError(message, response);
+  return response;
+}
+
+function cumulativeDayCounts(history) {
+  const counts = new Map();
+  let previousTotal = 0;
+  for (const point of history) {
+    const count = point.total - previousTotal;
+    if (!Number.isInteger(count) || count < 0) {
+      throw upstreamError('cached commit history is not cumulative', null, 502);
+    }
+    counts.set(point.day_utc, count);
+    previousTotal = point.total;
+  }
+  return counts;
+}
+
+function cumulativeHistoryFromCounts(counts) {
+  let total = 0;
+  return [...counts.keys()].sort().map((day_utc) => {
+    total += counts.get(day_utc);
+    return { day_utc, total };
+  });
+}
+
+function commitAuthorDay(event) {
+  return isObject(event) && isObject(event.commit) && isObject(event.commit.author)
+    ? utcDay(event.commit.author.date)
+    : null;
+}
+
+function mergeCommitHistory(payload, commits, nowMs) {
+  const previous = validateCommitsEnvelope(payload);
+  if (!previous.history_complete) {
+    throw upstreamError('incremental merge requires complete commit history', null, 502);
+  }
+  const counts = cumulativeDayCounts(previous.history);
+  for (const event of commits) {
+    const day = commitAuthorDay(event);
+    if (!day) throw upstreamError('compare response contains a malformed commit date', null, 502);
+    counts.set(day, (counts.get(day) || 0) + 1);
+  }
+  const history = cumulativeHistoryFromCounts(counts);
+  const total = previous.total + commits.length;
+  const finalTotal = history.length > 0 ? history[history.length - 1].total : 0;
+  if (finalTotal !== total) throw upstreamError('incremental commit total is inconsistent', null, 502);
+  return {
+    schema_version: PAYLOAD_VERSION,
+    total,
+    last_30_days: rollingCommitCountFromHistory(history, nowMs),
+    history,
+    history_complete: true,
+    as_of: isoAt(nowMs),
+  };
+}
+
+async function walkPinnedCommits(headSha, fetchImpl) {
+  const collected = [];
+  const seen = new Set();
+  let page = 1;
+  let lastResponse = null;
+
+  while (true) {
+    const url = `https://api.github.com/repos/${OWNER}/${REPO}/commits?sha=${encodeURIComponent(headSha)}&page=${page}&per_page=${PER_PAGE}`;
+    const response = responseOrThrow(
+      await fetchOnePage(url, ENDPOINTS.commits.accept, null, fetchImpl),
+      `commits page=${page} failed`
+    );
+    if (!Array.isArray(response.body)) {
+      throw upstreamError(`commits page=${page} is malformed`, response, 502);
+    }
+    for (const event of response.body) {
+      const key = paginationKey('commits', event);
+      if (key === null || !commitAuthorDay(event)) {
+        throw upstreamError('commit row is missing its SHA or author date', response, 502);
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(event);
+    }
+    lastResponse = response;
+    if (!hasNextPage(response.link) && response.body.length < PER_PAGE) break;
+    page += 1;
+  }
+
+  if (!collected.some((event) => event.sha === headSha)) {
+    throw upstreamError('pinned commit traversal did not contain its requested head', lastResponse, 502);
+  }
+  return { commits: collected, response: lastResponse };
+}
+
+async function compareCommits(baseSha, headSha, fetchImpl) {
+  const collected = [];
+  const seen = new Set();
+  let aheadBy = null;
+  let page = 1;
+  let lastResponse = null;
+
+  while (true) {
+    const url = `https://api.github.com/repos/${OWNER}/${REPO}/compare/${encodeURIComponent(baseSha)}...${encodeURIComponent(headSha)}?page=${page}&per_page=${PER_PAGE}`;
+    const response = await fetchOnePage(url, null, null, fetchImpl);
+    if (response.status === 404 || response.status === 409 || response.status === 422) {
+      return { rebuild: true, response };
+    }
+    responseOrThrow(response, `compare page=${page} failed`);
+    if (!isObject(response.body) || !Array.isArray(response.body.commits)) {
+      throw upstreamError(`compare page=${page} is malformed`, response, 502);
+    }
+
+    const pageAheadBy = nonNegativeInteger(response.body.ahead_by);
+    const pageBehindBy = nonNegativeInteger(response.body.behind_by);
+    if (response.body.status !== 'ahead' || pageBehindBy !== 0 || pageAheadBy === 0) {
+      return { rebuild: true, response };
+    }
+    if (pageAheadBy === null || (aheadBy !== null && pageAheadBy !== aheadBy)) {
+      throw upstreamError('compare pagination changed ahead_by', response, 502);
+    }
+    aheadBy = pageAheadBy;
+
+    for (const event of response.body.commits) {
+      const key = paginationKey('commits', event);
+      if (key === null || !commitAuthorDay(event)) {
+        throw upstreamError('compare response contains a malformed commit', response, 502);
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(event);
+    }
+    if (collected.length > aheadBy) {
+      throw upstreamError('compare returned more commits than ahead_by', response, 502);
+    }
+    lastResponse = response;
+    if (collected.length === aheadBy) break;
+    if (!hasNextPage(response.link) && response.body.commits.length < PER_PAGE) {
+      throw upstreamError('compare returned fewer unique commits than ahead_by', response, 502);
+    }
+    page += 1;
+  }
+
+  if (collected.length !== aheadBy) {
+    throw upstreamError('compare unique commit count does not equal ahead_by', lastResponse, 502);
+  }
+  if (!collected.some((event) => event.sha === headSha)) {
+    throw upstreamError('compare result does not contain the probed head', lastResponse, 502);
+  }
+  return { rebuild: false, commits: collected, response: lastResponse };
+}
+
+async function pollRepoSummary(existing, queries, fetchImpl, nowMs) {
+  const existingEtag = existing && existing.isComplete ? existing.etag : null;
+  const response = await fetchOnePage(
+    `https://api.github.com${ENDPOINTS['repo-summary'].path}`,
+    ENDPOINTS['repo-summary'].accept,
+    existingEtag,
+    fetchImpl
+  );
+  if (response.status === 304) {
+    queries.touchGithubCacheRow('repo-summary', nowMs, 304, response.rlRemaining, response.rlReset);
+    return;
+  }
+  responseOrThrow(response, 'repo-summary request failed');
+  const payload = sanitizePublicPayload('repo-summary', response.body, { nowMs });
+  writeSuccessfulPayload(
+    'repo-summary', payload, response.etag, nowMs, 200,
+    response.rlRemaining, response.rlReset, queries
+  );
+}
+
+function usableStarEnvelope(existing) {
+  if (!existing || !existing.isComplete || existing.payloadVersion !== PAYLOAD_VERSION) return null;
+  try { return validateStarsEnvelope(parseCachedPayload(existing)); } catch { return null; }
+}
+
+async function pollStars(existing, queries, fetchImpl, nowMs) {
+  const summary = repoStarSnapshot(queries, nowMs);
+  if (
+    !summary || summary.fetchedAt !== nowMs || summary.checkedAt !== nowMs ||
+    summary.lastErrorStatus !== null || (summary.status !== 200 && summary.status !== 304)
+  ) {
+    throw upstreamError('stars require a same-tick repository total', null, 503);
+  }
+
+  const envelope = usableStarEnvelope(existing);
+  const state = starPollState(existing);
+  const reconciledRecently = state && nowMs >= state.last_full_scan_at &&
+    nowMs - state.last_full_scan_at < DAY_MS;
+  const canUseCountFastPath = envelope && envelope.history_complete &&
+    envelope.source === 'stargazers' && envelope.total === summary.total && reconciledRecently;
+
+  if (!GITHUB_TOKEN) {
+    let payload;
+    try {
+      payload = starsFromRepositoryCount(parseCachedPayload(existing), summary.total, nowMs);
+    } catch {
+      payload = starsFromRepositoryCount(null, summary.total, nowMs);
+    }
+    writeSuccessfulPayload(
+      'stars', payload, null, nowMs, 200,
+      existing ? existing.rateLimitRemaining : null,
+      existing ? existing.rateLimitReset : null,
+      queries, nowMs, null, starPollState(existing)
+    );
+    return;
+  }
+
+  if (existing && existing.nextRetryAt && nowMs < existing.nextRetryAt) {
+    let payload;
+    try {
+      payload = starsFromRepositoryCount(parseCachedPayload(existing), summary.total, nowMs);
+    } catch {
+      payload = starsFromRepositoryCount(null, summary.total, nowMs);
+    }
+    queries.refreshGithubCacheSnapshotDuringBackoffRow(
+      'stars', JSON.stringify(payload), nowMs, PAYLOAD_VERSION, starPollState(existing)
+    );
+    return;
+  }
+
+  if (canUseCountFastPath) {
+    const refreshed = { ...envelope, as_of: isoAt(nowMs) };
+    writeSuccessfulPayload(
+      'stars', refreshed, existing.etag, nowMs, 200,
+      existing.rateLimitRemaining, existing.rateLimitReset, queries,
+      nowMs, null, state
+    );
+    return;
+  }
+
+  const collected = [];
+  const seen = new Set();
+  let page = 1;
+  let firstEtag = null;
+  let lastResponse = null;
+  while (true) {
+    const url = `https://api.github.com${ENDPOINTS.stars.path}?page=${page}&per_page=${PER_PAGE}`;
+    const response = responseOrThrow(
+      await fetchOnePage(url, ENDPOINTS.stars.accept, null, fetchImpl),
+      `stars page=${page} failed`
+    );
+    if (!Array.isArray(response.body)) {
+      throw upstreamError(`stars page=${page} is malformed`, response, 502);
+    }
+    if (page === 1) firstEtag = response.etag;
+    for (const event of response.body) {
+      const key = paginationKey('stars', event);
+      if (key !== null && seen.has(key)) continue;
+      if (key !== null) seen.add(key);
+      collected.push(event);
+    }
+    lastResponse = response;
+    if (!hasNextPage(response.link) && response.body.length < PER_PAGE) break;
+    page += 1;
+  }
+
+  const payload = aggregateCompleteStars(collected, summary.total, nowMs);
+  if (!payload) {
+    throw upstreamError('stargazer traversal did not match the repository total', lastResponse, 409);
+  }
+  writeSuccessfulPayload(
+    'stars', payload, firstEtag, nowMs, 200,
+    lastResponse.rlRemaining, lastResponse.rlReset, queries,
+    nowMs, null, { last_full_scan_at: nowMs }
+  );
+}
+
+function usableCommitEnvelope(existing) {
+  if (!existing || !existing.isComplete || existing.payloadVersion !== PAYLOAD_VERSION) return null;
+  try {
+    const envelope = validateCommitsEnvelope(parseCachedPayload(existing));
+    if (!envelope.history_complete) return null;
+    cumulativeDayCounts(envelope.history);
+    return envelope;
+  } catch {
+    return null;
+  }
+}
+
+async function pollCommits(existing, queries, fetchImpl, nowMs) {
+  const summary = repoSnapshot(queries, nowMs);
+  // Repo metadata is a dependency, not a commit-upstream failure. Only advance
+  // the commit snapshot against a default branch verified in this same tick;
+  // otherwise leave the row and its retry state untouched so recovery can poll
+  // immediately after the summary succeeds.
+  if (
+    !summary || summary.fetchedAt !== nowMs || summary.checkedAt !== nowMs ||
+    summary.lastErrorStatus !== null || (summary.status !== 200 && summary.status !== 304)
+  ) return;
+
+  const state = commitPollState(existing);
+  const cached = usableCommitEnvelope(existing);
+  const canIncrement = Boolean(state && cached && state.branch === summary.branch);
+  const headResponse = await fetchOnePage(
+    `https://api.github.com/repos/${OWNER}/${REPO}/commits?sha=${encodeURIComponent(summary.branch)}&page=1&per_page=1`,
+    null,
+    canIncrement ? existing.etag : null,
+    fetchImpl
+  );
+
+  if (headResponse.status === 304) {
+    if (!canIncrement) throw upstreamError('unexpected conditional head response', headResponse, 502);
+    const refreshed = refreshCommitWindow(cached, nowMs);
+    writeSuccessfulPayload(
+      'commits', refreshed, existing.etag, nowMs, 304,
+      headResponse.rlRemaining, headResponse.rlReset, queries,
+      nowMs, null, state
+    );
+    return;
+  }
+  responseOrThrow(headResponse, 'default-branch head probe failed');
+  const headCommit = Array.isArray(headResponse.body) ? headResponse.body[0] : null;
+  const headSha = isObject(headCommit) && typeof headCommit.sha === 'string' && headCommit.sha.length > 0
+    ? headCommit.sha
+    : null;
+  if (!headSha) throw upstreamError('default-branch head response is malformed', headResponse, 502);
+  const headEtag = headResponse.etag || (canIncrement && headSha === state.head_sha ? existing.etag : null);
+  const nextState = { branch: summary.branch, head_sha: headSha };
+
+  if (canIncrement && headSha === state.head_sha) {
+    const refreshed = refreshCommitWindow(cached, nowMs);
+    writeSuccessfulPayload(
+      'commits', refreshed, headEtag, nowMs, 200,
+      headResponse.rlRemaining, headResponse.rlReset, queries,
+      nowMs, null, nextState
+    );
+    return;
+  }
+
+  if (canIncrement) {
+    const compared = await compareCommits(state.head_sha, headSha, fetchImpl);
+    if (!compared.rebuild) {
+      const payload = mergeCommitHistory(cached, compared.commits, nowMs);
+      writeSuccessfulPayload(
+        'commits', payload, headEtag, nowMs, 200,
+        compared.response.rlRemaining, compared.response.rlReset, queries,
+        nowMs, null, nextState
+      );
+      return;
+    }
+  }
+
+  const walked = await walkPinnedCommits(headSha, fetchImpl);
+  const payload = aggregateCommits(walked.commits, nowMs, true);
+  writeSuccessfulPayload(
+    'commits', payload, headEtag, nowMs, 200,
+    walked.response.rlRemaining, walked.response.rlReset, queries,
+    nowMs, null, nextState
+  );
 }
 
 async function pollEndpoint(endpointId, queries, fetchImpl, nowMs) {
@@ -513,185 +921,28 @@ async function pollEndpoint(endpointId, queries, fetchImpl, nowMs) {
   ) * 1000;
 
   try {
-    // Without a token, the stargazer-list endpoint is restricted and would
-    // produce a permanent auth failure. The repository resource already gives
-    // us the authoritative total, so use it without making the doomed request.
-    if (endpointId === 'stars' && !GITHUB_TOKEN) {
-      if (!tryStarsFallback(endpointId, queries, nowMs, 200, null, null)) {
-        recordFailure(endpointId, queries, attemptedAt(), 503, null, null);
-      }
-      return;
-    }
-
-    if (existing && existing.nextRetryAt && nowMs < existing.nextRetryAt) return;
-
-    if (!cfg.paginated) {
-      const existingEtag = existing && existing.isComplete ? existing.etag : null;
-      const url = `https://api.github.com${cfg.path}${cfg.query ? `?${cfg.query}` : ''}`;
-      const response = await fetchOnePage(url, cfg.accept, existingEtag, fetchImpl);
-      if (response.status === 304) {
-        queries.touchGithubCacheRow(endpointId, nowMs, 304, response.rlRemaining, response.rlReset);
-        return;
-      }
-      if (response.status !== 200) {
-        recordFailure(
-          endpointId,
-          queries,
-          attemptedAt(),
-          response.status,
-          response.rlRemaining,
-          response.rlReset,
-          response.retryAfter
-        );
-        console.warn(`[github-poller] ${endpointId} HTTP ${response.status}; preserving last-known-good cache`);
-        return;
-      }
-      const payload = sanitizePublicPayload(endpointId, response.body, { nowMs });
-      writeSuccessfulPayload(endpointId, payload, response.etag, nowMs, 200, response.rlRemaining, response.rlReset, queries);
-      return;
-    }
-
-    // Incomplete/legacy rows never use their page-1 ETag: they must self-heal
-    // via a complete walk. Oldest-first endpoints always walk because page 1
-    // becomes immutable once full.
-    const existingEtag = existing && existing.isComplete && !cfg.oldestFirst ? existing.etag : null;
-    const base = `https://api.github.com${cfg.path}`;
-    const collected = [];
-    const seenKeys = new Set();
-    let page = 1;
-    let etagToStore = null;
-    let firstPageFingerprint = null;
-    let lastRlRemaining = null;
-    let lastRlReset = null;
-
-    while (true) {
-      const separator = cfg.query ? '&' : '';
-      const url = `${base}?${cfg.query}${separator}page=${page}&per_page=${PER_PAGE}`;
-      const response = await fetchOnePage(url, cfg.accept, page === 1 ? existingEtag : null, fetchImpl);
-
-      if (page === 1 && response.status === 304) {
-        if (endpointId === 'commits') {
-          const cached = parseCachedPayload(existing);
-          const refreshed = refreshCommitWindow(cached, nowMs);
-          writeSuccessfulPayload(
-            endpointId,
-            refreshed,
-            existing.etag,
-            nowMs,
-            304,
-            response.rlRemaining,
-            response.rlReset,
-            queries
-          );
-        } else {
-          queries.touchGithubCacheRow(endpointId, nowMs, 304, response.rlRemaining, response.rlReset);
-        }
-        return;
-      }
-      if (response.status !== 200 || !Array.isArray(response.body)) {
-        const failureAt = attemptedAt();
-        const fallbackRetryAt = failureRetryAt(
-          endpointId,
-          queries,
-          failureAt,
-          response.rlRemaining,
-          response.rlReset,
-          response.retryAfter
-        );
-        const restrictionRetryAt = endpointId === 'stars' && (response.status === 401 || response.status === 403)
-          ? Math.max(failureAt + RESTRICTED_STARS_RETRY_MS, fallbackRetryAt)
-          : fallbackRetryAt;
-        if (tryStarsFallback(
-          endpointId,
-          queries,
-          failureAt,
-          response.status || 502,
-          response.rlRemaining,
-          response.rlReset,
-          restrictionRetryAt
-        )) return;
-        recordFailure(
-          endpointId,
-          queries,
-          failureAt,
-          response.status || 502,
-          response.rlRemaining,
-          response.rlReset,
-          response.retryAfter
-        );
-        console.warn(`[github-poller] ${endpointId} page=${page} failed; preserving last-known-good cache`);
-        return;
-      }
-
-      if (page === 1) {
-        etagToStore = response.etag;
-        firstPageFingerprint = JSON.stringify(response.body);
-      }
-      lastRlRemaining = response.rlRemaining;
-      lastRlReset = response.rlReset;
-      for (const event of response.body) {
-        const key = paginationKey(endpointId, event);
-        if (key !== null && seenKeys.has(key)) continue;
-        if (key !== null) seenKeys.add(key);
-        collected.push(event);
-      }
-      if (!hasNextPage(response.link) && response.body.length < PER_PAGE) break;
-      page += 1;
-    }
-
-    // New commits reorder the leading pages. Verify page 1 did not change
-    // while a multi-page traversal was in flight before
-    // publishing the combined result as complete. A changed sentinel leaves
-    // the last-known-good row untouched and retries from page 1 next cycle.
-    if (page > 1 && !cfg.oldestFirst) {
-      const separator = cfg.query ? '&' : '';
-      const firstPageUrl = `${base}?${cfg.query}${separator}page=1&per_page=${PER_PAGE}`;
-      const sentinel = await fetchOnePage(firstPageUrl, cfg.accept, etagToStore || null, fetchImpl);
-      const stableByValidator = Boolean(etagToStore) && sentinel.status === 304;
-      const stableByBody = sentinel.status === 200 && Array.isArray(sentinel.body) &&
-        JSON.stringify(sentinel.body) === firstPageFingerprint;
-      if (!stableByValidator && !stableByBody) {
-        recordFailure(
-          endpointId,
-          queries,
-          attemptedAt(),
-          sentinel.status === 200 ? 409 : (sentinel.status || 502),
-          sentinel.rlRemaining,
-          sentinel.rlReset,
-          sentinel.retryAfter
-        );
-        console.warn(`[github-poller] ${endpointId} changed during pagination; preserving last-known-good cache`);
-        return;
-      }
-      if (stableByBody && sentinel.etag) etagToStore = sentinel.etag;
-    }
-
-    let payload;
-    if (endpointId === 'stars') {
-      // A successful terminal page proves the complete current list. Do not
-      // let an older repository-summary snapshot override that newer walk.
-      const sameTickSummary = repoStarSnapshot(queries, nowMs);
-      const expectedTotal = sameTickSummary && sameTickSummary.fetchedAt === nowMs
-        ? sameTickSummary.total
-        : collected.length;
-      payload = aggregateCompleteStars(collected, expectedTotal, nowMs);
-      if (!payload && sameTickSummary && sameTickSummary.fetchedAt === nowMs) {
-        if (tryStarsFallback(endpointId, queries, nowMs, 409, lastRlRemaining, lastRlReset)) return;
-      }
-      if (!payload) throw new Error('complete stargazer walk contained malformed rows');
-    } else {
-      payload = sanitizePublicPayload(endpointId, collected, { nowMs, historyComplete: true });
-    }
-
-    writeSuccessfulPayload(endpointId, payload, etagToStore, nowMs, 200, lastRlRemaining, lastRlReset, queries);
+    if (existing && existing.nextRetryAt && nowMs < existing.nextRetryAt && endpointId !== 'stars') return;
+    if (endpointId === 'repo-summary') await pollRepoSummary(existing, queries, fetchImpl, nowMs);
+    else if (endpointId === 'stars') await pollStars(existing, queries, fetchImpl, nowMs);
+    else if (endpointId === 'commits') await pollCommits(existing, queries, fetchImpl, nowMs);
   } catch (err) {
     const failureAt = attemptedAt();
-    const fallbackRetryAt = failureRetryAt(endpointId, queries, failureAt, null, null);
-    if (tryStarsFallback(endpointId, queries, failureAt, 0, null, null, fallbackRetryAt)) {
+    const status = err && Number.isInteger(err.httpStatus) ? err.httpStatus : 0;
+    const rlRemaining = !err || err.rlRemaining == null ? null : err.rlRemaining;
+    const rlReset = !err || err.rlReset == null ? null : err.rlReset;
+    const fallbackRetryAt = failureRetryAt(
+      endpointId, queries, failureAt, rlRemaining, rlReset, (err && err.retryAfter) || null
+    );
+    const nextRetryAt = endpointId === 'stars' && (status === 401 || status === 403)
+      ? Math.max(failureAt + RESTRICTED_STARS_RETRY_MS, fallbackRetryAt)
+      : fallbackRetryAt;
+    if (tryStarsFallback(endpointId, queries, failureAt, status, rlRemaining, rlReset, nextRetryAt)) {
       console.warn(`[github-poller] ${endpointId} request failed; using repository-count fallback`);
       return;
     }
-    recordFailure(endpointId, queries, failureAt, 0, null, null);
+    queries.recordGithubCacheFailureRow(
+      endpointId, failureAt, status, rlRemaining, rlReset, nextRetryAt
+    );
     console.error(`[github-poller] ${endpointId} tick failed:`, err && err.message ? err.message : err);
   }
 }

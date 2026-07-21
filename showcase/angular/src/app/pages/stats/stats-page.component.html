@@ -13,12 +13,10 @@
         </div>
         <span class="stats-live-badge" [class.is-live]="viewState.kind === 'ready'"
               [class.is-partial]="viewState.kind === 'partial'"
-              [class.is-stale]="viewState.kind === 'stale'" [attr.title]="stateBadgeTitle"
-              [attr.aria-label]="stateBadgeTitle" role="status">
+              [attr.title]="stateBadgeTitle" [attr.aria-label]="stateBadgeAriaLabel" role="status">
           @switch (viewState.kind) {
             @case ('ready') { <span i18n="@@stats.live.label">Live</span> }
             @case ('partial') { <span i18n="@@stats.status.partial">Partial</span> }
-            @case ('stale') { <span i18n="@@stats.status.stale">Stale</span> }
             @case ('loading') { <span i18n="@@stats.status.loadingLabel">Loading</span> }
             @case ('error') { <span i18n="@@stats.status.unavailableLabel">Unavailable</span> }
           }
@@ -44,20 +42,22 @@
                   <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_ACTIVE">active right now</span>
                 </span>
               }
-              <span class="headline-cell">
-                <strong>{{ formattedFsbTotal }}</strong>
-                <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">users (365d)</span>
-              </span>
-              @if (hasFsbAgentDaysSinceActiveV2) {
+              @if (hasFsbAggregateSnapshot) {
                 <span class="headline-cell">
-                  <strong>{{ formattedFsbAgentDays }}</strong>
-                  <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS">agent-days since active v2</span>
+                  <strong>{{ formattedFsbTotal }}</strong>
+                  <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOTAL">users (365d)</span>
+                </span>
+                @if (hasFsbAgentDaysSinceActiveV2) {
+                  <span class="headline-cell">
+                    <strong>{{ formattedFsbAgentDays }}</strong>
+                    <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_AGENT_DAYS">agent-days since active v2</span>
+                  </span>
+                }
+                <span class="headline-cell">
+                  <strong>{{ formattedFsbTokens }}</strong>
+                  <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (24h)</span>
                 </span>
               }
-              <span class="headline-cell">
-                <strong>{{ formattedFsbTokens }}</strong>
-                <span i18n="@@SHOWCASE_STATS_FSB_HEADLINE_TOKENS">tokens (24h)</span>
-              </span>
             </div>
           }
         </div>
@@ -70,16 +70,18 @@
           </div>
         }
         @if (isViewRenderable) {
-          @if (viewState.kind === 'stale') {
-            <div class="stale-notice" role="status" aria-live="polite">
-              <i class="ph ph-warning-circle" aria-hidden="true"></i>
-              <span i18n="@@stats.stale.notice">This view is showing the last available snapshot while fresh data is unavailable.</span>
+          @if (viewState.kind === 'partial') {
+            <div class="stats-notice freshness-notice" role="status" aria-live="polite">
+              <i class="ph ph-clock" aria-hidden="true"></i>
+              <span>{{ partialFreshnessMessage }}</span>
             </div>
           }
-          @if (viewState.kind === 'partial') {
-            <div class="stale-notice partial-notice" role="status" aria-live="polite">
-              <i class="ph ph-info" aria-hidden="true"></i>
-              <span i18n="@@stats.partial.notice">This view is usable, but some reporting or historical coverage is incomplete.</span>
+          @for (notice of qualityNotices; track notice.id) {
+            <div class="stats-notice quality-notice" [class.retry-notice]="notice.kind === 'retry'"
+                 role="status" aria-live="polite">
+              <i class="ph" [class.ph-info]="notice.kind === 'quality'"
+                 [class.ph-arrows-clockwise]="notice.kind === 'retry'" aria-hidden="true"></i>
+              <span>{{ notice.message }}</span>
             </div>
           }
           <div class="chart-mount" [class.chart-mount-hidden]="selectedView === 'fsb-active-now'">
@@ -123,11 +125,6 @@
                 <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_ANNOTATION">Regional distribution from today's hourly aggregate.</span>
               } @else {
                 <span i18n="@@SHOWCASE_STATS_FSB_GLOBE_EMPTY">Not enough anonymous activity yet to break down by region — check back soon.</span>
-              }
-              @if (regionAggregateState === 'partial') {
-                <span i18n="@@stats.globe.partial">The regional aggregate is not available yet.</span>
-              } @else if (regionAggregateState === 'stale') {
-                <span i18n="@@stats.globe.stale">The regional breakdown is older than two hours.</span>
               }
             </p>
           </div>

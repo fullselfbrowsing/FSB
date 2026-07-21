@@ -390,15 +390,16 @@ class Queries {
     );
 
     // Quick task 260516-7l5 -- GitHub stats cache.
-    // One row per endpoint_id (7 total). Populated by src/telemetry/github-poller.js
+    // One row per allowlisted endpoint_id (3 total). Populated by src/telemetry/github-poller.js
     // every 5 minutes. Read by src/routes/public-stats.js (/github/:endpoint_id sub-route).
     this.upsertGithubCache = this.db.prepare(`
       INSERT INTO github_cache (
         endpoint_id, payload_json, etag, fetched_at, http_status,
         rate_limit_remaining, rate_limit_reset, is_complete, payload_version,
-        last_attempt_at, last_error_status, consecutive_failures, next_retry_at
+        last_attempt_at, last_error_status, consecutive_failures, next_retry_at,
+        poll_state_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, ?)
       ON CONFLICT(endpoint_id) DO UPDATE SET
         payload_json = excluded.payload_json,
         etag = excluded.etag,
@@ -411,7 +412,8 @@ class Queries {
         last_attempt_at = excluded.last_attempt_at,
         last_error_status = NULL,
         consecutive_failures = 0,
-        next_retry_at = excluded.next_retry_at
+        next_retry_at = excluded.next_retry_at,
+        poll_state_json = excluded.poll_state_json
     `);
     // A 304 is only a successful refresh for an already-complete cache. Legacy
     // or failed partial rows never send an ETag, so this guard is defensive.
@@ -426,9 +428,10 @@ class Queries {
       INSERT INTO github_cache (
         endpoint_id, payload_json, etag, fetched_at, http_status,
         rate_limit_remaining, rate_limit_reset, is_complete, payload_version,
-        last_attempt_at, last_error_status, consecutive_failures, next_retry_at
+        last_attempt_at, last_error_status, consecutive_failures, next_retry_at,
+        poll_state_json
       )
-      VALUES (?, 'null', NULL, 0, ?, ?, ?, 0, 0, ?, ?, 1, ?)
+      VALUES (?, 'null', NULL, 0, ?, ?, ?, 0, 0, ?, ?, 1, ?, NULL)
       ON CONFLICT(endpoint_id) DO UPDATE SET
         http_status = excluded.http_status,
         rate_limit_remaining = excluded.rate_limit_remaining,
@@ -438,11 +441,40 @@ class Queries {
         consecutive_failures = github_cache.consecutive_failures + 1,
         next_retry_at = excluded.next_retry_at
     `);
+    this.upsertGithubCacheFailureSnapshot = this.db.prepare(`
+      INSERT INTO github_cache (
+        endpoint_id, payload_json, etag, fetched_at, http_status,
+        rate_limit_remaining, rate_limit_reset, is_complete, payload_version,
+        last_attempt_at, last_error_status, consecutive_failures, next_retry_at,
+        poll_state_json
+      )
+      VALUES (?, ?, NULL, ?, ?, ?, ?, 1, ?, ?, ?, 1, ?, ?)
+      ON CONFLICT(endpoint_id) DO UPDATE SET
+        payload_json = excluded.payload_json,
+        etag = NULL,
+        fetched_at = excluded.fetched_at,
+        http_status = excluded.http_status,
+        rate_limit_remaining = excluded.rate_limit_remaining,
+        rate_limit_reset = excluded.rate_limit_reset,
+        is_complete = 1,
+        payload_version = excluded.payload_version,
+        last_attempt_at = excluded.last_attempt_at,
+        last_error_status = excluded.last_error_status,
+        consecutive_failures = github_cache.consecutive_failures + 1,
+        next_retry_at = excluded.next_retry_at,
+        poll_state_json = excluded.poll_state_json
+    `);
+    this.refreshGithubCacheSnapshotDuringBackoff = this.db.prepare(`
+      UPDATE github_cache
+      SET payload_json = ?, etag = NULL, fetched_at = ?, is_complete = 1,
+          payload_version = ?, poll_state_json = ?
+      WHERE endpoint_id = ?
+    `);
     this.selectGithubCache = this.db.prepare(
       `SELECT endpoint_id, payload_json, etag, fetched_at, http_status,
               rate_limit_remaining, rate_limit_reset, is_complete,
               payload_version, last_attempt_at, last_error_status,
-              consecutive_failures, next_retry_at
+              consecutive_failures, next_retry_at, poll_state_json
        FROM github_cache WHERE endpoint_id = ?`
     );
     this.selectGithubEtag = this.db.prepare(
@@ -701,8 +733,8 @@ class Queries {
   // -----------------------------------------------------------------------
   // GitHub stats cache helpers. Successful writes replace the payload and
   // reset failure state. Failure writes preserve payload_json, etag,
-  // fetched_at, completeness, and payload version so readers retain the
-  // last-known-good snapshot.
+  // fetched_at, completeness, payload version, and private poll cursor so
+  // readers and the next attempt retain the last-known-good snapshot.
   // -----------------------------------------------------------------------
   upsertGithubCacheRow(
     endpointId,
@@ -715,8 +747,12 @@ class Queries {
     isComplete = true,
     payloadVersion = 1,
     lastAttemptAt = fetchedAt,
-    nextRetryAt = null
+    nextRetryAt = null,
+    pollState = null
   ) {
+    const pollStateJson = pollState === null || pollState === undefined
+      ? null
+      : JSON.stringify(pollState);
     this.upsertGithubCache.run(
       endpointId,
       payloadJson,
@@ -728,7 +764,8 @@ class Queries {
       isComplete ? 1 : 0,
       Number(payloadVersion) || 0,
       lastAttemptAt,
-      nextRetryAt
+      nextRetryAt,
+      pollStateJson
     );
   }
 
@@ -756,9 +793,63 @@ class Queries {
     );
   }
 
+  upsertGithubCacheFailureSnapshotRow(
+    endpointId,
+    payloadJson,
+    fetchedAt,
+    httpStatus,
+    rlRemaining,
+    rlReset,
+    payloadVersion,
+    attemptedAt,
+    nextRetryAt,
+    pollState = null
+  ) {
+    const normalizedStatus = Number.isInteger(Number(httpStatus)) ? Number(httpStatus) : 0;
+    const pollStateJson = pollState === null || pollState === undefined
+      ? null
+      : JSON.stringify(pollState);
+    this.upsertGithubCacheFailureSnapshot.run(
+      endpointId,
+      payloadJson,
+      fetchedAt,
+      normalizedStatus,
+      rlRemaining == null ? null : Number(rlRemaining),
+      rlReset == null ? null : Number(rlReset),
+      Number(payloadVersion) || 0,
+      attemptedAt,
+      normalizedStatus,
+      nextRetryAt,
+      pollStateJson
+    );
+  }
+
+  refreshGithubCacheSnapshotDuringBackoffRow(
+    endpointId,
+    payloadJson,
+    fetchedAt,
+    payloadVersion,
+    pollState = null
+  ) {
+    const pollStateJson = pollState === null || pollState === undefined
+      ? null
+      : JSON.stringify(pollState);
+    this.refreshGithubCacheSnapshotDuringBackoff.run(
+      payloadJson,
+      fetchedAt,
+      Number(payloadVersion) || 0,
+      pollStateJson,
+      endpointId
+    );
+  }
+
   getGithubCachePayload(endpointId) {
     const row = this.selectGithubCache.get(endpointId);
     if (!row) return null;
+    let pollState = null;
+    if (typeof row.poll_state_json === 'string') {
+      try { pollState = JSON.parse(row.poll_state_json); } catch { pollState = null; }
+    }
     return {
       payload: row.payload_json,
       etag: row.etag,
@@ -772,6 +863,7 @@ class Queries {
       lastErrorStatus: row.last_error_status,
       consecutiveFailures: row.consecutive_failures,
       nextRetryAt: row.next_retry_at,
+      pollState,
     };
   }
 

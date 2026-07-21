@@ -2,6 +2,10 @@
 //
 // Mirrors github-stats.types.ts structure: one DatasetState<T> discriminated
 // union + per-endpoint response interfaces. No I/O here; types only.
+
+import type { DatasetState as SharedDatasetState } from './dataset-state.types';
+
+export type { DatasetAvailability } from './dataset-state.types';
 //
 // The FSB public-stats server endpoint is mounted at /api/public-stats and
 // has no rate limiter (it is server-cached with a 30 s memo + 60 s
@@ -121,16 +125,5 @@ export interface FSBTelemetrySeries {
   d365: FSBTelemetrySeriesPoint[];
 }
 
-/**
- * Per-dataset state emitted by the service's BehaviorSubjects.
- *
- * Mirror of github-stats.types DatasetState<T>. A failed refresh after a prior
- * success emits `stale` with the last usable snapshot; an initial failure emits
- * `error`.
- */
-export type DatasetState<T> =
-  | { kind: 'loading' }
-  | { kind: 'ready'; data: T; fetchedAt: number }
-  | { kind: 'partial'; data: T; fetchedAt: number; message: string }
-  | { kind: 'stale'; data: T; fetchedAt: number; message: string }
-  | { kind: 'error'; message: string };
+/** Shared transport state retained here as a compatibility export. */
+export type DatasetState<T> = SharedDatasetState<T>;

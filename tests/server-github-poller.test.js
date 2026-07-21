@@ -1,5 +1,5 @@
 /**
- * GitHub poller/cache regression tests.
+ * Authenticated incremental GitHub poller/cache regression tests.
  *
  * Run: node tests/server-github-poller.test.js
  */
@@ -14,6 +14,15 @@ const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 
 const POLLER_PATH = path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'github-poller');
 
 const NOW = Date.parse('2026-07-20T12:00:00.000Z');
+const REPO_URL = 'https://api.github.com/repos/fullselfbrowsing/FSB';
+const STARS_URL = `${REPO_URL}/stargazers`;
+const COMMITS_URL = `${REPO_URL}/commits`;
+const COMPARE_URL = `${REPO_URL}/compare`;
+
+function headUrl(branch = 'main') {
+  return `${COMMITS_URL}?sha=${encodeURIComponent(branch)}&page=1&per_page=1`;
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -48,28 +57,31 @@ function response(canned) {
         return values[name.toLowerCase()] ?? null;
       },
     },
-    json: async () => canned.body,
+    json: async () => {
+      if (canned.malformedJson) throw new Error('malformed JSON');
+      return canned.body;
+    },
     text: async () => JSON.stringify(canned.body ?? ''),
   };
 }
 
-function makeFakeFetch(cannedByPrefix) {
+function makeFakeFetch(handler) {
   const calls = [];
-  const prefixes = Object.keys(cannedByPrefix).sort((a, b) => b.length - a.length);
   const fakeFetch = async (url, options) => {
     calls.push({ url, options });
-    const prefix = prefixes.find((candidate) => url.startsWith(candidate));
-    if (!prefix) throw new Error(`no canned response for ${url}`);
-    const value = typeof cannedByPrefix[prefix] === 'function'
-      ? cannedByPrefix[prefix](url, options)
-      : cannedByPrefix[prefix];
-    if (value && value.__reject) throw new Error(value.__reject);
-    return response(value);
+    const canned = await handler(url, options, calls.length);
+    if (!canned) throw new Error(`no canned response for ${url}`);
+    if (canned.reject) throw new Error(canned.reject);
+    return response(canned);
   };
   return { fakeFetch, calls };
 }
 
-function repoSummary(stars = 2) {
+function ok(body, extras = {}) {
+  return { status: 200, body, rlRemaining: '4999', rlReset: '0', ...extras };
+}
+
+function repoSummary(stars = 2, branch = 'main') {
   return {
     id: 123,
     name: 'FSB',
@@ -78,7 +90,7 @@ function repoSummary(stars = 2) {
     forks_count: 4,
     open_issues_count: 8,
     subscribers_count: 3,
-    default_branch: 'main',
+    default_branch: branch,
     pushed_at: '2026-07-20T10:00:00Z',
     owner: { login: 'private-shape-must-not-escape' },
   };
@@ -95,36 +107,59 @@ function commit(sha, date) {
   };
 }
 
-function happyCanned() {
-  return {
-    'https://api.github.com/repos/fullselfbrowsing/FSB/stargazers': {
-      status: 200,
-      body: [
-        { starred_at: '2026-07-18T10:00:00Z', user: { login: 'alice' } },
-        { starred_at: '2026-07-19T10:00:00Z', user: { login: 'bob' } },
-      ],
-      etag: '"stars-1"',
-      rlRemaining: '4998',
-      rlReset: '0',
-    },
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': {
-      status: 200,
-      body: [
-        commit('a', '2026-07-01T12:00:00Z'),
-        commit('b', '2026-07-19T12:00:00Z'),
-      ],
-      etag: '"commits-1"',
-      rlRemaining: '4996',
-      rlReset: '0',
-    },
-    'https://api.github.com/repos/fullselfbrowsing/FSB': {
-      status: 200,
-      body: repoSummary(2),
-      etag: '"summary-1"',
-      rlRemaining: '4999',
-      rlReset: '0',
-    },
-  };
+function star(id, date) {
+  return { starred_at: date, user: { id, login: `private-${id}` } };
+}
+
+function openDb() {
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  return { db, queries: new Queries(db) };
+}
+
+function seedRepo(poller, queries, fetchedAt = NOW, stars = 2, branch = 'main') {
+  const payload = poller.sanitizePublicPayload('repo-summary', repoSummary(stars, branch), { nowMs: fetchedAt });
+  queries.upsertGithubCacheRow(
+    'repo-summary', JSON.stringify(payload), '"repo-etag"', fetchedAt,
+    200, 5000, 0, true, 1, fetchedAt
+  );
+}
+
+function seedCommits(poller, queries, options = {}) {
+  const fetchedAt = options.fetchedAt ?? NOW - 60_000;
+  const events = options.events || [
+    commit('old-head', '2026-07-19T12:00:00Z'),
+    commit('old-root', '2026-07-18T12:00:00Z'),
+  ];
+  const payload = poller.aggregateCommits(events, fetchedAt, options.historyComplete ?? true);
+  queries.upsertGithubCacheRow(
+    'commits', JSON.stringify(payload), options.etag ?? '"old-head-etag"', fetchedAt,
+    200, 4900, 0, true, 1, fetchedAt, null,
+    options.pollState === undefined ? { branch: 'main', head_sha: 'old-head' } : options.pollState
+  );
+  return payload;
+}
+
+function seedStars(poller, queries, options = {}) {
+  const fetchedAt = options.fetchedAt ?? NOW - 60_000;
+  const events = options.events || [
+    star(1, '2026-07-18T10:00:00Z'),
+    star(2, '2026-07-19T10:00:00Z'),
+  ];
+  let payload = poller.sanitizePublicPayload('stars', events, {
+    nowMs: fetchedAt,
+    repoTotal: events.length,
+    historyComplete: options.historyComplete ?? true,
+  });
+  if (options.historyComplete === false) {
+    payload = { ...payload, history_complete: false, source: 'repository-count' };
+  }
+  queries.upsertGithubCacheRow(
+    'stars', JSON.stringify(payload), '"stars-etag"', fetchedAt,
+    200, 4900, 0, true, 1, fetchedAt, null,
+    options.pollState === undefined ? { last_full_scan_at: fetchedAt } : options.pollState
+  );
+  return payload;
 }
 
 (async function main() {
@@ -134,489 +169,494 @@ function happyCanned() {
   console.warn = () => {};
   console.error = () => {};
 
-  delete process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'github_pat_test';
   let poller = freshPoller();
 
-  check('allowlist contains only the three GitHub datasets used by the stats page',
-    JSON.stringify(poller.GITHUB_ENDPOINT_IDS) === JSON.stringify(['repo-summary', 'stars', 'commits']),
-    JSON.stringify(poller.GITHUB_ENDPOINT_IDS));
-  check('poll cadence remains five minutes', poller.GITHUB_POLL_INTERVAL_MS === 300000, String(poller.GITHUB_POLL_INTERVAL_MS));
-  check('issues endpoint configuration and sanitizer are retired',
-    poller.ENDPOINTS.issues === undefined && poller.aggregateIssues === undefined);
+  check('allowlist contains only current public GitHub datasets',
+    JSON.stringify(poller.GITHUB_ENDPOINT_IDS) === JSON.stringify(['repo-summary', 'stars', 'commits']));
+  check('poll cadence remains five minutes', poller.GITHUB_POLL_INTERVAL_MS === 300_000);
 
-  // Happy path: every persisted payload is compact, complete, and identity-free.
-  process.env.GITHUB_TOKEN = 'ghp_happy_path';
-  poller = freshPoller();
-  const db1 = new Database(':memory:');
-  initializeDatabase(db1);
-  const q1 = new Queries(db1);
-  const happy = makeFakeFetch(happyCanned());
-  await poller.runGithubPollerTick(db1, q1, happy.fakeFetch, NOW);
+  // The additive migration leaves all pre-existing rows without a cursor.
+  const legacyDb = new Database(':memory:');
+  legacyDb.exec(`
+    CREATE TABLE github_cache (
+      endpoint_id TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      etag TEXT,
+      fetched_at INTEGER NOT NULL,
+      http_status INTEGER NOT NULL,
+      rate_limit_remaining INTEGER,
+      rate_limit_reset INTEGER
+    );
+    INSERT INTO github_cache VALUES (
+      'repo-summary',
+      '${JSON.stringify(repoSummary()).replaceAll("'", "''")}',
+      '"legacy"', ${NOW}, 200, 60, 0
+    );
+  `);
+  initializeDatabase(legacyDb);
+  const legacyRow = legacyDb.prepare(
+    'SELECT poll_state_json FROM github_cache WHERE endpoint_id = ?'
+  ).get('repo-summary');
+  check('migration adds nullable private poll state and migrates existing rows as NULL',
+    legacyRow && legacyRow.poll_state_json === null, JSON.stringify(legacyRow));
+  legacyDb.close();
 
-  for (const endpointId of poller.GITHUB_ENDPOINT_IDS) {
-    const row = q1.getGithubCachePayload(endpointId);
-    check(`${endpointId} has a complete v1 cache row`, row && row.isComplete && row.payloadVersion === 1, JSON.stringify(row));
-    check(`${endpointId} cached payload contains no raw GitHub identity`,
-      row && !/(alice|bob|private@example|identity-must-not-escape|"user"|"owner")/.test(row.payload),
-      row && row.payload);
+  // First authenticated tick performs complete, immutable-head seed walks.
+  const happyDb = openDb();
+  const happyFetch = makeFakeFetch((url) => {
+    if (url === REPO_URL) return ok(repoSummary(2), { etag: '"repo-1"' });
+    if (url.startsWith(`${STARS_URL}?`)) {
+      return ok([star(1, '2026-07-18T10:00:00Z'), star(2, '2026-07-19T10:00:00Z')], { etag: '"stars-1"' });
+    }
+    if (url === headUrl()) return ok([commit('head-2', '2026-07-19T12:00:00Z')], { etag: '"head-2-etag"' });
+    if (url.startsWith(`${COMMITS_URL}?sha=head-2`)) {
+      return ok([commit('head-2', '2026-07-19T12:00:00Z'), commit('root-1', '2026-07-01T12:00:00Z')]);
+    }
+    return null;
+  });
+  await poller.runGithubPollerTick(happyDb.db, happyDb.queries, happyFetch.fakeFetch, NOW);
+  const seededStars = happyDb.queries.getGithubCachePayload('stars');
+  const seededCommits = happyDb.queries.getGithubCachePayload('commits');
+  check('first authenticated star walk seeds reconciliation state',
+    seededStars.pollState.last_full_scan_at === NOW, JSON.stringify(seededStars));
+  check('first authenticated commit walk is pinned to the probed immutable SHA and seeds its cursor',
+    seededCommits.pollState.branch === 'main' && seededCommits.pollState.head_sha === 'head-2' &&
+      happyFetch.calls.some((call) => call.url.includes('?sha=head-2')),
+    JSON.stringify(happyFetch.calls.map((call) => call.url)));
+  check('private cursor and raw identities are absent from public payload JSON',
+    !/(head-2|main|private-|identity-must-not-escape|private@example|"sha")/.test(
+      `${seededStars.payload}${seededCommits.payload}`
+    ), `${seededStars.payload} ${seededCommits.payload}`);
+  check('all authenticated GitHub requests carry the bearer token',
+    happyFetch.calls.every((call) => call.options.headers.Authorization === 'Bearer github_pat_test'));
+  check('every request has timeout cancellation attached',
+    happyFetch.calls.every((call) => call.options.signal && typeof call.options.signal.aborted === 'boolean'));
+
+  // Unchanged commits use one conditional head probe and still age the rolling window.
+  const conditionalDb = openDb();
+  seedRepo(poller, conditionalDb.queries, NOW);
+  seedCommits(poller, conditionalDb.queries, {
+    fetchedAt: Date.parse('2026-06-01T12:00:00Z'),
+    events: [commit('old-head', '2026-06-01T12:00:00Z')],
+  });
+  const conditionalFetch = makeFakeFetch((url, options) => {
+    if (url === headUrl()) {
+      return {
+        status: 304, etag: '"old-head-etag"', rlRemaining: '4800', rlReset: '0',
+        body: undefined,
+      };
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', conditionalDb.queries, conditionalFetch.fakeFetch, NOW);
+  const conditionalRow = conditionalDb.queries.getGithubCachePayload('commits');
+  const conditionalPayload = JSON.parse(conditionalRow.payload);
+  check('unchanged commit refresh is a single conditional head request',
+    conditionalFetch.calls.length === 1 &&
+      conditionalFetch.calls[0].options.headers['If-None-Match'] === '"old-head-etag"');
+  check('head 304 refreshes snapshot age, keeps cursor, and recalculates rolling 30 days',
+    conditionalRow.fetchedAt === NOW && conditionalRow.status === 304 &&
+      conditionalRow.pollState.head_sha === 'old-head' && conditionalPayload.last_30_days === 0,
+    JSON.stringify(conditionalRow));
+
+  // A failed summary must not let commits refresh against an unverified old
+  // default branch, and must not back off commit recovery.
+  const dependencyDb = openDb();
+  seedRepo(poller, dependencyDb.queries, NOW - 60_000, 2, 'main');
+  seedCommits(poller, dependencyDb.queries);
+  const beforeDependency = dependencyDb.queries.getGithubCachePayload('commits');
+  const summaryFailure = makeFakeFetch((url) => url === REPO_URL
+    ? { status: 500, body: {}, rlRemaining: '4800', rlReset: '0' }
+    : null);
+  await poller.pollEndpoint('repo-summary', dependencyDb.queries, summaryFailure.fakeFetch, NOW);
+  const dependencyCommitFetch = makeFakeFetch(() => null);
+  await poller.pollEndpoint('commits', dependencyDb.queries, dependencyCommitFetch.fakeFetch, NOW);
+  const afterDependency = dependencyDb.queries.getGithubCachePayload('commits');
+  check('failed same-tick summary leaves commits untouched and creates no commit backoff',
+    dependencyCommitFetch.calls.length === 0 &&
+      afterDependency.payload === beforeDependency.payload &&
+      afterDependency.fetchedAt === beforeDependency.fetchedAt &&
+      afterDependency.lastAttemptAt === beforeDependency.lastAttemptAt &&
+      afterDependency.consecutiveFailures === 0 && afterDependency.nextRetryAt === null,
+    JSON.stringify(afterDependency));
+
+  const recoveryAt = NOW + 300_000;
+  const dependencyRecovery = makeFakeFetch((url) => {
+    if (url === REPO_URL) return ok(repoSummary(2, 'release'), { etag: '"release-summary"' });
+    if (url === headUrl('release')) {
+      return ok([commit('release-recovery', '2026-07-20T12:05:00Z')], { etag: '"release-recovery"' });
+    }
+    if (url.includes('sha=release-recovery&page=1&per_page=100')) {
+      return ok([commit('release-recovery', '2026-07-20T12:05:00Z')]);
+    }
+    return null;
+  });
+  await poller.pollEndpoint('repo-summary', dependencyDb.queries, dependencyRecovery.fakeFetch, recoveryAt);
+  await poller.pollEndpoint('commits', dependencyDb.queries, dependencyRecovery.fakeFetch, recoveryAt);
+  const recoveredDependency = dependencyDb.queries.getGithubCachePayload('commits');
+  check('summary recovery immediately detects a default-branch change and performs a pinned rebuild',
+    recoveredDependency.fetchedAt === recoveryAt && recoveredDependency.pollState.branch === 'release' &&
+      recoveredDependency.pollState.head_sha === 'release-recovery' &&
+      dependencyRecovery.calls.some((call) => call.url.includes('sha=release-recovery&page=1&per_page=100')),
+    JSON.stringify(dependencyRecovery.calls.map((call) => call.url)));
+
+  // Normal fast-forward is a head probe plus compare request.
+  const fastDb = openDb();
+  seedRepo(poller, fastDb.queries, NOW);
+  seedCommits(poller, fastDb.queries);
+  const fastFetch = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('new-head', '2026-07-20T11:00:00Z')], { etag: '"new-head-etag"' });
+    if (url.startsWith(`${COMPARE_URL}/old-head...new-head?`)) {
+      return ok({ status: 'ahead', ahead_by: 1, behind_by: 0, commits: [commit('new-head', '2026-07-20T11:00:00Z')] });
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', fastDb.queries, fastFetch.fakeFetch, NOW);
+  const fastRow = fastDb.queries.getGithubCachePayload('commits');
+  check('one-commit fast-forward uses two requests and atomically advances payload, ETag, and cursor',
+    fastFetch.calls.length === 2 && JSON.parse(fastRow.payload).total === 3 &&
+      fastRow.etag === '"new-head-etag"' && fastRow.pollState.head_sha === 'new-head',
+    JSON.stringify({ calls: fastFetch.calls.map((call) => call.url), row: fastRow }));
+
+  // Paginated compare merge validates unique cardinality and supports backdated author dates.
+  const pagedDb = openDb();
+  seedRepo(poller, pagedDb.queries, NOW);
+  seedCommits(poller, pagedDb.queries);
+  const newCommits = Array.from({ length: 101 }, (_, index) => commit(
+    `new-${index}`,
+    index === 100 ? '2025-01-01T00:00:00Z' : '2026-07-20T00:00:00Z'
+  ));
+  const pagedFetch = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('new-100', '2025-01-01T00:00:00Z')], { etag: '"paged-head"' });
+    if (url.includes('/compare/old-head...new-100?page=1')) {
+      return ok(
+        { status: 'ahead', ahead_by: 101, behind_by: 0, commits: newCommits.slice(0, 100) },
+        { link: '<https://api.github.com/example?page=2>; rel="next"' }
+      );
+    }
+    if (url.includes('/compare/old-head...new-100?page=2')) {
+      return ok({ status: 'ahead', ahead_by: 101, behind_by: 0, commits: newCommits.slice(100) });
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', pagedDb.queries, pagedFetch.fakeFetch, NOW);
+  const pagedPayload = JSON.parse(pagedDb.queries.getGithubCachePayload('commits').payload);
+  check('paginated fast-forward merges every unique compare commit',
+    pagedPayload.total === 103 && pagedFetch.calls.length === 3, JSON.stringify(pagedPayload));
+  check('backdated compare commits are inserted into chronological cumulative history',
+    pagedPayload.history[0].day_utc === '2025-01-01' &&
+      pagedPayload.history.at(-1).total === 103, JSON.stringify(pagedPayload.history));
+
+  // Any compare inconsistency fails closed with payload/ETag/cursor/fetched_at untouched.
+  const atomicDb = openDb();
+  seedRepo(poller, atomicDb.queries, NOW);
+  seedCommits(poller, atomicDb.queries);
+  const beforeAtomic = atomicDb.queries.getGithubCachePayload('commits');
+  const malformedCompare = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('bad-head', '2026-07-20T00:00:00Z')], { etag: '"bad-head-etag"' });
+    if (url.startsWith(`${COMPARE_URL}/old-head...bad-head?`)) {
+      return ok({ status: 'ahead', ahead_by: 2, behind_by: 0, commits: [commit('bad-head', '2026-07-20T00:00:00Z')] });
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', atomicDb.queries, malformedCompare.fakeFetch, NOW);
+  const afterAtomic = atomicDb.queries.getGithubCachePayload('commits');
+  check('compare cardinality mismatch preserves payload, ETag, cursor, and fetched_at atomically',
+    afterAtomic.payload === beforeAtomic.payload && afterAtomic.etag === beforeAtomic.etag &&
+      afterAtomic.fetchedAt === beforeAtomic.fetchedAt &&
+      JSON.stringify(afterAtomic.pollState) === JSON.stringify(beforeAtomic.pollState) &&
+      afterAtomic.lastErrorStatus === 502,
+    JSON.stringify(afterAtomic));
+
+  const wrongHeadDb = openDb();
+  seedRepo(poller, wrongHeadDb.queries, NOW);
+  seedCommits(poller, wrongHeadDb.queries);
+  const beforeWrongHead = wrongHeadDb.queries.getGithubCachePayload('commits');
+  const wrongHeadCompare = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('expected-head', '2026-07-20T00:00:00Z')], { etag: '"expected-head"' });
+    if (url.startsWith(`${COMPARE_URL}/old-head...expected-head?`)) {
+      return ok({
+        status: 'ahead', ahead_by: 1, behind_by: 0,
+        commits: [commit('wrong-but-cardinality-matches', '2026-07-20T00:00:00Z')],
+      });
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', wrongHeadDb.queries, wrongHeadCompare.fakeFetch, NOW);
+  const afterWrongHead = wrongHeadDb.queries.getGithubCachePayload('commits');
+  check('right-cardinality compare with the wrong head SHA preserves the complete LKG',
+    afterWrongHead.payload === beforeWrongHead.payload &&
+      afterWrongHead.etag === beforeWrongHead.etag &&
+      afterWrongHead.fetchedAt === beforeWrongHead.fetchedAt &&
+      JSON.stringify(afterWrongHead.pollState) === JSON.stringify(beforeWrongHead.pollState) &&
+      afterWrongHead.lastErrorStatus === 502,
+    JSON.stringify(afterWrongHead));
+
+  const authDb = openDb();
+  seedRepo(poller, authDb.queries, NOW);
+  seedCommits(poller, authDb.queries);
+  const beforeAuth = authDb.queries.getGithubCachePayload('commits');
+  const authFailure = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('auth-head', '2026-07-20T00:00:00Z')], { etag: '"auth-head"' });
+    if (url.startsWith(`${COMPARE_URL}/old-head...auth-head?`)) return { status: 403, body: {}, rlRemaining: '0', rlReset: '0' };
+    return null;
+  });
+  await poller.pollEndpoint('commits', authDb.queries, authFailure.fakeFetch, NOW);
+  const afterAuth = authDb.queries.getGithubCachePayload('commits');
+  check('compare authentication failure preserves the full last-known-good row',
+    afterAuth.payload === beforeAuth.payload && afterAuth.etag === beforeAuth.etag &&
+      afterAuth.fetchedAt === beforeAuth.fetchedAt &&
+      JSON.stringify(afterAuth.pollState) === JSON.stringify(beforeAuth.pollState) &&
+      afterAuth.lastErrorStatus === 403,
+    JSON.stringify(afterAuth));
+
+  // Unavailable bases and rewritten history rebuild from the new immutable head.
+  for (const scenario of [
+    { label: 'unavailable compare base', compare: { status: 404, body: {} } },
+    { label: 'rewritten history', compare: ok({ status: 'diverged', ahead_by: 1, behind_by: 1, commits: [] }) },
+    { label: 'nonzero compare behind count', compare: ok({
+      status: 'ahead', ahead_by: 1, behind_by: 1,
+      commits: [commit('rewrite-head', '2026-07-20T00:00:00Z')],
+    }) },
+  ]) {
+    const rebuiltDb = openDb();
+    seedRepo(poller, rebuiltDb.queries, NOW);
+    seedCommits(poller, rebuiltDb.queries);
+    const rebuiltFetch = makeFakeFetch((url) => {
+      if (url === headUrl()) return ok([commit('rewrite-head', '2026-07-20T00:00:00Z')], { etag: '"rewrite-etag"' });
+      if (url.startsWith(`${COMPARE_URL}/old-head...rewrite-head?`)) {
+        return { rlRemaining: '4800', rlReset: '0', ...scenario.compare };
+      }
+      if (url.startsWith(`${COMMITS_URL}?sha=rewrite-head`)) {
+        return ok([
+          commit('rewrite-head', '2026-07-20T00:00:00Z'),
+          commit('rewrite-root', '2026-07-10T00:00:00Z'),
+        ]);
+      }
+      return null;
+    });
+    await poller.pollEndpoint('commits', rebuiltDb.queries, rebuiltFetch.fakeFetch, NOW);
+    const rebuilt = rebuiltDb.queries.getGithubCachePayload('commits');
+    check(`${scenario.label} triggers a complete traversal pinned to the new head`,
+      JSON.parse(rebuilt.payload).total === 2 && rebuilt.pollState.head_sha === 'rewrite-head' &&
+        rebuiltFetch.calls.some((call) => call.url.includes('?sha=rewrite-head')),
+      JSON.stringify(rebuiltFetch.calls.map((call) => call.url)));
+    rebuiltDb.db.close();
   }
-  check('poller makes no Issues API request',
-    !happy.calls.some((call) => call.url.includes('/issues')),
-    JSON.stringify(happy.calls.map((call) => call.url)));
 
-  const stars1 = JSON.parse(q1.getGithubCachePayload('stars').payload);
-  check('stars use the aggregate v1 contract',
-    stars1.schema_version === 1 && stars1.total === 2 && stars1.history.length === 2 && stars1.history_complete === true && stars1.source === 'stargazers',
-    JSON.stringify(stars1));
+  const branchDb = openDb();
+  seedRepo(poller, branchDb.queries, NOW, 2, 'release');
+  seedCommits(poller, branchDb.queries);
+  const branchFetch = makeFakeFetch((url, options) => {
+    if (url === headUrl('release')) return ok([commit('release-head', '2026-07-20T00:00:00Z')], { etag: '"release-etag"' });
+    if (url.startsWith(`${COMMITS_URL}?sha=release-head`)) return ok([commit('release-head', '2026-07-20T00:00:00Z')]);
+    return null;
+  });
+  await poller.pollEndpoint('commits', branchDb.queries, branchFetch.fakeFetch, NOW);
+  const branchRow = branchDb.queries.getGithubCachePayload('commits');
+  check('default-branch change bypasses compare and performs an unconditional pinned rebuild',
+    branchRow.pollState.branch === 'release' && branchFetch.calls.length === 2 &&
+      branchFetch.calls[0].options.headers['If-None-Match'] === undefined &&
+      !branchFetch.calls.some((call) => call.url.includes('/compare/')),
+    JSON.stringify(branchFetch.calls.map((call) => call.url)));
 
-  const commits1 = JSON.parse(q1.getGithubCachePayload('commits').payload);
-  check('commits use cumulative aggregate contract',
-    commits1.schema_version === 1 && commits1.total === 2 && commits1.last_30_days === 2 && commits1.history_complete === true && commits1.history.at(-1).total === 2,
-    JSON.stringify(commits1));
-  check('every fetch receives an AbortSignal for timeout enforcement',
-    happy.calls.length > 0 && happy.calls.every((call) => call.options.signal && typeof call.options.signal.aborted === 'boolean'),
-    `${happy.calls.length} calls`);
+  // Missing state forces a full seed; a failed seed leaves the prior public snapshot available.
+  const missingStateDb = openDb();
+  seedRepo(poller, missingStateDb.queries, NOW);
+  seedCommits(poller, missingStateDb.queries, { pollState: null });
+  const beforeSeedFailure = missingStateDb.queries.getGithubCachePayload('commits');
+  const seedFailure = makeFakeFetch((url) => {
+    if (url === headUrl()) return ok([commit('seed-head', '2026-07-20T00:00:00Z')], { etag: '"seed-etag"' });
+    if (url.startsWith(`${COMMITS_URL}?sha=seed-head`)) return { status: 500, body: {}, rlRemaining: '4700', rlReset: '0' };
+    return null;
+  });
+  await poller.pollEndpoint('commits', missingStateDb.queries, seedFailure.fakeFetch, NOW);
+  const failedSeed = missingStateDb.queries.getGithubCachePayload('commits');
+  check('failed first cursor seed preserves the pre-existing aggregate while state remains NULL',
+    failedSeed.payload === beforeSeedFailure.payload && failedSeed.fetchedAt === beforeSeedFailure.fetchedAt &&
+      failedSeed.pollState === null && failedSeed.lastErrorStatus === 500,
+    JSON.stringify(failedSeed));
 
-  // A tokenless deployment must not call the restricted stargazer-list API.
+  const laterPageDb = openDb();
+  seedRepo(poller, laterPageDb.queries, NOW);
+  seedCommits(poller, laterPageDb.queries, { pollState: null });
+  const beforeLaterPage = laterPageDb.queries.getGithubCachePayload('commits');
+  const firstRebuildPage = [
+    commit('long-head', '2026-07-20T00:00:00Z'),
+    ...Array.from({ length: 99 }, (_, index) => commit(`long-${index}`, '2026-07-19T00:00:00Z')),
+  ];
+  const laterPageFailure = makeFakeFetch((url) => {
+    if (url === headUrl()) {
+      return ok([commit('long-head', '2026-07-20T00:00:00Z')], { etag: '"long-head-etag"' });
+    }
+    if (url.includes('sha=long-head&page=1&per_page=100')) {
+      return ok(firstRebuildPage, {
+        link: '<https://api.github.com/example?page=2>; rel="next"',
+      });
+    }
+    if (url.includes('sha=long-head&page=2&per_page=100')) {
+      return { status: 500, body: {}, rlRemaining: '4600', rlReset: '0' };
+    }
+    return null;
+  });
+  await poller.pollEndpoint('commits', laterPageDb.queries, laterPageFailure.fakeFetch, NOW);
+  const afterLaterPage = laterPageDb.queries.getGithubCachePayload('commits');
+  check('later-page pinned rebuild failure preserves LKG payload, cursor, ETag, and fetched_at',
+    afterLaterPage.payload === beforeLaterPage.payload &&
+      afterLaterPage.etag === beforeLaterPage.etag &&
+      afterLaterPage.fetchedAt === beforeLaterPage.fetchedAt &&
+      JSON.stringify(afterLaterPage.pollState) === JSON.stringify(beforeLaterPage.pollState) &&
+      afterLaterPage.lastErrorStatus === 500 && laterPageFailure.calls.length === 3,
+    JSON.stringify(afterLaterPage));
+
+  // Star total is the cheap detector; identity traversal is skipped while reconciled.
+  const starFastDb = openDb();
+  seedRepo(poller, starFastDb.queries, NOW, 2);
+  seedStars(poller, starFastDb.queries, { fetchedAt: NOW - 60_000 });
+  const noIdentityFetch = makeFakeFetch(() => null);
+  await poller.pollEndpoint('stars', starFastDb.queries, noIdentityFetch.fakeFetch, NOW);
+  const fastStars = starFastDb.queries.getGithubCachePayload('stars');
+  check('unchanged complete star total under 24 hours skips the identity-list request',
+    noIdentityFetch.calls.length === 0 && fastStars.fetchedAt === NOW &&
+      JSON.parse(fastStars.payload).history_complete === true,
+    JSON.stringify(fastStars));
+
+  const starChangedDb = openDb();
+  seedRepo(poller, starChangedDb.queries, NOW, 3);
+  seedStars(poller, starChangedDb.queries, { fetchedAt: NOW - 60_000 });
+  const changedStarsFetch = makeFakeFetch((url) => url.startsWith(`${STARS_URL}?`)
+    ? ok([
+        star(1, '2026-07-18T00:00:00Z'),
+        star(2, '2026-07-19T00:00:00Z'),
+        star(3, '2026-07-20T00:00:00Z'),
+      ], { etag: '"stars-3"' })
+    : null);
+  await poller.pollEndpoint('stars', starChangedDb.queries, changedStarsFetch.fakeFetch, NOW);
+  const changedStars = starChangedDb.queries.getGithubCachePayload('stars');
+  check('changed repository total triggers a complete star reconciliation and advances state',
+    changedStarsFetch.calls.length === 1 && JSON.parse(changedStars.payload).total === 3 &&
+      JSON.parse(changedStars.payload).history_complete === true &&
+      changedStars.pollState.last_full_scan_at === NOW,
+    JSON.stringify(changedStars));
+
+  for (const scenario of [
+    { label: 'missing star state', options: { pollState: null } },
+    { label: 'incomplete star history', options: { historyComplete: false } },
+    { label: 'daily star reconciliation', options: { fetchedAt: NOW - (24 * 60 * 60 * 1000) } },
+  ]) {
+    const dueDb = openDb();
+    seedRepo(poller, dueDb.queries, NOW, 2);
+    seedStars(poller, dueDb.queries, scenario.options);
+    const dueFetch = makeFakeFetch((url) => url.startsWith(`${STARS_URL}?`)
+      ? ok([star(1, '2026-07-18T00:00:00Z'), star(2, '2026-07-19T00:00:00Z')])
+      : null);
+    await poller.pollEndpoint('stars', dueDb.queries, dueFetch.fakeFetch, NOW);
+    check(`${scenario.label} forces an atomic full stargazer walk`,
+      dueFetch.calls.length === 1 && dueDb.queries.getGithubCachePayload('stars').pollState.last_full_scan_at === NOW,
+      JSON.stringify(dueFetch.calls.map((call) => call.url)));
+    dueDb.db.close();
+  }
+
+  // Restricted tokens keep the same-tick total fresh while isolating history quality.
+  const restrictedDb = openDb();
+  seedRepo(poller, restrictedDb.queries, NOW, 3);
+  seedStars(poller, restrictedDb.queries, { fetchedAt: NOW - (24 * 60 * 60 * 1000) });
+  const previousRestrictedState = restrictedDb.queries.getGithubCachePayload('stars').pollState;
+  const restrictedFetch = makeFakeFetch((url) => url.startsWith(`${STARS_URL}?`)
+    ? { status: 403, body: {}, rlRemaining: '4990', rlReset: '0' }
+    : null);
+  await poller.pollEndpoint('stars', restrictedDb.queries, restrictedFetch.fakeFetch, NOW);
+  const restrictedRow = restrictedDb.queries.getGithubCachePayload('stars');
+  const restrictedPayload = JSON.parse(restrictedRow.payload);
+  check('restricted token fallback retains the fresh repository total and marks only history incomplete',
+    restrictedRow.fetchedAt === NOW && restrictedPayload.total === 3 &&
+      restrictedPayload.source === 'repository-count' && restrictedPayload.history_complete === false,
+    JSON.stringify(restrictedRow));
+  check('restricted token fallback preserves private reconciliation state and sets a six-hour retry',
+    JSON.stringify(restrictedRow.pollState) === JSON.stringify(previousRestrictedState) &&
+      restrictedRow.status === 403 && restrictedRow.lastErrorStatus === 403 &&
+      restrictedRow.consecutiveFailures === 1 &&
+      restrictedRow.nextRetryAt === NOW + poller.RESTRICTED_STARS_RETRY_MS,
+    JSON.stringify(restrictedRow));
+  check('restricted fallback never persists raw stargazer identities',
+    !/(private-|"user"|login)/.test(restrictedRow.payload), restrictedRow.payload);
+
+  // Real star-list failures retain health metadata while count-only snapshots
+  // continue to refresh during backoff. Repeated failures then back off
+  // exponentially from the retained consecutive-failure count.
+  const repeatedStarDb = openDb();
+  seedRepo(poller, repeatedStarDb.queries, NOW, 2);
+  seedStars(poller, repeatedStarDb.queries, { fetchedAt: NOW - (24 * 60 * 60 * 1000) });
+  const star500 = makeFakeFetch((url) => url.startsWith(`${STARS_URL}?`)
+    ? { status: 500, body: {}, rlRemaining: '4700', rlReset: '0' }
+    : null);
+  await poller.pollEndpoint('stars', repeatedStarDb.queries, star500.fakeFetch, NOW);
+  const firstStarFailure = repeatedStarDb.queries.getGithubCachePayload('stars');
+  check('first star 5xx keeps the repository-count snapshot fresh and records failure metadata',
+    firstStarFailure.fetchedAt === NOW && firstStarFailure.lastAttemptAt === NOW &&
+      firstStarFailure.status === 500 && firstStarFailure.lastErrorStatus === 500 &&
+      firstStarFailure.consecutiveFailures === 1 && firstStarFailure.nextRetryAt === NOW + 300_000 &&
+      JSON.parse(firstStarFailure.payload).source === 'repository-count',
+    JSON.stringify(firstStarFailure));
+
+  const insideBackoffAt = NOW + 60_000;
+  seedRepo(poller, repeatedStarDb.queries, insideBackoffAt, 3);
+  const noStarRetry = makeFakeFetch(() => null);
+  await poller.pollEndpoint('stars', repeatedStarDb.queries, noStarRetry.fakeFetch, insideBackoffAt);
+  const insideStarBackoff = repeatedStarDb.queries.getGithubCachePayload('stars');
+  check('star tick inside backoff refreshes count but preserves all failure and retry metadata',
+    noStarRetry.calls.length === 0 && insideStarBackoff.fetchedAt === insideBackoffAt &&
+      JSON.parse(insideStarBackoff.payload).total === 3 &&
+      insideStarBackoff.lastAttemptAt === NOW && insideStarBackoff.lastErrorStatus === 500 &&
+      insideStarBackoff.consecutiveFailures === 1 && insideStarBackoff.nextRetryAt === NOW + 300_000,
+    JSON.stringify(insideStarBackoff));
+
+  const secondFailureAt = NOW + 300_000;
+  seedRepo(poller, repeatedStarDb.queries, secondFailureAt, 4);
+  const secondStar500 = makeFakeFetch((url) => url.startsWith(`${STARS_URL}?`)
+    ? { status: 500, body: {}, rlRemaining: '4600', rlReset: '0' }
+    : null);
+  await poller.pollEndpoint('stars', repeatedStarDb.queries, secondStar500.fakeFetch, secondFailureAt);
+  const secondStarFailure = repeatedStarDb.queries.getGithubCachePayload('stars');
+  check('repeated star 5xx increments failure count and applies exponential retry delay',
+    secondStarFailure.fetchedAt === secondFailureAt && JSON.parse(secondStarFailure.payload).total === 4 &&
+      secondStarFailure.lastAttemptAt === secondFailureAt && secondStarFailure.lastErrorStatus === 500 &&
+      secondStarFailure.consecutiveFailures === 2 &&
+      secondStarFailure.nextRetryAt === secondFailureAt + 600_000,
+    JSON.stringify(secondStarFailure));
+
+  // Tokenless deployments use the same count-only fallback without calling the restricted API.
   delete process.env.GITHUB_TOKEN;
   const tokenlessPoller = freshPoller();
-  const dbTokenless = new Database(':memory:');
-  initializeDatabase(dbTokenless);
-  const qTokenless = new Queries(dbTokenless);
-  const tokenlessFetch = makeFakeFetch(happyCanned());
-  await tokenlessPoller.runGithubPollerTick(dbTokenless, qTokenless, tokenlessFetch.fakeFetch, NOW);
-  const tokenlessStars = JSON.parse(qTokenless.getGithubCachePayload('stars').payload);
-  check('tokenless poll uses repo count without requesting stargazer identities',
-    tokenlessStars.source === 'repository-count' &&
-      !tokenlessFetch.calls.some((call) => call.url.includes('/stargazers')),
-    JSON.stringify(tokenlessFetch.calls.map((call) => call.url)));
-  process.env.GITHUB_TOKEN = 'ghp_happy_path';
+  const tokenlessDb = openDb();
+  seedRepo(tokenlessPoller, tokenlessDb.queries, NOW, 4);
+  const tokenlessFetch = makeFakeFetch(() => null);
+  await tokenlessPoller.pollEndpoint('stars', tokenlessDb.queries, tokenlessFetch.fakeFetch, NOW);
+  const tokenless = JSON.parse(tokenlessDb.queries.getGithubCachePayload('stars').payload);
+  check('tokenless star poll uses repository count without an identity-list request',
+    tokenlessFetch.calls.length === 0 && tokenless.total === 4 &&
+      tokenless.source === 'repository-count' && tokenless.history_complete === false,
+    JSON.stringify(tokenless));
+
+  // Persistent backoff prevents commit endpoint hammering.
+  process.env.GITHUB_TOKEN = 'github_pat_test';
   poller = freshPoller();
+  const backoffDb = openDb();
+  seedRepo(poller, backoffDb.queries, NOW);
+  seedCommits(poller, backoffDb.queries);
+  backoffDb.queries.recordGithubCacheFailureRow('commits', NOW, 500, null, null, NOW + 600_000);
+  const skippedFetch = makeFakeFetch(() => null);
+  await poller.pollEndpoint('commits', backoffDb.queries, skippedFetch.fakeFetch, NOW + 1_000);
+  check('commit endpoint inside persistent backoff makes no request', skippedFetch.calls.length === 0);
 
-  // Conditional refresh preserves the complete last-known-good body.
-  const beforeSummary = q1.getGithubCachePayload('repo-summary');
-  const secondCanned = happyCanned();
-  secondCanned['https://api.github.com/repos/fullselfbrowsing/FSB'] = {
-    status: 304, body: undefined, etag: '"summary-1"', rlRemaining: '4900', rlReset: '0',
-  };
-  const second = makeFakeFetch(secondCanned);
-  await poller.runGithubPollerTick(db1, q1, second.fakeFetch, NOW + 60000);
-  const afterSummary = q1.getGithubCachePayload('repo-summary');
-  check('304 preserves payload byte-for-byte', afterSummary.payload === beforeSummary.payload, afterSummary.payload);
-  check('304 advances freshness and keeps cache complete',
-    afterSummary.fetchedAt === NOW + 60000 && afterSummary.status === 304 && afterSummary.isComplete,
-    JSON.stringify(afterSummary));
+  for (const holder of [
+    happyDb, conditionalDb, dependencyDb, fastDb, pagedDb, atomicDb, wrongHeadDb, authDb, branchDb,
+    missingStateDb, laterPageDb, starFastDb, starChangedDb, restrictedDb, tokenlessDb, backoffDb,
+    repeatedStarDb,
+  ]) holder.db.close();
 
-  // A page-1 304 means no new commits, but the rolling calendar window still
-  // changes as old days age out. Refresh that derived field from cached history.
-  const commit304 = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': {
-      status: 304,
-      body: undefined,
-      etag: '"commits-1"',
-      rlRemaining: '4899',
-      rlReset: '0',
-    },
-  });
-  const commitWindowNow = Date.parse('2026-08-20T12:00:00.000Z');
-  await poller.pollEndpoint('commits', q1, commit304.fakeFetch, commitWindowNow);
-  const commitsAfter304 = JSON.parse(q1.getGithubCachePayload('commits').payload);
-  check('commit 304 recomputes the rolling 30-calendar-day count',
-    commitsAfter304.last_30_days === 0 && commitsAfter304.as_of === new Date(commitWindowNow).toISOString(),
-    JSON.stringify(commitsAfter304));
-
-  // One cold endpoint failure records retry state without aborting the tick.
-  const db2 = new Database(':memory:');
-  initializeDatabase(db2);
-  const q2 = new Queries(db2);
-  const failureCanned = happyCanned();
-  failureCanned['https://api.github.com/repos/fullselfbrowsing/FSB/commits'] = { __reject: 'network down' };
-  const failureFetch = makeFakeFetch(failureCanned);
-  await poller.runGithubPollerTick(db2, q2, failureFetch.fakeFetch, NOW);
-  const failedCommit = q2.getGithubCachePayload('commits');
-  check('cold failure records an incomplete placeholder and exponential retry time',
-    failedCommit && !failedCommit.isComplete && failedCommit.status === 0 && failedCommit.consecutiveFailures === 1 && failedCommit.nextRetryAt === NOW + 300000,
-    JSON.stringify(failedCommit));
-  check('a sibling endpoint still updates after one failure', q2.getGithubCachePayload('repo-summary')?.isComplete === true);
-
-  // Token is captured at module load and sent only when configured.
-  process.env.GITHUB_TOKEN = 'ghp_test_123';
-  poller = freshPoller();
-  const db3 = new Database(':memory:');
-  initializeDatabase(db3);
-  const q3 = new Queries(db3);
-  const authFetch = makeFakeFetch(happyCanned());
-  await poller.runGithubPollerTick(db3, q3, authFetch.fakeFetch, NOW);
-  check('configured token is sent as a bearer token',
-    authFetch.calls.every((call) => call.options.headers.Authorization === 'Bearer ghp_test_123'));
   delete process.env.GITHUB_TOKEN;
-  poller = freshPoller();
-
-  // Regression: history larger than the former 30-page/3000-commit cap.
-  const db4 = new Database(':memory:');
-  initializeDatabase(db4);
-  const q4 = new Queries(db4);
-  const deepFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': (url, options) => {
-      if (options.headers['If-None-Match'] === '"deep"') {
-        return { status: 304, body: undefined, etag: '"deep"', rlRemaining: '4499', rlReset: '0' };
-      }
-      const page = Number(url.match(/[?&]page=(\d+)/)?.[1]);
-      const length = page <= 32 ? 100 : 7;
-      return {
-        status: 200,
-        body: Array.from({ length }, (_, index) => commit(`${page}-${index}`, '2025-01-01T00:00:00Z')),
-        etag: page === 1 ? '"deep"' : null,
-        rlRemaining: '4500',
-        rlReset: '0',
-      };
-    },
-  });
-  await poller.pollEndpoint('commits', q4, deepFetch.fakeFetch, NOW);
-  const deep = JSON.parse(q4.getGithubCachePayload('commits').payload);
-  check('commit pagination walks past 30 pages to the terminal short page',
-    deep.total === 3207 && deep.history_complete === true && deepFetch.calls.length === 34,
-    `total=${deep.total} calls=${deepFetch.calls.length}`);
-
-  // Follow Link rel=next even when a page is unexpectedly short, deduplicate
-  // boundary rows, and require a stable page-one ETag before committing.
-  const dbPaging = new Database(':memory:');
-  initializeDatabase(dbPaging);
-  const qPaging = new Queries(dbPaging);
-  const linkedFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': (url, options) => {
-      if (options.headers['If-None-Match'] === '"linked"') {
-        return { status: 304, body: undefined, etag: '"linked"', rlRemaining: '4900', rlReset: '0' };
-      }
-      const page = Number(url.match(/[?&]page=(\d+)/)?.[1]);
-      return page === 1
-        ? {
-            status: 200,
-            body: [commit('a', '2026-07-19T00:00:00Z'), commit('b', '2026-07-18T00:00:00Z')],
-            etag: '"linked"',
-            link: '<https://api.github.com/example?page=2>; rel="next"',
-            rlRemaining: '4902',
-            rlReset: '0',
-          }
-        : {
-            status: 200,
-            body: [commit('b', '2026-07-18T00:00:00Z'), commit('c', '2026-07-17T00:00:00Z')],
-            etag: null,
-            rlRemaining: '4901',
-            rlReset: '0',
-          };
-    },
-  });
-  await poller.pollEndpoint('commits', qPaging, linkedFetch.fakeFetch, NOW);
-  const linked = JSON.parse(qPaging.getGithubCachePayload('commits').payload);
-  check('pagination follows Link next, removes boundary duplicates, and revalidates page one',
-    linked.total === 3 && linkedFetch.calls.length === 3,
-    `total=${linked.total} calls=${linkedFetch.calls.length}`);
-
-  // GitHub normally supplies an ETag, but completeness must not depend on it.
-  // Re-read page one and compare its body when the validator is absent.
-  const dbNoEtag = new Database(':memory:');
-  initializeDatabase(dbNoEtag);
-  const qNoEtag = new Queries(dbNoEtag);
-  let stablePageOneCalls = 0;
-  const stableNoEtagFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': (url) => {
-      const page = Number(url.match(/[?&]page=(\d+)/)?.[1]);
-      if (page === 1) {
-        stablePageOneCalls += 1;
-        return {
-          status: 200,
-          body: [commit('a', '2026-07-19T00:00:00Z'), commit('b', '2026-07-18T00:00:00Z')],
-          etag: null,
-          link: stablePageOneCalls === 1 ? '<https://api.github.com/example?page=2>; rel="next"' : null,
-          rlRemaining: '4902',
-          rlReset: '0',
-        };
-      }
-      return {
-        status: 200,
-        body: [commit('c', '2026-07-17T00:00:00Z')],
-        etag: null,
-        rlRemaining: '4901',
-        rlReset: '0',
-      };
-    },
-  });
-  await poller.pollEndpoint('commits', qNoEtag, stableNoEtagFetch.fakeFetch, NOW);
-  const stableNoEtag = JSON.parse(qNoEtag.getGithubCachePayload('commits').payload);
-  check('multi-page walk without an ETag rechecks identical page-one content before publishing',
-    stableNoEtag.total === 3 && stableNoEtag.history_complete === true && stablePageOneCalls === 2,
-    `total=${stableNoEtag.total} pageOneCalls=${stablePageOneCalls}`);
-
-  const oldNoEtagPayload = JSON.stringify({
-    schema_version: 1,
-    total: 1,
-    last_30_days: 1,
-    history: [{ day_utc: '2026-07-16', total: 1 }],
-    history_complete: true,
-    as_of: '2026-07-19T12:00:00.000Z',
-  });
-  qNoEtag.upsertGithubCacheRow('commits', oldNoEtagPayload, null, NOW - 1000, 200, 4900, 0, true, 1);
-  let changedPageOneCalls = 0;
-  const changedNoEtagFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': (url) => {
-      const page = Number(url.match(/[?&]page=(\d+)/)?.[1]);
-      if (page === 1) {
-        changedPageOneCalls += 1;
-        return {
-          status: 200,
-          body: changedPageOneCalls === 1
-            ? [commit('a', '2026-07-19T00:00:00Z'), commit('b', '2026-07-18T00:00:00Z')]
-            : [commit('new-head', '2026-07-20T00:00:00Z'), commit('a', '2026-07-19T00:00:00Z')],
-          etag: null,
-          link: changedPageOneCalls === 1 ? '<https://api.github.com/example?page=2>; rel="next"' : null,
-          rlRemaining: '4899',
-          rlReset: '0',
-        };
-      }
-      return {
-        status: 200,
-        body: [commit('c', '2026-07-17T00:00:00Z')],
-        etag: null,
-        rlRemaining: '4898',
-        rlReset: '0',
-      };
-    },
-  });
-  await poller.pollEndpoint('commits', qNoEtag, changedNoEtagFetch.fakeFetch, NOW);
-  const changedNoEtag = qNoEtag.getGithubCachePayload('commits');
-  check('changed page one without an ETag fails closed and preserves the LKG',
-    changedNoEtag.payload === oldNoEtagPayload && changedNoEtag.lastErrorStatus === 409 && changedPageOneCalls === 2,
-    JSON.stringify(changedNoEtag));
-
-  let malformedCommitRejected = false;
-  try {
-    poller.aggregateCommits([commit('bad', 'not-a-date')], NOW, true);
-  } catch {
-    malformedCommitRejected = true;
-  }
-  check('complete commit aggregation rejects malformed dates instead of silently truncating', malformedCommitRejected);
-
-  // A later-page failure must never overwrite a complete LKG with a prefix.
-  const oldCommitPayload = JSON.stringify({
-    schema_version: 1,
-    total: 2,
-    last_30_days: 2,
-    history: [{ day_utc: '2026-07-19', total: 2 }],
-    history_complete: true,
-    as_of: '2026-07-19T12:00:00.000Z',
-  });
-  q4.upsertGithubCacheRow('commits', oldCommitPayload, '"old"', NOW - 1000, 200, 4500, 0, true, 1);
-  const partialFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': (url) => {
-      const page = Number(url.match(/[?&]page=(\d+)/)?.[1]);
-      if (page === 1) {
-        return { status: 200, body: Array.from({ length: 100 }, (_, i) => commit(`new-${i}`, '2026-07-20T00:00:00Z')), etag: '"new"', rlRemaining: '4000', rlReset: '0' };
-      }
-      return { status: 500, body: { message: 'boom' }, etag: null, rlRemaining: '3999', rlReset: '0' };
-    },
-  });
-  await poller.pollEndpoint('commits', q4, partialFetch.fakeFetch, NOW);
-  const afterPartial = q4.getGithubCachePayload('commits');
-  check('later-page failure preserves LKG payload and fetched_at',
-    afterPartial.payload === oldCommitPayload && afterPartial.fetchedAt === NOW - 1000 && afterPartial.isComplete,
-    JSON.stringify(afterPartial));
-  check('later-page failure records status and retry metadata',
-    afterPartial.status === 500 && afterPartial.lastErrorStatus === 500 && afterPartial.consecutiveFailures === 1 && afterPartial.nextRetryAt === NOW + 300000,
-    JSON.stringify(afterPartial));
-
-  // A migrated row is incomplete and therefore cannot use its legacy ETag.
-  const db5 = new Database(':memory:');
-  initializeDatabase(db5);
-  const q5 = new Queries(db5);
-  q5.upsertGithubCacheRow('commits', JSON.stringify([commit('legacy', '2025-01-01T00:00:00Z')]), '"legacy"', NOW - 1000, 200, 5000, 0, false, 0);
-  const healFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': {
-      status: 200,
-      body: [commit('fresh', '2026-07-20T00:00:00Z')],
-      etag: '"fresh"',
-      rlRemaining: '4999',
-      rlReset: '0',
-    },
-  });
-  await poller.pollEndpoint('commits', q5, healFetch.fakeFetch, NOW);
-  const healed = q5.getGithubCachePayload('commits');
-  check('incomplete legacy cache does not send If-None-Match',
-    !Object.prototype.hasOwnProperty.call(healFetch.calls[0].options.headers, 'If-None-Match'),
-    JSON.stringify(healFetch.calls[0].options.headers));
-  check('full traversal self-heals legacy cache to complete v1',
-    healed.isComplete && healed.payloadVersion === 1 && JSON.parse(healed.payload).history_complete === true,
-    JSON.stringify(healed));
-
-  // Restricted stargazer endpoint falls back to the authoritative summary and
-  // retains aggregate history without exposing identities.
-  const summaryPayload = poller.sanitizePublicPayload('repo-summary', repoSummary(3), { nowMs: NOW });
-  q5.upsertGithubCacheRow('repo-summary', JSON.stringify(summaryPayload), '"summary"', NOW, 200, 5000, 0, true, 1);
-  const oldStars = {
-    ...stars1,
-    as_of: '2026-07-15T12:00:00.000Z',
-  };
-  q5.upsertGithubCacheRow('stars', JSON.stringify(oldStars), '"stars-old"', NOW - 1000, 200, 5000, 0, true, 1);
-  const restrictedFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/stargazers': {
-      status: 403,
-      body: { message: 'collaborator access required' },
-      etag: null,
-      rlRemaining: '4998',
-      rlReset: '0',
-    },
-  });
-  process.env.GITHUB_TOKEN = 'ghp_restricted';
-  const restrictedPoller = freshPoller();
-  await restrictedPoller.pollEndpoint('stars', q5, restrictedFetch.fakeFetch, NOW);
-  const restricted = JSON.parse(q5.getGithubCachePayload('stars').payload);
-  check('restricted stars use repository-count fallback with current total',
-    restricted.source === 'repository-count' && restricted.total === 3 && restricted.history.at(-1).total === 3,
-    JSON.stringify(restricted));
-  check('restricted stars remain aggregate-only', !/(alice|bob|"user"|login)/.test(JSON.stringify(restricted)), JSON.stringify(restricted));
-  check('multi-day unknown star-count change downgrades history completeness',
-    restricted.history_complete === false,
-    JSON.stringify(restricted));
-  const midnightFallback = restrictedPoller.starsFromRepositoryCount({
-    ...stars1,
-    as_of: '2026-07-19T23:59:59.000Z',
-  }, 3, Date.parse('2026-07-20T00:00:01.000Z'));
-  check('star-count change across UTC midnight downgrades history completeness even across a short gap',
-    midnightFallback.history_complete === false,
-    JSON.stringify(midnightFallback));
-  const sameDayFallback = restrictedPoller.starsFromRepositoryCount({
-    ...stars1,
-    as_of: '2026-07-20T00:01:00.000Z',
-  }, 3, Date.parse('2026-07-20T00:02:00.000Z'));
-  check('repository-count change on the same day still marks historical distribution incomplete',
-    sameDayFallback.history_complete === false,
-    JSON.stringify(sameDayFallback));
-  const unchangedFallback = restrictedPoller.starsFromRepositoryCount(stars1, stars1.total, NOW);
-  check('every repository-count fallback is explicitly history-incomplete, even when net total is unchanged',
-    unchangedFallback.history_complete === false,
-    JSON.stringify(unchangedFallback));
-  check('401/403 stargazer restriction uses a six-hour retry cadence',
-    q5.getGithubCachePayload('stars').nextRetryAt === NOW + restrictedPoller.RESTRICTED_STARS_RETRY_MS,
-    JSON.stringify(q5.getGithubCachePayload('stars')));
-
-  let invalidStarEnvelopeRejected = false;
-  try {
-    restrictedPoller.normalizeStarsPayload({
-      schema_version: 1,
-      total: 99,
-      history: [{ day_utc: '2026-07-20', total: 3 }],
-      history_complete: true,
-      source: 'stargazers',
-      as_of: '2026-07-20T12:00:00.000Z',
-    }, 99, NOW);
-  } catch {
-    invalidStarEnvelopeRejected = true;
-  }
-  check('star envelope rejects a final history total inconsistent with total', invalidStarEnvelopeRejected);
-
-  // A complete stargazer traversal is newer and more authoritative than an
-  // older repository summary. Its own terminal-page cardinality wins.
-  q5.upsertGithubCacheRow(
-    'repo-summary',
-    JSON.stringify(restrictedPoller.sanitizePublicPayload('repo-summary', repoSummary(2), { nowMs: NOW })),
-    '"older-summary"',
-    NOW - 60000,
-    200,
-    5000,
-    0,
-    true,
-    1
-  );
-  q5.upsertGithubCacheRow('stars', JSON.stringify(oldStars), '"stars-before-new-walk"', NOW - 120000, 200, 5000, 0, true, 1);
-  const newerStarsFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/stargazers': {
-      status: 200,
-      body: [
-        { starred_at: '2026-07-18T10:00:00Z' },
-        { starred_at: '2026-07-19T10:00:00Z' },
-        { starred_at: '2026-07-20T10:00:00Z' },
-      ],
-      etag: '"newer-stars"',
-      rlRemaining: '4997',
-      rlReset: '0',
-    },
-  });
-  await restrictedPoller.pollEndpoint('stars', q5, newerStarsFetch.fakeFetch, NOW);
-  const newerStars = JSON.parse(q5.getGithubCachePayload('stars').payload);
-  check('newer complete stargazer walk is not overwritten by an older summary count',
-    newerStars.total === 3 && newerStars.history_complete === true && newerStars.source === 'stargazers',
-    JSON.stringify(newerStars));
-
-  const newerStarsRowBeforeFailure = q5.getGithubCachePayload('stars');
-  await restrictedPoller.pollEndpoint('stars', q5, restrictedFetch.fakeFetch, NOW + 1000);
-  const newerStarsRowAfterFailure = q5.getGithubCachePayload('stars');
-  check('an older repository summary cannot replace a newer star LKG after a restricted-endpoint failure',
-    newerStarsRowAfterFailure.payload === newerStarsRowBeforeFailure.payload &&
-      newerStarsRowAfterFailure.fetchedAt === newerStarsRowBeforeFailure.fetchedAt &&
-      newerStarsRowAfterFailure.lastErrorStatus === 403,
-    JSON.stringify(newerStarsRowAfterFailure));
-
-  // GitHub secondary rate limits communicate their own retry window.
-  const dbRetry = new Database(':memory:');
-  initializeDatabase(dbRetry);
-  const qRetry = new Queries(dbRetry);
-  const retryFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/commits': {
-      status: 429,
-      body: { message: 'secondary rate limit' },
-      retryAfter: '1200',
-      rlRemaining: '4999',
-      rlReset: '0',
-    },
-  });
-  await restrictedPoller.pollEndpoint('commits', qRetry, retryFetch.fakeFetch, NOW);
-  check('Retry-After extends persistent backoff beyond the default failure delay',
-    qRetry.getGithubCachePayload('commits').nextRetryAt === NOW + 1200000,
-    JSON.stringify(qRetry.getGithubCachePayload('commits')));
-
-  qRetry.upsertGithubCacheRow(
-    'repo-summary',
-    JSON.stringify(restrictedPoller.sanitizePublicPayload('repo-summary', repoSummary(3), { nowMs: NOW })),
-    '"retry-summary"',
-    NOW,
-    200,
-    5000,
-    0,
-    true,
-    1
-  );
-  qRetry.upsertGithubCacheRow('stars', JSON.stringify(oldStars), '"retry-stars"', NOW - 1000, 200, 5000, 0, true, 1);
-  const starRateResetAt = NOW + 1800000;
-  const starRetryFetch = makeFakeFetch({
-    'https://api.github.com/repos/fullselfbrowsing/FSB/stargazers': {
-      status: 429,
-      body: { message: 'secondary rate limit' },
-      retryAfter: '1200',
-      rlRemaining: '0',
-      rlReset: String(starRateResetAt / 1000),
-    },
-  });
-  await restrictedPoller.pollEndpoint('stars', qRetry, starRetryFetch.fakeFetch, NOW);
-  const starRetryRow = qRetry.getGithubCachePayload('stars');
-  check('repository-count fallback preserves the longest Retry-After/rate-reset instruction',
-    starRetryRow.nextRetryAt === starRateResetAt && JSON.parse(starRetryRow.payload).source === 'repository-count',
-    JSON.stringify(starRetryRow));
-
-  // Persistent backoff avoids hammering an unhealthy endpoint.
-  q5.recordGithubCacheFailureRow('commits', NOW, 500, null, null, NOW + 600000);
-  const skippedFetch = makeFakeFetch({});
-  await restrictedPoller.pollEndpoint('commits', q5, skippedFetch.fakeFetch, NOW + 1000);
-  check('endpoint inside backoff window makes no request', skippedFetch.calls.length === 0, String(skippedFetch.calls.length));
-
-  db1.close();
-  dbTokenless.close();
-  db2.close();
-  db3.close();
-  db4.close();
-  db5.close();
-  dbPaging.close();
-  dbNoEtag.close();
-  dbRetry.close();
   console.warn = originalWarn;
   console.error = originalError;
 
