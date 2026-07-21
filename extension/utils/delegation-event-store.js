@@ -52,6 +52,37 @@
     'totalTokens', 'turns', 'usd'
   ];
   var TOOL_COUNT_KEYS = ['count', 'name'];
+  var CONTEXT_KEYS = Object.freeze({
+    allowedTools: true,
+    argsSummary: true,
+    attempt: true,
+    billingKind: true,
+    callId: true,
+    client: true,
+    delayMs: true,
+    delegationId: true,
+    detail: true,
+    durationMs: true,
+    inputTokens: true,
+    maxAttempts: true,
+    model: true,
+    outputTokens: true,
+    profileVersion: true,
+    retryClass: true,
+    sequence: true,
+    sessionId: true,
+    state: true,
+    tabId: true,
+    terminalCode: true,
+    timestamp: true,
+    title: true,
+    toolCalls: true,
+    toolName: true,
+    toolStatus: true,
+    totalTokens: true,
+    turns: true,
+    usd: true
+  });
 
   var VALID_STATES = Object.freeze({
     idle: true,
@@ -140,21 +171,64 @@
     _fail('delegation_persistence_failed', message);
   }
 
+  function _ownDataKeys(value, allowNullPrototype) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    try {
+      var proto = Object.getPrototypeOf(value);
+      if (proto !== Object.prototype && !(allowNullPrototype && proto === null)) return null;
+      var keys = Reflect.ownKeys(value);
+      for (var index = 0; index < keys.length; index += 1) {
+        var key = keys[index];
+        if (typeof key !== 'string') return null;
+        var descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor
+            || descriptor.enumerable !== true
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      }
+      return keys;
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function _isPlainRecord(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    var proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
+    return _ownDataKeys(value, true) !== null;
   }
 
   function _hasExactKeys(value, keys) {
-    if (!_isPlainRecord(value)) return false;
-    var actual = Object.keys(value).sort();
+    var ownKeys = _ownDataKeys(value, true);
+    if (!ownKeys) return false;
+    var actual = ownKeys.slice().sort();
     var expected = keys.slice().sort();
     if (actual.length !== expected.length) return false;
     for (var i = 0; i < expected.length; i++) {
       if (actual[i] !== expected[i]) return false;
     }
     return true;
+  }
+
+  function _isDenseDataArray(value) {
+    if (!Array.isArray(value)) return false;
+    try {
+      var ownKeys = Reflect.ownKeys(value);
+      if (ownKeys.length !== value.length + 1 || ownKeys[ownKeys.length - 1] !== 'length') {
+        return false;
+      }
+      var lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+      if (!lengthDescriptor
+          || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+          || lengthDescriptor.value !== value.length) return false;
+      for (var index = 0; index < value.length; index += 1) {
+        if (ownKeys[index] !== String(index)) return false;
+        var descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor
+            || descriptor.enumerable !== true
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return false;
+      }
+      return true;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function _hasOwn(table, key) {
@@ -245,19 +319,33 @@
     return undefined;
   }
 
-  function _normalizeClient(value) {
+  function _canonicalProviderForClient(value) {
     if (value === null || value === undefined) return null;
-    if (!_hasExactKeys(value, CLIENT_KEYS)
+    if (_ownDataKeys(value, false) === null
+        || !_hasExactKeys(value, CLIENT_KEYS)
         || !delegationProviders
         || typeof delegationProviders.get !== 'function') return null;
-    var metadata = delegationProviders.get(value.id);
-    if (!metadata || value.label !== metadata.label) return null;
-    return { id: metadata.id, label: metadata.label };
+    try {
+      var id = Object.getOwnPropertyDescriptor(value, 'id').value;
+      var label = Object.getOwnPropertyDescriptor(value, 'label').value;
+      var metadata = delegationProviders.get(id);
+      if (!metadata || label !== metadata.label) return null;
+      return metadata;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function _normalizeClient(value) {
+    if (value === null || value === undefined) return null;
+    var metadata = _canonicalProviderForClient(value);
+    if (!metadata) _persistence('client must be an exact canonical provider pair');
+    return Object.freeze({ id: metadata.id, label: metadata.label });
   }
 
   function _normalizeAllowedTools(value) {
     if (value === null || value === undefined) return [];
-    if (!Array.isArray(value)) _persistence('allowedTools must be an array');
+    if (!_isDenseDataArray(value)) _persistence('allowedTools must be a dense data array');
     var seen = Object.create(null);
     var out = [];
     for (var i = 0; i < value.length; i++) {
@@ -272,7 +360,7 @@
 
   function _normalizeToolCounts(value) {
     if (value === null || value === undefined) return [];
-    if (!Array.isArray(value)) _persistence('toolCalls must be an array');
+    if (!_isDenseDataArray(value)) _persistence('toolCalls must be a dense data array');
     var counts = Object.create(null);
     var order = [];
     for (var i = 0; i < value.length; i++) {
@@ -292,6 +380,41 @@
     }
     if (order.length > MAX_TOOL_COUNT_ROWS) _quota('toolCalls exceeds its row limit');
     return order.map(function(name) { return { name: name, count: counts[name] }; });
+  }
+
+  function _snapshotContext(value) {
+    if (value === null || value === undefined) return Object.freeze({});
+    var keys = _ownDataKeys(value, false);
+    if (!keys) _persistence('context must be an exact own-data record');
+    var out = {};
+    for (var index = 0; index < keys.length; index += 1) {
+      var key = keys[index];
+      if (!_hasOwn(CONTEXT_KEYS, key)) _persistence('context contains an unknown field');
+      var fieldValue;
+      try {
+        fieldValue = Object.getOwnPropertyDescriptor(value, key).value;
+      } catch (_error) {
+        _persistence('context descriptor inspection failed');
+      }
+      if (key === 'client') {
+        out.client = _normalizeClient(fieldValue);
+      } else if (key === 'allowedTools') {
+        out.allowedTools = _normalizeAllowedTools(fieldValue);
+      } else if (key === 'toolCalls') {
+        out.toolCalls = _normalizeToolCounts(fieldValue);
+      } else {
+        if (fieldValue !== null
+            && fieldValue !== undefined
+            && typeof fieldValue === 'object') {
+          _persistence('context fields must contain only closed scalar data');
+        }
+        if (key === 'model' && fieldValue !== null && fieldValue !== undefined) {
+          _persistence('provider model metadata cannot enter delegation persistence');
+        }
+        out[key] = fieldValue;
+      }
+    }
+    return _deepFreeze(out);
   }
 
   function _normalizeTerminalCode(value) {
@@ -353,7 +476,9 @@
     return {
       client: _normalizeClient(_value(context, payload, 'client')),
       profileVersion: _boundedId(_value(context, payload, 'profileVersion', 'profile_version'), 'profileVersion', true),
-      model: _boundedId(_value(context, payload, 'model'), 'model', true),
+      // The key remains for version-1 envelope compatibility, but provider
+      // model identity is never accepted into new durable entries.
+      model: null,
       sessionId: _boundedId(_value(context, { sessionId: event.sessionId }, 'sessionId', 'session_id'), 'sessionId', true),
       allowedTools: _normalizeAllowedTools(_value(context, payload, 'allowedTools', 'tools'))
     };
@@ -401,11 +526,16 @@
       var sum = inputTokens + outputTokens;
       totalTokens = Number.isSafeInteger(sum) ? sum : null;
     }
-    var billingKind = _value(context, payload, 'billingKind', 'billing_kind');
-    if (!_hasOwn(VALID_BILLING_KINDS, billingKind)) billingKind = 'unknown';
-    var usd = billingKind === 'api'
-      ? _nonnegativeNumberOrNull(_value(context, payload, 'usd'))
-      : null;
+    var provider = _canonicalProviderForClient(context.client);
+    if (!provider) _persistence('result metrics require canonical provider context');
+    var claimedBillingKind = context.billingKind;
+    if (claimedBillingKind !== undefined && claimedBillingKind !== provider.billingKind) {
+      _persistence('billingKind does not match canonical provider context');
+    }
+    var billingKind = provider.billingKind;
+    // Neither shipped agent provider exposes authoritative dollar billing.
+    // Payload/context dollar claims are deliberately non-representable.
+    var usd = null;
     return {
       inputTokens: inputTokens,
       outputTokens: outputTokens,
@@ -420,7 +550,7 @@
 
   /** Pure, closed projection. Sequence/timestamp are supplied by the caller. */
   function project(event, context) {
-    context = context || {};
+    context = _snapshotContext(context);
     if (!_hasExactKeys(event, ['payload', 'sessionId', 'type'])) {
       _persistence('normalized event must have exact type/sessionId/payload keys');
     }
@@ -478,7 +608,8 @@
   function _assertValidInit(value) {
     if (!_hasExactKeys(value, INIT_KEYS)) _corrupt('init payload shape is invalid');
     if (value.client !== null) {
-      if (!_hasExactKeys(value.client, CLIENT_KEYS) || !_normalizeClient(value.client)) {
+      if (!_hasExactKeys(value.client, CLIENT_KEYS)
+          || !_canonicalProviderForClient(value.client)) {
         _corrupt('init client is invalid');
       }
     }
@@ -709,7 +840,9 @@
 
   async function appendBeforeFanout(delegationId, event, context) {
     delegationId = _boundedId(delegationId, 'delegationId', false);
-    context = context || {};
+    // Capture and validate caller-owned data synchronously, before the first
+    // storage await can give mutable references a chance to drift.
+    context = _snapshotContext(context);
     return _withStorageLock(async function() {
       var key = _key(delegationId);
       var stored = await _read(null);
@@ -720,13 +853,13 @@
       if (current.entries.length >= MAX_ENTRIES_PER_DELEGATION) {
         _quota('delegation entry count limit reached');
       }
-      var projectionContext = Object.assign({}, context, {
-        delegationId: delegationId,
-        sequence: current.entries.length + 1,
-        timestamp: Number.isSafeInteger(context.timestamp) && context.timestamp >= 0
-          ? context.timestamp
-          : Date.now()
-      });
+      var projectionContext = {};
+      Object.keys(context).forEach(function(key) { projectionContext[key] = context[key]; });
+      projectionContext.delegationId = delegationId;
+      projectionContext.sequence = current.entries.length + 1;
+      projectionContext.timestamp = Number.isSafeInteger(context.timestamp) && context.timestamp >= 0
+        ? context.timestamp
+        : Date.now();
       var entry = project(event, projectionContext);
       var next = {
         v: PAYLOAD_VERSION,
@@ -860,6 +993,9 @@
 
   async function markTerminal(delegationId, terminal) {
     delegationId = _boundedId(delegationId, 'delegationId', false);
+    var terminalContext = terminal && _isPlainRecord(terminal.context)
+      ? _snapshotContext(terminal.context)
+      : Object.freeze({});
     return _withStorageLock(async function() {
       var key = _key(delegationId);
       var all = await _read(null);
@@ -884,17 +1020,18 @@
       var entries = current.entries.slice();
       if (terminal && _isPlainRecord(terminal.event)
         && entries.length < MAX_ENTRIES_PER_DELEGATION) {
-        var terminalContext = _isPlainRecord(terminal.context)
-          ? Object.assign({}, terminal.context)
-          : {};
-        terminalContext.delegationId = delegationId;
-        terminalContext.sequence = entries.length + 1;
-        terminalContext.terminalCode = code;
-        terminalContext.timestamp = Number.isSafeInteger(terminalContext.timestamp)
+        var projectedTerminalContext = {};
+        Object.keys(terminalContext).forEach(function(key) {
+          projectedTerminalContext[key] = terminalContext[key];
+        });
+        projectedTerminalContext.delegationId = delegationId;
+        projectedTerminalContext.sequence = entries.length + 1;
+        projectedTerminalContext.terminalCode = code;
+        projectedTerminalContext.timestamp = Number.isSafeInteger(terminalContext.timestamp)
           && terminalContext.timestamp >= 0
           ? terminalContext.timestamp
           : Date.now();
-        entries.push(project(terminal.event, terminalContext));
+        entries.push(project(terminal.event, projectedTerminalContext));
       }
       var next = {
         v: PAYLOAD_VERSION,

@@ -441,7 +441,7 @@ function project(store, event, overrides = {}) {
     assert(!JSON.stringify(entry).includes(fixtures.secretCanary));
   });
 
-  await test('prototype-named enum inputs stay outside every closed vocabulary', () => {
+  await test('prototype-named enum inputs stay outside every closed vocabulary', async () => {
     const store = freshStore();
     assert.strictEqual(store.normalizeTerminalCode('constructor'), 'unknown_failure');
     assert.strictEqual(project(store, fixtures.stateEvent, {
@@ -453,9 +453,10 @@ function project(store, event, overrides = {}) {
     assert.strictEqual(project(store, fixtures.unknownRetryEvent, {
       retryClass: 'constructor',
     }).retry.class, 'unknown');
-    assert.strictEqual(project(store, fixtures.resultEvent, {
-      billingKind: '__proto__',
-    }).metrics.billingKind, 'unknown');
+    await expectCode(
+      () => project(store, fixtures.resultEvent, { billingKind: '__proto__' }),
+      'delegation_persistence_failed',
+    );
   });
 
   await test('string and collection limits accept boundary and reject boundary plus one', async () => {
@@ -478,7 +479,7 @@ function project(store, event, overrides = {}) {
       delegationId: boundary.id,
       sessionId: boundary.id,
       profileVersion: boundary.id,
-      model: boundary.id,
+      model: null,
       allowedTools: Array.from({ length: 16 }, (_, index) => (
         `${String(index).padStart(2, '0')}${'t'.repeat(94)}`
       )),
