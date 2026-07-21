@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: verifying
-stopped_at: Completed 64-13-PLAN.md
-last_updated: "2026-07-21T11:53:26.072Z"
-last_activity: 2026-07-21 -- Phase 64 Plan 13 complete; validation, security, CI, and guarded full suite green
+status: planning
+stopped_at: Phase 64 complete (13/13) — ready to discuss Phase 65
+last_updated: "2026-07-21T13:42:53.035Z"
+last_activity: 2026-07-21 -- Phase 64 complete; live UAT deferred; ready to discuss Phase 65
 progress:
   total_phases: 18
   completed_phases: 8
@@ -29,14 +29,14 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 64 — OpenCode Adapter
+**Current focus:** Phase 65 — Codex Adapter
 
 ## Current Position
 
-Phase: 64 (OpenCode Adapter) — EXECUTING
-Plan: 13 of 13
-Status: Phase complete — ready for verification
-Last activity: 2026-07-21 -- Phase 64 Plan 13 complete; validation, security, CI, and guarded full suite green
+Phase: 65 (Codex Adapter) — NOT STARTED
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-21 -- Phase 64 complete; live UAT deferred; ready to discuss Phase 65
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -236,6 +236,8 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Use one explicit adapter aggregate section while retaining the separate first-commit drift gate — Root and focused execution cover every parser, fixture, and drift edge exactly once.
 - [Phase 64]: Keep the existing direct drift-smoke CI job and one renamed Phase 64 root invocation — Preserve CI ordering and avoid duplicate or skipped adapter evidence.
 - [Phase 64]: Mark all 28 implementation rows green only after every focused, historical, security, root, and preservation gate passes — Automated closure remains distinct from the pending live UAT boundary.
+- [Phase 64]: Defer exactly UAT64-01 through UAT64-03 to the milestone-end live sweep — Formal verification found zero automated gaps; these cases require genuine account, process, browser, and accessibility evidence per the existing user instruction.
+- [Phase 64]: Carry two non-blocking UI audit warnings forward — UI audit scored 21/24 with no blockers; 44px delegated targets and profile-version presentation coverage remain advisory findings recorded in 64-UI-REVIEW.md.
 
 ### Pending Todos
 
@@ -280,8 +282,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T11:53:26.067Z
-Stopped at: Completed 64-13-PLAN.md
+Last session: 2026-07-21T13:42:53.028Z
+Stopped at: Phase 64 complete (13/13) — ready to discuss Phase 65
 Resume file: None
 
 ## Next Actions
