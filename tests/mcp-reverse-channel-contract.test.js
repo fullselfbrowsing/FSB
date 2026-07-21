@@ -206,9 +206,16 @@ async function run() {
     executeRunSource.includes('this.emitNormalizedEvent(run, resultEvent);'),
     'the supervisor owns one explicit post-cleanup result publication point',
   );
+  const resultPublicationIndex = executeRunSource.indexOf(
+    'this.emitNormalizedEvent(run, resultEvent);',
+  );
+  const successCleanupIndex = executeRunSource.lastIndexOf(
+    'await this.terminateAndCleanup(run);',
+    resultPublicationIndex,
+  );
   assert(
-    executeRunSource.lastIndexOf('await this.terminateAndCleanup(run);')
-      < executeRunSource.indexOf('this.emitNormalizedEvent(run, resultEvent);'),
+    successCleanupIndex > executeRunSource.indexOf("throw new Error('process_exit');")
+      && successCleanupIndex < resultPublicationIndex,
     'verified task-tree and runtime cleanup precede result publication',
   );
   const startedEmitterSource = supervisorSource.slice(

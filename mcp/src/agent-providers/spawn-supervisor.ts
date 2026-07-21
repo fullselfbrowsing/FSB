@@ -32,6 +32,7 @@ import {
 import {
   AGENT_PROTOCOL_DRIFT_REASONS,
   AgentProtocolDriftError,
+  freezeAgentEvent,
   type AgentProtocolDriftReason,
 } from './protocol-drift.js';
 import type { AgentProviderRegistry } from './registry.js';
@@ -1251,9 +1252,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.resolveSetup();
       await this.writeTask(run, process, child);
       await Promise.all([run.streams.parser, run.streams.stderr, run.streams.closed]);
-      if (run.stopRequested) return;
+      if (run.stopRequested) {
+        run.resultEvent = null;
+        return;
+      }
       if (run.parserError) throw run.parserError;
-      const resultEvent = this.requireResultEvent(run);
+      const resultEvent = this.takeResultEvent(run);
       const exit = await run.streams.closed;
       if (resultEvent.payload.is_error === true) {
         await this.terminateAndCleanup(run);
@@ -1264,8 +1268,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (exit.code !== 0 || exit.signal !== null) throw new Error('process_exit');
       await this.terminateAndCleanup(run);
       if (run.stopRequested) return;
+      validateNormalizedEvent(resultEvent);
+      this.emitNormalizedEvent(run, resultEvent);
       this.settleOnce(run, 'succeeded', eventTerminal(resultEvent));
     } catch (error) {
+      run.resultEvent = null;
       if (run.settled) return;
       if (run.stopRequested) return;
       const driftDetail = driftTerminalDetail(error, run.adapterId);
@@ -1924,13 +1931,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           }
           if (event.type === 'result') {
             if (run.resultEvent) throw new Error('agent_protocol_drift');
-            run.resultEvent = event;
+            run.resultEvent = freezeAgentEvent('result', event.sessionId, { ...event.payload });
           } else {
             this.publishOrBuffer(run, event, serialized);
           }
         }
         if (!run.resultEvent) throw new Error('agent_protocol_drift');
-        this.publishOrBuffer(run, run.resultEvent, validateNormalizedEvent(run.resultEvent));
       } catch (error) {
         run.parserError = error;
         if (run.authorityGranted && run.child && run.entry && !run.terminationPromise) {
@@ -3006,6 +3012,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private requireResultEvent(run: DelegationRun): AgentEvent {
     const event = run.resultEvent as AgentEvent | null;
     if (!event) throw new Error('agent_protocol_drift');
+    return event;
+  }
+
+  private takeResultEvent(run: DelegationRun): AgentEvent {
+    const event = this.requireResultEvent(run);
+    run.resultEvent = null;
     return event;
   }
 
