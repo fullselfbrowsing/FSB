@@ -1643,6 +1643,42 @@ async function sheetsNavigate(reference, settleMs = 80) {
   }
 }
 
+async function sheetsBoldHeaderRow(startCell, columnCount) {
+  if (!sheetsUi) return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'sheets-ui-helper-unavailable');
+  const parsed = sheetsUi.parseA1Range(startCell);
+  const columns = Number(columnCount);
+  if (!parsed || parsed.columnOnly || !Number.isInteger(columns) || columns < 1) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-header-format-range-invalid');
+  }
+
+  const startColumn = sheetsUi.numberToColumn(parsed.startColumn);
+  const endColumn = sheetsUi.numberToColumn(parsed.startColumn + columns - 1);
+  if (!startColumn || !endColumn) {
+    return sheetsError('RECIPE_DOM_FALLBACK_PENDING', 'ui-header-format-range-invalid');
+  }
+
+  const headerRange = `${parsed.sheetPrefix}${startColumn}${parsed.startRow}:${endColumn}${parsed.startRow}`;
+  const selected = await sheetsNavigate(headerRange, 70);
+  if (!selected.success) return selected;
+
+  try {
+    const bolded = sheetsTrustedKey(
+      await tools.keyPress(sheetsPrimaryShortcut('b', { useDebuggerAPI: true })),
+      'header-bold-not-trusted'
+    );
+    if (!bolded.success) return bolded;
+    await sheetsDelay(60);
+    const escaped = sheetsTrustedKey(
+      await tools.keyPress({ key: 'Escape', useDebuggerAPI: true }),
+      'header-deselect-not-trusted'
+    );
+    if (!escaped.success) return escaped;
+    return { success: true, range: headerRange };
+  } catch (_error) {
+    return sheetsError('GOOGLE_SHEETS_SESSION_UNAVAILABLE', 'ui-header-format-failed');
+  }
+}
+
 function sheetsFormulaBarState() {
   const selectors = ['#t-formula-bar-input', '.cell-input', '[aria-label="Formula bar"]'];
   for (const selector of selectors) {
@@ -5159,6 +5195,16 @@ const tools = {
       await sheetsRenameSpreadsheet(sheetName);
       const sharedResult = await sheetsUpdateValues(startCell, sharedRows, 'RAW');
       if (!sharedResult.success) return { ...sharedResult, action: 'fillsheet' };
+      if (sharedRows.length > 1) {
+        try {
+          const formatted = await sheetsBoldHeaderRow(startCell, sharedRows[0].length);
+          if (!formatted.success) {
+            console.warn('[fillsheet] Header formatting failed (non-fatal):', formatted.reason || formatted.error);
+          }
+        } catch (formatError) {
+          console.warn('[fillsheet] Header formatting failed (non-fatal):', formatError?.message || formatError);
+        }
+      }
       return {
         success: true,
         action: 'fillsheet',

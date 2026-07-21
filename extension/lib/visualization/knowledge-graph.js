@@ -128,9 +128,30 @@ const KnowledgeGraph = (function () {
     return identity === knownIdentity || identity.slice(-(knownIdentity.length + 1)) === '.' + knownIdentity;
   }
 
+  function patternMatchesHostnameSuffix(pattern, identity) {
+    if (!pattern || typeof pattern.source !== 'string' || !identity) return false;
+    var flags = typeof pattern.flags === 'string' ? pattern.flags.replace(/[gy]/g, '') : '';
+    var anchoredPattern;
+    try {
+      anchoredPattern = new RegExp('^(?:' + pattern.source + ')$', flags);
+    } catch (_error) {
+      return false;
+    }
+
+    var suffixes = [identity];
+    for (var di = 0; di < identity.length; di++) {
+      if (identity.charAt(di) === '.' && di + 1 < identity.length) {
+        suffixes.push(identity.slice(di + 1));
+      }
+    }
+    for (var si = 0; si < suffixes.length; si++) {
+      if (anchoredPattern.test(suffixes[si])) return true;
+    }
+    return false;
+  }
+
   function guideMatchesIdentity(guide, identity) {
     if (!guide || !identity || !Array.isArray(guide.patterns)) return false;
-    var candidates = [identity, 'https://' + identity + '/', 'http://www.' + identity + '/'];
     for (var pi = 0; pi < guide.patterns.length; pi++) {
       var pattern = guide.patterns[pi];
       if (!pattern || typeof pattern.test !== 'function') continue;
@@ -138,15 +159,7 @@ const KnowledgeGraph = (function () {
       for (var ii = 0; ii < patternIdentities.length; ii++) {
         if (identityMatchesKnownSite(identity, patternIdentities[ii])) return true;
       }
-      var originalLastIndex = pattern.lastIndex;
-      for (var ci = 0; ci < candidates.length; ci++) {
-        pattern.lastIndex = 0;
-        if (pattern.test(candidates[ci])) {
-          pattern.lastIndex = originalLastIndex;
-          return true;
-        }
-      }
-      pattern.lastIndex = originalLastIndex;
+      if (patternMatchesHostnameSuffix(pattern, identity)) return true;
     }
     return false;
   }

@@ -88,10 +88,16 @@ check(!patternIdentities(amazonPattern).some((identity) => ['com.au', 'com.br', 
 graph.setTaskMemories([
   taskMemory('https://WWW.AMAZON.COM./products', ['#buy']),
   taskMemory('https://www.amazon.com.au/products', ['#buy-au']),
+  taskMemory('https://shop.amazon.com/products', ['#buy-subdomain']),
   taskMemory('BOOKING.COM./hotels', ['#hotel']),
   taskMemory('https://github.com/org/repo', ['#code']),
+  taskMemory('https://api.github.com/repos/example', ['#api']),
   taskMemory('https://docs.google.com/spreadsheets/d/example/edit', ['#sheet']),
   taskMemory('https://news.com.au/world', ['#headline']),
+  taskMemory('https://notamazon.com/products', ['#not-amazon']),
+  taskMemory('https://fakebooking.com/hotels', ['#not-booking']),
+  taskMemory('https://notgithub.com/org/repo', ['#not-github']),
+  taskMemory('https://github.com.evil/org/repo', ['#github-superdomain']),
   taskMemory('https://www.genuinely-new.dev./docs', ['#one']),
   taskMemory('GENUINELY-NEW.DEV/path', ['#two'])
 ]);
@@ -101,16 +107,22 @@ for (const detailLevel of ['simple', 'full']) {
   const taskSites = data.nodes.filter((node) => node.type === 'task-site');
   const discovered = taskSites.find((node) => node.label === 'genuinely-new.dev');
   const australianNews = taskSites.find((node) => node.label === 'news.com.au');
-  check(taskSites.length === 2,
-    `${detailLevel} mode suppresses known guide domains and keeps both unrelated discovered domains`);
+  const collisionDomains = ['notamazon.com', 'fakebooking.com', 'notgithub.com', 'github.com.evil'];
+  check(taskSites.length === 6,
+    `${detailLevel} mode suppresses known guide domains and keeps unrelated and collision-shaped domains`);
   check(!!discovered,
     `${detailLevel} mode renders the normalized genuinely discovered domain`);
   check(discovered && discovered.selectorCount === 2,
     `${detailLevel} mode coalesces normalized aliases and merges learned selectors`);
   check(australianNews && australianNews.selectorCount === 1,
     `${detailLevel} mode does not mistake news.com.au for an Amazon identity`);
-  check(!taskSites.some((node) => /amazon|booking|github|docs\.google/i.test(node.label)),
-    `${detailLevel} mode never duplicates a known guide, including a path-specific guide`);
+  check(collisionDomains.every((domain) => taskSites.some((node) => node.label === domain)),
+    `${detailLevel} mode keeps hostname-prefix and superdomain collisions visible`);
+  check(!taskSites.some((node) => [
+    'amazon.com', 'amazon.com.au', 'shop.amazon.com', 'booking.com',
+    'github.com', 'api.github.com', 'docs.google.com'
+  ].includes(node.label)),
+    `${detailLevel} mode never duplicates exact guides, true subdomains, or path-specific guides`);
 }
 
 const simple = buildData('simple');
@@ -138,6 +150,8 @@ check(getAutomaticZoom(expandedState) < getDefaultZoom(mobileContainer, 'full'),
   'automatic Expanded zoom fits outer nodes inside a mobile-sized canvas');
 check((source.match(/state\.zoom = getAutomaticZoom\(state\)/g) || []).length === 2,
   'initial render and resize both apply automatic fit-to-view zoom');
+check(source.includes("new RegExp('^(?:' + pattern.source + ')$', flags)"),
+  'regex fallback is anchored to a complete DNS-label suffix');
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

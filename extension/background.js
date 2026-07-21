@@ -7950,6 +7950,38 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case 'deleteSessionHistory': {
+      const sessionId = typeof request.sessionId === 'string' ? request.sessionId.trim() : '';
+      if (!sessionId) {
+        sendResponse({ success: false, error: 'Session ID is required' });
+        break;
+      }
+      (async () => {
+        try {
+          const deleted = await automationLogger.deleteSession(sessionId);
+          sendResponse(deleted
+            ? { success: true }
+            : { success: false, error: 'Failed to delete session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to delete session history' });
+        }
+      })();
+      return true;
+    }
+
+    case 'clearSessionHistory':
+      (async () => {
+        try {
+          const cleared = await automationLogger.clearAllSessions();
+          sendResponse(cleared
+            ? { success: true }
+            : { success: false, error: 'Failed to clear session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to clear session history' });
+        }
+      })();
+      return true;
+
     case 'getSessionReplayData':
       // Get structured replay data for session visualization
       (async () => {

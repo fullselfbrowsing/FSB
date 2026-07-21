@@ -21,7 +21,8 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
   function capPersistedSessionHistory(sessionIndex, sessionStorage) {
     const counts = { autopilot: 0, mcp: 0 };
-    return (sessionIndex || []).filter(entry => {
+    const removedIds = [];
+    const retainedIndex = (sessionIndex || []).filter(entry => {
       const storedSession = entry?.id ? sessionStorage?.[entry.id] : null;
       const mode = storedSession ? storedSession.mode : entry?.mode;
       const bucket = mode === 'mcp-agent' ? 'mcp' : 'autopilot';
@@ -29,8 +30,21 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         counts[bucket]++;
         return true;
       }
-      if (entry?.id) delete sessionStorage[entry.id];
+      if (entry?.id) {
+        removedIds.push(entry.id);
+        delete sessionStorage[entry.id];
+      }
       return false;
+    });
+    return { retainedIndex, removedIds };
+  }
+
+  function filterAutomationLogsBySession(logs, sessionIds, removeAllSessionLogs = false) {
+    const ids = sessionIds instanceof Set ? sessionIds : new Set(sessionIds || []);
+    return (Array.isArray(logs) ? logs : []).filter(log => {
+      const sessionId = log?.data?.sessionId;
+      if (typeof sessionId !== 'string' || !sessionId) return true;
+      return !(removeAllSessionLogs || ids.has(sessionId));
     });
   }
 
@@ -232,6 +246,24 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
     withSessionMutationLock(fn) {
       if (typeof fn !== 'function') return Promise.resolve(undefined);
       return this._withSessionMutationLock(fn);
+    }
+
+    _removeInMemorySessionArtifacts(sessionIds, removeAllSessionArtifacts = false) {
+      const ids = sessionIds instanceof Set ? sessionIds : new Set(sessionIds || []);
+      const shouldRemove = sessionId => (
+        typeof sessionId === 'string' &&
+        sessionId.length > 0 &&
+        (removeAllSessionArtifacts || ids.has(sessionId))
+      );
+
+      this.logs = (this.logs || []).filter(log => !shouldRemove(log?.data?.sessionId));
+      this.actionRecords = (this.actionRecords || []).filter(record => !shouldRemove(record?.sessionId));
+
+      if (removeAllSessionArtifacts) {
+        this._domSnapshots = {};
+      } else if (this._domSnapshots) {
+        ids.forEach(sessionId => delete this._domSnapshots[sessionId]);
+      }
     }
 
     log(level, message, data = null) {
@@ -761,9 +793,16 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         const persistedLogs = filterPersistedSessionLogs(sessionLogs);
         if (sessionLogs.length === 0 && persistedLogs.length === 0) return false;
 
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
+        const stored = await chrome.storage.local.get([
+          'fsbSessionLogs',
+          'fsbSessionIndex',
+          'fsbDOMSnapshots',
+          'automationLogs'
+        ]);
         const sessionStorage = stored.fsbSessionLogs || {};
         const sessionIndex = stored.fsbSessionIndex || [];
+        const allSnapshots = stored.fsbDOMSnapshots || {};
+        const persistedAutomationLogs = Array.isArray(stored.automationLogs) ? stored.automationLogs : [];
 
         if (sessionStorage[sessionId]) {
           // APPEND MODE: Update existing session entry
@@ -883,14 +922,27 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         const existingIndex = sessionIndex.findIndex(s => s.id === sessionId);
         if (existingIndex !== -1) sessionIndex[existingIndex] = indexEntry;
         else sessionIndex.unshift(indexEntry);
-        const retainedSessionIndex = capPersistedSessionHistory(sessionIndex, sessionStorage);
-        await chrome.storage.local.set({
+        const cappedHistory = capPersistedSessionHistory(sessionIndex, sessionStorage);
+        const retainedSessionIndex = cappedHistory.retainedIndex;
+        const evictedIds = new Set(cappedHistory.removedIds);
+        const nextStorage = {
           fsbSessionLogs: sessionStorage,
           fsbSessionIndex: retainedSessionIndex
-        });
+        };
+
+        if (evictedIds.size > 0) {
+          evictedIds.forEach(id => delete allSnapshots[id]);
+          nextStorage.fsbDOMSnapshots = allSnapshots;
+          nextStorage.automationLogs = filterAutomationLogsBySession(persistedAutomationLogs, evictedIds);
+        }
+
+        await chrome.storage.local.set(nextStorage);
+        if (evictedIds.size > 0) this._removeInMemorySessionArtifacts(evictedIds);
 
         // Persist DOM snapshots to dedicated storage key
-        await this._persistDOMSnapshots(sessionId, retainedSessionIndex);
+        if (!evictedIds.has(sessionId)) {
+          await this._persistDOMSnapshots(sessionId, retainedSessionIndex);
+        }
 
         if (savedSession.mode === 'mcp-agent') {
           let retentionDays = 30;
@@ -985,21 +1037,18 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
         for (const id of expiredIds) {
           delete sessionStorage[id];
           delete allSnapshots[id];
-          if (this._domSnapshots) delete this._domSnapshots[id];
         }
         const retainedIndex = sessionIndex.filter(entry => !expiredSet.has(entry?.id));
-        const retainedAutomationLogs = persistedAutomationLogs.filter(
-          log => !expiredSet.has(log?.data?.sessionId)
-        );
-        // Keep the in-memory source of future debounced persists in sync so a
-        // timer queued after this prune cannot resurrect expired raw rows.
-        this.logs = this.logs.filter(log => !expiredSet.has(log?.data?.sessionId));
+        const retainedAutomationLogs = filterAutomationLogsBySession(persistedAutomationLogs, expiredSet);
         await chrome.storage.local.set({
           fsbSessionLogs: sessionStorage,
           fsbSessionIndex: retainedIndex,
           fsbDOMSnapshots: allSnapshots,
           automationLogs: retainedAutomationLogs
         });
+        // Keep the in-memory source of future debounced persists in sync so a
+        // timer queued after this prune cannot resurrect expired raw rows.
+        this._removeInMemorySessionArtifacts(expiredSet);
         return { removed: expiredIds.length, ids: expiredIds };
       } catch (error) {
         if (chrome.runtime?.id) {
@@ -1085,20 +1134,29 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
 
     async _deleteSessionUnlocked(sessionId) {
       // Guard against invalidated extension context
-      if (!chrome.runtime?.id) return false;
+      if (!chrome.runtime?.id || typeof sessionId !== 'string' || !sessionId) return false;
       try {
-        const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
+        const stored = await chrome.storage.local.get([
+          'fsbSessionLogs',
+          'fsbSessionIndex',
+          'fsbDOMSnapshots',
+          'automationLogs'
+        ]);
         const sessionStorage = stored.fsbSessionLogs || {};
-        const sessionIndex = stored.fsbSessionIndex || [];
+        const sessionIndex = Array.isArray(stored.fsbSessionIndex) ? stored.fsbSessionIndex : [];
         const allSnapshots = stored.fsbDOMSnapshots || {};
+        const removedIds = new Set([sessionId]);
         delete sessionStorage[sessionId];
         delete allSnapshots[sessionId];
         const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
+        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, removedIds);
         await chrome.storage.local.set({
           fsbSessionLogs: sessionStorage,
           fsbSessionIndex: updatedIndex,
-          fsbDOMSnapshots: allSnapshots
+          fsbDOMSnapshots: allSnapshots,
+          automationLogs: retainedAutomationLogs
         });
+        this._removeInMemorySessionArtifacts(removedIds);
         return true;
       } catch (error) {
         return false;
@@ -1145,8 +1203,15 @@ if (globalThis.__FSB_AUTOMATION_LOGGER_LOADED__) {
       // Guard against invalidated extension context
       if (!chrome.runtime?.id) return false;
       try {
-        await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex', 'fsbDOMSnapshots']);
-        this._domSnapshots = {};
+        const stored = await chrome.storage.local.get('automationLogs');
+        const retainedAutomationLogs = filterAutomationLogsBySession(stored.automationLogs, [], true);
+        await chrome.storage.local.set({
+          fsbSessionLogs: {},
+          fsbSessionIndex: [],
+          fsbDOMSnapshots: {},
+          automationLogs: retainedAutomationLogs
+        });
+        this._removeInMemorySessionArtifacts([], true);
         return true;
       } catch (error) {
         return false;

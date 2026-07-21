@@ -23,6 +23,7 @@ function sheetsDomHarness(options = {}) {
   let deleteCalls = 0;
   let insertCalls = 0;
   const keyCalls = [];
+  const typeCalls = [];
   const nameBox = options.missingNameBox ? null : {
     value: selectedAddress,
     textContent: selectedAddress,
@@ -62,6 +63,7 @@ function sheetsDomHarness(options = {}) {
       return trusted;
     },
     async typeWithKeys(params) {
+      typeCalls.push({ ...params });
       if (options.typeResult) return options.typeResult;
       pendingAddress = String(params.text);
       if (nameBox) nameBox.value = pendingAddress;
@@ -115,6 +117,7 @@ function sheetsDomHarness(options = {}) {
   context.globalThis = context;
   const exports = [
     'sheetsNavigate',
+    'sheetsBoldHeaderRow',
     'sheetsWithUiLock',
     'sheetsReadValues',
     'sheetsUpdateValues',
@@ -132,10 +135,52 @@ function sheetsDomHarness(options = {}) {
     api: context.__sheetsInternals,
     cells,
     keyCalls,
+    typeCalls,
     get pasteCalls() { return pasteCalls; },
     get deleteCalls() { return deleteCalls; },
     get insertCalls() { return insertCalls; }
   };
+}
+
+function fillsheetActionHarness(options = {}) {
+  const start = ACTIONS_SOURCE.indexOf('  fillsheet: async (params) => {');
+  const end = ACTIONS_SOURCE.indexOf('\n\n  // =========================================================================\n  // GOOGLE SHEETS: readsheet', start);
+  assert.ok(start >= 0 && end > start, 'legacy fillsheet action source exists');
+
+  const calls = { format: 0, rename: 0, update: 0, warnings: [] };
+  const context = {
+    FSB: { isCanvasBasedEditor() { return true; } },
+    sheetsUi: ui,
+    sheetsError(code, reason) { return { success: false, code, error: code, reason }; },
+    sheetsWithUiLock(operation) { return operation(); },
+    async sheetsRenameSpreadsheet() { calls.rename++; },
+    async sheetsUpdateValues(range, values) {
+      calls.update++;
+      if (options.updateResult) return options.updateResult;
+      return {
+        success: true,
+        updatedCells: values.length * values[0].length,
+        chunks: 1
+      };
+    },
+    async sheetsBoldHeaderRow() {
+      calls.format++;
+      if (options.formatError) throw options.formatError;
+      return options.formatResult || { success: true };
+    },
+    console: {
+      warn(...args) { calls.warnings.push(args); }
+    },
+    globalThis: null
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(
+    `globalThis.__fillsheet = ({${ACTIONS_SOURCE.slice(start, end)}}).fillsheet;`,
+    context,
+    { filename: 'extension/content/actions.fillsheet.js' }
+  );
+  return { fillsheet: context.__fillsheet, calls };
 }
 
 test('parses bounded A1, quoted-sheet, single-cell, and column append ranges', () => {
@@ -316,6 +361,46 @@ test('DOM fallback uses Command on macOS and Control on other platforms', async 
   assert.equal(windowsPaste.metaKey, undefined);
 });
 
+test('legacy fillsheet selects and bolds the exact bounded header range', async () => {
+  const windows = sheetsDomHarness({ platform: 'Win32', userAgentDataPlatform: 'Windows' });
+  const windowsResult = await windows.api.sheetsBoldHeaderRow("'Data 2026'!B4", 3);
+  assert.equal(windowsResult.success, true);
+  assert.equal(windowsResult.range, "'Data 2026'!B4:D4");
+  assert.equal(windows.typeCalls[windows.typeCalls.length - 1].text, "'Data 2026'!B4:D4");
+  const windowsBold = windows.keyCalls.find(call => call.key === 'b');
+  assert.equal(windowsBold.ctrlKey, true);
+  assert.equal(windowsBold.metaKey, undefined);
+  assert.equal(windowsBold.useDebuggerAPI, true);
+  assert.equal(windows.keyCalls[windows.keyCalls.length - 1].key, 'Escape');
+
+  const mac = sheetsDomHarness({ platform: 'MacIntel', userAgentDataPlatform: 'macOS' });
+  assert.equal((await mac.api.sheetsBoldHeaderRow('A1', 2)).success, true);
+  const macBold = mac.keyCalls.find(call => call.key === 'b');
+  assert.equal(macBold.metaKey, true);
+  assert.equal(macBold.ctrlKey, undefined);
+});
+
+test('legacy fillsheet skips single-row formatting and keeps formatting failures non-fatal', async () => {
+  const singleRow = fillsheetActionHarness();
+  const singleResult = await singleRow.fillsheet({ startCell: 'A1', data: 'Name,Age' });
+  assert.equal(singleResult.success, true);
+  assert.equal(singleRow.calls.update, 1);
+  assert.equal(singleRow.calls.format, 0);
+
+  const failedFormat = fillsheetActionHarness({
+    formatResult: { success: false, reason: 'header-bold-not-trusted' }
+  });
+  const multiResult = await failedFormat.fillsheet({
+    startCell: 'C3',
+    data: 'Name,Age\nAda,37',
+    sheetName: 'People'
+  });
+  assert.equal(multiResult.success, true);
+  assert.equal(multiResult.cellsFilled, 4);
+  assert.equal(failedFormat.calls.format, 1);
+  assert.equal(failedFormat.calls.warnings.length, 1);
+});
+
 test('DOM append scans a rectangular table and clear verifies actual readback', async () => {
   const append = sheetsDomHarness({
     cells: {
@@ -407,6 +492,7 @@ test('content action exposes only the fixed Sheets UI operations and protects va
   assert.match(actions, /RECOVERY_AMBIGUOUS/);
   assert.match(actions, /renderSemantics:\s*'formula-bar'/);
   assert.match(actions, /sheetsUi\.csvToValues\(data\)/);
+  assert.match(legacySheetsActions, /sharedRows\.length > 1[\s\S]*sheetsBoldHeaderRow\(startCell, sharedRows\[0\]\.length\)/);
   assert.match(actions, /sheetsReadValues\(range, 'ROWS'\)/);
   assert.doesNotMatch(legacySheetsActions, /document\.querySelector\('#t-name-box'\)|tools\.keyPress\(/);
   assert.match(messaging, /'fillsheet'[\s\S]*'readsheet'[\s\S]*'sheetsSession'/);

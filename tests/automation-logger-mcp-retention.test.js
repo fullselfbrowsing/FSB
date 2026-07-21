@@ -85,6 +85,25 @@ function rawLog(sessionId, marker) {
   };
 }
 
+function unscopedLog(marker) {
+  return {
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: marker,
+    data: { logType: 'serviceWorker' }
+  };
+}
+
+function actionRecord(sessionId, marker) {
+  return {
+    sessionId,
+    tool: 'type',
+    timestamp: Date.now(),
+    params: { text: marker },
+    success: true
+  };
+}
+
 (async function main() {
   console.log('--- AutomationLogger concurrent save serialization ---');
   {
@@ -164,12 +183,33 @@ function rawLog(sessionId, marker) {
       mcpIds.push(mcpId);
     }
 
+    const capLogs = [
+      rawLog('mcp-49', 'evicted-mcp-secret'),
+      rawLog('autopilot-49', 'evicted-autopilot-secret'),
+      rawLog('mcp-0', 'retained-mcp-log')
+    ];
     const storage = makeStorage({
       fsbMcpSessionRetentionDays: 30,
       fsbSessionLogs: sessions,
-      fsbSessionIndex: index
+      fsbSessionIndex: index,
+      fsbDOMSnapshots: {
+        'mcp-49': [{ html: 'evicted-mcp-snapshot' }],
+        'autopilot-49': [{ html: 'evicted-autopilot-snapshot' }],
+        'mcp-0': [{ html: 'retained-mcp-snapshot' }]
+      },
+      automationLogs: capLogs
     }, 0);
     const logger = loadLogger(storage);
+    logger.logs = clone(capLogs);
+    logger._domSnapshots = {
+      'mcp-49': [{ html: 'memory-mcp-snapshot' }],
+      'autopilot-49': [{ html: 'memory-autopilot-snapshot' }]
+    };
+    logger.actionRecords = [
+      actionRecord('mcp-49', 'evicted-mcp-action'),
+      actionRecord('autopilot-49', 'evicted-autopilot-action'),
+      actionRecord('mcp-0', 'retained-mcp-action')
+    ];
 
     logger.logSessionStart('mcp-new', 'Newest MCP session', 51);
     const savedMcp = await logger.saveSession('mcp-new', {
@@ -190,6 +230,15 @@ function rawLog(sessionId, marker) {
       'saving an MCP session preserves every existing Autopilot row');
     check(!afterMcpIds.includes('mcp-49') && !storage.store.fsbSessionLogs['mcp-49'],
       'the oldest MCP overflow row is removed from the index and full store');
+    check(!storage.store.automationLogs.some((log) => log.data?.sessionId === 'mcp-49') &&
+          !logger.logs.some((log) => log.data?.sessionId === 'mcp-49'),
+      'MCP cap eviction removes persisted and in-memory raw logs');
+    check(!storage.store.fsbDOMSnapshots['mcp-49'] && !logger._domSnapshots['mcp-49'],
+      'MCP cap eviction removes persisted and in-memory DOM snapshots');
+    check(!logger.actionRecords.some((record) => record.sessionId === 'mcp-49'),
+      'MCP cap eviction removes in-memory action records');
+    check(storage.store.automationLogs.some((log) => log.data?.sessionId === 'autopilot-49'),
+      'MCP cap eviction preserves the pending Autopilot raw log');
     check(JSON.stringify(afterMcpIds) === JSON.stringify(expectedAfterMcpIds),
       'per-mode capping preserves the interleaved order of retained rows');
     check(afterMcpIds.includes('autopilot-0') && storage.store.fsbSessionLogs['autopilot-0'].mode === undefined,
@@ -214,6 +263,13 @@ function rawLog(sessionId, marker) {
       'saving an Autopilot session preserves every retained MCP row');
     check(!afterAutopilotIds.includes('autopilot-49') && !storage.store.fsbSessionLogs['autopilot-49'],
       'the oldest Autopilot overflow row is removed from the index and full store');
+    check(!storage.store.automationLogs.some((log) => log.data?.sessionId === 'autopilot-49') &&
+          !logger.logs.some((log) => log.data?.sessionId === 'autopilot-49'),
+      'Autopilot cap eviction removes persisted and in-memory raw logs');
+    check(!storage.store.fsbDOMSnapshots['autopilot-49'] && !logger._domSnapshots['autopilot-49'],
+      'Autopilot cap eviction removes persisted and in-memory DOM snapshots');
+    check(!logger.actionRecords.some((record) => record.sessionId === 'autopilot-49'),
+      'Autopilot cap eviction removes in-memory action records');
     check(JSON.stringify(afterAutopilotIds) === JSON.stringify(expectedAfterAutopilotIds),
       'the second per-mode cap also preserves retained-row ordering');
   }
@@ -334,6 +390,98 @@ function rawLog(sessionId, marker) {
       'outcome-only update preserves replay history');
     check(full.logs.length === 1 && full.logs[0].message === 'preserve-log',
       'outcome-only update preserves session logs');
+  }
+
+  console.log('\n--- AutomationLogger complete individual session deletion ---');
+  {
+    const targetId = 'delete-target';
+    const keepId = 'delete-keep';
+    const globalLog = unscopedLog('keep-global-diagnostic');
+    const logs = [
+      rawLog(targetId, 'delete-sensitive-text'),
+      rawLog(keepId, 'keep-other-session'),
+      globalLog
+    ];
+    const storage = makeStorage({
+      fsbSessionLogs: {
+        [targetId]: { id: targetId, mode: 'mcp-agent' },
+        [keepId]: { id: keepId, mode: 'autopilot' }
+      },
+      fsbSessionIndex: [{ id: targetId }, { id: keepId }],
+      fsbDOMSnapshots: {
+        [targetId]: [{ html: 'delete-persisted-snapshot' }],
+        [keepId]: [{ html: 'keep-persisted-snapshot' }]
+      },
+      automationLogs: logs
+    }, 8);
+    const logger = loadLogger(storage);
+    logger.logs = clone(logs);
+    logger._domSnapshots = {
+      [targetId]: [{ html: 'delete-memory-snapshot' }],
+      [keepId]: [{ html: 'keep-memory-snapshot' }]
+    };
+    logger.actionRecords = [
+      actionRecord(targetId, 'delete-action'),
+      actionRecord(keepId, 'keep-action'),
+      actionRecord(null, 'keep-unscoped-action')
+    ];
+
+    // Queue persistence first to prove deletion remains the authoritative final write.
+    const [, deleted] = await Promise.all([logger.persistLogs(), logger.deleteSession(targetId)]);
+    check(deleted === true, 'individual deletion reports success');
+    check(!storage.store.fsbSessionLogs[targetId] &&
+          !storage.store.fsbSessionIndex.some((entry) => entry.id === targetId),
+      'individual deletion removes the full and indexed history rows');
+    check(!storage.store.fsbDOMSnapshots[targetId] && !logger._domSnapshots[targetId],
+      'individual deletion removes persisted and in-memory snapshots');
+    check(!storage.store.automationLogs.some((log) => log.data?.sessionId === targetId) &&
+          !logger.logs.some((log) => log.data?.sessionId === targetId),
+      'individual deletion removes persisted and in-memory raw logs after a queued persist');
+    check(!logger.actionRecords.some((record) => record.sessionId === targetId),
+      'individual deletion removes in-memory action records');
+    check(!!storage.store.fsbSessionLogs[keepId] &&
+          storage.store.automationLogs.some((log) => log.data?.sessionId === keepId),
+      'individual deletion preserves unrelated session history and logs');
+    check(storage.store.automationLogs.some((log) => log.message === globalLog.message),
+      'individual deletion preserves unscoped diagnostics');
+  }
+
+  console.log('\n--- AutomationLogger clear-all removes orphan session artifacts ---');
+  {
+    const logs = [
+      rawLog('saved-mcp', 'saved-session-secret'),
+      rawLog('already-orphaned', 'orphaned-session-secret'),
+      unscopedLog('keep-global-diagnostic')
+    ];
+    const storage = makeStorage({
+      fsbSessionLogs: { 'saved-mcp': { id: 'saved-mcp', mode: 'mcp-agent' } },
+      fsbSessionIndex: [{ id: 'saved-mcp', mode: 'mcp-agent' }],
+      fsbDOMSnapshots: { 'saved-mcp': [{ html: 'saved-snapshot' }] },
+      automationLogs: logs
+    }, 0);
+    const logger = loadLogger(storage);
+    logger.logs = clone(logs);
+    logger._domSnapshots = { 'saved-mcp': [{ html: 'memory-snapshot' }] };
+    logger.actionRecords = [
+      actionRecord('saved-mcp', 'saved-action'),
+      actionRecord('already-orphaned', 'orphan-action'),
+      actionRecord(null, 'keep-unscoped-action')
+    ];
+
+    const cleared = await logger.clearAllSessions();
+    check(cleared === true, 'clear-all reports success');
+    check(Object.keys(storage.store.fsbSessionLogs).length === 0 && storage.store.fsbSessionIndex.length === 0,
+      'clear-all empties full and indexed session history');
+    check(Object.keys(storage.store.fsbDOMSnapshots).length === 0 &&
+          Object.keys(logger._domSnapshots).length === 0,
+      'clear-all empties persisted and in-memory snapshots');
+    check(storage.store.automationLogs.length === 1 &&
+          storage.store.automationLogs[0].message === 'keep-global-diagnostic',
+      'clear-all removes saved and already-orphaned raw session logs but preserves global diagnostics');
+    check(logger.logs.length === 1 && logger.logs[0].message === 'keep-global-diagnostic',
+      'clear-all keeps the in-memory persistence source aligned with storage');
+    check(logger.actionRecords.length === 1 && logger.actionRecords[0].sessionId === null,
+      'clear-all removes session action records while preserving unscoped records');
   }
 
   console.log('\n--- AutomationLogger external scrub shares the save lock ---');

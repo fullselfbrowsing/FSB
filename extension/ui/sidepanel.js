@@ -3522,15 +3522,11 @@ async function startReplay(sessionId) {
 
 async function deleteHistorySession(sessionId) {
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-    delete sessionStorage[sessionId];
-    const updatedIndex = sessionIndex.filter(function(s) { return s.id !== sessionId; });
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId: sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
     loadHistoryList();
   } catch (error) {
     console.error('Failed to delete session:', error);
@@ -3594,7 +3590,8 @@ async function loadSessionView(sessionId) {
 async function clearAllHistorySessions() {
   if (!confirm('Delete all session history? This cannot be undone.')) return;
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
     loadHistoryList();
   } catch (error) {
     console.error('Failed to clear all sessions:', error);

@@ -3151,21 +3151,11 @@ async function deleteSession(sessionId) {
   }
 
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-
-    // Remove from storage
-    delete sessionStorage[sessionId];
-
-    // Remove from index
-    const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-
-    // Save changes
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
 
     // Close detail panel if viewing this session
     if (currentViewingSession && currentViewingSession.id === sessionId) {
@@ -3193,7 +3183,8 @@ async function clearAllSessions() {
   }
 
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
 
     closeSessionDetail();
     loadSessionList();
