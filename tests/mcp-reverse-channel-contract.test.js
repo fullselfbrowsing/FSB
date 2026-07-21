@@ -34,6 +34,12 @@ async function run() {
       payload: { delegationId: 'delegation_server_0001', adapterId: 'claude-code', profileVersion: '1' },
     },
     {
+      id: 'delegate-opencode-1',
+      type: 'ext:event',
+      event: 'delegation.started',
+      payload: { delegationId: 'delegation_server_0002', adapterId: 'opencode', profileVersion: '1.14.25' },
+    },
+    {
       id: 'delegate-start-1',
       type: 'ext:event',
       event: 'delegation.event',
@@ -154,6 +160,36 @@ async function run() {
     ),
     'the supervisor recognizes shared production typed drift before generic error normalization',
   );
+  for (const sentinel of [
+    'agent "fsb" not found. Falling back to default agent',
+    'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
+  ]) {
+    assert(supervisorSource.includes(sentinel), 'the reviewed bounded fallback sentinel is source-pinned');
+  }
+  assert(
+    /private async writeTask\(\s*run: DelegationRun,\s*process: ProcessSpec,\s*child: ChildProcessWithoutNullStreams/.test(
+      supervisorSource,
+    ),
+    'one central task writer is guarded by run state and the selected process role',
+  );
+  const startedEmitterSource = supervisorSource.slice(
+    supervisorSource.indexOf('private emitStarted('),
+    supervisorSource.indexOf('private emitNormalizedEvent('),
+  );
+  for (const required of ['delegationId', 'adapterId', 'profileVersion']) {
+    assert(startedEmitterSource.includes(required), `delegation.started includes ${required}`);
+  }
+  for (const forbidden of [
+    'topology',
+    'endpoint',
+    'port',
+    'secretRef',
+    'password',
+    'stderr',
+    'task:',
+  ]) {
+    assert(!startedEmitterSource.includes(forbidden), `delegation.started omits ${forbidden}`);
+  }
   assert(
     !supervisorSource.includes("from './claude-stream.js'"),
     'the supervisor does not import a provider-native parser',

@@ -107,6 +107,7 @@ function makeChild(options = {}) {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const stdinBytes = [];
+  let stdinEndCount = 0;
   let closed = false;
   let stdin = null;
 
@@ -146,6 +147,7 @@ function makeChild(options = {}) {
       setImmediate(callback);
     },
     final(callback) {
+      stdinEndCount += 1;
       callback();
       if (options.onStdinEnd) {
         setImmediate(() => options.onStdinEnd({ child, stdout, stderr, close, send }));
@@ -175,6 +177,10 @@ function makeChild(options = {}) {
     close,
     send,
     get closed() { return closed; },
+  });
+  Object.defineProperty(child, 'stdinEndCount', {
+    enumerable: true,
+    get() { return stdinEndCount; },
   });
 
   if (!options.suppressSpawnEvent) {
@@ -1220,6 +1226,8 @@ async function runHappyPathTest(supervisorModule) {
   assert.equal(call.argv.some((value) => value.includes(task)), false);
   assert.equal(Object.values(call.options.env).some((value) => String(value).includes(task)), false);
   assert.equal(Buffer.concat(call.child.stdinBytes).toString('utf8'), task);
+  assert.equal(call.child.stdinBytes.length, 1, 'the selected task child receives one write');
+  assert.equal(call.child.stdinEndCount, 1, 'the selected task child receives one EOF');
 
   const preparedIndex = harness.order.indexOf('prepare');
   const spawnIndex = harness.order.indexOf('spawn');
@@ -1255,6 +1263,23 @@ async function runHappyPathTest(supervisorModule) {
 }
 
 async function runFailureBarrierTests(supervisorModule) {
+  {
+    const sentinel = 'agent "fsb" not found. Falling back to default agent';
+    const harness = makeHarness(supervisorModule, { stderrValue: `prefix ${sentinel} suffix` });
+    const task = 'direct fallback sentinel task';
+    const result = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task }),
+      harness.emit,
+    );
+    assert.equal(result.status, 'failed');
+    assert.equal(harness.spawnCalls.length, 1);
+    assert.equal(harness.spawnCalls[0].child.stdinBytes.length, 1);
+    assert.equal(harness.spawnCalls[0].child.stdinEndCount, 1);
+    assert.equal(harness.terminationCalls.length, 1);
+    assert.equal(JSON.stringify({ result, emitted: harness.emitted }).includes(sentinel), false);
+    assert.equal(JSON.stringify({ result, emitted: harness.emitted }).includes(task), false);
+  }
+
   {
     const harness = makeHarness(supervisorModule, { prepareError: true });
     const result = await harness.supervisor.handleExtRequest(

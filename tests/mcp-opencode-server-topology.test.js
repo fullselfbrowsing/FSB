@@ -110,6 +110,7 @@ function makeChild(role, pid, controls) {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const stdinBytes = [];
+  let stdinEndCount = 0;
   let closed = false;
 
   const close = (exit = { code: 0, signal: null }) => {
@@ -136,6 +137,7 @@ function makeChild(role, pid, controls) {
       setImmediate(callback);
     },
     final(callback) {
+      stdinEndCount += 1;
       callback();
       if (role === 'owned_server' || role === 'policy_preflight') return;
       const finish = () => {
@@ -143,6 +145,7 @@ function makeChild(role, pid, controls) {
           close({ code: 1, signal: null });
           return;
         }
+        for (const chunk of controls.taskStderrChunks.get(role) ?? []) stderr.write(chunk);
         send([
           normalizedEvent('init', { role }, `session-topology-${pid}`),
           normalizedEvent('result', { is_error: false, role }, `session-topology-${pid}`),
@@ -166,6 +169,10 @@ function makeChild(role, pid, controls) {
     stdinBytes,
     close,
     get closed() { return closed; },
+  });
+  Object.defineProperty(child, 'stdinEndCount', {
+    enumerable: true,
+    get() { return stdinEndCount; },
   });
   queueMicrotask(() => {
     child.emit('spawn');
@@ -365,6 +372,7 @@ function makeHarness(supervisorModule, options = {}) {
     healthGate: null,
     holdTaskRoles: new Set(),
     pendingTaskCompletions: new Map(),
+    taskStderrChunks: new Map(),
     policyEnabled: options.policyEnabled === true,
     expectedPolicyDocuments: cleanPolicy,
     processPolicyDocuments: options.processPolicyDocuments
@@ -1152,6 +1160,127 @@ async function runLeaseLifecycle(supervisorModule) {
   }
 }
 
+async function runTaskOnce(supervisorModule) {
+  const fallbackSentinels = [
+    'agent "fsb" not found. Falling back to default agent',
+    'agent "fsb" is a subagent, not a primary agent. Falling back to default agent',
+  ];
+
+  {
+    const task = 'DIRECT_TASK_ONCE_CANARY';
+    const harness = makeHarness(supervisorModule);
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('opencode', task, 'ext-task-once-direct'),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'succeeded');
+    const direct = harness.spawnCalls.filter((call) => call.role === 'direct_task');
+    assert.equal(direct.length, 1);
+    assert.equal(direct[0].child.stdinBytes.length, 1);
+    assert.equal(Buffer.concat(direct[0].child.stdinBytes).toString('utf8'), task);
+    assert.equal(direct[0].child.stdinEndCount, 1);
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule);
+    const coldTask = 'COLD_TASK_ONCE_CANARY';
+    assert.equal((await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', coldTask, 'ext-task-once-cold'),
+      harness.emit,
+    )).status, 'succeeded');
+    const server = harness.spawnCalls.find((call) => call.role === 'owned_server');
+    const cold = harness.spawnCalls.find((call) => call.role === 'cold_task');
+    assert.equal(server.child.stdinBytes.length, 0, 'server stdin receives no task bytes');
+    assert.equal(cold.child.stdinBytes.length, 1);
+    assert.equal(Buffer.concat(cold.child.stdinBytes).toString('utf8'), coldTask);
+    assert.equal(cold.child.stdinEndCount, 1);
+    assert.equal(cold.passwordAtSpawn, undefined);
+
+    const attachTask = 'ATTACH_TASK_ONCE_CANARY';
+    assert.equal((await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', attachTask, 'ext-task-once-attach'),
+      harness.emit,
+    )).status, 'succeeded');
+    const attach = harness.spawnCalls.find((call) => call.role === 'attach_task');
+    assert.equal(attach.child.stdinBytes.length, 1);
+    assert.equal(Buffer.concat(attach.child.stdinBytes).toString('utf8'), attachTask);
+    assert.equal(attach.child.stdinEndCount, 1);
+    assert.equal(attach.passwordAtSpawn, harness.secretPassword);
+    assert.equal(Object.hasOwn(attach.options.env, 'OPENCODE_SERVER_PASSWORD'), false);
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 1);
+    for (const event of harness.emitted.filter((item) => item.event === 'delegation.started')) {
+      assert.deepEqual(Object.keys(event.payload).sort(), [
+        'adapterId',
+        'delegationId',
+        'profileVersion',
+      ]);
+      for (const forbidden of ['endpoint', 'port', 'secretRef', 'password', 'topology', 'task']) {
+        assert.equal(Object.hasOwn(event.payload, forbidden), false);
+      }
+    }
+    await harness.supervisor.close();
+  }
+
+  for (const fixture of [
+    { role: 'direct_task', adapterId: 'opencode', sentinel: fallbackSentinels[0] },
+    { role: 'cold_task', adapterId: 'claude-code', sentinel: fallbackSentinels[0] },
+    { role: 'attach_task', adapterId: 'claude-code', sentinel: fallbackSentinels[1] },
+  ]) {
+    const harness = makeHarness(supervisorModule);
+    if (fixture.role === 'attach_task') {
+      assert.equal((await harness.supervisor.handleExtRequest(
+        startRequest('claude-code', 'attach sentinel seed', 'ext-sentinel-seed'),
+        harness.emit,
+      )).status, 'succeeded');
+    }
+    const split = Math.floor(fixture.sentinel.length / 2);
+    harness.controls.taskStderrChunks.set(fixture.role, [
+      `ignored stderr before ${fixture.sentinel.slice(0, split)}`,
+      `${fixture.sentinel.slice(split)} ignored stderr after`,
+    ]);
+    const before = harness.spawnCalls.length;
+    const task = `STDERR_TASK_CANARY_${fixture.role}`;
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest(fixture.adapterId, task, `ext-sentinel-${fixture.role}`),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed', `${fixture.role} fallback warning fails closed`);
+    assert.deepEqual(
+      harness.spawnCalls.slice(before).map((call) => call.role),
+      [fixture.role],
+      `${fixture.role} sentinel creates no fallback task child`,
+    );
+    const taskCall = harness.spawnCalls.at(-1);
+    assert.equal(taskCall.child.stdinBytes.length, 1);
+    assert.equal(taskCall.child.stdinEndCount, 1);
+    const serialized = JSON.stringify({ terminal, emitted: harness.emitted });
+    assert.equal(serialized.includes(fixture.sentinel), false);
+    assert.equal(serialized.includes(task), false);
+    await harness.supervisor.close();
+  }
+
+  {
+    const harness = makeHarness(supervisorModule);
+    await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'zero event seed', 'ext-zero-event-seed'),
+      harness.emit,
+    );
+    harness.controls.zeroEventRoles.add('attach_task');
+    const before = harness.spawnCalls.length;
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest('claude-code', 'zero event task once', 'ext-zero-event-once'),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.deepEqual(harness.spawnCalls.slice(before).map((call) => call.role), ['attach_task']);
+    assert.equal(harness.spawnCalls.at(-1).child.stdinBytes.length, 1);
+    assert.equal(harness.spawnCalls.at(-1).child.stdinEndCount, 1);
+    assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 1);
+    await harness.supervisor.close();
+  }
+}
+
 async function runPolicyAttestation(supervisorModule) {
   {
     const task = 'POLICY_TASK_CANARY_must_only_reach_selected_stdin';
@@ -1363,11 +1492,15 @@ async function main() {
   if (!section || section === 'policy-attestation') {
     await runPolicyAttestation(supervisorModule);
   }
+  if (!section || section === 'task-once') {
+    await runTaskOnce(supervisorModule);
+  }
   if (section && ![
     'selection-replay',
     'owned-health',
     'lease-lifecycle',
     'policy-attestation',
+    'task-once',
   ].includes(section)) {
     throw new Error(`Unknown topology test section: ${section}`);
   }
