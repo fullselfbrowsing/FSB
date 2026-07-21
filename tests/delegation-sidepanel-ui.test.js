@@ -473,6 +473,8 @@ assert(feedSource.includes('textContent') && feedSource.includes('createTextNode
   'delegation renderer uses only text DOM construction');
 assert(panelSource.includes("message.type !== 'FSB_DELEGATION_UPDATED'"),
   'side panel accepts only the canonical runtime update type');
+assert(!/opencode/i.test(panelSource),
+  'side-panel presentation contains no OpenCode-specific renderer or state branch');
 assert(panelSource.includes("_delegationHasExactKeys(message, ['announceSequence', 'snapshot', 'type'])"),
   'runtime message shape is exact');
 assert(panelSource.includes('snapshot.delegationId !== _delegationUiState.delegationId'),
@@ -609,6 +611,8 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     const control = new TestNode('div');
     const context = {
       document: globalThis.document,
+      FsbDelegationProviders: DelegationProviders,
+      FsbDelegationProviders: DelegationProviders,
       _delegationUiState: {
         mode: 'ready',
         providerId: provider.id,
@@ -642,6 +646,10 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
       _setDelegationComposerLocked() {}
     };
     vm.createContext(context);
+    [
+      '_delegationOwnDataValue',
+      '_delegationCanonicalProvider'
+    ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
     vm.runInContext(consentRenderSource, context);
     context._renderDelegationConsent({ focusHeading: true });
     return { stateCard, control };
@@ -920,6 +928,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     };
     const context = {
       DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+      FsbDelegationProviders: DelegationProviders,
       _delegationComposerEditRevision: 4,
       _delegationUiState: state,
       chatInput,
@@ -953,6 +962,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     vm.createContext(context);
     [
       '_delegationHasExactKeys',
+      '_delegationOwnDataValue',
+      '_delegationCanonicalProvider',
       '_delegationValidPreflightResponse',
       '_beginDelegationPreflightIntent',
       '_delegationIntentIsCurrent',
@@ -1033,6 +1044,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     const composerLocks = [];
     const context = {
       document: globalThis.document,
+      FsbDelegationProviders: DelegationProviders,
       _delegationUiState: { mode: 'ready', errorCode: null },
       _delegationRunStopControls: [],
       _ensureDelegationMount: () => ({ run, state: stateCard, feed, control }),
@@ -1051,6 +1063,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       '_delegationSemanticIcon',
       '_delegationSemanticHeading',
       '_delegationAction',
+      '_delegationOwnDataValue',
+      '_delegationCanonicalProvider',
       '_renderDelegationPreflightFailure'
     ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
 
@@ -1096,6 +1110,24 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(findAll(stateCard, 'code').length, 0);
     assert.deepEqual(headers[1], { label: 'Ready', tone: '' });
     assert.equal(composerLocks[1], false);
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'start_rejected',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'OpenCode cannot start this task');
+    assert(stateCard.textContent.includes(
+      'OpenCode could not use a signed-in account and model. Open provider setup, confirm OpenCode can run non-interactively, then try this message again.'
+    ));
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Open provider setup', 'Back to message'
+    ]);
+    assert.equal(stateCard.getAttribute('role'), null,
+      'not-ready OpenCode reuses the existing non-alert preflight state');
+    assert.deepEqual(headers[2], { label: 'Ready', tone: '' });
+    assert.equal(composerLocks[2], false);
   }
 
   {
@@ -1362,6 +1394,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     };
     const context = {
       DELEGATION_NATIVE_WAKE_ID_PATTERN: /^[A-Za-z0-9_-]{16,64}$/,
+      FsbDelegationProviders: DelegationProviders,
       _delegationComposerEditRevision: 0,
       _delegationUiState: state,
       chatInput,
@@ -1390,6 +1423,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     vm.createContext(context);
     [
       '_delegationHasExactKeys',
+      '_delegationOwnDataValue',
+      '_delegationCanonicalProvider',
       '_delegationValidPreflightResponse',
       '_delegationValidConsentResponse',
       '_beginDelegationPreflightIntent',
@@ -1723,6 +1758,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     function makeBindingFailureHarness(stopOutcomes) {
       const commands = [];
       const inlineErrors = [];
+      const preflightFailures = [];
       const rendered = [];
       const stateNode = new TestNode('div');
       const counts = { ready: 0, added: 0, persisted: 0 };
@@ -1732,6 +1768,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         pendingStart: false,
         pendingStop: false,
         task,
+        providerId: 'claude-code',
+        providerLabel: 'Claude Code',
         errorCode: null,
         challengeId: 'consumed-challenge',
         challengeExpiresAt: 12345,
@@ -1777,6 +1815,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         },
         _ensureDelegationMount: () => ({ state: stateNode }),
         _renderDelegationInlineError(_container, text) { inlineErrors.push(text); },
+        _renderDelegationPreflightFailure(result) { preflightFailures.push(clone(result)); },
         updateSendButtonState() {},
         _persistMessageToConversation() { counts.persisted += 1; },
         _resetDelegationSelection() { throw new Error('unbound run cannot become selected'); },
@@ -1811,7 +1850,9 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
         '_beginDelegationStart',
         '_stopDelegation'
       ].forEach((name) => vm.runInContext(extractNamedFunction(panelSource, name), context));
-      return { commands, context, counts, inlineErrors, outcomes, rendered, state, stateNode };
+      return {
+        commands, context, counts, inlineErrors, outcomes, preflightFailures, rendered, state, stateNode
+      };
     }
 
     const successful = makeBindingFailureHarness([{ ok: true, snapshot: stopped }]);
@@ -2044,6 +2085,12 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     await rejectedStart.context._beginDelegationStart(null);
     assert.equal(rejectedStart.context._delegationUnboundCleanupByOrigin.size, 0,
       'rejected start releases its synchronous cleanup reservation');
+    assert.deepEqual(rejectedStart.preflightFailures, [{
+      ok: false,
+      code: 'start_rejected',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    }], 'not-ready start rejection reuses one existing provider-labelled failure surface');
 
     const committedBinding = makeBindingFailureHarness([]);
     committedBinding.context._writeDelegationConversationBinding = async () => {
@@ -2677,6 +2724,27 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       terminal: null
     };
     const card = new TestNode('div');
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      provider: { id: 'opencode', label: 'OpenCode' }
+    });
+    assert(card.textContent.includes('OpenCode running'));
+    assert(card.textContent.includes('OpenCode is working in the background'));
+
+    context._renderDelegationRunHeader(card, {
+      ...base,
+      provider: { id: 'opencode', label: 'OpenCode' },
+      state: 'failed',
+      terminal: { code: 'agent_failed', releasedTabCount: 0 }
+    });
+    assert(card.textContent.includes('Agent could not finish this task'));
+    assert(card.textContent.includes(
+      'OpenCode stopped before the task was complete. Review the error details, then try the same message again.'
+    ));
+    assert.deepEqual(findAll(card, 'button').map((button) => button.textContent), [
+      'Try message again'
+    ], 'OpenCode failure has one explicit new-intent retry and no automatic replay control');
 
     context._renderDelegationRunHeader(card, { ...base, connection: 'disconnected' });
     assert.equal(card.getAttribute('data-delegation-state'), 'running');

@@ -598,23 +598,63 @@ function _delegationHasExactKeys(value, keys) {
   return true;
 }
 
+function _delegationOwnDataValue(value, key) {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    return undefined;
+  }
+  try {
+    var descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function _delegationCanonicalProvider(providerId, providerLabel, allowIdOnly) {
+  var helper = typeof FsbDelegationProviders !== 'undefined'
+    ? FsbDelegationProviders
+    : null;
+  var get = _delegationOwnDataValue(helper, 'get');
+  if (typeof get !== 'function'
+      || typeof providerId !== 'string'
+      || (typeof providerLabel !== 'string' && allowIdOnly !== true)) return null;
+  var metadata = null;
+  try { metadata = get.call(helper, providerId); }
+  catch (_error) { return null; }
+  var canonicalId = _delegationOwnDataValue(metadata, 'id');
+  var canonicalLabel = _delegationOwnDataValue(metadata, 'label');
+  var billingKind = _delegationOwnDataValue(metadata, 'billingKind');
+  if (canonicalId !== providerId
+      || (allowIdOnly !== true && canonicalLabel !== providerLabel)
+      || (billingKind !== 'subscription' && billingKind !== 'unknown')) return null;
+  return { id: canonicalId, label: canonicalLabel, billingKind: billingKind };
+}
+
 function _delegationValidPreflightResponse(value) {
   if (!value || typeof value !== 'object') return false;
-  if (value.ok === true && value.kind === 'agent') {
+  var ok = _delegationOwnDataValue(value, 'ok');
+  var kind = _delegationOwnDataValue(value, 'kind');
+  if (ok === true && kind === 'agent') {
     return _delegationHasExactKeys(value, ['kind', 'ok', 'providerId', 'providerLabel'])
-      && value.providerId === 'claude-code'
-      && value.providerLabel === 'Claude Code';
+      && _delegationCanonicalProvider(
+        _delegationOwnDataValue(value, 'providerId'),
+        _delegationOwnDataValue(value, 'providerLabel')
+      ) !== null;
   }
-  if (value.ok === true && value.kind === 'api') {
+  if (ok === true && kind === 'api') {
     return _delegationHasExactKeys(value, ['agentProviderId', 'kind', 'ok', 'providerId'])
-      && typeof value.providerId === 'string'
-      && value.agentProviderId === '';
+      && typeof _delegationOwnDataValue(value, 'providerId') === 'string'
+      && _delegationOwnDataValue(value, 'agentProviderId') === '';
   }
-  return value.ok === false
-    && _delegationHasExactKeys(value, ['code', 'ok', 'providerId', 'providerLabel'])
-    && typeof value.code === 'string'
-    && typeof value.providerId === 'string'
-    && typeof value.providerLabel === 'string';
+  if (ok !== false
+      || !_delegationHasExactKeys(value, ['code', 'ok', 'providerId', 'providerLabel'])
+      || typeof _delegationOwnDataValue(value, 'code') !== 'string') return false;
+  var providerId = _delegationOwnDataValue(value, 'providerId');
+  var providerLabel = _delegationOwnDataValue(value, 'providerLabel');
+  return (providerId === '' && providerLabel === 'Selected provider')
+    || _delegationCanonicalProvider(providerId, providerLabel) !== null;
 }
 
 function _createDelegationIntentId() {
@@ -703,24 +743,31 @@ function _continueDelegationPreflightIntent(intentId) {
 }
 
 function _delegationValidConsentResponse(value) {
-  return _delegationHasExactKeys(value, [
+  if (!_delegationHasExactKeys(value, [
     'challengeId', 'expiresAt', 'ok', 'providerId', 'providerLabel', 'trusted'
-  ])
-    && value.ok === true
-    && value.providerId === 'claude-code'
-    && value.providerLabel === 'Claude Code'
-    && typeof value.trusted === 'boolean';
+  ])) return false;
+  return _delegationOwnDataValue(value, 'ok') === true
+    && _delegationCanonicalProvider(
+      _delegationOwnDataValue(value, 'providerId'),
+      _delegationOwnDataValue(value, 'providerLabel')
+    ) !== null
+    && typeof _delegationOwnDataValue(value, 'trusted') === 'boolean';
 }
 
-function _delegationValidTrustResponse(value) {
-  if (value && value.ok === true) {
+function _delegationValidTrustResponse(value, providerId) {
+  if (value && _delegationOwnDataValue(value, 'ok') === true) {
     return _delegationHasExactKeys(value, ['ok', 'providerId', 'trusted'])
-      && value.providerId === 'claude-code'
-      && value.trusted === true;
+      && _delegationCanonicalProvider(
+        _delegationOwnDataValue(value, 'providerId'),
+        undefined,
+        true
+      ) !== null
+      && _delegationOwnDataValue(value, 'providerId') === providerId
+      && _delegationOwnDataValue(value, 'trusted') === true;
   }
   return _delegationHasExactKeys(value, ['code', 'ok'])
-    && value.ok === false
-    && typeof value.code === 'string';
+    && _delegationOwnDataValue(value, 'ok') === false
+    && typeof _delegationOwnDataValue(value, 'code') === 'string';
 }
 
 function _delegationValidLifecycleResponse(value) {
@@ -1414,9 +1461,14 @@ function _renderDelegationConsent(options) {
   _delegationRunStopControls = [];
   _restoreLegacyStopControl();
   mount.state.removeAttribute('role');
+  var provider = _delegationCanonicalProvider(
+    _delegationUiState.providerId,
+    _delegationUiState.providerLabel
+  );
+  var providerLabel = provider ? provider.label : 'Agent';
 
   var heading = _delegationElement(
-    'h2', 'delegation-state-heading', 'Let Claude Code control this browser?'
+    'h2', 'delegation-state-heading', 'Let ' + providerLabel + ' control this browser?'
   );
   heading.id = 'delegationRunHeading';
   heading.tabIndex = -1;
@@ -1424,7 +1476,7 @@ function _renderDelegationConsent(options) {
   mount.state.appendChild(_delegationElement(
     'p',
     'delegation-state-body',
-    'Claude Code may drive FSB browser tools for this task.'
+    providerLabel + ' may drive FSB browser tools for this task.'
   ));
   mount.state.appendChild(_delegationElement(
     'p',
@@ -1438,12 +1490,13 @@ function _renderDelegationConsent(options) {
   checkbox.checked = false;
   checkbox.disabled = _delegationUiState.pendingStart || _delegationUiState.pendingTrust;
   trust.appendChild(checkbox);
-  trust.appendChild(document.createTextNode('Trust Claude Code for future runs'));
+  trust.appendChild(document.createTextNode('Trust ' + providerLabel + ' for future runs'));
   mount.state.appendChild(trust);
   mount.state.appendChild(_delegationElement(
     'p',
     'delegation-state-note',
-    'This turns off confirmation for future Claude Code runs on this browser. You can restore confirmation in Providers.'
+    'This turns off confirmation for future ' + providerLabel
+      + ' runs on this browser. You can restore confirmation in Providers.'
   ));
 
   if (_delegationUiState.errorCode) {
@@ -1457,7 +1510,7 @@ function _renderDelegationConsent(options) {
 
   var actions = _delegationElement('div', 'delegation-state-actions');
   var allow = _delegationAction(
-    'Allow & start Claude Code',
+    'Allow & start ' + providerLabel,
     'delegation-action-primary',
     function() { _allowDelegationFromConsent(checkbox); }
   );
@@ -1553,11 +1606,11 @@ function _renderDelegationPreflightFailure(result) {
   result = result || {};
   _clearDelegationElapsedTimer();
   var code = typeof result.code === 'string' ? result.code : 'agent_offline';
-  var providerLabel = result.providerId === 'claude-code'
-    ? 'Claude Code'
-    : (typeof result.providerLabel === 'string' && result.providerLabel.length <= 128
-      ? result.providerLabel
-      : 'Selected provider');
+  var provider = _delegationCanonicalProvider(
+    _delegationOwnDataValue(result, 'providerId'),
+    _delegationOwnDataValue(result, 'providerLabel')
+  );
+  var providerLabel = provider ? provider.label : 'Selected provider';
   var headingText = 'Agent offline';
   var bodyText = 'FSB cannot reach the local agent service. Run the doctor command, then try this message again.';
   var primaryLabel = 'Copy doctor command';
@@ -1579,6 +1632,16 @@ function _renderDelegationPreflightFailure(result) {
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = null;
     secondaryAction = null;
+  } else if (code === 'start_rejected') {
+    headingText = providerLabel + ' cannot start this task';
+    bodyText = providerLabel
+      + ' could not use a signed-in account and model. Open provider setup, confirm '
+      + providerLabel
+      + ' can run non-interactively, then try this message again.';
+    primaryLabel = 'Open provider setup';
+    primaryAction = _openDelegationProviderSetup;
+    secondaryLabel = 'Back to message';
+    secondaryAction = _backToDelegationMessage;
   } else if (code !== 'agent_offline' && code !== 'runtime_unavailable') {
     headingText = 'Agent could not start this task';
     bodyText = 'Keep this message in the composer, review the provider settings, and try again.';
@@ -1732,8 +1795,9 @@ function _renderDelegationControlBar(snapshot, options) {
   control.classList.add('hidden');
 
   if (_delegationCanTakeControl(snapshot)) {
+    var providerLabel = snapshot.provider ? snapshot.provider.label : 'Agent';
     control.appendChild(_delegationElement(
-      'span', 'delegation-control-copy', 'Claude Code controls this active tab'
+      'span', 'delegation-control-copy', providerLabel + ' controls this active tab'
     ));
     var takeButton = _delegationAction('Take control', '', _takeDelegationControl);
     takeButton.setAttribute('data-delegation-action', 'take-control');
@@ -1963,13 +2027,14 @@ function _renderDelegationRunHeader(container, snapshot) {
     && !offline
     && !unpaired
     && !unsupported;
+  var providerLabel = snapshot.provider ? snapshot.provider.label : 'Agent';
   var headingText = _delegationStateLabel(snapshot);
   if (bindingCleanupPending) headingText = 'Agent cleanup needs attention';
   else if (restartLost) headingText = 'Agent run ended after daemon restart';
   else if (stopped) headingText = _delegationStoppedHeading(snapshot);
   else if (offline) headingText = 'Agent offline';
   else if (disconnected) headingText = 'Agent connection lost';
-  else if (unpaired) headingText = 'Pair this browser before starting Claude Code';
+  else if (unpaired) headingText = 'Pair this browser before starting ' + providerLabel;
   else if (unsupported) {
     headingText = (snapshot.provider ? snapshot.provider.label : 'Selected provider')
       + ' cannot run browser tasks';
@@ -2043,7 +2108,8 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      'FSB could not return this tab to Claude Code, so the run ended and the tab remains under your control. Start a new task when you are ready.'
+      'FSB could not return this tab to ' + providerLabel
+        + ', so the run ended and the tab remains under your control. Start a new task when you are ready.'
     ));
     var resumeFailureActions = _delegationElement('div', 'delegation-state-actions');
     resumeFailureActions.appendChild(_delegationAction(
@@ -2054,7 +2120,8 @@ function _renderDelegationRunHeader(container, snapshot) {
     container.appendChild(_delegationElement(
       'p',
       'delegation-state-body',
-      'Claude Code stopped before the task was complete. Review the error details, then try the same message again.'
+      providerLabel
+        + ' stopped before the task was complete. Review the error details, then try the same message again.'
     ));
     var retryActions = _delegationElement('div', 'delegation-state-actions');
     retryActions.appendChild(_delegationAction(
@@ -2076,7 +2143,10 @@ function _renderDelegationRunHeader(container, snapshot) {
     _renderDelegationInlineError(container, 'Take control is no longer available for this tab.');
   } else if (_delegationUiState.errorCode === 'hold_failed'
       || _delegationUiState.errorCode === 'hold_lease_failed') {
-    _renderDelegationInlineError(container, 'Claude Code could not pause for human control.');
+    _renderDelegationInlineError(
+      container,
+      providerLabel + ' could not pause for human control.'
+    );
   } else if (_delegationUiState.errorCode === 'stop_failed'
       || _delegationUiState.errorCode === 'runtime_unavailable') {
     _renderDelegationInlineError(
@@ -2414,7 +2484,14 @@ async function _beginDelegationStart(challengeId) {
     _delegationUiState.errorCode = response && typeof response.code === 'string'
       ? response.code
       : 'start_rejected';
-    if (_delegationUiState.challengeId) {
+    if (_delegationUiState.errorCode === 'start_rejected') {
+      _renderDelegationPreflightFailure({
+        ok: false,
+        code: 'start_rejected',
+        providerId: _delegationUiState.providerId,
+        providerLabel: _delegationUiState.providerLabel
+      });
+    } else if (_delegationUiState.challengeId) {
       _renderDelegationConsent({ focusHeading: false });
     } else {
       _renderDelegationReadyState();
@@ -2422,7 +2499,8 @@ async function _beginDelegationStart(challengeId) {
       var failedMount = _ensureDelegationMount();
       _renderDelegationInlineError(
         failedMount.state,
-        'Claude Code could not start this task. Keep the message and try again.'
+        (_delegationUiState.providerLabel || 'Agent')
+          + ' could not start this task. Keep the message and try again.'
       );
     }
     updateSendButtonState();
@@ -2542,11 +2620,12 @@ async function _allowDelegationFromConsent(checkbox) {
     var trustResponse = await _sendDelegationCommand({
       type: 'FSB_DELEGATION_SET_TRUST',
       challengeId: _delegationUiState.challengeId,
-      providerId: 'claude-code',
+      providerId: _delegationUiState.providerId,
       trusted: true
     });
     _delegationUiState.pendingTrust = false;
-    if (!_delegationValidTrustResponse(trustResponse) || trustResponse.ok !== true) {
+    if (!_delegationValidTrustResponse(trustResponse, _delegationUiState.providerId)
+        || trustResponse.ok !== true) {
       _delegationUiState.errorCode = trustResponse && trustResponse.code
         ? trustResponse.code
         : 'trust_challenge_invalid';
@@ -3798,9 +3877,7 @@ async function handleSendMessage() {
 
   if (!_delegationValidPreflightResponse(preflight)
       || preflight.ok !== true
-      || preflight.kind !== 'agent'
-      || preflight.providerId !== 'claude-code'
-      || preflight.providerLabel !== 'Claude Code') {
+      || preflight.kind !== 'agent') {
     var safePreflightFailure = _delegationValidPreflightResponse(preflight)
       && preflight.ok === false
       ? preflight
@@ -3819,8 +3896,8 @@ async function handleSendMessage() {
   }
 
   _delegationUiState.task = message;
-  _delegationUiState.providerId = 'claude-code';
-  _delegationUiState.providerLabel = 'Claude Code';
+  _delegationUiState.providerId = preflight.providerId;
+  _delegationUiState.providerLabel = preflight.providerLabel;
   if (!_continueDelegationPreflightIntent(intentId)) {
     _clearDelegationPreflightIntent(intentId);
     updateSendButtonState();
@@ -3837,7 +3914,9 @@ async function handleSendMessage() {
     return;
   }
   _clearDelegationPreflightIntent(intentId);
-  if (!_delegationValidConsentResponse(consent)) {
+  if (!_delegationValidConsentResponse(consent)
+      || consent.providerId !== _delegationUiState.providerId
+      || consent.providerLabel !== _delegationUiState.providerLabel) {
     _delegationUiState.errorCode = 'consent_required';
     _renderDelegationPreflightFailure({ code: 'consent_required' });
     updateSendButtonState();

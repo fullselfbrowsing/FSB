@@ -403,11 +403,11 @@ function ensureDelegationTrustControl() {
   heading.id = 'delegationTrustHeading';
   heading.textContent = 'Run confirmation';
   const copy = document.createElement('p');
-  copy.textContent = 'Require confirmation before Claude Code starts another delegated browser task.';
+  copy.textContent = 'Require confirmation before the selected agent starts another delegated browser task.';
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'form-secondary-btn provider-detail-action';
-  button.textContent = 'Restore confirmation for Claude Code';
+  button.textContent = 'Restore confirmation';
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
