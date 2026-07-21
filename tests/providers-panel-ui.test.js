@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -83,6 +84,7 @@ function assertBalancedHtmlFragment(fragment, label) {
 const HTML = read('extension/ui/control_panel.html');
 const CSS = read('extension/ui/options.css');
 const JS = read('extension/ui/options.js');
+const DELEGATION_PROVIDERS = require('../extension/utils/delegation-providers.js');
 const PROVIDERS = require('../extension/ui/providers-panel.js');
 
 console.log('Providers panel UI: canonical route and static roster');
@@ -116,11 +118,34 @@ assert.ok(
   'legacy hash is normalized before section lookup'
 );
 
+const canonicalHelperScript = '  <script src="../utils/delegation-providers.js"></script>\n';
+const canonicalHelperTags = HTML.match(
+  /<script\s+src="\.\.\/utils\/delegation-providers\.js"><\/script>/g
+) || [];
 const helperTags = HTML.match(/<script\s+src="providers-panel\.js"><\/script>/g) || [];
-assert.strictEqual(helperTags.length, 1, 'provider helper is loaded exactly once');
+assert.strictEqual(canonicalHelperTags.length, 1,
+  'canonical delegation provider helper is loaded exactly once');
+assert.strictEqual(helperTags.length, 1, 'provider panel helper is loaded exactly once');
 assert.ok(
-  HTML.indexOf('src="providers-panel.js"') < HTML.indexOf('src="options.js"'),
-  'provider helper loads before options.js'
+  HTML.indexOf('src="../utils/delegation-providers.js"')
+    < HTML.indexOf('src="providers-panel.js"')
+    && HTML.indexOf('src="providers-panel.js"') < HTML.indexOf('src="options.js"'),
+  'canonical delegation helper loads before both Providers consumers'
+);
+assert.match(HTML,
+  /<script src="\.\.\/utils\/delegation-providers\.js"><\/script>\s*<script src="providers-panel\.js"><\/script>\s*<script src="options\.js"><\/script>/,
+  'the three Providers scripts remain adjacent in dependency order');
+
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+assert.strictEqual(
+  sha256(HTML.replace(canonicalHelperScript, '')),
+  'effea844924badc6cf0bae22d3a98a75d4a4f12506bb1e4b1897dd51b01b667e',
+  'the canonical helper line is the only control-panel HTML delta'
+);
+assert.strictEqual(
+  sha256(providersSection),
+  '747b52e964882ef11f82f96e22696c495b45e2c1ffee8b2e8f552fd436f64a04',
+  'the visible Providers section remains byte-equivalent'
 );
 
 const radioTags = HTML.match(/<input\b[^>]*\bname="fsbProviderSelection"[^>]*>/g) || [];
@@ -135,6 +160,11 @@ const expectedContract = [
   ...PROVIDERS.API_PROVIDER_IDS.map((id) => ({ kind: 'api', id, value: id }))
 ];
 assert.deepStrictEqual(radioContract, expectedContract);
+assert.deepStrictEqual(radioContract.slice(0, 3), [
+  { kind: 'agent', id: 'claude-code', value: 'claude-code' },
+  { kind: 'agent', id: 'opencode', value: 'opencode' },
+  { kind: 'agent', id: 'codex', value: 'codex' }
+], 'OpenCode remains the unchanged second Agent CLI row between Claude Code and Codex');
 
 const providerLabels = HTML.match(/<label\b[^>]*class="provider-row"[^>]*>[\s\S]*?<\/label>/g) || [];
 assert.strictEqual(providerLabels.length, 10, 'every radio has a provider-row label');
@@ -206,6 +236,17 @@ assert.strictEqual((providersSection.match(/data-provider-compatibility-group=/g
   'exactly the three agent rows contain one compatibility group');
 assert.strictEqual((providersSection.match(/data-provider-compatibility-description=/g) || []).length, 3,
   'exactly the three agent radios receive one stable compatibility description');
+const openCodeRow = providerLabels[1];
+assert.strictEqual((openCodeRow.match(/data-provider-id="opencode"/g) || []).length, 2,
+  'the unchanged OpenCode label and native radio share the closed provider id');
+assert.strictEqual((openCodeRow.match(/data-provider-evidence="opencode"/g) || []).length, 1,
+  'OpenCode retains one evidence badge in its existing content cluster');
+assert.strictEqual((openCodeRow.match(/data-provider-compatibility-group="opencode"/g) || []).length, 1,
+  'OpenCode retains one compatibility group');
+assert.strictEqual((openCodeRow.match(/data-provider-compatibility-description="opencode"/g) || []).length, 1,
+  'OpenCode retains one stable compatibility description');
+assert.strictEqual((openCodeRow.match(/<input\b[^>]*\bdata-provider-id="opencode"[^>]*>/g) || []).length, 1,
+  'OpenCode retains one native radio');
 
 const modelProviderMatch = HTML.match(/<select\b[^>]*\bid="modelProvider"[^>]*>[\s\S]*?<\/select>/);
 assert.ok(modelProviderMatch, 'hidden compatibility #modelProvider remains present');
@@ -369,6 +410,11 @@ const providerCssStart = CSS.indexOf('/* ---------------------------------------
 const providerCssEnd = CSS.indexOf('/* ---------------------------------------------------------------------------\n * Model Discovery', providerCssStart);
 assert.ok(providerCssStart >= 0 && providerCssEnd > providerCssStart, 'Providers CSS block is present');
 const providerCss = CSS.slice(providerCssStart, providerCssEnd);
+assert.strictEqual(
+  sha256(providerCss),
+  '295a04bf37d4fb44b3ea24a8900ac1171eec59db9a4f33e525fa69fb23f7dfa6',
+  'the Providers CSS block remains byte-equivalent'
+);
 assert.match(providerCss, /\.provider-row\s*\{/);
 assert.match(providerCss, /min-height:\s*64px/);
 assert.match(providerCss, /padding:\s*16px/);
@@ -609,6 +655,15 @@ const setupGuideSource = extractFunction(JS, 'openAgentSetupGuide');
 const announcementSource = extractFunction(JS, 'setProviderEvidenceAnnouncement');
 const refreshFailureMessageSource = extractFunction(JS, 'getCompatibilityRefreshFailureMessage');
 const eventSetupSource = extractFunction(JS, 'setupEventListeners');
+const providerPresentationSources = [
+  recommendationRenderSource,
+  evidenceRenderSource,
+  compatibilityRenderSource,
+  compatibilityModelSource,
+  descriptionRenderSource,
+  agentDetailsRenderSource,
+  announcementSource
+].join('\n');
 assert.match(requestClientsSource, /\? \{ action: 'refreshMcpCompatibility' \}/,
   'manual evidence refresh uses the explicit live compatibility action');
 assert.match(requestClientsSource, /: \{ action: 'getMcpClients' \}/,
@@ -683,6 +738,11 @@ assert.match(JS, /setTimeout\(\(\) => \{[\s\S]*?refreshProviderEvidence\(\);[\s\
 assert.doesNotMatch(refreshEvidenceSource + eventSetupSource,
   /setInterval|visibilitychange|focus\s*\)|scan|detectInstalled/i,
   'provider evidence has no polling, focus refresh, or disk-scan trigger');
+assert.doesNotMatch(providerPresentationSources, /['"]opencode['"]/,
+  'existing provider renderers contain no OpenCode-specific branch');
+assert.doesNotMatch(providerPresentationSources,
+  /1\.14\.25|semver|tested[_ -]?range\s*[:=]|binary(?:Path)?|server(?:Url|Port)|basicAuth|topology|native(?:Model|Provider)|sessionContinuation/i,
+  'provider rendering contains no native version, path, topology, secret, model, or continuation field');
 
 function makeClassList(initial) {
   const names = new Set(initial || []);
@@ -1152,6 +1212,7 @@ function createProviderHarness(initialStorage, harnessOptions) {
     document,
     chrome,
     config: { availableModels: Object.fromEntries(PROVIDERS.API_PROVIDER_IDS.map((id) => [id, []])) },
+    FsbDelegationProviders: DELEGATION_PROVIDERS,
     FSBProvidersPanel: PROVIDERS,
     FSBAnalytics: function() {},
     Event: class { constructor(type) { this.type = type; } },
@@ -1676,7 +1737,7 @@ async function runAgentDetailsTests() {
     },
     opencode: {
       connected: { lastSeenAt: 20 },
-      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 1_000 }
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1_000 }
     },
     codex: {
       installed: { detected: true, checkedAt: 30 },
@@ -1700,8 +1761,8 @@ async function runAgentDetailsTests() {
       heading: 'OpenCode details',
       installation: 'Not installed',
       connection: 'Seen before',
-      compatibility: 'Unsupported',
-      compatibilityHelp: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
+      compatibility: 'Supported',
+      compatibilityHelp: "This CLI is within FSB's fixture-tested compatibility range.",
       authHelp: 'The CLI has not reported its account type.',
       copy: 'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.',
       label: 'Review OpenCode providers and billing',
@@ -1747,6 +1808,16 @@ async function runAgentDetailsTests() {
     assert.strictEqual(harness.agentBillingLink.getAttribute('rel'), 'noopener noreferrer');
     assert.strictEqual(harness.agentBillingLink.hidden, false);
   }
+
+  const openCodeDefinition = PROVIDERS.getProviderDefinition('agent', 'opencode');
+  assert.strictEqual(openCodeDefinition.secondaryBillingLinkLabel, 'Review OpenCode Zen');
+  assert.strictEqual(openCodeDefinition.secondaryBillingUrl, 'https://opencode.ai/docs/zen/');
+  assert.doesNotMatch([
+    openCodeDefinition.billingCopy,
+    openCodeDefinition.billingLinkLabel,
+    openCodeDefinition.secondaryBillingLinkLabel
+  ].join(' '), /included in|subscription|\$\s*\d|\bfree\b|\bunlimited\b/i,
+  'approved OpenCode billing metadata makes no inferred plan or price claim');
 
   harness.openAgentSetupGuideBtn.dispatchEvent({ type: 'click' });
   assert.deepStrictEqual(harness.openedSetupPages, [
@@ -1869,7 +1940,7 @@ async function runProviderEvidenceTests() {
         opencode: {
           id: 'opencode', raw: false, displayName: 'OpenCode', clicked: { lastClickedAt: 900 },
           installed: null, connected: null, live: { agentId: 'agent_open' },
-          compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 700 }
         },
         'claude-code': {
           id: 'claude-code', raw: false, displayName: 'Claude Code', clicked: null,
@@ -1904,10 +1975,12 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(compatibilityIcon(harness, 'claude-code').classList.contains('fa-circle-check'), true);
   assert.strictEqual(compatibilityDescription(harness, 'claude-code').textContent,
     "Compatibility: Supported. This CLI is within FSB's fixture-tested compatibility range.");
-  for (const providerId of ['opencode', 'codex']) {
-    assert.strictEqual(compatibilityStatus(harness, providerId).textContent, 'Unsupported');
-    assert.strictEqual(compatibilityIcon(harness, providerId).classList.contains('fa-circle-xmark'), true);
-  }
+  assert.strictEqual(compatibilityStatus(harness, 'opencode').textContent, 'Supported');
+  assert.strictEqual(compatibilityIcon(harness, 'opencode').classList.contains('fa-circle-check'), true);
+  assert.strictEqual(compatibilityDescription(harness, 'opencode').textContent,
+    "Compatibility: Supported. This CLI is within FSB's fixture-tested compatibility range.");
+  assert.strictEqual(compatibilityStatus(harness, 'codex').textContent, 'Unsupported');
+  assert.strictEqual(compatibilityIcon(harness, 'codex').classList.contains('fa-circle-xmark'), true);
   assert.strictEqual(providerDescription(harness, 'claude-code').textContent,
     'Recommended. Connected now.');
   assert.strictEqual(providerDescription(harness, 'opencode').textContent, 'Connected now.');
@@ -1920,6 +1993,118 @@ async function runProviderEvidenceTests() {
     dirty: harness.dashboardState().hasUnsavedChanges,
     writes: harness.writes.length
   }, beforeRefresh, 'evidence refresh preserves selection, API values, Save state, and storage');
+
+  const openCodeClients = (compatibility) => ({
+    'claude-code': {
+      id: 'claude-code', raw: false, displayName: 'Claude Code',
+      clicked: null, installed: null, connected: null, live: null,
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 700 }
+    },
+    opencode: {
+      id: 'opencode', raw: false, displayName: 'OpenCode',
+      clicked: null, installed: null, connected: null, live: null,
+      compatibility
+    },
+    codex: {
+      id: 'codex', raw: false, displayName: 'Codex',
+      clicked: null, installed: null, connected: null, live: null,
+      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
+    }
+  });
+  const openCodeStates = [
+    {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 700 },
+      label: 'Supported',
+      icon: 'fa-circle-check',
+      className: 'compatibility-badge--supported',
+      detail: "This CLI is within FSB's fixture-tested compatibility range.",
+      announcement: 'Provider status refreshed.'
+    },
+    {
+      compatibility: { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 700 },
+      label: 'Degraded',
+      icon: 'fa-triangle-exclamation',
+      className: 'compatibility-badge--degraded',
+      detail: "This CLI is newer than FSB's fixture-tested range. You can keep it selected; existing start checks still apply.",
+      announcement: 'Provider status refreshed. Compatibility is now Degraded.'
+    },
+    {
+      compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 700 },
+      label: 'Degraded',
+      icon: 'fa-triangle-exclamation',
+      className: 'compatibility-badge--degraded',
+      detail: 'Compatibility evidence is stale. Refresh status to check again.',
+      announcement: 'Provider status refreshed.'
+    },
+    {
+      compatibility: { status: 'unsupported', reason: 'matrix_invalid', checkedAt: 700 },
+      label: 'Unsupported',
+      icon: 'fa-circle-xmark',
+      className: 'compatibility-badge--unsupported',
+      detail: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
+      announcement: 'Provider status refreshed. Compatibility is now Unsupported.'
+    }
+  ];
+  const openCodeStateHarness = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      refreshOutcome: 'refreshed',
+      clients: openCodeClients(openCodeStates[0].compatibility)
+    }
+  });
+  openCodeStateHarness.context.setupEventListeners();
+  openCodeStateHarness.state().clients = openCodeClients(openCodeStates[0].compatibility);
+  openCodeStateHarness.state().evidenceStatus = 'ready';
+  openCodeStateHarness.state().hasSuccessfulEvidence = true;
+  openCodeStateHarness.state().recommendation = PROVIDERS.getRecommendation(
+    openCodeStateHarness.state().clients
+  );
+  openCodeStateHarness.context.setProviderSelection('agent', 'opencode', { markDirty: false });
+  openCodeStateHarness.modelName.appendChild(makeOption('preserved-open-model', 'preserved-open-model'));
+  openCodeStateHarness.modelName.value = 'preserved-open-model';
+  openCodeStateHarness.apiKey.value = 'preserved-xai-key';
+  openCodeStateHarness.geminiApiKey.value = 'preserved-gemini-key';
+  openCodeStateHarness.openaiApiKey.value = 'preserved-openai-key';
+  openCodeStateHarness.anthropicApiKey.value = 'preserved-anthropic-key';
+  openCodeStateHarness.customApiKey.value = 'preserved-custom-key';
+  openCodeStateHarness.customEndpoint.value = 'https://example.invalid/open-code';
+  openCodeStateHarness.openrouterApiKey.value = 'preserved-openrouter-key';
+  openCodeStateHarness.lmstudioBaseUrl.value = 'http://localhost:5678';
+  openCodeStateHarness.dashboardState().hasUnsavedChanges = true;
+  openCodeStateHarness.refreshButton.focus();
+
+  for (const state of openCodeStates) {
+    openCodeStateHarness.setRuntimeResponse({
+      success: true,
+      refreshOutcome: 'refreshed',
+      clients: openCodeClients(state.compatibility)
+    });
+    const beforeOpenCodeTransition = compatibilityIdentitySnapshot(openCodeStateHarness);
+    await openCodeStateHarness.context.refreshProviderEvidence({ announce: true });
+    assert.deepStrictEqual(
+      compatibilityIdentitySnapshot(openCodeStateHarness),
+      beforeOpenCodeTransition,
+      state.label + ' OpenCode rendering preserves focus, row order, selection, recommendation, API values, dirty state, auth, billing, and storage'
+    );
+    assert.strictEqual(compatibilityStatus(openCodeStateHarness, 'opencode').textContent, state.label);
+    assert.strictEqual(compatibilityStatus(openCodeStateHarness, 'opencode').classList.contains(
+      state.className
+    ), true);
+    assert.strictEqual(compatibilityIcon(openCodeStateHarness, 'opencode').classList.contains(
+      state.icon
+    ), true);
+    assert.strictEqual(compatibilityDescription(openCodeStateHarness, 'opencode').textContent,
+      `Compatibility: ${state.label}. ${state.detail}`);
+    assert.strictEqual(openCodeStateHarness.agentCompatibilityStatus.textContent, state.label);
+    assert.strictEqual(openCodeStateHarness.agentCompatibilityHelp.textContent, state.detail);
+    assert.strictEqual(openCodeStateHarness.agentAccountStatus.textContent, 'Not reported');
+    assert.strictEqual(openCodeStateHarness.agentAccountHelp.textContent,
+      'The CLI has not reported its account type.');
+    assert.strictEqual(openCodeStateHarness.agentBillingStatus.textContent, 'Billing not reported');
+    assert.strictEqual(openCodeStateHarness.announcement.textContent, state.announcement);
+    assert.strictEqual(compatibilityStatus(openCodeStateHarness, 'codex').textContent, 'Unsupported',
+      'Codex stays fail-closed while OpenCode compatibility changes');
+  }
 
   harness.setRuntimeResponse({
     success: true,
@@ -2218,6 +2403,38 @@ async function runProviderEvidenceTests() {
   assert.strictEqual(timeoutSupported.agentCompatibilityStatus.textContent, 'Degraded',
     'runtime timeout keeps row and selected-detail compatibility coherent');
   assert.strictEqual(timeoutSupported.announcement.textContent,
+    'Compatibility data could not be refreshed. Cached support is now Degraded.');
+
+  const timeoutOpenCode = createProviderHarness({}, {
+    runtimeResponse: {
+      success: true,
+      refreshOutcome: 'refreshed',
+      clients: openCodeClients({
+        status: 'supported', reason: 'within_tested_range', checkedAt: 700
+      })
+    }
+  });
+  timeoutOpenCode.context.setProviderSelection('agent', 'opencode', { markDirty: false });
+  timeoutOpenCode.modelName.appendChild(makeOption('timeout-open-model', 'timeout-open-model'));
+  timeoutOpenCode.modelName.value = 'timeout-open-model';
+  timeoutOpenCode.openaiApiKey.value = 'timeout-preserved-key';
+  timeoutOpenCode.dashboardState().hasUnsavedChanges = true;
+  timeoutOpenCode.refreshButton.focus();
+  await timeoutOpenCode.context.refreshProviderEvidence();
+  const beforeOpenCodeTimeout = compatibilityIdentitySnapshot(timeoutOpenCode);
+  timeoutOpenCode.holdRuntime();
+  await timeoutOpenCode.context.refreshProviderEvidence({ announce: true });
+  assert.deepStrictEqual(compatibilityIdentitySnapshot(timeoutOpenCode), beforeOpenCodeTimeout,
+    'OpenCode timeout preserves focus, row order, selection, recommendation, API values, dirty state, auth, billing, and storage');
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(timeoutOpenCode.state().clients.opencode.compatibility)),
+    { status: 'degraded', reason: 'evidence_stale', checkedAt: 700 },
+    'OpenCode timeout degrades retained safe support without native inspection'
+  );
+  assert.strictEqual(compatibilityStatus(timeoutOpenCode, 'opencode').textContent, 'Degraded');
+  assert.strictEqual(timeoutOpenCode.agentCompatibilityStatus.textContent, 'Degraded');
+  assert.strictEqual(compatibilityStatus(timeoutOpenCode, 'codex').textContent, 'Unsupported');
+  assert.strictEqual(timeoutOpenCode.announcement.textContent,
     'Compatibility data could not be refreshed. Cached support is now Degraded.');
 
   for (const contract of [
