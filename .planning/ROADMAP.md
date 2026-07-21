@@ -227,7 +227,7 @@
 - [x] 64-12-PLAN.md — Project OpenCode through the existing delegated consent/side-panel/feed/summary UI with no provider-specific branch.
 
 **Wave 10** *(blocked on Wave 9 completion)*
-- [ ] 64-13-PLAN.md — Wire exact validation/root/CI/security/full-suite gates and the still-pending three-row human-UAT ledger.
+- [x] 64-13-PLAN.md — Wire exact validation/root/CI/security/full-suite gates and the still-pending three-row human-UAT ledger.
 
 ### Phase 65: Codex Adapter
 **Goal**: Task-mode delegation coverage extends to OpenAI Codex with correct auth-state disclosure (ChatGPT OAuth vs API key vs unauthenticated) so users know which billing bucket a run will hit before starting; `caps.chatMode: false` across all v0.9.91 adapters confirms task-mode-only scope for the milestone.
@@ -255,7 +255,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 61. Delegation UX & SW-Eviction Persistence | 8/8 | Complete (UAT deferred) | 2026-07-15 |
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
-| 64. OpenCode Adapter | 12/13 | In Progress|  |
+| 64. OpenCode Adapter | 13/13 | Complete   | 2026-07-21 |
 | 65. Codex Adapter | 0/0 | Not started | — |
 
 ## Completed Milestones

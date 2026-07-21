@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: executing
-stopped_at: Completed 64-12-PLAN.md
-last_updated: "2026-07-21T11:11:03.808Z"
-last_activity: 2026-07-21 -- Phase 64 Plan 12 complete; provider-neutral delegated UI and terminal barrier green
+status: verifying
+stopped_at: Completed 64-13-PLAN.md
+last_updated: "2026-07-21T11:53:26.072Z"
+last_activity: 2026-07-21 -- Phase 64 Plan 13 complete; validation, security, CI, and guarded full suite green
 progress:
   total_phases: 18
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 53
-  completed_plans: 54
-  percent: 39
+  completed_plans: 55
+  percent: 44
 ---
 
 *Note: the `total_phases`/`completed_phases` counts above are scoped to the active v0.9.91 milestone (Phases 57-65) only. Some GSD tooling (`roadmap.analyze`, `phase.complete`) reports a noisy multi-phase count including collapsed `## Completed Milestones` archive entries and `## Backlog` sections — treat this file's own numbers as authoritative for v0.9.91 progress.*
@@ -35,8 +35,8 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 Phase: 64 (OpenCode Adapter) — EXECUTING
 Plan: 13 of 13
-Status: Ready to execute
-Last activity: 2026-07-21 -- Phase 64 Plan 12 complete; provider-neutral delegated UI and terminal barrier green
+Status: Phase complete — ready for verification
+Last activity: 2026-07-21 -- Phase 64 Plan 13 complete; validation, security, CI, and guarded full suite green
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -232,6 +232,10 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Load the canonical provider helper before both side-panel consumers as the sole HTML change — Add no visible markup or CSS while enabling validated provider labels.
 - [Phase 64]: Bind consent and trust to an exact canonical provider identity while keeping start intent provider-free — Background-owned settings remain the only adapter selection authority.
 - [Phase 64]: Hide result and summary rows for every non-completed outcome — Only controller-authoritative completed terminal truth may present a persisted result candidate as success.
+- [Phase 64]: Keep exactly three genuine OpenCode account, process, browser, and accessibility scenarios pending — Deterministic fixtures and DOM tests cannot promote human evidence.
+- [Phase 64]: Use one explicit adapter aggregate section while retaining the separate first-commit drift gate — Root and focused execution cover every parser, fixture, and drift edge exactly once.
+- [Phase 64]: Keep the existing direct drift-smoke CI job and one renamed Phase 64 root invocation — Preserve CI ordering and avoid duplicate or skipped adapter evidence.
+- [Phase 64]: Mark all 28 implementation rows green only after every focused, historical, security, root, and preservation gate passes — Automated closure remains distinct from the pending live UAT boundary.
 
 ### Pending Todos
 
@@ -276,8 +280,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T11:11:03.804Z
-Stopped at: Completed 64-12-PLAN.md
+Last session: 2026-07-21T11:53:26.067Z
+Stopped at: Completed 64-13-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -312,3 +316,4 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 64 P10 | 31 min | 3 tasks | 9 files |
 | Phase 64 P11 | 13 min | 2 tasks | 6 files |
 | Phase 64 P12 | 14 min | 2 tasks | 7 files |
+| Phase 64 P13 | 30 min | 3 tasks | 9 files |
