@@ -55,6 +55,34 @@ const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
   'node tests/providers-panel-ui.test.js',
 ]);
 
+const PHASE64_PLAN_TASK_COUNTS = Object.freeze([
+  1, 1, 1, 3, 1, 2, 3, 3, 3, 3, 2, 2, 3,
+]);
+
+const PHASE64_EXPECTED_TASK_IDS = Object.freeze(PHASE64_PLAN_TASK_COUNTS.flatMap(
+  (count, planIndex) => Array.from({ length: count }, (_, taskIndex) => (
+    `64-${String(planIndex + 1).padStart(2, '0')}-${String(taskIndex + 1).padStart(2, '0')}`
+  )),
+));
+
+const PHASE64_EXPECTED_WAVES = Object.freeze([1, 2, 3, 4, 5, 6, 6, 7, 7, 8, 8, 9, 10]);
+
+const PHASE64_EXPECTED_WAVE0_OWNERS = Object.freeze([
+  '64-01-01',
+  '64-02-01',
+  '64-03-01',
+  '64-04-01..03',
+  '64-05-01',
+  '64-06-01..02',
+  '64-07-01..03',
+  '64-08-01..03',
+  '64-09-01..03',
+  '64-10-01..03',
+  '64-11-01..02',
+  '64-12-01..02',
+  '64-13-02',
+]);
+
 const PHASE61_NEW_TEST_COMMANDS = Object.freeze([
   'node tests/delegation-routing.test.js',
   'node tests/delegation-consent.test.js',
@@ -380,12 +408,43 @@ function phase64PlanGraph() {
       dependencyBlock.matchAll(/^\s+- ["']64-(\d{2})["']\s*$/gm),
       (match) => match[1],
     );
-    const tasks = Array.from(source.matchAll(/<name>(64-\d{2}-\d{2}):/g), (match) => match[1]);
-    const commands = Array.from(
-      source.matchAll(/<automated>([\s\S]*?)<\/automated>/g),
-      (match) => decodeXml(match[1]),
+    const requirementBlock = (source.match(/^requirements:\s*\n([\s\S]*?)^must_haves:/m)
+      || [null, ''])[1];
+    const requirements = Array.from(
+      requirementBlock.matchAll(/^\s+- (MULTI-\d{2})\s*$/gm),
+      (match) => match[1],
     );
-    return Object.freeze({ name, plan, wave, dependencies, tasks, commands, source });
+    const threatModel = (source.match(/<threat_model>([\s\S]*?)<\/threat_model>/)
+      || [null, ''])[1];
+    const threats = Array.from(
+      threatModel.matchAll(/<threat id="(T64-\d{2})"/g),
+      (match) => match[1],
+    );
+    const taskRecords = Array.from(source.matchAll(/<task\b[\s\S]*?<\/task>/g), (match) => {
+      const block = match[0];
+      const id = (block.match(/<name>(64-\d{2}-\d{2}):/) || [null, null])[1];
+      const automated = (block.match(/<automated>([\s\S]*?)<\/automated>/)
+        || [null, null])[1];
+      return Object.freeze({
+        id,
+        command: automated === null ? null : decodeXml(automated),
+        block,
+      });
+    });
+    const tasks = taskRecords.map((task) => task.id);
+    const commands = taskRecords.map((task) => task.command);
+    return Object.freeze({
+      name,
+      plan,
+      wave,
+      dependencies,
+      requirements,
+      threats,
+      taskRecords,
+      tasks,
+      commands,
+      source,
+    });
   });
   return Object.freeze({ planNames, plans });
 }
@@ -547,6 +606,302 @@ function runPhase64WiringContract() {
       && exactOccurrences(read('extension/ui/sidepanel.html'),
         '<script src="../utils/delegation-providers.js"></script>') === 1,
   'only the two reviewed local HTML contexts load the canonical provider helper');
+}
+
+function phase64ExpandIds(value, prefix) {
+  const exact = new RegExp(`^${prefix}(\\d{2})$`);
+  const range = new RegExp(`^${prefix}(\\d{2})[–-](?:${prefix})?(\\d{2})$`);
+  const ids = [];
+  for (const token of String(value).split(',').map((item) => item.trim()).filter(Boolean)) {
+    const exactMatch = token.match(exact);
+    if (exactMatch) {
+      ids.push(`${prefix}${exactMatch[1]}`);
+      continue;
+    }
+    const rangeMatch = token.match(range);
+    if (!rangeMatch) {
+      ids.push(`invalid:${token}`);
+      continue;
+    }
+    const first = Number(rangeMatch[1]);
+    const last = Number(rangeMatch[2]);
+    if (first > last || last - first > 64) {
+      ids.push(`invalid:${token}`);
+      continue;
+    }
+    for (let index = first; index <= last; index += 1) {
+      ids.push(`${prefix}${String(index).padStart(2, '0')}`);
+    }
+  }
+  return Array.from(new Set(ids)).sort((left, right) => left.localeCompare(right));
+}
+
+function phase64ValidationRows(source) {
+  return Array.from(source.matchAll(/^\| (64-\d{2}-\d{2}) \|[^\n]*$/gm), (match) => {
+    const cells = match[0].slice(1, -1).split('|').map((cell) => cell.trim());
+    const commandMatch = (cells[6] || '').match(/^`([\s\S]*)`$/);
+    return Object.freeze({
+      line: match[0],
+      cells,
+      id: cells[0],
+      plan: cells[1],
+      wave: Number(cells[2]),
+      requirements: phase64ExpandIds(cells[3], 'MULTI-'),
+      threats: phase64ExpandIds(cells[4], 'T64-'),
+      secureBehavior: cells[5],
+      command: commandMatch ? commandMatch[1] : null,
+      status: cells[7],
+    });
+  });
+}
+
+function phase64PlanGraphViolations(plans) {
+  const violations = [];
+  const plansById = new Map(plans.map((plan) => [plan.plan, plan]));
+  const waves = plans.map((plan) => plan.wave);
+  if (JSON.stringify(waves) !== JSON.stringify(PHASE64_EXPECTED_WAVES)) {
+    violations.push('plan waves do not match the approved dependency sequence');
+  }
+  const taskIds = plans.flatMap((plan) => plan.tasks);
+  if (JSON.stringify(taskIds) !== JSON.stringify(PHASE64_EXPECTED_TASK_IDS)) {
+    violations.push('plan task ids do not match the exact 28-task roster');
+  }
+  for (const plan of plans) {
+    if (plan.dependencies.length !== new Set(plan.dependencies).size) {
+      violations.push(`Plan ${plan.plan} has duplicate dependencies`);
+    }
+    for (const dependency of plan.dependencies) {
+      const owner = plansById.get(dependency);
+      if (!owner) violations.push(`Plan ${plan.plan} has a missing dependency ${dependency}`);
+      if (owner && owner.wave >= plan.wave) {
+        violations.push(`Plan ${plan.plan} does not follow dependency ${dependency}`);
+      }
+    }
+    if (plan.tasks.length !== plan.taskRecords.length
+        || plan.taskRecords.some((task) => task.id === null || task.command === null)) {
+      violations.push(`Plan ${plan.plan} has a task without one automated command`);
+    }
+    if (plan.commands.some((command) => command && command.includes('npm --prefix mcp run build'))) {
+      violations.push(`Plan ${plan.plan} contains an unwrapped MCP build`);
+    }
+  }
+  return violations;
+}
+
+function phase64ValidationViolations(source) {
+  const violations = [];
+  const requireContract = (condition, message) => {
+    if (!condition) violations.push(message);
+  };
+  const { plans } = phase64PlanGraph();
+  const plansById = new Map(plans.map((plan) => [plan.plan, plan]));
+  const expectedRecords = plans.flatMap((plan) => plan.taskRecords.map((task) => ({
+    ...task,
+    plan: plan.plan,
+    wave: plan.wave,
+    requirements: plan.requirements,
+  })));
+
+  requireContract(/^status: approved$/m.test(source)
+      && /^implementation_status: complete$/m.test(source)
+      && /^nyquist_compliant: true$/m.test(source)
+      && /^wave_0_complete: true$/m.test(source)
+      && /^reviewed: 2026-07-21$/m.test(source)
+      && /^plan_count: 13$/m.test(source)
+      && /^validation_tasks: 28$/m.test(source),
+  'frontmatter records approved, complete, current 13-plan/28-task validation');
+  requireContract(!/\bTBD\b/i.test(source), 'validation contains no TBD placeholder');
+
+  for (const violation of phase64PlanGraphViolations(plans)) violations.push(violation);
+  const rows = phase64ValidationRows(source);
+  requireContract(rows.length === 28, 'validation contains exactly 28 task rows');
+  requireContract(new Set(rows.map((row) => row.id)).size === rows.length,
+    'validation task ids are unique');
+  requireContract(JSON.stringify(rows.map((row) => row.id))
+      === JSON.stringify(PHASE64_EXPECTED_TASK_IDS),
+  'validation task ids are complete and ordered');
+
+  for (let index = 0; index < expectedRecords.length; index += 1) {
+    const expected = expectedRecords[index];
+    const row = rows[index];
+    if (!row) continue;
+    const plan = plansById.get(expected.plan);
+    requireContract(row.cells.length === 8, `${expected.id} has exactly eight columns`);
+    requireContract(row.id === expected.id && row.plan === expected.plan,
+      `${expected.id} maps to its declaring plan`);
+    requireContract(row.wave === expected.wave, `${expected.id} maps to its declaring wave`);
+    requireContract(JSON.stringify(row.requirements) === JSON.stringify(expected.requirements),
+      `${expected.id} maps every declaring requirement exactly`);
+    requireContract(row.threats.length > 0
+        && row.threats.every((threat) => plan.threats.includes(threat)),
+    `${expected.id} maps only declared plan threats`);
+    requireContract(row.command === expected.command,
+      `${expected.id} command is byte-equal to PLAN automated verification`);
+    requireContract(row.status === '✅ green', `${expected.id} is deterministically green`);
+    requireContract(row.secureBehavior.length >= 24 && !/planned|TBD/i.test(row.secureBehavior),
+      `${expected.id} retains concrete secure behavior`);
+  }
+
+  for (const plan of plans) {
+    const coveredThreats = Array.from(new Set(rows
+      .filter((row) => row.plan === plan.plan)
+      .flatMap((row) => row.threats))).sort((left, right) => left.localeCompare(right));
+    const declaredThreats = [...plan.threats].sort((left, right) => left.localeCompare(right));
+    requireContract(JSON.stringify(coveredThreats) === JSON.stringify(declaredThreats),
+      `Plan ${plan.plan} validation rows cover every declared threat exactly`);
+  }
+
+  const allPlanSource = plans.map((plan) => plan.source).join('\n');
+  const expectedRequirements = ['MULTI-01', 'MULTI-02', 'MULTI-03'];
+  const expectedDecisions = Array.from({ length: 16 }, (_, index) =>
+    `D64-${String(index + 1).padStart(2, '0')}`);
+  const expectedThreats = Array.from({ length: 10 }, (_, index) =>
+    `T64-${String(index + 1).padStart(2, '0')}`);
+  const requirementSection = between(source, '## Requirement Verification', '## Decision Coverage');
+  const decisionSection = between(source, '## Decision Coverage', '## Threat References and Owners');
+  const threatSection = between(source, '## Threat References and Owners', '## Focused Command Matrix');
+  requireContract(JSON.stringify(Array.from(
+    requirementSection.matchAll(/^\| \*\*(MULTI-\d{2})\*\* \|/gm),
+    (match) => match[1],
+  )) === JSON.stringify(expectedRequirements),
+  'requirement table maps MULTI-01 through MULTI-03 exactly once');
+  requireContract(JSON.stringify(Array.from(
+    decisionSection.matchAll(/^\| (D64-\d{2})\b/gm),
+    (match) => match[1],
+  )) === JSON.stringify(expectedDecisions),
+  'decision table maps D64-01 through D64-16 exactly once');
+  requireContract(JSON.stringify(Array.from(
+    threatSection.matchAll(/^\| (T64-\d{2})\b/gm),
+    (match) => match[1],
+  )) === JSON.stringify(expectedThreats),
+  'threat table maps T64-01 through T64-10 exactly once');
+  requireContract(JSON.stringify(Array.from(new Set(
+    Array.from(allPlanSource.matchAll(/\bMULTI-\d{2}\b/g), (match) => match[0]),
+  )).sort()) === JSON.stringify(expectedRequirements),
+  'plan frontmatter and task evidence cover every Phase 64 requirement');
+  requireContract(JSON.stringify(Array.from(new Set(
+    Array.from(allPlanSource.matchAll(/\bD64-\d{2}\b/g), (match) => match[0]),
+  )).sort()) === JSON.stringify(expectedDecisions),
+  'plans cover every locked Phase 64 decision');
+  requireContract(JSON.stringify(Array.from(new Set(
+    Array.from(allPlanSource.matchAll(/\bT64-\d{2}\b/g), (match) => match[0]),
+  )).sort()) === JSON.stringify(expectedThreats),
+  'plans cover every blocking Phase 64 threat');
+  requireContract(!/<threat\b[^>]*(?:severity="(?:HIGH|CRITICAL)")[^>]*disposition="(?:accept|defer)"/i
+    .test(allPlanSource), 'no HIGH or CRITICAL plan threat is accepted or deferred');
+
+  const wave0Section = between(source, '## Wave 0 / Test-First Ownership', '## Per-Task Verification Map');
+  const wave0Rows = Array.from(wave0Section.matchAll(/^\| [^|]+ \| ([^|]+) \|[^\n]+\| (✅ owned) \|$/gm),
+    (match) => ({ owner: match[1].trim(), status: match[2] }));
+  requireContract(JSON.stringify(wave0Rows.map((row) => row.owner))
+      === JSON.stringify(PHASE64_EXPECTED_WAVE0_OWNERS)
+      && wave0Rows.every((row) => row.status === '✅ owned'),
+  'Wave-0 table has the exact thirteen test-first owners');
+
+  const manualSection = between(source, '## Manual-Only Verifications', '## Validation Sign-Off');
+  const manualRows = Array.from(manualSection.matchAll(/^\| (?:Genuine|Installed|Live)[^\n]+$/gm),
+    (match) => match[0].slice(1, -1).split('|').map((cell) => cell.trim()));
+  requireContract(manualRows.length === 3
+      && manualRows.every((row) => row.length === 6
+        && row[1] === 'MULTI-01–03'
+        && row[2] === '`human_needed`'
+        && row[3] === '`pending`'
+        && row[4] === '*(empty)*'),
+  'manual table retains exactly three pending evidence-empty external scenarios');
+  requireContract(source.includes('All 28 implementation rows are `✅ green`; Phase 64 automated validation is complete.')
+      && !/implementation row remains `planned`/i.test(source)
+      && source.includes('**Approval:** automated validation complete; genuine external UAT remains pending.'),
+  'completion prose separates deterministic green evidence from pending genuine UAT');
+
+  return Object.freeze(violations);
+}
+
+function runPhase64FinalContract() {
+  console.log('\n--- Phase 64 exact Nyquist, architecture, security, and UI closure ---');
+
+  check(exists(PHASE64_VALIDATION_PATH), 'Phase 64 validation artifact exists');
+  if (!exists(PHASE64_VALIDATION_PATH)) return;
+  const validation64 = read(PHASE64_VALIDATION_PATH);
+  const violations = phase64ValidationViolations(validation64);
+  check(violations.length === 0,
+    `Phase 64 validation satisfies every exact-map rule${violations.length ? `: ${violations.join('; ')}` : ''}`);
+
+  if (violations.length === 0) {
+    const rows = phase64ValidationRows(validation64);
+    const firstLine = rows[0].line;
+    const firstLineEnd = validation64.indexOf(firstLine) + firstLine.length;
+    const negativeFixtures = Object.freeze({
+      'missing task row': validation64.replace(`${firstLine}\n`, ''),
+      'duplicate task row': validation64.slice(0, firstLineEnd)
+        + `\n${firstLine}` + validation64.slice(firstLineEnd),
+      'wrong plan': validation64.replace('| 64-01-01 | 01 |', '| 64-01-01 | 02 |'),
+      'wrong wave': validation64.replace('| 64-01-01 | 01 | 1 |', '| 64-01-01 | 01 | 2 |'),
+      'wrong requirement': validation64.replace('| MULTI-03 | T64-08,', '| MULTI-01 | T64-08,'),
+      'missing threat': validation64.replace('T64-08, T64-09, T64-10', 'T64-08, T64-09'),
+      'wrong command': validation64.replace(
+        rows[0].command,
+        'node tests/missing-phase64-suite.test.js',
+      ),
+      'planned status': validation64.replace('| ✅ green |', '| ⬜ planned |'),
+      'bare MCP build': validation64.replace(rows[0].command, 'npm --prefix mcp run build'),
+      'TBD placeholder': validation64.replace(rows[0].secureBehavior, 'TBD'),
+      'missing decision': validation64.replace('| D64-16 ', '| D64-15 '),
+    });
+    for (const [label, candidate] of Object.entries(negativeFixtures)) {
+      check(phase64ValidationViolations(candidate).length > 0,
+        `Phase 64 validation parser rejects ${label}`);
+    }
+
+    const { plans } = phase64PlanGraph();
+    const invalidWavePlans = plans.map((plan) => (
+      plan.plan === '02' ? { ...plan, wave: 1 } : plan
+    ));
+    check(phase64PlanGraphViolations(invalidWavePlans).length > 0,
+      'Phase 64 plan parser rejects an invalid dependency wave');
+  }
+
+  const adapter64 = read('mcp/src/agent-providers/adapter.ts');
+  const adapterInterface64 = (adapter64.match(/export interface AgentProviderAdapter \{([\s\S]*?)\n\}/)
+    || [null, ''])[1];
+  equal(Array.from(adapterInterface64.matchAll(/^\s{2}([A-Za-z]+)\(/gm), (match) => match[1]),
+    ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps'],
+  'Phase 64 retains the exact five-method adapter surface');
+  const supervisor64 = read('mcp/src/agent-providers/spawn-supervisor.ts');
+  const successfulSettlement64 = between(supervisor64,
+    'const resultEvent = this.takeResultEvent(run);',
+    '} catch (error) {');
+  check(supervisor64.includes('verifyPolicyAttestation')
+      && !/from ['"].*opencode-(?:profile|detect|stream)/.test(supervisor64)
+      && !/(?:adapterId|spec\.adapterId)\s*===\s*(?:OPENCODE_ADAPTER_ID|['"]opencode['"])/.test(supervisor64),
+  'supervisor uses the shared verifier without an OpenCode import or adapter-id branch');
+  check(supervisor64.indexOf('run.replayClosed = true') < supervisor64.indexOf('this.spawnChild(')
+      && successfulSettlement64.indexOf('await this.terminateAndCleanup(run)')
+        < successfulSettlement64.indexOf('this.emitNormalizedEvent(run, resultEvent)')
+      && successfulSettlement64.indexOf('this.emitNormalizedEvent(run, resultEvent)')
+        < successfulSettlement64.indexOf("this.settleOnce(run, 'succeeded'"),
+  'replay closes before spawn and the private candidate crosses only after cleanup');
+  check(adapter64.includes("key === OPENCODE_SERVER_PASSWORD_ENV_KEY")
+      && adapter64.includes("ownValue(binding, 'secretRef') !== OWNED_SERVER_BASIC_PASSWORD_SECRET_REF")
+      && !/OPENCODE_SERVER_PASSWORD/.test(read('mcp/src/agent-providers/runtime-files.ts')),
+  'fixedEnv, opaque binding, and runtime-journal secret boundaries remain exact');
+  const detector64 = read('mcp/src/agent-providers/opencode-detect.ts');
+  const profile64 = read('mcp/src/agent-providers/opencode-profile.ts');
+  check(detector64.includes("OPENCODE_PROFILE_VERSION = '1.14.25'")
+      && profile64.includes("'*': 'deny'")
+      && profile64.includes("'fsb_*': 'allow'")
+      && profile64.indexOf("'*': 'deny'") < profile64.indexOf("'fsb_*': 'allow'"),
+  'private OpenCode 1.14.25 policy retains ordered deny then final fsb_* allow');
+
+  const canonicalProviders64 = read('extension/utils/delegation-providers.js');
+  check(/\{ id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' \},\s*\{ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' \}/m
+    .test(canonicalProviders64),
+  'browser metadata is the exact Claude/OpenCode table with unknown OpenCode billing');
+  const controlPanel64 = read('extension/ui/control_panel.html');
+  const providerCss64 = read('extension/ui/options.css') + read('extension/ui/sidepanel.css');
+  check(exactOccurrences(controlPanel64, 'class="provider-row"') === 10
+      && exactOccurrences(controlPanel64, 'data-provider-id="opencode"') === 2
+      && !/opencode/i.test(providerCss64),
+  'OpenCode reuses the existing Providers row structure with no provider-specific CSS branch');
 }
 
 function runPhase63UatLedgerContract() {
@@ -1054,7 +1409,10 @@ if (sectionArgs.length > 0) {
   }
   if (sectionArgs[1].startsWith('phase64-')) {
     runPhase64UatLedgerContract();
-    if (sectionArgs[1] === 'phase64-validation') runPhase64WiringContract();
+    if (sectionArgs[1] === 'phase64-validation') {
+      runPhase64WiringContract();
+      runPhase64FinalContract();
+    }
   } else {
     runPhase63UatLedgerContract();
     if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
@@ -1068,6 +1426,7 @@ runPhase63UatLedgerContract();
 runPhase63FinalContract();
 runPhase64UatLedgerContract();
 runPhase64WiringContract();
+runPhase64FinalContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.
@@ -1233,6 +1592,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   !PHASE61_NEW_TEST_COMMANDS.includes(command)
   && !PHASE62_NEW_TEST_COMMANDS.includes(command)
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
+  && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -1588,7 +1948,9 @@ check(clearTrustFunction.includes("fsbDelegationHasExactKeys(request, ['provider
   && clearTrustFunction.includes('FsbDelegationConsent.clearTrusted')
   && !/(?:issueChallenge|consumeChallenge|writeTrustFromChallenge|controller|delegate\.start)/.test(clearTrustFunction),
 'background clear is the canonical Providers-only authority-reducing path');
-check(/chrome\.runtime\.sendMessage\(\{\s*type: 'FSB_DELEGATION_CLEAR_TRUST',\s*providerId: 'claude-code'\s*\}\)/.test(optionsClearTrustFunction)
+check(optionsClearTrustFunction.includes("type: 'FSB_DELEGATION_CLEAR_TRUST'")
+  && optionsClearTrustFunction.includes('providerId: provider.id')
+  && optionsClearTrustFunction.includes('getCanonicalDelegationProvider(providerPanelState.agentProviderId)')
   && !/chrome\.storage|localStorage|saveSettings|markUnsavedChanges/.test(optionsClearTrustFunction),
 'Providers clears trust through one runtime command with no direct storage mutation');
 check(/clear does not consume the fresh challenge required after trust is removed/.test(read('tests/delegation-consent.test.js'))
@@ -1785,7 +2147,7 @@ const phase62ThreatEvidence = Object.freeze({
   'T62-04': [['tests/mcp-version-parity.test.js', /doctor text and JSON modes consume the same collected snapshot/]],
   'T62-05': [['mcp/src/agent-providers/serve-delegation.ts', /adapter\.compatibility/]],
   'T62-06': [['tests/providers-panel-ui.test.js', /compatibility.*observational|observational.*compatibility/i]],
-  'T62-07': [['extension/utils/agent-protocol-drift-diagnostics.js', /REQUIRED_KEYS = Object\.freeze\(\['adapterId', 'expected', 'observed'\]\)/]],
+  'T62-07': [['extension/utils/agent-protocol-drift-diagnostics.js', /REQUIRED_KEYS\s*=\s*Object\.freeze\(\[\s*'adapterId',\s*'profileVersion',\s*'reason',\s*'expected',\s*'eventIndex',\s*'issuePaths',?\s*\]\)/]],
   'T62-08': [['extension/background.js', /FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512/]],
 });
 for (const id of phase62ThreatIds) checkEvidence(id, phase62ThreatEvidence[id]);
@@ -1965,6 +2327,7 @@ for (const command of PHASE62_NEW_TEST_COMMANDS) {
 const prePhase62Commands = rootCommands.filter((command) => (
   !PHASE62_NEW_TEST_COMMANDS.includes(command)
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
+  && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');
@@ -1996,7 +2359,7 @@ check(phase63BuildIndex >= 0
   && phase63RootIndexes.every((index) => index > phase63BuildIndex && index < firstDependentMcpIndex)
   && phase63RootIndexes.every((index, position) => position === 0 || index > phase63RootIndexes[position - 1]),
 'all six Phase 63 root gates occupy one ordered slot after build and before dependent seams');
-check(exactOccurrences(ciSource, 'name: Phase 63 native-host contract (sole Linux root invocation)') === 1
+check(exactOccurrences(ciSource, 'name: Phase 64 OpenCode contract (sole Linux root invocation)') === 1
   && exactOccurrences(ciSource, 'run: npm test') === 1
   && !ciSource.includes('run: node scripts/run-phase63-focused-tests.mjs'),
 'CI source-pins the sole Linux root invocation without a duplicate focused run');
@@ -2287,7 +2650,7 @@ check(supervisorSource.includes("code === 'agent_protocol_drift' ? driftDetail :
 
 const driftReporterSource = read('extension/utils/agent-protocol-drift-diagnostics.js');
 check(driftReporterSource.includes('var REPORT_WINDOW_MS = 10000;')
-  && driftReporterSource.includes("var REQUIRED_KEYS = Object.freeze(['adapterId', 'expected', 'observed']);")
+  && /var REQUIRED_KEYS\s*=\s*Object\.freeze\(\[\s*'adapterId',\s*'profileVersion',\s*'reason',\s*'expected',\s*'eventIndex',\s*'issuePaths',?\s*\]\)/.test(driftReporterSource)
   && driftReporterSource.includes('timestamp - previous < REPORT_WINDOW_MS')
   && driftReporterSource.indexOf('timestamp - previous < REPORT_WINDOW_MS')
     < driftReporterSource.indexOf("sink(\n            'BG'"),
@@ -2315,7 +2678,9 @@ check(!extErrorBlock.includes('agent_protocol_drift'),
 
 const providersSource = read('extension/ui/providers-panel.js');
 const apiProviderBlock = between(providersSource, 'var API_PROVIDER_IDS', 'var AGENT_PROVIDER_IDS');
-const agentProviderBlock = between(providersSource, 'var AGENT_PROVIDER_IDS', 'var COMPATIBILITY_UNSUPPORTED_REASONS');
+const agentProviderBlock = (providersSource.match(
+  /var AGENT_PROVIDER_IDS = Object\.freeze\(\[([\s\S]*?)\]\);/,
+) || [null, ''])[1];
 equal(Array.from(apiProviderBlock.matchAll(/'([^']+)'/g), (match) => match[1]),
   ['xai', 'gemini', 'openai', 'anthropic', 'openrouter', 'lmstudio', 'custom'],
   'Providers retains the exact seven API-provider order');
