@@ -191,6 +191,17 @@ function findByClass(root, className) {
   return found;
 }
 
+function domShape(node) {
+  return {
+    tagName: node.tagName,
+    className: node.className,
+    attributes: Object.keys(node.attributes || {}).sort().map((name) => [
+      name, node.attributes[name]
+    ]),
+    children: node.children.map(domShape)
+  };
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -212,6 +223,21 @@ function extractNamedFunction(source, name) {
     }
   }
   throw new Error('unbalanced function source for ' + name);
+}
+
+function canonicalProviderSnapshot(providerId, providerLabel, billingKind) {
+  const value = snapshot();
+  value.provider = { id: providerId, label: providerLabel };
+  value.entries[0].init.client = { id: providerId, label: providerLabel };
+  value.entries[0].init.profileVersion = null;
+  value.entries[0].init.model = null;
+  value.entries[0].init.sessionId = null;
+  value.entries[0].init.allowedTools = [];
+  value.entries[3].metrics.billingKind = billingKind;
+  value.entries[3].metrics.usd = null;
+  value.summary.billingKind = billingKind;
+  value.summary.usd = null;
+  return value;
 }
 
 console.log('\n--- Phase 61 delegation feed contract ---');
@@ -243,6 +269,25 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const unknownTerminal = clone(canonical);
   unknownTerminal.terminal.code = 'provider_said_maybe';
   assert.equal(Feed.validateSnapshot(unknownTerminal), false, 'terminal classification is closed');
+
+  const openCode = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
+  assert.equal(Feed.validateSnapshot(openCode), true,
+    'canonical OpenCode snapshot validates through the shared provider identity model');
+  for (const invalidIdentity of [
+    { id: 'opencode', label: 'Claude Code' },
+    { id: 'claude-code', label: 'OpenCode' },
+    { id: 'codex', label: 'Codex' },
+    { id: 'OpenCode', label: 'OpenCode' }
+  ]) {
+    const invalid = clone(openCode);
+    invalid.provider = invalidIdentity;
+    assert.equal(Feed.validateSnapshot(invalid), false,
+      'snapshot rejects provider identity ' + JSON.stringify(invalidIdentity));
+  }
+  const crossedIdentity = clone(openCode);
+  crossedIdentity.entries[0].init.client = { id: 'claude-code', label: 'Claude Code' };
+  assert.equal(Feed.validateSnapshot(crossedIdentity), false,
+    'snapshot and init provider identities cannot cross');
 }
 
 {
@@ -332,6 +377,63 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const failedToolCard = Feed.renderEntry(failedTool);
   assert.equal(failedToolCard.getAttribute('data-delegation-tone'), 'danger',
     'canonical failed tool status receives an explicit danger marker');
+}
+
+{
+  const claudeContainer = new TestNode('div');
+  const openCodeContainer = new TestNode('div');
+  const claude = canonicalProviderSnapshot('claude-code', 'Claude Code', 'subscription');
+  const openCode = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
+  assert.equal(Feed.render(claudeContainer, claude, { hydrated: false }).ok, true);
+  assert.equal(Feed.render(openCodeContainer, openCode, { hydrated: false }).ok, true);
+  assert.deepEqual(domShape(openCodeContainer), domShape(claudeContainer),
+    'Claude and OpenCode normalized inputs produce identical feed DOM structure');
+  assert(openCodeContainer.textContent.includes('OpenCode'));
+  assert(openCodeContainer.textContent.includes('BillingBilling not reported'),
+    'OpenCode run summary uses the exact unknown-billing phrase');
+  assert(!/Included in your subscription|\$\d|\bfree\b|\bunlimited\b/i.test(
+    openCodeContainer.textContent
+  ), 'unknown billing cannot imply a plan, price, or allowance');
+
+  const hydratedContainer = new TestNode('div');
+  const hydrated = clone(openCode);
+  hydrated.hydrated = true;
+  assert.equal(Feed.render(hydratedContainer, hydrated, { hydrated: true }).ok, true);
+  assert.deepEqual(domShape(hydratedContainer), domShape(openCodeContainer),
+    'cold, verified-attach, and hydrated normalized success share one feed DOM');
+}
+
+{
+  function candidateSnapshot(state, terminalCode) {
+    const value = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
+    value.state = state;
+    value.entries[3].state = 'running';
+    value.summary.state = state === 'running' ? 'running' : 'failed';
+    value.terminal = terminalCode === null
+      ? null
+      : { code: terminalCode, releasedTabCount: 0 };
+    value.hydrated = false;
+    return value;
+  }
+
+  for (const scenario of [
+    { name: 'candidate before clean exit', value: candidateSnapshot('running', null) },
+    { name: 'protocol drift after candidate', value: candidateSnapshot('failed', 'agent_protocol_drift') },
+    { name: 'nonzero or signal failure after candidate', value: candidateSnapshot('failed', 'agent_failed') },
+    { name: 'missing or duplicate terminal failure', value: candidateSnapshot('failed', 'unknown_failure') }
+  ]) {
+    const container = new TestNode('div');
+    const rendered = Feed.render(container, scenario.value, { hydrated: false });
+    assert.deepEqual(rendered, { ok: true, lastSequence: 4, hydrated: false },
+      scenario.name + ' retains sequence accounting without presenting success');
+    assert.equal(findByClass(container, 'delegation-entry-result').length, 0,
+      scenario.name + ' renders zero result cards');
+    assert.equal(findByClass(container, 'delegation-summary').length, 0,
+      scenario.name + ' renders zero run summaries');
+    assert(!container.textContent.includes('Result')
+        && !container.textContent.includes('Run summary'),
+      scenario.name + ' exposes no transient success copy');
+  }
 }
 
 {
@@ -471,6 +573,10 @@ assert(!/innerHTML|insertAdjacentHTML|\.href\s*=|\.src\s*=|setAttribute\(['"](?:
   'delegation renderer has no HTML, URL, inline-style, or handler sink');
 assert(feedSource.includes('textContent') && feedSource.includes('createTextNode'),
   'delegation renderer uses only text DOM construction');
+assert(!/opencode/i.test(feedSource),
+  'feed presentation contains no OpenCode-specific renderer or billing branch');
+assert(feedSource.includes("'Billing not reported'"),
+  'feed source pins the exact unknown-billing phrase');
 assert(panelSource.includes("message.type !== 'FSB_DELEGATION_UPDATED'"),
   'side panel accepts only the canonical runtime update type');
 assert(!/opencode/i.test(panelSource),

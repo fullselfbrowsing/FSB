@@ -990,6 +990,8 @@ function project(store, event, overrides = {}) {
       assert.strictEqual(hydrated[0].entries.at(-1).state, 'running');
       assert.strictEqual(hydrated[0].entries.at(-1).metrics.billingKind, 'unknown');
       assert.strictEqual(hydrated[0].entries.at(-1).metrics.usd, null);
+      assert.strictEqual(hydrated[0].entries.some((entry) => entry.state === 'completed'), false,
+        'a persisted OpenCode result candidate contains no completed presentation truth');
 
       await store.markCleanupPending(delegationId, {
         code: 'agent_failed',
@@ -1004,6 +1006,8 @@ function project(store, event, overrides = {}) {
       assert.strictEqual(terminal.terminal, true);
       assert.strictEqual(terminal.terminalCode, 'agent_failed');
       assert.strictEqual(terminal.entries.at(-1).state, 'failed');
+      assert.strictEqual(terminal.entries.some((entry) => entry.state === 'completed'), false,
+        'failed settlement cannot retain a transient completed result row');
       assert.strictEqual((await freshStore().hydrateNonterminal()).length, 0);
     } finally {
       mock.restore();
