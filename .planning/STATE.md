@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
 status: executing
-stopped_at: Completed 65-05-PLAN.md
-last_updated: "2026-07-22T13:25:47.349Z"
+stopped_at: Completed 65-06-PLAN.md
+last_updated: "2026-07-22T14:09:17.998Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 18
   completed_phases: 8
   total_plans: 61
-  completed_plans: 60
+  completed_plans: 61
   percent: 44
 ---
 
@@ -34,7 +34,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 ## Current Position
 
 Phase: 65 (codex-adapter) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-07-22
 
@@ -282,8 +282,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-22T13:25:47.342Z
-Stopped at: Completed 65-05-PLAN.md
+Last session: 2026-07-22T14:09:17.991Z
+Stopped at: Completed 65-06-PLAN.md
 Resume file: None
 
 ## Next Actions
@@ -324,3 +324,4 @@ Execute 64-10-PLAN.md next. Generalize durable event/controller hydration and sa
 | Phase 65 P03 | 20 min | 2 tasks | 6 files |
 | Phase 65 P04 | 46 min | 3 tasks | 11 files |
 | Phase 65 P05 | 1h 4m | 1 tasks | 32 files |
+| Phase 65 P06 | 40 min | 2 tasks | 16 files |
