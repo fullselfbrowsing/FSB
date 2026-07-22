@@ -10,8 +10,36 @@ const enginePath = path.join(repoRoot, 'extension', 'ai', 'engine-config.js');
 const configPath = path.join(repoRoot, 'extension', 'config', 'config.js');
 const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const preflightPath = path.join(repoRoot, 'extension', 'utils', 'delegation-preflight.js');
+const sidepanelPath = path.join(repoRoot, 'extension', 'ui', 'sidepanel.js');
 const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
 const preflightSource = fs.readFileSync(preflightPath, 'utf8');
+const sidepanelSource = fs.readFileSync(sidepanelPath, 'utf8');
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
+if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity-preflight') {
+  throw new Error(`unknown section: ${SELECTED_SECTION}`);
+}
+
+const CLAUDE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'claude-code',
+  label: 'Claude Code',
+  profileVersion: '2.1.177',
+  authState: 'unknown',
+  billingKind: 'subscription'
+});
+const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'opencode',
+  label: 'OpenCode',
+  profileVersion: '1.14.25',
+  authState: 'unknown',
+  billingKind: 'unknown'
+});
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -29,6 +57,17 @@ function bridgeState(overrides = {}) {
 
 function supportedCompatibility(checkedAt = 100) {
   return { status: 'supported', reason: 'within_tested_range', checkedAt };
+}
+
+function sentDelegationRequestSource(messageType) {
+  const marker = `type: '${messageType}'`;
+  const markerIndex = sidepanelSource.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `${messageType} request exists`);
+  const startIndex = sidepanelSource.lastIndexOf('_sendDelegationCommand({', markerIndex);
+  const endIndex = sidepanelSource.indexOf('});', markerIndex);
+  assert.notEqual(startIndex, -1, `${messageType} request has a send boundary`);
+  assert.notEqual(endIndex, -1, `${messageType} request has a closing boundary`);
+  return sidepanelSource.slice(startIndex, endIndex + 3);
 }
 
 async function main() {
@@ -134,6 +173,102 @@ async function main() {
   assert.equal(Object.isFrozen(preflight), true);
   assert.deepEqual(Object.keys(preflight), ['check']);
 
+  const acceptedIdentityInput = clone(CLAUDE_ACCEPTED_IDENTITY);
+  const acceptedIdentityResult = preflight.check({
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'anthropic',
+    bridgeState: bridgeState(),
+    compatibility: supportedCompatibility(),
+    acceptedIdentity: acceptedIdentityInput
+  });
+  assert.deepEqual(clone(acceptedIdentityResult), {
+    ok: true,
+    kind: 'agent',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code',
+    acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
+  }, 'preflight returns the complete validator-approved identity');
+  assert.equal(Object.isFrozen(acceptedIdentityResult.acceptedIdentity), true,
+    'accepted identity is immutable before the first asynchronous boundary');
+  assert.notEqual(acceptedIdentityResult.acceptedIdentity, acceptedIdentityInput,
+    'preflight never adopts a caller-owned identity record');
+  acceptedIdentityInput.profileVersion = 'changed-after-check';
+  assert.equal(acceptedIdentityResult.acceptedIdentity.profileVersion, '2.1.177',
+    'caller mutation cannot relabel an accepted preflight');
+
+  const nullPrototypeIdentity = Object.assign(Object.create(null), CLAUDE_ACCEPTED_IDENTITY);
+  assert.deepEqual(clone(preflight.check({
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'anthropic',
+    bridgeState: bridgeState(),
+    compatibility: supportedCompatibility(),
+    acceptedIdentity: nullPrototypeIdentity
+  }).acceptedIdentity), CLAUDE_ACCEPTED_IDENTITY,
+  'a complete null-prototype transport record is reconstructed safely');
+
+  let accessorReads = 0;
+  const accessorIdentity = clone(CLAUDE_ACCEPTED_IDENTITY);
+  Object.defineProperty(accessorIdentity, 'authState', {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return 'unknown';
+    }
+  });
+  const inheritedIdentity = Object.assign(
+    Object.create({ inherited: true }),
+    CLAUDE_ACCEPTED_IDENTITY
+  );
+  const symbolIdentity = clone(CLAUDE_ACCEPTED_IDENTITY);
+  symbolIdentity[Symbol('identity-extra')] = true;
+  for (const acceptedIdentity of [
+    undefined,
+    null,
+    {},
+    { ...CLAUDE_ACCEPTED_IDENTITY, extra: true },
+    Object.fromEntries(Object.entries(CLAUDE_ACCEPTED_IDENTITY)
+      .filter(([key]) => key !== 'profileVersion')),
+    { ...CLAUDE_ACCEPTED_IDENTITY, providerId: 'opencode' },
+    { ...CLAUDE_ACCEPTED_IDENTITY, label: 'Claude' },
+    { ...CLAUDE_ACCEPTED_IDENTITY, profileVersion: '' },
+    { ...CLAUDE_ACCEPTED_IDENTITY, authState: 'unauthenticated', billingKind: 'unknown' },
+    { ...CLAUDE_ACCEPTED_IDENTITY, authState: 'chatgpt' },
+    { ...CLAUDE_ACCEPTED_IDENTITY, billingKind: 'api' },
+    accessorIdentity,
+    inheritedIdentity,
+    symbolIdentity
+  ]) {
+    assert.deepEqual(clone(preflight.check({
+      providerKind: 'agent',
+      agentProviderId: 'claude-code',
+      modelProvider: 'anthropic',
+      bridgeState: bridgeState(),
+      compatibility: supportedCompatibility(),
+      acceptedIdentity
+    })), {
+      ok: false,
+      code: 'provider_status_refresh',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code'
+    }, 'missing, partial, stale, hostile, or non-runnable identity fails closed');
+  }
+  assert.equal(accessorReads, 0, 'preflight validation never invokes identity accessors');
+
+  const forbiddenRequestAuthority = /acceptedIdentity|providerId|providerLabel|profileVersion|authState|billingKind|compatibility|billingOverride/;
+  for (const messageType of [
+    'FSB_DELEGATION_PREFLIGHT',
+    'FSB_DELEGATION_CONSENT',
+    'FSB_DELEGATION_START'
+  ]) {
+    assert.doesNotMatch(
+      sentDelegationRequestSource(messageType),
+      forbiddenRequestAuthority,
+      `${messageType} side-panel request carries intent only`
+    );
+  }
+
   const futureConsentUiContract = Object.freeze({
     allowed: '{CLI} may drive FSB browser tools for this task.',
     forbidden: 'It cannot edit files, run shell commands, or fetch arbitrary URLs.',
@@ -173,13 +308,15 @@ async function main() {
     agentProviderId: 'claude-code',
     modelProvider: 'anthropic',
     bridgeState: bridgeState(),
-    compatibility: supportedCompatibility()
+    compatibility: supportedCompatibility(),
+    acceptedIdentity: clone(CLAUDE_ACCEPTED_IDENTITY)
   };
   assert.deepEqual(clone(preflight.check(readyInput)), {
     ok: true,
     kind: 'agent',
     providerId: 'claude-code',
-    providerLabel: 'Claude Code'
+    providerLabel: 'Claude Code',
+    acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
   });
   assert.deepEqual(clone(preflight.check({
     ...readyInput,
@@ -211,12 +348,14 @@ async function main() {
 
   assert.deepEqual(clone(preflight.check({
     ...readyInput,
-    agentProviderId: 'opencode'
+    agentProviderId: 'opencode',
+    acceptedIdentity: clone(OPENCODE_ACCEPTED_IDENTITY)
   })), {
     ok: true,
     kind: 'agent',
     providerId: 'opencode',
-    providerLabel: 'OpenCode'
+    providerLabel: 'OpenCode',
+    acceptedIdentity: OPENCODE_ACCEPTED_IDENTITY
   }, 'OpenCode enters delegated mode only with canonical compatibility evidence');
 
   for (const compatibility of [

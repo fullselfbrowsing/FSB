@@ -98,6 +98,13 @@
       : null;
   }
 
+  function acceptedAgentIdentity(value, providerId) {
+    if (!delegationProviders
+        || typeof delegationProviders.validateAcceptedAgentIdentity !== 'function') return null;
+    var identity = delegationProviders.validateAcceptedAgentIdentity(value);
+    return identity && identity.providerId === providerId ? identity : null;
+  }
+
   function failure(code, providerId) {
     return {
       ok: false,
@@ -141,11 +148,18 @@
       return failure('unsupported_provider', agentProviderId);
     }
 
+    var acceptedIdentity = acceptedAgentIdentity(
+      getOwnValue(input, 'acceptedIdentity'),
+      agentProviderId
+    );
+    if (!acceptedIdentity) return failure('provider_status_refresh', agentProviderId);
+
     return {
       ok: true,
       kind: 'agent',
       providerId: agentProviderId,
-      providerLabel: providerLabel(agentProviderId)
+      providerLabel: providerLabel(agentProviderId),
+      acceptedIdentity: acceptedIdentity
     };
   }
 
