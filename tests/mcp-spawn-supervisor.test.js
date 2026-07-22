@@ -61,6 +61,13 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     authState: 'unknown',
     billingKind: 'unknown',
   }),
+  codex: Object.freeze({
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription',
+  }),
 });
 
 function acceptedIdentity(providerId = 'claude-code', overrides = {}) {
@@ -141,6 +148,69 @@ function authorityDocument(endpoint = 'http://127.0.0.1:7226/mcp', overrides = {
       defaultToolsApprovalMode: 'approve',
       ...overrides,
     }],
+  };
+}
+
+function codexAuthorityConfig(endpoint = 'http://127.0.0.1:7226/mcp') {
+  return [
+    '-c', 'project_doc_max_bytes=0',
+    '-c', 'mcp_servers={}',
+    '-c', `mcp_servers.fsb.url=${JSON.stringify(endpoint)}`,
+    '-c', 'mcp_servers.fsb.required=true',
+    '-c', 'mcp_servers.fsb.enabled=true',
+    '-c', 'mcp_servers.fsb.enabled_tools=["search_capabilities","invoke_capability"]',
+    '-c', 'mcp_servers.fsb.default_tools_approval_mode="approve"',
+  ];
+}
+
+function codexAuthorityStdin(cwd) {
+  return Object.freeze(Array.from(Buffer.from(`${[
+    {
+      method: 'initialize',
+      id: 1,
+      params: {
+        clientInfo: {
+          name: 'fsb_codex_authority',
+          title: 'Full Self-Browsing Codex Authority',
+          version: '0.142.5',
+        },
+        capabilities: {
+          optOutNotificationMethods: ['remoteControl/status/changed'],
+        },
+      },
+    },
+    { method: 'initialized', params: {} },
+    { method: 'config/read', id: 2, params: { includeLayers: false, cwd } },
+  ].map((document) => JSON.stringify(document)).join('\n')}\n`)));
+}
+
+function codexAuthorityOutput(mcpServers) {
+  return `${[
+    {
+      id: 1,
+      result: {
+        userAgent: 'codex_cli_rs/0.142.5',
+        codexHome: '/fixture/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'linux',
+      },
+    },
+    {
+      id: 2,
+      result: { config: { mcp_servers: mcpServers }, origins: {} },
+    },
+  ].map((document) => JSON.stringify(document)).join('\n')}\n`;
+}
+
+function codexEffectiveServer(endpoint = 'http://127.0.0.1:7226/mcp') {
+  return {
+    url: endpoint,
+    environment_id: 'local',
+    enabled: true,
+    required: true,
+    tool_timeout_sec: null,
+    default_tools_approval_mode: 'approve',
+    enabled_tools: ['search_capabilities', 'invoke_capability'],
   };
 }
 
@@ -313,8 +383,15 @@ function makeHarness(supervisorModule, options = {}) {
   const adapterId = options.adapterId ?? 'claude-code';
   const command = adapterId === 'opencode'
     ? '/fixture/bin/opencode'
-    : '/fixture/bin/claude';
-  const profileVersion = adapterId === 'opencode' ? '1.14.25' : '2.1.177';
+    : adapterId === 'codex'
+      ? '/fixture/bin/codex'
+      : '/fixture/bin/claude';
+  const profileVersion = adapterId === 'opencode'
+    ? '1.14.25'
+    : adapterId === 'codex'
+      ? '0.142.5'
+      : '2.1.177';
+  const authState = adapterId === 'codex' ? 'chatgpt' : 'unknown';
   const runtimeRoot = '/fixture/private/agent-runtime';
 
   const adapter = {
@@ -325,7 +402,7 @@ function makeHarness(supervisorModule, options = {}) {
       return {
         installed: true,
         version: profileVersion,
-        authState: 'unknown',
+        authState,
         profileVersion,
         binary: { command, realPath: command, argvPrefix: [] },
       };
@@ -336,8 +413,50 @@ function makeHarness(supervisorModule, options = {}) {
       if (options.buildGate) await options.buildGate.promise;
       if (options.buildError) throw new Error('fixture build failure');
       runtimeRuns.set(context.delegationId, 'config');
+      const codexAuthority = options.preSpawnAuthority === 'codex';
+      const codexConfig = codexAuthorityConfig();
       const authorityDescriptors = options.preSpawnAuthority
-        ? {
+        ? codexAuthority
+          ? {
+              preSpawnIdentityProbe: Object.freeze({
+                source: 'retained_binary',
+                argv: Object.freeze(['identity-probe']),
+                timeoutMs: 250,
+                stdoutLimitBytes: 64,
+                stderrLimitBytes: 64,
+                expectedAuthState: 'chatgpt',
+                outcomes: Object.freeze([Object.freeze({
+                  authState: 'chatgpt',
+                  exitCode: 0,
+                  stdout: Object.freeze({ kind: 'exact', bytes: Object.freeze([73]) }),
+                  stderr: Object.freeze({ kind: 'empty' }),
+                })]),
+              }),
+              effectiveAuthorityAttestation: Object.freeze({
+                source: 'retained_binary',
+                argv: Object.freeze([
+                  ...codexConfig,
+                  'app-server',
+                  '--stdio',
+                  '--strict-config',
+                ]),
+                stdinBytes: codexAuthorityStdin(path.dirname(context.privateMcpConfigPath)),
+                timeoutMs: 250,
+                stdoutLimitBytes: 64 * 1024,
+                stderrLimitBytes: 64,
+                classifier: 'codex_effective_authority_json',
+                expectedServerName: 'fsb',
+                endpointRef: 'direct_runtime_endpoint',
+                required: true,
+                enabled: true,
+                enabledTools: Object.freeze(['search_capabilities', 'invoke_capability']),
+                defaultToolsApprovalMode: 'approve',
+                headers: 'absent',
+                env: 'absent',
+                bearerToken: 'absent',
+              }),
+            }
+          : {
             preSpawnIdentityProbe: Object.freeze({
               source: 'retained_binary',
               argv: Object.freeze(['identity-probe']),
@@ -379,12 +498,20 @@ function makeHarness(supervisorModule, options = {}) {
           task: Object.freeze({
             role: 'direct_task',
             command,
-            argv: Object.freeze([
-              '-p',
-              '--strict-mcp-config',
-              '--mcp-config', context.privateMcpConfigPath,
-              '--output-format', 'stream-json',
-            ]),
+            argv: Object.freeze(codexAuthority
+              ? [
+                  'exec',
+                  '-',
+                  ...(options.codexTaskConfigMutation
+                    ? [...codexConfig.slice(0, -1), 'mcp_servers.fsb.enabled=false']
+                    : codexConfig),
+                ]
+              : [
+                  '-p',
+                  '--strict-mcp-config',
+                  '--mcp-config', context.privateMcpConfigPath,
+                  '--output-format', 'stream-json',
+                ]),
             cwd: options.preSpawnAuthority
               ? path.dirname(context.privateMcpConfigPath)
               : '/fixture/workspace',
@@ -2777,6 +2904,105 @@ async function runPreSpawnAuthorityTests(supervisorModule, authorityModule) {
     assert.equal(mismatch.zeroizeCalls, 1);
     assert(mismatch.stdout.every((byte) => byte === 0));
     assert.equal(JSON.stringify(terminal).includes('IDENTITY_MISMATCH_CANARY'), false);
+  }
+
+  {
+    const results = [
+      trackedProbeResult(Buffer.from([73])),
+      trackedProbeResult(Buffer.from(codexAuthorityOutput({
+        fsb: codexEffectiveServer(),
+      }), 'utf8')),
+    ];
+    const harness = makeHarness(supervisorModule, {
+      adapterId: 'codex',
+      preSpawnAuthority: 'codex',
+      directRuntimeReference,
+      processProbe: (_descriptor, index) => results[index].result,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'codex', task: 'Codex native effective authority success' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'succeeded');
+    const barrierOffsets = [
+      'build',
+      'probe:identity-probe',
+      'probe:-c',
+      'prepare',
+      'spawn',
+      'stdin',
+    ].map((entry) => harness.order.indexOf(entry));
+    assert(barrierOffsets.every((offset, index) => (
+      offset >= 0 && (index === 0 || barrierOffsets[index - 1] < offset)
+    )), 'Codex config/read completes before runtime preparation, spawn, and stdin');
+    assert.equal(harness.probeCalls.length, 2);
+    assert.strictEqual(
+      harness.probeCalls[0].environment,
+      harness.probeCalls[1].environment,
+      'identity and config/read use the exact same sanitized environment',
+    );
+    assert.equal(harness.probeCalls[1].command, '/fixture/bin/codex');
+    assert.equal(
+      harness.probeCalls[1].cwd,
+      `/fixture/private/agent-runtime/${terminal.delegationId}`,
+    );
+    assert(Array.isArray(harness.probeCalls[1].stdinBytes));
+    assert.equal(
+      Buffer.from(harness.probeCalls[1].stdinBytes).toString('utf8').includes('config/read'),
+      true,
+    );
+    assert(results.every((result) => result.zeroizeCalls === 1));
+  }
+
+  {
+    const results = [
+      trackedProbeResult(Buffer.from([73])),
+      trackedProbeResult(Buffer.from(codexAuthorityOutput({
+        fsb: codexEffectiveServer(),
+        foreign: codexEffectiveServer('http://127.0.0.1:7333/mcp'),
+      }), 'utf8')),
+    ];
+    const harness = makeHarness(supervisorModule, {
+      adapterId: 'codex',
+      preSpawnAuthority: 'codex',
+      directRuntimeReference,
+      processProbe: (_descriptor, index) => results[index].result,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'codex', task: 'foreign native MCP must fail closed' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.equal(harness.probeCalls.length, 2);
+    assert.deepEqual(harness.counters, {
+      detect: 1, build: 1, prepare: 0, activate: 0, remove: 0,
+    });
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(harness.emitted.length, 0);
+    assert(results.every((result) => result.zeroizeCalls === 1));
+    assert(results.every((result) => result.stdout.every((byte) => byte === 0)));
+  }
+
+  {
+    const harness = makeHarness(supervisorModule, {
+      adapterId: 'codex',
+      preSpawnAuthority: 'codex',
+      directRuntimeReference,
+      codexTaskConfigMutation: true,
+      processProbe: () => {
+        throw new Error('mismatched overrides must block before probing');
+      },
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'codex', task: 'mismatched config overrides fail closed' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.equal(harness.probeCalls.length, 0);
+    assert.equal(harness.counters.prepare, 0);
+    assert.equal(harness.spawnCalls.length, 0);
   }
 
   {

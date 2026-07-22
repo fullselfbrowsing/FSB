@@ -14,6 +14,7 @@ import {
 
 const MAX_PROBE_ARGUMENTS = 256;
 const MAX_PROBE_ARGUMENT_BYTES = 64 * 1024;
+const MAX_PROBE_STDIN_BYTES = 64 * 1024;
 const MAX_PROBE_CHANNEL_BYTES = 1024 * 1024;
 const MAX_PROBE_TIMEOUT_MS = 60_000;
 
@@ -46,6 +47,7 @@ export interface BoundedProcessProbeDescriptor {
   readonly timeoutMs: number;
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;
+  readonly stdinBytes?: readonly number[];
   readonly signal?: AbortSignal;
 }
 
@@ -136,6 +138,30 @@ function cloneArguments(value: unknown): readonly string[] {
   return Object.freeze(result);
 }
 
+function cloneInputBytes(value: unknown): readonly number[] {
+  if (
+    !Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Array.prototype
+    || value.length < 1
+    || value.length > MAX_PROBE_STDIN_BYTES
+    || Reflect.ownKeys(value).length !== value.length + 1
+  ) invalidDescriptor();
+  const result: number[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (
+      !descriptor
+      || !descriptor.enumerable
+      || !Object.hasOwn(descriptor, 'value')
+      || !Number.isSafeInteger(descriptor.value)
+      || descriptor.value < 0
+      || descriptor.value > 255
+    ) invalidDescriptor();
+    result.push(descriptor.value as number);
+  }
+  return Object.freeze(result);
+}
+
 function validateSignal(value: unknown): AbortSignal | undefined {
   if (value === undefined) return undefined;
   if (
@@ -161,9 +187,12 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
   ];
   const keys = Reflect.ownKeys(record) as string[];
   if (
-    (keys.length !== requiredKeys.length && keys.length !== requiredKeys.length + 1)
+    keys.length < requiredKeys.length
+    || keys.length > requiredKeys.length + 2
     || requiredKeys.some((key) => !keys.includes(key))
-    || keys.some((key) => !requiredKeys.includes(key) && key !== 'signal')
+    || keys.some((key) => (
+      !requiredKeys.includes(key) && key !== 'stdinBytes' && key !== 'signal'
+    ))
   ) invalidDescriptor();
   const command = boundedString(ownValue(record, 'command'));
   const cwd = boundedString(ownValue(record, 'cwd'));
@@ -185,6 +214,9 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
       ownValue(record, 'stderrLimitBytes'),
       MAX_PROBE_CHANNEL_BYTES,
     ),
+    ...(keys.includes('stdinBytes')
+      ? { stdinBytes: cloneInputBytes(ownValue(record, 'stdinBytes')) }
+      : {}),
     ...(keys.includes('signal') ? { signal: validateSignal(ownValue(record, 'signal')) } : {}),
   });
 }
@@ -239,6 +271,9 @@ export function runBoundedProcessProbe(
     let settled = false;
     let failureStarted = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let stdinBuffer: Buffer | null = descriptor.stdinBytes
+      ? Buffer.from(descriptor.stdinBytes)
+      : null;
     let closePromiseResolve: (() => void) | null = null;
     const childClosed = new Promise<void>((resolve) => {
       closePromiseResolve = resolve;
@@ -255,6 +290,8 @@ export function runBoundedProcessProbe(
       child.stdin.removeListener('error', onStdinError);
       child.removeListener('error', onError);
       child.removeListener('close', onClose);
+      stdinBuffer?.fill(0);
+      stdinBuffer = null;
     };
 
     const fail = (code: ProcessProbeFailureCode): void => {
@@ -265,6 +302,7 @@ export function runBoundedProcessProbe(
       descriptor.signal?.removeEventListener('abort', onAbort);
       child.stdout.removeListener('data', onStdout);
       child.stderr.removeListener('data', onStderr);
+      stdinBuffer?.fill(0);
       zeroBuffers(stdoutChunks);
       zeroBuffers(stderrChunks);
       const terminateTree = dependencies.terminateTree ?? terminateDetachedProcessTree;
@@ -375,8 +413,17 @@ export function runBoundedProcessProbe(
     timer = setTimeout(() => fail('timeout'), descriptor.timeoutMs);
     timer.unref?.();
     try {
-      child.stdin.end();
+      if (stdinBuffer) {
+        child.stdin.end(stdinBuffer, () => {
+          stdinBuffer?.fill(0);
+          stdinBuffer = null;
+        });
+      } else {
+        child.stdin.end();
+      }
     } catch {
+      stdinBuffer?.fill(0);
+      stdinBuffer = null;
       fail('spawn_failed');
     }
   });

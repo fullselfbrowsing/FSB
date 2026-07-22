@@ -1,3 +1,5 @@
+import { isAbsolute, resolve } from 'node:path';
+import { TextDecoder } from 'node:util';
 import type {
   AdapterAuthState,
   DirectRuntimeReference,
@@ -17,6 +19,11 @@ const MAX_TIMEOUT_MS = 60_000;
 const MAX_OUTCOMES = 16;
 const MAX_MATCHER_BYTES = 64 * 1024;
 const MAX_ENABLED_TOOLS = 256;
+const MAX_CODEX_APP_SERVER_MESSAGES = 8;
+const CODEX_AUTHORITY_CLIENT_NAME = 'fsb_codex_authority';
+const CODEX_AUTHORITY_CLIENT_TITLE = 'Full Self-Browsing Codex Authority';
+const CODEX_AUTHORITY_PROTOCOL_VERSION = '0.142.5';
+const CODEX_REMOTE_CONTROL_NOTIFICATION = 'remoteControl/status/changed';
 const SAFE_AUTH_STATES = Object.freeze([
   'chatgpt',
   'api_key',
@@ -570,27 +577,28 @@ function cloneEnabledTools(value: unknown): readonly string[] {
   return tools;
 }
 
-function validateCodexAuthorityArguments(argv: readonly string[]): void {
+function codexAuthorityConfigArguments(argv: readonly string[]): readonly string[] {
   const code = 'invalid_authority_attestation' as const;
   if (
     argv.length < 12
-    || argv[argv.length - 3] !== 'get'
-    || argv[argv.length - 2] !== 'fsb'
-    || argv[argv.length - 1] !== '--json'
+    || argv[argv.length - 3] !== 'app-server'
+    || argv[argv.length - 2] !== '--stdio'
+    || argv[argv.length - 1] !== '--strict-config'
   ) contractFailure(code);
-  const getIndex = argv.length - 3;
-  let mcpIndex = -1;
-  for (let index = getIndex - 1; index >= 0; index -= 1) {
-    if (argv[index] === 'mcp') {
-      mcpIndex = index;
+  const appServerIndex = argv.length - 3;
+  let configIndex = -1;
+  for (let index = 0; index < appServerIndex; index += 1) {
+    if (argv[index] === '-c') {
+      configIndex = index;
       break;
     }
   }
-  if (mcpIndex < 0 || (getIndex - mcpIndex - 1) % 2 !== 0) contractFailure(code);
+  if (configIndex < 0 || (appServerIndex - configIndex) % 2 !== 0) contractFailure(code);
+  const configArguments = argv.slice(configIndex, appServerIndex);
   const values: string[] = [];
-  for (let index = mcpIndex + 1; index < getIndex; index += 2) {
-    if (argv[index] !== '-c') contractFailure(code);
-    values.push(argv[index + 1]!);
+  for (let index = 0; index < configArguments.length; index += 2) {
+    if (configArguments[index] !== '-c') contractFailure(code);
+    values.push(configArguments[index + 1]!);
   }
   const exactCritical = [
     'mcp_servers={}',
@@ -608,6 +616,114 @@ function validateCodexAuthorityArguments(argv: readonly string[]): void {
   if (values.some((value) => value.startsWith('mcp_servers') && !allowedMcpValues.has(value))) {
     contractFailure(code);
   }
+  return Object.freeze(configArguments);
+}
+
+function validateCodexAuthorityRequest(bytes: readonly number[]): void {
+  const code = 'invalid_authority_attestation' as const;
+  const owned = Buffer.from(bytes);
+  let text: string | null = null;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(owned);
+    if (!text.endsWith('\n')) contractFailure(code);
+    const lines = text.split('\n');
+    if (lines.length !== 4 || lines[3] !== '' || lines.slice(0, 3).some((line) => !line)) {
+      contractFailure(code);
+    }
+    const documents = lines.slice(0, 3).map((line) => JSON.parse(line) as unknown);
+    const initialize = exactRecord(documents[0], ['method', 'id', 'params'], code);
+    if (
+      ownValue(initialize, 'method', code) !== 'initialize'
+      || ownValue(initialize, 'id', code) !== 1
+    ) contractFailure(code);
+    const initializeParams = exactRecord(
+      ownValue(initialize, 'params', code),
+      ['clientInfo', 'capabilities'],
+      code,
+    );
+    const clientInfo = exactRecord(
+      ownValue(initializeParams, 'clientInfo', code),
+      ['name', 'title', 'version'],
+      code,
+    );
+    if (
+      ownValue(clientInfo, 'name', code) !== CODEX_AUTHORITY_CLIENT_NAME
+      || ownValue(clientInfo, 'title', code) !== CODEX_AUTHORITY_CLIENT_TITLE
+      || ownValue(clientInfo, 'version', code) !== CODEX_AUTHORITY_PROTOCOL_VERSION
+    ) contractFailure(code);
+    const capabilities = exactRecord(
+      ownValue(initializeParams, 'capabilities', code),
+      ['optOutNotificationMethods'],
+      code,
+    );
+    const optedOut = denseArray(
+      ownValue(capabilities, 'optOutNotificationMethods', code),
+      1,
+      code,
+    );
+    if (
+      optedOut.length !== 1
+      || arrayValue(optedOut, 0, code) !== CODEX_REMOTE_CONTROL_NOTIFICATION
+    ) contractFailure(code);
+
+    const initialized = exactRecord(documents[1], ['method', 'params'], code);
+    if (
+      ownValue(initialized, 'method', code) !== 'initialized'
+      || Reflect.ownKeys(ownDataRecord(ownValue(initialized, 'params', code), code)).length !== 0
+    ) contractFailure(code);
+
+    const configRead = exactRecord(documents[2], ['method', 'id', 'params'], code);
+    if (
+      ownValue(configRead, 'method', code) !== 'config/read'
+      || ownValue(configRead, 'id', code) !== 2
+    ) contractFailure(code);
+    const configParams = exactRecord(
+      ownValue(configRead, 'params', code),
+      ['includeLayers', 'cwd'],
+      code,
+    );
+    const cwd = ownValue(configParams, 'cwd', code);
+    if (
+      ownValue(configParams, 'includeLayers', code) !== false
+      || typeof cwd !== 'string'
+      || !isAbsolute(cwd)
+      || resolve(cwd) !== cwd
+    ) contractFailure(code);
+  } catch (error) {
+    if (error instanceof EffectiveAuthorityContractError) throw error;
+    contractFailure(code);
+  } finally {
+    owned.fill(0);
+    text = null;
+  }
+}
+
+/** Require the authority probe to reuse the task's complete ordered CLI overrides. */
+export function codexAuthorityUsesTaskConfig(
+  authorityArgv: readonly string[],
+  taskArgv: readonly unknown[],
+): boolean {
+  try {
+    const authorityConfig = codexAuthorityConfigArguments(authorityArgv);
+    if (!Array.isArray(taskArgv) || Object.getPrototypeOf(taskArgv) !== Array.prototype) {
+      return false;
+    }
+    const configIndex = taskArgv.findIndex((entry) => entry === '-c');
+    if (configIndex < 0) return false;
+    const taskConfig = taskArgv.slice(configIndex);
+    if (
+      taskConfig.length !== authorityConfig.length
+      || taskConfig.some((entry, index) => (
+        typeof entry !== 'string' || entry !== authorityConfig[index]
+      ))
+    ) return false;
+    for (let index = 0; index < taskConfig.length; index += 2) {
+      if (taskConfig[index] !== '-c' || typeof taskConfig[index + 1] !== 'string') return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Validate the exact provider-neutral effective-authority descriptor. */
@@ -616,9 +732,13 @@ export function validateEffectiveAuthorityAttestation(
 ): EffectiveAuthorityAttestation {
   const code = 'invalid_authority_attestation' as const;
   try {
+    const base = ownDataRecord(value, code);
+    const rawClassifier = ownValue(base, 'classifier', code);
+    const expectsStdin = rawClassifier === 'codex_effective_authority_json';
     const record = exactRecord(value, [
       'source',
       'argv',
+      ...(expectsStdin ? ['stdinBytes'] : []),
       'timeoutMs',
       'stdoutLimitBytes',
       'stderrLimitBytes',
@@ -654,12 +774,17 @@ export function validateEffectiveAuthorityAttestation(
       code,
     ) as EffectiveAuthorityAttestation['classifier'];
     const argv = cloneArguments(ownValue(record, 'argv', code), code);
+    let stdinBytes: readonly number[] | undefined;
     if (classifier === 'codex_effective_authority_json') {
-      validateCodexAuthorityArguments(argv);
+      codexAuthorityConfigArguments(argv);
+      stdinBytes = cloneBytes(ownValue(record, 'stdinBytes', code), code);
+      if (stdinBytes.length === 0) contractFailure(code);
+      validateCodexAuthorityRequest(stdinBytes);
     }
     return Object.freeze({
       source: 'retained_binary',
       argv,
+      ...(stdinBytes ? { stdinBytes } : {}),
       timeoutMs: boundedInteger(ownValue(record, 'timeoutMs', code), 1, MAX_TIMEOUT_MS, code),
       stdoutLimitBytes: boundedInteger(
         ownValue(record, 'stdoutLimitBytes', code),
@@ -729,45 +854,139 @@ function classifyCodexNativeAuthority(
   directRuntime: DirectRuntimeReference,
 ): EffectiveAuthorityClassification {
   const code = 'invalid_authority_attestation' as const;
-  const server = exactRecord(value, [
-    'name',
-    'enabled',
-    'disabled_reason',
-    'transport',
-    'enabled_tools',
-    'disabled_tools',
-    'startup_timeout_sec',
-    'tool_timeout_sec',
+  const messages = denseArray(value, MAX_CODEX_APP_SERVER_MESSAGES, code);
+  let initializeResult: OwnDataRecord | null = null;
+  let configReadResult: OwnDataRecord | null = null;
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = ownDataRecord(arrayValue(messages, index, code), code);
+    if (Object.hasOwn(message, 'id')) {
+      const response = exactRecord(message, ['id', 'result'], code);
+      const id = ownValue(response, 'id', code);
+      const result = ownDataRecord(ownValue(response, 'result', code), code);
+      if (id === 1 && initializeResult === null) initializeResult = result;
+      else if (id === 2 && configReadResult === null) configReadResult = result;
+      else return malformedAuthority();
+      continue;
+    }
+    const notification = exactRecord(message, ['method', 'params'], code);
+    if (ownValue(notification, 'method', code) !== CODEX_REMOTE_CONTROL_NOTIFICATION) {
+      return malformedAuthority();
+    }
+    ownDataRecord(ownValue(notification, 'params', code), code);
+  }
+  if (initializeResult === null || configReadResult === null) return malformedAuthority();
+  const initialize = exactRecord(initializeResult, [
+    'userAgent',
+    'codexHome',
+    'platformFamily',
+    'platformOs',
   ], code);
-  const transport = exactRecord(ownValue(server, 'transport', code), [
-    'type',
+  const codexHome = ownValue(initialize, 'codexHome', code);
+  if (
+    typeof ownValue(initialize, 'userAgent', code) !== 'string'
+    || typeof codexHome !== 'string'
+    || !isAbsolute(codexHome)
+    || typeof ownValue(initialize, 'platformFamily', code) !== 'string'
+    || typeof ownValue(initialize, 'platformOs', code) !== 'string'
+  ) return malformedAuthority();
+
+  const configResponse = exactRecord(configReadResult, ['config', 'origins'], code);
+  const config = ownDataRecord(ownValue(configResponse, 'config', code), code);
+  ownDataRecord(ownValue(configResponse, 'origins', code), code);
+  const roster = ownDataRecord(ownValue(config, 'mcp_servers', code), code);
+  const serverNames = Reflect.ownKeys(roster) as string[];
+  if (serverNames.length > MAX_ENABLED_TOOLS) return malformedAuthority();
+  const enabledServerNames: string[] = [];
+  for (const serverName of serverNames) {
+    const server = ownDataRecord(ownValue(roster, serverName, code), code);
+    const enabled = ownValue(server, 'enabled', code);
+    if (typeof enabled !== 'boolean') return malformedAuthority();
+    if (enabled) enabledServerNames.push(serverName);
+  }
+
+  const serverCountMatches = enabledServerNames.length === 1;
+  const serverNameMatches = enabledServerNames.length === 1
+    && enabledServerNames[0] === descriptor.expectedServerName;
+  if (!Object.hasOwn(roster, descriptor.expectedServerName)) {
+    const checks = [
+      ['server_count', serverCountMatches],
+      ['server_name', serverNameMatches],
+      ['endpoint', false],
+      ['required', false],
+      ['enabled', false],
+      ['enabled_tools', false],
+      ['approval_policy', false],
+      ['headers_present', false],
+      ['env_present', false],
+      ['bearer_present', false],
+    ] as const;
+    const failed = checks.find(([, pass]) => !pass)!;
+    return Object.freeze({
+      pass: false,
+      reason: failed[0],
+      serverCountMatches,
+      serverNameMatches,
+      endpointMatches: false,
+      requiredMatches: false,
+      enabledMatches: false,
+      enabledToolsMatch: false,
+      approvalPolicyMatches: false,
+      headersAbsent: false,
+      envAbsent: false,
+      bearerTokenAbsent: false,
+    });
+  }
+
+  // Pinned to ConfigReadResponse + flattened McpServerConfig in Codex 0.142.5.
+  const server = ownDataRecord(ownValue(roster, descriptor.expectedServerName, code), code);
+  const requiredKeys = [
     'url',
+    'environment_id',
+    'enabled',
+    'required',
+    'tool_timeout_sec',
+    'default_tools_approval_mode',
+    'enabled_tools',
+  ];
+  const optionalSensitiveKeys = [
+    'bearer_token',
     'bearer_token_env_var',
     'http_headers',
     'env_http_headers',
-  ], code);
+    'env',
+    'env_vars',
+  ];
+  const serverKeys = Reflect.ownKeys(server) as string[];
   if (
-    ownValue(server, 'disabled_reason', code) !== null
-    || ownValue(server, 'disabled_tools', code) !== null
-    || ownValue(server, 'startup_timeout_sec', code) !== null
+    requiredKeys.some((key) => !serverKeys.includes(key))
+    || serverKeys.some((key) => (
+      !requiredKeys.includes(key) && !optionalSensitiveKeys.includes(key)
+    ))
+    || ownValue(server, 'environment_id', code) !== 'local'
     || ownValue(server, 'tool_timeout_sec', code) !== null
-    || ownValue(transport, 'type', code) !== 'streamable_http'
   ) return malformedAuthority();
+
   const tools = observedTools(ownValue(server, 'enabled_tools', code));
-  const serverCountMatches = true;
-  const serverNameMatches = ownValue(server, 'name', code) === descriptor.expectedServerName;
-  const endpointMatches = ownValue(transport, 'url', code) === directRuntime.endpoint;
-  const requiredMatches = true;
+  const endpointMatches = ownValue(server, 'url', code) === directRuntime.endpoint;
+  const requiredMatches = ownValue(server, 'required', code) === descriptor.required;
   const enabledMatches = ownValue(server, 'enabled', code) === descriptor.enabled;
   const enabledToolsMatch = tools !== null
     && tools.length === descriptor.enabledTools.length
     && new Set(tools).size === tools.length
     && tools.every((tool, index) => tool === descriptor.enabledTools[index]);
-  const approvalPolicyMatches = true;
-  const headersAbsent = ownValue(transport, 'http_headers', code) === null;
-  const envAbsent = ownValue(transport, 'env_http_headers', code) === null;
-  const bearerTokenAbsent = ownValue(transport, 'bearer_token_env_var', code) === null;
+  const approvalPolicyMatches = ownValue(
+    server,
+    'default_tools_approval_mode',
+    code,
+  ) === descriptor.defaultToolsApprovalMode;
+  const headersAbsent = !serverKeys.includes('http_headers');
+  const envAbsent = !serverKeys.includes('env_http_headers')
+    && !serverKeys.includes('env')
+    && !serverKeys.includes('env_vars');
+  const bearerTokenAbsent = !serverKeys.includes('bearer_token_env_var')
+    && !serverKeys.includes('bearer_token');
   const checks = [
+    ['server_count', serverCountMatches],
     ['server_name', serverNameMatches],
     ['endpoint', endpointMatches],
     ['required', requiredMatches],
@@ -841,7 +1060,7 @@ export function classifyEffectiveAuthority(
     ) return malformedAuthority();
 
     const tools = observedTools(ownValue(server, 'enabledTools', 'invalid_authority_attestation'));
-    const serverCountMatches = true;
+    const serverCountMatches = servers.length === 1;
     const serverNameMatches = ownValue(
       server,
       'serverName',

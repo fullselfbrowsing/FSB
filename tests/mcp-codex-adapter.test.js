@@ -178,6 +178,15 @@ async function runGenericProbeTests(
   success.zeroize();
   assert.equal(ownedBuffersAreZero(success), true, 'success channels zero idempotently');
 
+  const stdinCanary = Buffer.from('FIXED_PROBE_STDIN');
+  const stdinEcho = await runBoundedProcessProbe(descriptor([
+    '-e',
+    'const chunks=[];process.stdin.on("data",(chunk)=>chunks.push(chunk));process.stdin.on("end",()=>process.stdout.write(Buffer.concat(chunks)));',
+  ], { stdinBytes: Object.freeze(Array.from(stdinCanary)) }));
+  assert.equal(stdinEcho.stdout.equals(stdinCanary), true, 'fixed probe stdin reaches the child');
+  stdinEcho.zeroize();
+  assert.equal(ownedBuffersAreZero(stdinEcho), true);
+
   const nonzero = await runBoundedProcessProbe(descriptor([
     '-e',
     'process.exitCode = 17;',
@@ -572,6 +581,7 @@ async function runGenericAuthorityTests(
   assert(Object.isFrozen(frozenAuthority));
   assert(Object.isFrozen(frozenAuthority.argv));
   assert(Object.isFrozen(frozenAuthority.enabledTools));
+  assert.equal(frozenAuthority.stdinBytes, undefined);
 
   const frozenSpec = adapterModule.freezeSpawnSpec(
     directSpawnSpec(identityProbe(), authorityAttestation()),
@@ -755,6 +765,47 @@ function codexContext(reference, authState = 'chatgpt', version = '0.142.5') {
   };
 }
 
+function codexFsbEffectiveServer(endpoint, overrides = {}) {
+  return {
+    url: endpoint,
+    environment_id: 'local',
+    enabled: true,
+    required: true,
+    tool_timeout_sec: null,
+    default_tools_approval_mode: 'approve',
+    enabled_tools: ['search_capabilities', 'invoke_capability'],
+    ...overrides,
+  };
+}
+
+function codexConfigReadMessages(mcpServers, overrides = {}) {
+  return [
+    {
+      id: 1,
+      result: {
+        userAgent: 'codex_cli_rs/0.142.5',
+        codexHome: '/fixture/codex-home',
+        platformFamily: 'unix',
+        platformOs: 'macos',
+      },
+    },
+    ...(overrides.remoteControlNotification
+      ? [{ method: 'remoteControl/status/changed', params: {} }]
+      : []),
+    {
+      id: 2,
+      result: {
+        config: { mcp_servers: mcpServers },
+        origins: {},
+      },
+    },
+  ];
+}
+
+function withoutKey(value, key) {
+  return Object.fromEntries(Object.entries(value).filter(([name]) => name !== key));
+}
+
 async function runCodexIsolationTests(
   codexModule,
   codexDetectModule,
@@ -898,41 +949,116 @@ async function runCodexIsolationTests(
     'search_capabilities',
     'invoke_capability',
   ]);
-  const nativeAuthority = {
-    name: 'fsb',
-    enabled: true,
-    disabled_reason: null,
-    transport: {
-      type: 'streamable_http',
-      url: endpoint,
-      bearer_token_env_var: null,
-      http_headers: null,
-      env_http_headers: null,
-    },
-    enabled_tools: ['search_capabilities', 'invoke_capability'],
-    disabled_tools: null,
-    startup_timeout_sec: null,
-    tool_timeout_sec: null,
-  };
+  assert.deepEqual(spec.effectiveAuthorityAttestation.argv.slice(-3), [
+    'app-server', '--stdio', '--strict-config',
+  ]);
+  assert(Object.isFrozen(spec.effectiveAuthorityAttestation.stdinBytes));
+  const authorityRequests = Buffer.from(spec.effectiveAuthorityAttestation.stdinBytes)
+    .toString('utf8')
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  assert.deepEqual(authorityRequests.map((request) => request.method), [
+    'initialize', 'initialized', 'config/read',
+  ]);
+  assert.equal(authorityRequests[2].params.cwd, '/fixture/runtime/codex-run');
+  assert.equal(authorityRequests[2].params.includeLayers, false);
+  assert.equal(authorityRequests.some((request) => (
+    request.method.includes('model')
+    || request.method.includes('login')
+    || request.method.includes('browser')
+  )), false);
+  assert.equal(effectiveAuthorityModule.codexAuthorityUsesTaskConfig(
+    spec.effectiveAuthorityAttestation.argv,
+    spec.topology.task.argv,
+  ), true);
+  assert.equal(effectiveAuthorityModule.codexAuthorityUsesTaskConfig(
+    spec.effectiveAuthorityAttestation.argv,
+    [...spec.topology.task.argv.slice(0, -1), 'mcp_servers.fsb.enabled=false'],
+  ), false);
+
+  const nativeServer = codexFsbEffectiveServer(endpoint);
+  const nativeAuthority = codexConfigReadMessages({ fsb: nativeServer });
   assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
     nativeAuthority,
     spec.effectiveAuthorityAttestation,
     reference,
   ).pass, true);
-  for (const mutation of [
-    { ...nativeAuthority, name: 'foreign' },
-    { ...nativeAuthority, enabled_tools: ['search_capabilities'] },
-    { ...nativeAuthority, transport: { ...nativeAuthority.transport, url: 'http://127.0.0.1:7333/mcp' } },
-    { ...nativeAuthority, transport: { ...nativeAuthority.transport, http_headers: { Authorization: 'HEADER_CANARY' } } },
-  ]) {
+  assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
+    codexConfigReadMessages({ fsb: nativeServer, dormant: { enabled: false } }),
+    spec.effectiveAuthorityAttestation,
+    reference,
+  ).pass, true, 'disabled inherited servers are outside the complete enabled roster');
+  assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
+    codexConfigReadMessages({ fsb: nativeServer }, { remoteControlNotification: true }),
+    spec.effectiveAuthorityAttestation,
+    reference,
+  ).pass, true, 'the pinned initialize status notification is tolerated');
+
+  const nativeNegatives = [
+    [codexConfigReadMessages({
+      fsb: nativeServer,
+      foreign: codexFsbEffectiveServer('http://127.0.0.1:7333/mcp'),
+    }), 'server_count'],
+    [codexConfigReadMessages({
+      fsb: nativeServer,
+      FSB: codexFsbEffectiveServer('http://127.0.0.1:7334/mcp'),
+    }), 'server_count'],
+    [codexConfigReadMessages({ foreign: { enabled: true } }), 'server_name'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, enabled: false } }), 'server_count'],
+    [codexConfigReadMessages({ fsb: nativeServer, ambiguous: {} }), 'malformed'],
+    [codexConfigReadMessages({ fsb: withoutKey(nativeServer, 'required') }), 'malformed'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, required: false } }), 'required'],
+    [codexConfigReadMessages({ fsb: withoutKey(nativeServer, 'default_tools_approval_mode') }), 'malformed'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, default_tools_approval_mode: 'prompt' } }), 'approval_policy'],
+    [codexConfigReadMessages({ fsb: withoutKey(nativeServer, 'enabled_tools') }), 'malformed'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, enabled_tools: ['search_capabilities'] } }), 'enabled_tools'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, url: 'http://127.0.0.1:7333/mcp' } }), 'endpoint'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, environment_id: 'remote' } }), 'malformed'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, tool_timeout_sec: 10 } }), 'malformed'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, http_headers: { Authorization: 'HEADER_CANARY' } } }), 'headers_present'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, env_http_headers: { Authorization: 'ENV_HEADER_CANARY' } } }), 'env_present'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, bearer_token_env_var: 'TOKEN_CANARY' } }), 'bearer_present'],
+    [codexConfigReadMessages({ fsb: { ...nativeServer, disabled_tools: [] } }), 'malformed'],
+    [[nativeAuthority[1]], 'malformed'],
+    [{ id: 2, result: nativeAuthority[1].result }, 'malformed'],
+  ];
+  for (const [mutation, expectedReason] of nativeNegatives) {
     const result = effectiveAuthorityModule.classifyEffectiveAuthority(
       mutation,
       spec.effectiveAuthorityAttestation,
       reference,
     );
     assert.equal(result.pass, false);
-    assert.equal(JSON.stringify(result).includes('HEADER_CANARY'), false);
+    assert.equal(result.reason, expectedReason);
+    const serialized = JSON.stringify(result);
+    for (const canary of ['HEADER_CANARY', 'ENV_HEADER_CANARY', 'TOKEN_CANARY']) {
+      assert.equal(serialized.includes(canary), false);
+    }
   }
+
+  assert.throws(
+    () => effectiveAuthorityModule.validateEffectiveAuthorityAttestation({
+      ...spec.effectiveAuthorityAttestation,
+      stdinBytes: [],
+    }),
+    (error) => error.code === 'invalid_authority_attestation',
+  );
+  assert.throws(
+    () => effectiveAuthorityModule.validateEffectiveAuthorityAttestation({
+      ...spec.effectiveAuthorityAttestation,
+      argv: [...spec.effectiveAuthorityAttestation.argv.slice(0, -3), 'mcp', 'get', 'fsb'],
+    }),
+    (error) => error.code === 'invalid_authority_attestation',
+  );
+
+  const authoritySource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'effective-authority.ts'),
+    'utf8',
+  );
+  assert.equal(authoritySource.includes('const serverCountMatches = true'), false);
+  assert.equal(authoritySource.includes('const requiredMatches = true'), false);
+  assert.equal(authoritySource.includes('const approvalPolicyMatches = true'), false);
 
   const calls = [];
   const fakeDetection = Object.freeze({ installed: false });

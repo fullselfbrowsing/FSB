@@ -75,6 +75,7 @@ import {
   verifyPolicyAttestation,
 } from './policy-attestation.js';
 import {
+  codexAuthorityUsesTaskConfig,
   classifyEffectiveAuthority,
   classifyPreSpawnIdentityProbe,
   validateDirectRuntimeReference,
@@ -2119,6 +2120,26 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     }
   }
 
+  private parseJsonLines(bytes: Buffer): readonly unknown[] {
+    let text: string | null = null;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      if (!text.endsWith('\n')) throw new PolicyAttestationFailure();
+      const lines = text.split('\n');
+      lines.pop();
+      if (lines.length < 2 || lines.length > 8 || lines.some((line) => line.length === 0)) {
+        throw new PolicyAttestationFailure();
+      }
+      return Object.freeze(lines.map((line) => JSON.parse(line) as unknown));
+    } catch (error) {
+      if (error instanceof PolicyAttestationFailure) throw error;
+      throw new PolicyAttestationFailure();
+    } finally {
+      bytes.fill(0);
+      text = null;
+    }
+  }
+
   private withDeadline<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
     let timer: unknown = null;
     const timeout = new Promise<never>((_resolve, reject) => {
@@ -2174,6 +2195,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       this.directRuntimeReference,
       this.generation,
     );
+    const codexAuthority = authorityDescriptor.classifier
+      === 'codex_effective_authority_json';
+    if (
+      codexAuthority && !codexAuthorityUsesTaskConfig(
+        authorityDescriptor.argv,
+        process.argv,
+      )
+    ) throw new PolicyAttestationFailure();
 
     let identityResult: BoundedProcessProbeResult | null = null;
     try {
@@ -2217,11 +2246,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       authorityResult = await this.processProbe(Object.freeze({
         command: process.command,
         argv: authorityDescriptor.argv,
-        cwd: this.cwd,
+        cwd: codexAuthority ? process.cwd : this.cwd,
         environment,
         timeoutMs: authorityDescriptor.timeoutMs,
         stdoutLimitBytes: authorityDescriptor.stdoutLimitBytes,
         stderrLimitBytes: authorityDescriptor.stderrLimitBytes,
+        ...(authorityDescriptor.stdinBytes
+          ? { stdinBytes: authorityDescriptor.stdinBytes }
+          : {}),
         ...(run.routeSignal ? { signal: run.routeSignal } : {}),
       }));
       if (
@@ -2229,7 +2261,9 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         || authorityResult.exit.signal !== null
         || authorityResult.stderr.length !== 0
       ) throw new PolicyAttestationFailure();
-      document = this.parseJsonDocument(authorityResult.stdout);
+      document = codexAuthority
+        ? this.parseJsonLines(authorityResult.stdout)
+        : this.parseJsonDocument(authorityResult.stdout);
       const classification = classifyEffectiveAuthority(
         document,
         authorityDescriptor,

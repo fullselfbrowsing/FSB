@@ -114,6 +114,8 @@ export interface PreSpawnIdentityProbe {
 export interface EffectiveAuthorityAttestation {
   readonly source: 'retained_binary';
   readonly argv: readonly string[];
+  /** Optional fixed protocol request written to the retained binary's stdin. */
+  readonly stdinBytes?: readonly number[];
   readonly timeoutMs: number;
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;

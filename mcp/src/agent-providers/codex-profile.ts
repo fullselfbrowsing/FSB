@@ -25,6 +25,9 @@ const AUTH_CHATGPT = Buffer.from('Logged in using ChatGPT\n', 'utf8');
 const AUTH_UNAUTHENTICATED = Buffer.from('Not logged in\n', 'utf8');
 const AUTH_API_PREFIX = Buffer.from('Logged in using an API key - ', 'utf8');
 const AUTH_API_SEPARATOR = Buffer.from('***', 'ascii');
+const AUTHORITY_CLIENT_NAME = 'fsb_codex_authority';
+const AUTHORITY_CLIENT_TITLE = 'Full Self-Browsing Codex Authority';
+const REMOTE_CONTROL_NOTIFICATION = 'remoteControl/status/changed';
 
 export const CODEX_ALLOWED_MCP_TOOLS = Object.freeze([
   'search_capabilities',
@@ -364,17 +367,42 @@ function authProbe(argvPrefix: readonly string[], authState: AdapterAuthState): 
 function authorityAttestation(
   argvPrefix: readonly string[],
   configArguments: readonly string[],
+  scratchDirectory: string,
 ): EffectiveAuthorityAttestation {
+  const request = Buffer.from(`${[
+    {
+      method: 'initialize',
+      id: 1,
+      params: {
+        clientInfo: {
+          name: AUTHORITY_CLIENT_NAME,
+          title: AUTHORITY_CLIENT_TITLE,
+          version: CODEX_PROFILE_VERSION,
+        },
+        capabilities: {
+          optOutNotificationMethods: [REMOTE_CONTROL_NOTIFICATION],
+        },
+      },
+    },
+    { method: 'initialized', params: {} },
+    {
+      method: 'config/read',
+      id: 2,
+      params: { includeLayers: false, cwd: scratchDirectory },
+    },
+  ].map((document) => JSON.stringify(document)).join('\n')}\n`, 'utf8');
+  const stdinBytes = Object.freeze(Array.from(request));
+  request.fill(0);
   return {
     source: 'retained_binary',
     argv: Object.freeze([
       ...argvPrefix,
-      'mcp',
       ...configArguments,
-      'get',
-      'fsb',
-      '--json',
+      'app-server',
+      '--stdio',
+      '--strict-config',
     ]),
+    stdinBytes,
     timeoutMs: 5_000,
     stdoutLimitBytes: 64 * 1024,
     stderrLimitBytes: 8 * 1024,
@@ -421,6 +449,7 @@ export function buildCodexSpawnSpec(task: AgentTask, context: SpawnContext): Spa
     effectiveAuthorityAttestation: authorityAttestation(
       validated.argvPrefix,
       configArguments,
+      validated.scratchDirectory,
     ),
   });
 }
