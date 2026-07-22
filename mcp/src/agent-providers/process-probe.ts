@@ -8,6 +8,9 @@ import {
   isSanitizedAgentEnvironment,
   type SanitizedAgentEnvironment,
 } from './spawn-environment.js';
+import {
+  terminateDetachedProcessTree,
+} from './process-tree.js';
 
 const MAX_PROBE_ARGUMENTS = 256;
 const MAX_PROBE_ARGUMENT_BYTES = 64 * 1024;
@@ -22,7 +25,8 @@ export type ProcessProbeFailureCode =
   | 'stdout_overflow'
   | 'stderr_overflow'
   | 'malformed_channel'
-  | 'invalid_exit';
+  | 'invalid_exit'
+  | 'tree_unsettled';
 
 export class ProcessProbeError extends Error {
   readonly code: ProcessProbeFailureCode;
@@ -54,6 +58,18 @@ export interface BoundedProcessProbeResult {
   }>;
   /** Zero both owned channels. Safe to call repeatedly. */
   zeroize(): void;
+}
+
+export interface ProcessProbeDependencies {
+  readonly spawn?: (
+    command: string,
+    argv: readonly string[],
+    options: SpawnOptionsWithoutStdio,
+  ) => ChildProcessWithoutNullStreams;
+  readonly terminateTree?: (
+    pid: number,
+    childClosed: Promise<void>,
+  ) => Promise<void>;
 }
 
 type OwnDataRecord = Readonly<Record<string, unknown>>;
@@ -177,14 +193,6 @@ function zeroBuffers(buffers: readonly Buffer[]): void {
   for (const buffer of buffers) buffer.fill(0);
 }
 
-function stopProbeChild(child: ChildProcessWithoutNullStreams): void {
-  try {
-    child.kill('SIGKILL');
-  } catch {
-    // The safe probe failure remains authoritative if the child already exited.
-  }
-}
-
 /**
  * Execute one non-shell probe with byte-bounded channels. No raw channel byte
  * is converted to text or included in diagnostics; callers classify the owned
@@ -192,6 +200,7 @@ function stopProbeChild(child: ChildProcessWithoutNullStreams): void {
  */
 export function runBoundedProcessProbe(
   input: BoundedProcessProbeDescriptor,
+  dependencies: ProcessProbeDependencies = {},
 ): Promise<BoundedProcessProbeResult> {
   let descriptor: BoundedProcessProbeDescriptor;
   try {
@@ -206,6 +215,7 @@ export function runBoundedProcessProbe(
 
   const options: SpawnOptionsWithoutStdio = Object.freeze({
     shell: false,
+    detached: true,
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
     cwd: descriptor.cwd,
@@ -214,7 +224,9 @@ export function runBoundedProcessProbe(
 
   let child: ChildProcessWithoutNullStreams;
   try {
-    child = nodeSpawn(descriptor.command, descriptor.argv, options);
+    child = dependencies.spawn
+      ? dependencies.spawn(descriptor.command, descriptor.argv, options)
+      : nodeSpawn(descriptor.command, descriptor.argv, options);
   } catch {
     return Promise.reject(new ProcessProbeError('spawn_failed'));
   }
@@ -225,7 +237,12 @@ export function runBoundedProcessProbe(
     let stdoutBytes = 0;
     let stderrBytes = 0;
     let settled = false;
+    let failureStarted = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let closePromiseResolve: (() => void) | null = null;
+    const childClosed = new Promise<void>((resolve) => {
+      closePromiseResolve = resolve;
+    });
 
     const cleanup = (): void => {
       if (timer !== null) clearTimeout(timer);
@@ -233,18 +250,38 @@ export function runBoundedProcessProbe(
       descriptor.signal?.removeEventListener('abort', onAbort);
       child.stdout.removeListener('data', onStdout);
       child.stderr.removeListener('data', onStderr);
+      child.stdout.removeListener('error', onStdoutError);
+      child.stderr.removeListener('error', onStderrError);
+      child.stdin.removeListener('error', onStdinError);
       child.removeListener('error', onError);
       child.removeListener('close', onClose);
     };
 
     const fail = (code: ProcessProbeFailureCode): void => {
-      if (settled) return;
-      settled = true;
-      cleanup();
+      if (settled || failureStarted) return;
+      failureStarted = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      descriptor.signal?.removeEventListener('abort', onAbort);
+      child.stdout.removeListener('data', onStdout);
+      child.stderr.removeListener('data', onStderr);
       zeroBuffers(stdoutChunks);
       zeroBuffers(stderrChunks);
-      stopProbeChild(child);
-      reject(new ProcessProbeError(code));
+      const terminateTree = dependencies.terminateTree ?? terminateDetachedProcessTree;
+      void terminateTree(child.pid ?? 0, childClosed).then(
+        () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new ProcessProbeError(code));
+        },
+        () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new ProcessProbeError('tree_unsettled'));
+        },
+      );
     };
 
     const append = (
@@ -274,9 +311,14 @@ export function runBoundedProcessProbe(
     const onStdout = (value: unknown): void => append(value, stdoutChunks, 'stdout');
     const onStderr = (value: unknown): void => append(value, stderrChunks, 'stderr');
     const onError = (): void => fail('spawn_failed');
+    const onStdoutError = (): void => fail('malformed_channel');
+    const onStderrError = (): void => fail('malformed_channel');
+    const onStdinError = (): void => fail('spawn_failed');
     const onAbort = (): void => fail('aborted');
     const onClose = (code: number | null, signal: NodeJS.Signals | null): void => {
-      if (settled) return;
+      closePromiseResolve?.();
+      closePromiseResolve = null;
+      if (settled || failureStarted) return;
       if (
         (code !== null && !Number.isSafeInteger(code))
         || (signal !== null && (typeof signal !== 'string' || signal.length === 0))
@@ -320,6 +362,9 @@ export function runBoundedProcessProbe(
 
     child.stdout.on('data', onStdout);
     child.stderr.on('data', onStderr);
+    child.stdout.once('error', onStdoutError);
+    child.stderr.once('error', onStderrError);
+    child.stdin.once('error', onStdinError);
     child.once('error', onError);
     child.once('close', onClose);
     descriptor.signal?.addEventListener('abort', onAbort, { once: true });

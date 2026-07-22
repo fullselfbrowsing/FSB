@@ -19,6 +19,8 @@ const MAX_PROC_FILE_BYTES = 256 * 1024;
 const MAX_NATIVE_OUTPUT_BYTES = 2 * 1024 * 1024;
 const NATIVE_TIMEOUT_MS = 5000;
 const DEFAULT_FINAL_WAIT_MS = 1000;
+const DETACHED_TREE_POLL_MS = 20;
+const DETACHED_TREE_MAX_POLLS = 250;
 
 const FINGERPRINT_ENV_NAME = 'FSB_AGENT_FINGERPRINT';
 const ARGV_SIGNATURE_ENV_NAME = 'FSB_AGENT_ARGV_SIGNATURE';
@@ -601,6 +603,18 @@ export interface ProcessTreeTerminatorDependencies {
   readonly exec?: NativeExec;
 }
 
+export interface DetachedProcessTreeTerminationDependencies {
+  readonly platform?: NodeJS.Platform;
+  readonly signalGroup?: (negativeProcessGroupId: number, signal: TreeSignal) => void;
+  readonly taskkill?: (pid: number) => Promise<void>;
+  readonly wait?: (milliseconds: number) => Promise<void>;
+  readonly groupPresent?: (negativeProcessGroupId: number) => boolean;
+  readonly processPresent?: (pid: number) => boolean;
+  readonly systemRoot?: string;
+  readonly fs?: Pick<ProcessFsDependencies, 'lstat'>;
+  readonly exec?: NativeExec;
+}
+
 export class TreeUnsettledError extends Error {
   readonly code = 'tree_unsettled' as const;
 
@@ -641,6 +655,104 @@ function createNativeTaskkill(
       NATIVE_EXEC_OPTIONS,
     );
   };
+}
+
+function nativeGroupPresent(negativeProcessGroupId: number): boolean {
+  try {
+    process.kill(negativeProcessGroupId, 0);
+    return true;
+  } catch (error) {
+    if (errorCode(error) === 'ESRCH') return false;
+    if (errorCode(error) === 'EPERM') return true;
+    throw new TreeUnsettledError();
+  }
+}
+
+function nativeProcessPresent(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (errorCode(error) === 'ESRCH') return false;
+    if (errorCode(error) === 'EPERM') return true;
+    throw new TreeUnsettledError();
+  }
+}
+
+async function waitForDetachedTreeSettlement(
+  childClosed: Promise<void>,
+  wait: (milliseconds: number) => Promise<void>,
+  treePresent: () => boolean,
+): Promise<void> {
+  let childSettled = false;
+  void childClosed.then(
+    () => { childSettled = true; },
+    () => { childSettled = true; },
+  );
+  for (let attempt = 0; attempt < DETACHED_TREE_MAX_POLLS; attempt += 1) {
+    if (!treePresent() && childSettled) return;
+    await wait(DETACHED_TREE_POLL_MS);
+  }
+  if (!treePresent() && childSettled) return;
+  throw new TreeUnsettledError();
+}
+
+/** Terminate and verify a detached probe process tree without journal state. */
+export async function terminateDetachedProcessTree(
+  pid: number,
+  childClosed: Promise<void>,
+  dependencies: DetachedProcessTreeTerminationDependencies = {},
+): Promise<void> {
+  if (!Number.isSafeInteger(pid) || pid < 1) {
+    await childClosed;
+    return;
+  }
+  const platform = dependencies.platform ?? process.platform;
+  const wait = dependencies.wait ?? defaultWait;
+  if (platform === 'win32') {
+    const fs = dependencies.fs ?? { lstat: DEFAULT_PROCESS_FS.lstat };
+    const taskkill = dependencies.taskkill ?? createNativeTaskkill(
+      dependencies.systemRoot ?? process.env.SystemRoot ?? '',
+      fs,
+      dependencies.exec ?? defaultExec,
+    );
+    try {
+      await taskkill(pid);
+    } catch {
+      throw new TreeUnsettledError();
+    }
+    const processPresent = dependencies.processPresent ?? nativeProcessPresent;
+    await waitForDetachedTreeSettlement(
+      childClosed,
+      wait,
+      () => processPresent(pid),
+    );
+    return;
+  }
+  if (platform !== 'linux' && platform !== 'darwin') throw new TreeUnsettledError();
+
+  const negativeGroupId = -pid;
+  const signalGroup = dependencies.signalGroup
+    ?? ((group, signal) => process.kill(group, signal));
+  const groupPresent = dependencies.groupPresent ?? nativeGroupPresent;
+  try {
+    signalGroup(negativeGroupId, 'SIGTERM');
+  } catch (error) {
+    if (errorCode(error) !== 'ESRCH') throw new TreeUnsettledError();
+  }
+  await wait(Math.min(100, DEFAULT_FINAL_WAIT_MS));
+  if (groupPresent(negativeGroupId)) {
+    try {
+      signalGroup(negativeGroupId, 'SIGKILL');
+    } catch (error) {
+      if (errorCode(error) !== 'ESRCH') throw new TreeUnsettledError();
+    }
+  }
+  await waitForDetachedTreeSettlement(
+    childClosed,
+    wait,
+    () => groupPresent(negativeGroupId),
+  );
 }
 
 class VerifiedProcessTreeTerminator implements ProcessTreeTerminator {

@@ -1,9 +1,11 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
-const { Readable } = require('node:stream');
+const { PassThrough, Readable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -14,6 +16,11 @@ const processProbeBuildPath = path.join(
   mcpBuildRoot,
   'agent-providers',
   'process-probe.js',
+);
+const processTreeBuildPath = path.join(
+  mcpBuildRoot,
+  'agent-providers',
+  'process-tree.js',
 );
 const spawnEnvironmentBuildPath = path.join(
   mcpBuildRoot,
@@ -53,7 +60,69 @@ function ownedBuffersAreZero(result) {
     && result.stderr.every((byte) => byte === 0);
 }
 
-async function runGenericProbeTests(processProbeModule, spawnEnvironmentModule) {
+function waitForCondition(predicate, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const poll = () => {
+      if (predicate()) {
+        resolve();
+        return;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error('condition timeout'));
+        return;
+      }
+      setTimeout(poll, 10);
+    };
+    poll();
+  });
+}
+
+function processIsPresent(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error && error.code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+function descendantProbeScript(pidPath, markerPath, channel) {
+  const descendant = [
+    "const fs = require('node:fs');",
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerPath)}, 'escaped'), 750);`,
+    'setInterval(() => {}, 1000);',
+  ].join('');
+  const output = channel === 'stdout'
+    ? 'setImmediate(() => process.stdout.write(Buffer.alloc(4096, 0x53)));'
+    : channel === 'stderr'
+      ? 'setImmediate(() => process.stderr.write(Buffer.alloc(4096, 0x45)));'
+      : '';
+  return [
+    "const fs = require('node:fs');",
+    "const { spawn } = require('node:child_process');",
+    `const descendant = spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], { stdio: 'ignore' });`,
+    `fs.writeFileSync(${JSON.stringify(pidPath)}, JSON.stringify({ root: process.pid, descendant: descendant.pid }));`,
+    output,
+    'setInterval(() => {}, 1000);',
+  ].join('');
+}
+
+function fakeProbeChild(pid) {
+  const child = new EventEmitter();
+  child.pid = pid;
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  return child;
+}
+
+async function runGenericProbeTests(
+  processProbeModule,
+  processTreeModule,
+  spawnEnvironmentModule,
+) {
   const {
     ProcessProbeError,
     runBoundedProcessProbe,
@@ -170,6 +239,87 @@ async function runGenericProbeTests(processProbeModule, spawnEnvironmentModule) 
   ], { signal: controller.signal }));
   controller.abort();
   await assert.rejects(aborted, (error) => error.code === 'aborted');
+
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    const treeCases = [
+      ['timeout tree', 'none', { timeoutMs: 125 }, null, 'timeout'],
+      ['abort tree', 'none', {}, new AbortController(), 'aborted'],
+      ['stdout overflow tree', 'stdout', { stdoutLimitBytes: 32 }, null, 'stdout_overflow'],
+      ['stderr overflow tree', 'stderr', { stderrLimitBytes: 32 }, null, 'stderr_overflow'],
+    ];
+    for (const [label, channel, overrides, abortController, expectedCode] of treeCases) {
+      const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-probe-tree-'));
+      const pidPath = path.join(temporaryDirectory, 'pids.json');
+      const markerPath = path.join(temporaryDirectory, 'escaped.marker');
+      try {
+        const operation = runBoundedProcessProbe(descriptor([
+          '-e',
+          descendantProbeScript(pidPath, markerPath, channel),
+        ], {
+          ...overrides,
+          ...(abortController ? { signal: abortController.signal } : {}),
+        }));
+        await waitForCondition(() => fs.existsSync(pidPath));
+        abortController?.abort();
+        await assert.rejects(operation, (error) => error.code === expectedCode, label);
+        const pids = JSON.parse(fs.readFileSync(pidPath, 'utf8'));
+        assert.equal(processIsPresent(pids.root), false, `${label} root settled before rejection`);
+        assert.equal(
+          processIsPresent(pids.descendant),
+          false,
+          `${label} descendant settled before rejection`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        assert.equal(fs.existsSync(markerPath), false, `${label} descendant marker never appears`);
+      } finally {
+        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+      }
+    }
+  }
+
+  for (const [label, trigger, expectedCode] of [
+    ['spawn event failure', (child) => child.emit('error', new Error('synthetic')), 'spawn_failed'],
+    ['stdout stream failure', (child) => child.stdout.emit('error', new Error('synthetic')), 'malformed_channel'],
+    ['stderr stream failure', (child) => child.stderr.emit('error', new Error('synthetic')), 'malformed_channel'],
+    ['stdin stream failure', (child) => child.stdin.emit('error', new Error('synthetic')), 'spawn_failed'],
+  ]) {
+    const child = fakeProbeChild(42_001);
+    let releaseTree;
+    let treeSettled = false;
+    let rejected = false;
+    const operation = runBoundedProcessProbe(descriptor(['synthetic']), {
+      spawn: () => {
+        queueMicrotask(() => trigger(child));
+        return child;
+      },
+      terminateTree: async (pid, childClosed) => {
+        assert.equal(pid, 42_001, label);
+        child.emit('close', null, 'SIGKILL');
+        await childClosed;
+        await new Promise((resolve) => { releaseTree = resolve; });
+        treeSettled = true;
+      },
+    });
+    operation.catch(() => { rejected = true; });
+    await waitForCondition(() => typeof releaseTree === 'function');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(rejected, false, `${label} cannot reject before tree settlement`);
+    releaseTree();
+    await assert.rejects(operation, (error) => error.code === expectedCode, label);
+    assert.equal(treeSettled, true, `${label} terminator settled`);
+  }
+
+  const windowsTaskkillPids = [];
+  const windowsPresencePids = [];
+  await processTreeModule.terminateDetachedProcessTree(42_002, Promise.resolve(), {
+    platform: 'win32',
+    taskkill: async (pid) => { windowsTaskkillPids.push(pid); },
+    processPresent: (pid) => { windowsPresencePids.push(pid); return false; },
+    wait: async () => undefined,
+  });
+  assert.deepEqual(windowsTaskkillPids, [42_002]);
+  assert(windowsPresencePids.length >= 1);
+  assert(windowsPresencePids.every((pid) => pid === 42_002));
 
   await assert.rejects(
     runBoundedProcessProbe({
@@ -910,9 +1060,10 @@ async function runCodexParserTests(codexStreamModule) {
 
 async function main() {
   const processProbeModule = await import(pathToFileURL(processProbeBuildPath).href);
+  const processTreeModule = await import(pathToFileURL(processTreeBuildPath).href);
   const spawnEnvironmentModule = await import(pathToFileURL(spawnEnvironmentBuildPath).href);
   if (SELECTED_SECTION === 'generic-probe') {
-    await runGenericProbeTests(processProbeModule, spawnEnvironmentModule);
+    await runGenericProbeTests(processProbeModule, processTreeModule, spawnEnvironmentModule);
     console.log('mcp-codex-adapter.test.js: PASS');
     return;
   }
@@ -957,7 +1108,7 @@ async function main() {
     return;
   }
   if (SELECTED_SECTION === null) {
-    await runGenericProbeTests(processProbeModule, spawnEnvironmentModule);
+    await runGenericProbeTests(processProbeModule, processTreeModule, spawnEnvironmentModule);
     await runGenericAuthorityTests(
       adapterModule,
       effectiveAuthorityModule,
