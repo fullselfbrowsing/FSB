@@ -25,12 +25,25 @@ function deferred() {
   return { promise, resolve };
 }
 
-function startRequest(adapterId, task, id) {
+function acceptedIdentity(adapterId, profileVersion = 'fixture-profile-1') {
+  const metadata = adapterId === 'opencode'
+    ? { label: 'OpenCode', billingKind: 'unknown' }
+    : { label: 'Claude Code', billingKind: 'subscription' };
+  return {
+    providerId: adapterId,
+    label: metadata.label,
+    profileVersion,
+    authState: 'unknown',
+    billingKind: metadata.billingKind,
+  };
+}
+
+function startRequest(adapterId, task, id, profileVersion) {
   return {
     id,
     type: 'ext:request',
     method: 'delegate.start',
-    payload: { adapterId, task },
+    payload: { acceptedIdentity: acceptedIdentity(adapterId, profileVersion), task },
   };
 }
 
@@ -1231,11 +1244,20 @@ async function runTaskOnce(supervisorModule) {
     assert.equal(harness.spawnCalls.filter((call) => call.role === 'cold_task').length, 1);
     for (const event of harness.emitted.filter((item) => item.event === 'delegation.started')) {
       assert.deepEqual(Object.keys(event.payload).sort(), [
-        'adapterId',
+        'acceptedIdentity',
         'delegationId',
-        'profileVersion',
       ]);
-      for (const forbidden of ['endpoint', 'port', 'secretRef', 'password', 'topology', 'task']) {
+      assert.deepEqual(event.payload.acceptedIdentity, acceptedIdentity('claude-code'));
+      for (const forbidden of [
+        'adapterId',
+        'endpoint',
+        'password',
+        'port',
+        'profileVersion',
+        'secretRef',
+        'task',
+        'topology',
+      ]) {
         assert.equal(Object.hasOwn(event.payload, forbidden), false);
       }
     }
@@ -1432,10 +1454,10 @@ async function runPolicyAttestation(supervisorModule) {
     const started = harness.emitted.filter((event) => event.event === 'delegation.started');
     assert.equal(started.length, 1);
     assert.deepEqual(Object.keys(started[0].payload).sort(), [
-      'adapterId',
+      'acceptedIdentity',
       'delegationId',
-      'profileVersion',
     ]);
+    assert.deepEqual(started[0].payload.acceptedIdentity, acceptedIdentity('claude-code'));
     await harness.supervisor.close();
   }
 
@@ -1794,7 +1816,7 @@ async function runProductionComposition(supervisorModule) {
     const recovery = await supervisor.recover();
     assert.equal(recovery.spawnAvailable, true);
     const first = await supervisor.handleExtRequest(
-      startRequest('opencode', 'production composition cold task', 'ext-production-cold'),
+      startRequest('opencode', 'production composition cold task', 'ext-production-cold', '1.14.25'),
       (event) => emitted.push(event),
     );
     assert.equal(first.status, 'succeeded');
@@ -1814,7 +1836,7 @@ async function runProductionComposition(supervisorModule) {
     assert.equal(warmJournal.entries[0].delegationId, serverCall.runtimeId);
 
     const second = await supervisor.handleExtRequest(
-      startRequest('opencode', 'production composition warm task', 'ext-production-attach'),
+      startRequest('opencode', 'production composition warm task', 'ext-production-attach', '1.14.25'),
       (event) => emitted.push(event),
     );
     assert.equal(second.status, 'succeeded');
@@ -1832,18 +1854,18 @@ async function runProductionComposition(supervisorModule) {
     );
     assert.equal(spawnCalls.filter((call) => call.role === 'owned_server').length, 1);
     assert.equal(spawnCalls.at(-1).argv.includes('http://127.0.0.1:43123'), true);
-    assert.equal(supervisorModule.DELEGATION_PROVIDER_KEY_NAMES.length, 142);
-    const supervisorSource = fs.readFileSync(
-      path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-supervisor.ts'),
+    assert.equal(supervisorModule.DELEGATION_PROVIDER_KEY_NAMES.length, 149);
+    const spawnEnvironmentSource = fs.readFileSync(
+      path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'spawn-environment.ts'),
       'utf8',
     );
-    assert.match(supervisorSource, /OpenCode v1\.14\.25/);
-    assert.match(supervisorSource, /3c85719fea0ee83389c814d7abbf1f98c5c6f0f1/);
-    assert.match(supervisorSource, /packages\/opencode\/test\/tool\/fixtures\/models-api\.json/);
+    assert.match(spawnEnvironmentSource, /OpenCode v1\.14\.25/);
+    assert.match(spawnEnvironmentSource, /3c85719fea0ee83389c814d7abbf1f98c5c6f0f1/);
+    assert.match(spawnEnvironmentSource, /packages\/opencode\/test\/tool\/fixtures\/models-api\.json/);
     assert.deepEqual(
       supervisorModule.DELEGATION_PROVIDER_KEY_NAMES,
       [...supervisorModule.DELEGATION_PROVIDER_KEY_NAMES].sort(),
-      'the OpenCode v1.14.25 deny roster remains deterministic and source-reviewable',
+      'the shared provider deny roster remains deterministic and source-reviewable',
     );
     for (const familyCanary of [
       'ANTHROPIC_API_KEY',
@@ -1851,6 +1873,8 @@ async function runProductionComposition(supervisorModule) {
       'AWS_WEB_IDENTITY_TOKEN_FILE',
       'AWS_CONTAINER_CREDENTIALS_FULL_URI',
       'CLOUDFLARE_API_TOKEN',
+      'CODEX_API_KEY',
+      'CODEX_EXEC_SERVER_URL',
       'GITLAB_TOKEN',
       'GOOGLE_APPLICATION_CREDENTIALS',
       'OPENCODE_AUTH_CONTENT',
@@ -1864,11 +1888,15 @@ async function runProductionComposition(supervisorModule) {
     }
     for (const call of spawnCalls) {
       for (const key of supervisorModule.DELEGATION_PROVIDER_KEY_NAMES) {
-        assert.equal(
-          Object.hasOwn(call.environment, key),
-          false,
-          `${key} is scrubbed from ${call.role}`,
-        );
+        if (key === 'CODEX_EXEC_SERVER_URL') {
+          assert.equal(call.environment[key], 'none', `${key} is forced closed for ${call.role}`);
+        } else {
+          assert.equal(
+            Object.hasOwn(call.environment, key),
+            false,
+            `${key} is scrubbed from ${call.role}`,
+          );
+        }
       }
       for (const [key, value] of Object.entries(operationalEnvironment)) {
         assert.equal(call.environment[key], value, `${key} is retained for ${call.role}`);
