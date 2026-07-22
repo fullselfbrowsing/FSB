@@ -651,6 +651,16 @@ function _delegationValidPreflightResponse(value) {
   if (ok !== false
       || !_delegationHasExactKeys(value, ['code', 'ok', 'providerId', 'providerLabel'])
       || typeof _delegationOwnDataValue(value, 'code') !== 'string') return false;
+  var code = _delegationOwnDataValue(value, 'code');
+  if ([
+    'agent_offline',
+    'agent_unpaired',
+    'auth_unauthenticated',
+    'auth_unknown',
+    'provider_status_refresh',
+    'runtime_unavailable',
+    'unsupported_provider'
+  ].indexOf(code) === -1) return false;
   var providerId = _delegationOwnDataValue(value, 'providerId');
   var providerLabel = _delegationOwnDataValue(value, 'providerLabel');
   return (providerId === '' && providerLabel === 'Selected provider')
@@ -1632,6 +1642,22 @@ function _renderDelegationPreflightFailure(result) {
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = null;
     secondaryAction = null;
+  } else if (code === 'auth_unauthenticated') {
+    headingText = providerLabel + ' cannot start this task';
+    bodyText = 'Sign in to ' + providerLabel
+      + ' first. Open provider setup, refresh status, then try this message again.';
+    primaryLabel = 'Open provider setup';
+    primaryAction = _openDelegationProviderSetup;
+    secondaryLabel = 'Back to message';
+    secondaryAction = _backToDelegationMessage;
+  } else if (code === 'auth_unknown') {
+    headingText = providerLabel + ' cannot start this task';
+    bodyText = providerLabel
+      + ' sign-in status could not be verified. Open provider setup, refresh status, then try this message again.';
+    primaryLabel = 'Open provider setup';
+    primaryAction = _openDelegationProviderSetup;
+    secondaryLabel = 'Back to message';
+    secondaryAction = _backToDelegationMessage;
   } else if (code === 'start_rejected') {
     headingText = providerLabel + ' cannot start this task';
     bodyText = providerLabel

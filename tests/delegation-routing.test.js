@@ -121,7 +121,10 @@ function runCodexAuthPreflightContract() {
     }
   }
 
-  for (const authState of ['unauthenticated', 'unknown']) {
+  for (const [authState, expectedCode] of [
+    ['unauthenticated', 'auth_unauthenticated'],
+    ['unknown', 'auth_unknown']
+  ]) {
     assert.equal(canonical.createAcceptedAgentIdentity('codex', authState), null,
       `${authState} cannot mint Codex authority`);
     assert.deepEqual(clone(preflight.check({
@@ -130,14 +133,26 @@ function runCodexAuthPreflightContract() {
       modelProvider: 'xai',
       bridgeState: bridgeState(),
       compatibility: supportedCompatibility(),
+      authState,
       acceptedIdentity: null
     })), {
       ok: false,
-      code: 'provider_status_refresh',
+      code: expectedCode,
       providerId: 'codex',
       providerLabel: 'Codex'
     });
   }
+
+  assert.equal(preflight.check({
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'xai',
+    bridgeState: bridgeState(),
+    compatibility: supportedCompatibility(),
+    authState: 'unknown',
+    acceptedIdentity: null
+  }).code, 'provider_status_refresh',
+  'non-Codex identity failure retains the closed generic recovery code');
 
   for (const acceptedIdentity of [
     { ...CODEX_CHATGPT_ACCEPTED_IDENTITY, billingKind: 'api' },

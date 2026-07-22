@@ -1691,6 +1691,7 @@ async function fsbReadAuthoritativeProviderEvidence(providerId) {
   let rowDescriptor;
   let compatibilityDescriptor;
   let acceptedIdentityDescriptor;
+  let authStateDescriptor;
   try {
     rowDescriptor = Object.getOwnPropertyDescriptor(clients, providerId);
     if (!rowDescriptor
@@ -1701,6 +1702,7 @@ async function fsbReadAuthoritativeProviderEvidence(providerId) {
       rowDescriptor.value,
       'acceptedIdentity'
     );
+    authStateDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, 'authState');
   } catch (_error) {
     return null;
   }
@@ -1709,12 +1711,27 @@ async function fsbReadAuthoritativeProviderEvidence(providerId) {
     && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
     ? compatibilityDescriptor.value
     : null;
-  const acceptedIdentity = acceptedIdentityDescriptor
+  let acceptedIdentity = acceptedIdentityDescriptor
     && acceptedIdentityDescriptor.enumerable === true
     && Object.prototype.hasOwnProperty.call(acceptedIdentityDescriptor, 'value')
     ? fsbDelegationAcceptedIdentity(acceptedIdentityDescriptor.value)
     : null;
-  return Object.freeze({ compatibility, acceptedIdentity });
+  const projectedAuthState = authStateDescriptor
+    && authStateDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(authStateDescriptor, 'value')
+    ? authStateDescriptor.value
+    : undefined;
+  let authState = projectedAuthState === 'chatgpt'
+    || projectedAuthState === 'api_key'
+    || projectedAuthState === 'unauthenticated'
+    || projectedAuthState === 'unknown'
+    ? projectedAuthState
+    : (acceptedIdentity ? acceptedIdentity.authState : 'unknown');
+  if (acceptedIdentity && acceptedIdentity.authState !== authState) {
+    acceptedIdentity = null;
+    authState = 'unknown';
+  }
+  return Object.freeze({ compatibility, acceptedIdentity, authState });
 }
 
 function fsbDelegationBridgeState() {
@@ -1742,7 +1759,8 @@ async function fsbDelegationPreflightResult() {
     modelProvider: config.modelProvider,
     bridgeState: fsbDelegationBridgeState(),
     compatibility: evidence && evidence.compatibility,
-    acceptedIdentity: evidence && evidence.acceptedIdentity
+    acceptedIdentity: evidence && evidence.acceptedIdentity,
+    authState: evidence && evidence.authState
   });
   return { config, result };
 }

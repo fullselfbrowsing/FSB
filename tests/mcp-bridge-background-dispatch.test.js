@@ -2737,6 +2737,30 @@ async function runCodexStartAuthorityCases() {
     assertDeepEqual(result, { ok: false, code: 'preflight_failed', snapshot: null },
       `${authState} Codex evidence cannot reach consent or transport`);
     assertEqual(harness.startRequests.length, 0, `${authState} sends no daemon start`);
+
+    const preflightHarness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'codex' },
+      compatibilityClients: {
+        codex: {
+          compatibility: {
+            status: 'supported', reason: 'within_tested_range', checkedAt: 100
+          },
+          authState
+        }
+      }
+    });
+    const preflight = await preflightHarness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: `Explain ${authState} Codex recovery`
+    });
+    assertDeepEqual(preflight, {
+      ok: false,
+      code: authState === 'unauthenticated' ? 'auth_unauthenticated' : 'auth_unknown',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    }, `${authState} survives background reduction only as a closed safe recovery code`);
+    assertEqual(JSON.stringify(preflight).includes('Logged in'), false,
+      `${authState} response contains no provider-native status bytes`);
   }
 
   {

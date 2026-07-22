@@ -155,7 +155,25 @@
       getOwnValue(input, 'acceptedIdentity'),
       agentProviderId
     );
-    if (!acceptedIdentity) return failure('provider_status_refresh', agentProviderId);
+    var authState = getOwnValue(input, 'authState');
+    var safeAuthState = authState === 'chatgpt'
+      || authState === 'api_key'
+      || authState === 'unauthenticated'
+      || authState === 'unknown'
+      ? authState
+      : null;
+    if (!acceptedIdentity) {
+      if (agentProviderId === 'codex' && safeAuthState === 'unauthenticated') {
+        return failure('auth_unauthenticated', agentProviderId);
+      }
+      if (agentProviderId === 'codex' && safeAuthState === 'unknown') {
+        return failure('auth_unknown', agentProviderId);
+      }
+      return failure('provider_status_refresh', agentProviderId);
+    }
+    if (safeAuthState !== null && safeAuthState !== acceptedIdentity.authState) {
+      return failure('provider_status_refresh', agentProviderId);
+    }
 
     return {
       ok: true,

@@ -1453,6 +1453,47 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       'not-ready OpenCode reuses the existing non-alert preflight state');
     assert.deepEqual(headers[2], { label: 'Ready', tone: '' });
     assert.equal(composerLocks[2], false);
+
+    for (const [code, body] of [
+      [
+        'auth_unauthenticated',
+        'Sign in to Codex first. Open provider setup, refresh status, then try this message again.'
+      ],
+      [
+        'auth_unknown',
+        'Codex sign-in status could not be verified. Open provider setup, refresh status, then try this message again.'
+      ]
+    ]) {
+      context._renderDelegationPreflightFailure({
+        ok: false,
+        code,
+        providerId: 'codex',
+        providerLabel: 'Codex'
+      });
+      assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Codex cannot start this task');
+      assert.equal(findAll(stateCard, 'p')[0].textContent, body);
+      assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+        'Open provider setup', 'Back to message'
+      ]);
+      assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
+        `${code} keeps managed focus on the shared recovery heading`);
+      assert.equal(stateCard.getAttribute('role'), null);
+    }
+
+    context._renderDelegationPreflightFailure({
+      ok: false,
+      code: 'provider_status_refresh',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    });
+    assert.equal(findAll(stateCard, 'h2')[0].textContent, 'Agent could not start this task');
+    assert.equal(findAll(stateCard, 'p')[0].textContent,
+      'Keep this message in the composer, review the provider settings, and try again.');
+    assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
+      'Open provider setup', 'Back to message'
+    ]);
+    assert.equal(findAll(stateCard, 'h2')[0].focusCount, 1,
+      'generic status failure retains the existing focused fallback');
   }
 
   {
@@ -1673,6 +1714,29 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
           code: 'agent_unpaired',
           providerId: 'claude-code',
           providerLabel: 'Claude Code'
+        }
+      },
+      ...[
+        ['unauthenticated Codex', 'auth_unauthenticated'],
+        ['unknown-auth Codex', 'auth_unknown']
+      ].map(([name, code]) => ({
+        name,
+        response: { ok: false, code, providerId: 'codex', providerLabel: 'Codex' },
+        expected: { ok: false, code, providerId: 'codex', providerLabel: 'Codex' }
+      })),
+      {
+        name: 'provider-native auth bytes are not a safe reason',
+        response: {
+          ok: false,
+          code: 'Logged in using native-secret-bytes',
+          providerId: 'codex',
+          providerLabel: 'Codex'
+        },
+        expected: {
+          ok: false,
+          code: 'agent_offline',
+          providerId: '',
+          providerLabel: 'Selected provider'
         }
       },
       {
