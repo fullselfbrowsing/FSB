@@ -123,6 +123,11 @@ const PHASE64_NEW_ROOT_COMMANDS = Object.freeze([
   'node tests/mcp-opencode-server-topology.test.js',
 ]);
 
+const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
+  'node tests/phase65-full-tests-harness.test.js',
+  'node tests/mcp-codex-adapter.test.js',
+]);
+
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
   'node tests/agent-provider-forbidden-flags.test.js',
   'node tests/delegation-routing.test.js',
@@ -986,9 +991,20 @@ function runPhase64FinalContract() {
   'private OpenCode 1.14.25 policy retains ordered deny then final fsb_* allow');
 
   const canonicalProviders64 = read('extension/utils/delegation-providers.js');
-  check(/\{ id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' \},\s*\{ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' \}/m
-    .test(canonicalProviders64),
-  'browser metadata is the exact Claude/OpenCode table with unknown OpenCode billing');
+  const providerDefinitions64 = between(
+    canonicalProviders64,
+    'var definitions = deepFreeze([',
+    '\n  ]);',
+  );
+  equal(Array.from(providerDefinitions64.matchAll(/^      id: '([^']+)',$/gm),
+    (match) => match[1]),
+  ['claude-code', 'opencode', 'codex'],
+  'browser metadata retains the canonical three-provider order');
+  check(canonicalProviders64.includes("var METADATA_KEYS = ['id', 'label', 'billingKind'];")
+      && providerDefinitions64.includes("authToBilling: { unknown: 'subscription' }")
+      && providerDefinitions64.includes("authToBilling: { unknown: 'unknown' }")
+      && providerDefinitions64.includes("authToBilling: { chatgpt: 'subscription', api_key: 'api' }"),
+  'public metadata stays three-field while internal billing mappings remain exact');
   const controlPanel64 = read('extension/ui/control_panel.html');
   const providerCss64 = read('extension/ui/options.css') + read('extension/ui/sidepanel.css');
   check(exactOccurrences(controlPanel64, 'class="provider-row"') === 10
@@ -2290,6 +2306,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   && !PHASE62_NEW_TEST_COMMANDS.includes(command)
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
+  && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -2877,8 +2894,8 @@ const rawCompatibilityMatrix = between(
   'const parsedMatrix',
 );
 equal(Array.from(rawCompatibilityMatrix.matchAll(/adapterId:\s*'([^']+)'/g), (match) => match[1]),
-  ['claude-code', 'opencode'],
-  'the canonical matrix has the exact Claude Code/OpenCode production order');
+  ['claude-code', 'opencode', 'codex'],
+  'the canonical matrix has the exact Claude Code/OpenCode/Codex production order');
 for (const exactMatrixToken of [
   'schemaVersion: 1',
   "profileVersion: '2.1.177'",
@@ -2908,6 +2925,19 @@ for (const exactOpenCodeMatrixToken of [
 }
 check(/adapterId: 'opencode',[\s\S]*capabilities: \{[\s\S]*taskMode: true,[\s\S]*chatMode: false,[\s\S]*resume: false,[\s\S]*serverMode: true,[\s\S]*displayLabel: 'OpenCode'/.test(rawCompatibilityMatrix),
   'canonical OpenCode row retains exact server/task-only capabilities');
+for (const exactCodexMatrixToken of [
+  "displayLabel: 'Codex'",
+  "profileVersion: '0.142.5'",
+  "minimumVersion: '0.142.5'",
+  "testedThroughVersion: '0.142.5'",
+  "fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json'",
+  'taskMode: true',
+  'chatMode: false',
+  'serverMode: false',
+]) {
+  check(rawCompatibilityMatrix.includes(exactCodexMatrixToken),
+    `canonical Codex row retains ${exactCodexMatrixToken}`);
+}
 check(/compareVersions\(version, minimum\) < 0[\s\S]*'below_minimum'[\s\S]*compareVersions\(version, testedThrough\) > 0[\s\S]*'degraded'[\s\S]*'newer_than_tested_range'[\s\S]*'supported'[\s\S]*'within_tested_range'/.test(compatibilitySource),
   'canonical classifier keeps inclusive tested bounds and same-major newer degradation');
 
@@ -2945,8 +2975,8 @@ const driftFixtureContracts = between(
 equal(Array.from(
   driftFixtureContracts.matchAll(/^  (?:'([^']+)'|([a-z][a-z0-9-]*)):\s*\{$/gm),
   (match) => match[1] || match[2],
-), ['claude-code', 'opencode'],
-  'drift smoke fixture table is the exact closed Claude/OpenCode roster');
+), ['claude-code', 'opencode', 'codex'],
+  'drift smoke fixture table is the exact closed three-provider roster');
 equal(Array.from(
   driftFixtureContracts.matchAll(
     /^    adapterId: '([^']+)',\n    directory: '([^']+)',\n    parserModule: '([^']+)',\n    parserExport: '([^']+)',/gm,
@@ -2955,10 +2985,11 @@ equal(Array.from(
 ), [
   ['claude-code', 'claude-code-2.1.177', 'claude-stream.js', 'parseClaudeEvents'],
   ['opencode', 'opencode-1.14.25', 'opencode-stream.js', 'parseOpenCodeEvents'],
+  ['codex', 'codex-0.142.5', 'codex-stream.js', 'parseCodexEvents'],
 ], 'each adapter-native fixture points at its exact compiled production parser export');
-check(exactOccurrences(driftFixtureContracts, 'requiredInitFields:') === 2
-  && exactOccurrences(driftFixtureContracts, 'requiredTerminalFields:') === 2,
-  'both closed fixture contracts declare native init and terminal field requirements');
+check(exactOccurrences(driftFixtureContracts, 'requiredInitFields:') === 3
+  && exactOccurrences(driftFixtureContracts, 'requiredTerminalFields:') === 3,
+  'all three closed fixture contracts declare native init and terminal field requirements');
 check(/for \(const field of contract\.requiredInitFields\) \{\s*assert\.ok\(hasPath\(nativeInit\[0\], field\)/.test(driftSmokeSource)
   && /for \(const field of contract\.requiredTerminalFields\) \{\s*assert\.ok\(hasPath\(nativeTerminal\[0\], field\)/.test(driftSmokeSource),
   'drift smoke validates every declared dotted native init and terminal field');
@@ -2974,17 +3005,18 @@ for (const productionRosterToken of [
     `production roster keeps its registry/matrix/fixture bijection: ${productionRosterToken}`);
 }
 for (const atomicProductionExposureToken of [
-  "assert.deepEqual(registryIds, ['claude-code', 'opencode'], 'production registry is exact');",
-  "assert.deepEqual(matrixIds, ['claude-code', 'opencode'], 'compatibility matrix is exact');",
+  "const exactProductionIds = ['claude-code', 'opencode', 'codex'];",
   'assertProductionRoster(registryIds, matrixRows, registry);',
   "assert.deepEqual(registryIds, exactProductionIds, 'production registry order is exact')",
+  "assert.deepEqual(rows.map((row) => row.adapterId), exactProductionIds, 'matrix order is exact')",
   "assert.deepEqual(productionAdapterIds, exactProductionIds, 'production adapter roster is exact')",
   "assert.ok(registry.require('opencode'));",
-  "assert.throws(() => registry.require('codex'), /Unknown adapter id/);",
-  "assert.deepEqual(committedManifests, expectedManifests, 'fixture roster is exactly Claude and OpenCode');",
+  "assert.ok(registry.require('codex'));",
+  "assert.throws(() => registry.require('foreign'), /Unknown adapter id/);",
+  "'fixture roster is exactly Claude, OpenCode, and Codex',",
 ]) {
   check(driftSmokeSource.includes(atomicProductionExposureToken),
-    `OpenCode exposure retains its exact atomic roster boundary: ${atomicProductionExposureToken}`);
+    `production exposure retains its exact atomic roster boundary: ${atomicProductionExposureToken}`);
 }
 
 const loadParserSource = extractFunction(driftSmokeSource, 'loadParser');
@@ -3025,6 +3057,7 @@ const prePhase62Commands = rootCommands.filter((command) => (
   !PHASE62_NEW_TEST_COMMANDS.includes(command)
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
+  && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');
@@ -3211,7 +3244,7 @@ for (const doctorToken of [
   'const adapter = requireMethod.call(registry, contract.adapterId)',
   'detection = await detectMethod.call(adapter)',
   'classifyAdapterCompatibility',
-  "authState: 'unknown'",
+  'authState: normalized.authState',
 ]) {
   check(doctorCollectorSource.includes(doctorToken),
     `doctor collection remains local and canonical: ${doctorToken}`);
@@ -3268,19 +3301,23 @@ for (const forbiddenProjectionField of [
 const providerStorageSource = read('extension/utils/mcp-agent-providers.js');
 check(providerStorageSource.includes("var FSB_AGENT_COMPATIBILITY_MAX_AGE_MS = 15 * 60 * 1000;")
   && providerStorageSource.includes("var FSB_COMPATIBILITY_SNAPSHOT_KEYS = ['schemaVersion', 'checkedAt', 'adapters'];")
-  && providerStorageSource.includes("var FSB_COMPATIBILITY_ROW_KEYS = ['adapterId', 'displayLabel', 'status', 'reason'];"),
-'browser storage pins the exact safe schema and fifteen-minute freshness interval');
+  && /var FSB_COMPATIBILITY_ROW_KEYS = \[\s*'adapterId', 'displayLabel', 'status', 'reason', 'authState'\s*\];/.test(providerStorageSource)
+  && providerStorageSource.includes('if (record.schemaVersion !== 2) return null;')
+  && providerStorageSource.includes("var FSB_LEGACY_COMPATIBILITY_ROSTER = Object.freeze(['claude-code', 'opencode']);"),
+'browser storage pins the exact safe schema-v2/auth row, legacy-v1 boundary, and freshness interval');
 const replaceCompatibilitySource = extractFunction(providerStorageSource, 'replaceCompatibility');
-check(replaceCompatibilitySource.includes('parseCompatibilitySnapshot(snapshot)')
+check(replaceCompatibilitySource.includes('parseCompatibilitySnapshot(snapshot, false)')
   && replaceCompatibilitySource.includes('enqueueMutation')
   && replaceCompatibilitySource.indexOf('var envelope = await read()')
     < replaceCompatibilitySource.indexOf('return await write(envelope)'),
 'compatibility replacement exact-validates and serializes one durable envelope write');
-const projectedCompatibilitySource = extractFunction(providerStorageSource, 'projectedCompatibility');
+const projectedCompatibilitySource = extractFunction(providerStorageSource, 'projectedAdapterEvidence');
 check(projectedCompatibilitySource.includes('now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS')
-  && projectedCompatibilitySource.includes("compatibilityProjection('degraded', 'evidence_stale'")
-  && projectedCompatibilitySource.includes("compatibilityProjection('unsupported', 'matrix_invalid'"),
-'freshness is a one-way supported-to-degraded downgrade and invalid evidence fails closed');
+  && projectedCompatibilitySource.includes("'degraded', 'evidence_stale'")
+  && projectedCompatibilitySource.includes("'unsupported', 'matrix_invalid'")
+  && projectedCompatibilitySource.includes("'unknown', null")
+  && projectedCompatibilitySource.includes('createAcceptedAgentIdentity(adapterId, row.authState)'),
+'freshness downgrades runnable evidence, invalid evidence fails closed, and identity derives only from fresh approved auth');
 const providerStorageTests = read('tests/mcp-agent-providers-storage.test.js');
 for (const durableEvidence of [
   'a mutation preserves both sibling maps and unknown envelope keys',
@@ -3463,8 +3500,10 @@ for (const forbiddenUiPattern of [
     `Providers UI has no direct compatibility/process/private authority matching ${forbiddenUiPattern}`);
 }
 check(exists('mcp/src/agent-providers/opencode.ts')
-  && !exists('mcp/src/agent-providers/codex.ts'),
-  'production exposure adds only OpenCode while Codex remains absent');
+  && exists('mcp/src/agent-providers/codex.ts')
+  && read('mcp/src/agent-providers/registry.ts').includes('createOpenCodeAdapter')
+  && read('mcp/src/agent-providers/registry.ts').includes('createCodexAdapter'),
+  'production exposure retains canonical OpenCode and Codex registrations');
 const openCodeAdapterSource = read('mcp/src/agent-providers/opencode.ts');
 const openCodeAdapterComposition = extractFunction(openCodeAdapterSource, 'createOpenCodeAdapter');
 equal(Array.from(
