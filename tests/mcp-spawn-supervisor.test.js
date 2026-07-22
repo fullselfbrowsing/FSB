@@ -30,6 +30,11 @@ const acceptedIdentityBuildPath = path.join(
   'agent-providers',
   'accepted-identity.js',
 );
+const spawnEnvironmentBuildPath = path.join(
+  mcpBuildRoot,
+  'agent-providers',
+  'spawn-environment.js',
+);
 
 const SELECTED_SECTION = (() => {
   const offset = process.argv.indexOf('--section');
@@ -2553,11 +2558,92 @@ async function runRouteLossStatusTests(supervisorModule) {
     'retained route-loss evidence reserves its exact id after completed-result eviction');
 }
 
+function runSharedEnvironmentTests(spawnEnvironmentModule) {
+  const {
+    DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    DELEGATION_PROVIDER_KEY_NAMES,
+    buildSanitizedAgentEnvironment,
+    freezeAgentEnvironmentPolicy,
+    isSanitizedAgentEnvironment,
+  } = spawnEnvironmentModule;
+  assert(Object.isFrozen(DELEGATION_AGENT_ENVIRONMENT_POLICY));
+  assert(Object.isFrozen(DELEGATION_AGENT_ENVIRONMENT_POLICY.inheritedAllowRules));
+  assert(Object.isFrozen(DELEGATION_AGENT_ENVIRONMENT_POLICY.strippedKeys));
+  assert(Object.isFrozen(DELEGATION_AGENT_ENVIRONMENT_POLICY.forcedValues));
+  assert(DELEGATION_PROVIDER_KEY_NAMES.includes('OPENAI_API_KEY'));
+  assert(DELEGATION_PROVIDER_KEY_NAMES.includes('ANTHROPIC_API_KEY'));
+  assert(DELEGATION_AGENT_ENVIRONMENT_POLICY.strippedKeys.includes('OPENCODE_SERVER_PASSWORD'));
+
+  const sanitized = buildSanitizedAgentEnvironment({
+    PATH: '/fixture/bin',
+    FSB_SAFE_VALUE: 'retained',
+    OPENAI_API_KEY: 'AMBIENT_KEY_CANARY_MUST_NOT_SURVIVE',
+    ANTHROPIC_API_KEY: 'SECOND_AMBIENT_KEY_CANARY_MUST_NOT_SURVIVE',
+    OPENCODE_SERVER_PASSWORD: 'SERVER_PASSWORD_CANARY_MUST_NOT_SURVIVE',
+  }, {
+    FSB_FIXED_VALUE: 'fixed',
+  }, DELEGATION_AGENT_ENVIRONMENT_POLICY);
+  assert.equal(isSanitizedAgentEnvironment(sanitized), true);
+  assert.deepEqual(sanitized, {
+    PATH: '/fixture/bin',
+    FSB_SAFE_VALUE: 'retained',
+    FSB_FIXED_VALUE: 'fixed',
+  });
+
+  assert.throws(
+    () => buildSanitizedAgentEnvironment(
+      { PATH: '/fixture/bin' },
+      { OPENAI_API_KEY: 'FIXED_RESTORATION_CANARY_MUST_NOT_SURVIVE' },
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    ),
+    (error) => {
+      assert.equal(error.message, 'Invalid agent environment contract');
+      assert.equal(error.message.includes('FIXED_RESTORATION_CANARY_MUST_NOT_SURVIVE'), false);
+      return true;
+    },
+  );
+
+  const forcedPolicy = freezeAgentEnvironmentPolicy({
+    inheritedAllowRules: ['allow_unlisted'],
+    strippedKeys: ['FSB_POLICY_OWNED'],
+    forcedValues: { FSB_POLICY_OWNED: 'forced' },
+  });
+  assert.deepEqual(
+    buildSanitizedAgentEnvironment(
+      { FSB_POLICY_OWNED: 'ambient', FSB_RETAINED: 'yes' },
+      {},
+      forcedPolicy,
+    ),
+    { FSB_RETAINED: 'yes', FSB_POLICY_OWNED: 'forced' },
+    'only immutable policy-owned forced values may follow stripping',
+  );
+
+  let getterCalls = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'OPENAI_API_KEY', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'ACCESSOR_CANARY_MUST_NOT_BE_READ';
+    },
+  });
+  assert.throws(
+    () => buildSanitizedAgentEnvironment(
+      hostile,
+      {},
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    ),
+    /Invalid agent environment contract/,
+  );
+  assert.equal(getterCalls, 0);
+}
+
 async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
   const protocolDriftModule = await import(pathToFileURL(protocolDriftBuildPath).href);
   const acceptedIdentityModule = await import(pathToFileURL(acceptedIdentityBuildPath).href);
+  const spawnEnvironmentModule = await import(pathToFileURL(spawnEnvironmentBuildPath).href);
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     runAcceptedIdentityFoundationTests(acceptedIdentityModule);
     console.log('mcp-spawn-supervisor.test.js: PASS');
@@ -2565,6 +2651,11 @@ async function main() {
   }
   if (SELECTED_SECTION === 'consent-bound-start') {
     await runConsentBoundStartTests(supervisorModule);
+    console.log('mcp-spawn-supervisor.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION === 'shared-environment') {
+    runSharedEnvironmentTests(spawnEnvironmentModule);
     console.log('mcp-spawn-supervisor.test.js: PASS');
     return;
   }
