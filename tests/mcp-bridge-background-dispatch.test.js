@@ -1480,8 +1480,8 @@ async function runCompatibilityRefreshCases() {
       }
     });
     const result = await harness.readCached();
-    assertEqual(result.compatibilityExpiresAt, 900_100,
-      'compatibility expiry uses the earliest exact shipped-provider row and ignores dormant Codex');
+    assertEqual(result.compatibilityExpiresAt, 900_001,
+      'compatibility expiry uses the earliest exact shipped-provider row including Codex');
     assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
       'expiry projection cannot write compatibility or provider selection');
   }
@@ -1560,7 +1560,8 @@ async function runCompatibilityRefreshCases() {
       clients: {
         'claude-code': {
           id: 'claude-code',
-          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+          authState: 'unknown'
         }
       },
       refreshOutcome: 'stale',
@@ -1600,7 +1601,8 @@ async function runCompatibilityRefreshCases() {
       clients: {
         'claude-code': {
           id: 'claude-code',
-          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+          authState: 'unknown'
         }
       },
       refreshOutcome: 'stale',
@@ -1610,17 +1612,25 @@ async function runCompatibilityRefreshCases() {
       'storage rejection still returns existing provider rows once');
   }
 
-  for (const [label, compatibility] of [
-    ['degraded', { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 100 }],
-    ['unsupported', { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 }]
+  for (const [label, compatibility, expectedCompatibility] of [
+    [
+      'degraded',
+      { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 100 },
+      { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+    ],
+    [
+      'unsupported',
+      { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 },
+      { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 }
+    ]
   ]) {
     const clients = {
       'claude-code': { id: 'claude-code', compatibility }
     };
     const harness = buildCompatibilityRefreshHarness({ clients, rejectRequest: true });
     const result = await harness.refresh();
-    assertDeepEqual(result.clients['claude-code'].compatibility, compatibility,
-      `refresh failure preserves retained ${label} compatibility truth`);
+    assertDeepEqual(result.clients['claude-code'].compatibility, expectedCompatibility,
+      `refresh failure safely projects retained ${label} compatibility truth`);
   }
 
   {
@@ -2451,7 +2461,7 @@ async function runDelegationAuthorityCases() {
 
   for (const request of [
     { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'Claude-Code' },
-    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'codex' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'future-agent' },
     { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'claude-code', trusted: false }
   ]) {
     const harness = buildDelegationCommandHarness();
