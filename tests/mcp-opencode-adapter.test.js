@@ -212,9 +212,10 @@ async function runFirstCommitDriftGate() {
   assert.equal(OPENCODE_STREAM_LINE_LIMIT_BYTES, 256 * 1024);
   assert.equal(OPENCODE_STREAM_LIMIT_BYTES, 2 * 1024 * 1024);
   assert.ok(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS));
-  assert.deepEqual(Object.keys(AGENT_PROTOCOL_DRIFT_REASONS).sort(), ['claude-code', 'opencode']);
+  assert.deepEqual(Object.keys(AGENT_PROTOCOL_DRIFT_REASONS).sort(), ['claude-code', 'codex', 'opencode']);
   assert.ok(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS['claude-code']));
   assert.ok(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS.opencode));
+  assert.ok(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS.codex));
   const onlyOpenCodeReasons = AGENT_PROTOCOL_DRIFT_REASONS.opencode.filter(
     (reason) => !AGENT_PROTOCOL_DRIFT_REASONS['claude-code'].includes(reason),
   );
@@ -248,10 +249,10 @@ async function runFirstCommitDriftGate() {
   assert.equal(isExactOwnDataRecord(accessor, ['a']), false);
 
   const registry = registryModule.createProductionAdapterRegistry({ kill: async () => {} });
-  assert.deepEqual(registry.ids(), ['claude-code', 'opencode']);
+  assert.deepEqual(registry.ids(), ['claude-code', 'opencode', 'codex']);
   assert.deepEqual(
     compatibility.ADAPTER_COMPATIBILITY_MATRIX.adapters.map((row) => row.adapterId),
-    ['claude-code', 'opencode'],
+    ['claude-code', 'opencode', 'codex'],
   );
 
   const events = await collect(parseOpenCodeEvents, [fixtureBytes]);
@@ -803,7 +804,7 @@ async function runComposition() {
     resolveOpenCodeProfileRuntime: dependencies.resolveProfileRuntime,
     kill: dependencies.kill,
   });
-  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode']);
+  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode', 'codex']);
   const productionAdapter = productionRegistry.require('opencode');
   assert.deepEqual(Object.keys(productionAdapter), [
     'detect',
@@ -814,7 +815,7 @@ async function runComposition() {
   ]);
   assert.deepEqual(await productionAdapter.buildSpawn(task, context), spawnSpec);
   assert.strictEqual(productionAdapter.caps(), OPENCODE_CAPABILITIES);
-  assert.throws(() => productionRegistry.require('codex'), /Unknown adapter id/);
+  assert.ok(productionRegistry.require('codex'));
 }
 
 async function runProfilePolicy() {

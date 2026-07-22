@@ -6,6 +6,18 @@ const path = require('path');
 const util = require('util');
 const vm = require('vm');
 
+const delegationProviders = require(path.join(
+  __dirname,
+  '..',
+  'extension',
+  'utils',
+  'delegation-providers.js'
+));
+const CLAUDE_ACCEPTED_IDENTITY = delegationProviders.createAcceptedAgentIdentity(
+  'claude-code',
+  'unknown'
+);
+
 let passed = 0;
 let failed = 0;
 
@@ -230,12 +242,16 @@ function extractNativePreflightComposition(backgroundSource) {
     backgroundSource,
     'function fsbDelegationHasExactKeys(value, expected) {'
   );
+  const acceptedIdentity = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbDelegationAcceptedIdentity(value) {'
+  );
   const startMarker = 'async function fsbReadAuthoritativeProviderConfig() {';
   const endMarker = '\nasync function fsbDelegationConsentCommand(request) {';
   const start = backgroundSource.indexOf(startMarker);
   const end = backgroundSource.indexOf(endMarker, start);
   if (start === -1 || end <= start) throw new Error('native preflight composition markers missing');
-  return `${exactKeys}\n${backgroundSource.slice(start, end)}`;
+  return `${exactKeys}\n${acceptedIdentity}\n${backgroundSource.slice(start, end)}`;
 }
 
 function buildBackgroundPreflightHarness(options = {}) {
@@ -318,6 +334,24 @@ function buildBackgroundPreflightHarness(options = {}) {
   };
   const context = {
     chrome,
+    FsbDelegationProviders: delegationProviders,
+    FsbMcpAgentProviders: {
+      async getMergedClients() {
+        return {
+          'claude-code': {
+            compatibility: {
+              status: 'supported',
+              reason: 'within_tested_range',
+              checkedAt: 1000
+            },
+            acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
+          }
+        };
+      }
+    },
+    fsbAgentRegistryInstance: {
+      listAgents() { return []; }
+    },
     FsbDelegationPreflight: preflight,
     FsbNativeHostWake: {
       ensureWake() {
@@ -657,7 +691,13 @@ async function testNonOfflinePreflightNeverWakes() {
         pairingStatus: 'paired',
         delegationConnection: { state: 'connected' }
       },
-      expected: { ok: true, kind: 'agent', providerId: 'claude-code', providerLabel: 'Claude Code' }
+      expected: {
+        ok: true,
+        kind: 'agent',
+        providerId: 'claude-code',
+        providerLabel: 'Claude Code',
+        acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
+      }
     },
     {
       name: 'reachable unpaired agent',
@@ -671,9 +711,14 @@ async function testNonOfflinePreflightNeverWakes() {
     },
     {
       name: 'unsupported agent',
-      providerConfig: { providerKind: 'agent', agentProviderId: 'opencode', modelProvider: 'xai' },
+      providerConfig: { providerKind: 'agent', agentProviderId: 'foreign-agent', modelProvider: 'xai' },
       bridgeState: {},
-      expected: { ok: false, code: 'unsupported_provider', providerId: 'opencode', providerLabel: 'opencode' }
+      expected: {
+        ok: false,
+        code: 'unsupported_provider',
+        providerId: 'foreign-agent',
+        providerLabel: 'foreign-agent'
+      }
     }
   ];
 
@@ -737,7 +782,13 @@ async function testConcurrentOfflineIntentsShareContinuation() {
   });
   harness.resolveWake({ ok: true, outcome: 'started', reason: 'daemon_started_ready' });
   const [firstResult, secondResult] = await Promise.all([first, second]);
-  const expected = { ok: true, kind: 'agent', providerId: 'claude-code', providerLabel: 'Claude Code' };
+  const expected = {
+    ok: true,
+    kind: 'agent',
+    providerId: 'claude-code',
+    providerLabel: 'Claude Code',
+    acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY
+  };
   assertDeepEqual(firstResult, expected, 'first caller returns the exact existing ready result');
   assertDeepEqual(secondResult, expected, 'joining caller returns the exact existing ready result');
   assertEqual(harness.calls.arm.length, 1, 'concurrent callers share one bridge readiness wait');
