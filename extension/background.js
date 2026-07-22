@@ -1414,6 +1414,9 @@ const FSB_DELEGATION_PROFILE_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,12
 const FSB_DELEGATION_STATUS_TIMEOUT_MS = 5000;
 const FSB_DELEGATION_STATUS_ACTIVE_LIMIT = 64;
 const FSB_DELEGATION_STATUS_LOSS_LIMIT = 128;
+const FSB_DELEGATION_ACCEPTED_IDENTITY_KEYS = Object.freeze([
+  'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+]);
 
 function fsbDelegationHasExactKeys(value, expected) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -1423,19 +1426,57 @@ function fsbDelegationHasExactKeys(value, expected) {
     && actual.every((key, index) => key === sortedExpected[index]);
 }
 
-function fsbDelegationCreateRunContext(providerId, profileVersion) {
+function fsbDelegationReadExactOwnDataRecord(value, expected, allowNullPrototype) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && !(allowNullPrototype && prototype === null)) return null;
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.length !== expected.length) return null;
+    const record = {};
+    for (const key of expected) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return null;
+      record[key] = descriptor.value;
+    }
+    return ownKeys.every((key) => typeof key === 'string' && expected.includes(key))
+      ? record
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function fsbDelegationAcceptedIdentity(value) {
   const canonical = globalThis.FsbDelegationProviders;
-  const metadata = canonical && typeof canonical.get === 'function'
-    ? canonical.get(providerId)
+  return canonical && typeof canonical.validateAcceptedAgentIdentity === 'function'
+    ? canonical.validateAcceptedAgentIdentity(value)
     : null;
-  if (!metadata
-      || typeof profileVersion !== 'string'
-      || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(profileVersion)) return null;
+}
+
+function fsbDelegationSameAcceptedIdentity(left, right) {
+  const acceptedLeft = fsbDelegationAcceptedIdentity(left);
+  const acceptedRight = fsbDelegationAcceptedIdentity(right);
+  return !!acceptedLeft
+    && !!acceptedRight
+    && FSB_DELEGATION_ACCEPTED_IDENTITY_KEYS.every(
+      (key) => acceptedLeft[key] === acceptedRight[key]
+    );
+}
+
+function fsbDelegationCreateRunContext(value) {
+  const acceptedIdentity = fsbDelegationAcceptedIdentity(value);
+  if (!acceptedIdentity
+      || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(acceptedIdentity.profileVersion)) return null;
   return Object.freeze({
-    providerId: metadata.id,
-    label: metadata.label,
-    profileVersion,
-    billingKind: metadata.billingKind
+    acceptedIdentity,
+    providerId: acceptedIdentity.providerId,
+    label: acceptedIdentity.label,
+    profileVersion: acceptedIdentity.profileVersion,
+    authState: acceptedIdentity.authState,
+    billingKind: acceptedIdentity.billingKind
   });
 }
 
@@ -1451,11 +1492,13 @@ function fsbDelegationRunContextFromSnapshot(snapshot) {
   if (!initEntry
       || snapshot.provider.id !== initEntry.init.client.id
       || snapshot.provider.label !== initEntry.init.client.label) return null;
-  const context = fsbDelegationCreateRunContext(
-    snapshot.provider.id,
-    initEntry.init.profileVersion
-  );
-  return context && context.label === snapshot.provider.label ? context : null;
+  const context = fsbDelegationCreateRunContext(snapshot.acceptedIdentity);
+  return context
+    && context.providerId === snapshot.provider.id
+    && context.label === snapshot.provider.label
+    && context.profileVersion === initEntry.init.profileVersion
+    ? context
+    : null;
 }
 
 function fsbDelegationStatusIsCanonical(value) {
@@ -1612,7 +1655,7 @@ async function fsbReadAuthoritativeProviderConfig() {
   };
 }
 
-async function fsbReadAuthoritativeProviderCompatibility(providerId) {
+async function fsbReadAuthoritativeProviderEvidence(providerId) {
   const canonical = globalThis.FsbDelegationProviders;
   const providers = globalThis.FsbMcpAgentProviders;
   if (!canonical
@@ -1627,17 +1670,31 @@ async function fsbReadAuthoritativeProviderCompatibility(providerId) {
   const clients = await providers.getMergedClients(liveRecords);
   let rowDescriptor;
   let compatibilityDescriptor;
+  let acceptedIdentityDescriptor;
   try {
     rowDescriptor = Object.getOwnPropertyDescriptor(clients, providerId);
-    if (!rowDescriptor || !Object.prototype.hasOwnProperty.call(rowDescriptor, 'value')) return null;
+    if (!rowDescriptor
+        || rowDescriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(rowDescriptor, 'value')) return null;
     compatibilityDescriptor = Object.getOwnPropertyDescriptor(rowDescriptor.value, 'compatibility');
+    acceptedIdentityDescriptor = Object.getOwnPropertyDescriptor(
+      rowDescriptor.value,
+      'acceptedIdentity'
+    );
   } catch (_error) {
     return null;
   }
-  return compatibilityDescriptor
-      && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
+  const compatibility = compatibilityDescriptor
+    && compatibilityDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
     ? compatibilityDescriptor.value
     : null;
+  const acceptedIdentity = acceptedIdentityDescriptor
+    && acceptedIdentityDescriptor.enumerable === true
+    && Object.prototype.hasOwnProperty.call(acceptedIdentityDescriptor, 'value')
+    ? fsbDelegationAcceptedIdentity(acceptedIdentityDescriptor.value)
+    : null;
+  return Object.freeze({ compatibility, acceptedIdentity });
 }
 
 function fsbDelegationBridgeState() {
@@ -1656,15 +1713,16 @@ function fsbDelegationBridgeState() {
 
 async function fsbDelegationPreflightResult() {
   const config = await fsbReadAuthoritativeProviderConfig();
-  const compatibility = config.providerKind === 'agent'
-    ? await fsbReadAuthoritativeProviderCompatibility(config.agentProviderId)
+  const evidence = config.providerKind === 'agent'
+    ? await fsbReadAuthoritativeProviderEvidence(config.agentProviderId)
     : null;
   const result = globalThis.FsbDelegationPreflight.check({
     providerKind: config.providerKind,
     agentProviderId: config.agentProviderId,
     modelProvider: config.modelProvider,
     bridgeState: fsbDelegationBridgeState(),
-    compatibility
+    compatibility: evidence && evidence.compatibility,
+    acceptedIdentity: evidence && evidence.acceptedIdentity
   });
   return { config, result };
 }
@@ -1841,7 +1899,7 @@ async function fsbDelegationConsentCommand(request) {
     return { ok: false, code: 'invalid_request' };
   }
   const issued = await globalThis.FsbDelegationConsent.issueChallenge({
-    providerId: authority.result.providerId,
+    acceptedIdentity: authority.result.acceptedIdentity,
     taskDigest
   });
   if (!issued || issued.ok !== true) {
@@ -1887,7 +1945,7 @@ async function fsbDelegationSetTrustCommand(request) {
   }
   const result = await globalThis.FsbDelegationConsent.writeTrustFromChallenge({
     challengeId: request.challengeId,
-    providerId: request.providerId,
+    acceptedIdentity: authority.result.acceptedIdentity,
     trusted: true
   });
   return result && result.ok === true
@@ -2080,9 +2138,7 @@ async function fsbSettleDelegationFromFinal(delegationId, finalResult, transport
         timestamp: Date.now(),
         terminalCode: code,
         treeSettled: !transportError && code !== 'tree_unsettled',
-        client: { id: runContext.providerId, label: runContext.label },
-        profileVersion: runContext.profileVersion,
-        billingKind: runContext.billingKind
+        acceptedIdentity: runContext.acceptedIdentity
       }
     });
     if (code === 'agent_protocol_drift') {
@@ -2130,7 +2186,7 @@ async function fsbDelegationStartCommand(request) {
   if (trusted) {
     if (challengeId !== null) return fsbDelegationFailure('consent_invalid', null);
     const issued = await globalThis.FsbDelegationConsent.issueChallenge({
-      providerId: selectedProvider.id,
+      acceptedIdentity: authority.result.acceptedIdentity,
       taskDigest
     });
     if (!issued || issued.ok !== true) return fsbDelegationFailure('consent_required', null);
@@ -2153,7 +2209,7 @@ async function fsbDelegationStartCommand(request) {
 
   const consumed = await globalThis.FsbDelegationConsent.consumeChallenge({
     challengeId,
-    providerId: selectedProvider.id,
+    acceptedIdentity: currentAuthority.result.acceptedIdentity,
     taskDigest
   });
   if (!consumed || consumed.ok !== true) {
@@ -2162,14 +2218,16 @@ async function fsbDelegationStartCommand(request) {
       null
     );
   }
-
-  let boot;
-  try {
-    boot = await bootstrapDelegationController();
-  } catch (_error) {
-    return fsbDelegationFailure('start_rejected', null);
+  const consumedIdentity = fsbDelegationAcceptedIdentity(consumed.acceptedIdentity);
+  if (!consumedIdentity
+      || !fsbDelegationSameAcceptedIdentity(
+        consumedIdentity,
+        currentAuthority.result.acceptedIdentity
+      )) {
+    return fsbDelegationFailure('provider_changed', null);
   }
-  const controller = boot.controller;
+
+  let controller = null;
   let resolveAccepted;
   let rejectAccepted;
   const acceptedPromise = new Promise((resolve, reject) => {
@@ -2180,41 +2238,50 @@ async function fsbDelegationStartCommand(request) {
   try {
     finalPromise = mcpBridgeClient.sendExtRequest(
       'delegate.start',
-      { adapterId: selectedProvider.id, task: request.task },
+      { acceptedIdentity: consumedIdentity, task: request.task },
       {
         async onEvent(eventName, payload) {
           if (eventName !== 'delegation.started') return;
-          if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
-              || payload.adapterId !== selectedProvider.id
-              || typeof payload.delegationId !== 'string'
-              || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)) {
+          const started = fsbDelegationReadExactOwnDataRecord(
+            payload,
+            ['acceptedIdentity', 'delegationId'],
+            false
+          );
+          const echoedIdentity = started
+            ? fsbDelegationAcceptedIdentity(started.acceptedIdentity)
+            : null;
+          if (!started
+              || !echoedIdentity
+              || !fsbDelegationSameAcceptedIdentity(echoedIdentity, consumedIdentity)
+              || typeof started.delegationId !== 'string'
+              || !FSB_DELEGATION_GENERATION_PATTERN.test(started.delegationId)) {
             const error = new Error('missing server delegation id');
             rejectAccepted(error);
             throw error;
           }
-          const runContext = fsbDelegationCreateRunContext(
-            selectedProvider.id,
-            payload.profileVersion
-          );
-          if (!runContext || fsbDelegationRunContexts.has(payload.delegationId)) {
+          const runContext = fsbDelegationCreateRunContext(echoedIdentity);
+          if (!runContext || fsbDelegationRunContexts.has(started.delegationId)) {
             const error = new Error('delegation run context is invalid');
             rejectAccepted(error);
             throw error;
           }
           try {
-            await controller.start({
-              delegationId: payload.delegationId,
-              provider: { id: runContext.providerId, label: runContext.label },
-              profileVersion: payload.profileVersion,
+            controller = (await bootstrapDelegationController()).controller;
+            const startedRun = await controller.start({
+              delegationId: started.delegationId,
+              acceptedIdentity: echoedIdentity,
               connection: 'connected'
             });
-            fsbDelegationRunContexts.set(payload.delegationId, runContext);
+            if (!startedRun || startedRun.ok !== true) {
+              throw new Error('delegation controller rejected start');
+            }
+            fsbDelegationRunContexts.set(started.delegationId, runContext);
           } catch (error) {
-            fsbDelegationRunContexts.delete(payload.delegationId);
+            fsbDelegationRunContexts.delete(started.delegationId);
             rejectAccepted(error);
             throw error;
           }
-          resolveAccepted(payload.delegationId);
+          resolveAccepted(started.delegationId);
         }
       }
     );
@@ -2237,6 +2304,7 @@ async function fsbDelegationStartCommand(request) {
     (result) => fsbSettleDelegationFromFinal(delegationId, result, null),
     (error) => fsbSettleDelegationFromFinal(delegationId, null, error)
   ).catch(() => {});
+  if (!controller) return fsbDelegationFailure('start_rejected', null);
   const acceptedSnapshot = controller.getSnapshot(delegationId);
   if (acceptedSnapshot) {
     await fsbReconcileDelegationSnapshots(controller, [acceptedSnapshot]);
@@ -2351,37 +2419,44 @@ function fsbDelegationEventContext(delegationId, event) {
   if (!runContext) return null;
   return {
     timestamp: Date.now(),
-    client: { id: runContext.providerId, label: runContext.label },
-    profileVersion: runContext.profileVersion,
-    billingKind: runContext.billingKind
+    acceptedIdentity: runContext.acceptedIdentity
   };
 }
 
 async function fsbObserveDelegationBridgeEvent(bridgeEvent) {
-  if (!fsbDelegationHasExactKeys(bridgeEvent, ['event', 'id', 'method', 'payload'])
-      || bridgeEvent.method !== 'delegate.start') {
+  const bridgeRecord = fsbDelegationReadExactOwnDataRecord(
+    bridgeEvent,
+    ['event', 'id', 'method', 'payload'],
+    false
+  );
+  if (!bridgeRecord || bridgeRecord.method !== 'delegate.start') {
     return;
   }
-  const controller = globalThis.fsbDelegationControllerInstance;
-  if (!controller) throw new Error('delegation controller is unavailable');
 
-  if (bridgeEvent.event === 'delegation.started') {
-    const payload = bridgeEvent.payload;
-    if (!fsbDelegationHasExactKeys(payload, ['adapterId', 'delegationId', 'profileVersion'])
-        || !globalThis.FsbDelegationProviders.get(payload.adapterId)
+  if (bridgeRecord.event === 'delegation.started') {
+    const payload = fsbDelegationReadExactOwnDataRecord(
+      bridgeRecord.payload,
+      ['acceptedIdentity', 'delegationId'],
+      false
+    );
+    const acceptedIdentity = payload
+      ? fsbDelegationAcceptedIdentity(payload.acceptedIdentity)
+      : null;
+    if (!payload
+        || !acceptedIdentity
         || typeof payload.delegationId !== 'string'
-        || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)
-        || typeof payload.profileVersion !== 'string'
-        || !FSB_DELEGATION_PROFILE_VERSION_PATTERN.test(payload.profileVersion)) {
+        || !FSB_DELEGATION_GENERATION_PATTERN.test(payload.delegationId)) {
       throw new Error('delegation.started payload is invalid');
     }
-    // Request-bound onEvent acceptance validates this adapter against the
-    // saved selection and commits controller state before resolving Start.
+    // Request-bound onEvent acceptance compares this identity with consumed
+    // consent before it boots or persists controller state.
     return;
   }
 
-  if (bridgeEvent.event !== 'delegation.event') return;
-  const payload = bridgeEvent.payload;
+  if (bridgeRecord.event !== 'delegation.event') return;
+  const controller = globalThis.fsbDelegationControllerInstance;
+  if (!controller) throw new Error('delegation controller is unavailable');
+  const payload = bridgeRecord.payload;
   if (!fsbDelegationHasExactKeys(payload, ['delegationId', 'event'])
       || typeof payload.delegationId !== 'string'
       || !fsbDelegationHasExactKeys(payload.event, ['payload', 'sessionId', 'type'])) {

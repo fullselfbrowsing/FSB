@@ -36,12 +36,52 @@ const SELECTED_SECTION = (() => {
   return offset < 0 ? null : process.argv[offset + 1] || '';
 })();
 
+const ACCEPTED_IDENTITIES = Object.freeze({
+  'claude-code': Object.freeze({
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription',
+  }),
+  opencode: Object.freeze({
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown',
+  }),
+});
+
+function acceptedIdentity(providerId = 'claude-code', overrides = {}) {
+  const canonical = ACCEPTED_IDENTITIES[providerId] ?? {
+    ...ACCEPTED_IDENTITIES['claude-code'],
+    providerId,
+  };
+  return { ...canonical, ...overrides };
+}
+
 function startRequest(payload, overrides = {}) {
+  let wirePayload = payload;
+  if (
+    payload
+    && typeof payload === 'object'
+    && !Array.isArray(payload)
+    && Object.getPrototypeOf(payload) === Object.prototype
+    && Object.prototype.hasOwnProperty.call(payload, 'adapterId')
+  ) {
+    const { adapterId, task, ...extras } = payload;
+    wirePayload = {
+      acceptedIdentity: acceptedIdentity(adapterId),
+      task,
+      ...extras,
+    };
+  }
   return {
     id: 'ext-start-1',
     type: 'ext:request',
     method: 'delegate.start',
-    payload,
+    payload: wirePayload,
     ...overrides,
   };
 }
@@ -159,6 +199,7 @@ function makeChild(options = {}) {
     highWaterMark: options.highWaterMark ?? 8,
     write(chunk, _encoding, callback) {
       stdinBytes.push(Buffer.from(chunk));
+      if (options.onStdinWrite) options.onStdinWrite(chunk);
       if (options.stdinError) {
         callback(new Error('fixture stdin failure'));
         return;
@@ -215,11 +256,15 @@ function makeHarness(supervisorModule, options = {}) {
   const spawnCalls = [];
   const children = new Map();
   const counters = { detect: 0, build: 0, prepare: 0, activate: 0, remove: 0 };
+  const runtimeIdentityCalls = { fingerprint: 0, runtimeId: 0 };
   const runtimeRuns = new Map();
   let preparedEntry = null;
   let activeEntry = null;
-  const command = '/fixture/bin/claude';
-  const profileVersion = '2.1.177';
+  const adapterId = options.adapterId ?? 'claude-code';
+  const command = adapterId === 'opencode'
+    ? '/fixture/bin/opencode'
+    : '/fixture/bin/claude';
+  const profileVersion = adapterId === 'opencode' ? '1.14.25' : '2.1.177';
   const runtimeRoot = '/fixture/private/agent-runtime';
 
   const adapter = {
@@ -242,7 +287,7 @@ function makeHarness(supervisorModule, options = {}) {
       if (options.buildError) throw new Error('fixture build failure');
       runtimeRuns.set(context.delegationId, 'config');
       return Object.freeze({
-        adapterId: 'claude-code',
+        adapterId,
         profileVersion,
         topology: Object.freeze({
           kind: 'direct',
@@ -258,7 +303,7 @@ function makeHarness(supervisorModule, options = {}) {
             cwd: '/fixture/workspace',
             privateFiles: Object.freeze([context.privateMcpConfigPath]),
             fixedEnv: Object.freeze({
-              FSB_AGENT_ADAPTER: 'claude-code',
+              FSB_AGENT_ADAPTER: adapterId,
               FSB_AGENT_PROFILE: profileVersion,
               FSB_DELEGATION_ID: context.delegationId,
               FSB_AGENT_FINGERPRINT: context.runtimeFingerprint,
@@ -284,10 +329,10 @@ function makeHarness(supervisorModule, options = {}) {
   const registry = {
     require(id) {
       order.push(`registry:${id}`);
-      if (id !== 'claude-code') throw new Error('unexpected adapter');
+      if (id !== adapterId) throw new Error('unexpected adapter');
       return adapter;
     },
-    ids() { return ['claude-code']; },
+    ids() { return [adapterId]; },
   };
 
   const runtimeFiles = {
@@ -463,6 +508,7 @@ function makeHarness(supervisorModule, options = {}) {
       const child = makeChild({
         ...(options.childOptions ?? {}),
         pid: options.childOptions?.pid ?? 41001 + spawnCalls.length,
+        onStdinWrite: () => order.push('stdin'),
         onStdinEnd: options.onStdinEnd ?? ((controls) => {
           controls.send([
             normalizedEvent('init', { tools: ['mcp__fsb'] }),
@@ -485,7 +531,16 @@ function makeHarness(supervisorModule, options = {}) {
     },
     mintDelegationId: options.mintDelegationId
       ?? (() => `delegation_fixture_${String(++delegationCounter).padStart(4, '0')}`),
-    mintFingerprint: () => 'runtime_fingerprint_fixture_0001',
+    mintFingerprint: () => {
+      runtimeIdentityCalls.fingerprint += 1;
+      order.push('runtime-fingerprint');
+      return 'runtime_fingerprint_fixture_0001';
+    },
+    mintRuntimeId: (role) => {
+      runtimeIdentityCalls.runtimeId += 1;
+      order.push(`runtime-id:${role}`);
+      return `${role}_fixture_0001`;
+    },
     mintGeneration: () => 'generation_fixture_0001',
     signalProcessGroup(group, signal) {
       order.push(`signal:${signal}`);
@@ -540,6 +595,7 @@ function makeHarness(supervisorModule, options = {}) {
     spawnCalls,
     children,
     counters,
+    runtimeIdentityCalls,
     runtimeRuns,
     terminationCalls,
     lifecycleCalls,
@@ -700,6 +756,168 @@ function runAcceptedIdentityFoundationTests(identityModule) {
     () => identityModule.acceptedIdentityFromDetection('claude-code', detectionAccessor),
     /adapter_unavailable/,
   );
+}
+
+async function runConsentBoundStartTests(supervisorModule) {
+  for (const adapterId of ['claude-code', 'opencode']) {
+    const task = `${adapterId} consent-bound success`;
+    const harness = makeHarness(supervisorModule, { adapterId });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ acceptedIdentity: acceptedIdentity(adapterId), task }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'succeeded');
+    const started = harness.emitted.find((event) => event.event === 'delegation.started');
+    assert(started, `${adapterId} emits acceptance`);
+    assert.deepEqual(started.payload, {
+      delegationId: terminal.delegationId,
+      acceptedIdentity: ACCEPTED_IDENTITIES[adapterId],
+    });
+    assert(Object.isFrozen(started.payload.acceptedIdentity));
+    assert.deepEqual(Object.keys(started.payload).sort(), ['acceptedIdentity', 'delegationId']);
+    assert.equal(harness.spawnCalls.length, 1);
+    assert.equal(
+      Buffer.concat(harness.spawnCalls[0].child.stdinBytes).toString('utf8'),
+      task,
+    );
+    const orderedBarrier = [
+      'detect',
+      'runtime-fingerprint',
+      'paths',
+      'build',
+      'prepare',
+      'spawn',
+      'emit:delegation.started',
+      'stdin',
+    ].map((entry) => harness.order.indexOf(entry));
+    assert(
+      orderedBarrier.every((offset, index) => (
+        offset >= 0 && (index === 0 || orderedBarrier[index - 1] < offset)
+      )),
+      `${adapterId} identity comparison precedes every runtime and stdin side effect`,
+    );
+  }
+
+  let accessorReads = 0;
+  const accessorIdentity = acceptedIdentity();
+  Object.defineProperty(accessorIdentity, 'authState', {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return 'unknown';
+    },
+  });
+  const symbolIdentity = acceptedIdentity();
+  symbolIdentity[Symbol('forged')] = true;
+  const inheritedIdentity = Object.assign(
+    Object.create({ billingKind: 'subscription' }),
+    acceptedIdentity(),
+  );
+  const hostileIdentities = [
+    { ...acceptedIdentity(), label: 'OpenCode' },
+    { ...acceptedIdentity(), authState: 'chatgpt' },
+    { ...acceptedIdentity(), billingKind: 'api' },
+    { ...acceptedIdentity(), providerId: 'opencode' },
+    { ...acceptedIdentity(), extra: true },
+    Object.fromEntries(Object.entries(acceptedIdentity()).filter(([key]) => key !== 'authState')),
+    accessorIdentity,
+    symbolIdentity,
+    inheritedIdentity,
+  ];
+  for (const identity of hostileIdentities) {
+    const harness = makeHarness(supervisorModule);
+    await expectInvalid(() => harness.supervisor.handleExtRequest(
+      startRequest({ acceptedIdentity: identity, task: 'hostile identity' }),
+      harness.emit,
+    ));
+    assert.deepEqual(harness.counters, {
+      detect: 0, build: 0, prepare: 0, activate: 0, remove: 0,
+    });
+    assert.deepEqual(harness.runtimeIdentityCalls, { fingerprint: 0, runtimeId: 0 });
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(harness.emitted.length, 0);
+  }
+  assert.equal(accessorReads, 0, 'wire validation never invokes accepted-identity accessors');
+
+  {
+    const harness = makeHarness(supervisorModule);
+    await expectInvalid(() => harness.supervisor.handleExtRequest(
+      {
+        id: 'ext-forged-legacy-selector',
+        type: 'ext:request',
+        method: 'delegate.start',
+        payload: { adapterId: 'claude-code', task: 'forged legacy selector' },
+      },
+      harness.emit,
+    ));
+    assert.equal(harness.counters.detect, 0);
+    assert.equal(harness.spawnCalls.length, 0);
+  }
+
+  for (const mismatch of [
+    {
+      label: 'profile',
+      requestedIdentity: acceptedIdentity('claude-code', { profileVersion: '2.1.178' }),
+      detection: undefined,
+    },
+    {
+      label: 'auth',
+      requestedIdentity: acceptedIdentity('claude-code'),
+      detection: {
+        installed: true,
+        version: '2.1.177',
+        authState: 'unauthenticated',
+        profileVersion: '2.1.177',
+        binary: {
+          command: '/fixture/bin/claude',
+          realPath: '/fixture/bin/claude',
+          argvPrefix: [],
+        },
+      },
+    },
+  ]) {
+    const harness = makeHarness(supervisorModule, {
+      ...(mismatch.detection ? { detection: mismatch.detection } : {}),
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({
+        acceptedIdentity: mismatch.requestedIdentity,
+        task: `${mismatch.label} mismatch must not replay`,
+      }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.deepEqual(harness.counters, {
+      detect: 1, build: 0, prepare: 0, activate: 0, remove: 0,
+    });
+    assert.deepEqual(harness.runtimeIdentityCalls, { fingerprint: 0, runtimeId: 0 });
+    assert.equal(harness.order.includes('paths'), false);
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(harness.emitted.length, 0);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.counters.detect, 1, `${mismatch.label} mismatch is not replayed`);
+    assert.equal(
+      (await harness.supervisor.handleExtRequest(statusRequest(), harness.emit)).active.length,
+      0,
+    );
+  }
+
+  {
+    const mutableIdentity = acceptedIdentity();
+    const harness = makeHarness(supervisorModule);
+    const pending = harness.supervisor.handleExtRequest(
+      startRequest({ acceptedIdentity: mutableIdentity, task: 'immutable wire clone' }),
+      harness.emit,
+    );
+    mutableIdentity.profileVersion = 'changed-after-parse';
+    const terminal = await pending;
+    assert.equal(terminal.status, 'succeeded');
+    assert.deepEqual(
+      harness.emitted.find((event) => event.event === 'delegation.started').payload.acceptedIdentity,
+      ACCEPTED_IDENTITIES['claude-code'],
+    );
+  }
 }
 
 async function runStrictPayloadTests(supervisorModule) {
@@ -2342,6 +2560,11 @@ async function main() {
   const acceptedIdentityModule = await import(pathToFileURL(acceptedIdentityBuildPath).href);
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     runAcceptedIdentityFoundationTests(acceptedIdentityModule);
+    console.log('mcp-spawn-supervisor.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION === 'consent-bound-start') {
+    await runConsentBoundStartTests(supervisorModule);
     console.log('mcp-spawn-supervisor.test.js: PASS');
     return;
   }

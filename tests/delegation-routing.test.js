@@ -11,9 +11,11 @@ const configPath = path.join(repoRoot, 'extension', 'config', 'config.js');
 const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'delegation-providers.js');
 const preflightPath = path.join(repoRoot, 'extension', 'utils', 'delegation-preflight.js');
 const sidepanelPath = path.join(repoRoot, 'extension', 'ui', 'sidepanel.js');
+const backgroundPath = path.join(repoRoot, 'extension', 'background.js');
 const delegationProvidersSource = fs.readFileSync(delegationProvidersPath, 'utf8');
 const preflightSource = fs.readFileSync(preflightPath, 'utf8');
 const sidepanelSource = fs.readFileSync(sidepanelPath, 'utf8');
+const backgroundSource = fs.readFileSync(backgroundPath, 'utf8');
 const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
@@ -22,7 +24,9 @@ const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
 if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
 }
-if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity-preflight') {
+if (SELECTED_SECTION !== null
+    && SELECTED_SECTION !== 'accepted-identity-preflight'
+    && SELECTED_SECTION !== 'immediate-start-identity') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -70,7 +74,98 @@ function sentDelegationRequestSource(messageType) {
   return sidepanelSource.slice(startIndex, endIndex + 3);
 }
 
+function runImmediateStartIdentityContract() {
+  const startOffset = backgroundSource.indexOf(
+    'async function fsbDelegationStartCommand(request) {'
+  );
+  const endOffset = backgroundSource.indexOf(
+    'function fsbDelegationMapLifecycleFailure',
+    startOffset
+  );
+  assert.notEqual(startOffset, -1, 'background start command exists');
+  assert(endOffset > startOffset, 'background start command has a closed source boundary');
+  const delegatedStart = backgroundSource.slice(startOffset, endOffset);
+  assert.match(
+    delegatedStart,
+    /fsbDelegationHasExactKeys\(request, \['challengeId', 'task', 'type'\]\)/,
+    'side-panel start input remains exact and provider-free'
+  );
+  assert.doesNotMatch(
+    delegatedStart,
+    /request\.(?:acceptedIdentity|providerId|adapterId|providerLabel|profileVersion|authState|billingKind|compatibility)/,
+    'side-panel request fields never become provider or identity authority'
+  );
+  assert.match(
+    delegatedStart,
+    /acceptedIdentity: currentAuthority\.result\.acceptedIdentity/,
+    'one-time challenge consumption receives the second preflight identity'
+  );
+  assert.match(
+    delegatedStart,
+    /\{ acceptedIdentity: consumedIdentity, task: request\.task \}/,
+    'authenticated daemon start carries only consumed identity and task'
+  );
+  assert.doesNotMatch(
+    delegatedStart,
+    /\{\s*adapterId:/,
+    'authenticated daemon start has no standalone provider selector'
+  );
+
+  const consumeOffset = delegatedStart.indexOf('consumeChallenge({');
+  const consumedComparisonOffset = delegatedStart.indexOf(
+    'fsbDelegationSameAcceptedIdentity(\n        consumedIdentity,'
+  );
+  const transportOffset = delegatedStart.indexOf("sendExtRequest(\n      'delegate.start'");
+  const echoComparisonOffset = delegatedStart.indexOf(
+    'fsbDelegationSameAcceptedIdentity(echoedIdentity, consumedIdentity)'
+  );
+  const controllerBootOffset = delegatedStart.indexOf(
+    'controller = (await bootstrapDelegationController()).controller'
+  );
+  const controllerStartOffset = delegatedStart.indexOf('await controller.start({');
+  assert(
+    consumeOffset >= 0
+      && consumeOffset < consumedComparisonOffset
+      && consumedComparisonOffset < transportOffset,
+    'consumed identity equality gates daemon transport'
+  );
+  assert(
+    transportOffset < echoComparisonOffset
+      && echoComparisonOffset < controllerBootOffset
+      && controllerBootOffset < controllerStartOffset,
+    'daemon echo equality gates controller creation and persistence'
+  );
+  assert.match(
+    delegatedStart,
+    /\['acceptedIdentity', 'delegationId'\]/,
+    'started payload accepts exactly identity plus daemon delegation id'
+  );
+  assert.match(
+    delegatedStart,
+    /acceptedIdentity: echoedIdentity/,
+    'controller persists only the exact daemon-confirmed identity'
+  );
+
+  const forbiddenRequestAuthority = /acceptedIdentity|providerId|providerLabel|profileVersion|authState|billingKind|compatibility|billingOverride/;
+  for (const messageType of [
+    'FSB_DELEGATION_PREFLIGHT',
+    'FSB_DELEGATION_CONSENT',
+    'FSB_DELEGATION_START'
+  ]) {
+    assert.doesNotMatch(
+      sentDelegationRequestSource(messageType),
+      forbiddenRequestAuthority,
+      `${messageType} side-panel request remains intent-only`
+    );
+  }
+}
+
 async function main() {
+  if (SELECTED_SECTION === 'immediate-start-identity') {
+    runImmediateStartIdentityContract();
+    console.log('delegation-routing.test.js: PASS');
+    return;
+  }
   const engine = require(enginePath);
   const legacyModes = {
     autopilot: {

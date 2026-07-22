@@ -33,6 +33,37 @@ const vm = require('vm');
 const delegationProviders = require(path.join(
   __dirname, '..', 'extension', 'utils', 'delegation-providers.js'
 ));
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX < 0
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1] || '';
+if (SECTION_ARGUMENT_INDEX >= 0 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
+if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity') {
+  throw new Error(`unknown section: ${SELECTED_SECTION}`);
+}
+
+const ACCEPTED_IDENTITIES = Object.freeze({
+  'claude-code': Object.freeze({
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription'
+  }),
+  opencode: Object.freeze({
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown'
+  })
+});
+
+function acceptedIdentity(providerId = 'claude-code', overrides = {}) {
+  return { ...ACCEPTED_IDENTITIES[providerId], ...overrides };
+}
 
 let passed = 0;
 let failed = 0;
@@ -610,11 +641,18 @@ function buildDelegationCommandHarness(options = {}) {
     },
     async consumeChallenge(input) {
       calls.push(['consumeChallenge', toPlainObject(input)]);
-      return { ok: true };
+      return {
+        ok: true,
+        acceptedIdentity: acceptedIdentity(input.acceptedIdentity.providerId)
+      };
     },
     async writeTrustFromChallenge(input) {
       calls.push(['writeTrustFromChallenge', toPlainObject(input)]);
-      return options.writeTrustResult || { ok: true, providerId: input.providerId, trusted: true };
+      return options.writeTrustResult || {
+        ok: true,
+        providerId: input.acceptedIdentity.providerId,
+        trusted: true
+      };
     },
     async clearTrusted(input) {
       calls.push(['clearTrusted', toPlainObject(input)]);
@@ -634,10 +672,12 @@ function buildDelegationCommandHarness(options = {}) {
         calls.push(['getMergedClients']);
         return options.compatibilityClients || {
           'claude-code': {
-            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+            acceptedIdentity: acceptedIdentity('claude-code')
           },
           opencode: {
-            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+            acceptedIdentity: acceptedIdentity('opencode')
           }
         };
       }
@@ -711,6 +751,9 @@ function buildDelegationProviderRoutingHarness(options = {}) {
   const controllerStarts = [];
   const acceptedEvents = [];
   const snapshots = new Map();
+  let controllerCreates = 0;
+  let controllerHydrates = 0;
+  let evidenceReadCount = 0;
   let bridgeObserver = null;
   let inboundAuthorityReady = true;
   let delegationAuthorityReady = true;
@@ -721,23 +764,32 @@ function buildDelegationProviderRoutingHarness(options = {}) {
   };
   const compatibilityClients = {
     'claude-code': {
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('claude-code')
     },
     opencode: {
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('opencode')
     }
   };
 
   const hydratedSnapshots = (options.hydratedSnapshots || []).map(toPlainObject);
   hydratedSnapshots.forEach((snapshot) => snapshots.set(snapshot.delegationId, snapshot));
   const controller = {
-    async hydrate() { return hydratedSnapshots; },
+    async hydrate() {
+      controllerHydrates += 1;
+      return hydratedSnapshots;
+    },
     subscribe() {},
     async start(input) {
       controllerStarts.push(toPlainObject(input));
       const snapshot = {
         delegationId: input.delegationId,
-        provider: toPlainObject(input.provider),
+        acceptedIdentity: toPlainObject(input.acceptedIdentity),
+        provider: {
+          id: input.acceptedIdentity.providerId,
+          label: input.acceptedIdentity.label
+        },
         terminal: null
       };
       snapshots.set(input.delegationId, snapshot);
@@ -778,7 +830,10 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     },
     async consumeChallenge(input) {
       calls.push(['consumeChallenge', toPlainObject(input)]);
-      return options.consumeResult || { ok: true };
+      return options.consumeResult || {
+        ok: true,
+        acceptedIdentity: toPlainObject(input.acceptedIdentity)
+      };
     },
     async getTrustedEnvelope() { return false; }
   };
@@ -846,11 +901,22 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     FsbMcpAgentProviders: {
       async getMergedClients() {
         calls.push(['getMergedClients']);
+        const sequence = options.identitySequence;
+        if (Array.isArray(sequence) && sequence.length > 0) {
+          const selected = sequence[Math.min(evidenceReadCount, sequence.length - 1)];
+          compatibilityClients[providerConfig.agentProviderId].acceptedIdentity = toPlainObject(selected);
+        }
+        evidenceReadCount += 1;
         return compatibilityClients;
       }
     },
     FsbDelegationConsent: consent,
-    FsbDelegationController: { create() { return controller; } },
+    FsbDelegationController: {
+      create() {
+        controllerCreates += 1;
+        return controller;
+      }
+    },
     FsbDelegationEventStore: {},
     fsbAgentRegistryInstance: registry,
     bootstrapAgentRegistry: async () => {},
@@ -891,7 +957,7 @@ function buildDelegationProviderRoutingHarness(options = {}) {
       payload
     };
     try {
-      await bridgeObserver(bridgeEvent);
+      if (bridgeObserver) await bridgeObserver(bridgeEvent);
       if (typeof request.options.onEvent === 'function') {
         await request.options.onEvent(eventName, payload);
       }
@@ -910,6 +976,8 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     startRequests,
     controllerStarts,
     acceptedEvents,
+    get controllerCreates() { return controllerCreates; },
+    get controllerHydrates() { return controllerHydrates; },
     setProviderId(providerId) { providerConfig.agentProviderId = providerId; },
     async waitForStartRequest(index = 0) {
       for (let attempt = 0; attempt < 20 && !startRequests[index]; attempt++) {
@@ -1006,7 +1074,9 @@ function buildDriftSettlementHarness(options = {}) {
       const provider = delegationProviders.get(providerId);
       if (!provider) throw new Error('test provider is invalid');
       snapshots.set(delegationId, { delegationId, terminal: null });
+      const identity = Object.freeze(acceptedIdentity(providerId, { profileVersion }));
       runContexts.set(delegationId, Object.freeze({
+        acceptedIdentity: identity,
         providerId: provider.id,
         label: provider.label,
         profileVersion,
@@ -1017,7 +1087,9 @@ function buildDriftSettlementHarness(options = {}) {
       const provider = delegationProviders.get(providerId);
       if (!provider) throw new Error('test provider is invalid');
       snapshots.set(delegationId, { delegationId, terminal: null });
+      const identity = Object.freeze(acceptedIdentity(providerId, { profileVersion }));
       runContexts.set(delegationId, Object.freeze({
+        acceptedIdentity: identity,
         providerId: provider.id,
         label: provider.label,
         profileVersion,
@@ -1105,9 +1177,7 @@ async function runDriftSettlementCases() {
         timestamp: 4242,
         terminalCode: 'agent_protocol_drift',
         treeSettled: true,
-        client: { id: 'claude-code', label: 'Claude Code' },
-        profileVersion: '2.1.177',
-        billingKind: 'subscription'
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
       }
     }, 'controller terminal input remains byte-for-shape unchanged');
     assertEqual(harness.profiles.has(delegationId), false,
@@ -1171,9 +1241,9 @@ async function runDriftSettlementCases() {
       eventIndex: 4097,
       issuePaths: ['part.state', 'messageID']
     }, 'matching accepted OpenCode context reports its exact safe detail');
-    assertEqual(harness.settlementCalls[0].context.client.id, 'opencode',
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.providerId, 'opencode',
       'OpenCode drift terminal retains the accepted provider identity');
-    assertEqual(harness.settlementCalls[0].context.billingKind, 'unknown',
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.billingKind, 'unknown',
       'OpenCode drift terminal retains unknown billing');
 
     for (const [delegationId, detail] of [
@@ -2218,7 +2288,8 @@ async function runDelegationAuthorityCases() {
       ok: true,
       kind: 'agent',
       providerId: 'claude-code',
-      providerLabel: 'Claude Code'
+      providerLabel: 'Claude Code',
+      acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
     }, 'preflight returns only the pure closed agent disposition');
     assertDeepEqual(harness.calls.map((call) => call[0]), ['getMergedClients'],
       'preflight reads compatibility without consent/controller/transport mutation');
@@ -2237,9 +2308,9 @@ async function runDelegationAuthorityCases() {
     assertEqual(result.providerLabel, 'OpenCode',
       'consent returns only the canonical OpenCode label');
     assertDeepEqual(harness.calls.find((call) => call[0] === 'issueChallenge')[1], {
-      providerId: 'opencode',
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
       taskDigest: harness.calls.find((call) => call[0] === 'issueChallenge')[1].taskDigest
-    }, 'challenge issuance binds the authoritative OpenCode id and task digest only');
+    }, 'challenge issuance binds the authoritative OpenCode identity and task digest only');
   }
 
   {
@@ -2254,7 +2325,8 @@ async function runDelegationAuthorityCases() {
       ok: true,
       kind: 'agent',
       providerId: 'opencode',
-      providerLabel: 'OpenCode'
+      providerLabel: 'OpenCode',
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode
     }, 'background preflight authorizes OpenCode from saved settings and compatibility');
   }
 
@@ -2405,6 +2477,141 @@ async function runDelegationAuthorityCases() {
   }
 }
 
+async function runAcceptedIdentityBoundaryCases() {
+  console.log('\n--- B11: accepted identity is consent-bound before visible state ---');
+
+  for (const providerId of ['claude-code', 'opencode']) {
+    const harness = buildDelegationProviderRoutingHarness({ providerId });
+    const task = `${providerId} accepted identity`;
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task,
+      challengeId: `dch_${providerId.replace('-', '_')}`
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, `${providerId} sends one authenticated start request`);
+    if (!request) continue;
+    assertDeepEqual(request.payload, {
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      task
+    }, `${providerId} transports only consumed identity and task`);
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, ACCEPTED_IDENTITIES[providerId],
+      `${providerId} challenge consumption uses the second preflight identity`);
+    assertEqual(harness.controllerCreates, 0,
+      `${providerId} does not create a controller before daemon identity echo`);
+    assertEqual(harness.controllerStarts.length, 0,
+      `${providerId} has no visible state before daemon identity echo`);
+
+    const delegationId = `delegation_identity_${providerId.replace('-', '_')}`;
+    const error = await harness.emitStarted(request, {
+      delegationId,
+      acceptedIdentity: acceptedIdentity(providerId)
+    });
+    assertEqual(error, null, `${providerId} exact echo is accepted`);
+    const result = await pending;
+    assertEqual(result.ok, true, `${providerId} exact echo creates one accepted run`);
+    assertEqual(harness.controllerCreates, 1, `${providerId} boots one controller after equality`);
+    assertEqual(harness.controllerHydrates, 1, `${providerId} hydrates once after equality`);
+    assertDeepEqual(harness.controllerStarts, [{
+      delegationId,
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      connection: 'connected'
+    }], `${providerId} persists only daemon-confirmed identity`);
+    assertDeepEqual(harness.contexts.get(delegationId), {
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      providerId,
+      label: ACCEPTED_IDENTITIES[providerId].label,
+      profileVersion: ACCEPTED_IDENTITIES[providerId].profileVersion,
+      authState: 'unknown',
+      billingKind: ACCEPTED_IDENTITIES[providerId].billingKind
+    }, `${providerId} run context retains the immutable five-field echo`);
+  }
+
+  const echoMutations = [
+    ['providerId', 'opencode'],
+    ['label', 'OpenCode'],
+    ['profileVersion', '2.1.178'],
+    ['authState', 'chatgpt'],
+    ['billingKind', 'api']
+  ];
+  for (const [field, value] of echoMutations) {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'claude-code' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: `reject ${field} echo mutation`,
+      challengeId: `dch_echo_${field}`
+    });
+    const request = await harness.waitForStartRequest();
+    const error = await harness.emitStarted(request, {
+      delegationId: `delegation_echo_${field}`,
+      acceptedIdentity: acceptedIdentity('claude-code', { [field]: value })
+    });
+    assert(error instanceof Error, `${field} echo mutation rejects request acceptance`);
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      `${field} echo mutation has one bounded start rejection`);
+    assertEqual(harness.controllerCreates, 0, `${field} mismatch creates no controller`);
+    assertEqual(harness.controllerHydrates, 0, `${field} mismatch hydrates no controller`);
+    assertEqual(harness.controllerStarts.length, 0, `${field} mismatch persists no run`);
+    assertEqual(harness.contexts.size, 0, `${field} mismatch creates no feed context`);
+    await flushMicrotasks();
+    assertEqual(harness.startRequests.length, 1, `${field} mismatch is never replayed`);
+  }
+
+  {
+    let accessorReads = 0;
+    const hostileIdentity = acceptedIdentity();
+    Object.defineProperty(hostileIdentity, 'authState', {
+      enumerable: true,
+      get() {
+        accessorReads += 1;
+        return 'unknown';
+      }
+    });
+    const harness = buildDelegationProviderRoutingHarness();
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'reject hostile echo identity',
+      challengeId: 'dch_hostile_echo'
+    });
+    const request = await harness.waitForStartRequest();
+    await harness.emitStarted(request, {
+      delegationId: 'delegation_hostile_echo',
+      acceptedIdentity: hostileIdentity
+    });
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      'hostile echo has one bounded start rejection');
+    assertEqual(accessorReads, 0, 'hostile echo validation never invokes accessors');
+    assertEqual(harness.controllerCreates, 0, 'hostile echo creates no controller');
+    assertEqual(harness.controllerStarts.length, 0, 'hostile echo creates no visible state');
+  }
+
+  {
+    const firstIdentity = acceptedIdentity();
+    const currentIdentity = acceptedIdentity('claude-code', { profileVersion: '2.1.178' });
+    const harness = buildDelegationProviderRoutingHarness({
+      identitySequence: [firstIdentity, currentIdentity],
+      consumeResult: { ok: true, acceptedIdentity: firstIdentity }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'consumed identity changed before transport',
+      challengeId: 'dch_preflight_drift'
+    });
+    assertDeepEqual(result, { ok: false, code: 'provider_changed', snapshot: null },
+      'consumed identity must still equal the second preflight result');
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, currentIdentity,
+      'one-time consumption receives only the current second-preflight identity');
+    assertEqual(harness.startRequests.length, 0,
+      'consumed/current identity drift sends no daemon request');
+    assertEqual(harness.controllerCreates, 0,
+      'consumed/current identity drift creates no controller');
+    assertEqual(harness.controllerStarts.length, 0,
+      'consumed/current identity drift creates no visible state');
+  }
+}
+
 async function runDelegationProviderRoutingCases() {
   console.log('\n--- B11: accepted delegation provider routing is immutable ---');
 
@@ -2419,20 +2626,21 @@ async function runDelegationProviderRoutingCases() {
     assert(request, 'Claude authoritative start reaches one daemon request');
     if (request) {
       assertDeepEqual(request.payload, {
-        adapterId: 'claude-code', task: 'Claude provider-free task'
-      }, 'delegate.start sends only the selected canonical adapter id and task');
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code'], task: 'Claude provider-free task'
+      }, 'delegate.start sends only the consumed canonical identity and task');
       await harness.emitStarted(request, {
-        adapterId: 'claude-code',
         delegationId: 'delegation_claude_route',
-        profileVersion: 'profile-claude'
+        acceptedIdentity: acceptedIdentity('claude-code')
       });
       const result = await pending;
       assertEqual(result.ok, true, 'matching Claude acceptance starts exactly one run');
       const context = harness.contexts.get('delegation_claude_route');
       assertDeepEqual(context, {
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code'],
         providerId: 'claude-code',
         label: 'Claude Code',
-        profileVersion: 'profile-claude',
+        profileVersion: '2.1.177',
+        authState: 'unknown',
         billingKind: 'subscription'
       }, 'accepted Claude run stores only canonical immutable metadata');
       assertEqual(Object.isFrozen(context), true, 'accepted Claude run metadata is deeply frozen');
@@ -2444,18 +2652,14 @@ async function runDelegationProviderRoutingCases() {
       });
       assertDeepEqual(harness.acceptedEvents.at(-1).context, {
         timestamp: harness.acceptedEvents.at(-1).context.timestamp,
-        client: { id: 'claude-code', label: 'Claude Code' },
-        profileVersion: 'profile-claude',
-        billingKind: 'subscription'
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
       }, 'later events ignore changed settings and use only accepted Claude context');
       await harness.resolveFinal(request, { status: 'succeeded' });
       assertDeepEqual(harness.acceptedEvents.at(-1).context, {
         timestamp: harness.acceptedEvents.at(-1).context.timestamp,
         terminalCode: 'completed',
         treeSettled: true,
-        client: { id: 'claude-code', label: 'Claude Code' },
-        profileVersion: 'profile-claude',
-        billingKind: 'subscription'
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
       }, 'Claude final settlement retains subscription billing from accepted context');
       assertEqual(harness.contexts.has('delegation_claude_route'), false,
         'terminal settlement always clears accepted Claude context');
@@ -2475,19 +2679,20 @@ async function runDelegationProviderRoutingCases() {
     assert(request, 'OpenCode authoritative start reaches one daemon request');
     if (request) {
       assertDeepEqual(request.payload, {
-        adapterId: 'opencode', task: 'OpenCode provider-free task'
+        acceptedIdentity: ACCEPTED_IDENTITIES.opencode, task: 'OpenCode provider-free task'
       }, 'OpenCode delegate.start payload is exact and canonical');
       await harness.emitStarted(request, {
-        adapterId: 'opencode',
         delegationId: 'delegation_opencode_route',
-        profileVersion: 'profile-opencode'
+        acceptedIdentity: acceptedIdentity('opencode')
       });
       const result = await pending;
       assertEqual(result.ok, true, 'matching OpenCode acceptance starts exactly one run');
       assertDeepEqual(harness.contexts.get('delegation_opencode_route'), {
+        acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
         providerId: 'opencode',
         label: 'OpenCode',
-        profileVersion: 'profile-opencode',
+        profileVersion: '1.14.25',
+        authState: 'unknown',
         billingKind: 'unknown'
       }, 'accepted OpenCode context never inherits Claude identity or billing');
       harness.setProviderId('claude-code');
@@ -2495,13 +2700,13 @@ async function runDelegationProviderRoutingCases() {
         delegationId: 'delegation_opencode_route',
         event: { type: 'result', sessionId: null, payload: {} }
       });
-      assertEqual(harness.acceptedEvents.at(-1).context.billingKind, 'unknown',
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
         'OpenCode result billing remains unknown after a settings change');
-      assertDeepEqual(harness.acceptedEvents.at(-1).context.client,
-        { id: 'opencode', label: 'OpenCode' },
+      assertDeepEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity,
+        ACCEPTED_IDENTITIES.opencode,
         'OpenCode event identity remains canonical after a settings change');
       await harness.resolveFinal(request, { status: 'failed', terminal: { code: 'agent_failed' } });
-      assertEqual(harness.acceptedEvents.at(-1).context.billingKind, 'unknown',
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
         'OpenCode terminal billing remains unknown');
       assertEqual(harness.contexts.has('delegation_opencode_route'), false,
         'terminal settlement always clears accepted OpenCode context');
@@ -2522,9 +2727,8 @@ async function runDelegationProviderRoutingCases() {
     assert(request, 'mismatch case reaches one selected OpenCode request');
     if (request) {
       await harness.emitStarted(request, {
-        adapterId: 'claude-code',
         delegationId: 'delegation_mismatch_route',
-        profileVersion: 'profile-mismatch'
+        acceptedIdentity: acceptedIdentity('claude-code')
       });
       const result = await pending;
       assertDeepEqual(result, { ok: false, code: 'start_rejected', snapshot: null },
@@ -2564,12 +2768,13 @@ async function runDelegationProviderRoutingCases() {
   {
     const hydrated = {
       delegationId: 'delegation_hydrated_open',
+      acceptedIdentity: acceptedIdentity('opencode'),
       provider: { id: 'opencode', label: 'OpenCode' },
       terminal: null,
       entries: [{
         init: {
           client: { id: 'opencode', label: 'OpenCode' },
-          profileVersion: 'profile-hydrated-open'
+          profileVersion: '1.14.25'
         }
       }]
     };
@@ -2589,9 +2794,7 @@ async function runDelegationProviderRoutingCases() {
     });
     assertDeepEqual(harness.acceptedEvents.at(-1).context, {
       timestamp: harness.acceptedEvents.at(-1).context.timestamp,
-      client: { id: 'opencode', label: 'OpenCode' },
-      profileVersion: 'profile-hydrated-open',
-      billingKind: 'unknown'
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode
     }, 'eviction-style hydration restores context only from accepted persisted metadata');
   }
 }
@@ -2839,7 +3042,7 @@ function runSourceContractCase() {
       && !delegationComposition.includes('fsbDelegationProfiles'),
     'background owns one accepted-run metadata map instead of a profile-only map');
   assert(delegatedStart.includes('await controller.start({')
-      && delegatedStart.includes('profileVersion: payload.profileVersion'),
+      && delegatedStart.includes('acceptedIdentity: echoedIdentity'),
     'request-bound started acceptance durably commits canonical metadata before resolving');
   const controllerStart = controllerSource.slice(
     controllerSource.indexOf('function start(input) {'),
@@ -2943,6 +3146,11 @@ function runSourceContractCase() {
 // ---------------------------------------------------------------------------
 
 async function run() {
+  if (SELECTED_SECTION === 'accepted-identity') {
+    await runAcceptedIdentityBoundaryCases();
+    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+    process.exit(failed > 0 ? 1 : 0);
+  }
   await runPrefersInternalDispatchCase();
   await runSendMessageFallbackCase();
   await runListCredentialsSecretStripCase();

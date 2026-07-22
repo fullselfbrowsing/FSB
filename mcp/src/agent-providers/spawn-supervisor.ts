@@ -28,10 +28,15 @@ import type {
 import {
   CLAUDE_CODE_ADAPTER_ID,
   OPENCODE_SERVER_PASSWORD_ENV_KEY,
-  OPENCODE_ADAPTER_ID,
   OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
   freezeSpawnSpec,
 } from './adapter.js';
+import {
+  acceptedAgentIdentitiesEqual,
+  acceptedIdentityFromDetection,
+  validateAcceptedAgentIdentity,
+  type AcceptedAgentIdentity,
+} from './accepted-identity.js';
 import {
   AGENT_PROTOCOL_DRIFT_REASONS,
   AgentProtocolDriftError,
@@ -247,7 +252,7 @@ const PROVIDER_KEY_NAMES = Object.freeze([
 ] as const);
 
 const START_REQUEST_KEYS = Object.freeze(['id', 'method', 'payload', 'type']);
-const START_PAYLOAD_KEYS = Object.freeze(['adapterId', 'task']);
+const START_PAYLOAD_KEYS = Object.freeze(['acceptedIdentity', 'task']);
 const CANCEL_PAYLOAD_KEYS = Object.freeze(['delegationId']);
 const STATUS_PAYLOAD_KEYS = Object.freeze([]);
 
@@ -288,11 +293,6 @@ const DRIFT_EXPECTED_BY_REASON = Object.freeze({
   unknown_stream_event: 'known_event_shape',
   unknown_system_subtype: 'known_event_shape',
 } satisfies Readonly<Record<AgentProtocolDriftReason, DriftExpected>>);
-
-const DelegateStartSchema = z.object({
-  adapterId: z.enum([CLAUDE_CODE_ADAPTER_ID, OPENCODE_ADAPTER_ID]),
-  task: z.string().min(1),
-}).strict();
 
 const DelegateCancelSchema = z.object({
   delegationId: z.string().regex(DELEGATION_ID_PATTERN),
@@ -499,9 +499,11 @@ interface DelegationRun {
   readonly delegationId: string;
   readonly requestId: string;
   readonly adapterId: AgentProviderId;
+  readonly requestedIdentity: AcceptedAgentIdentity;
   readonly task: string;
   readonly emit: (event: ExtEvent) => void;
   readonly adapter: AgentProviderAdapter;
+  acceptedIdentity: AcceptedAgentIdentity | null;
   profileVersion: string;
   readonly terminalPromise: Promise<RunTerminalResult>;
   readonly resolveTerminal: (result: RunTerminalResult) => void;
@@ -810,22 +812,56 @@ function directProcessArguments(process: ProcessSpec): readonly string[] | null 
   return process.argv as readonly string[];
 }
 
-function parseStartRequest(request: ExtRequest): { adapterId: AgentProviderId; task: string } {
+function exactOwnWireDataRecord(
+  value: unknown,
+  expectedKeys: readonly string[],
+): Readonly<Record<string, unknown>> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length
+      || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+    ) return null;
+    const record: Record<string, unknown> = {};
+    for (const key of expectedKeys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        !descriptor
+        || descriptor.enumerable !== true
+        || !Object.hasOwn(descriptor, 'value')
+      ) return null;
+      record[key] = descriptor.value;
+    }
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+function parseStartRequest(request: ExtRequest): {
+  acceptedIdentity: AcceptedAgentIdentity;
+  task: string;
+} {
+  const requestRecord = exactOwnWireDataRecord(request, START_REQUEST_KEYS);
+  const payload = requestRecord?.payload;
+  const payloadRecord = exactOwnWireDataRecord(payload, START_PAYLOAD_KEYS);
+  const acceptedIdentity = validateAcceptedAgentIdentity(payloadRecord?.acceptedIdentity);
+  const task = payloadRecord?.task;
   if (
-    !isPlainRecord(request)
-    || !exactKeys(request, START_REQUEST_KEYS)
-    || request.type !== 'ext:request'
-    || request.method !== 'delegate.start'
-    || !isPlainRecord(request.payload)
-    || !exactKeys(request.payload, START_PAYLOAD_KEYS)
+    !requestRecord
+    || requestRecord.type !== 'ext:request'
+    || requestRecord.method !== 'delegate.start'
+    || !payloadRecord
+    || !acceptedIdentity
+    || typeof task !== 'string'
+    || task.length === 0
+    || !isWellFormedText(task)
+    || Buffer.byteLength(task, 'utf8') > TASK_LIMIT_BYTES
   ) throw new InvalidDelegationRequestError();
-  const parsed = DelegateStartSchema.safeParse(request.payload);
-  if (
-    !parsed.success
-    || !isWellFormedText(parsed.data.task)
-    || Buffer.byteLength(parsed.data.task, 'utf8') > TASK_LIMIT_BYTES
-  ) throw new InvalidDelegationRequestError();
-  return parsed.data;
+  return Object.freeze({ acceptedIdentity, task });
 }
 
 function parseCancelRequest(request: ExtRequest): { delegationId: string } {
@@ -1146,7 +1182,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       if (!this.accepting) throw new InvalidDelegationRequestError();
       if (request.method === 'delegate.start') {
         const payload = parseStartRequest(request);
-        return this.start(request.id, payload.task, payload.adapterId, emit, context);
+        return this.start(request.id, payload.task, payload.acceptedIdentity, emit, context);
       }
       if (request.method === 'delegate.cancel') {
         const payload = parseCancelRequest(request);
@@ -1211,11 +1247,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private async start(
     requestId: string,
     task: string,
-    adapterId: AgentProviderId,
+    requestedIdentity: AcceptedAgentIdentity,
     emit: (event: ExtEvent) => void,
     context?: ExtRequestContext,
   ): Promise<Record<string, unknown>> {
     const delegationId = this.uniqueDelegationId();
+    const adapterId = requestedIdentity.providerId;
     const adapter = this.dependencies.registry.require(adapterId);
     let resolveTerminal!: (result: RunTerminalResult) => void;
     const terminalPromise = new Promise<RunTerminalResult>((resolve) => {
@@ -1229,9 +1266,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       delegationId,
       requestId,
       adapterId,
+      requestedIdentity,
       task,
       emit,
       adapter,
+      acceptedIdentity: null,
       profileVersion: 'unknown',
       terminalPromise,
       resolveTerminal,
@@ -1284,6 +1323,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.state = 'spawning';
       const detection = await run.adapter.detect();
       validateDetection(detection);
+      const detectedIdentity = acceptedIdentityFromDetection(run.adapterId, detection);
+      if (!acceptedAgentIdentitiesEqual(run.requestedIdentity, detectedIdentity)) {
+        throw new Error('adapter_unavailable');
+      }
+      run.acceptedIdentity = detectedIdentity;
       profileVersion = detection.profileVersion;
       run.profileVersion = profileVersion;
       this.throwIfStopped(run);
@@ -2276,6 +2320,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   }
 
   private emitStarted(run: DelegationRun, entry: ActiveJournalEntry): void {
+    const acceptedIdentity = run.acceptedIdentity;
+    if (
+      !acceptedIdentity
+      || acceptedIdentity.providerId !== entry.adapterId
+      || acceptedIdentity.profileVersion !== entry.profileVersion
+    ) throw new Error('adapter_unavailable');
     try {
       run.emit({
         id: run.requestId,
@@ -2283,8 +2333,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         event: 'delegation.started',
         payload: {
           delegationId: run.delegationId,
-          adapterId: entry.adapterId,
-          profileVersion: entry.profileVersion,
+          acceptedIdentity,
         },
       });
     } catch {
