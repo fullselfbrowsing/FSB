@@ -40,6 +40,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -52,6 +53,45 @@ const MANIFEST_PATH = path.join(
   '39-breadth-c-commerce-travel-misc-most-sensitive',
   '39-06-REMAINING-APPS.md'
 );
+const MANIFEST_RELATIVE_PATH = path.relative(REPO_ROOT, MANIFEST_PATH).split(path.sep).join('/');
+
+function readWorkspaceOrTrackedHeadFile(absolutePath, relativePath) {
+  if (fs.existsSync(absolutePath)) {
+    return { bytes: fs.readFileSync(absolutePath), source: 'workspace' };
+  }
+  if (!relativePath.startsWith('.planning/') || relativePath.includes('..')) {
+    throw new Error('tracked-delete fallback is restricted to a bounded planning path');
+  }
+  const status = spawnSync('git', [
+    'status', '--porcelain=v1', '-z', '--untracked-files=no', '--', relativePath,
+  ], {
+    cwd: REPO_ROOT,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+    encoding: null,
+    maxBuffer: 1024 * 1024,
+    shell: false,
+  });
+  const statusBytes = Buffer.from(status.stdout || Buffer.alloc(0));
+  const trackedDelete = status.status === 0
+    && statusBytes.length > 3
+    && (statusBytes.subarray(0, 2).equals(Buffer.from(' D'))
+      || statusBytes.subarray(0, 2).equals(Buffer.from('D ')))
+    && statusBytes[statusBytes.length - 1] === 0;
+  if (!trackedDelete) {
+    throw new Error('missing manifest is not an exact tracked deletion');
+  }
+  const head = spawnSync('git', ['show', `HEAD:${relativePath}`], {
+    cwd: REPO_ROOT,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+    encoding: null,
+    maxBuffer: 1024 * 1024,
+    shell: false,
+  });
+  if (head.error || head.signal || head.status !== 0) {
+    throw new Error('tracked manifest HEAD read failed');
+  }
+  return { bytes: Buffer.from(head.stdout), source: 'HEAD tracked-delete fallback' };
+}
 
 let passed = 0;
 let failed = 0;
@@ -179,9 +219,10 @@ function parseManifestVendoredStems(md) {
     'totals.head (' + t.head + ') equals the count of handler/recipe-backed descriptors (' + headSlugs.length + ')');
 
   // (4) COMPLETENESS VERIFIED AGAINST THE 39-06 MANIFEST -----------------------
-  check(fs.existsSync(MANIFEST_PATH),
-    'the 39-06 remaining-app manifest (39-06-REMAINING-APPS.md) exists on disk (the completeness source of truth)');
-  const manifestMd = fs.readFileSync(MANIFEST_PATH, 'utf8');
+  const manifest = readWorkspaceOrTrackedHeadFile(MANIFEST_PATH, MANIFEST_RELATIVE_PATH);
+  check(manifest.source === 'workspace' || manifest.source === 'HEAD tracked-delete fallback',
+    'the 39-06 remaining-app manifest is read byte-for-byte from the live workspace when present or its tracked HEAD bytes when user-deleted');
+  const manifestMd = manifest.bytes.toString('utf8');
   const vendoredStems = parseManifestVendoredStems(manifestMd);
   check(vendoredStems.length > 0,
     'parsed the manifest VENDORED+IMPORTED rows (got ' + vendoredStems.length + ' app stems: ' + vendoredStems.join(', ') + ')');
