@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: verifying
-stopped_at: Completed 65-08-PLAN.md
-last_updated: "2026-07-22T15:54:15.859Z"
+status: human_needed
+stopped_at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
+last_updated: "2026-07-22T18:45:13.807Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 18
@@ -29,13 +29,13 @@ See: .planning/research/ARCHITECTURE.md (file:line integration seams; brownfield
 See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIREMENTS.md, .planning/v1.2.0-MILESTONE-AUDIT.md (archived Showcase i18n Completeness milestone)
 
 **Core value:** Reliable single-attempt execution — the AI decides correctly, the mechanics execute precisely. v0.9.91 does not touch the DOM/automation single-attempt property; it extends the surface so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers that drive the same live browser through FSB's own MCP tools.
-**Current focus:** Phase 65 — codex-adapter
+**Current focus:** Milestone-end human UAT sweep; Phase 65 automated verification is complete
 
 ## Current Position
 
 Phase: 65 (codex-adapter) — EXECUTING
 Plan: 8 of 8
-Status: Phase complete — ready for verification
+Status: human_needed
 Last activity: 2026-07-22
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
@@ -52,7 +52,7 @@ Last activity: 2026-07-22
 | 64 | OpenCode Adapter | MULTI-01, MULTI-02, MULTI-03 | In Progress (9/13) |
 | 65 | Codex Adapter | MULTI-04, MULTI-05, MULTI-06 | Not started |
 
-Coverage: 51/51 v0.9.91 requirements mapped, 48/51 complete, 0 orphaned. Dependency chain: 57 (identity data) → 58 (provider selection UI reads it) → 59 (security foundation before any spawn code) → 60 (adapter contract needs the channel) → 61 (UX/lifecycle needs the adapter) → 62 (drift gate needs something to check) → 63 (native-host closes the "agent offline" cliff after that state exists) → 64 → 65 (contract must be stable before adapter breadth). Security-first hard rule is satisfied: Phase 59 was code-green before Phase 60 spawn code landed.
+Coverage: 51/51 v0.9.91 requirements mapped and automated/source complete; milestone closure awaits the accumulated human UAT ledgers
 
 ## Hard Invariants (v0.9.91)
 
@@ -238,6 +238,7 @@ v0.9.91-specific decisions so far:
 - [Phase 64]: Mark all 28 implementation rows green only after every focused, historical, security, root, and preservation gate passes — Automated closure remains distinct from the pending live UAT boundary.
 - [Phase 64]: Defer exactly UAT64-01 through UAT64-03 to the milestone-end live sweep — Formal verification found zero automated gaps; these cases require genuine account, process, browser, and accessibility evidence per the existing user instruction.
 - [Phase 64]: Carry two non-blocking UI audit warnings forward — UI audit scored 21/24 with no blockers; 44px delegated targets and profile-version presentation coverage remain advisory findings recorded in 64-UI-REVIEW.md.
+- [Phase 65]: Keep Phase 65 and milestone closure human-pending after zero-gap automated verification — UAT65-01 through UAT65-03 require genuine Codex accounts, live browser/process behavior, and assistive-technology evidence; automation cannot promote them.
 
 ### Pending Todos
 
@@ -252,6 +253,8 @@ No active blocker.
 - **Phase 59 pairing decision resolved:** Use explicit `fsb-mcp-server pair`, a durable exact extension-Origin binding, a per-daemon 32-byte session credential, `pair --reset` for deliberate rebind, per-frame sessionId revalidation, and a secret-free `bridge.auth-status` acknowledgement. Silent TOFU is rejected.
 
 Phase 60 resolved the static inline-agent/profile and Windows shell-free resolution questions in source and deterministic tests. Their genuine installed-CLI corroboration remains in the deferred Phase 60 UAT ledger. Phase 64 Plan 07 resolved the remaining OpenCode server-shape item with cold-first execution plus an FSB-owned, authenticated `opencode serve` lease for later exact-identity attaches.
+
+- Milestone-end UAT gate: Phase 65 adds UAT65-01 through UAT65-03 (genuine auth matrix, live Codex/browser lifecycle, and accessibility/responsive rendering); all remain human_needed, pending, and evidence-empty.
 
 ## Deferred Items
 
@@ -282,8 +285,8 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-22T15:54:15.854Z
-Stopped at: Completed 65-08-PLAN.md
+Last session: 2026-07-22T18:44:34.205Z
+Stopped at: Phase 65 automated verification passed; human UAT65-01 through UAT65-03 pending
 Resume file: None
 
 ## Next Actions
