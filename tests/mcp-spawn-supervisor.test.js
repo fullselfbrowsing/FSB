@@ -184,6 +184,10 @@ function codexAuthorityStdin(cwd) {
   ].map((document) => JSON.stringify(document)).join('\n')}\n`)));
 }
 
+function codexAuthorityResponsePrefix() {
+  return Object.freeze(Array.from(Buffer.from('{"id":2,"result":', 'utf8')));
+}
+
 function codexAuthorityOutput(mcpServers) {
   return `${[
     {
@@ -195,6 +199,7 @@ function codexAuthorityOutput(mcpServers) {
         platformOs: 'linux',
       },
     },
+    { method: 'remoteControl/status/changed', params: {} },
     {
       id: 2,
       result: { config: { mcp_servers: mcpServers }, origins: {} },
@@ -441,6 +446,7 @@ function makeHarness(supervisorModule, options = {}) {
                   '--strict-config',
                 ]),
                 stdinBytes: codexAuthorityStdin(path.dirname(context.privateMcpConfigPath)),
+                stdinCloseAfterStdoutLinePrefixBytes: codexAuthorityResponsePrefix(),
                 timeoutMs: 250,
                 stdoutLimitBytes: 64 * 1024,
                 stderrLimitBytes: 64,
@@ -2947,6 +2953,10 @@ async function runPreSpawnAuthorityTests(supervisorModule, authorityModule) {
       `/fixture/private/agent-runtime/${terminal.delegationId}`,
     );
     assert(Array.isArray(harness.probeCalls[1].stdinBytes));
+    assert.deepEqual(
+      harness.probeCalls[1].stdinCloseAfterStdoutLinePrefixBytes,
+      codexAuthorityResponsePrefix(),
+    );
     assert.equal(
       Buffer.from(harness.probeCalls[1].stdinBytes).toString('utf8').includes('config/read'),
       true,
@@ -2982,6 +2992,55 @@ async function runPreSpawnAuthorityTests(supervisorModule, authorityModule) {
     assert.equal(harness.emitted.length, 0);
     assert(results.every((result) => result.zeroizeCalls === 1));
     assert(results.every((result) => result.stdout.every((byte) => byte === 0)));
+  }
+
+  {
+    const validLines = codexAuthorityOutput({ fsb: codexEffectiveServer() })
+      .trimEnd()
+      .split('\n');
+    const closedNativeCases = [
+      {
+        label: 'missing config/read id 2',
+        stdout: Buffer.from(`${validLines.slice(0, 2).join('\n')}\n`, 'utf8'),
+        exit: { code: 0, signal: null },
+      },
+      {
+        label: 'malformed config/read JSON',
+        stdout: Buffer.from(`${validLines.slice(0, 2).join('\n')}\n{"id":2,"result":not-json}\n`, 'utf8'),
+        exit: { code: 0, signal: null },
+      },
+      {
+        label: 'early nonzero app-server exit',
+        stdout: Buffer.from(codexAuthorityOutput({ fsb: codexEffectiveServer() }), 'utf8'),
+        exit: { code: 17, signal: null },
+      },
+    ];
+    for (const testCase of closedNativeCases) {
+      const results = [
+        trackedProbeResult(Buffer.from([73])),
+        trackedProbeResult(testCase.stdout, Buffer.alloc(0), testCase.exit),
+      ];
+      const harness = makeHarness(supervisorModule, {
+        adapterId: 'codex',
+        preSpawnAuthority: 'codex',
+        directRuntimeReference,
+        processProbe: (_descriptor, index) => results[index].result,
+      });
+      const terminal = await harness.supervisor.handleExtRequest(
+        startRequest({ adapterId: 'codex', task: testCase.label }),
+        harness.emit,
+      );
+      assert.equal(terminal.status, 'failed', testCase.label);
+      assert.equal(terminal.terminal.code, 'adapter_unavailable', testCase.label);
+      assert.equal(harness.counters.prepare, 0, testCase.label);
+      assert.equal(harness.spawnCalls.length, 0, testCase.label);
+      assert.equal(harness.emitted.length, 0, testCase.label);
+      assert(results.every((result) => result.zeroizeCalls === 1), testCase.label);
+      assert(results.every((result) => (
+        result.stdout.every((byte) => byte === 0)
+        && result.stderr.every((byte) => byte === 0)
+      )), testCase.label);
+    }
   }
 
   {

@@ -24,6 +24,9 @@ const CODEX_AUTHORITY_CLIENT_NAME = 'fsb_codex_authority';
 const CODEX_AUTHORITY_CLIENT_TITLE = 'Full Self-Browsing Codex Authority';
 const CODEX_AUTHORITY_PROTOCOL_VERSION = '0.142.5';
 const CODEX_REMOTE_CONTROL_NOTIFICATION = 'remoteControl/status/changed';
+const CODEX_CONFIG_READ_RESPONSE_PREFIX = Object.freeze(
+  Array.from(Buffer.from('{"id":2,"result":', 'utf8')),
+);
 const SAFE_AUTH_STATES = Object.freeze([
   'chatgpt',
   'api_key',
@@ -738,7 +741,9 @@ export function validateEffectiveAuthorityAttestation(
     const record = exactRecord(value, [
       'source',
       'argv',
-      ...(expectsStdin ? ['stdinBytes'] : []),
+      ...(expectsStdin
+        ? ['stdinBytes', 'stdinCloseAfterStdoutLinePrefixBytes']
+        : []),
       'timeoutMs',
       'stdoutLimitBytes',
       'stderrLimitBytes',
@@ -775,16 +780,31 @@ export function validateEffectiveAuthorityAttestation(
     ) as EffectiveAuthorityAttestation['classifier'];
     const argv = cloneArguments(ownValue(record, 'argv', code), code);
     let stdinBytes: readonly number[] | undefined;
+    let stdinCloseAfterStdoutLinePrefixBytes: readonly number[] | undefined;
     if (classifier === 'codex_effective_authority_json') {
       codexAuthorityConfigArguments(argv);
       stdinBytes = cloneBytes(ownValue(record, 'stdinBytes', code), code);
       if (stdinBytes.length === 0) contractFailure(code);
       validateCodexAuthorityRequest(stdinBytes);
+      stdinCloseAfterStdoutLinePrefixBytes = cloneBytes(
+        ownValue(record, 'stdinCloseAfterStdoutLinePrefixBytes', code),
+        code,
+      );
+      if (
+        stdinCloseAfterStdoutLinePrefixBytes.length
+          !== CODEX_CONFIG_READ_RESPONSE_PREFIX.length
+        || stdinCloseAfterStdoutLinePrefixBytes.some(
+          (byte, index) => byte !== CODEX_CONFIG_READ_RESPONSE_PREFIX[index],
+        )
+      ) contractFailure(code);
     }
     return Object.freeze({
       source: 'retained_binary',
       argv,
       ...(stdinBytes ? { stdinBytes } : {}),
+      ...(stdinCloseAfterStdoutLinePrefixBytes
+        ? { stdinCloseAfterStdoutLinePrefixBytes }
+        : {}),
       timeoutMs: boundedInteger(ownValue(record, 'timeoutMs', code), 1, MAX_TIMEOUT_MS, code),
       stdoutLimitBytes: boundedInteger(
         ownValue(record, 'stdoutLimitBytes', code),
@@ -855,26 +875,36 @@ function classifyCodexNativeAuthority(
 ): EffectiveAuthorityClassification {
   const code = 'invalid_authority_attestation' as const;
   const messages = denseArray(value, MAX_CODEX_APP_SERVER_MESSAGES, code);
-  let initializeResult: OwnDataRecord | null = null;
-  let configReadResult: OwnDataRecord | null = null;
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = ownDataRecord(arrayValue(messages, index, code), code);
-    if (Object.hasOwn(message, 'id')) {
-      const response = exactRecord(message, ['id', 'result'], code);
-      const id = ownValue(response, 'id', code);
-      const result = ownDataRecord(ownValue(response, 'result', code), code);
-      if (id === 1 && initializeResult === null) initializeResult = result;
-      else if (id === 2 && configReadResult === null) configReadResult = result;
-      else return malformedAuthority();
-      continue;
-    }
-    const notification = exactRecord(message, ['method', 'params'], code);
-    if (ownValue(notification, 'method', code) !== CODEX_REMOTE_CONTROL_NOTIFICATION) {
-      return malformedAuthority();
-    }
-    ownDataRecord(ownValue(notification, 'params', code), code);
+  if (messages.length !== 3) return malformedAuthority();
+  const initializeResponse = exactRecord(
+    arrayValue(messages, 0, code),
+    ['id', 'result'],
+    code,
+  );
+  if (ownValue(initializeResponse, 'id', code) !== 1) return malformedAuthority();
+  const initializeResult = ownDataRecord(
+    ownValue(initializeResponse, 'result', code),
+    code,
+  );
+  const notification = exactRecord(
+    arrayValue(messages, 1, code),
+    ['method', 'params'],
+    code,
+  );
+  if (ownValue(notification, 'method', code) !== CODEX_REMOTE_CONTROL_NOTIFICATION) {
+    return malformedAuthority();
   }
-  if (initializeResult === null || configReadResult === null) return malformedAuthority();
+  ownDataRecord(ownValue(notification, 'params', code), code);
+  const configReadResponse = exactRecord(
+    arrayValue(messages, 2, code),
+    ['id', 'result'],
+    code,
+  );
+  if (ownValue(configReadResponse, 'id', code) !== 2) return malformedAuthority();
+  const configReadResult = ownDataRecord(
+    ownValue(configReadResponse, 'result', code),
+    code,
+  );
   const initialize = exactRecord(initializeResult, [
     'userAgent',
     'codexHome',

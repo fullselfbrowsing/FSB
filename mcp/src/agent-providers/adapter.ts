@@ -116,6 +116,8 @@ export interface EffectiveAuthorityAttestation {
   readonly argv: readonly string[];
   /** Optional fixed protocol request written to the retained binary's stdin. */
   readonly stdinBytes?: readonly number[];
+  /** Keep stdin open until a complete stdout line begins with these exact bytes. */
+  readonly stdinCloseAfterStdoutLinePrefixBytes?: readonly number[];
   readonly timeoutMs: number;
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;

@@ -28,6 +28,9 @@ const AUTH_API_SEPARATOR = Buffer.from('***', 'ascii');
 const AUTHORITY_CLIENT_NAME = 'fsb_codex_authority';
 const AUTHORITY_CLIENT_TITLE = 'Full Self-Browsing Codex Authority';
 const REMOTE_CONTROL_NOTIFICATION = 'remoteControl/status/changed';
+const CONFIG_READ_RESPONSE_PREFIX = Object.freeze(
+  Array.from(Buffer.from('{"id":2,"result":', 'utf8')),
+);
 
 export const CODEX_ALLOWED_MCP_TOOLS = Object.freeze([
   'search_capabilities',
@@ -393,6 +396,9 @@ function authorityAttestation(
   ].map((document) => JSON.stringify(document)).join('\n')}\n`, 'utf8');
   const stdinBytes = Object.freeze(Array.from(request));
   request.fill(0);
+  const stdinCloseAfterStdoutLinePrefixBytes = Object.freeze(
+    [...CONFIG_READ_RESPONSE_PREFIX],
+  );
   return {
     source: 'retained_binary',
     argv: Object.freeze([
@@ -403,6 +409,7 @@ function authorityAttestation(
       '--strict-config',
     ]),
     stdinBytes,
+    stdinCloseAfterStdoutLinePrefixBytes,
     timeoutMs: 5_000,
     stdoutLimitBytes: 64 * 1024,
     stderrLimitBytes: 8 * 1024,

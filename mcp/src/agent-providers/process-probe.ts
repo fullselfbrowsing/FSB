@@ -48,6 +48,7 @@ export interface BoundedProcessProbeDescriptor {
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;
   readonly stdinBytes?: readonly number[];
+  readonly stdinCloseAfterStdoutLinePrefixBytes?: readonly number[];
   readonly signal?: AbortSignal;
 }
 
@@ -188,16 +189,28 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
   const keys = Reflect.ownKeys(record) as string[];
   if (
     keys.length < requiredKeys.length
-    || keys.length > requiredKeys.length + 2
+    || keys.length > requiredKeys.length + 3
     || requiredKeys.some((key) => !keys.includes(key))
     || keys.some((key) => (
-      !requiredKeys.includes(key) && key !== 'stdinBytes' && key !== 'signal'
+      !requiredKeys.includes(key)
+      && key !== 'stdinBytes'
+      && key !== 'stdinCloseAfterStdoutLinePrefixBytes'
+      && key !== 'signal'
     ))
   ) invalidDescriptor();
   const command = boundedString(ownValue(record, 'command'));
   const cwd = boundedString(ownValue(record, 'cwd'));
   const environment = ownValue(record, 'environment');
   if (!isAbsolute(command) || !isAbsolute(cwd) || !isSanitizedAgentEnvironment(environment)) {
+    invalidDescriptor();
+  }
+  const hasStdin = keys.includes('stdinBytes');
+  const hasResponseDrivenClose = keys.includes('stdinCloseAfterStdoutLinePrefixBytes');
+  if (hasResponseDrivenClose && !hasStdin) invalidDescriptor();
+  const stdinCloseAfterStdoutLinePrefixBytes = hasResponseDrivenClose
+    ? cloneInputBytes(ownValue(record, 'stdinCloseAfterStdoutLinePrefixBytes'))
+    : undefined;
+  if (stdinCloseAfterStdoutLinePrefixBytes?.some((byte) => byte === 0x0a || byte === 0x0d)) {
     invalidDescriptor();
   }
   return Object.freeze({
@@ -214,8 +227,11 @@ function validateDescriptor(value: unknown): BoundedProcessProbeDescriptor {
       ownValue(record, 'stderrLimitBytes'),
       MAX_PROBE_CHANNEL_BYTES,
     ),
-    ...(keys.includes('stdinBytes')
+    ...(hasStdin
       ? { stdinBytes: cloneInputBytes(ownValue(record, 'stdinBytes')) }
+      : {}),
+    ...(stdinCloseAfterStdoutLinePrefixBytes
+      ? { stdinCloseAfterStdoutLinePrefixBytes }
       : {}),
     ...(keys.includes('signal') ? { signal: validateSignal(ownValue(record, 'signal')) } : {}),
   });
@@ -275,6 +291,13 @@ export function runBoundedProcessProbe(
     let stdinBuffer: Buffer | null = descriptor.stdinBytes
       ? Buffer.from(descriptor.stdinBytes)
       : null;
+    let stdoutCompletionPrefix: Buffer | null = descriptor
+      .stdinCloseAfterStdoutLinePrefixBytes
+      ? Buffer.from(descriptor.stdinCloseAfterStdoutLinePrefixBytes)
+      : null;
+    let stdoutCompletionIndex = 0;
+    let stdoutCompletionLineMatches = true;
+    let stdoutCompletionObserved = false;
     let closePromiseResolve: (() => void) | null = null;
     const childClosed = new Promise<void>((resolve) => {
       closePromiseResolve = resolve;
@@ -293,6 +316,8 @@ export function runBoundedProcessProbe(
       child.removeListener('close', onClose);
       stdinBuffer?.fill(0);
       stdinBuffer = null;
+      stdoutCompletionPrefix?.fill(0);
+      stdoutCompletionPrefix = null;
     };
 
     const fail = (code: ProcessProbeFailureCode): void => {
@@ -323,6 +348,36 @@ export function runBoundedProcessProbe(
       );
     };
 
+    const closeStdinAfterResponse = (): void => {
+      if (stdoutCompletionObserved || stdoutCompletionPrefix === null) return;
+      stdoutCompletionObserved = true;
+      try {
+        child.stdin.end();
+      } catch {
+        fail('spawn_failed');
+      }
+    };
+
+    const observeStdoutCompletion = (value: Buffer): void => {
+      const prefix = stdoutCompletionPrefix;
+      if (prefix === null || stdoutCompletionObserved) return;
+      for (const byte of value) {
+        if (byte === 0x0a) {
+          if (stdoutCompletionLineMatches && stdoutCompletionIndex === prefix.length) {
+            closeStdinAfterResponse();
+            return;
+          }
+          stdoutCompletionIndex = 0;
+          stdoutCompletionLineMatches = true;
+          continue;
+        }
+        if (stdoutCompletionLineMatches && stdoutCompletionIndex < prefix.length) {
+          if (byte === prefix[stdoutCompletionIndex]) stdoutCompletionIndex += 1;
+          else stdoutCompletionLineMatches = false;
+        }
+      }
+    };
+
     const append = (
       value: unknown,
       chunks: Buffer[],
@@ -346,6 +401,7 @@ export function runBoundedProcessProbe(
         chunks.push(copy);
         if (channel === 'stdout') stdoutBytes = next;
         else stderrBytes = next;
+        if (channel === 'stdout') observeStdoutCompletion(copy);
       } finally {
         value.fill(0);
       }
@@ -439,10 +495,17 @@ export function runBoundedProcessProbe(
     timer.unref?.();
     try {
       if (stdinBuffer) {
-        child.stdin.end(stdinBuffer, () => {
-          stdinBuffer?.fill(0);
-          stdinBuffer = null;
-        });
+        if (stdoutCompletionPrefix) {
+          child.stdin.write(stdinBuffer, () => {
+            stdinBuffer?.fill(0);
+            stdinBuffer = null;
+          });
+        } else {
+          child.stdin.end(stdinBuffer, () => {
+            stdinBuffer?.fill(0);
+            stdinBuffer = null;
+          });
+        }
       } else {
         child.stdin.end();
       }

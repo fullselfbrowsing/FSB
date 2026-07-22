@@ -2254,6 +2254,12 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         ...(authorityDescriptor.stdinBytes
           ? { stdinBytes: authorityDescriptor.stdinBytes }
           : {}),
+        ...(authorityDescriptor.stdinCloseAfterStdoutLinePrefixBytes
+          ? {
+              stdinCloseAfterStdoutLinePrefixBytes:
+                authorityDescriptor.stdinCloseAfterStdoutLinePrefixBytes,
+            }
+          : {}),
         ...(run.routeSignal ? { signal: run.routeSignal } : {}),
       }));
       if (

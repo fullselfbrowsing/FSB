@@ -124,6 +124,81 @@ function successfulDescendantProbeScript(pidPath, markerPath) {
   ].join('');
 }
 
+function faithfulCodexAppServerScript(auditPath, pidPath, markerPath, endpoint) {
+  const descendant = [
+    "const fs = require('node:fs');",
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerPath)}, 'escaped'), 350);`,
+    'setInterval(() => {}, 1000);',
+  ].join('');
+  const initializeResult = {
+    id: 1,
+    result: {
+      userAgent: 'codex_cli_rs/0.142.5',
+      codexHome: '/fixture/codex-home',
+      platformFamily: 'unix',
+      platformOs: 'test',
+    },
+  };
+  const configReadResult = {
+    id: 2,
+    result: {
+      config: { mcp_servers: { fsb: codexFsbEffectiveServer(endpoint) } },
+      origins: {},
+    },
+  };
+  return [
+    "const fs = require('node:fs');",
+    "const { spawn } = require('node:child_process');",
+    `const descendant = spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], { stdio: 'ignore' });`,
+    `fs.writeFileSync(${JSON.stringify(pidPath)}, JSON.stringify({ root: process.pid, descendant: descendant.pid }));`,
+    `const auditPath = ${JSON.stringify(auditPath)};`,
+    `const initializeResult = ${JSON.stringify(initializeResult)};`,
+    `const configReadResult = ${JSON.stringify(configReadResult)};`,
+    "const notification = { method: 'remoteControl/status/changed', params: {} };",
+    "const expectedMethods = ['initialize', 'initialized', 'config/read'];",
+    'let pending = Buffer.alloc(0);',
+    'let methods = [];',
+    'let ended = false;',
+    'let id2Sent = false;',
+    'let finished = false;',
+    'let validSequence = true;',
+    'const emit = (document) => process.stdout.write(`${JSON.stringify(document)}\\n`);',
+    'const finish = () => {',
+    '  if (finished) return;',
+    '  finished = true;',
+    '  fs.writeFileSync(auditPath, JSON.stringify({ methods, id2Sent, eofAfterId2: ended && id2Sent, validSequence }));',
+    '  process.exit(validSequence ? 0 : 93);',
+    '};',
+    "process.stdin.on('data', (chunk) => {",
+    '  pending = Buffer.concat([pending, chunk]);',
+    '  while (true) {',
+    '    const newline = pending.indexOf(10);',
+    '    if (newline < 0) break;',
+    '    const line = pending.subarray(0, newline);',
+    '    pending = pending.subarray(newline + 1);',
+    '    if (line.length === 0) continue;',
+    '    let request;',
+    '    try { request = JSON.parse(line.toString("utf8")); } catch { validSequence = false; continue; }',
+    '    methods.push(request.method);',
+    '    if (request.method === "initialize" && request.id === 1) emit(initializeResult);',
+    '    else if (request.method === "initialized") emit(notification);',
+    '    else if (request.method === "config/read" && request.id === 2) {',
+    '      validSequence = validSequence && JSON.stringify(methods) === JSON.stringify(expectedMethods);',
+    '      setTimeout(() => {',
+    '        if (ended || !validSequence) return;',
+    '        id2Sent = true;',
+    '        emit(configReadResult);',
+    '      }, 30);',
+    '    } else validSequence = false;',
+    '  }',
+    '});',
+    "process.stdin.on('end', () => {",
+    '  ended = true;',
+    '  setTimeout(finish, id2Sent ? 10 : 80);',
+    '});',
+  ].join('');
+}
+
 function fakeProbeChild(pid) {
   const child = new EventEmitter();
   child.pid = pid;
@@ -201,6 +276,39 @@ async function runGenericProbeTests(
   assert.equal(stdinEcho.stdout.equals(stdinCanary), true, 'fixed probe stdin reaches the child');
   stdinEcho.zeroize();
   assert.equal(ownedBuffersAreZero(stdinEcho), true);
+
+  const responseChild = fakeProbeChild(42_000);
+  const responsePrefix = Buffer.from('{"id":2,"result":', 'utf8');
+  const responseLifecycle = Object.freeze({
+    stdinBytes: Object.freeze([0x52, 0x0a]),
+    stdinCloseAfterStdoutLinePrefixBytes: Object.freeze(Array.from(responsePrefix)),
+  });
+  const responseSources = [
+    Buffer.from('{"id":1,"result":{}}\n{"id":2,"res', 'utf8'),
+    Buffer.from('ult":{"config":{}}}', 'utf8'),
+    Buffer.from('\n', 'utf8'),
+  ];
+  const responseDriven = runBoundedProcessProbe(descriptor(['synthetic'], {
+    stdinBytes: Object.freeze(Array.from(Buffer.from('REQUESTS\n', 'utf8'))),
+    stdinCloseAfterStdoutLinePrefixBytes: Object.freeze(Array.from(responsePrefix)),
+  }), {
+    spawn: () => responseChild,
+    terminateTree: async (_pid, childClosed) => childClosed,
+  });
+  assert.equal(responseChild.stdin.writableEnded, false,
+    'response-driven stdin stays open after the request write');
+  responseChild.stdout.emit('data', responseSources[0]);
+  responseChild.stdout.emit('data', responseSources[1]);
+  assert.equal(responseChild.stdin.writableEnded, false,
+    'a matching prefix does not close stdin before the complete response line');
+  responseChild.stdout.emit('data', responseSources[2]);
+  await waitForCondition(() => responseChild.stdin.writableEnded);
+  responseChild.emit('close', 0, null);
+  const responseDrivenResult = await responseDriven;
+  assert.equal(responseSources.every((source) => source.every((byte) => byte === 0)), true,
+    'response-driven exact source chunks are erased');
+  responseDrivenResult.zeroize();
+  assert.equal(ownedBuffersAreZero(responseDrivenResult), true);
 
   const nonzero = await runBoundedProcessProbe(descriptor([
     '-e',
@@ -280,6 +388,7 @@ async function runGenericProbeTests(
           '-e',
           descendantProbeScript(pidPath, markerPath, channel),
         ], {
+          ...responseLifecycle,
           ...overrides,
           ...(abortController ? { signal: abortController.signal } : {}),
         }));
@@ -481,6 +590,7 @@ async function runGenericProbeTests(
       ? 'RETAINED_OVERFLOW_SOURCE'
       : 'RETAINED_FAILURE_SOURCE');
     const operation = runBoundedProcessProbe(descriptor(['synthetic'], {
+      ...responseLifecycle,
       ...testCase.overrides,
       ...(testCase.controller ? { signal: testCase.controller.signal } : {}),
     }), {
@@ -518,6 +628,14 @@ async function runGenericProbeTests(
     }),
     (error) => error.code === 'invalid_descriptor',
     'an unbranded environment cannot cross the probe boundary',
+  );
+  await assert.rejects(
+    runBoundedProcessProbe({
+      ...descriptor(['-e', 'process.exit(0);']),
+      stdinCloseAfterStdoutLinePrefixBytes: [123],
+    }),
+    (error) => error.code === 'invalid_descriptor',
+    'response-driven close requires a bounded stdin request',
   );
 
   const probeSource = fs.readFileSync(
@@ -880,7 +998,7 @@ function codexConfigReadMessages(mcpServers, overrides = {}) {
         platformOs: 'macos',
       },
     },
-    ...(overrides.remoteControlNotification
+    ...(overrides.remoteControlNotification !== false
       ? [{ method: 'remoteControl/status/changed', params: {} }]
       : []),
     {
@@ -903,6 +1021,7 @@ async function runCodexIsolationTests(
   codexProfileModule,
   effectiveAuthorityModule,
   spawnEnvironmentModule,
+  processProbeModule,
 ) {
   const strippedCanaries = {
     CODEX_API_KEY: 'CODEX_API_CANARY',
@@ -1044,6 +1163,14 @@ async function runCodexIsolationTests(
     'app-server', '--stdio', '--strict-config',
   ]);
   assert(Object.isFrozen(spec.effectiveAuthorityAttestation.stdinBytes));
+  assert(Object.isFrozen(
+    spec.effectiveAuthorityAttestation.stdinCloseAfterStdoutLinePrefixBytes,
+  ));
+  assert.equal(
+    Buffer.from(spec.effectiveAuthorityAttestation.stdinCloseAfterStdoutLinePrefixBytes)
+      .equals(Buffer.from('{"id":2,"result":', 'utf8')),
+    true,
+  );
   const authorityRequests = Buffer.from(spec.effectiveAuthorityAttestation.stdinBytes)
     .toString('utf8')
     .trimEnd()
@@ -1068,6 +1195,111 @@ async function runCodexIsolationTests(
     [...spec.topology.task.argv.slice(0, -1), 'mcp_servers.fsb.enabled=false'],
   ), false);
 
+  const protocolRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-codex-protocol-'));
+  try {
+    const runFaithfulProtocol = async (label, responseDriven) => {
+      const runDirectory = path.join(protocolRoot, label);
+      fs.mkdirSync(runDirectory, { recursive: true });
+      const auditPath = path.join(runDirectory, 'audit.json');
+      const pidPath = path.join(runDirectory, 'pids.json');
+      const markerPath = path.join(runDirectory, 'escaped.marker');
+      const script = faithfulCodexAppServerScript(
+        auditPath,
+        pidPath,
+        markerPath,
+        endpoint,
+      );
+      const fixtureContext = codexContext(reference);
+      const privateMcpConfigPath = path.join(runDirectory, 'mcp.json');
+      const nativeSpec = codexProfileModule.buildCodexSpawnSpec(
+        { text: 'Faithful native protocol transport fixture.' },
+        {
+          ...fixtureContext,
+          detection: {
+            ...fixtureContext.detection,
+            binary: {
+              command: process.execPath,
+              realPath: process.execPath,
+              argvPrefix: ['-e', script, '--'],
+            },
+          },
+          cwd: runDirectory,
+          privateMcpConfigPath,
+          runtimeFiles: [privateMcpConfigPath],
+        },
+      );
+      const attestation = nativeSpec.effectiveAuthorityAttestation;
+      const result = await processProbeModule.runBoundedProcessProbe({
+        command: process.execPath,
+        argv: attestation.argv,
+        cwd: runDirectory,
+        environment,
+        timeoutMs: attestation.timeoutMs,
+        stdoutLimitBytes: attestation.stdoutLimitBytes,
+        stderrLimitBytes: attestation.stderrLimitBytes,
+        stdinBytes: attestation.stdinBytes,
+        ...(responseDriven
+          ? {
+              stdinCloseAfterStdoutLinePrefixBytes:
+                attestation.stdinCloseAfterStdoutLinePrefixBytes,
+            }
+          : {}),
+      });
+      const messages = result.stdout.toString('utf8').trimEnd().split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+      const audit = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
+      const pids = JSON.parse(fs.readFileSync(pidPath, 'utf8'));
+      assert.deepEqual(audit.methods, ['initialize', 'initialized', 'config/read']);
+      assert.equal(audit.validSequence, true);
+      assert.equal(audit.methods.some((method) => (
+        method.includes('model')
+        || method.includes('login')
+        || method.includes('browser')
+        || method.includes('task')
+      )), false, 'native authority handshake invokes no model, login, browser, or task');
+      assert.equal(processIsPresent(pids.root), false, `${label} root settled`);
+      assert.equal(processIsPresent(pids.descendant), false, `${label} descendant settled`);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assert.equal(fs.existsSync(markerPath), false, `${label} descendant marker never appears`);
+      return { result, messages, audit, attestation };
+    };
+
+    const immediateEof = await runFaithfulProtocol('immediate-eof', false);
+    try {
+      assert.deepEqual(immediateEof.messages.map((message) => message.id ?? null), [1, null]);
+      assert.equal(immediateEof.audit.id2Sent, false,
+        'faithful pinned protocol omits config/read after immediate EOF');
+      assert.equal(immediateEof.audit.eofAfterId2, false);
+      assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
+        immediateEof.messages,
+        immediateEof.attestation,
+        reference,
+      ).pass, false, 'incomplete native response fails closed');
+    } finally {
+      immediateEof.result.zeroize();
+      assert.equal(ownedBuffersAreZero(immediateEof.result), true);
+    }
+
+    const responseDriven = await runFaithfulProtocol('response-driven', true);
+    try {
+      assert.deepEqual(responseDriven.messages.map((message) => message.id ?? null), [1, null, 2]);
+      assert.equal(responseDriven.audit.id2Sent, true);
+      assert.equal(responseDriven.audit.eofAfterId2, true,
+        'stdin closes only after the complete id 2 response line');
+      assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
+        responseDriven.messages,
+        responseDriven.attestation,
+        reference,
+      ).pass, true, 'response-driven handshake proves the exact effective roster');
+    } finally {
+      responseDriven.result.zeroize();
+      assert.equal(ownedBuffersAreZero(responseDriven.result), true);
+    }
+  } finally {
+    fs.rmSync(protocolRoot, { recursive: true, force: true });
+  }
+
   const nativeServer = codexFsbEffectiveServer(endpoint);
   const nativeAuthority = codexConfigReadMessages({ fsb: nativeServer });
   assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
@@ -1081,10 +1313,10 @@ async function runCodexIsolationTests(
     reference,
   ).pass, true, 'disabled inherited servers are outside the complete enabled roster');
   assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
-    codexConfigReadMessages({ fsb: nativeServer }, { remoteControlNotification: true }),
+    codexConfigReadMessages({ fsb: nativeServer }),
     spec.effectiveAuthorityAttestation,
     reference,
-  ).pass, true, 'the pinned initialize status notification is tolerated');
+  ).pass, true, 'the pinned initialize/status/config-read sequence is exact');
 
   const nativeNegatives = [
     [codexConfigReadMessages({
@@ -1111,8 +1343,19 @@ async function runCodexIsolationTests(
     [codexConfigReadMessages({ fsb: { ...nativeServer, env_http_headers: { Authorization: 'ENV_HEADER_CANARY' } } }), 'env_present'],
     [codexConfigReadMessages({ fsb: { ...nativeServer, bearer_token_env_var: 'TOKEN_CANARY' } }), 'bearer_present'],
     [codexConfigReadMessages({ fsb: { ...nativeServer, disabled_tools: [] } }), 'malformed'],
-    [[nativeAuthority[1]], 'malformed'],
-    [{ id: 2, result: nativeAuthority[1].result }, 'malformed'],
+    [codexConfigReadMessages(
+      { fsb: nativeServer },
+      { remoteControlNotification: false },
+    ), 'malformed'],
+    [[nativeAuthority[2]], 'malformed'],
+    [{ id: 2, result: nativeAuthority[2].result }, 'malformed'],
+    [[nativeAuthority[2], nativeAuthority[1], nativeAuthority[0]], 'malformed'],
+    [[
+      nativeAuthority[0],
+      { method: 'foreign/status', params: {} },
+      nativeAuthority[2],
+    ], 'malformed'],
+    [[...nativeAuthority, { method: 'remoteControl/status/changed', params: {} }], 'malformed'],
   ];
   for (const [mutation, expectedReason] of nativeNegatives) {
     const result = effectiveAuthorityModule.classifyEffectiveAuthority(
@@ -1132,6 +1375,13 @@ async function runCodexIsolationTests(
     () => effectiveAuthorityModule.validateEffectiveAuthorityAttestation({
       ...spec.effectiveAuthorityAttestation,
       stdinBytes: [],
+    }),
+    (error) => error.code === 'invalid_authority_attestation',
+  );
+  assert.throws(
+    () => effectiveAuthorityModule.validateEffectiveAuthorityAttestation({
+      ...spec.effectiveAuthorityAttestation,
+      stdinCloseAfterStdoutLinePrefixBytes: Array.from(Buffer.from('{"id":7,"result":')),
     }),
     (error) => error.code === 'invalid_authority_attestation',
   );
@@ -1400,6 +1650,7 @@ async function main() {
       codexProfileModule,
       effectiveAuthorityModule,
       spawnEnvironmentModule,
+      processProbeModule,
     );
     console.log('mcp-codex-adapter.test.js: PASS');
     return;
@@ -1427,6 +1678,7 @@ async function main() {
       codexProfileModule,
       effectiveAuthorityModule,
       spawnEnvironmentModule,
+      processProbeModule,
     );
     runCodexAuthTests(codexDetectModule, codexProfileModule, effectiveAuthorityModule);
     await runCodexParserTests(codexStreamModule);
