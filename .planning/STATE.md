@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.9.91
 milestone_name: MCP Clients as Providers
-status: planning
-stopped_at: Phase 64 complete (13/13) — ready to discuss Phase 65
-last_updated: "2026-07-21T13:42:53.035Z"
-last_activity: 2026-07-21 -- Phase 64 complete; live UAT deferred; ready to discuss Phase 65
+status: executing
+stopped_at: Phase 65 UI-SPEC approved
+last_updated: "2026-07-22T09:57:50.820Z"
+last_activity: 2026-07-22 -- Phase 65 planning complete
 progress:
   total_phases: 18
   completed_phases: 8
-  total_plans: 53
+  total_plans: 61
   completed_plans: 55
   percent: 44
 ---
@@ -35,8 +35,8 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 
 Phase: 65 (Codex Adapter) — NOT STARTED
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-21 -- Phase 64 complete; live UAT deferred; ready to discuss Phase 65
+Status: Ready to execute
+Last activity: 2026-07-22 -- Phase 65 planning complete
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -282,9 +282,9 @@ v2 deferred (see REQUIREMENTS.md v0.9.91 v2 section): CHAT-FUTURE-01/02 (chat-mo
 
 ## Session Continuity
 
-Last session: 2026-07-21T13:42:53.028Z
-Stopped at: Phase 64 complete (13/13) — ready to discuss Phase 65
-Resume file: None
+Last session: 2026-07-22T08:57:22.262Z
+Stopped at: Phase 65 UI-SPEC approved
+Resume file: .planning/phases/65-codex-adapter/65-UI-SPEC.md
 
 ## Next Actions
 
