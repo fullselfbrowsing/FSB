@@ -87,7 +87,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **MULTI-03**: A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-1.14.25/` (or the latest pinned version) proves the adapter's event schema in CI without a live CLI.
 - [x] **MULTI-04**: A Codex adapter (`mcp/src/agent-providers/codex.ts`) implements the `AgentProviderAdapter` contract, invoking `codex exec --json` with the current-verified flag set (v0.142.5 as baseline: use `--ephemeral` + `--ignore-user-config` for hermeticity; do not use the deprecated `--full-auto`).
 - [x] **MULTI-05**: The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth vs API key vs unauthenticated and surfaces the state in the provider panel so the user knows which billing bucket a run will hit.
-- [x] **MULTI-06**: A recorded Codex JSONL fixture pins the event schema in CI, and the adapter's `caps()` correctly reports `chatMode: false` for v0.9.91 (task-mode only across all adapters).
+- [x] **MULTI-06**: A schema-derived Codex JSONL contract fixture pins the event schema in CI with `liveCapturePending: true` until genuine UAT capture, and the adapter's `caps()` correctly reports `chatMode: false` for v0.9.91 (task-mode only across all adapters).
 
 ## v2 Requirements
 

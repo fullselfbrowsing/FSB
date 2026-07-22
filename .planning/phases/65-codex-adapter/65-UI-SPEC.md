@@ -326,11 +326,11 @@ Live Chrome rendering, contrast, wrapping, focus visibility/order, announcement 
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS — source contract; live optical/render evidence remains UAT65-03
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS — source contract; computed typography and zoom evidence remain UAT65-03
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved for source implementation; live evidence remains UAT65-01 through UAT65-03

@@ -38,7 +38,7 @@
 - [x] **Phase 62: CI Drift-Smoke Gate & Doctor Extensions** - Per-adapter CI drift-smoke against canned fixtures (fail-loud on unknown event types / missing fields / version outside compat matrix), `fsb-mcp-server doctor` per-adapter section (binary path, version, auth, secret rotation age), machine-readable adapter compatibility matrix consumed by the extension (completed 2026-07-16; automated/source/full-suite verification passed and three live checks are deferred to the milestone-end UAT gate)
 - [ ] **Phase 63: Native-Messaging Host** - `install --native-host` writes the platform-appropriate manifest (mac/Linux/Windows), extension gains additive `nativeMessaging` permission, "Agent offline" state auto-attempts wake before the doctor deep-link; the native host only launches (or attaches to) `serve` — it NEVER spawns agent CLIs directly (all spawn authority stays inside the daemon behind Phase 59 CHAN gates)
 - [ ] **Phase 64: OpenCode Adapter** - Second adapter proves the contract accommodates server-mode + attach on top of cold spawn without any Phase 60 rewrite; pinned OpenCode agent definition + recorded JSONL fixture + drift-smoke coverage
-- [ ] **Phase 65: Codex Adapter** - Third adapter with `codex exec --json` on the verified 0.142.5 hermetic flag set (`--ephemeral` + `--ignore-user-config`, never the deprecated `--full-auto`), `detect()` surfacing ChatGPT OAuth / API key / unauthenticated so the Providers panel discloses which billing bucket a run will hit; `caps.chatMode: false` across all adapters (task-mode only for v0.9.91)
+- [ ] **Phase 65: Codex Adapter** - Third adapter with `codex exec --json` on the verified 0.142.5 hermetic flag set (`--ephemeral` + `--ignore-user-config`, never the deprecated `--full-auto`), `detect()` surfacing ChatGPT OAuth / API key / unauthenticated so the Providers panel discloses which billing bucket a run will hit; `caps.chatMode: false` across all adapters (automated/source verification passed 2026-07-22; exactly three live UAT scenarios remain pending)
 
 ## Phase Details
 
@@ -235,10 +235,19 @@
 **Requirements**: MULTI-04, MULTI-05, MULTI-06
 **Success Criteria** (what must be TRUE):
   1. A Codex adapter (`mcp/src/agent-providers/codex.ts`) implements the `AgentProviderAdapter` contract, invoking `codex exec --json` with the verified 0.142.5 flag set (`--ephemeral` + `--ignore-user-config` for hermeticity; the deprecated `--full-auto` is NEVER referenced in adapter source, protected by the CHAN-07 grep gate against `--auto`).
-  2. The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth, API key, or unauthenticated and surfaces the state in the Providers panel so the user knows which billing bucket a run will hit — with copy that reflects the specific detected auth state ("included in your ChatGPT Plus subscription" vs "billed to your API key" vs "sign in to codex first").
-  3. A recorded Codex JSONL fixture pins the event schema in CI (under `tests/fixtures/agent-streams/codex-0.142.5/` or the phase-pinned version); the Phase 62 drift-smoke job includes Codex from the first commit of this phase, and the adapter's `caps()` correctly reports `chatMode: false` — matching the milestone-wide task-mode-only posture.
+  2. The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth, API key, or unauthenticated and surfaces the state in the Providers panel so the user knows which billing bucket a run will hit — with the accepted copy **Included with your ChatGPT plan**, **Billed to the API key stored by Codex; dollar amount not reported.**, or the exact sign-in/status-refresh recovery copy.
+  3. A schema-derived Codex JSONL contract fixture pins the event schema in CI under `tests/fixtures/agent-streams/codex-0.142.5/`, honestly retains `liveCapturePending: true`, and awaits genuine capture in UAT65-02; the Phase 62 drift-smoke job includes Codex from the first implementation commit, and the adapter's `caps()` correctly reports `chatMode: false` — matching the milestone-wide task-mode-only posture.
   4. A user with Codex installed can pick "Codex" as their provider and observe the same delegation UX as Claude Code and OpenCode with the correct per-auth-state cost copy, and the Providers panel's `agent`-kind cost row shows tokens / turns / duration + the auth-state-appropriate subscription caption rather than a fabricated dollar amount.
-**Plans**: TBD
+**Plans**: 8/8 complete
+
+- [x] 65-01-PLAN.md — Establish canonical accepted identity, capability vocabulary, and durable provider-neutral persistence before Codex exposure.
+- [x] 65-02-PLAN.md — Bind background-owned preflight, consent, trust, and replay rejection to the exact five-field identity.
+- [x] 65-03-PLAN.md — Enforce immediate supervisor re-attestation and exact start echo before any runtime or browser-visible effect.
+- [x] 65-04-PLAN.md — Add bounded byte probes, sanitized environments, serve-owned authority descriptors, and empty direct scratch cleanup.
+- [x] 65-05-PLAN.md — Atomically expose the complete Codex adapter, profile, parser, fixture, roster, drift, and negative corpus.
+- [x] 65-06-PLAN.md — Project safe auth evidence and exact billing copy through the existing three-provider Providers surface.
+- [x] 65-07-PLAN.md — Preserve immutable accepted identity through feed/hydration and close shared 44px delegated controls.
+- [x] 65-08-PLAN.md — Lock exact validation/UAT contracts and the preservation-safe focused, root, and CI closure gate.
 
 ## Progress
 
