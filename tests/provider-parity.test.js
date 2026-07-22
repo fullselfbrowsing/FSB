@@ -38,6 +38,14 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // (confirmed against universal-provider.js PROVIDER_CONFIGS).
 const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
 const SHIPPED_AGENT_IDS = ['claude-code', 'opencode'];
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
 
 // The two capability tools that MUST stay out-of-registry (INV-01) and therefore
 // can never appear in any provider's formatted tool envelope.
@@ -87,6 +95,140 @@ const sidepanelSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 
 const backgroundSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'background.js'), 'utf8');
 
 async function run() {
+  // -------------------------------------------------------------------------
+  // Phase 65 Plan 01: accepted delegated runs bind provider, profile, auth,
+  // and billing into one exact immutable identity before Codex is exposed.
+  // -------------------------------------------------------------------------
+  console.log('\n--- accepted identity foundation (MULTI-05) ---');
+
+  const delegationProviders = require(path.join(
+    REPO_ROOT,
+    'extension',
+    'utils',
+    'delegation-providers.js',
+  ));
+  check(JSON.stringify(delegationProviders.AGENT_AUTH_STATES)
+      === JSON.stringify(['chatgpt', 'api_key', 'unauthenticated', 'unknown'])
+      && Object.isFrozen(delegationProviders.AGENT_AUTH_STATES),
+    'auth states are the exact frozen four-value provider-neutral vocabulary');
+  check(JSON.stringify(delegationProviders.AGENT_BILLING_KINDS)
+      === JSON.stringify(['subscription', 'api', 'unknown'])
+      && Object.isFrozen(delegationProviders.AGENT_BILLING_KINDS),
+    'billing kinds are the exact frozen three-value provider-neutral vocabulary');
+
+  const publicMetadataBefore = JSON.stringify([
+    { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
+    { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+  ]);
+  check(JSON.stringify(delegationProviders.list()) === publicMetadataBefore
+      && JSON.stringify(delegationProviders.get('claude-code'))
+        === JSON.stringify({ id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' })
+      && JSON.stringify(delegationProviders.get('opencode'))
+        === JSON.stringify({ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' }),
+    'Claude Code and OpenCode public metadata remain byte-for-byte equivalent');
+  check(delegationProviders.resolveAgentBillingKind('claude-code', 'unknown') === 'subscription'
+      && delegationProviders.resolveAgentBillingKind('opencode', 'unknown') === 'unknown',
+    'existing providers retain their runnable unknown-auth billing behavior');
+  for (const [providerId, authState] of [
+    ['claude-code', 'chatgpt'],
+    ['claude-code', 'api_key'],
+    ['opencode', 'unauthenticated'],
+    ['opencode', '__proto__'],
+    ['codex', 'unknown'],
+    ['constructor', 'unknown'],
+  ]) {
+    check(delegationProviders.resolveAgentBillingKind(providerId, authState) === null,
+      `${providerId}/${authState}: invalid or unshipped auth-to-billing pair fails closed`);
+  }
+
+  const acceptedIdentity = {
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown',
+  };
+  const validatedIdentity = delegationProviders.validateAcceptedAgentIdentity(acceptedIdentity);
+  acceptedIdentity.providerId = 'claude-code';
+  acceptedIdentity.label = 'Claude Code';
+  acceptedIdentity.profileVersion = 'mutated-after-validation';
+  check(validatedIdentity
+      && JSON.stringify(validatedIdentity) === JSON.stringify({
+        providerId: 'opencode',
+        label: 'OpenCode',
+        profileVersion: '1.14.25',
+        authState: 'unknown',
+        billingKind: 'unknown',
+      })
+      && Object.isFrozen(validatedIdentity),
+    'validator returns one immutable canonical copy unaffected by caller mutation');
+
+  const nullPrototypeIdentity = Object.assign(Object.create(null), {
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription',
+  });
+  check(JSON.stringify(delegationProviders.validateAcceptedAgentIdentity(nullPrototypeIdentity))
+      === JSON.stringify({
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion: '2.1.177',
+        authState: 'unknown',
+        billingKind: 'subscription',
+      }),
+    'validator accepts an exact null-prototype own-data record');
+
+  let accessorReads = 0;
+  const accessorIdentity = {
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+  };
+  Object.defineProperty(accessorIdentity, 'billingKind', {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return 'unknown';
+    },
+  });
+  const symbolIdentity = { ...nullPrototypeIdentity };
+  symbolIdentity[Symbol('extra')] = true;
+  const inheritedIdentity = Object.assign(Object.create({ inherited: true }), nullPrototypeIdentity);
+  const hostileIdentities = [
+    null,
+    [],
+    { ...nullPrototypeIdentity, extra: true },
+    Object.fromEntries(Object.entries(nullPrototypeIdentity).filter(([key]) => key !== 'authState')),
+    { ...nullPrototypeIdentity, providerId: 'codex', label: 'Codex' },
+    { ...nullPrototypeIdentity, label: 'Open Code' },
+    { ...nullPrototypeIdentity, profileVersion: null },
+    { ...nullPrototypeIdentity, profileVersion: '' },
+    { ...nullPrototypeIdentity, authState: 'chatgpt' },
+    { ...nullPrototypeIdentity, billingKind: 'api' },
+    accessorIdentity,
+    symbolIdentity,
+    inheritedIdentity,
+  ];
+  hostileIdentities.forEach((identity, index) => {
+    check(delegationProviders.validateAcceptedAgentIdentity(identity) === null,
+      `hostile accepted-identity shape ${index + 1} fails closed`);
+  });
+  check(accessorReads === 0, 'accepted-identity validation never invokes caller accessors');
+  check(!delegationProviders.ids().includes('codex')
+      && !JSON.stringify(delegationProviders.list()).includes('codex'),
+    'the production roster remains exactly Claude Code and OpenCode');
+
+  if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed > 0 ? 1 : 0);
+  }
+  if (SELECTED_SECTION !== null) {
+    throw new Error('unknown section: ' + SELECTED_SECTION);
+  }
+
   // -------------------------------------------------------------------------
   // (0) Phase 61 provider namespace parity. The seven BYOK ids remain the only
   // API surface, while each shipped agent provider requires its exact

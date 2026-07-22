@@ -2,6 +2,16 @@
   'use strict';
 
   var METADATA_KEYS = ['id', 'label', 'billingKind'];
+  var ACCEPTED_IDENTITY_KEYS = [
+    'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+  ];
+  var AGENT_AUTH_STATES = Object.freeze([
+    'chatgpt', 'api_key', 'unauthenticated', 'unknown'
+  ]);
+  var AGENT_BILLING_KINDS = Object.freeze([
+    'subscription', 'api', 'unknown'
+  ]);
+  var MAX_PROFILE_VERSION_CHARS = 128;
 
   function deepFreeze(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -11,8 +21,18 @@
   }
 
   var definitions = deepFreeze([
-    { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
-    { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' }
+    {
+      id: 'claude-code',
+      label: 'Claude Code',
+      billingKind: 'subscription',
+      authToBilling: { unknown: 'subscription' }
+    },
+    {
+      id: 'opencode',
+      label: 'OpenCode',
+      billingKind: 'unknown',
+      authToBilling: { unknown: 'unknown' }
+    }
   ]);
   var byId = Object.create(null);
   definitions.forEach(function(metadata) { byId[metadata.id] = metadata; });
@@ -27,15 +47,16 @@
     });
   }
 
-  function exactOwnDataRecord(value) {
+  function exactOwnDataRecord(value, expectedKeys, allowNullPrototype) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     try {
-      if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+      var prototype = Object.getPrototypeOf(value);
+      if (prototype !== Object.prototype && !(allowNullPrototype && prototype === null)) return null;
       var ownKeys = Reflect.ownKeys(value);
-      if (ownKeys.length !== METADATA_KEYS.length) return null;
+      if (ownKeys.length !== expectedKeys.length) return null;
       var record = {};
-      for (var index = 0; index < METADATA_KEYS.length; index += 1) {
-        var key = METADATA_KEYS[index];
+      for (var index = 0; index < expectedKeys.length; index += 1) {
+        var key = expectedKeys[index];
         var descriptor = Object.getOwnPropertyDescriptor(value, key);
         if (!descriptor
             || !descriptor.enumerable
@@ -44,7 +65,7 @@
       }
       for (var keyIndex = 0; keyIndex < ownKeys.length; keyIndex += 1) {
         if (typeof ownKeys[keyIndex] !== 'string'
-            || METADATA_KEYS.indexOf(ownKeys[keyIndex]) === -1) return null;
+            || expectedKeys.indexOf(ownKeys[keyIndex]) === -1) return null;
       }
       return record;
     } catch (_error) {
@@ -59,13 +80,47 @@
   }
 
   function validate(value) {
-    var record = exactOwnDataRecord(value);
+    var record = exactOwnDataRecord(value, METADATA_KEYS, false);
     if (!record) return null;
     var canonical = get(record.id);
     if (!canonical
         || record.label !== canonical.label
         || record.billingKind !== canonical.billingKind) return null;
     return canonical;
+  }
+
+  function resolveAgentBillingKind(providerId, authState) {
+    if (typeof providerId !== 'string'
+        || typeof authState !== 'string'
+        || !Object.prototype.hasOwnProperty.call(byId, providerId)) return null;
+    var mapping = byId[providerId].authToBilling;
+    if (!mapping || !Object.prototype.hasOwnProperty.call(mapping, authState)) return null;
+    var billingKind = mapping[authState];
+    return AGENT_BILLING_KINDS.indexOf(billingKind) === -1 ? null : billingKind;
+  }
+
+  function validateAcceptedAgentIdentity(value) {
+    var record = exactOwnDataRecord(value, ACCEPTED_IDENTITY_KEYS, true);
+    if (!record
+        || typeof record.profileVersion !== 'string'
+        || record.profileVersion.length === 0
+        || Array.from(record.profileVersion).length > MAX_PROFILE_VERSION_CHARS
+        || AGENT_AUTH_STATES.indexOf(record.authState) === -1
+        || AGENT_BILLING_KINDS.indexOf(record.billingKind) === -1) return null;
+    var metadata = Object.prototype.hasOwnProperty.call(byId, record.providerId)
+      ? byId[record.providerId]
+      : null;
+    var billingKind = resolveAgentBillingKind(record.providerId, record.authState);
+    if (!metadata
+        || record.label !== metadata.label
+        || record.billingKind !== billingKind) return null;
+    return deepFreeze({
+      providerId: metadata.id,
+      label: metadata.label,
+      profileVersion: record.profileVersion,
+      authState: record.authState,
+      billingKind: billingKind
+    });
   }
 
   function ids() {
@@ -81,11 +136,15 @@
   }
 
   var api = Object.freeze({
+    AGENT_AUTH_STATES: AGENT_AUTH_STATES,
+    AGENT_BILLING_KINDS: AGENT_BILLING_KINDS,
     get: get,
     validate: validate,
     ids: ids,
     list: list,
-    isShippedId: isShippedId
+    isShippedId: isShippedId,
+    resolveAgentBillingKind: resolveAgentBillingKind,
+    validateAcceptedAgentIdentity: validateAcceptedAgentIdentity
   });
 
   global.FsbDelegationProviders = api;
