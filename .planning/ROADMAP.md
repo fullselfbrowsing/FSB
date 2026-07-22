@@ -256,7 +256,7 @@ Security-first hard rule: Phase 59 is code-green before Phase 60 spawn code land
 | 62. CI Drift-Smoke Gate & Doctor Extensions | 6/6 | Complete (UAT deferred) | 2026-07-16 |
 | 63. Native-Messaging Host | 12/12 | Complete    | 2026-07-20 |
 | 64. OpenCode Adapter | 13/13 | Complete   | 2026-07-21 |
-| 65. Codex Adapter | 1/8 | In Progress|  |
+| 65. Codex Adapter | 2/8 | In Progress|  |
 
 ## Completed Milestones
 
