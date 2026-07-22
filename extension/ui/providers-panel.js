@@ -65,6 +65,30 @@
   var AGENT_AUTH_NOT_REPORTED = 'Not reported';
   var CLAUDE_AUTH_HELP = 'Claude Code does not report an auth state that FSB can safely read.';
   var GENERIC_AGENT_AUTH_HELP = 'The CLI has not reported its account type.';
+  var CODEX_AUTH_DISPLAY_MODELS = Object.freeze({
+    chatgpt: Object.freeze({
+      label: 'ChatGPT',
+      help: 'Codex is signed in with ChatGPT.'
+    }),
+    api_key: Object.freeze({
+      label: 'API key',
+      help: 'Codex is signed in with an API key stored by Codex.'
+    }),
+    unauthenticated: Object.freeze({
+      label: 'Not signed in',
+      help: 'Sign in to Codex first.'
+    }),
+    unknown: Object.freeze({
+      label: 'Status unavailable',
+      help: 'Codex sign-in status is unavailable. Refresh status before starting a task.'
+    })
+  });
+  var CODEX_BILLING_LABELS = Object.freeze({
+    chatgpt: 'Included with your ChatGPT plan',
+    api_key: 'Billed to the API key stored by Codex; dollar amount not reported.',
+    unauthenticated: 'Sign in to Codex first.',
+    unknown: 'Billing not reported'
+  });
 
   var API_PROVIDER_SET = createProviderSet(API_PROVIDER_IDS);
   var AGENT_PROVIDER_SET = createProviderSet(AGENT_PROVIDER_IDS);
@@ -340,18 +364,46 @@
     return fallback;
   }
 
-  function getAgentAuthDisplay(providerId) {
+  function getSafeAgentAuthState(providerId, row) {
+    if (providerId !== 'codex'
+        || !isPlainDataRecord(row)
+        || getOwnValue(row, 'raw') === true) return 'unknown';
+    var authState = getOwnValue(row, 'authState');
+    return typeof authState === 'string'
+        && hasOwn(CODEX_AUTH_DISPLAY_MODELS, authState)
+      ? authState
+      : 'unknown';
+  }
+
+  function copyDisplayModel(model) {
+    return { label: model.label, help: model.help };
+  }
+
+  function getAgentAuthDisplay(providerId, row) {
     if (!isAgentProvider(providerId)) return null;
+    if (providerId === 'codex') {
+      return copyDisplayModel(CODEX_AUTH_DISPLAY_MODELS[getSafeAgentAuthState(providerId, row)]);
+    }
     return {
       label: AGENT_AUTH_NOT_REPORTED,
       help: providerId === 'claude-code' ? CLAUDE_AUTH_HELP : GENERIC_AGENT_AUTH_HELP
     };
   }
 
-  function getBillingLabel(authState) {
-    var mode = typeof authState === 'string'
-      ? authState
-      : getOwnValue(authState, 'mode');
+  function getBillingLabel(providerId, row) {
+    if (isAgentProvider(providerId)) {
+      if (providerId === 'codex') {
+        var authState = getSafeAgentAuthState(providerId, row);
+        return {
+          label: CODEX_BILLING_LABELS[authState],
+          confirmed: authState === 'chatgpt' || authState === 'api_key'
+        };
+      }
+      return { label: 'Billing not reported', confirmed: false };
+    }
+    var mode = typeof providerId === 'string'
+      ? providerId
+      : getOwnValue(providerId, 'mode');
     mode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
 
     if (mode === 'subscription') {

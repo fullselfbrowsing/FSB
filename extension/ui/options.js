@@ -608,15 +608,20 @@ function projectStaleProviderCompatibility(clients) {
   const projected = copyProviderClientMap(clients) || Object.create(null);
   getShippedDelegationProviderIds().forEach((providerId) => {
     const row = getOwnDataValue(projected, providerId);
+    if (!isProviderDataRecord(row)) return;
+    const nextRow = copyProviderDataRecord(row);
+    nextRow.authState = 'unknown';
+    delete nextRow.acceptedIdentity;
     const compatibility = getOwnDataValue(row, 'compatibility');
     const status = getOwnDataValue(compatibility, 'status');
     const reason = getOwnDataValue(compatibility, 'reason');
     const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
-    if (status !== 'supported'
-        || reason !== 'within_tested_range'
-        || !Number.isSafeInteger(checkedAt)
-        || checkedAt < 0) return;
-    const nextRow = copyProviderDataRecord(row);
+    const runnable = (status === 'supported' && reason === 'within_tested_range')
+      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    if (!runnable || !Number.isSafeInteger(checkedAt) || checkedAt < 0) {
+      projected[providerId] = nextRow;
+      return;
+    }
     const nextCompatibility = copyProviderDataRecord(compatibility);
     nextCompatibility.status = 'degraded';
     nextCompatibility.reason = 'evidence_stale';
@@ -646,7 +651,7 @@ function getProviderStorageCompatibilityCheckedAt(change) {
   const compatibility = getOwnDataValue(nextEnvelope, 'compatibility');
   const schemaVersion = getOwnDataValue(compatibility, 'schemaVersion');
   const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
-  return schemaVersion === 1 && Number.isSafeInteger(checkedAt) && checkedAt >= 0
+  return schemaVersion === 2 && Number.isSafeInteger(checkedAt) && checkedAt >= 0
     ? checkedAt
     : null;
 }
@@ -709,6 +714,11 @@ function mergeProviderCompatibilityProjection(currentClients, projectedClients) 
         || !isValidProviderCompatibilityProjection(compatibility)) return;
     const nextRow = copyProviderDataRecord(currentRow);
     nextRow.compatibility = copyProviderDataRecord(compatibility);
+    const authState = getOwnDataValue(projectedRow, 'authState');
+    nextRow.authState = ['chatgpt', 'api_key', 'unauthenticated', 'unknown'].includes(authState)
+      ? authState
+      : 'unknown';
+    delete nextRow.acceptedIdentity;
     merged[providerId] = nextRow;
     mergedAny = true;
   });
@@ -1054,11 +1064,11 @@ function renderSelectedAgentDetails() {
   if (!definition) return;
   const row = getOwnDataValue(providerPanelState.clients, providerId);
   const status = helper.getAgentStatus(row);
-  const auth = helper.getAgentAuthDisplay(providerId);
+  const auth = helper.getAgentAuthDisplay(providerId, row);
   const unavailable = providerPanelState.evidenceStatus === 'unavailable';
   const initialLoading = providerPanelState.evidenceStatus === 'loading'
     && !providerPanelState.hasSuccessfulEvidence;
-  const billing = helper.getBillingLabel(undefined);
+  const billing = helper.getBillingLabel(providerId, row);
 
   if (elements.agentProviderDetailsHeading) {
     elements.agentProviderDetailsHeading.textContent = `${definition.displayName} details`;
@@ -1340,7 +1350,7 @@ function refreshProviderCompatibilityProjection() {
       renderProviderCompatibility();
       if (helper && providerPanelState.providerKind === 'agent'
           && helper.isAgentProvider(providerPanelState.agentProviderId)) {
-        renderSelectedAgentCompatibility(helper, providerPanelState.agentProviderId);
+        renderSelectedAgentDetails();
       }
       return providerPanelState.clients;
     })
@@ -1353,7 +1363,7 @@ function refreshProviderCompatibilityProjection() {
       renderProviderCompatibility();
       if (helper && providerPanelState.providerKind === 'agent'
           && helper.isAgentProvider(providerPanelState.agentProviderId)) {
-        renderSelectedAgentCompatibility(helper, providerPanelState.agentProviderId);
+        renderSelectedAgentDetails();
       }
       return providerPanelState.clients;
     })

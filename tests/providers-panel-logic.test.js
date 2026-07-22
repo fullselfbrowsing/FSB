@@ -517,14 +517,6 @@ async function main() {
       ), unsupportedCompatibility, `${providerId}/${reason} maps to Unsupported`);
     }
   }
-  for (const providerId of ['codex']) {
-    assert.deepEqual(providers.getCompatibilityDisplayModel(
-      providerId,
-      compatibilityRow('supported', 'within_tested_range'),
-      formatAbsolute
-    ), unsupportedCompatibility, `${providerId} remains Unsupported while its adapter is unshipped`);
-  }
-
   let rowAccessorCalls = 0;
   const accessorRow = {};
   Object.defineProperty(accessorRow, 'compatibility', {
@@ -626,6 +618,96 @@ async function main() {
     providers.getAgentAuthDisplay('claude-code'),
     'agent auth display mapping returns a fresh object');
 
+  const safeCodexRow = (authState, compatibility = {
+    status: 'supported', reason: 'within_tested_range', checkedAt: 1000
+  }) => ({ authState, compatibility });
+  const codexAuthModels = {
+    chatgpt: {
+      label: 'ChatGPT',
+      help: 'Codex is signed in with ChatGPT.',
+      billing: 'Included with your ChatGPT plan',
+      confirmed: true
+    },
+    api_key: {
+      label: 'API key',
+      help: 'Codex is signed in with an API key stored by Codex.',
+      billing: 'Billed to the API key stored by Codex; dollar amount not reported.',
+      confirmed: true
+    },
+    unauthenticated: {
+      label: 'Not signed in',
+      help: 'Sign in to Codex first.',
+      billing: 'Sign in to Codex first.',
+      confirmed: false
+    },
+    unknown: {
+      label: 'Status unavailable',
+      help: 'Codex sign-in status is unavailable. Refresh status before starting a task.',
+      billing: 'Billing not reported',
+      confirmed: false
+    }
+  };
+  for (const [authState, expected] of Object.entries(codexAuthModels)) {
+    const row = safeCodexRow(authState);
+    assert.deepEqual(providers.getAgentAuthDisplay('codex', row), {
+      label: expected.label,
+      help: expected.help
+    }, `${authState} maps to the exact Codex account copy`);
+    assert.deepEqual(providers.getBillingLabel('codex', row), {
+      label: expected.billing,
+      confirmed: expected.confirmed
+    }, `${authState} maps to the exact Codex billing copy`);
+  }
+  for (const compatibility of [
+    { status: 'supported', reason: 'within_tested_range', checkedAt: 1000 },
+    { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 1000 },
+    { status: 'degraded', reason: 'evidence_stale', checkedAt: 1000 },
+    { status: 'unsupported', reason: 'binary_not_found', checkedAt: 1000 },
+    { status: 'supported', reason: 'within_tested_range', checkedAt: -1 },
+    undefined
+  ]) {
+    const row = compatibility === undefined
+      ? { authState: 'chatgpt' }
+      : safeCodexRow('chatgpt', compatibility);
+    assert.deepEqual(providers.getAgentAuthDisplay('codex', row), {
+      label: 'ChatGPT', help: 'Codex is signed in with ChatGPT.'
+    }, 'compatibility cannot alter the safe Codex auth presentation');
+    assert.deepEqual(providers.getBillingLabel('codex', row), {
+      label: 'Included with your ChatGPT plan', confirmed: true
+    }, 'compatibility cannot alter the safe Codex billing presentation');
+  }
+  const unknownCodexAuth = codexAuthModels.unknown;
+  const unsafeCodexRows = [
+    safeCodexRow('unexpected'),
+    { raw: true, authState: 'chatgpt' },
+    Object.assign(Object.create({ authState: 'chatgpt' }), {
+      compatibility: {
+        status: 'supported', reason: 'within_tested_range', checkedAt: 1000
+      }
+    })
+  ];
+  let authGetterCalls = 0;
+  const codexAccessorRow = safeCodexRow('unknown');
+  Object.defineProperty(codexAccessorRow, 'authState', {
+    enumerable: true,
+    get() {
+      authGetterCalls += 1;
+      return 'chatgpt';
+    }
+  });
+  unsafeCodexRows.push(codexAccessorRow);
+  for (const row of unsafeCodexRows) {
+    assert.deepEqual(providers.getAgentAuthDisplay('codex', row), {
+      label: unknownCodexAuth.label,
+      help: unknownCodexAuth.help
+    }, 'malformed or non-canonical Codex auth evidence fails to Status unavailable');
+    assert.deepEqual(providers.getBillingLabel('codex', row), {
+      label: unknownCodexAuth.billing,
+      confirmed: false
+    }, 'malformed or non-canonical Codex auth evidence cannot assert billing');
+  }
+  assert.equal(authGetterCalls, 0, 'Codex auth mapping never invokes an accessor');
+
   const compatibilityMapperSource = extractFunction(
     helperSource,
     'function getCompatibilityDisplayModel('
@@ -678,6 +760,9 @@ async function main() {
     },
     opencode: {
       compatibility: { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 1000 }
+    },
+    codex: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1500 }
     }
   };
   assert.equal(projectionContext.getCheckedAt(dualCompatibility), 1000,
@@ -697,6 +782,8 @@ async function main() {
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
     },
     codex: {
+      authState: 'chatgpt',
+      acceptedIdentity: { authState: 'chatgpt', authCheckedAt: 3000 },
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 3000 }
     },
     xai: {
@@ -708,9 +795,14 @@ async function main() {
       status: 'degraded', reason: 'evidence_stale', checkedAt: 3000
     }, `${providerId} support downgrades through the shared shipped roster`);
   }
-  assert.deepEqual(clone(staleProjection.codex.compatibility), {
-    status: 'supported', reason: 'within_tested_range', checkedAt: 3000
-  }, 'the unshipped Codex row is not granted a compatibility transition');
+  assert.deepEqual(providers.getAgentAuthDisplay('codex', staleProjection.codex), {
+    label: 'Status unavailable',
+    help: 'Codex sign-in status is unavailable. Refresh status before starting a task.'
+  }, 'the stale projection forces Codex auth to the unknown UI state');
+  assert.equal(staleProjection.codex.authState, 'unknown',
+    'the stale projection removes the prior Codex auth assertion');
+  assert.equal(Object.hasOwn(staleProjection.codex, 'acceptedIdentity'), false,
+    'the stale projection removes accepted start identity authority');
   assert.deepEqual(clone(staleProjection.xai.compatibility), {
     status: 'supported', reason: 'within_tested_range', checkedAt: 3000
   }, 'API rows are outside shipped-agent compatibility transitions');
@@ -879,8 +971,12 @@ async function main() {
     harness.state.providerKind = 'agent';
     harness.state.agentProviderId = 'codex';
     harness.render();
-    assert.equal(harness.elements.delegationTrustSection.hidden, true,
-      'future unsupported agent details do not render the Claude trust control');
+    assert.equal(harness.elements.delegationTrustSection.hidden, false,
+      'canonical Codex details expose the same restore-confirmation control');
+    assert.equal(harness.elements.delegationTrustCopy.textContent,
+      'Require confirmation before Codex starts another delegated browser task.');
+    assert.equal(harness.elements.delegationTrustClearBtn.textContent,
+      'Restore confirmation for Codex');
   }
 
   {

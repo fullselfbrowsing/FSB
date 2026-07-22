@@ -730,8 +730,12 @@ assert.doesNotMatch(otherClientsRenderSource, /innerHTML|insertAdjacentHTML/,
   'raw client names use text-only DOM population');
 assert.match(eventSetupSource, /area === 'local' && changes && changes\.fsbAgentProviders/);
 assert.match(eventSetupSource, /area === 'session' && changes && changes\.fsbAgentRegistry/);
-assert.match(agentDetailsRenderSource, /getBillingLabel\(undefined\)/,
-  'Phase 57 evidence is not treated as auth state');
+assert.match(agentDetailsRenderSource, /getAgentAuthDisplay\(providerId, row\)/,
+  'the selected account helper receives the current safe provider row');
+assert.match(agentDetailsRenderSource, /getBillingLabel\(providerId, row\)/,
+  'the selected billing helper receives the same current safe provider row');
+assert.doesNotMatch(agentDetailsRenderSource, /['"]codex['"]/,
+  'the shared selected-agent renderer has no Codex-specific branch');
 assert.match(agentDetailsRenderSource, /billing\.label/);
 assert.match(agentDetailsRenderSource, /definition\.billingCopy/);
 assert.match(agentDetailsRenderSource, /definition\.billingUrl/);
@@ -1751,7 +1755,10 @@ async function runAgentDetailsTests() {
     },
     codex: {
       installed: { detected: true, checkedAt: 30 },
-      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 1_000 }
+      authState: 'chatgpt',
+      compatibility: {
+        status: 'supported', reason: 'within_tested_range', checkedAt: 1_000
+      }
     }
   };
 
@@ -1762,7 +1769,9 @@ async function runAgentDetailsTests() {
       connection: 'Connected now',
       compatibility: 'Supported',
       compatibilityHelp: "This CLI is within FSB's fixture-tested compatibility range.",
+      account: 'Not reported',
       authHelp: 'Claude Code does not report an auth state that FSB can safely read.',
+      billing: 'Billing not reported',
       copy: "Uses the account signed into Claude Code. FSB does not need your Anthropic credential. Usage and charges follow that account's Claude plan or API configuration.",
       label: 'Review Claude plans and billing',
       url: 'https://claude.com/pricing'
@@ -1773,7 +1782,9 @@ async function runAgentDetailsTests() {
       connection: 'Seen before',
       compatibility: 'Supported',
       compatibilityHelp: "This CLI is within FSB's fixture-tested compatibility range.",
+      account: 'Not reported',
       authHelp: 'The CLI has not reported its account type.',
+      billing: 'Billing not reported',
       copy: 'Uses the provider configured in OpenCode. FSB does not need that provider credential. Charges may come from OpenCode Zen or the configured provider.',
       label: 'Review OpenCode providers and billing',
       url: 'https://opencode.ai/docs/providers/'
@@ -1782,9 +1793,11 @@ async function runAgentDetailsTests() {
       heading: 'Codex details',
       installation: 'Installed',
       connection: 'Not connected',
-      compatibility: 'Unsupported',
-      compatibilityHelp: 'FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.',
-      authHelp: 'The CLI has not reported its account type.',
+      compatibility: 'Supported',
+      compatibilityHelp: "This CLI is within FSB's fixture-tested compatibility range.",
+      account: 'ChatGPT',
+      authHelp: 'Codex is signed in with ChatGPT.',
+      billing: 'Included with your ChatGPT plan',
       copy: "Uses the account signed into Codex. FSB does not need your OpenAI credential. Usage, credits, and charges follow that account's current OpenAI plan or API configuration.",
       label: 'Review current Codex billing',
       url: 'https://help.openai.com/en/articles/20001106-codex-rate-card-2'
@@ -1802,7 +1815,7 @@ async function runAgentDetailsTests() {
     assert.match(harness.agentCompatibilityChecked.textContent, /^Checked /,
       'validated compatibility timestamps render as localized absolute checked text');
     assert.strictEqual(harness.agentCompatibilityChecked.hidden, false);
-    assert.strictEqual(harness.agentAccountStatus.textContent, 'Not reported');
+    assert.strictEqual(harness.agentAccountStatus.textContent, contract.account);
     assert.strictEqual(harness.agentAccountHelp.textContent, contract.authHelp);
     assert.strictEqual(harness.agentNoCredentialCaption.textContent,
       "FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.");
@@ -1810,13 +1823,54 @@ async function runAgentDetailsTests() {
     assert.strictEqual(harness.agentUsageTurns.textContent, '—');
     assert.strictEqual(harness.agentUsageDuration.textContent, '—');
     assert.strictEqual(harness.agentUsageEmptyState.textContent, 'No delegated runs yet');
-    assert.strictEqual(harness.agentBillingStatus.textContent, 'Billing not reported');
+    assert.strictEqual(harness.agentBillingStatus.textContent, contract.billing);
     assert.strictEqual(harness.agentBillingCopy.textContent, contract.copy);
     assert.strictEqual(harness.agentBillingLinkLabel.textContent, contract.label);
     assert.strictEqual(harness.agentBillingLink.getAttribute('href'), contract.url);
     assert.strictEqual(harness.agentBillingLink.getAttribute('target'), '_blank');
     assert.strictEqual(harness.agentBillingLink.getAttribute('rel'), 'noopener noreferrer');
     assert.strictEqual(harness.agentBillingLink.hidden, false);
+  }
+
+  const codexPresentationStates = {
+    chatgpt: {
+      account: 'ChatGPT',
+      help: 'Codex is signed in with ChatGPT.',
+      billing: 'Included with your ChatGPT plan'
+    },
+    api_key: {
+      account: 'API key',
+      help: 'Codex is signed in with an API key stored by Codex.',
+      billing: 'Billed to the API key stored by Codex; dollar amount not reported.'
+    },
+    unauthenticated: {
+      account: 'Not signed in',
+      help: 'Sign in to Codex first.',
+      billing: 'Sign in to Codex first.'
+    },
+    unknown: {
+      account: 'Status unavailable',
+      help: 'Codex sign-in status is unavailable. Refresh status before starting a task.',
+      billing: 'Billing not reported'
+    }
+  };
+  const beforeCodexStates = compatibilityIdentitySnapshot(harness);
+  for (const [authState, presentation] of Object.entries(codexPresentationStates)) {
+    harness.state().clients.codex.authState = authState;
+    harness.context.setProviderSelection('agent', 'codex', { markDirty: false });
+    assert.strictEqual(harness.agentAccountStatus.textContent, presentation.account);
+    assert.strictEqual(harness.agentAccountHelp.textContent, presentation.help);
+    assert.strictEqual(harness.agentBillingStatus.textContent, presentation.billing);
+  }
+  const afterCodexStates = compatibilityIdentitySnapshot(harness);
+  for (const field of [
+    'selected', 'focused', 'rowOrder', 'recommendation', 'providerKind', 'agentProviderId',
+    'modelProvider', 'modelName', 'apiKey', 'geminiApiKey', 'openaiApiKey',
+    'anthropicApiKey', 'customApiKey', 'customEndpoint', 'openrouterApiKey',
+    'lmstudioBaseUrl', 'dirty', 'billingCopy', 'writes'
+  ]) {
+    assert.deepStrictEqual(afterCodexStates[field], beforeCodexStates[field],
+      `Codex auth presentation preserves ${field}`);
   }
 
   const openCodeDefinition = PROVIDERS.getProviderDefinition('agent', 'opencode');
@@ -2237,8 +2291,11 @@ async function runProviderEvidenceTests() {
   harness.setRuntimeError('private transport detail must not surface');
   await harness.context.refreshProviderEvidence({ announce: true });
   assert.strictEqual(harness.state().evidenceStatus, 'stale');
-  assert.strictEqual(JSON.stringify(harness.state().clients), priorClients,
-    'runtime failure retains the previous successful evidence snapshot');
+  const expectedStaleClients = JSON.parse(priorClients);
+  expectedStaleClients.codex.authState = 'unknown';
+  delete expectedStaleClients.codex.acceptedIdentity;
+  assert.strictEqual(JSON.stringify(harness.state().clients), JSON.stringify(expectedStaleClients),
+    'runtime failure retains prior evidence while invalidating stale Codex auth');
   assert.strictEqual(JSON.stringify(harness.state().recommendation), priorRecommendation,
     'runtime failure retains the previous recommendation');
   assert.strictEqual(harness.agentDetails.getAttribute('role'), null,
@@ -2293,17 +2350,20 @@ async function runProviderEvidenceTests() {
       installed: { detected: true, configPath: null, checkedAt: 600 },
       connected: null,
       live: null,
+      authState: 'unknown',
       compatibility
     },
     opencode: {
       id: 'opencode', raw: false, displayName: 'OpenCode', clicked: null,
       installed: null, connected: null, live: null,
+      authState: 'unknown',
       compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
     },
     codex: {
       id: 'codex', raw: false, displayName: 'Codex', clicked: null,
       installed: null, connected: null, live: null,
-      compatibility: { status: 'unsupported', reason: 'adapter_unshipped', checkedAt: 700 }
+      authState: 'unknown',
+      compatibility: { status: 'unsupported', reason: 'binary_not_found', checkedAt: 700 }
     }
   });
   const supportedClients = compatibilityClients({
@@ -2451,12 +2511,14 @@ async function runProviderEvidenceTests() {
     {
       label: 'degraded',
       compatibility: { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 700 },
+      retainedCompatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 700 },
       visible: 'Degraded',
       announcement: 'Compatibility data could not be refreshed. Cached support is now Degraded.'
     },
     {
       label: 'unsupported',
       compatibility: { status: 'unsupported', reason: 'wrong_major', checkedAt: 700 },
+      retainedCompatibility: { status: 'unsupported', reason: 'wrong_major', checkedAt: 700 },
       visible: 'Unsupported',
       announcement: 'Compatibility data is unavailable. Showing Unsupported.'
     }
@@ -2474,8 +2536,8 @@ async function runProviderEvidenceTests() {
     await retained.context.refreshProviderEvidence({ announce: true });
     assert.deepStrictEqual(
       JSON.parse(JSON.stringify(retained.state().clients['claude-code'].compatibility)),
-      contract.compatibility,
-      `runtime failure preserves retained ${contract.label} compatibility truth`
+      contract.retainedCompatibility,
+      `runtime failure safely projects retained ${contract.label} compatibility truth`
     );
     assert.strictEqual(compatibilityStatus(retained, 'claude-code').textContent, contract.visible);
     assert.strictEqual(retained.agentCompatibilityStatus.textContent, contract.visible);
@@ -2841,7 +2903,7 @@ async function runProviderEvidenceTests() {
   const compatibilityStorageChange = (checkedAt) => ({
     fsbAgentProviders: {
       newValue: {
-        compatibility: { schemaVersion: 1, checkedAt, adapters: [] }
+        compatibility: { schemaVersion: 2, checkedAt, adapters: [] }
       }
     }
   });
