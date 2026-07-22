@@ -645,25 +645,26 @@ async function runCodexAcceptedIdentity() {
       detail: 'A bounded presentation detail',
     });
     assert.strictEqual(running.kind, 'tool-call');
-    exactKeys(running.tool, ['callId', 'name', 'tabId', 'argsSummary', 'status', 'durationMs']);
+    exactKeys(running.tool, ['callId', 'name', 'tabId', 'status', 'durationMs']);
     assert.deepStrictEqual(running.tool, {
       callId: 'synthetic-tool-01',
       name: 'mcp__fsb__search_capabilities',
       tabId: 42,
-      argsSummary: 'Search capabilities',
       status: 'running',
       durationMs: null,
     });
     assert.strictEqual(running.init, null);
     assert.strictEqual(running.retry, null);
     assert.strictEqual(running.metrics, null);
+    assert(!Object.hasOwn(running.tool, 'argsSummary'));
+    assert(!JSON.stringify(running).includes('Search capabilities'),
+      'tool argument summaries never enter a persisted presentation entry');
 
     const succeeded = project(store, fixtures.toolResultEvent, { sequence: 3, tabId: 42 });
     assert.deepStrictEqual(succeeded.tool, {
       callId: 'synthetic-tool-01',
       name: 'mcp__fsb__search_capabilities',
       tabId: 42,
-      argsSummary: null,
       status: 'succeeded',
       durationMs: 125,
     });
@@ -671,6 +672,31 @@ async function runCodexAcceptedIdentity() {
     assert.strictEqual(failed.tool.status, 'failed');
     assert(!JSON.stringify([running, succeeded, failed]).includes(fixtures.secretCanary));
     assert(!JSON.stringify([running, succeeded, failed]).includes(fixtures.taskCanary));
+  });
+
+  await test('hydrates and rewrites legacy tool arguments without exposing their value', async () => {
+    const bootstrap = freshStore();
+    const tool = project(bootstrap, fixtures.toolUseEvent, { sequence: 1 });
+    const argumentCanary = '<legacy-args>secret://presentation-canary</legacy-args>';
+    const legacyTool = {
+      ...tool,
+      tool: { ...tool.tool, argsSummary: argumentCanary },
+    };
+    const key = storageKey(bootstrap);
+    const mock = installSessionStorage({ [key]: persistedEnvelope([legacyTool]) });
+    try {
+      const store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated.length, 1);
+      assert(!Object.hasOwn(hydrated[0].entries[0].tool, 'argsSummary'));
+      assert(!JSON.stringify(hydrated).includes(argumentCanary));
+      assert(!Object.hasOwn(mock.data[key].entries[0].tool, 'argsSummary'),
+        'legacy storage is rewritten to the canonical no-arguments shape');
+      assert(!JSON.stringify(mock.data[key]).includes(argumentCanary));
+      assert.strictEqual(mock.setCalls, 1);
+    } finally {
+      mock.restore();
+    }
   });
 
   await test('projects typed retry fields and closes unknown provider classes', () => {
@@ -931,15 +957,14 @@ async function runCodexAcceptedIdentity() {
 
     assert.strictEqual(project(store, fixtures.toolUseEvent, {
       toolName: boundary.id,
-      argsSummary: boundary.presentation,
     }).tool.name.length, 128);
     await expectCode(
       () => project(store, fixtures.toolUseEvent, { toolName: boundary.idPlusOne }),
       'delegation_quota_exceeded',
     );
     await expectCode(
-      () => project(store, fixtures.toolUseEvent, { argsSummary: boundary.presentationPlusOne }),
-      'delegation_quota_exceeded',
+      () => project(store, fixtures.toolUseEvent, { argsSummary: boundary.presentation }),
+      'delegation_persistence_failed',
     );
 
     const rows128 = Array.from({ length: 128 }, (_, index) => ({
@@ -1687,7 +1712,6 @@ async function runCodexAcceptedIdentity() {
         callId: null,
         name: 'unknown',
         tabId: null,
-        argsSummary: null,
         status: 'unknown',
         durationMs: null,
       } }])],

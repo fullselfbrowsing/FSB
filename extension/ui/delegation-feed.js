@@ -188,12 +188,11 @@
   }
 
   function _validTool(value) {
-    return _hasExactKeys(value, ['argsSummary', 'callId', 'durationMs', 'name', 'status', 'tabId'])
+    return _hasExactKeys(value, ['callId', 'durationMs', 'name', 'status', 'tabId'])
       && _isNullableString(value.callId, 128)
       && typeof value.name === 'string'
       && value.name.length > 0
       && Array.from(value.name).length <= 128
-      && _isNullableString(value.argsSummary, 256)
       && VALID_TOOL_STATUSES[value.status] === true
       && _isNullableInteger(value.tabId)
       && _isNullableInteger(value.durationMs);
@@ -482,7 +481,6 @@
       var toolList = _element('dl', 'delegation-definition-list');
       _definition(toolList, 'Name', entry.tool.name);
       _definition(toolList, 'Call id', entry.tool.callId, 'delegation-machine-value');
-      _definition(toolList, 'Arguments', entry.tool.argsSummary);
       _definition(toolList, 'Reported tab', entry.tool.tabId);
       _definition(toolList, 'Status', entry.tool.status);
       _definition(toolList, 'Duration', _duration(entry.tool.durationMs));

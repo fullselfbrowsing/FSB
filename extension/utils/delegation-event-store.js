@@ -48,7 +48,10 @@
   var CLEANUP_PENDING_KEYS = ['agentId', 'cancellationConfirmed', 'code'];
   var INIT_KEYS = ['allowedTools', 'client', 'model', 'profileVersion', 'sessionId'];
   var CLIENT_KEYS = ['id', 'label'];
-  var TOOL_KEYS = ['argsSummary', 'callId', 'durationMs', 'name', 'status', 'tabId'];
+  var TOOL_KEYS = ['callId', 'durationMs', 'name', 'status', 'tabId'];
+  var LEGACY_TOOL_KEYS = [
+    'argsSummary', 'callId', 'durationMs', 'name', 'status', 'tabId'
+  ];
   var RETRY_KEYS = ['attempt', 'class', 'delayMs', 'maxAttempts'];
   var METRICS_KEYS = [
     'billingKind', 'durationMs', 'inputTokens', 'outputTokens', 'toolCalls',
@@ -58,7 +61,6 @@
   var CONTEXT_KEYS = Object.freeze({
     acceptedIdentity: true,
     allowedTools: true,
-    argsSummary: true,
     attempt: true,
     callId: true,
     delayMs: true,
@@ -516,7 +518,6 @@
       callId: _boundedId(callId, 'tool.callId', true),
       name: _boundedString(typeof name === 'string' && name.length > 0 ? name : 'unknown', MAX_TOOL_NAME_CHARS, 'tool.name', false),
       tabId: _nonnegativeIntegerOrNull(_value(context, payload, 'tabId', 'tab_id')),
-      argsSummary: _boundedString(_value(context, payload, 'argsSummary', 'args_summary'), MAX_PRESENTATION_CHARS, 'tool.argsSummary', true),
       status: status,
       durationMs: _nonnegativeIntegerOrNull(_value(context, payload, 'durationMs', 'duration_ms'))
     };
@@ -662,10 +663,6 @@
     if (typeof value.name !== 'string' || !value.name || _characterLength(value.name) > MAX_TOOL_NAME_CHARS) {
       _corrupt('tool name is invalid');
     }
-    if (value.argsSummary !== null
-      && (typeof value.argsSummary !== 'string' || _characterLength(value.argsSummary) > MAX_PRESENTATION_CHARS)) {
-      _corrupt('tool argsSummary is invalid');
-    }
     if (!_hasOwn(VALID_TOOL_STATUSES, value.status)) _corrupt('tool status is invalid');
     _assertNullableBoundedInteger(value.tabId, 'tool tabId');
     _assertNullableBoundedInteger(value.durationMs, 'tool durationMs');
@@ -740,6 +737,40 @@
     }
   }
 
+  function _withoutLegacyToolPresentation(entry) {
+    if (!_hasExactKeys(entry, ENTRY_KEYS)
+      || entry.kind !== 'tool-call'
+      || !_hasExactKeys(entry.tool, LEGACY_TOOL_KEYS)) {
+      return { entry: entry, migrated: false };
+    }
+    // `argsSummary` used to be an allowed presentation field. Do not inspect,
+    // stringify, clone, or retain its value: reconstruct only the approved
+    // tool identity/status metadata before canonical validation.
+    return {
+      migrated: true,
+      entry: {
+        v: entry.v,
+        delegationId: entry.delegationId,
+        sequence: entry.sequence,
+        timestamp: entry.timestamp,
+        kind: entry.kind,
+        state: entry.state,
+        title: entry.title,
+        detail: entry.detail,
+        init: entry.init,
+        tool: {
+          callId: entry.tool.callId,
+          name: entry.tool.name,
+          tabId: entry.tool.tabId,
+          status: entry.tool.status,
+          durationMs: entry.tool.durationMs
+        },
+        retry: entry.retry,
+        metrics: entry.metrics
+      }
+    };
+  }
+
   function _assertValidEnvelope(envelope, delegationId) {
     if (!_hasExactKeys(envelope, ENVELOPE_KEYS)) {
       _corrupt('ledger envelope shape is invalid');
@@ -772,8 +803,12 @@
     if (!Array.isArray(envelope.entries) || envelope.entries.length > MAX_ENTRIES_PER_DELEGATION) {
       _corrupt('ledger entries are invalid');
     }
+    var migrated = false;
+    var normalizedEntries = [];
     for (var i = 0; i < envelope.entries.length; i++) {
-      var entry = envelope.entries[i];
+      var normalized = _withoutLegacyToolPresentation(envelope.entries[i]);
+      var entry = normalized.entry;
+      migrated = migrated || normalized.migrated;
       _assertValidEntry(entry, delegationId, i + 1, true);
       if (entry.init !== null
         && (!entry.init.client
@@ -787,8 +822,18 @@
           || entry.metrics.usd !== null)) {
         _corrupt('persisted billing identity changed');
       }
+      normalizedEntries.push(entry);
     }
-    return envelope;
+    if (!migrated) return envelope;
+    return {
+      v: envelope.v,
+      delegationId: envelope.delegationId,
+      acceptedIdentity: envelope.acceptedIdentity,
+      terminal: envelope.terminal,
+      terminalCode: envelope.terminalCode,
+      cleanupPending: envelope.cleanupPending,
+      entries: normalizedEntries
+    };
   }
 
   function _storageArea() {
@@ -846,12 +891,24 @@
       }
       var envelope = _assertValidEnvelope(all[key], delegationId);
       aggregateBytes += _serializedBytes(envelope);
-      rows.push({ delegationId: delegationId, envelope: envelope });
+      rows.push({
+        delegationId: delegationId,
+        envelope: envelope,
+        migrated: envelope !== all[key]
+      });
     });
     if (aggregateBytes > MAX_AGGREGATE_BYTES) {
       _corrupt('persisted aggregate ledger exceeds quota');
     }
     return rows;
+  }
+
+  async function _persistNormalizedRows(rows) {
+    var update = {};
+    rows.forEach(function(row) {
+      if (row.migrated) update[_key(row.delegationId)] = row.envelope;
+    });
+    if (Object.keys(update).length > 0) await _write(update);
   }
 
   var _storageTail = Promise.resolve();
@@ -887,7 +944,7 @@
       var current = stored[key] === undefined
         ? _emptyEnvelope(delegationId, acceptedIdentity)
         : stored[key];
-      _assertValidEnvelope(current, delegationId);
+      current = _assertValidEnvelope(current, delegationId);
       if (!_sameAcceptedIdentity(current.acceptedIdentity, acceptedIdentity)) {
         _persistence('accepted identity changed after delegation acceptance');
       }
@@ -929,7 +986,9 @@
     return _withStorageLock(async function() {
       var all = await _read(null);
       var ledgers = [];
-      _validatedLedgerRows(all).forEach(function(row) {
+      var rows = _validatedLedgerRows(all);
+      await _persistNormalizedRows(rows);
+      rows.forEach(function(row) {
         if (!row.envelope.terminal) ledgers.push(_clone(row.envelope));
       });
       return _deepFreeze(ledgers);
@@ -956,7 +1015,9 @@
     return _withStorageLock(async function() {
       var all = await _read(null);
       var terminal = [];
-      _validatedLedgerRows(all).forEach(function(row) {
+      var rows = _validatedLedgerRows(all);
+      await _persistNormalizedRows(rows);
+      rows.forEach(function(row) {
         if (wanted.has(row.delegationId)
           && row.envelope.terminal === true
           && row.envelope.cleanupPending === null
@@ -1005,6 +1066,11 @@
           _corrupt('cleanup marker conflicts with persisted ledger');
         }
         if (current.cleanupPending.cancellationConfirmed === marker.cancellationConfirmed) {
+          if (current !== all[key]) {
+            var normalizedUpdate = {};
+            normalizedUpdate[key] = current;
+            await _write(normalizedUpdate);
+          }
           return _deepFreeze(_clone(current));
         }
         var promoted = {
@@ -1067,6 +1133,11 @@
       var code = _normalizeTerminalCode(candidate);
       if (current.terminal) {
         if (current.terminalCode !== code) _corrupt('terminal code conflicts with persisted ledger');
+        if (current !== all[key]) {
+          var normalizedUpdate = {};
+          normalizedUpdate[key] = current;
+          await _write(normalizedUpdate);
+        }
         return _deepFreeze(_clone(current));
       }
       if (current.cleanupPending && current.cleanupPending.code !== code) {

@@ -148,7 +148,6 @@ function snapshot(overrides) {
       callId: 'call_fixture',
       name: 'mcp__fsb__read_page',
       tabId: 42,
-      argsSummary: 'current tab',
       status: 'succeeded',
       durationMs: 150
     }),
@@ -375,7 +374,7 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const text = container.textContent;
   [
     'Claude Code', 'claude-sonnet', 'session_fixture', 'mcp__fsb',
-    'mcp__fsb__read_page', 'current tab', '42', 'succeeded', '150 ms',
+    'mcp__fsb__read_page', '42', 'succeeded', '150 ms',
     'api_retry', '250 ms', '11', '7', '18', '3', '900 ms',
     'Included in your subscription', 'Show tool-call breakdown'
   ].forEach((value) => assert(text.includes(value), 'renderer exposes typed field: ' + value));
@@ -393,10 +392,11 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert.equal(toolDisclosure.textContent, 'mcp__fsb__read_page — succeeded',
     'collapsed tool disclosure names the call and canonical status');
   assert(toolDetails.textContent.includes('call_fixture')
-      && toolDetails.textContent.includes('current tab')
       && toolDetails.textContent.includes('42')
       && toolDetails.textContent.includes('150 ms'),
-    'expanded tool body retains call id, arguments, tab, and duration');
+    'expanded tool body retains call id, tab, and duration');
+  assert(!toolDetails.textContent.includes('Arguments'),
+    'tool arguments have no visible or accessibility definition row');
 
   const details = findByClass(container, 'delegation-tool-breakdown')[0];
   const disclosure = findAll(details, 'summary')[0];
@@ -542,12 +542,10 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const hostile = snapshot();
   hostile.entries[0].init.model = '<img src=x onerror=globalThis.pwned=true>';
   hostile.entries[1].tool.name = 'javascript:alert(1)';
-  hostile.entries[1].tool.argsSummary = '<svg onload=steal()>https://evil.invalid/?secret=1</svg>';
   hostile.entries[2].retry.class = 'transport_retry';
   const container = new TestNode('div');
   assert.equal(Feed.render(container, hostile, { hydrated: false }).ok, true);
   assert(container.textContent.includes('<img src=x onerror=globalThis.pwned=true>'));
-  assert(container.textContent.includes('<svg onload=steal()>https://evil.invalid/?secret=1</svg>'));
   const allNodes = findAll(container, 'article')
     .concat(findAll(container, 'summary'))
     .concat(findAll(container, 'dd'));
@@ -558,13 +556,27 @@ console.log('\n--- Phase 61 delegation feed contract ---');
     assert.equal(node.getAttribute('onerror'), null, 'event data never becomes handler');
   });
   assert.equal(globalThis.pwned, undefined, 'hostile metadata remains inert text');
+
+  const forbiddenToolPresentation = snapshot();
+  const argumentCanary = '<svg onload=steal()>https://evil.invalid/?secret=1</svg>';
+  const resultCanary = 'raw-result-secret-canary';
+  forbiddenToolPresentation.entries[1].tool.argsSummary = argumentCanary;
+  forbiddenToolPresentation.entries[1].tool.result = resultCanary;
+  const rejectedContainer = new TestNode('div');
+  assert.deepEqual(
+    Feed.render(rejectedContainer, forbiddenToolPresentation, { hydrated: false }),
+    { ok: false, lastSequence: null, hydrated: false },
+    'legacy argument and raw result fields are outside the feed view-model'
+  );
+  assert.equal(rejectedContainer.textContent, '');
+  assert(!rejectedContainer.textContent.includes(argumentCanary));
+  assert(!rejectedContainer.textContent.includes(resultCanary));
 }
 
 {
   const missing = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
   missing.entries[1].tool.callId = null;
   missing.entries[1].tool.tabId = null;
-  missing.entries[1].tool.argsSummary = null;
   missing.entries[1].tool.durationMs = null;
   missing.summary = summary({
     inputTokens: null,
