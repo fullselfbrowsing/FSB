@@ -1,5 +1,6 @@
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
   type AdapterDetection,
   type AgentEvent,
@@ -8,6 +9,11 @@ import {
   type SupervisedChild,
 } from './adapter.js';
 import { createClaudeCodeAdapter } from './claude-code.js';
+import {
+  createCodexAdapter,
+  type CodexDetectionDependency,
+  type CodexParserDependency,
+} from './codex.js';
 import {
   createOpenCodeAdapter,
   type OpenCodeDetectionDependency,
@@ -47,6 +53,8 @@ export interface ProductionAdapterRegistryDependencies {
   readonly openCodeDetect?: OpenCodeDetectionDependency;
   readonly openCodeParseEvents?: OpenCodeParserDependency;
   readonly resolveOpenCodeProfileRuntime?: OpenCodeProfileRuntimeDependency;
+  readonly codexDetect?: CodexDetectionDependency;
+  readonly codexParseEvents?: CodexParserDependency;
   readonly kill: (
     child: SupervisedChild,
     options: { grace: number },
@@ -56,6 +64,7 @@ export interface ProductionAdapterRegistryDependencies {
 const CANONICAL_IDS = Object.freeze([
   CLAUDE_CODE_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
 ] as const);
 const ADAPTER_METHODS = Object.freeze([
   'detect',
@@ -69,7 +78,11 @@ function parseRegistrationId(id: string): AgentProviderId {
   if (typeof id !== 'string' || id.length === 0 || id !== id.toLowerCase()) {
     throw new AdapterRegistryError('invalid_adapter_id', 'Adapter id must be canonical');
   }
-  if (id !== CLAUDE_CODE_ADAPTER_ID && id !== OPENCODE_ADAPTER_ID) {
+  if (
+    id !== CLAUDE_CODE_ADAPTER_ID
+    && id !== OPENCODE_ADAPTER_ID
+    && id !== CODEX_ADAPTER_ID
+  ) {
     throw new AdapterRegistryError('unknown_adapter_id', 'Unknown adapter id');
   }
   return id;
@@ -167,7 +180,7 @@ function validateAdapter(adapter: AgentProviderAdapter): void {
 
 /**
  * Construct the complete immutable production roster. Registration is closed
- * to the two shipped canonical ids and their reviewed order.
+ * to the three shipped canonical ids and their reviewed order.
  */
 export function createAdapterRegistry(
   registrations: readonly AdapterRegistration[],
@@ -227,6 +240,14 @@ export function createProductionAdapterRegistry(
         detect: dependencies.openCodeDetect,
         resolveProfileRuntime: dependencies.resolveOpenCodeProfileRuntime,
         parseEvents: dependencies.openCodeParseEvents,
+        kill: dependencies.kill,
+      }),
+    },
+    {
+      id: CODEX_ADAPTER_ID,
+      adapter: createCodexAdapter({
+        detect: dependencies.codexDetect,
+        parseEvents: dependencies.codexParseEvents,
         kill: dependencies.kill,
       }),
     },

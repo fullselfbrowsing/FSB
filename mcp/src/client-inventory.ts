@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { isAbsolute } from 'node:path';
 import type { WebSocketBridge } from './bridge.js';
+import { createCodexDetector } from './agent-providers/codex-detect.js';
 import { createOpenCodeDetector } from './agent-providers/opencode-detect.js';
 import { PLATFORMS, resolvePlatformTarget } from './platforms.js';
 import type { PlatformRegistry, PlatformTarget } from './platforms.js';
@@ -28,22 +29,25 @@ type ExecFileDependency = (
 type ClientInventoryDependencies = {
   execFile: ExecFileDependency;
   detectOpenCode: () => Promise<unknown>;
+  detectCodex: () => Promise<unknown>;
   platform: NodeJS.Platform;
   platforms: PlatformRegistry;
   resolvePlatformTarget: (platformKey: string) => PlatformTarget;
   now: () => number;
 };
 
-const INVENTORY_PROVIDER_ROSTER = Object.freeze(['claude-code', 'opencode'] as const);
+const INVENTORY_PROVIDER_ROSTER = Object.freeze(['claude-code', 'opencode', 'codex'] as const);
 const MAX_RETAINED_PATH_BYTES = 4_096;
 const MAX_RETAINED_PREFIX_ARGUMENTS = 8;
 const MAX_RETAINED_PREFIX_BYTES = 32 * 1_024;
 const MAX_RETAINED_VERSION_BYTES = 64;
 const openCodeDetector = createOpenCodeDetector();
+const codexDetector = createCodexDetector();
 
 const DEFAULT_DEPENDENCIES: ClientInventoryDependencies = {
   execFile: execFile as unknown as ExecFileDependency,
   detectOpenCode: () => openCodeDetector.detect(),
+  detectCodex: () => codexDetector.detect(),
   platform: process.platform,
   platforms: PLATFORMS,
   resolvePlatformTarget,
@@ -53,13 +57,26 @@ const DEFAULT_DEPENDENCIES: ClientInventoryDependencies = {
 let dependencies: ClientInventoryDependencies = { ...DEFAULT_DEPENDENCIES };
 let inventoryPromise: Promise<McpClientInventory> | null = null;
 
+const TEST_ONLY_EXEC_FILE: ExecFileDependency = () => {
+  throw new TypeError('Client inventory test exec dependency is not configured');
+};
+const TEST_ONLY_PROVIDER_DETECT = async (): Promise<unknown> => {
+  throw new TypeError('Client inventory test provider detector is not configured');
+};
+
 /** Test-only dependency injection/reset hook. Pass null to restore production dependencies. */
 export function __configureClientInventoryForTests(
   overrides: Partial<ClientInventoryDependencies> | null,
 ): void {
   dependencies = overrides === null
     ? { ...DEFAULT_DEPENDENCIES }
-    : { ...DEFAULT_DEPENDENCIES, ...overrides };
+    : {
+        ...DEFAULT_DEPENDENCIES,
+        execFile: TEST_ONLY_EXEC_FILE,
+        detectOpenCode: TEST_ONLY_PROVIDER_DETECT,
+        detectCodex: TEST_ONLY_PROVIDER_DETECT,
+        ...overrides,
+      };
   inventoryPromise = null;
 }
 
@@ -140,7 +157,7 @@ function safeRetainedPrefix(value: unknown): boolean {
   return Reflect.ownKeys(value).length === value.length + 1;
 }
 
-function projectsRetainedOpenCodeAvailability(value: unknown): boolean {
+function projectsRetainedProviderAvailability(value: unknown): boolean {
   const detection = ownDataRecord(value);
   if (!detection || typeof detection.installed !== 'boolean') return false;
   const version = detection.version;
@@ -166,7 +183,20 @@ async function detectOpenCode(checkedAt: number): Promise<McpClientInventoryReco
     evidence = null;
   }
   return Object.freeze({
-    detected: projectsRetainedOpenCodeAvailability(evidence),
+    detected: projectsRetainedProviderAvailability(evidence),
+    checkedAt,
+  });
+}
+
+async function detectCodex(checkedAt: number): Promise<McpClientInventoryRecord> {
+  let evidence: unknown = null;
+  try {
+    evidence = await dependencies.detectCodex();
+  } catch {
+    evidence = null;
+  }
+  return Object.freeze({
+    detected: projectsRetainedProviderAvailability(evidence),
     checkedAt,
   });
 }
@@ -177,7 +207,9 @@ function hasExactInventoryProviderRoster(keys: readonly string[]): boolean {
     return INVENTORY_PROVIDER_ROSTER.some((providerId) => providerId === normalized);
   });
   return providerKeys.length === INVENTORY_PROVIDER_ROSTER.length
-    && providerKeys.every((key, index) => key === INVENTORY_PROVIDER_ROSTER[index]);
+    && INVENTORY_PROVIDER_ROSTER.every((providerId) => (
+      providerKeys.filter((key) => key === providerId).length === 1
+    ));
 }
 
 async function performInventorySweep(): Promise<McpClientInventory> {
@@ -195,6 +227,10 @@ async function performInventorySweep(): Promise<McpClientInventory> {
     }
     if (platformKey === 'opencode') {
       inventory[platformKey] = await detectOpenCode(checkedAt);
+      continue;
+    }
+    if (platformKey === 'codex') {
+      inventory[platformKey] = await detectCodex(checkedAt);
       continue;
     }
 

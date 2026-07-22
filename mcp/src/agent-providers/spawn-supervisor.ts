@@ -348,6 +348,7 @@ export interface ProductionSpawnSupervisorOptions {
   readonly runtimeRootPath?: string;
   readonly processSeams?: Readonly<{
     openCodeDetect?: ProductionAdapterRegistryDependencies['openCodeDetect'];
+    codexDetect?: ProductionAdapterRegistryDependencies['codexDetect'];
     spawn?: AgentSpawnDependency;
     processProbe?: AgentProcessProbeDependency;
     inspector?: ProcessInspector;
@@ -2145,7 +2146,10 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       {
         inheritedAllowRules: DELEGATION_AGENT_ENVIRONMENT_POLICY.inheritedAllowRules,
         strippedKeys: DELEGATION_AGENT_ENVIRONMENT_POLICY.strippedKeys,
-        forcedValues: Object.freeze({ FSB_AGENT_ARGV_SIGNATURE: argvSignature }),
+        forcedValues: Object.freeze({
+          ...DELEGATION_AGENT_ENVIRONMENT_POLICY.forcedValues,
+          FSB_AGENT_ARGV_SIGNATURE: argvSignature,
+        }),
       },
     );
   }
@@ -2193,6 +2197,13 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         || classification.authState !== identityDescriptor.expectedAuthState
         || classification.authState !== run.acceptedIdentity.authState
       ) throw new PolicyAttestationFailure();
+      const freshIdentity = acceptedIdentityFromDetection(run.adapterId, {
+        authState: classification.authState,
+        profileVersion: run.acceptedIdentity.profileVersion,
+      });
+      if (!acceptedAgentIdentitiesEqual(freshIdentity, run.acceptedIdentity)) {
+        throw new PolicyAttestationFailure();
+      }
     } catch (error) {
       if (error instanceof PolicyAttestationFailure) throw error;
       throw new PolicyAttestationFailure();
@@ -3476,6 +3487,7 @@ export function createProductionSpawnSupervisor(
   let supervisor: SpawnSupervisor | null = null;
   const registry = createProductionAdapterRegistry({
     openCodeDetect: options.processSeams?.openCodeDetect,
+    codexDetect: options.processSeams?.codexDetect,
     resolveOpenCodeProfileRuntime: (_context, _role, scope) => {
       if (!scope || scope.runtimeFiles.length !== 3 || !opencodeDataRoot) {
         throw new TypeError('OpenCode production runtime graph is unavailable');

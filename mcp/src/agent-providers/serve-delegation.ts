@@ -106,6 +106,7 @@ const EMPTY_CLOSE_RESULT: SpawnSupervisorCloseResult = Object.freeze({
   failed: 0,
   alreadySettled: 0,
 });
+const MAX_COMPATIBILITY_ADAPTERS = 16;
 
 function defaultDependencies(): Required<ServeDelegationDependencies> {
   return {
@@ -253,6 +254,9 @@ async function collectCompatibilitySnapshot(
   checkedAt: number,
 ): Promise<SafeCompatibilitySnapshot> {
   const contracts = ADAPTER_COMPATIBILITY_MATRIX.adapters;
+  if (contracts.length === 0 || contracts.length > MAX_COMPATIBILITY_ADAPTERS) {
+    throw new TypeError('Adapter compatibility roster is invalid');
+  }
   const idsMethod = ownCallable(registry, 'ids');
   const requireMethod = ownCallable(registry, 'require');
   let registryIds: readonly string[] | null = null;

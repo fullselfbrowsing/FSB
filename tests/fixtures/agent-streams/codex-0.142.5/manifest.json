@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "fixture": "contract-stream.jsonl",
+  "expectedEvents": "expected-events.json",
+  "nativeNegativeCorpus": "native-negative-corpus.json",
+  "profileVersion": "0.142.5",
+  "provenance": "schema-derived-contract",
+  "liveCapturePending": true,
+  "recordedProvenanceStatus": "human_needed",
+  "recordedProvenanceRequirement": "MULTI-04/MULTI-05/MULTI-06",
+  "sanitized": true,
+  "sanitization": {
+    "syntheticIdentifiers": true,
+    "containsRealPrompt": false,
+    "containsBrowserContent": false,
+    "containsCredentials": false,
+    "containsFilesystemPaths": false
+  },
+  "expectedSequence": [
+    "init",
+    "assistant",
+    "tool_use",
+    "tool_result",
+    "result"
+  ],
+  "terminalLabel": "success",
+  "sourceDocs": [
+    "https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/exec/src/exec_events.rs",
+    "https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/exec/src/event_processor_with_jsonl_output.rs",
+    "https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/cli/src/mcp_cmd.rs"
+  ],
+  "milestoneEndTask": "At the milestone-end UAT gate, obtain one genuine sanitized Codex 0.142.5 stream, compare its required shapes with this contract, and keep liveCapturePending true until that comparison is reviewed."
+}

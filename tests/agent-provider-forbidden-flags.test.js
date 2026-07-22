@@ -122,6 +122,20 @@ try {
     'agent-providers',
     'opencode-detect.ts',
   );
+  const codexProfilePath = path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'codex-profile.ts',
+  );
+  const codexDetectorPath = path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'codex-detect.ts',
+  );
   const supervisorPath = path.join(
     repoRoot,
     'mcp',
@@ -131,6 +145,8 @@ try {
   );
   const profileSource = fs.readFileSync(profilePath, 'utf8');
   const detectorSource = fs.readFileSync(detectorPath, 'utf8');
+  const codexProfileSource = fs.readFileSync(codexProfilePath, 'utf8');
+  const codexDetectorSource = fs.readFileSync(codexDetectorPath, 'utf8');
   const supervisorSource = fs.readFileSync(supervisorPath, 'utf8');
   const adapterSource = fs.readFileSync(path.join(
     repoRoot,
@@ -152,6 +168,13 @@ try {
     'src',
     'agent-providers',
     'runtime-files.ts',
+  ), 'utf8');
+  const environmentSource = fs.readFileSync(path.join(
+    repoRoot,
+    'mcp',
+    'src',
+    'agent-providers',
+    'spawn-environment.ts',
   ), 'utf8');
   const providerContractSource = fs.readFileSync(path.join(
     repoRoot,
@@ -206,10 +229,14 @@ try {
   assert(supervisorSource.includes("descriptor.source === 'process_json'"));
   assert(supervisorSource.includes("descriptor.source === 'owned_server_json'"));
   assert(!/from ['"].*opencode-(?:profile|detect|stream)/.test(supervisorSource));
+  assert(!/from ['"].*codex-(?:profile|detect|stream)/.test(supervisorSource));
   assert(!/(?:adapterId|spec\.adapterId)\s*===\s*(?:OPENCODE_ADAPTER_ID|['"]opencode['"])/.test(
     supervisorSource,
   ));
   assert(!/(?:verify|check|reduce)OpenCodePolicy/.test(supervisorSource));
+  assert(!/(?:adapterId|spec\.adapterId)\s*===\s*(?:CODEX_ADAPTER_ID|['"]codex['"])/.test(
+    supervisorSource,
+  ));
 
   const adapterInterface = (adapterSource.match(
     /export interface AgentProviderAdapter \{([\s\S]*?)\n\}/,
@@ -316,6 +343,60 @@ try {
     /export function (?:check|verify|reduce)OpenCode/,
     /adapterId\s*===\s*['"]opencode['"]/,
   ]) assert(!forbiddenPattern.test(profileSource), `${forbiddenPattern} is absent from OpenCode profile`);
+
+  assert(codexDetectorSource.includes("CODEX_PROFILE_VERSION = '0.142.5'"));
+  assert(codexProfileSource.includes("'exec',"));
+  assert(codexProfileSource.includes("'-',"));
+  for (const required of [
+    "'--json'",
+    "'--ephemeral'",
+    "'--ignore-user-config'",
+    "'--ignore-rules'",
+    "'--strict-config'",
+    "'--color'",
+    "'never'",
+    "'--sandbox'",
+    "'read-only'",
+    "'--skip-git-repo-check'",
+    "'project_doc_max_bytes=0'",
+    "'web_search=\"disabled\"'",
+    "'shell_environment_policy.inherit=\"none\"'",
+    "'mcp_servers={}'",
+    "'mcp_servers.fsb.required=true'",
+    "'mcp_servers.fsb.enabled=true'",
+    "'mcp_servers.fsb.default_tools_approval_mode=\"approve\"'",
+  ]) assert(codexProfileSource.includes(required), `${required} is source-pinned in Codex profile`);
+  for (const forbidden of [
+    "'resume'",
+    "'review'",
+    "'--model'",
+    "'--profile'",
+    "'--image'",
+    "'--output-last-message'",
+    "'--output-schema'",
+    "'--add-dir'",
+    "'--search'",
+    "'--local-provider'",
+    "'--full-auto'",
+    "'--yolo'",
+    "'--dangerously-bypass-approvals-and-sandbox'",
+    "'--ask-for-approval'",
+  ]) assert(!codexProfileSource.includes(forbidden), `${forbidden} is absent from Codex profile`);
+  for (const stripped of [
+    'CODEX_API_KEY',
+    'CODEX_ACCESS_TOKEN',
+    'OPENAI_API_KEY',
+    'CODEX_EXEC_SERVER_URL',
+    'CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN',
+    'CODEX_EXEC_SERVER_NOISE_CHATGPT_ACCOUNT_ID',
+    'CODEX_EXEC_SERVER_NOISE_ENVIRONMENT_ID',
+    'CODEX_EXEC_SERVER_NOISE_REGISTRY_URL',
+  ]) assert(environmentSource.includes(`'${stripped}'`), `${stripped} is in the strip roster`);
+  assert(environmentSource.includes("CODEX_EXEC_SERVER_URL: 'none'"));
+  assert(codexProfileSource.includes("'search_capabilities'"));
+  assert(codexProfileSource.includes("'invoke_capability'"));
+  assert(codexProfileSource.includes("kind: 'masked_token' as const"));
+  assert(codexDetectorSource.includes('result.zeroize()'));
 
   console.log('agent-provider-forbidden-flags: all assertions passed');
 } finally {

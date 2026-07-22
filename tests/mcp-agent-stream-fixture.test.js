@@ -8,6 +8,13 @@ const { pathToFileURL } = require('url');
 
 const repoRoot = path.resolve(__dirname, '..');
 const streamBuildPath = path.join(repoRoot, 'mcp', 'build', 'agent-providers', 'claude-stream.js');
+const codexStreamBuildPath = path.join(
+  repoRoot,
+  'mcp',
+  'build',
+  'agent-providers',
+  'codex-stream.js',
+);
 const protocolDriftBuildPath = path.join(
   repoRoot,
   'mcp',
@@ -31,6 +38,13 @@ const manifest = JSON.parse(manifestText);
 const fixtureLines = fixtureText.trimEnd().split(/\r?\n/).map((line) => JSON.parse(line));
 const fixtureBytes = Buffer.from(fixtureText, 'utf8');
 const sessionId = fixtureLines[0].session_id;
+const codexFixtureDir = path.join(
+  repoRoot,
+  'tests',
+  'fixtures',
+  'agent-streams',
+  'codex-0.142.5',
+);
 
 const MANIFEST_KEYS = [
   'expectedSequence',
@@ -164,9 +178,13 @@ async function run() {
   assert.strictEqual(CLAUDE_STREAM_LINE_LIMIT_BYTES, 256 * 1024);
   assert.strictEqual(ClaudeExportedDriftError, AgentProtocolDriftError);
   assert.strictEqual(new AgentProtocolDriftError('invalid_json', 1).code, 'agent_protocol_drift');
-  assert.deepStrictEqual(Object.keys(AGENT_PROTOCOL_DRIFT_REASONS).sort(), ['claude-code', 'opencode']);
+  assert.deepStrictEqual(
+    Object.keys(AGENT_PROTOCOL_DRIFT_REASONS).sort(),
+    ['claude-code', 'codex', 'opencode'],
+  );
   assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS));
   assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS['claude-code']));
+  assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS.codex));
   assert(Object.isFrozen(AGENT_PROTOCOL_DRIFT_REASONS.opencode));
 
   // EV-01: the checked-in artifact is a schema-derived contract, not recorded provenance.
@@ -362,6 +380,83 @@ async function run() {
   const separatedEvents = await collect(parseClaudeEvents, [fixtureBytes]);
   assert.deepStrictEqual(separatedEvents, events);
   assert(!JSON.stringify(separatedEvents).includes(stderrEquivalent.toString('utf8')));
+
+  const codexStream = await import(pathToFileURL(codexStreamBuildPath).href);
+  const codexManifestText = fs.readFileSync(path.join(codexFixtureDir, 'manifest.json'), 'utf8');
+  const codexFixtureText = fs.readFileSync(
+    path.join(codexFixtureDir, 'contract-stream.jsonl'),
+    'utf8',
+  );
+  const codexManifest = JSON.parse(codexManifestText);
+  const codexExpected = JSON.parse(fs.readFileSync(
+    path.join(codexFixtureDir, 'expected-events.json'),
+    'utf8',
+  ));
+  const codexNegatives = JSON.parse(fs.readFileSync(
+    path.join(codexFixtureDir, 'native-negative-corpus.json'),
+    'utf8',
+  ));
+  assert.deepStrictEqual(Object.keys(codexManifest).sort(), [
+    'expectedEvents',
+    'expectedSequence',
+    'fixture',
+    'liveCapturePending',
+    'milestoneEndTask',
+    'nativeNegativeCorpus',
+    'profileVersion',
+    'provenance',
+    'recordedProvenanceRequirement',
+    'recordedProvenanceStatus',
+    'sanitization',
+    'sanitized',
+    'schemaVersion',
+    'sourceDocs',
+    'terminalLabel',
+  ]);
+  assert.strictEqual(codexManifest.profileVersion, '0.142.5');
+  assert.strictEqual(codexManifest.provenance, 'schema-derived-contract');
+  assert.strictEqual(codexManifest.liveCapturePending, true);
+  assert.strictEqual(codexManifest.recordedProvenanceStatus, 'human_needed');
+  assert.strictEqual(codexManifest.expectedEvents, 'expected-events.json');
+  assert.strictEqual(codexManifest.nativeNegativeCorpus, 'native-negative-corpus.json');
+  assert.strictEqual(codexManifest.terminalLabel, 'success');
+  assert.match(codexManifest.milestoneEndTask, /genuine sanitized Codex 0\.142\.5 stream/);
+  assert.doesNotMatch(codexManifestText, /live recording|captured output/i);
+  assert.strictEqual(codexNegatives.profileVersion, '0.142.5');
+  assert(codexNegatives.cases.length >= 40);
+  assert.strictEqual(
+    new Set(codexNegatives.cases.map((entry) => entry.id)).size,
+    codexNegatives.cases.length,
+  );
+  const codexBytes = Buffer.from(codexFixtureText, 'utf8');
+  const codexEvents = await collect(codexStream.parseCodexEvents, [codexBytes]);
+  assert.deepStrictEqual(codexEvents, codexExpected);
+  assert.deepStrictEqual(codexEvents.map((event) => event.type), codexManifest.expectedSequence);
+  assert.strictEqual(codexEvents.filter((event) => event.type === 'result').length, 1);
+  assert.strictEqual(codexEvents.at(-1).payload.candidate, true);
+  for (let split = 1; split < codexBytes.length; split += 17) {
+    assert.deepStrictEqual(await collect(codexStream.parseCodexEvents, [
+      codexBytes.subarray(0, split),
+      codexBytes.subarray(split),
+    ]), codexEvents, `Codex byte split ${split} changed normalization`);
+  }
+  assert.deepStrictEqual(
+    await collect(codexStream.parseCodexEvents, [Buffer.from(codexFixtureText.trimEnd())]),
+    codexEvents,
+  );
+  assert.deepStrictEqual(
+    await collect(codexStream.parseCodexEvents, [
+      Buffer.from(codexFixtureText.replaceAll('\n', '\r\n')),
+    ]),
+    codexEvents,
+  );
+  const codexSafeEvents = JSON.stringify(codexEvents);
+  for (const forbidden of [
+    'synthetic private plan',
+    'synthetic private reasoning',
+    'synthetic capability',
+    'synthetic tool output',
+  ]) assert.strictEqual(codexSafeEvents.includes(forbidden), false);
 
   console.log('mcp-agent-stream-fixture.test.js: PASS');
   console.log('CLAUDE-03 recorded provenance: human_needed (schema-derived contract only)');

@@ -346,15 +346,17 @@ async function run() {
     ? Array.from(productionRegistryBlock[0].matchAll(/^\s*id: ([A-Z_]+_ADAPTER_ID),$/gm), (match) => match[1])
     : [];
   assert(
-    /const CANONICAL_IDS = Object\.freeze\(\[\s*CLAUDE_CODE_ADAPTER_ID,\s*OPENCODE_ADAPTER_ID,\s*\] as const\);/m.test(adapterRegistrySource)
+    /const CANONICAL_IDS = Object\.freeze\(\[\s*CLAUDE_CODE_ADAPTER_ID,\s*OPENCODE_ADAPTER_ID,\s*CODEX_ADAPTER_ID,\s*\] as const\);/m.test(adapterRegistrySource)
       && JSON.stringify(productionRegistryIds) === JSON.stringify([
         'CLAUDE_CODE_ADAPTER_ID',
         'OPENCODE_ADAPTER_ID',
+        'CODEX_ADAPTER_ID',
       ])
       && /adapter: createClaudeCodeAdapter\(dependencies\)/m.test(productionRegistryBlock?.[0] || '')
       && /adapter: createOpenCodeAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
-      && !/\b(?:CODEX_ADAPTER_ID|createCodexAdapter)\b|from '\.\/codex\.js'/.test(adapterRegistrySource),
-    'production registry remains the exact closed Claude Code/OpenCode roster with Codex absent',
+      && /adapter: createCodexAdapter\(\{[\s\S]*?kill: dependencies\.kill,[\s\S]*?\}\)/m.test(productionRegistryBlock?.[0] || '')
+      && /from '\.\/codex\.js'/.test(adapterRegistrySource),
+    'production registry is the exact closed Claude Code/OpenCode/Codex roster',
   );
   assert(
     !/(?:hold|resume|status)\s*\(/.test(adapterInterface ? adapterInterface[1] : ''),

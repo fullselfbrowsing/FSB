@@ -34,6 +34,11 @@ const MANIFEST_KEYS = Object.freeze([
   'sourceDocs',
   'terminalLabel',
 ]);
+const CODEX_MANIFEST_KEYS = Object.freeze([
+  ...MANIFEST_KEYS,
+  'expectedEvents',
+  'nativeNegativeCorpus',
+]);
 
 function deepFreeze(value) {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return value;
@@ -51,6 +56,13 @@ function opencodeNativeLabel(event) {
   if (event.type === 'tool_use') return `${event.type}/${event.part && event.part.type}/${event.part && event.part.state && event.part.state.status}`;
   if (event.type === 'step_finish') return `${event.type}/${event.part && event.part.type}/${event.part && event.part.reason}`;
   if (event.part && typeof event.part.type === 'string') return `${event.type}/${event.part.type}`;
+  return event.type;
+}
+
+function codexNativeLabel(event) {
+  if (event.item && typeof event.item.type === 'string') {
+    return `${event.type}/${event.item.type}${event.item.status ? `/${event.item.status}` : ''}`;
+  }
   return event.type;
 }
 
@@ -252,6 +264,100 @@ const FIXTURE_CONTRACTS = deepFreeze({
       },
     ],
   },
+  codex: {
+    adapterId: 'codex',
+    directory: 'codex-0.142.5',
+    parserModule: 'codex-stream.js',
+    parserExport: 'parseCodexEvents',
+    profileVersion: '0.142.5',
+    requirement: 'MULTI-04/MULTI-05/MULTI-06',
+    manifestKeys: CODEX_MANIFEST_KEYS,
+    expectedEvents: 'expected-events.json',
+    nativeNegativeCorpus: 'native-negative-corpus.json',
+    expectedNormalizedSequence: [
+      'init',
+      'assistant',
+      'tool_use',
+      'tool_result',
+      'result',
+    ],
+    terminalLabel: 'success',
+    sourceDocs: [
+      'https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/exec/src/exec_events.rs',
+      'https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/exec/src/event_processor_with_jsonl_output.rs',
+      'https://github.com/openai/codex/blob/rust-v0.142.5/codex-rs/cli/src/mcp_cmd.rs',
+    ],
+    expectedNativeSequence: [
+      'thread.started',
+      'turn.started',
+      'item.started/todo_list',
+      'item.completed/reasoning',
+      'item.completed/agent_message',
+      'item.started/mcp_tool_call/in_progress',
+      'item.updated/todo_list',
+      'item.completed/reasoning',
+      'item.completed/mcp_tool_call/completed',
+      'item.completed/todo_list',
+      'turn.completed',
+    ],
+    nativeLabel: codexNativeLabel,
+    selectInit(lines) {
+      return lines.filter((event) => event.type === 'thread.started');
+    },
+    selectTerminal(lines) {
+      return lines.filter((event) => event.type === 'turn.completed');
+    },
+    requiredInitFields: ['thread_id'],
+    requiredTerminalFields: [
+      'usage.input_tokens',
+      'usage.cached_input_tokens',
+      'usage.output_tokens',
+      'usage.reasoning_output_tokens',
+    ],
+    assertTerminal(events, manifest) {
+      assert.equal(events.at(-1).payload.subtype, manifest.terminalLabel);
+      assert.equal(events.at(-1).payload.is_error, false);
+      assert.equal(events.at(-1).payload.candidate, true);
+    },
+    negativeMutators: [
+      {
+        reason: 'unknown_event_type',
+        mutate(lines) { lines[3] = { type: 'TOP_SECRET_SENTINEL' }; return lines; },
+      },
+      {
+        reason: 'event_before_init',
+        mutate(lines) { return lines.slice(1); },
+      },
+      {
+        reason: 'invalid_shape',
+        mutate(lines) { deletePath(lines[0], 'thread_id'); return lines; },
+      },
+      {
+        reason: 'invalid_shape',
+        mutate(lines) { deletePath(lines.at(-1), 'usage.output_tokens'); return lines; },
+      },
+      {
+        reason: 'invalid_order',
+        mutate(lines) {
+          const message = lines.splice(4, 1)[0];
+          lines.splice(1, 0, message);
+          return lines;
+        },
+      },
+      {
+        reason: 'provider_error',
+        mutate(lines) { lines[5].item.server = 'foreign'; return lines; },
+      },
+      {
+        reason: 'missing_result',
+        mutate(lines) { return lines.slice(0, -1); },
+      },
+      {
+        reason: 'duplicate_result',
+        mutate(lines) { lines.push(clone(lines.at(-1))); return lines; },
+      },
+    ],
+  },
 });
 
 function clone(value) {
@@ -289,7 +395,10 @@ function hasPath(value, dottedPath) {
 }
 
 function validateManifest(manifest, contract) {
-  assert.ok(exactPlainRecord(manifest, MANIFEST_KEYS), 'fixture manifest has exact plain keys');
+  assert.ok(
+    exactPlainRecord(manifest, contract.manifestKeys || MANIFEST_KEYS),
+    'fixture manifest has exact plain keys',
+  );
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.fixture, 'contract-stream.jsonl');
   assert.equal(manifest.profileVersion, contract.profileVersion);
@@ -311,6 +420,10 @@ function validateManifest(manifest, contract) {
   assert.deepEqual(manifest.sourceDocs, contract.sourceDocs);
   assert.match(manifest.milestoneEndTask, /milestone-end UAT gate/);
   assert.match(manifest.milestoneEndTask, /keep liveCapturePending true/);
+  if (contract.adapterId === 'codex') {
+    assert.equal(manifest.expectedEvents, contract.expectedEvents);
+    assert.equal(manifest.nativeNegativeCorpus, contract.nativeNegativeCorpus);
+  }
 }
 
 function listCommittedManifests() {
@@ -327,7 +440,7 @@ function encode(lines) {
 }
 
 function assertProductionRoster(registryIds, rows, registry) {
-  const exactProductionIds = ['claude-code', 'opencode'];
+  const exactProductionIds = ['claude-code', 'opencode', 'codex'];
   const sortedRegistryIds = [...registryIds].sort();
   const matrixIds = rows.map((row) => row.adapterId).sort();
   assert.deepEqual(matrixIds, sortedRegistryIds, 'registry and matrix adapter rosters agree');
@@ -439,7 +552,10 @@ async function loadParser(contract, registry) {
 
 async function main() {
   assert.ok(Object.isFrozen(FIXTURE_CONTRACTS));
-  assert.deepEqual(Object.keys(FIXTURE_CONTRACTS).sort(), ['claude-code', 'opencode']);
+  assert.deepEqual(
+    Object.keys(FIXTURE_CONTRACTS).sort(),
+    ['claude-code', 'codex', 'opencode'],
+  );
   for (const contract of Object.values(FIXTURE_CONTRACTS)) {
     assert.ok(Object.isFrozen(contract));
     assert.ok(Object.isFrozen(contract.expectedNativeSequence));
@@ -448,12 +564,29 @@ async function main() {
 
   const compatibility = await import(pathToFileURL(compatibilityBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
-  const registry = registryModule.createProductionAdapterRegistry({ kill: async () => {} });
+  const registry = registryModule.createProductionAdapterRegistry({
+    codexDetect: async () => ({
+      installed: false,
+      version: null,
+      authState: 'unknown',
+      binary: null,
+      profileVersion: null,
+    }),
+    kill: async () => {},
+  });
   const registryIds = registry.ids();
   const matrixRows = compatibility.ADAPTER_COMPATIBILITY_MATRIX.adapters;
   const matrixIds = matrixRows.map((row) => row.adapterId);
-  assert.deepEqual(registryIds, ['claude-code', 'opencode'], 'production registry is exact');
-  assert.deepEqual(matrixIds, ['claude-code', 'opencode'], 'compatibility matrix is exact');
+  assert.deepEqual(
+    registryIds,
+    ['claude-code', 'opencode', 'codex'],
+    'production registry is exact',
+  );
+  assert.deepEqual(
+    matrixIds,
+    ['claude-code', 'opencode', 'codex'],
+    'compatibility matrix is exact',
+  );
   assertProductionRoster(registryIds, matrixRows, registry);
   assert.throws(
     () => assertProductionRoster(
@@ -464,14 +597,19 @@ async function main() {
     /registry and matrix/,
   );
   assert.ok(registry.require('opencode'));
-  assert.throws(() => registry.require('codex'), /Unknown adapter id/);
+  assert.ok(registry.require('codex'));
+  assert.throws(() => registry.require('foreign'), /Unknown adapter id/);
 
   const contractIds = Object.keys(FIXTURE_CONTRACTS).sort();
   const committedManifests = listCommittedManifests();
   const expectedManifests = contractIds.map(
     (adapterId) => `tests/fixtures/agent-streams/${FIXTURE_CONTRACTS[adapterId].directory}/manifest.json`,
   ).sort();
-  assert.deepEqual(committedManifests, expectedManifests, 'fixture roster is exactly Claude and OpenCode');
+  assert.deepEqual(
+    committedManifests,
+    expectedManifests,
+    'fixture roster is exactly Claude, OpenCode, and Codex',
+  );
 
   for (const adapterId of contractIds) {
     const contract = FIXTURE_CONTRACTS[adapterId];
@@ -508,6 +646,30 @@ async function main() {
     assert.equal(events.filter((event) => event.type === 'result').length, 1);
     assert.equal(events.at(-1).type, 'result');
     contract.assertTerminal(events, manifest);
+    if (adapterId === 'codex') {
+      const expectedEvents = JSON.parse(fs.readFileSync(
+        path.join(path.dirname(manifestPath), contract.expectedEvents),
+        'utf8',
+      ));
+      assert.deepEqual(events, expectedEvents, 'Codex expected normalized events stay exact');
+      const negativeCorpus = JSON.parse(fs.readFileSync(
+        path.join(path.dirname(manifestPath), contract.nativeNegativeCorpus),
+        'utf8',
+      ));
+      assert.equal(negativeCorpus.schemaVersion, 1);
+      assert.equal(negativeCorpus.profileVersion, contract.profileVersion);
+      assert.equal(negativeCorpus.baseFixture, manifest.fixture);
+      assert(negativeCorpus.cases.length >= 40);
+      assert.equal(
+        new Set(negativeCorpus.cases.map((entry) => entry.id)).size,
+        negativeCorpus.cases.length,
+      );
+      assert(negativeCorpus.cases.every((entry) => (
+        typeof entry.expectedReason === 'string'
+        && entry.expectedReason.length > 0
+        && entry.operation
+      )));
+    }
 
     const matrixRow = matrixRows.find((row) => row.adapterId === adapterId);
     assert.ok(matrixRow, `${adapterId} has one compatibility row`);
@@ -547,6 +709,7 @@ async function main() {
   assert.match(source, /const FIXTURE_CONTRACTS = deepFreeze/);
   assert.match(source, /parserModule: 'claude-stream\.js'/);
   assert.match(source, /parserModule: 'opencode-stream\.js'/);
+  assert.match(source, /parserModule: 'codex-stream\.js'/);
   assert.match(source, /production registry order is exact/);
   assert.match(source, /production adapter roster is exact/);
   assert.equal(source.includes(['production registry', ' remains Claude-only'].join('')), false);
@@ -554,7 +717,7 @@ async function main() {
   assertCiEntry();
 
   console.log('mcp-agent-drift-smoke.test.js: PASS');
-  console.log('fixture roster: claude-code, opencode; liveCapturePending: true');
+  console.log('fixture roster: claude-code, opencode, codex; liveCapturePending: true');
 }
 
 main().catch((error) => {

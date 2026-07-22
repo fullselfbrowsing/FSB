@@ -161,6 +161,7 @@ async function main() {
 
   const {
     CLAUDE_CODE_ADAPTER_ID,
+    CODEX_ADAPTER_ID,
     OPENCODE_ADAPTER_ID,
     OPENCODE_SERVER_PASSWORD_ENV_KEY,
     OWNED_SERVER_BASIC_PASSWORD_SECRET_REF,
@@ -176,9 +177,11 @@ async function main() {
 
   assert.equal(CLAUDE_CODE_ADAPTER_ID, 'claude-code');
   assert.equal(OPENCODE_ADAPTER_ID, 'opencode');
+  assert.equal(CODEX_ADAPTER_ID, 'codex');
   assert.equal(OPENCODE_SERVER_PASSWORD_ENV_KEY, 'OPENCODE_SERVER_PASSWORD');
   assert.equal(OWNED_SERVER_BASIC_PASSWORD_SECRET_REF, 'owned_server_basic_password');
   assert.equal(PLATFORMS['claude-code'].flag, 'claude-code', 'platform id remains canonical');
+  assert.equal(PLATFORMS.codex.flag, 'codex', 'Codex platform id remains canonical');
 
   const detection = Object.freeze({
     installed: true,
@@ -230,6 +233,13 @@ async function main() {
     parseEvents: async function* () {},
     kill: async () => {},
     caps: () => openCodeCapabilities,
+  });
+  const fakeCodexAdapter = Object.freeze({
+    detect: async () => detection,
+    buildSpawn: async (_task, _context) => immutableSpec,
+    parseEvents: async function* () {},
+    kill: async () => {},
+    caps: () => TASK_ONLY_CAPABILITIES,
   });
 
   assert.deepEqual(
@@ -475,13 +485,15 @@ async function main() {
   const registry = createAdapterRegistry([
     { id: 'claude-code', adapter: fakeAdapter },
     { id: 'opencode', adapter: fakeOpenCodeAdapter },
+    { id: 'codex', adapter: fakeCodexAdapter },
   ]);
   assert.strictEqual(registry.require('claude-code'), fakeAdapter, 'exact canonical lookup succeeds');
   assert.strictEqual(registry.require('opencode'), fakeOpenCodeAdapter, 'second canonical lookup succeeds');
-  assert.deepEqual(registry.ids(), ['claude-code', 'opencode']);
+  assert.strictEqual(registry.require('codex'), fakeCodexAdapter, 'third canonical lookup succeeds');
+  assert.deepEqual(registry.ids(), ['claude-code', 'opencode', 'codex']);
   assert.ok(Object.isFrozen(registry));
   assert.ok(Object.isFrozen(registry.ids()));
-  assert.throws(() => registry.ids().push('codex'), TypeError);
+  assert.throws(() => registry.ids().push('foreign'), TypeError);
   assert.throws(() => { registry.require = () => fakeAdapter; }, TypeError);
 
   expectRegistryError(
@@ -495,7 +507,7 @@ async function main() {
     'invalid_adapter_id',
   );
   expectRegistryError(
-    () => registry.require('codex'),
+    () => registry.require('foreign'),
     AdapterRegistryError,
     'unknown_adapter_id',
   );
@@ -523,7 +535,7 @@ async function main() {
   expectRegistryError(
     () => createAdapterRegistry([
       { id: 'claude-code', adapter: fakeAdapter },
-      { id: 'codex', adapter: fakeOpenCodeAdapter },
+      { id: 'foreign', adapter: fakeOpenCodeAdapter },
     ]),
     AdapterRegistryError,
     'unknown_adapter_id',
@@ -550,6 +562,7 @@ async function main() {
     () => createAdapterRegistry([
       { id: 'opencode', adapter: fakeOpenCodeAdapter },
       { id: 'claude-code', adapter: fakeAdapter },
+      { id: 'codex', adapter: fakeCodexAdapter },
     ]),
     AdapterRegistryError,
     'invalid_adapter_id',
@@ -558,12 +571,22 @@ async function main() {
     () => createAdapterRegistry([
       { id: 'claude-code', adapter: { ...fakeAdapter } },
       { id: 'opencode', adapter: fakeOpenCodeAdapter },
+      { id: 'codex', adapter: fakeCodexAdapter },
     ]),
     /immutable/i,
   );
 
-  const productionRegistry = createProductionAdapterRegistry({ kill: async () => {} });
-  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode']);
+  const productionRegistry = createProductionAdapterRegistry({
+    codexDetect: async () => ({
+      installed: false,
+      version: null,
+      authState: 'unknown',
+      binary: null,
+      profileVersion: null,
+    }),
+    kill: async () => {},
+  });
+  assert.deepEqual(productionRegistry.ids(), ['claude-code', 'opencode', 'codex']);
   for (const id of productionRegistry.ids()) {
     const productionAdapter = productionRegistry.require(id);
     assert.ok(Object.isFrozen(productionAdapter), `${id} production adapter is immutable`);
@@ -573,11 +596,13 @@ async function main() {
       `${id} production adapter has exactly five methods in contract order`,
     );
   }
-  expectRegistryError(
-    () => productionRegistry.require('codex'),
-    AdapterRegistryError,
-    'unknown_adapter_id',
-  );
+  assert.deepEqual(await productionRegistry.require('codex').detect(), {
+    installed: false,
+    version: null,
+    authState: 'unknown',
+    binary: null,
+    profileVersion: null,
+  }, 'production-registry contract uses only its injected synthetic Codex detector');
 
   const adapterSource = fs.readFileSync(adapterSourcePath, 'utf8');
   const policySource = fs.readFileSync(policySourcePath, 'utf8');
@@ -600,7 +625,9 @@ async function main() {
   assert.match(supervisorSource, /from ['"]\.\/protocol-drift\.js['"]/, 'supervisor imports shared drift contract');
   assert.doesNotMatch(supervisorSource, /from ['"]\.\/claude-stream\.js['"]/, 'supervisor does not import a provider parser');
   assert.doesNotMatch(supervisorSource, /from ['"][^'"]*opencode[^'"]*['"]/, 'supervisor has no OpenCode import');
+  assert.doesNotMatch(supervisorSource, /from ['"][^'"]*codex[^'"]*['"]/, 'supervisor has no Codex import');
   assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]opencode['"]/, 'supervisor has no OpenCode id branch');
+  assert.doesNotMatch(supervisorSource, /adapterId\s*===\s*['"]codex['"]/, 'supervisor has no Codex id branch');
   const prepareIndex = supervisorSource.indexOf('runtimeFiles.prepareRun({');
   const spawnIndex = supervisorSource.indexOf('this.spawnChild(', prepareIndex);
   const activateIndex = supervisorSource.indexOf('runtimeFiles.activateRun({', spawnIndex);
@@ -622,7 +649,7 @@ async function main() {
   }
   assert.doesNotMatch(runtimeSource, /rmSync\([^)]*recursive\s*:\s*true/,
     'runtime cleanup does not gain arbitrary recursive deletion authority');
-  assert.doesNotMatch(policySource, /claude|opencode/i, 'shared verifier is provider-neutral');
+  assert.doesNotMatch(policySource, /claude|opencode|codex/i, 'shared verifier is provider-neutral');
   assert.doesNotMatch(policySource, /callback|resolver|template/i, 'shared verifier has no executable extension seam');
 
   const shippedAgent = JSON.parse(fs.readFileSync(shippedAgentPath, 'utf8'));

@@ -183,14 +183,19 @@ function makeOfflineBridge() {
   };
 }
 
-function makeAdapterRegistry(claudeDetect, openCodeDetect = async () => makeOpenCodeDetection()) {
+function makeAdapterRegistry(
+  claudeDetect,
+  openCodeDetect = async () => makeOpenCodeDetection(),
+  codexDetect = async () => makeCodexDetection(),
+) {
   const adapters = Object.freeze({
     'claude-code': Object.freeze({ detect: claudeDetect }),
     opencode: Object.freeze({ detect: openCodeDetect }),
+    codex: Object.freeze({ detect: codexDetect }),
   });
   return Object.freeze({
     ids() {
-      return Object.freeze(['claude-code', 'opencode']);
+      return Object.freeze(['claude-code', 'opencode', 'codex']);
     },
     require(id) {
       if (!Object.hasOwn(adapters, id)) throw new Error('unknown adapter');
@@ -203,7 +208,7 @@ function makeDetection(overrides = {}) {
   return {
     installed: true,
     version: '2.1.177',
-    authState: 'authenticated',
+    authState: 'unknown',
     binary: {
       command: '/opt/claude',
       realPath: '/opt/claude',
@@ -218,13 +223,28 @@ function makeOpenCodeDetection(overrides = {}) {
   return {
     installed: true,
     version: '1.14.25',
-    authState: 'authenticated',
+    authState: 'unknown',
     binary: {
       command: '/opt/opencode',
       realPath: '/opt/opencode',
       argvPrefix: [],
     },
     profileVersion: '1.14.25',
+    ...overrides,
+  };
+}
+
+function makeCodexDetection(overrides = {}) {
+  return {
+    installed: true,
+    version: '0.142.5',
+    authState: 'chatgpt',
+    binary: {
+      command: '/opt/codex',
+      realPath: '/opt/codex',
+      argvPrefix: [],
+    },
+    profileVersion: '0.142.5',
     ...overrides,
   };
 }
@@ -710,6 +730,12 @@ async function run() {
               message: 'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
             },
           }),
+          async () => makeCodexDetection({
+            billing: 'DOCTOR_CODEX_BILLING_SENTINEL',
+            model: 'DOCTOR_CODEX_MODEL_SENTINEL',
+            config: 'DOCTOR_CODEX_CONFIG_SENTINEL',
+            nativeBody: 'DOCTOR_CODEX_NATIVE_BODY_SENTINEL',
+          }),
         ),
         readBridgeAuthState: () => ({
           version: 1,
@@ -732,7 +758,7 @@ async function run() {
     offlineSnapshot.compatibilityMatrix === compatibility.ADAPTER_COMPATIBILITY_MATRIX,
     'doctor snapshot reuses the canonical compatibility matrix object',
   );
-  assertEqual(offlineSnapshot.adapterDiagnostics.length, 2, 'doctor emits the exact two-row registry/matrix roster');
+  assertEqual(offlineSnapshot.adapterDiagnostics.length, 3, 'doctor emits the exact three-row registry/matrix roster');
   const doctorRow = offlineSnapshot.adapterDiagnostics[0];
   assertDeepEqual(
     Object.keys(doctorRow).sort(),
@@ -777,6 +803,20 @@ async function run() {
     'OpenCode doctor row retains bounded local path/version facts but never infers auth',
   );
   assertDeepEqual(
+    offlineSnapshot.adapterDiagnostics[2],
+    {
+      adapterId: 'codex',
+      displayLabel: 'Codex',
+      binaryPath: '/opt/codex',
+      detectedVersion: '0.142.5',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'chatgpt',
+      profileVersion: '0.142.5',
+    },
+    'Codex doctor row publishes only retained local facts and its safe auth enum',
+  );
+  assertDeepEqual(
     offlineSnapshot.bridgeAuthMetadata,
     {
       sharedSecretPresent: true,
@@ -804,6 +844,10 @@ async function run() {
     'DOCTOR_OPENCODE_CONFIG_SENTINEL',
     'DOCTOR_OPENCODE_NATIVE_BODY_SENTINEL',
     'DOCTOR_OPENCODE_DIAGNOSTIC_SENTINEL',
+    'DOCTOR_CODEX_BILLING_SENTINEL',
+    'DOCTOR_CODEX_MODEL_SENTINEL',
+    'DOCTOR_CODEX_CONFIG_SENTINEL',
+    'DOCTOR_CODEX_NATIVE_BODY_SENTINEL',
   ]) {
     assert(!serializedOfflineSnapshot.includes(sentinel), `serialized offline doctor snapshot omits ${sentinel}`);
     assert(!formattedOfflineSnapshot.includes(sentinel), `formatted offline doctor snapshot omits ${sentinel}`);
@@ -898,6 +942,62 @@ async function run() {
     }
   }
 
+  console.log('\n--- deterministic Codex doctor evidence ---');
+  for (const [label, detection, expected] of [
+    ['supported ChatGPT', makeCodexDetection(), {
+      binaryPath: '/opt/codex',
+      detectedVersion: '0.142.5',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'chatgpt',
+    }],
+    ['degraded stored API key', makeCodexDetection({
+      version: '0.144.6',
+      authState: 'api_key',
+      profileVersion: '0.142.5',
+    }), {
+      binaryPath: '/opt/codex',
+      detectedVersion: '0.144.6',
+      compatibilityStatus: 'degraded',
+      compatibilityReason: 'newer_than_tested_range',
+      authState: 'api_key',
+    }],
+    ['unauthenticated', makeCodexDetection({ authState: 'unauthenticated' }), {
+      binaryPath: '/opt/codex',
+      detectedVersion: '0.142.5',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'unauthenticated',
+    }],
+    ['unknown native state', makeCodexDetection({ authState: 'authenticated' }), {
+      binaryPath: '/opt/codex',
+      detectedVersion: '0.142.5',
+      compatibilityStatus: 'supported',
+      compatibilityReason: 'within_tested_range',
+      authState: 'unknown',
+    }],
+  ]) {
+    const snapshot = await diagnostics.collectBridgeDiagnostics(
+      { waitForExtensionMs: 0 },
+      {
+        bridgeFactory: makeOfflineBridge,
+        adapterRegistry: makeAdapterRegistry(
+          async () => makeDetection(),
+          async () => makeOpenCodeDetection(),
+          async () => detection,
+        ),
+        readBridgeAuthState: () => null,
+        now: () => 10_000,
+      },
+    );
+    assertDeepEqual(snapshot.adapterDiagnostics[2], {
+      adapterId: 'codex',
+      displayLabel: 'Codex',
+      ...expected,
+      profileVersion: '0.142.5',
+    }, `${label} maps to the canonical safe Codex doctor row`);
+  }
+
   console.log('\n--- malformed injected authorities fail closed ---');
   const throwingSnapshot = await diagnostics.collectBridgeDiagnostics(
     { waitForExtensionMs: 0 },
@@ -972,7 +1072,7 @@ async function run() {
     enumerable: true,
     get() {
       rosterAccessorReads++;
-      return () => ['claude-code', 'opencode'];
+      return () => ['claude-code', 'opencode', 'codex'];
     },
   });
   accessorRegistry.require = () => {
@@ -980,15 +1080,15 @@ async function run() {
     return Object.freeze({ detect: async () => makeDetection() });
   };
   const prototypeRegistry = Object.create({
-    ids: () => Object.freeze(['claude-code', 'opencode']),
+    ids: () => Object.freeze(['claude-code', 'opencode', 'codex']),
     require: () => Object.freeze({ detect: async () => makeDetection() }),
   });
   const rosterCases = [
-    ['missing', ['claude-code']],
-    ['duplicate', ['claude-code', 'opencode', 'opencode']],
-    ['orphan', ['claude-code', 'opencode', 'codex']],
-    ['case variant', ['claude-code', 'OpenCode']],
-    ['reordered', ['opencode', 'claude-code']],
+    ['missing', ['claude-code', 'opencode']],
+    ['duplicate', ['claude-code', 'opencode', 'codex', 'codex']],
+    ['orphan', ['claude-code', 'opencode', 'codex', 'foreign']],
+    ['case variant', ['claude-code', 'OpenCode', 'codex']],
+    ['reordered', ['opencode', 'claude-code', 'codex']],
   ].map(([label, ids]) => [label, Object.freeze({
     ids: () => Object.freeze([...ids]),
     require: () => {

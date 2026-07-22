@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
   type AgentProviderId,
 } from './adapter.js';
@@ -430,7 +431,9 @@ function isAllowedRoleAdapter(role: RuntimeRole, adapterId: unknown): adapterId 
   if (role === 'provider_server' || role === 'policy_preflight') {
     return adapterId === OPENCODE_ADAPTER_ID;
   }
-  return adapterId === CLAUDE_CODE_ADAPTER_ID || adapterId === OPENCODE_ADAPTER_ID;
+  return adapterId === CLAUDE_CODE_ADAPTER_ID
+    || adapterId === OPENCODE_ADAPTER_ID
+    || adapterId === CODEX_ADAPTER_ID;
 }
 
 function normalizedFieldName(value: string): string {
@@ -1449,7 +1452,7 @@ export class AgentRuntimeFiles {
         this.requireSecureDirectory(directory, [MCP_CONFIG_FILENAME]);
         this.requireSecureFile(paths.mcpConfigPath);
         this.fs.unlinkSync(paths.mcpConfigPath);
-      } else {
+      } else if (entry.adapterId === OPENCODE_ADAPTER_ID) {
         this.requireSecureDirectory(directory, [
           OPENCODE_CONFIG_ROOT_DIRECTORY,
           OPENCODE_TEST_HOME_DIRECTORY,
@@ -1466,6 +1469,8 @@ export class AgentRuntimeFiles {
         this.fs.rmdirSync(paths.opencodeConfigRoot);
         this.fs.rmdirSync(paths.opencodeTestHomePath);
         this.fs.rmdirSync(paths.opencodeManagedConfigPath);
+      } else {
+        this.requireSecureDirectory(directory, []);
       }
       this.fs.rmdirSync(directory);
     } catch (error) {

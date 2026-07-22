@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Readable } = require('node:stream');
 const { pathToFileURL } = require('node:url');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -29,6 +30,17 @@ const serveDelegationBuildPath = path.join(
   mcpBuildRoot,
   'agent-providers',
   'serve-delegation.js',
+);
+const codexBuildPath = path.join(mcpBuildRoot, 'agent-providers', 'codex.js');
+const codexDetectBuildPath = path.join(mcpBuildRoot, 'agent-providers', 'codex-detect.js');
+const codexProfileBuildPath = path.join(mcpBuildRoot, 'agent-providers', 'codex-profile.js');
+const codexStreamBuildPath = path.join(mcpBuildRoot, 'agent-providers', 'codex-stream.js');
+const codexFixtureDir = path.join(
+  repoRoot,
+  'tests',
+  'fixtures',
+  'agent-streams',
+  'codex-0.142.5',
 );
 
 const SELECTED_SECTION = (() => {
@@ -181,8 +193,8 @@ async function runGenericProbeTests(processProbeModule, spawnEnvironmentModule) 
     .filter((name) => name.endsWith('.ts'))
     .map((name) => fs.readFileSync(path.join(productionRoot, name), 'utf8'))
     .join('\n');
-  assert.equal(productionSource.includes('CODEX_ADAPTER_ID'), false);
-  assert.equal(productionSource.includes('createCodexAdapter'), false);
+  assert.equal(productionSource.includes('CODEX_ADAPTER_ID'), true);
+  assert.equal(productionSource.includes('createCodexAdapter'), true);
 }
 
 function identityProbe(overrides = {}) {
@@ -458,6 +470,444 @@ async function runGenericAuthorityTests(
   await running.shutdown();
 }
 
+function probeResult(stdout, stderr, code = 0, signal = null) {
+  const stdoutBytes = Buffer.from(stdout);
+  const stderrBytes = Buffer.from(stderr);
+  return {
+    stdout: stdoutBytes,
+    stderr: stderrBytes,
+    exit: Object.freeze({ code, signal }),
+    zeroize() {
+      stdoutBytes.fill(0);
+      stderrBytes.fill(0);
+    },
+  };
+}
+
+async function collectEvents(parser, input) {
+  const events = [];
+  for await (const event of parser(Readable.from([input]))) events.push(event);
+  return events;
+}
+
+function codexContext(reference, authState = 'chatgpt', version = '0.142.5') {
+  const privateMcpConfigPath = '/fixture/runtime/codex-run/mcp.json';
+  return {
+    adapterId: 'codex',
+    detection: {
+      installed: true,
+      version,
+      authState,
+      binary: {
+        command: '/fixture/bin/codex',
+        realPath: '/fixture/bin/codex',
+        argvPrefix: [],
+      },
+      profileVersion: '0.142.5',
+    },
+    delegationId: 'delegation_codex_0001',
+    runtimeFingerprint: 'runtime_fingerprint_codex_0001',
+    cwd: '/fixture/work',
+    privateMcpConfigPath,
+    runtimeFiles: [privateMcpConfigPath],
+    runtimeScopes: [{}, {}, {}],
+    directRuntimeReference: reference,
+  };
+}
+
+async function runCodexIsolationTests(
+  codexModule,
+  codexDetectModule,
+  codexProfileModule,
+  effectiveAuthorityModule,
+  spawnEnvironmentModule,
+) {
+  const strippedCanaries = {
+    CODEX_API_KEY: 'CODEX_API_CANARY',
+    CODEX_ACCESS_TOKEN: 'CODEX_ACCESS_CANARY',
+    OPENAI_API_KEY: 'OPENAI_API_CANARY',
+    CODEX_EXEC_SERVER_URL: 'https://foreign.invalid',
+    CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN: 'NOISE_AUTH_CANARY',
+    CODEX_EXEC_SERVER_NOISE_CHATGPT_ACCOUNT_ID: 'NOISE_ACCOUNT_CANARY',
+    CODEX_EXEC_SERVER_NOISE_ENVIRONMENT_ID: 'NOISE_ENV_CANARY',
+    CODEX_EXEC_SERVER_NOISE_REGISTRY_URL: 'NOISE_REGISTRY_CANARY',
+  };
+  const environment = spawnEnvironmentModule.buildSanitizedAgentEnvironment({
+    ...strippedCanaries,
+    CODEX_HOME: '/fixture/codex-home-retained',
+    PATH: '/fixture/bin',
+  }, {}, spawnEnvironmentModule.DELEGATION_AGENT_ENVIRONMENT_POLICY);
+  for (const key of Object.keys(strippedCanaries)) {
+    if (key === 'CODEX_EXEC_SERVER_URL') continue;
+    assert.equal(environment[key], undefined, `${key} is stripped`);
+  }
+  assert.equal(environment.CODEX_EXEC_SERVER_URL, 'none');
+  assert.equal(environment.CODEX_HOME, '/fixture/codex-home-retained');
+
+  async function detectVersion(version, authBytes = Buffer.from('Logged in using ChatGPT\n')) {
+    const produced = [];
+    const detector = codexDetectModule.createCodexDetector({
+      platform: 'darwin',
+      pathValue: '/fixture/bin',
+      cwd: '/fixture/work',
+      sourceEnv: {
+        ...strippedCanaries,
+        CODEX_HOME: '/fixture/codex-home-retained',
+        PATH: '/fixture/bin',
+      },
+      resolveBinary: async () => ({
+        sourcePath: '/fixture/bin/codex',
+        realPath: '/fixture/bin/codex',
+      }),
+      resolveRealPath: async (value) => value,
+      resolveWindowsShim: async () => null,
+      probe: async (descriptor) => {
+        assert.equal(descriptor.environment.CODEX_EXEC_SERVER_URL, 'none');
+        assert.equal(descriptor.environment.CODEX_API_KEY, undefined);
+        assert.equal(descriptor.environment.OPENAI_API_KEY, undefined);
+        assert.equal(descriptor.environment.CODEX_HOME, '/fixture/codex-home-retained');
+        const result = descriptor.argv.includes('--version')
+          ? probeResult(Buffer.from(`codex-cli ${version}\n`), Buffer.alloc(0))
+          : probeResult(Buffer.alloc(0), authBytes);
+        produced.push(result);
+        return result;
+      },
+    });
+    const detection = await detector.detect();
+    assert(produced.every(ownedBuffersAreZero), 'all detector probe buffers are erased');
+    return detection;
+  }
+
+  const supported = await detectVersion('0.142.5');
+  assert.deepEqual(supported, {
+    installed: true,
+    version: '0.142.5',
+    authState: 'chatgpt',
+    binary: {
+      command: '/fixture/bin/codex',
+      realPath: '/fixture/bin/codex',
+      argvPrefix: [],
+    },
+    profileVersion: '0.142.5',
+  });
+  assert.equal((await detectVersion('0.144.6')).installed, true,
+    'newer compatible Codex remains retained as degraded evidence');
+  const below = await detectVersion('0.142.4');
+  assert.equal(below.installed, false);
+  assert.equal(below.diagnostic.code, 'version_unsupported');
+  const wrongMajor = await detectVersion('1.0.0');
+  assert.equal(wrongMajor.installed, false);
+  assert.equal(wrongMajor.diagnostic.code, 'version_unsupported');
+
+  const endpoint = 'http://127.0.0.1:7225/mcp';
+  const reference = effectiveAuthorityModule.createDirectRuntimeReference(
+    endpoint,
+    'generation_codex_profile_0001',
+  );
+  const spec = codexProfileModule.buildCodexSpawnSpec(
+    { text: 'Synthetic task text must travel only over stdin.' },
+    codexContext(reference),
+  );
+  assert(Object.isFrozen(spec));
+  assert.equal(spec.adapterId, 'codex');
+  assert.equal(spec.profileVersion, '0.142.5');
+  assert.equal(spec.topology.kind, 'direct');
+  assert.deepEqual(
+    spec.topology.task.argv.slice(0, codexProfileModule.CODEX_BASE_ARGV.length),
+    codexProfileModule.CODEX_BASE_ARGV,
+  );
+  assert.deepEqual(codexProfileModule.CODEX_BASE_ARGV, [
+    'exec', '-', '--json', '--ephemeral', '--ignore-user-config', '--ignore-rules',
+    '--strict-config', '--color', 'never', '--sandbox', 'read-only',
+    '--skip-git-repo-check',
+  ]);
+  assert.equal(spec.topology.task.stdin, 'task');
+  assert.equal(spec.topology.task.stdout, 'agent_jsonl');
+  assert.equal(spec.topology.task.cwd, '/fixture/runtime/codex-run');
+  assert.deepEqual(spec.topology.task.privateFiles, []);
+  assert.deepEqual(spec.topology.task.fixedEnv, {});
+  assert.equal(spec.topology.task.argv.includes('Synthetic task text must travel only over stdin.'), false);
+  for (const forbidden of [
+    'resume', 'review', '--model', '--profile', '--image', '--output-last-message',
+    '--output-schema', '--add-dir', '--search', '--local-provider', '--full-auto', '--yolo',
+    '--dangerously-bypass-approvals-and-sandbox', '--ask-for-approval',
+  ]) assert.equal(spec.topology.task.argv.includes(forbidden), false, `${forbidden} is forbidden`);
+  const configValues = spec.topology.task.argv
+    .map((value, index, values) => (value === '-c' ? values[index + 1] : null))
+    .filter(Boolean);
+  for (const required of [
+    'project_doc_max_bytes=0',
+    'web_search="disabled"',
+    'shell_environment_policy.inherit="none"',
+    'mcp_servers={}',
+    'mcp_servers.fsb.required=true',
+    'mcp_servers.fsb.enabled=true',
+    'mcp_servers.fsb.enabled_tools=["search_capabilities","invoke_capability"]',
+    'mcp_servers.fsb.default_tools_approval_mode="approve"',
+  ]) assert.equal(configValues.filter((value) => value === required).length, 1, required);
+  assert.equal(configValues.filter((value) => value.startsWith('mcp_servers.fsb.url=')).length, 1);
+  assert(codexProfileModule.CODEX_DISABLED_TOOL_FEATURES.length >= 50);
+  for (const feature of codexProfileModule.CODEX_DISABLED_TOOL_FEATURES) {
+    assert.equal(configValues.filter((value) => value === `features.${feature}=false`).length, 1);
+  }
+
+  assert.equal(spec.preSpawnIdentityProbe.expectedAuthState, 'chatgpt');
+  assert.deepEqual(spec.preSpawnIdentityProbe.argv, ['login', 'status']);
+  assert.equal(spec.effectiveAuthorityAttestation.classifier, 'codex_effective_authority_json');
+  assert.deepEqual(spec.effectiveAuthorityAttestation.enabledTools, [
+    'search_capabilities',
+    'invoke_capability',
+  ]);
+  const nativeAuthority = {
+    name: 'fsb',
+    enabled: true,
+    disabled_reason: null,
+    transport: {
+      type: 'streamable_http',
+      url: endpoint,
+      bearer_token_env_var: null,
+      http_headers: null,
+      env_http_headers: null,
+    },
+    enabled_tools: ['search_capabilities', 'invoke_capability'],
+    disabled_tools: null,
+    startup_timeout_sec: null,
+    tool_timeout_sec: null,
+  };
+  assert.equal(effectiveAuthorityModule.classifyEffectiveAuthority(
+    nativeAuthority,
+    spec.effectiveAuthorityAttestation,
+    reference,
+  ).pass, true);
+  for (const mutation of [
+    { ...nativeAuthority, name: 'foreign' },
+    { ...nativeAuthority, enabled_tools: ['search_capabilities'] },
+    { ...nativeAuthority, transport: { ...nativeAuthority.transport, url: 'http://127.0.0.1:7333/mcp' } },
+    { ...nativeAuthority, transport: { ...nativeAuthority.transport, http_headers: { Authorization: 'HEADER_CANARY' } } },
+  ]) {
+    const result = effectiveAuthorityModule.classifyEffectiveAuthority(
+      mutation,
+      spec.effectiveAuthorityAttestation,
+      reference,
+    );
+    assert.equal(result.pass, false);
+    assert.equal(JSON.stringify(result).includes('HEADER_CANARY'), false);
+  }
+
+  const calls = [];
+  const fakeDetection = Object.freeze({ installed: false });
+  const fakeParser = async function* () { yield Object.freeze({ type: 'diagnostic' }); };
+  const adapter = codexModule.createCodexAdapter({
+    detect: async () => fakeDetection,
+    parseEvents: fakeParser,
+    kill: async (...args) => { calls.push(args); },
+  });
+  assert.deepEqual(Object.keys(adapter), ['detect', 'buildSpawn', 'parseEvents', 'kill', 'caps']);
+  assert(Object.isFrozen(adapter));
+  assert.strictEqual(await adapter.detect(), fakeDetection);
+  const parsed = [];
+  for await (const event of adapter.parseEvents(Readable.from([]))) parsed.push(event);
+  assert.deepEqual(parsed, [{ type: 'diagnostic' }]);
+  assert.deepEqual(adapter.caps(), {
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: false,
+  });
+  await adapter.kill({ pid: 1 }, { grace: 10 });
+  assert.equal(calls.length, 1);
+}
+
+function runCodexAuthTests(codexDetectModule, codexProfileModule, effectiveAuthorityModule) {
+  const cases = [
+    ['chatgpt', Buffer.alloc(0), Buffer.from('Logged in using ChatGPT\n'), 0, null, 'chatgpt'],
+    ['api key', Buffer.alloc(0), Buffer.from('Logged in using an API key - abCD12_-***z9_Y-\n'), 0, null, 'api_key'],
+    ['unauthenticated', Buffer.alloc(0), Buffer.from('Not logged in\n'), 1, null, 'unauthenticated'],
+    ['extra whitespace', Buffer.alloc(0), Buffer.from('Logged in using ChatGPT \n'), 0, null, 'unknown'],
+    ['wrong api shape', Buffer.alloc(0), Buffer.from('Logged in using an API key - abCD12!!***z9_Y-\n'), 0, null, 'unknown'],
+    ['wrong api exit', Buffer.alloc(0), Buffer.from('Logged in using an API key - abCD12_-***z9_Y-\n'), 1, null, 'unknown'],
+    ['stdout contamination', Buffer.from('secret'), Buffer.from('Logged in using ChatGPT\n'), 0, null, 'unknown'],
+    ['signal', Buffer.alloc(0), Buffer.from('Logged in using ChatGPT\n'), null, 'SIGTERM', 'unknown'],
+  ];
+  for (const [label, stdout, stderr, code, signal, expected] of cases) {
+    const result = probeResult(stdout, stderr, code, signal);
+    assert.equal(codexDetectModule.classifyCodexAuthProbe(result), expected, label);
+    assert.equal(ownedBuffersAreZero(result), true, `${label} buffers are erased`);
+  }
+
+  const reference = effectiveAuthorityModule.createDirectRuntimeReference(
+    'http://127.0.0.1:7226/mcp',
+    'generation_codex_auth_0001',
+  );
+  const apiSpec = codexProfileModule.buildCodexSpawnSpec(
+    { text: 'Synthetic API task' },
+    codexContext(reference, 'api_key'),
+  );
+  const validApi = effectiveAuthorityModule.classifyPreSpawnIdentityProbe({
+    stdout: Buffer.alloc(0),
+    stderr: Buffer.from('Logged in using an API key - abCD12_-***z9_Y-\n'),
+    exit: { code: 0, signal: null },
+  }, apiSpec.preSpawnIdentityProbe);
+  assert.deepEqual(validApi, { matched: true, authState: 'api_key', reason: 'match' });
+  const invalidApi = effectiveAuthorityModule.classifyPreSpawnIdentityProbe({
+    stdout: Buffer.alloc(0),
+    stderr: Buffer.from('Logged in using an API key - abCD12!!***z9_Y-\n'),
+    exit: { code: 0, signal: null },
+  }, apiSpec.preSpawnIdentityProbe);
+  assert.deepEqual(invalidApi, { matched: false, authState: null, reason: 'byte_mismatch' });
+
+  const detectSource = fs.readFileSync(
+    path.join(repoRoot, 'mcp', 'src', 'agent-providers', 'codex-detect.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(detectSource, /console\.|credential|keyring/i);
+  assert.match(detectSource, /finally\s*\{\s*result\.zeroize\(\);\s*\}/);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function setPath(root, segments, value) {
+  let current = root;
+  for (const segment of segments.slice(0, -1)) current = current[segment];
+  current[segments[segments.length - 1]] = value;
+}
+
+function generatedNegative(generator, baseLines, streamModule) {
+  if (generator === 'invalid_utf8') return Buffer.from([0xff, 0x0a]);
+  if (generator === 'invalid_json') return Buffer.from('{\n', 'utf8');
+  if (generator === 'line_overflow') {
+    return Buffer.alloc(streamModule.CODEX_STREAM_LINE_LIMIT_BYTES + 1, 0x78);
+  }
+  if (generator === 'stream_overflow') {
+    return Buffer.alloc(streamModule.CODEX_STREAM_LIMIT_BYTES + 1, 0x78);
+  }
+  if (generator === 'event_overflow') {
+    const prefix = baseLines.slice(0, 3).map(JSON.stringify);
+    const update = JSON.stringify(baseLines[6]);
+    return Buffer.from([...prefix, ...Array.from({ length: 4_094 }, () => update)].join('\n') + '\n');
+  }
+  const lines = cloneJson(baseLines);
+  if (generator === 'depth_overflow') {
+    let nested = null;
+    for (let index = 0; index < 12; index += 1) nested = { next: nested };
+    lines[5].item.arguments = nested;
+  } else if (generator === 'node_overflow') {
+    lines[5].item.arguments = Object.fromEntries(Array.from(
+      { length: 256 },
+      (_, index) => [`key_${index}`, Array.from({ length: 16 }, () => null)],
+    ));
+  } else if (generator === 'key_overflow') {
+    lines[5].item.arguments = Object.fromEntries(Array.from(
+      { length: 257 },
+      (_, index) => [`key_${index}`, null],
+    ));
+  } else if (generator === 'array_overflow') {
+    lines[5].item.arguments = Array.from({ length: 257 }, () => null);
+  } else {
+    throw new Error(`Unknown generated native-negative case: ${generator}`);
+  }
+  return Buffer.from(`${lines.map(JSON.stringify).join('\n')}\n`);
+}
+
+function negativeInput(testCase, baseLines, streamModule) {
+  const operation = testCase.operation;
+  if (operation.kind === 'generated') {
+    return generatedNegative(operation.generator, baseLines, streamModule);
+  }
+  const lines = cloneJson(baseLines);
+  if (operation.kind === 'remove_line') {
+    lines.splice(operation.index, 1);
+  } else if (operation.kind === 'insert_line') {
+    const value = operation.copyLine === undefined
+      ? cloneJson(operation.value)
+      : cloneJson(lines[operation.copyLine]);
+    lines.splice(operation.index, 0, value);
+  } else if (operation.kind === 'append_line') {
+    lines.push(cloneJson(operation.value));
+  } else if (operation.kind === 'replace_line') {
+    lines[operation.index] = cloneJson(operation.value);
+  } else if (operation.kind === 'move_line') {
+    const [value] = lines.splice(operation.from, 1);
+    lines.splice(operation.to, 0, value);
+  } else if (operation.kind === 'set_path') {
+    setPath(lines[operation.line], operation.path, cloneJson(operation.value));
+  } else if (operation.kind === 'set_failed_mcp') {
+    lines[operation.line].item.status = 'failed';
+    lines[operation.line].item.result = null;
+    lines[operation.line].item.error = { message: 'synthetic failure' };
+  } else if (operation.kind === 'replace_item_type') {
+    lines[operation.line].item.type = operation.value;
+  } else if (operation.kind === 'insert_raw_line') {
+    lines.splice(operation.index, 0, operation.value);
+  } else {
+    throw new Error(`Unknown native-negative operation: ${operation.kind}`);
+  }
+  return Buffer.from(`${lines.map((line) => (
+    typeof line === 'string' ? line : JSON.stringify(line)
+  )).join('\n')}\n`);
+}
+
+async function runCodexParserTests(codexStreamModule) {
+  const fixtureText = fs.readFileSync(path.join(codexFixtureDir, 'contract-stream.jsonl'), 'utf8');
+  const expected = JSON.parse(fs.readFileSync(
+    path.join(codexFixtureDir, 'expected-events.json'),
+    'utf8',
+  ));
+  const manifest = JSON.parse(fs.readFileSync(path.join(codexFixtureDir, 'manifest.json'), 'utf8'));
+  const corpus = JSON.parse(fs.readFileSync(
+    path.join(codexFixtureDir, 'native-negative-corpus.json'),
+    'utf8',
+  ));
+  const baseLines = fixtureText.trimEnd().split(/\r?\n/).map((line) => JSON.parse(line));
+  const events = await collectEvents(codexStreamModule.parseCodexStream, Buffer.from(fixtureText));
+  assert.deepEqual(events, expected);
+  assert.deepEqual(events.map((event) => event.type), manifest.expectedSequence);
+  assert(events.every(Object.isFrozen));
+  assert(events.every((event) => Object.isFrozen(event.payload)));
+  const serializedEvents = JSON.stringify(events);
+  for (const privateFragment of [
+    'synthetic private plan',
+    'synthetic private reasoning',
+    'synthetic capability',
+    'synthetic tool output',
+  ]) assert.equal(serializedEvents.includes(privateFragment), false);
+
+  assert.equal(corpus.schemaVersion, 1);
+  assert.equal(corpus.profileVersion, '0.142.5');
+  assert.equal(corpus.baseFixture, 'contract-stream.jsonl');
+  assert(corpus.cases.length >= 40, 'native-negative corpus is comprehensive');
+  assert.equal(new Set(corpus.cases.map((entry) => entry.id)).size, corpus.cases.length);
+  for (const testCase of corpus.cases) {
+    const input = negativeInput(testCase, baseLines, codexStreamModule);
+    await assert.rejects(
+      collectEvents(codexStreamModule.parseCodexStream, input),
+      (error) => {
+        assert.equal(error.code, 'agent_protocol_drift', testCase.id);
+        assert.equal(error.providerId, 'codex', testCase.id);
+        assert.equal(error.reason, testCase.expectedReason, testCase.id);
+        const safeError = JSON.stringify({
+          name: error.name,
+          code: error.code,
+          providerId: error.providerId,
+          reason: error.reason,
+          eventIndex: error.eventIndex,
+          issuePaths: error.issuePaths,
+          message: error.message,
+        });
+        for (const privateFragment of [
+          'synthetic private plan',
+          'synthetic private reasoning',
+          'synthetic capability',
+          'synthetic tool output',
+        ]) assert.equal(safeError.includes(privateFragment), false, testCase.id);
+        return true;
+      },
+    );
+  }
+}
+
 async function main() {
   const processProbeModule = await import(pathToFileURL(processProbeBuildPath).href);
   const spawnEnvironmentModule = await import(pathToFileURL(spawnEnvironmentBuildPath).href);
@@ -478,16 +928,50 @@ async function main() {
     console.log('mcp-codex-adapter.test.js: PASS');
     return;
   }
+  const adapterModule = await import(pathToFileURL(adapterBuildPath).href);
+  const effectiveAuthorityModule = await import(pathToFileURL(effectiveAuthorityBuildPath).href);
+  const serveDelegationModule = await import(pathToFileURL(serveDelegationBuildPath).href);
+  const codexModule = await import(pathToFileURL(codexBuildPath).href);
+  const codexDetectModule = await import(pathToFileURL(codexDetectBuildPath).href);
+  const codexProfileModule = await import(pathToFileURL(codexProfileBuildPath).href);
+  const codexStreamModule = await import(pathToFileURL(codexStreamBuildPath).href);
+  if (SELECTED_SECTION === 'isolation') {
+    await runCodexIsolationTests(
+      codexModule,
+      codexDetectModule,
+      codexProfileModule,
+      effectiveAuthorityModule,
+      spawnEnvironmentModule,
+    );
+    console.log('mcp-codex-adapter.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION === 'auth') {
+    runCodexAuthTests(codexDetectModule, codexProfileModule, effectiveAuthorityModule);
+    console.log('mcp-codex-adapter.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION === 'parser') {
+    await runCodexParserTests(codexStreamModule);
+    console.log('mcp-codex-adapter.test.js: PASS');
+    return;
+  }
   if (SELECTED_SECTION === null) {
     await runGenericProbeTests(processProbeModule, spawnEnvironmentModule);
-    const adapterModule = await import(pathToFileURL(adapterBuildPath).href);
-    const effectiveAuthorityModule = await import(pathToFileURL(effectiveAuthorityBuildPath).href);
-    const serveDelegationModule = await import(pathToFileURL(serveDelegationBuildPath).href);
     await runGenericAuthorityTests(
       adapterModule,
       effectiveAuthorityModule,
       serveDelegationModule,
     );
+    await runCodexIsolationTests(
+      codexModule,
+      codexDetectModule,
+      codexProfileModule,
+      effectiveAuthorityModule,
+      spawnEnvironmentModule,
+    );
+    runCodexAuthTests(codexDetectModule, codexProfileModule, effectiveAuthorityModule);
+    await runCodexParserTests(codexStreamModule);
     console.log('mcp-codex-adapter.test.js: PASS');
     return;
   }

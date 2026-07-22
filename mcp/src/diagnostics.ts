@@ -3,7 +3,10 @@ import { isAbsolute } from 'node:path';
 import type { WebSocketBridge } from './bridge.js';
 import { WebSocketBridge as Bridge } from './bridge.js';
 import { readBridgeAuthState as readPrivateBridgeAuthState } from './bridge-auth.js';
-import type { AdapterDetection } from './agent-providers/adapter.js';
+import type {
+  AdapterAuthState,
+  AdapterDetection,
+} from './agent-providers/adapter.js';
 import {
   ADAPTER_COMPATIBILITY_MATRIX,
   classifyAdapterCompatibility,
@@ -75,7 +78,7 @@ export type AdapterDoctorRow = Readonly<{
   detectedVersion: string | null;
   compatibilityStatus: CompatibilityStatus;
   compatibilityReason: CompatibilityReason;
-  authState: 'unknown';
+  authState: AdapterAuthState;
   profileVersion: string;
 }>;
 
@@ -530,7 +533,12 @@ function matrixInvalidAdapterRows(): readonly AdapterDoctorRow[] {
 
 function normalizeAdapterDetection(
   value: unknown,
-): { binaryPath: string | null; version: string | null; evidenceVersion: string | null } | null {
+): {
+  binaryPath: string | null;
+  version: string | null;
+  evidenceVersion: string | null;
+  authState: AdapterAuthState;
+} | null {
   const detection = ownDataRecord(value);
   if (!detection) return null;
 
@@ -554,8 +562,14 @@ function normalizeAdapterDetection(
   const version = boundedDoctorString(rawVersion, MAX_DOCTOR_FIELD_LENGTH)
     ? rawVersion
     : null;
+  const authState = detection.authState === 'chatgpt'
+    || detection.authState === 'api_key'
+    || detection.authState === 'unauthenticated'
+    || detection.authState === 'unknown'
+    ? detection.authState
+    : 'unknown';
 
-  return Object.freeze({ binaryPath, version, evidenceVersion });
+  return Object.freeze({ binaryPath, version, evidenceVersion, authState });
 }
 
 async function collectAdapterDoctorRows(
@@ -615,7 +629,7 @@ async function collectAdapterDoctorRows(
         : normalized.version,
       compatibilityStatus: compatibility.status,
       compatibilityReason: compatibility.reason,
-      authState: 'unknown',
+      authState: normalized.authState,
       profileVersion: contract.profileVersion,
     }));
   }

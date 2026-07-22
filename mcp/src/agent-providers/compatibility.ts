@@ -1,5 +1,6 @@
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
   type AdapterCapabilities,
 } from './adapter.js';
@@ -122,6 +123,7 @@ const KNOWN_NORMALIZED_EVENTS = new Set([
 const CANONICAL_ADAPTER_IDS = Object.freeze([
   CLAUDE_CODE_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
 ] as const);
 const EXPECTED_CAPABILITIES = Object.freeze({
   [CLAUDE_CODE_ADAPTER_ID]: Object.freeze({
@@ -135,6 +137,12 @@ const EXPECTED_CAPABILITIES = Object.freeze({
     chatMode: false,
     resume: false,
     serverMode: true,
+  }),
+  [CODEX_ADAPTER_ID]: Object.freeze({
+    taskMode: true,
+    chatMode: false,
+    resume: false,
+    serverMode: false,
   }),
 });
 
@@ -250,7 +258,10 @@ function parseFixtureReference(value: unknown, adapterId: string, profileVersion
 
 function parseCapabilities(
   value: unknown,
-  adapterId: typeof CLAUDE_CODE_ADAPTER_ID | typeof OPENCODE_ADAPTER_ID,
+  adapterId:
+    | typeof CLAUDE_CODE_ADAPTER_ID
+    | typeof OPENCODE_ADAPTER_ID
+    | typeof CODEX_ADAPTER_ID,
 ): AdapterCapabilities | null {
   const record = ownDataRecord(value, CAPABILITY_KEYS);
   if (!record || CAPABILITY_KEYS.some((key) => typeof record[key] !== 'boolean')) return null;
@@ -271,6 +282,7 @@ function parseContract(value: unknown): AdapterCompatibilityContract | null {
   if (
     record.adapterId !== CLAUDE_CODE_ADAPTER_ID
     && record.adapterId !== OPENCODE_ADAPTER_ID
+    && record.adapterId !== CODEX_ADAPTER_ID
   ) return null;
   if (!boundedString(record.displayLabel, MAX_ID_OR_LABEL_LENGTH)) return null;
   const capabilities = parseCapabilities(record.capabilities, record.adapterId);
@@ -435,6 +447,35 @@ const RAW_ADAPTER_COMPATIBILITY_MATRIX = {
       'tool_use',
       'tool_result',
       'assistant',
+      'result',
+    ],
+  }, {
+    adapterId: 'codex',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: false,
+    },
+    displayLabel: 'Codex',
+    profileVersion: '0.142.5',
+    minimumVersion: '0.142.5',
+    testedThroughVersion: '0.142.5',
+    supportedMajor: 0,
+    fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
+    requiredInitFields: ['type', 'thread_id'],
+    requiredResultFields: [
+      'type',
+      'usage.input_tokens',
+      'usage.cached_input_tokens',
+      'usage.output_tokens',
+      'usage.reasoning_output_tokens',
+    ],
+    expectedNormalizedSequence: [
+      'init',
+      'assistant',
+      'tool_use',
+      'tool_result',
       'result',
     ],
   }],

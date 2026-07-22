@@ -1,6 +1,7 @@
 import type { AdapterDetection, AgentProviderId } from './adapter.js';
 import {
   CLAUDE_CODE_ADAPTER_ID,
+  CODEX_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
 } from './adapter.js';
 
@@ -55,6 +56,15 @@ const PROVIDER_DEFINITIONS: Readonly<
   [OPENCODE_ADAPTER_ID]: Object.freeze({
     label: 'OpenCode',
     authToBilling: Object.freeze({ unknown: 'unknown' }),
+  }),
+  [CODEX_ADAPTER_ID]: Object.freeze({
+    label: 'Codex',
+    authToBilling: Object.freeze({
+      chatgpt: 'subscription',
+      api_key: 'api',
+      unauthenticated: 'unknown',
+      unknown: 'unknown',
+    }),
   }),
 });
 

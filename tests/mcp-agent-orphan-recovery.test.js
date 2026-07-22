@@ -2048,13 +2048,27 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
     assert.deepEqual(runtime.remaining(), [ambiguousServer]);
   }
 
-  for (const crashState of ['prepared', 'active']) {
+  for (const directProfile of [
+    {
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      binaryRealPath: '/fixture/bin/claude',
+    },
+    {
+      adapterId: 'codex',
+      profileVersion: '0.142.5',
+      binaryRealPath: '/fixture/bin/codex',
+    },
+  ]) for (const crashState of ['prepared', 'active']) {
     const state = tempRoot(`direct-recovery-${crashState}`);
     try {
       const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
       const delegationId = `direct_runtime_crash_${crashState}_0001`;
       const prepared = await runtime.prepareRun(directPreparedInput({
         delegationId,
+        adapterId: directProfile.adapterId,
+        profileVersion: directProfile.profileVersion,
+        binaryRealPath: directProfile.binaryRealPath,
         argvSignature: `argv_signature_direct_${crashState}_0001`,
         envFingerprint: `env_fingerprint_direct_${crashState}_0001`,
       }));
@@ -2098,8 +2112,8 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
         spawnAvailable: true,
         profiles: [{
           role: 'direct',
-          adapterId: 'claude-code',
-          profileVersion: '2.1.177',
+          adapterId: directProfile.adapterId,
+          profileVersion: directProfile.profileVersion,
           confirmedKilled: crashState === 'active' ? 1 : 0,
           staleCleared: crashState === 'prepared' ? 1 : 0,
           ambiguousFailClosed: 0,

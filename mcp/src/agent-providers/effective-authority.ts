@@ -9,7 +9,7 @@ import type {
 
 const GENERATION_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const SAFE_CLASSIFICATION_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
-const SAFE_TOOL_PATTERN = /^fsb_[A-Za-z0-9_~-]{1,127}$/;
+const SAFE_TOOL_PATTERN = /^(?:fsb_[A-Za-z0-9_~-]{1,127}|search_capabilities|invoke_capability)$/;
 const MAX_ARGUMENTS = 256;
 const MAX_ARGUMENT_BYTES = 64 * 1024;
 const MAX_CHANNEL_BYTES = 1024 * 1024;
@@ -18,7 +18,6 @@ const MAX_OUTCOMES = 16;
 const MAX_MATCHER_BYTES = 64 * 1024;
 const MAX_ENABLED_TOOLS = 256;
 const SAFE_AUTH_STATES = Object.freeze([
-  'authenticated',
   'chatgpt',
   'api_key',
   'unauthenticated',
@@ -244,12 +243,56 @@ function cloneMatcher(value: unknown): ProbeByteMatcher {
     ) contractFailure(code);
     return Object.freeze({ kind, prefix, suffix, minBytes, maxBytes });
   }
+  if (kind === 'masked_token') {
+    const record = exactRecord(
+      value,
+      ['kind', 'prefix', 'separator', 'suffix', 'leadingBytes', 'trailingBytes'],
+      code,
+    );
+    const prefix = cloneBytes(ownValue(record, 'prefix', code), code);
+    const separator = cloneBytes(ownValue(record, 'separator', code), code);
+    const suffix = cloneBytes(ownValue(record, 'suffix', code), code);
+    const leadingBytes = boundedInteger(
+      ownValue(record, 'leadingBytes', code),
+      1,
+      MAX_CHANNEL_BYTES,
+      code,
+    );
+    const trailingBytes = boundedInteger(
+      ownValue(record, 'trailingBytes', code),
+      1,
+      MAX_CHANNEL_BYTES,
+      code,
+    );
+    if (
+      prefix.length === 0
+      || separator.length === 0
+      || suffix.length === 0
+      || prefix.length + separator.length + suffix.length + leadingBytes + trailingBytes
+        > MAX_CHANNEL_BYTES
+    ) contractFailure(code);
+    return Object.freeze({
+      kind,
+      prefix,
+      separator,
+      suffix,
+      leadingBytes,
+      trailingBytes,
+    });
+  }
   contractFailure(code);
 }
 
 function matcherMaximum(matcher: ProbeByteMatcher): number {
   if (matcher.kind === 'empty') return 0;
   if (matcher.kind === 'exact') return matcher.bytes.length;
+  if (matcher.kind === 'masked_token') {
+    return matcher.prefix.length
+      + matcher.leadingBytes
+      + matcher.separator.length
+      + matcher.trailingBytes
+      + matcher.suffix.length;
+  }
   return matcher.maxBytes;
 }
 
@@ -266,6 +309,16 @@ function matcherEquals(left: ProbeByteMatcher, right: ProbeByteMatcher): boolean
       && left.prefix.length === right.prefix.length
       && left.suffix.length === right.suffix.length
       && left.prefix.every((byte, index) => byte === right.prefix[index])
+      && left.suffix.every((byte, index) => byte === right.suffix[index]);
+  }
+  if (left.kind === 'masked_token' && right.kind === 'masked_token') {
+    return left.leadingBytes === right.leadingBytes
+      && left.trailingBytes === right.trailingBytes
+      && left.prefix.length === right.prefix.length
+      && left.separator.length === right.separator.length
+      && left.suffix.length === right.suffix.length
+      && left.prefix.every((byte, index) => byte === right.prefix[index])
+      && left.separator.every((byte, index) => byte === right.separator[index])
       && left.suffix.every((byte, index) => byte === right.suffix[index]);
   }
   return false;
@@ -360,6 +413,35 @@ function matchBytes(bytes: Buffer, matcher: ProbeByteMatcher): boolean {
   if (matcher.kind === 'exact') {
     return bytes.length === matcher.bytes.length
       && matcher.bytes.every((byte, index) => bytes[index] === byte);
+  }
+  if (matcher.kind === 'masked_token') {
+    const expectedLength = matcher.prefix.length
+      + matcher.leadingBytes
+      + matcher.separator.length
+      + matcher.trailingBytes
+      + matcher.suffix.length;
+    if (bytes.length !== expectedLength) return false;
+    let offset = 0;
+    if (matcher.prefix.some((byte, index) => bytes[index] !== byte)) return false;
+    offset += matcher.prefix.length;
+    const isTokenByte = (byte: number): boolean => (
+      (byte >= 0x30 && byte <= 0x39)
+      || (byte >= 0x41 && byte <= 0x5a)
+      || (byte >= 0x61 && byte <= 0x7a)
+      || byte === 0x2d
+      || byte === 0x5f
+    );
+    for (let index = 0; index < matcher.leadingBytes; index += 1) {
+      if (!isTokenByte(bytes[offset + index]!)) return false;
+    }
+    offset += matcher.leadingBytes;
+    if (matcher.separator.some((byte, index) => bytes[offset + index] !== byte)) return false;
+    offset += matcher.separator.length;
+    for (let index = 0; index < matcher.trailingBytes; index += 1) {
+      if (!isTokenByte(bytes[offset + index]!)) return false;
+    }
+    offset += matcher.trailingBytes;
+    return matcher.suffix.every((byte, index) => bytes[offset + index] === byte);
   }
   if (bytes.length < matcher.minBytes || bytes.length > matcher.maxBytes) return false;
   if (matcher.prefix.some((byte, index) => bytes[index] !== byte)) return false;
@@ -488,6 +570,46 @@ function cloneEnabledTools(value: unknown): readonly string[] {
   return tools;
 }
 
+function validateCodexAuthorityArguments(argv: readonly string[]): void {
+  const code = 'invalid_authority_attestation' as const;
+  if (
+    argv.length < 12
+    || argv[argv.length - 3] !== 'get'
+    || argv[argv.length - 2] !== 'fsb'
+    || argv[argv.length - 1] !== '--json'
+  ) contractFailure(code);
+  const getIndex = argv.length - 3;
+  let mcpIndex = -1;
+  for (let index = getIndex - 1; index >= 0; index -= 1) {
+    if (argv[index] === 'mcp') {
+      mcpIndex = index;
+      break;
+    }
+  }
+  if (mcpIndex < 0 || (getIndex - mcpIndex - 1) % 2 !== 0) contractFailure(code);
+  const values: string[] = [];
+  for (let index = mcpIndex + 1; index < getIndex; index += 2) {
+    if (argv[index] !== '-c') contractFailure(code);
+    values.push(argv[index + 1]!);
+  }
+  const exactCritical = [
+    'mcp_servers={}',
+    'mcp_servers.fsb.required=true',
+    'mcp_servers.fsb.enabled=true',
+    'mcp_servers.fsb.enabled_tools=["search_capabilities","invoke_capability"]',
+    'mcp_servers.fsb.default_tools_approval_mode="approve"',
+  ];
+  if (exactCritical.some((value) => values.filter((item) => item === value).length !== 1)) {
+    contractFailure(code);
+  }
+  const urlValues = values.filter((value) => value.startsWith('mcp_servers.fsb.url='));
+  if (urlValues.length !== 1) contractFailure(code);
+  const allowedMcpValues = new Set([...exactCritical, urlValues[0]!]);
+  if (values.some((value) => value.startsWith('mcp_servers') && !allowedMcpValues.has(value))) {
+    contractFailure(code);
+  }
+}
+
 /** Validate the exact provider-neutral effective-authority descriptor. */
 export function validateEffectiveAuthorityAttestation(
   value: unknown,
@@ -513,7 +635,10 @@ export function validateEffectiveAuthorityAttestation(
     ], code);
     if (
       ownValue(record, 'source', code) !== 'retained_binary'
-      || ownValue(record, 'classifier', code) !== 'effective_authority_json'
+      || (
+        ownValue(record, 'classifier', code) !== 'effective_authority_json'
+        && ownValue(record, 'classifier', code) !== 'codex_effective_authority_json'
+      )
       || ownValue(record, 'expectedServerName', code) !== 'fsb'
       || ownValue(record, 'endpointRef', code) !== 'direct_runtime_endpoint'
       || ownValue(record, 'required', code) !== true
@@ -523,9 +648,18 @@ export function validateEffectiveAuthorityAttestation(
       || ownValue(record, 'env', code) !== 'absent'
       || ownValue(record, 'bearerToken', code) !== 'absent'
     ) contractFailure(code);
+    const classifier = ownValue(
+      record,
+      'classifier',
+      code,
+    ) as EffectiveAuthorityAttestation['classifier'];
+    const argv = cloneArguments(ownValue(record, 'argv', code), code);
+    if (classifier === 'codex_effective_authority_json') {
+      validateCodexAuthorityArguments(argv);
+    }
     return Object.freeze({
       source: 'retained_binary',
-      argv: cloneArguments(ownValue(record, 'argv', code), code),
+      argv,
       timeoutMs: boundedInteger(ownValue(record, 'timeoutMs', code), 1, MAX_TIMEOUT_MS, code),
       stdoutLimitBytes: boundedInteger(
         ownValue(record, 'stdoutLimitBytes', code),
@@ -539,7 +673,7 @@ export function validateEffectiveAuthorityAttestation(
         MAX_CHANNEL_BYTES,
         code,
       ),
-      classifier: 'effective_authority_json',
+      classifier,
       expectedServerName: 'fsb',
       endpointRef: 'direct_runtime_endpoint',
       required: true,
@@ -589,6 +723,79 @@ function observedTools(value: unknown): readonly string[] | null {
   }
 }
 
+function classifyCodexNativeAuthority(
+  value: unknown,
+  descriptor: EffectiveAuthorityAttestation,
+  directRuntime: DirectRuntimeReference,
+): EffectiveAuthorityClassification {
+  const code = 'invalid_authority_attestation' as const;
+  const server = exactRecord(value, [
+    'name',
+    'enabled',
+    'disabled_reason',
+    'transport',
+    'enabled_tools',
+    'disabled_tools',
+    'startup_timeout_sec',
+    'tool_timeout_sec',
+  ], code);
+  const transport = exactRecord(ownValue(server, 'transport', code), [
+    'type',
+    'url',
+    'bearer_token_env_var',
+    'http_headers',
+    'env_http_headers',
+  ], code);
+  if (
+    ownValue(server, 'disabled_reason', code) !== null
+    || ownValue(server, 'disabled_tools', code) !== null
+    || ownValue(server, 'startup_timeout_sec', code) !== null
+    || ownValue(server, 'tool_timeout_sec', code) !== null
+    || ownValue(transport, 'type', code) !== 'streamable_http'
+  ) return malformedAuthority();
+  const tools = observedTools(ownValue(server, 'enabled_tools', code));
+  const serverCountMatches = true;
+  const serverNameMatches = ownValue(server, 'name', code) === descriptor.expectedServerName;
+  const endpointMatches = ownValue(transport, 'url', code) === directRuntime.endpoint;
+  const requiredMatches = true;
+  const enabledMatches = ownValue(server, 'enabled', code) === descriptor.enabled;
+  const enabledToolsMatch = tools !== null
+    && tools.length === descriptor.enabledTools.length
+    && new Set(tools).size === tools.length
+    && tools.every((tool, index) => tool === descriptor.enabledTools[index]);
+  const approvalPolicyMatches = true;
+  const headersAbsent = ownValue(transport, 'http_headers', code) === null;
+  const envAbsent = ownValue(transport, 'env_http_headers', code) === null;
+  const bearerTokenAbsent = ownValue(transport, 'bearer_token_env_var', code) === null;
+  const checks = [
+    ['server_name', serverNameMatches],
+    ['endpoint', endpointMatches],
+    ['required', requiredMatches],
+    ['enabled', enabledMatches],
+    ['enabled_tools', enabledToolsMatch],
+    ['approval_policy', approvalPolicyMatches],
+    ['headers_present', headersAbsent],
+    ['env_present', envAbsent],
+    ['bearer_present', bearerTokenAbsent],
+  ] as const;
+  const failed = checks.find(([, pass]) => !pass);
+  const pass = failed === undefined;
+  return Object.freeze({
+    pass,
+    reason: pass ? 'match' : failed[0],
+    serverCountMatches,
+    serverNameMatches,
+    endpointMatches,
+    requiredMatches,
+    enabledMatches,
+    enabledToolsMatch,
+    approvalPolicyMatches,
+    headersAbsent,
+    envAbsent,
+    bearerTokenAbsent,
+  });
+}
+
 /** Reduce a parsed native roster to equality booleans and one closed reason. */
 export function classifyEffectiveAuthority(
   value: unknown,
@@ -598,6 +805,9 @@ export function classifyEffectiveAuthority(
   try {
     const descriptor = validateEffectiveAuthorityAttestation(descriptorValue);
     const directRuntime = validateDirectRuntimeReference(directRuntimeValue);
+    if (descriptor.classifier === 'codex_effective_authority_json') {
+      return classifyCodexNativeAuthority(value, descriptor, directRuntime);
+    }
     const root = exactRecord(value, ['servers'], 'invalid_authority_attestation');
     const servers = denseArray(
       ownValue(root, 'servers', 'invalid_authority_attestation'),

@@ -5,12 +5,14 @@ import {
 
 export const CLAUDE_CODE_ADAPTER_ID = 'claude-code' as const;
 export const OPENCODE_ADAPTER_ID = 'opencode' as const;
+export const CODEX_ADAPTER_ID = 'codex' as const;
 
 export type AgentProviderId =
   | typeof CLAUDE_CODE_ADAPTER_ID
-  | typeof OPENCODE_ADAPTER_ID;
+  | typeof OPENCODE_ADAPTER_ID
+  | typeof CODEX_ADAPTER_ID;
 
-export type AdapterAuthState = 'authenticated' | 'unauthenticated' | 'unknown';
+export type AdapterAuthState = 'chatgpt' | 'api_key' | 'unauthenticated' | 'unknown';
 
 export type AdapterDiagnosticCode =
   | 'adapter_unavailable'
@@ -80,6 +82,14 @@ export type ProbeByteMatcher =
       suffix: readonly number[];
       minBytes: number;
       maxBytes: number;
+    }>
+  | Readonly<{
+      kind: 'masked_token';
+      prefix: readonly number[];
+      separator: readonly number[];
+      suffix: readonly number[];
+      leadingBytes: number;
+      trailingBytes: number;
     }>;
 
 export interface IdentityProbeOutcome {
@@ -107,7 +117,7 @@ export interface EffectiveAuthorityAttestation {
   readonly timeoutMs: number;
   readonly stdoutLimitBytes: number;
   readonly stderrLimitBytes: number;
-  readonly classifier: 'effective_authority_json';
+  readonly classifier: 'effective_authority_json' | 'codex_effective_authority_json';
   readonly expectedServerName: 'fsb';
   readonly endpointRef: 'direct_runtime_endpoint';
   readonly required: true;
@@ -863,7 +873,11 @@ function cloneTopology(value: unknown): SpawnTopology {
 }
 
 function cloneAdapterId(value: unknown): AgentProviderId {
-  if (value !== CLAUDE_CODE_ADAPTER_ID && value !== OPENCODE_ADAPTER_ID) {
+  if (
+    value !== CLAUDE_CODE_ADAPTER_ID
+    && value !== OPENCODE_ADAPTER_ID
+    && value !== CODEX_ADAPTER_ID
+  ) {
     invalidContract('adapter id');
   }
   return value;

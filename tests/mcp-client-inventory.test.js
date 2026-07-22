@@ -56,10 +56,26 @@ function openCodeDetection(overrides = {}) {
   };
 }
 
+function codexDetection(overrides = {}) {
+  return {
+    installed: true,
+    version: '0.142.5',
+    authState: 'chatgpt',
+    binary: {
+      command: '/private/CODEX_EXECUTABLE_SENTINEL',
+      realPath: '/private/CODEX_EXECUTABLE_SENTINEL',
+      argvPrefix: [],
+    },
+    profileVersion: '0.142.5',
+    ...overrides,
+  };
+}
+
 function requiredInventoryPlatforms(extra = {}) {
   return {
     'claude-code': fakePlatform('Claude Code'),
     opencode: fakePlatform('OpenCode'),
+    codex: fakePlatform('Codex'),
     ...extra,
   };
 }
@@ -105,6 +121,13 @@ async function main() {
           nativeBody: 'OPENCODE_NATIVE_BODY_SENTINEL',
           diagnostic: { code: 'ok', message: 'OPENCODE_DIAGNOSTIC_SENTINEL' },
         }),
+        detectCodex: async () => codexDetection({
+          authState: 'CODEX_AUTH_SENTINEL',
+          model: 'CODEX_MODEL_SENTINEL',
+          config: 'CODEX_CONFIG_SENTINEL',
+          nativeBody: 'CODEX_NATIVE_BODY_SENTINEL',
+          diagnostic: { code: 'ok', message: 'CODEX_DIAGNOSTIC_SENTINEL' },
+        }),
         resolvePlatformTarget: (key) => {
           resolvedKeys.push(key);
           return {
@@ -122,7 +145,9 @@ async function main() {
       assert.deepEqual(Object.keys(inventory), Object.keys(PLATFORMS), 'every registry key appears');
       assert.deepEqual(
         resolvedKeys,
-        Object.keys(PLATFORMS).filter((key) => key !== 'claude-code' && key !== 'opencode'),
+        Object.keys(PLATFORMS).filter((key) => (
+          key !== 'claude-code' && key !== 'opencode' && key !== 'codex'
+        )),
         'every non-provider entry delegates unchanged to resolvePlatformTarget',
       );
       assert.deepEqual(inventory.cursor, {
@@ -141,6 +166,10 @@ async function main() {
         detected: true,
         checkedAt: 1_783_858_833_000,
       }, 'OpenCode inventory reuses retained detector evidence but projects availability only');
+      assert.deepEqual(inventory.codex, {
+        detected: true,
+        checkedAt: 1_783_858_833_000,
+      }, 'Codex inventory reuses retained detector evidence but projects availability only');
       const serializedInventory = JSON.stringify(inventory);
       for (const forbidden of [
         '/fixture/cursor.json',
@@ -152,6 +181,13 @@ async function main() {
         'OPENCODE_CONFIG_SENTINEL',
         'OPENCODE_NATIVE_BODY_SENTINEL',
         'OPENCODE_DIAGNOSTIC_SENTINEL',
+        '0.142.5',
+        'CODEX_EXECUTABLE_SENTINEL',
+        'CODEX_AUTH_SENTINEL',
+        'CODEX_MODEL_SENTINEL',
+        'CODEX_CONFIG_SENTINEL',
+        'CODEX_NATIVE_BODY_SENTINEL',
+        'CODEX_DIAGNOSTIC_SENTINEL',
       ]) {
         assert.equal(serializedInventory.includes(forbidden), false,
           `browser-bound inventory excludes ${forbidden}`);
@@ -170,6 +206,7 @@ async function main() {
         platforms: requiredInventoryPlatforms(),
         now: () => 200,
         detectOpenCode: async () => openCodeDetection(),
+        detectCodex: async () => codexDetection(),
         execFile: (file, args, options, callback) => {
           calls.push({ file, args, options });
           const failure = failures.shift();
@@ -198,6 +235,7 @@ async function main() {
         platform: 'darwin',
         platforms: requiredInventoryPlatforms(),
         detectOpenCode: async () => openCodeDetection(),
+        detectCodex: async () => codexDetection(),
         execFile: successfulExec('Claude development build', calls),
       });
       const inventory = await detectMcpClientInventory();
@@ -214,6 +252,7 @@ async function main() {
         platforms: requiredInventoryPlatforms(),
         now: () => 400,
         detectOpenCode: async () => openCodeDetection(),
+        detectCodex: async () => codexDetection(),
         execFile: (_file, _args, _options, callback) => {
           callback(failingError(code), '', '');
         },
@@ -231,6 +270,7 @@ async function main() {
         platform: 'linux',
         platforms: requiredInventoryPlatforms(),
         detectOpenCode: async () => openCodeDetection(),
+        detectCodex: async () => codexDetection(),
         execFile: (_file, _args, _options, callback) => {
           execCount += 1;
           callback(null, '1.2.3', '');
@@ -280,6 +320,7 @@ async function main() {
             callback(failingError('ENOENT'), '', '');
           },
           detectOpenCode: async () => detection,
+          detectCodex: async () => codexDetection(),
         });
         const inventory = await detectMcpClientInventory();
         assert.deepEqual(inventory.opencode, {
@@ -293,9 +334,58 @@ async function main() {
     }
 
     {
+      let accessorRead = false;
+      const accessorDetection = {};
+      for (const key of ['version', 'binary']) {
+        Object.defineProperty(accessorDetection, key, {
+          enumerable: true,
+          get() {
+            accessorRead = true;
+            return key === 'version' ? '0.142.5' : codexDetection().binary;
+          },
+        });
+      }
+      const cases = [
+        ['exact profile', codexDetection(), true],
+        ['newer retained profile', codexDetection({
+          installed: false,
+          version: '0.144.6',
+        }), true],
+        ['missing binary', codexDetection({
+          installed: false,
+          version: null,
+          binary: null,
+        }), false],
+        ['accessor evidence', accessorDetection, false],
+        ['prototype evidence', Object.create(codexDetection()), false],
+      ];
+      for (const [label, detection, expectedDetected] of cases) {
+        __configureClientInventoryForTests({
+          platform: 'linux',
+          platforms: requiredInventoryPlatforms(),
+          now: () => 475,
+          execFile: (_file, _args, _options, callback) => {
+            callback(failingError('ENOENT'), '', '');
+          },
+          detectOpenCode: async () => openCodeDetection(),
+          detectCodex: async () => detection,
+        });
+        const inventory = await detectMcpClientInventory();
+        assert.deepEqual(inventory.codex, {
+          detected: expectedDetected,
+          checkedAt: 475,
+        }, `${label} projects deterministic Codex availability only`);
+        assert.deepEqual(Object.keys(inventory.codex), ['detected', 'checkedAt'],
+          `${label} cannot expand the browser-bound inventory grammar`);
+      }
+      assert.equal(accessorRead, false, 'inventory rejects Codex accessors without invoking them');
+    }
+
+    {
       const platforms = {
         'claude-code': { detected: false, checkedAt: 500 },
         opencode: { detected: false, checkedAt: 500 },
+        codex: { detected: false, checkedAt: 500 },
         cursor: { detected: true, checkedAt: 500 },
       };
       __configureClientInventoryForTests({
@@ -305,6 +395,12 @@ async function main() {
           callback(failingError('ENOENT'), '', '');
         },
         detectOpenCode: async () => openCodeDetection({
+          installed: false,
+          version: null,
+          binary: null,
+          profileVersion: null,
+        }),
+        detectCodex: async () => codexDetection({
           installed: false,
           version: null,
           binary: null,
@@ -373,6 +469,7 @@ async function main() {
         now: () => 700,
         execFile: successfulExec('Claude Code 2.1.177', []),
         detectOpenCode: async () => openCodeDetection(),
+        detectCodex: async () => codexDetection(),
       });
       await assert.rejects(
         detectMcpClientInventory(),
@@ -404,6 +501,18 @@ async function main() {
       serveLifecycleSource,
       /await bridge\.connect\(\);\s*await dependencies\.pushInventory\(bridge\);/,
       'serve mode pushes inventory immediately after its recovery-gated bridge connect',
+    );
+    const inventorySource = fs.readFileSync(
+      path.join(repoRoot, 'mcp', 'src', 'client-inventory.ts'),
+      'utf8',
+    );
+    assert.match(inventorySource, /execFile: TEST_ONLY_EXEC_FILE/);
+    assert.match(inventorySource, /detectOpenCode: TEST_ONLY_PROVIDER_DETECT/);
+    assert.match(inventorySource, /detectCodex: TEST_ONLY_PROVIDER_DETECT/);
+    assert.equal(
+      (fs.readFileSync(__filename, 'utf8').match(/detectCodex:\s*async/g) || []).length,
+      (fs.readFileSync(__filename, 'utf8').match(/__configureClientInventoryForTests\(\{/g) || []).length,
+      'every injected inventory case supplies a synthetic Codex detector',
     );
 
     console.log('mcp-client-inventory.test.js: PASS');

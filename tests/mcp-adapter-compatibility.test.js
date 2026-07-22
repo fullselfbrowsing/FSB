@@ -142,7 +142,7 @@ async function requestServeCompatibility(serveDelegation, registry, checkedAt = 
       },
       createQueue: () => ({}),
       startHttp: async () => ({
-        endpoint: 'http://127.0.0.1:7225',
+        endpoint: 'http://127.0.0.1:7225/mcp',
         healthEndpoint: 'http://127.0.0.1:7225/health',
         markServeReady() {},
         async close() {},
@@ -189,10 +189,10 @@ async function main() {
 
   assert.deepEqual(Object.keys(ADAPTER_COMPATIBILITY_MATRIX).sort(), ['adapters', 'schemaVersion']);
   assert.equal(ADAPTER_COMPATIBILITY_MATRIX.schemaVersion, 1);
-  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 2);
+  assert.equal(ADAPTER_COMPATIBILITY_MATRIX.adapters.length, 3);
   assert.deepEqual(
     ADAPTER_COMPATIBILITY_MATRIX.adapters.map((candidate) => candidate.adapterId),
-    ['claude-code', 'opencode'],
+    ['claude-code', 'opencode', 'codex'],
   );
   const row = ADAPTER_COMPATIBILITY_MATRIX.adapters[0];
   assert.deepEqual(Object.keys(row).sort(), ROW_KEYS);
@@ -272,10 +272,42 @@ async function main() {
       'result',
     ],
   });
+  const codexRow = ADAPTER_COMPATIBILITY_MATRIX.adapters[2];
+  assert.deepEqual(Object.keys(codexRow).sort(), ROW_KEYS);
+  assert.deepEqual(codexRow, {
+    adapterId: 'codex',
+    capabilities: {
+      taskMode: true,
+      chatMode: false,
+      resume: false,
+      serverMode: false,
+    },
+    displayLabel: 'Codex',
+    profileVersion: '0.142.5',
+    minimumVersion: '0.142.5',
+    testedThroughVersion: '0.142.5',
+    supportedMajor: 0,
+    fixtureManifest: 'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
+    requiredInitFields: ['type', 'thread_id'],
+    requiredResultFields: [
+      'type',
+      'usage.input_tokens',
+      'usage.cached_input_tokens',
+      'usage.output_tokens',
+      'usage.reasoning_output_tokens',
+    ],
+    expectedNormalizedSequence: [
+      'init',
+      'assistant',
+      'tool_use',
+      'tool_result',
+      'result',
+    ],
+  });
   assertDeepFrozen(ADAPTER_COMPATIBILITY_MATRIX);
   assert.strictEqual(getAdapterCompatibilityContract('claude-code'), row);
   assert.strictEqual(getAdapterCompatibilityContract('opencode'), openCodeRow);
-  assert.equal(getAdapterCompatibilityContract('codex'), null);
+  assert.strictEqual(getAdapterCompatibilityContract('codex'), codexRow);
   assert.equal(getAdapterCompatibilityContract('OpenCode'), null);
 
   assert.equal(extractAdapterVersion('Claude Code 2.1.177'), '2.1.177');
@@ -367,9 +399,27 @@ async function main() {
     'opencode',
   );
   assertClassification(
-    classifyAdapterCompatibility('codex', '1.14.25'),
+    classifyAdapterCompatibility('codex', '0.142.5'),
+    'supported',
+    'within_tested_range',
+    'codex',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('codex', '0.144.6'),
+    'degraded',
+    'newer_than_tested_range',
+    'codex',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('codex', '0.142.4'),
     'unsupported',
-    'adapter_unshipped',
+    'below_minimum',
+    'codex',
+  );
+  assertClassification(
+    classifyAdapterCompatibility('codex', '1.0.0'),
+    'unsupported',
+    'wrong_major',
     'codex',
   );
 
@@ -384,9 +434,10 @@ async function main() {
 
   const supported = classifyAdapterCompatibility('claude-code', '2.1.177');
   const openCodeSupported = classifyAdapterCompatibility('opencode', '1.14.25');
+  const codexSupported = classifyAdapterCompatibility('codex', '0.142.5');
   const snapshot = createSafeCompatibilitySnapshot(
     1_784_222_000_000,
-    [supported, openCodeSupported],
+    [supported, openCodeSupported, codexSupported],
   );
   assert.deepEqual(snapshot, {
     schemaVersion: 1,
@@ -399,6 +450,11 @@ async function main() {
     }, {
       adapterId: 'opencode',
       displayLabel: 'OpenCode',
+      status: 'supported',
+      reason: 'within_tested_range',
+    }, {
+      adapterId: 'codex',
+      displayLabel: 'Codex',
       status: 'supported',
       reason: 'within_tested_range',
     }],
@@ -432,6 +488,7 @@ async function main() {
   const daemonSentinels = [
     '/private/CLAUDE_EXECUTABLE_SENTINEL',
     '/private/OPENCODE_EXECUTABLE_SENTINEL',
+    '/private/CODEX_EXECUTABLE_SENTINEL',
     'DAEMON_RAW_VERSION_SENTINEL',
     'DAEMON_AUTH_SENTINEL',
     'DAEMON_BILLING_SENTINEL',
@@ -447,27 +504,28 @@ async function main() {
   const daemonSnapshot = await requestServeCompatibility(
     serveDelegation,
     compatibilityRegistry(
-      ['claude-code', 'opencode'],
+      ['claude-code', 'opencode', 'codex'],
       {
         'claude-code': retainedDetection('2.1.177', daemonSentinels[0]),
         opencode: retainedDetection('1.14.25', daemonSentinels[1], {
-          rawVersion: daemonSentinels[2],
-          auth: daemonSentinels[3],
-          billing: daemonSentinels[4],
-          model: daemonSentinels[5],
-          config: daemonSentinels[6],
-          nativeBody: daemonSentinels[7],
-          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[8] },
-          topology: daemonSentinels[9],
-          endpoint: daemonSentinels[10],
-          port: daemonSentinels[11],
-          secret: daemonSentinels[12],
+          rawVersion: daemonSentinels[3],
+          auth: daemonSentinels[4],
+          billing: daemonSentinels[5],
+          model: daemonSentinels[6],
+          config: daemonSentinels[7],
+          nativeBody: daemonSentinels[8],
+          diagnostic: { code: 'agent_protocol_drift', message: daemonSentinels[9] },
+          topology: daemonSentinels[10],
+          endpoint: daemonSentinels[11],
+          port: daemonSentinels[12],
+          secret: daemonSentinels[13],
         }),
+        codex: retainedDetection('0.142.5', daemonSentinels[2]),
       },
     ),
   );
   assert.deepEqual(daemonSnapshot, snapshot,
-    'serve compatibility returns the exact two-row browser-safe canonical snapshot');
+    'serve compatibility returns the exact three-row browser-safe canonical snapshot');
   assertDeepFrozen(daemonSnapshot);
   const serializedDaemonSnapshot = JSON.stringify(daemonSnapshot);
   for (const sentinel of daemonSentinels) {
@@ -502,10 +560,11 @@ async function main() {
     const projected = await requestServeCompatibility(
       serveDelegation,
       compatibilityRegistry(
-        ['claude-code', 'opencode'],
+        ['claude-code', 'opencode', 'codex'],
         {
           'claude-code': retainedDetection('2.1.177', '/opt/claude'),
           opencode: openCodeDetection,
+          codex: retainedDetection('0.142.5', '/opt/codex'),
         },
       ),
       1_784_222_000_001,
@@ -516,7 +575,7 @@ async function main() {
       status: expectedStatus,
       reason: expectedReason,
     }, `${label} produces one deterministic OpenCode safe row without omission`);
-    assert.equal(projected.adapters.length, 2, `${label} preserves the exact two-provider roster`);
+    assert.equal(projected.adapters.length, 3, `${label} preserves the exact three-provider roster`);
     for (const sentinel of [
       'NEWER_MESSAGE_SENTINEL',
       'MISSING_MESSAGE_SENTINEL',
@@ -548,10 +607,11 @@ async function main() {
     const projected = await requestServeCompatibility(
       serveDelegation,
       compatibilityRegistry(
-        ['claude-code', 'opencode'],
+        ['claude-code', 'opencode', 'codex'],
         {
           'claude-code': retainedDetection('2.1.177', '/opt/claude'),
           opencode: unsafeDetection,
+          codex: retainedDetection('0.142.5', '/opt/codex'),
         },
       ),
     );
@@ -571,7 +631,7 @@ async function main() {
     enumerable: true,
     get() {
       rosterAccessorReads += 1;
-      return () => ['claude-code', 'opencode'];
+      return () => ['claude-code', 'opencode', 'codex'];
     },
   });
   accessorRegistry.require = () => {
@@ -579,15 +639,15 @@ async function main() {
     return Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') });
   };
   const prototypeRegistry = Object.create({
-    ids: () => Object.freeze(['claude-code', 'opencode']),
+    ids: () => Object.freeze(['claude-code', 'opencode', 'codex']),
     require: () => Object.freeze({ detect: async () => retainedDetection('2.1.177', '/opt/claude') }),
   });
   const mismatchRegistries = [
-    ['missing', ['claude-code']],
-    ['duplicate', ['claude-code', 'opencode', 'opencode']],
-    ['orphan', ['claude-code', 'opencode', 'codex']],
-    ['case variant', ['claude-code', 'OpenCode']],
-    ['reordered', ['opencode', 'claude-code']],
+    ['missing', ['claude-code', 'opencode']],
+    ['duplicate', ['claude-code', 'opencode', 'codex', 'codex']],
+    ['orphan', ['claude-code', 'opencode', 'codex', 'foreign']],
+    ['case variant', ['claude-code', 'OpenCode', 'codex']],
+    ['reordered', ['opencode', 'claude-code', 'codex']],
   ].map(([label, ids]) => [label, Object.freeze({
     ids: () => Object.freeze([...ids]),
     require: () => {
@@ -695,7 +755,7 @@ async function main() {
   duplicateAdapter.adapters.push(clone(row));
   invalidMatrices.push(duplicateAdapter);
   const sparseAdapters = clone(ADAPTER_COMPATIBILITY_MATRIX);
-  sparseAdapters.adapters.length = 3;
+  sparseAdapters.adapters.length = 4;
   invalidMatrices.push(sparseAdapters);
   const missingOpenCode = clone(ADAPTER_COMPATIBILITY_MATRIX);
   missingOpenCode.adapters.pop();

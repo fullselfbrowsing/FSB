@@ -1,0 +1,11 @@
+{"type":"thread.started","thread_id":"synthetic-codex-thread-01"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"synthetic-todo-01","type":"todo_list","items":[{"text":"synthetic private plan","completed":false}]}}
+{"type":"item.completed","item":{"id":"synthetic-reasoning-01","type":"reasoning","text":"synthetic private reasoning"}}
+{"type":"item.completed","item":{"id":"synthetic-message-01","type":"agent_message","text":"synthetic-assistant-before-tool"}}
+{"type":"item.started","item":{"id":"synthetic-call-01","type":"mcp_tool_call","server":"fsb","tool":"search_capabilities","arguments":{"query":"synthetic capability"},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.updated","item":{"id":"synthetic-todo-01","type":"todo_list","items":[{"text":"synthetic private plan","completed":true}]}}
+{"type":"item.completed","item":{"id":"synthetic-reasoning-02","type":"reasoning","text":"synthetic private reasoning after tool start"}}
+{"type":"item.completed","item":{"id":"synthetic-call-01","type":"mcp_tool_call","server":"fsb","tool":"search_capabilities","arguments":{"query":"synthetic capability"},"result":{"content":[{"type":"text","text":"synthetic tool output"}],"structured_content":{"matches":[]}},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"synthetic-todo-01","type":"todo_list","items":[{"text":"synthetic private plan","completed":true}]}}
+{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10}}

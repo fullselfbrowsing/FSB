@@ -23,6 +23,43 @@ const PHASE63_UI_SPEC_PATH = `${PHASE63_DIR}/63-UI-SPEC.md`;
 const PHASE64_DIR = '.planning/phases/64-opencode-adapter';
 const PHASE64_UAT_PATH = `${PHASE64_DIR}/64-HUMAN-UAT.md`;
 const PHASE64_VALIDATION_PATH = `${PHASE64_DIR}/64-VALIDATION.md`;
+const PHASE65_DIR = '.planning/phases/65-codex-adapter';
+const PHASE65_PLAN05_PATH = `${PHASE65_DIR}/65-05-PLAN.md`;
+
+const PHASE65_ATOMIC_EXPOSURE_FILES = Object.freeze([
+  'mcp/src/agent-providers/adapter.ts',
+  'mcp/src/agent-providers/accepted-identity.ts',
+  'mcp/src/agent-providers/codex.ts',
+  'mcp/src/agent-providers/codex-detect.ts',
+  'mcp/src/agent-providers/codex-profile.ts',
+  'mcp/src/agent-providers/codex-stream.ts',
+  'mcp/src/agent-providers/registry.ts',
+  'mcp/src/agent-providers/compatibility.ts',
+  'mcp/src/agent-providers/protocol-drift.ts',
+  'mcp/src/agent-providers/spawn-environment.ts',
+  'mcp/src/agent-providers/effective-authority.ts',
+  'mcp/src/agent-providers/runtime-files.ts',
+  'mcp/src/agent-providers/spawn-supervisor.ts',
+  'mcp/src/agent-providers/serve-delegation.ts',
+  'mcp/src/client-inventory.ts',
+  'mcp/src/diagnostics.ts',
+  'tests/mcp-codex-adapter.test.js',
+  'tests/mcp-agent-orphan-recovery.test.js',
+  'tests/mcp-spawn-supervisor.test.js',
+  'tests/mcp-agent-stream-fixture.test.js',
+  'tests/mcp-agent-drift-smoke.test.js',
+  'tests/mcp-agent-provider-contract.test.js',
+  'tests/mcp-adapter-compatibility.test.js',
+  'tests/mcp-version-parity.test.js',
+  'tests/mcp-diagnostics-status.test.js',
+  'tests/mcp-client-inventory.test.js',
+  'tests/agent-provider-forbidden-flags.test.js',
+  'tests/delegation-phase-contract.test.js',
+  'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
+  'tests/fixtures/agent-streams/codex-0.142.5/contract-stream.jsonl',
+  'tests/fixtures/agent-streams/codex-0.142.5/expected-events.json',
+  'tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json',
+]);
 
 const PHASE64_NEW_ROOT_COMMANDS = Object.freeze([
   'node tests/phase64-full-tests-harness.test.js',
@@ -1394,6 +1431,91 @@ function runPhase63FinalContract() {
   'final automated contract leaves genuine OS/browser/accessibility evidence human-needed');
 }
 
+function phase65AtomicExposureViolations(files) {
+  const violations = [];
+  for (const relativePath of PHASE65_ATOMIC_EXPOSURE_FILES) {
+    if (typeof files[relativePath] !== 'string') violations.push(`missing:${relativePath}`);
+  }
+  const production = Object.entries(files)
+    .filter(([relativePath]) => relativePath.startsWith('mcp/src/'))
+    .map(([, source]) => source)
+    .join('\n');
+  const exposed = [
+    'CODEX_ADAPTER_ID',
+    'createCodexAdapter',
+    "adapterId: 'codex'",
+    'codex-0.142.5',
+  ].some((token) => production.includes(token));
+  if (!exposed) violations.push('production:codex-not-exposed');
+  for (const token of [
+    'CODEX_ADAPTER_ID',
+    'createCodexAdapter',
+    'createCodexDetector',
+    'buildCodexSpawnSpec',
+    'parseCodexEvents',
+    'codex-0.142.5',
+  ]) {
+    if (!production.includes(token)) violations.push(`production:${token}`);
+  }
+  for (const relativePath of [
+    'tests/fixtures/agent-streams/codex-0.142.5/manifest.json',
+    'tests/fixtures/agent-streams/codex-0.142.5/contract-stream.jsonl',
+    'tests/fixtures/agent-streams/codex-0.142.5/expected-events.json',
+    'tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json',
+  ]) {
+    if (typeof files[relativePath] !== 'string') violations.push(`fixture:${relativePath}`);
+  }
+  return violations;
+}
+
+function runPhase65AtomicExposureContract() {
+  console.log('\n--- Phase 65 atomic Codex exposure ---');
+  const plan = read(PHASE65_PLAN05_PATH);
+  const taskIds = Array.from(plan.matchAll(/<task id="([^"]+)"/g), (match) => match[1]);
+  check(JSON.stringify(taskIds) === JSON.stringify(['65-05-01']),
+    'Plan 05 contains exactly the single atomic exposure task');
+  const taskFiles = (plan.match(/<files>([^<]+)<\/files>/) || [null, ''])[1]
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  check(JSON.stringify(taskFiles) === JSON.stringify(PHASE65_ATOMIC_EXPOSURE_FILES),
+    'the single task owns the complete corrected exposure file set in exact order');
+  const frontmatterFiles = (plan.match(/files_modified:\n([\s\S]*?)\nautonomous:/) || [null, ''])[1]
+    .split('\n')
+    .map((line) => line.match(/^\s*-\s+(.+)$/)?.[1] || '')
+    .filter(Boolean);
+  check(JSON.stringify(frontmatterFiles) === JSON.stringify(PHASE65_ATOMIC_EXPOSURE_FILES),
+    'frontmatter and task ownership expose the same indivisible file boundary');
+  check(/exactly one task and exactly one indivisible executor commit/.test(plan)
+      && /Commit all listed files once/.test(plan)
+      && /do not create an intermediate production commit/.test(plan),
+  'Plan 05 pins one implementation commit with no intermediate exposure');
+
+  const files = Object.fromEntries(PHASE65_ATOMIC_EXPOSURE_FILES.map((relativePath) => [
+    relativePath,
+    exists(relativePath) ? read(relativePath) : null,
+  ]));
+  const violations = phase65AtomicExposureViolations(files);
+  check(violations.length === 0,
+    `complete Codex exposure has no partial-surface violations: ${violations.join(', ')}`);
+  const mutation = { ...files };
+  delete mutation['tests/fixtures/agent-streams/codex-0.142.5/native-negative-corpus.json'];
+  check(phase65AtomicExposureViolations(mutation).length > 0,
+    'the sentinel rejects a literal partial-exposure mutation');
+
+  const adapter = files['mcp/src/agent-providers/adapter.ts'] || '';
+  const registry = files['mcp/src/agent-providers/registry.ts'] || '';
+  const compatibility = files['mcp/src/agent-providers/compatibility.ts'] || '';
+  const drift = files['tests/mcp-agent-drift-smoke.test.js'] || '';
+  check(/CODEX_ADAPTER_ID\s*=\s*'codex'/.test(adapter)
+      && /'chatgpt'\s*\|\s*'api_key'\s*\|\s*'unauthenticated'\s*\|\s*'unknown'/.test(adapter),
+  'adapter ids and auth states expose the closed Codex contract together');
+  check(/createCodexAdapter/.test(registry)
+      && /codex-0\.142\.5/.test(compatibility)
+      && /codex-0\.142\.5/.test(drift),
+  'registry, matrix, fixture parser, and drift roster expose Codex together');
+}
+
 const sectionArgs = process.argv.slice(2);
 if (sectionArgs.length > 0) {
   if (sectionArgs.length !== 2
@@ -1403,11 +1525,14 @@ if (sectionArgs.length > 0) {
         'phase63-final-contract',
         'phase64-uat-ledger',
         'phase64-validation',
+        'phase65-atomic-exposure',
       ].includes(sectionArgs[1])) {
-    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger|phase64-validation]');
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger|phase64-validation|phase65-atomic-exposure]');
     process.exit(2);
   }
-  if (sectionArgs[1].startsWith('phase64-')) {
+  if (sectionArgs[1] === 'phase65-atomic-exposure') {
+    runPhase65AtomicExposureContract();
+  } else if (sectionArgs[1].startsWith('phase64-')) {
     runPhase64UatLedgerContract();
     if (sectionArgs[1] === 'phase64-validation') {
       runPhase64WiringContract();
@@ -1417,7 +1542,9 @@ if (sectionArgs.length > 0) {
     runPhase63UatLedgerContract();
     if (sectionArgs[1] === 'phase63-final-contract') runPhase63FinalContract();
   }
-  const phaseLabel = sectionArgs[1].startsWith('phase64') ? '64' : '63';
+  const phaseLabel = sectionArgs[1].startsWith('phase65')
+    ? '65'
+    : sectionArgs[1].startsWith('phase64') ? '64' : '63';
   console.log(`\n=== Phase ${phaseLabel} focused contract results: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }

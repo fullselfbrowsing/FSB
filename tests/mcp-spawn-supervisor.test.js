@@ -761,6 +761,17 @@ function runAcceptedIdentityFoundationTests(identityModule) {
       argvPrefix: [],
     },
   };
+  const codexDetection = {
+    installed: true,
+    version: '0.142.5',
+    authState: 'chatgpt',
+    profileVersion: '0.142.5',
+    binary: {
+      command: '/fixture/bin/codex',
+      realPath: '/fixture/bin/codex',
+      argvPrefix: [],
+    },
+  };
   const claude = identityModule.acceptedIdentityFromDetection(
     'claude-code',
     claudeDetection,
@@ -768,6 +779,10 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   const openCode = identityModule.acceptedIdentityFromDetection(
     'opencode',
     openCodeDetection,
+  );
+  const codex = identityModule.acceptedIdentityFromDetection(
+    'codex',
+    codexDetection,
   );
   assert.deepEqual(claude, {
     providerId: 'claude-code',
@@ -783,8 +798,16 @@ function runAcceptedIdentityFoundationTests(identityModule) {
     authState: 'unknown',
     billingKind: 'unknown',
   });
+  assert.deepEqual(codex, {
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription',
+  });
   assert(Object.isFrozen(claude));
   assert(Object.isFrozen(openCode));
+  assert(Object.isFrozen(codex));
   assert.deepEqual(Object.keys(claude), [
     'providerId', 'label', 'profileVersion', 'authState', 'billingKind',
   ]);
@@ -797,6 +820,7 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   assert.equal(validatedNullPrototype.profileVersion, '2.1.177');
   assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, validatedNullPrototype), true);
   assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, openCode), false);
+  assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, codex), false);
 
   const accessor = { ...claude };
   Object.defineProperty(accessor, 'label', {
@@ -829,13 +853,6 @@ function runAcceptedIdentityFoundationTests(identityModule) {
       authState: 'unknown',
       billingKind: 'subscription',
     },
-    {
-      providerId: 'codex',
-      label: 'Codex',
-      profileVersion: '0.142.5',
-      authState: 'chatgpt',
-      billingKind: 'subscription',
-    },
     accessor,
     symbolKey,
     inherited,
@@ -847,7 +864,10 @@ function runAcceptedIdentityFoundationTests(identityModule) {
   }
 
   assert.throws(
-    () => identityModule.acceptedIdentityFromDetection('codex', openCodeDetection),
+    () => identityModule.acceptedIdentityFromDetection('codex', {
+      ...codexDetection,
+      authState: 'authenticated',
+    }),
     /adapter_unavailable/,
   );
   assert.throws(
@@ -1699,7 +1719,11 @@ async function runHappyPathTest(supervisorModule) {
   assert.equal(call.options.cwd, '/fixture/workspace');
   assert.equal(call.options.env.SAFE_VALUE, 'retained-safe-value');
   for (const key of supervisorModule.DELEGATION_PROVIDER_KEY_NAMES) {
-    assert.equal(Object.hasOwn(call.options.env, key), false, `${key} is scrubbed`);
+    if (key === 'CODEX_EXEC_SERVER_URL') {
+      assert.equal(call.options.env[key], 'none', `${key} is forced closed`);
+    } else {
+      assert.equal(Object.hasOwn(call.options.env, key), false, `${key} is scrubbed`);
+    }
   }
   assert.match(call.options.env.FSB_AGENT_ARGV_SIGNATURE, /^[A-Za-z0-9_-]{16,256}$/);
   assert.equal(call.argv.some((value) => value.includes(task)), false);
