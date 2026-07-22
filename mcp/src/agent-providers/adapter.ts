@@ -1,3 +1,8 @@
+import {
+  validateEffectiveAuthorityAttestation,
+  validatePreSpawnIdentityProbe,
+} from './effective-authority.js';
+
 export const CLAUDE_CODE_ADAPTER_ID = 'claude-code' as const;
 export const OPENCODE_ADAPTER_ID = 'opencode' as const;
 
@@ -57,6 +62,61 @@ export interface SpawnContext {
   readonly runtimeFiles: readonly string[];
   /** Optional role-scoped runtime graphs minted by the supervisor. */
   readonly runtimeScopes?: readonly SpawnRuntimeScope[];
+  /** Serve-owned endpoint/generation capability; never accepted from the wire. */
+  readonly directRuntimeReference?: DirectRuntimeReference;
+}
+
+export interface DirectRuntimeReference {
+  readonly endpoint: string;
+  readonly generation: string;
+}
+
+export type ProbeByteMatcher =
+  | Readonly<{ kind: 'empty' }>
+  | Readonly<{ kind: 'exact'; bytes: readonly number[] }>
+  | Readonly<{
+      kind: 'prefix_suffix';
+      prefix: readonly number[];
+      suffix: readonly number[];
+      minBytes: number;
+      maxBytes: number;
+    }>;
+
+export interface IdentityProbeOutcome {
+  readonly authState: AdapterAuthState;
+  readonly exitCode: number;
+  readonly stdout: ProbeByteMatcher;
+  readonly stderr: ProbeByteMatcher;
+}
+
+/** Declarative classifier over a retained-binary byte probe. */
+export interface PreSpawnIdentityProbe {
+  readonly source: 'retained_binary';
+  readonly argv: readonly string[];
+  readonly timeoutMs: number;
+  readonly stdoutLimitBytes: number;
+  readonly stderrLimitBytes: number;
+  readonly expectedAuthState: AdapterAuthState;
+  readonly outcomes: readonly IdentityProbeOutcome[];
+}
+
+/** Declarative exact effective-authority proof over a retained-binary JSON probe. */
+export interface EffectiveAuthorityAttestation {
+  readonly source: 'retained_binary';
+  readonly argv: readonly string[];
+  readonly timeoutMs: number;
+  readonly stdoutLimitBytes: number;
+  readonly stderrLimitBytes: number;
+  readonly classifier: 'effective_authority_json';
+  readonly expectedServerName: 'fsb';
+  readonly endpointRef: 'direct_runtime_endpoint';
+  readonly required: true;
+  readonly enabled: true;
+  readonly enabledTools: readonly string[];
+  readonly defaultToolsApprovalMode: 'approve';
+  readonly headers: 'absent';
+  readonly env: 'absent';
+  readonly bearerToken: 'absent';
 }
 
 export type SpawnRuntimeRole = 'delegation' | 'provider_server' | 'policy_preflight';
@@ -214,6 +274,8 @@ export interface SpawnSpec {
   readonly topology: SpawnTopology;
   readonly attestations: readonly AttestationDescriptor[];
   readonly privateRuntimes?: readonly SpawnPrivateRuntime[];
+  readonly preSpawnIdentityProbe?: PreSpawnIdentityProbe;
+  readonly effectiveAuthorityAttestation?: EffectiveAuthorityAttestation;
 }
 
 export type AgentEventType =
@@ -845,11 +907,19 @@ export function freezeSpawnSpec(spec: unknown): SpawnSpec {
   const base = ownDataRecord(spec, 'spawn spec');
   if (Object.hasOwn(base, 'topology')) {
     const hasPrivateRuntimes = Object.hasOwn(base, 'privateRuntimes');
+    const hasIdentityProbe = Object.hasOwn(base, 'preSpawnIdentityProbe');
+    const hasAuthorityAttestation = Object.hasOwn(base, 'effectiveAuthorityAttestation');
+    if (hasIdentityProbe !== hasAuthorityAttestation) {
+      invalidContract('pre-spawn authority descriptors');
+    }
+    const keys = ['adapterId', 'profileVersion', 'topology', 'attestations'];
+    if (hasPrivateRuntimes) keys.push('privateRuntimes');
+    if (hasIdentityProbe) {
+      keys.push('preSpawnIdentityProbe', 'effectiveAuthorityAttestation');
+    }
     const record = exactRecord(
       spec,
-      hasPrivateRuntimes
-        ? ['adapterId', 'profileVersion', 'topology', 'attestations', 'privateRuntimes']
-        : ['adapterId', 'profileVersion', 'topology', 'attestations'],
+      keys,
       'spawn spec',
     );
     const frozen = {
@@ -858,9 +928,25 @@ export function freezeSpawnSpec(spec: unknown): SpawnSpec {
       topology: cloneTopology(ownValue(record, 'topology')),
       attestations: cloneAttestations(ownValue(record, 'attestations')),
     };
-    return Object.freeze(hasPrivateRuntimes
-      ? { ...frozen, privateRuntimes: clonePrivateRuntimes(ownValue(record, 'privateRuntimes')) }
-      : frozen);
+    if (hasIdentityProbe && frozen.topology.kind !== 'direct') {
+      invalidContract('pre-spawn authority topology');
+    }
+    return Object.freeze({
+      ...frozen,
+      ...(hasPrivateRuntimes
+        ? { privateRuntimes: clonePrivateRuntimes(ownValue(record, 'privateRuntimes')) }
+        : {}),
+      ...(hasIdentityProbe
+        ? {
+            preSpawnIdentityProbe: validatePreSpawnIdentityProbe(
+              ownValue(record, 'preSpawnIdentityProbe'),
+            ),
+            effectiveAuthorityAttestation: validateEffectiveAuthorityAttestation(
+              ownValue(record, 'effectiveAuthorityAttestation'),
+            ),
+          }
+        : {}),
+    });
   }
   const legacy = exactRecord(spec, [
     'adapterId',

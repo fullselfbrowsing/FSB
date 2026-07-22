@@ -17,6 +17,7 @@ import type {
   AgentProviderAdapter,
   AttestationDescriptor,
   ChildExit,
+  DirectRuntimeReference,
   ProcessSpec,
   SpawnPrivateRuntime,
   SpawnRuntimeRole,
@@ -68,6 +69,7 @@ import { createProcessInspector, createProcessTreeTerminator } from './process-t
 import {
   verifyPolicyAttestation,
 } from './policy-attestation.js';
+import { validateDirectRuntimeReference } from './effective-authority.js';
 import type {
   ExtEvent,
   ExtRequest,
@@ -436,6 +438,7 @@ export interface SpawnSupervisorDependencies {
   readonly terminator: ProcessTreeTerminator;
   readonly startupRecovery: AgentStartupRecovery;
   readonly endpoint: string;
+  readonly directRuntimeReference?: DirectRuntimeReference;
   readonly cwd?: string;
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
@@ -466,6 +469,7 @@ export interface SpawnSupervisorDependencies {
 
 export interface ProductionSpawnSupervisorOptions {
   readonly endpoint: string;
+  readonly directRuntimeReference?: DirectRuntimeReference;
   readonly cwd?: string;
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
@@ -1114,6 +1118,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly mintFingerprint: () => string;
   private readonly mintRuntimeId: (role: Exclude<SpawnRuntimeRole, 'delegation'>) => string;
   private readonly generation: string;
+  private readonly directRuntimeReference: DirectRuntimeReference | null;
   private readonly signalProcessGroup: NonNullable<SpawnSupervisorDependencies['signalProcessGroup']>;
   private readonly inspectProcessGroupStatus: ProcessGroupStatusInspector;
   private readonly schedule: NonNullable<SpawnSupervisorDependencies['schedule']>;
@@ -1154,7 +1159,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       ?? (() => randomBytes(32).toString('base64url'));
     this.mintRuntimeId = dependencies.mintRuntimeId
       ?? ((role) => `${role}_${randomBytes(16).toString('base64url')}`);
-    this.generation = (dependencies.mintGeneration ?? randomUUID)();
+    const directRuntimeReference = dependencies.directRuntimeReference === undefined
+      ? null
+      : validateDirectRuntimeReference(dependencies.directRuntimeReference);
+    this.generation = directRuntimeReference?.generation
+      ?? (dependencies.mintGeneration ?? randomUUID)();
+    this.directRuntimeReference = directRuntimeReference === null
+      ? null
+      : validateDirectRuntimeReference(directRuntimeReference, this.generation);
+    if (
+      this.directRuntimeReference !== null
+      && this.directRuntimeReference.endpoint !== dependencies.endpoint
+    ) throw new TypeError('Direct runtime endpoint ownership is unavailable');
     this.signalProcessGroup = dependencies.signalProcessGroup
       ?? ((negativeProcessGroupId, signal) => process.kill(negativeProcessGroupId, signal));
     this.inspectProcessGroupStatus = dependencies.inspectProcessGroupStatus
@@ -1352,6 +1368,14 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
         privateMcpConfigPath: paths.mcpConfigPath,
         runtimeFiles: [paths.mcpConfigPath],
         runtimeScopes,
+        ...(this.directRuntimeReference
+          ? {
+              directRuntimeReference: validateDirectRuntimeReference(
+                this.directRuntimeReference,
+                this.generation,
+              ),
+            }
+          : {}),
       });
       this.throwIfStopped(run);
       const spec = freezeSpawnSpec(declaredSpec);
@@ -3417,7 +3441,13 @@ export function createProductionSpawnSupervisor(
   const inspectProcessGroupStatus = createProcessGroupStatusInspector(platform);
   const terminator = options.processSeams?.terminator
     ?? createProcessTreeTerminator({ platform, inspector });
-  const generation = randomUUID();
+  const directRuntimeReference = options.directRuntimeReference === undefined
+    ? null
+    : validateDirectRuntimeReference(options.directRuntimeReference);
+  if (directRuntimeReference && directRuntimeReference.endpoint !== options.endpoint) {
+    throw new TypeError('Direct runtime endpoint ownership is unavailable');
+  }
+  const generation = directRuntimeReference?.generation ?? randomUUID();
   const environment = options.environment ?? process.env;
   const dataHome = environment.XDG_DATA_HOME;
   const home = environment.HOME;
@@ -3467,6 +3497,7 @@ export function createProductionSpawnSupervisor(
     mintGeneration: () => generation,
     inspectProcessGroupStatus,
     endpoint: options.endpoint,
+    ...(directRuntimeReference ? { directRuntimeReference } : {}),
     ...(options.cwd ? { cwd: options.cwd } : {}),
     platform,
     ...(options.environment ? { environment: options.environment } : {}),

@@ -29,6 +29,10 @@ const popupSource = readRepoFile('extension', 'ui', 'popup.js');
 const sidepanelSource = readRepoFile('extension', 'ui', 'sidepanel.js');
 const dashboardSource = readRepoFile('showcase', 'js', 'dashboard.js');
 const wsClientSource = readRepoFile('extension', 'ws', 'ws-client.js');
+const adapterSource = readRepoFile('mcp', 'src', 'agent-providers', 'adapter.ts');
+const authoritySource = readRepoFile('mcp', 'src', 'agent-providers', 'effective-authority.ts');
+const serveDelegationSource = readRepoFile('mcp', 'src', 'agent-providers', 'serve-delegation.ts');
+const registrySource = readRepoFile('mcp', 'src', 'agent-providers', 'registry.ts');
 
 console.log('\n--- background contract cleanup tests ---');
 
@@ -61,6 +65,17 @@ assert(
   'state-emitter docs explain dashboard state uses separate channels'
 );
 assert(!stateEmitterSource.includes('sidepanel, popup, and\ndashboard listeners receive delta updates without polling'), 'state-emitter no longer claims dashboard receives sessionStateEvent directly');
+
+console.log('\n--- direct runtime authority contracts ---');
+
+assert(adapterSource.includes('export interface DirectRuntimeReference'), 'adapter exposes the private direct runtime reference type');
+assert(adapterSource.includes('export interface PreSpawnIdentityProbe'), 'adapter exposes the private pre-spawn identity descriptor');
+assert(adapterSource.includes('export interface EffectiveAuthorityAttestation'), 'adapter exposes the private effective-authority descriptor');
+assert(authoritySource.includes("endpointRef: 'direct_runtime_endpoint'"), 'authority descriptor resolves only a supervisor-owned endpoint reference');
+assert(authoritySource.includes("parsed.hostname !== '127.0.0.1'"), 'direct runtime materialization pins numeric loopback');
+assert(serveDelegationSource.indexOf('await dependencies.startHttp') < serveDelegationSource.indexOf('createDirectRuntimeReference('), 'serve materializes the direct reference only after HTTP ownership');
+assert(serveDelegationSource.includes('dependencies.mintGeneration()'), 'serve owns the direct runtime generation');
+assert(!registrySource.includes('CODEX_ADAPTER_ID') && !registrySource.includes('createCodexAdapter'), 'generic authority substrate does not expand the production adapter roster');
 
 console.log('\n=== Results: ' + passed + ' passed, ' + failed + ' failed ===');
 process.exit(failed > 0 ? 1 : 0);

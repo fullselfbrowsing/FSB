@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { BridgeMode, BridgeOptions, BridgeTopologyState, ExtRequestHandler } from '../types.js';
 import { WebSocketBridge } from '../bridge.js';
 import { startHttpServer } from '../http.js';
@@ -19,6 +20,8 @@ import {
   type SpawnSupervisor,
   type SpawnSupervisorCloseResult,
 } from './spawn-supervisor.js';
+import type { DirectRuntimeReference } from './adapter.js';
+import { createDirectRuntimeReference } from './effective-authority.js';
 
 export interface ServeDelegationBridge {
   connect(): Promise<void>;
@@ -60,9 +63,11 @@ export interface ServeDelegationDependencies {
   readonly createSupervisor?: (
     endpoint: string,
     onDegraded: (code: 'tree_unsettled' | 'runtime_cleanup_failed') => void,
+    directRuntimeReference: DirectRuntimeReference,
   ) => SpawnSupervisor;
   readonly createCompatibilityRegistry?: () => AgentProviderRegistry;
   readonly now?: () => number;
+  readonly mintGeneration?: () => string;
   readonly prepareBridgeAuth?: () => void | Promise<void>;
   readonly pushInventory?: (bridge: ServeDelegationBridge) => Promise<void>;
   readonly registerSignal?: (
@@ -112,9 +117,10 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       bridge: options.bridge as WebSocketBridge,
       queue: options.queue as TaskQueue,
     }),
-    createSupervisor: (endpoint, onDegraded) => createProductionSpawnSupervisor({
+    createSupervisor: (endpoint, onDegraded, directRuntimeReference) => createProductionSpawnSupervisor({
       endpoint,
       onDegraded,
+      directRuntimeReference,
     }),
     createCompatibilityRegistry: () => createProductionAdapterRegistry({
       kill: async () => {
@@ -122,6 +128,7 @@ function defaultDependencies(): Required<ServeDelegationDependencies> {
       },
     }),
     now: () => Date.now(),
+    mintGeneration: () => randomUUID(),
     prepareBridgeAuth: () => undefined,
     pushInventory: async (bridge) => pushMcpClientInventory(bridge as WebSocketBridge),
     registerSignal: (signal, handler) => process.on(signal, handler),
@@ -341,10 +348,14 @@ export async function startServeDelegation(
       bridge,
       queue,
     });
+    const directRuntimeReference = createDirectRuntimeReference(
+      httpServer.endpoint,
+      dependencies.mintGeneration(),
+    );
     supervisor = dependencies.createSupervisor(httpServer.endpoint, () => {
       degraded = true;
       requestDegradedShutdown?.();
-    });
+    }, directRuntimeReference);
     const recovery = await supervisor.recover();
     if (!recovery.spawnAvailable) throw new ServeDelegationStartupError();
     await dependencies.prepareBridgeAuth();
