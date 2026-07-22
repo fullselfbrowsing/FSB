@@ -100,6 +100,23 @@ function rolePreparedInput(runtime, overrides = {}) {
   };
 }
 
+function directPreparedInput(overrides = {}) {
+  return {
+    role: 'direct',
+    delegationId: 'direct_runtime_fixture_0001',
+    adapterId: 'claude-code',
+    profileVersion: '2.1.177',
+    createdAt: 1000,
+    binaryRealPath: '/fixture/bin/claude',
+    argvSignature: 'argv_signature_direct_fixture_0001',
+    fixedEnv: {},
+    envFingerprint: 'env_fingerprint_direct_fixture_0001',
+    generation: 'generation_fixture_previous',
+    privateArtifacts: [],
+    ...overrides,
+  };
+}
+
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
@@ -147,6 +164,7 @@ async function runRuntimeFilesTests(runtimeModule) {
   assert.equal(AGENT_RUNTIME_FILE_MODE, 0o600);
   assert.equal(AGENT_RUNTIME_JOURNAL_VERSION, 2);
   assert.deepEqual(AGENT_RUNTIME_ROLES, [
+    'direct',
     'delegation',
     'provider_server',
     'policy_preflight',
@@ -277,6 +295,44 @@ async function runRuntimeFilesTests(runtimeModule) {
     assert.equal(fs.existsSync(runtime.recoveryPath), false);
   } finally {
     roleState.cleanup();
+  }
+
+  const directState = tempRoot('runtime-direct-state');
+  try {
+    const runtime = createAgentRuntimeFiles({ rootPath: directState.root, platform: 'linux' });
+    const prepared = await runtime.prepareRun(directPreparedInput());
+    assert.equal(prepared.entry.role, 'direct');
+    assert.deepEqual(prepared.entry.fixedEnv, {});
+    assert.equal(fs.statSync(prepared.runDirectory).mode & 0o777, 0o700);
+    assert.deepEqual(fs.readdirSync(prepared.runDirectory), []);
+    assert.equal(fs.existsSync(prepared.mcpConfigPath), false);
+    assert.equal(collectArtifactText(prepared.runDirectory), '');
+    const active = await runtime.activateRun({
+      ...activeInput({ delegationId: prepared.entry.delegationId }),
+      role: 'direct',
+    });
+    assert.equal(active.role, 'direct');
+    await runtime.removeRun({ delegationId: active.delegationId, role: 'direct' });
+    assert.equal(fs.existsSync(prepared.runDirectory), false);
+    assert.deepEqual(readJson(runtime.journalPath), { version: 2, entries: [] });
+
+    const guarded = await runtime.prepareRun(directPreparedInput({
+      delegationId: 'direct_runtime_guarded_0001',
+      envFingerprint: 'env_fingerprint_direct_guarded_0001',
+    }));
+    const foreignPath = path.join(guarded.runDirectory, 'foreign-artifact');
+    fs.writeFileSync(foreignPath, 'foreign', { mode: 0o600 });
+    await expectRuntimeError(
+      () => runtime.removeRun({ delegationId: guarded.entry.delegationId, role: 'direct' }),
+      'runtime_target_unavailable',
+    );
+    assert.equal(fs.existsSync(foreignPath), true, 'direct cleanup fails closed on a non-empty scratch');
+    assert.deepEqual(runtime.readJournal().journal.entries, [guarded.entry]);
+    fs.unlinkSync(foreignPath);
+    await runtime.removeRun({ delegationId: guarded.entry.delegationId, role: 'direct' });
+    assert.equal(fs.existsSync(guarded.runDirectory), false);
+  } finally {
+    directState.cleanup();
   }
 
   const legacyState = tempRoot('runtime-legacy-v1');
@@ -1990,6 +2046,74 @@ async function runRecoveryTests(runtimeModule, processTreeModule) {
     assert.strictEqual(terminator.calls[0].entry, providerServer);
     assert.deepEqual(runtime.recorded, [result.restartLosses[0]]);
     assert.deepEqual(runtime.remaining(), [ambiguousServer]);
+  }
+
+  for (const crashState of ['prepared', 'active']) {
+    const state = tempRoot(`direct-recovery-${crashState}`);
+    try {
+      const runtime = createAgentRuntimeFiles({ rootPath: state.root, platform: 'linux' });
+      const delegationId = `direct_runtime_crash_${crashState}_0001`;
+      const prepared = await runtime.prepareRun(directPreparedInput({
+        delegationId,
+        argvSignature: `argv_signature_direct_${crashState}_0001`,
+        envFingerprint: `env_fingerprint_direct_${crashState}_0001`,
+      }));
+      const entry = crashState === 'active'
+        ? await runtime.activateRun({
+            role: 'direct',
+            delegationId,
+            pid: 44501,
+            processGroupId: 44501,
+            startedAt: 1100,
+            processStartIdentity: 'direct-start-44501',
+          })
+        : prepared.entry;
+      let inspections = 0;
+      const terminationCalls = [];
+      const result = await createAgentStartupRecovery({
+        runtimeFiles: runtime,
+        inspector: {
+          async inspect(candidate) {
+            assert.deepEqual(candidate, entry);
+            inspections += 1;
+            if (crashState === 'prepared' || inspections > 1) return staleInspection;
+            return confirmedInspection({
+              pid: 44501,
+              processGroupId: 44501,
+              processStartIdentity: 'direct-start-44501',
+            });
+          },
+        },
+        terminator: {
+          async stop(candidate, child, options) {
+            terminationCalls.push({ candidate, child, options });
+          },
+        },
+        terminationGrace: 25,
+      }).recover();
+      assert.deepEqual(result, {
+        confirmedKilled: crashState === 'active' ? 1 : 0,
+        staleCleared: crashState === 'prepared' ? 1 : 0,
+        ambiguousFailClosed: 0,
+        spawnAvailable: true,
+        profiles: [{
+          role: 'direct',
+          adapterId: 'claude-code',
+          profileVersion: '2.1.177',
+          confirmedKilled: crashState === 'active' ? 1 : 0,
+          staleCleared: crashState === 'prepared' ? 1 : 0,
+          ambiguousFailClosed: 0,
+        }],
+        restartLosses: [],
+      });
+      assert.equal(terminationCalls.length, crashState === 'active' ? 1 : 0);
+      assert.deepEqual(runtime.readJournal().journal.entries, []);
+      assert.equal(fs.existsSync(prepared.runDirectory), false);
+      assert.equal(fs.existsSync(runtime.recoveryPath), false,
+        'direct scratch recovery records no delegation restart-loss artifact');
+    } finally {
+      state.cleanup();
+    }
   }
 
   for (const crashState of ['prepared', 'active']) {

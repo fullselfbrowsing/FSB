@@ -60,6 +60,11 @@ import type {
 import type { AgentRuntimeFiles } from './runtime-files.js';
 import { createAgentRuntimeFiles, createAgentStartupRecovery } from './runtime-files.js';
 import type {
+  BoundedProcessProbeDescriptor,
+  BoundedProcessProbeResult,
+} from './process-probe.js';
+import { runBoundedProcessProbe } from './process-probe.js';
+import type {
   ProcessInspection,
   ProcessInspector,
   ProcessTreeTerminator,
@@ -69,7 +74,17 @@ import { createProcessInspector, createProcessTreeTerminator } from './process-t
 import {
   verifyPolicyAttestation,
 } from './policy-attestation.js';
-import { validateDirectRuntimeReference } from './effective-authority.js';
+import {
+  classifyEffectiveAuthority,
+  classifyPreSpawnIdentityProbe,
+  validateDirectRuntimeReference,
+} from './effective-authority.js';
+import {
+  buildSanitizedAgentEnvironment,
+  DELEGATION_AGENT_ENVIRONMENT_POLICY,
+  DELEGATION_PROVIDER_KEY_NAMES as SOURCE_PINNED_PROVIDER_KEY_NAMES,
+  type SanitizedAgentEnvironment,
+} from './spawn-environment.js';
 import type {
   ExtEvent,
   ExtRequest,
@@ -101,157 +116,7 @@ const TASK_STDERR_FALLBACK_SENTINELS = Object.freeze([
 ] as const);
 
 const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
-// Source-pinned provider credential/discovery boundary for OpenCode v1.14.25,
-// tag commit 3c85719fea0ee83389c814d7abbf1f98c5c6f0f1. The base roster is the
-// provider `env` metadata in packages/opencode/test/tool/fixtures/models-api.json;
-// the additions are the custom-provider reads in src/provider/provider.ts,
-// auth/config/model injection reads, and the AWS/Google credential chains those
-// custom providers invoke. HOME and XDG_DATA/STATE/CACHE_HOME are deliberately
-// absent so the isolated profile can retain the user's native OpenCode sign-in.
-const PROVIDER_KEY_NAMES = Object.freeze([
-  '302AI_API_KEY',
-  'ABACUS_API_KEY',
-  'AICORE_DEPLOYMENT_ID',
-  'AICORE_RESOURCE_GROUP',
-  'AICORE_SERVICE_KEY',
-  'AIHUBMIX_API_KEY',
-  'AI_GATEWAY_API_KEY',
-  'ALIBABA_CODING_PLAN_API_KEY',
-  'ANTHROPIC_API_KEY',
-  'AWS_ACCESS_KEY_ID',
-  'AWS_BEARER_TOKEN_BEDROCK',
-  'AWS_CONFIG_FILE',
-  'AWS_CONTAINER_AUTHORIZATION_TOKEN',
-  'AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE',
-  'AWS_CONTAINER_CREDENTIALS_FULL_URI',
-  'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI',
-  'AWS_DEFAULT_PROFILE',
-  'AWS_DEFAULT_REGION',
-  'AWS_EC2_METADATA_DISABLED',
-  'AWS_EC2_METADATA_SERVICE_ENDPOINT',
-  'AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE',
-  'AWS_EC2_METADATA_V1_DISABLED',
-  'AWS_PROFILE',
-  'AWS_REGION',
-  'AWS_ROLE_ARN',
-  'AWS_ROLE_SESSION_NAME',
-  'AWS_SDK_LOAD_CONFIG',
-  'AWS_SECRET_ACCESS_KEY',
-  'AWS_SESSION_TOKEN',
-  'AWS_SHARED_CREDENTIALS_FILE',
-  'AWS_WEB_IDENTITY_TOKEN_FILE',
-  'AZURE_API_KEY',
-  'AZURE_COGNITIVE_SERVICES_API_KEY',
-  'AZURE_COGNITIVE_SERVICES_RESOURCE_NAME',
-  'AZURE_OPENAI_API_KEY',
-  'AZURE_RESOURCE_NAME',
-  'BAILING_API_TOKEN',
-  'BASETEN_API_KEY',
-  'BERGET_API_KEY',
-  'CEREBRAS_API_KEY',
-  'CF_AIG_TOKEN',
-  'CHUTES_API_KEY',
-  'CLARIFAI_PAT',
-  'CLOUDFERRO_SHERLOCK_API_KEY',
-  'CLOUDFLARE_ACCOUNT_ID',
-  'CLOUDFLARE_API_KEY',
-  'CLOUDFLARE_API_TOKEN',
-  'CLOUDFLARE_GATEWAY_ID',
-  'CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE',
-  'COHERE_API_KEY',
-  'CORTECS_API_KEY',
-  'DASHSCOPE_API_KEY',
-  'DEEPINFRA_API_KEY',
-  'DEEPSEEK_API_KEY',
-  'DINFERENCE_API_KEY',
-  'DRUN_API_KEY',
-  'EVROC_API_KEY',
-  'FASTROUTER_API_KEY',
-  'FIREWORKS_API_KEY',
-  'FIRMWARE_API_KEY',
-  'FRIENDLI_TOKEN',
-  'GCE_METADATA_HOST',
-  'GCE_METADATA_IP',
-  'GCE_METADATA_ROOT',
-  'GCLOUD_PROJECT',
-  'GCP_PROJECT',
-  'GEMINI_API_KEY',
-  'GITHUB_TOKEN',
-  'GITLAB_INSTANCE_URL',
-  'GITLAB_TOKEN',
-  'GOOGLE_APPLICATION_CREDENTIALS',
-  'GOOGLE_CLOUD_LOCATION',
-  'GOOGLE_CLOUD_PROJECT',
-  'GOOGLE_CLOUD_QUOTA_PROJECT',
-  'GOOGLE_GENERATIVE_AI_API_KEY',
-  'GOOGLE_VERTEX_LOCATION',
-  'GOOGLE_VERTEX_PROJECT',
-  'GROQ_API_KEY',
-  'HELICONE_API_KEY',
-  'HF_TOKEN',
-  'IFLOW_API_KEY',
-  'INCEPTION_API_KEY',
-  'INFERENCE_API_KEY',
-  'IOINTELLIGENCE_API_KEY',
-  'JIEKOU_API_KEY',
-  'KILO_API_KEY',
-  'KIMI_API_KEY',
-  'KUAE_API_KEY',
-  'LLAMA_API_KEY',
-  'LLMGATEWAY_API_KEY',
-  'LMSTUDIO_API_KEY',
-  'LUCIDQUERY_API_KEY',
-  'MEGANOVA_API_KEY',
-  'MINIMAX_API_KEY',
-  'MISTRAL_API_KEY',
-  'MOARK_API_KEY',
-  'MODELSCOPE_API_KEY',
-  'MOONSHOT_API_KEY',
-  'MORPH_API_KEY',
-  'NANO_GPT_API_KEY',
-  'NEBIUS_API_KEY',
-  'NOVA_API_KEY',
-  'NOVITA_API_KEY',
-  'NVIDIA_API_KEY',
-  'OLLAMA_API_KEY',
-  'OPENAI_API_KEY',
-  'OPENCODE_API_KEY',
-  'OPENCODE_AUTH_CONTENT',
-  'OPENCODE_CONFIG',
-  'OPENCODE_CONFIG_CONTENT',
-  'OPENCODE_CONFIG_DIR',
-  'OPENCODE_MODELS_PATH',
-  'OPENCODE_MODELS_URL',
-  'OPENROUTER_API_KEY',
-  'OVHCLOUD_API_KEY',
-  'PERPLEXITY_API_KEY',
-  'POE_API_KEY',
-  'PRIVATEMODE_API_KEY',
-  'PRIVATEMODE_ENDPOINT',
-  'QIHANG_API_KEY',
-  'QINIU_API_KEY',
-  'REQUESTY_API_KEY',
-  'SCALEWAY_API_KEY',
-  'SILICONFLOW_API_KEY',
-  'SILICONFLOW_CN_API_KEY',
-  'STACKIT_API_KEY',
-  'STEPFUN_API_KEY',
-  'SUBMODEL_INSTAGEN_ACCESS_KEY',
-  'SYNTHETIC_API_KEY',
-  'TENCENT_CODING_PLAN_API_KEY',
-  'TOGETHER_API_KEY',
-  'UPSTAGE_API_KEY',
-  'V0_API_KEY',
-  'VENICE_API_KEY',
-  'VERTEX_LOCATION',
-  'VIVGRID_API_KEY',
-  'VULTR_API_KEY',
-  'WANDB_API_KEY',
-  'XAI_API_KEY',
-  'XIAOMI_API_KEY',
-  'ZENMUX_API_KEY',
-  'ZHIPU_API_KEY',
-] as const);
+const PROVIDER_KEY_NAMES = SOURCE_PINNED_PROVIDER_KEY_NAMES;
 
 const START_REQUEST_KEYS = Object.freeze(['id', 'method', 'payload', 'type']);
 const START_PAYLOAD_KEYS = Object.freeze(['acceptedIdentity', 'task']);
@@ -394,6 +259,10 @@ export type AgentSpawnDependency = (
   options: SpawnInvocationOptions,
 ) => ChildProcessWithoutNullStreams;
 
+export type AgentProcessProbeDependency = (
+  descriptor: BoundedProcessProbeDescriptor,
+) => Promise<BoundedProcessProbeResult>;
+
 export interface OwnedServerHttpRequestOptions {
   readonly hostname: '127.0.0.1';
   readonly port: number;
@@ -443,6 +312,7 @@ export interface SpawnSupervisorDependencies {
   readonly platform?: NodeJS.Platform;
   readonly environment?: NodeJS.ProcessEnv;
   readonly spawn?: AgentSpawnDependency;
+  readonly processProbe?: AgentProcessProbeDependency;
   readonly randomBytes?: (size: number) => Buffer;
   readonly requestOwnedServer?: OwnedServerHttpRequestDependency;
   readonly wallNow?: () => number;
@@ -479,6 +349,7 @@ export interface ProductionSpawnSupervisorOptions {
   readonly processSeams?: Readonly<{
     openCodeDetect?: ProductionAdapterRegistryDependencies['openCodeDetect'];
     spawn?: AgentSpawnDependency;
+    processProbe?: AgentProcessProbeDependency;
     inspector?: ProcessInspector;
     terminator?: ProcessTreeTerminator;
   }>;
@@ -1106,6 +977,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private readonly completedRuns = new Map<string, RunTerminalResult>();
   private readonly entriesByPid = new Map<number, JournalEntry>();
   private readonly spawnChild: AgentSpawnDependency;
+  private readonly processProbe: AgentProcessProbeDependency;
   private readonly randomSecretBytes: (size: number) => Buffer;
   private readonly requestOwnedServer: OwnedServerHttpRequestDependency;
   private readonly cwd: string;
@@ -1137,14 +1009,17 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private closePromise: Promise<SpawnSupervisorCloseResult> | null = null;
 
   constructor(dependencies: SpawnSupervisorDependencies) {
-    const sanitizedEnvironment = { ...(dependencies.environment ?? process.env) };
-    for (const key of PROVIDER_KEY_NAMES) delete sanitizedEnvironment[key];
-    delete sanitizedEnvironment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
+    const sanitizedEnvironment = buildSanitizedAgentEnvironment(
+      dependencies.environment ?? process.env,
+      Object.freeze({}),
+      DELEGATION_AGENT_ENVIRONMENT_POLICY,
+    );
     this.dependencies = Object.freeze({
       ...dependencies,
       environment: Object.freeze(sanitizedEnvironment),
     });
     this.spawnChild = dependencies.spawn ?? defaultSpawn;
+    this.processProbe = dependencies.processProbe ?? runBoundedProcessProbe;
     this.randomSecretBytes = dependencies.randomBytes ?? randomBytes;
     this.requestOwnedServer = dependencies.requestOwnedServer ?? defaultOwnedServerHttpRequest;
     this.cwd = dependencies.cwd ?? process.cwd();
@@ -1379,7 +1254,8 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       });
       this.throwIfStopped(run);
       const spec = freezeSpawnSpec(declaredSpec);
-      this.validateSpawnSpec(run, detection, spec, runtimeScopes);
+      this.validateSpawnSpec(run, detection, spec, runtimeScopes, paths.runDirectory);
+      if (spec.preSpawnIdentityProbe !== undefined) run.runtimeOwned = false;
       let process: ProcessSpec;
       let argv: readonly string[];
       if (spec.topology.kind === 'direct') {
@@ -1410,20 +1286,42 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       }
       this.throwIfStopped(run);
       const argvSignature = createArgvSignature(process.command, argv);
+      const environment = this.createEnvironment(process.fixedEnv, argvSignature);
+      const directAuthorityBound = await this.executePreSpawnAuthorityBarrier(
+        run,
+        spec,
+        process,
+        environment,
+      );
+      this.throwIfStopped(run);
       const createdAt = this.wallNow();
       const delegationRuntime = this.privateRuntime(spec, 'delegation');
       const prepared = process.role === 'direct_task'
-        ? await this.dependencies.runtimeFiles.prepareRun({
-            delegationId: run.delegationId,
-            adapterId: run.adapterId,
-            profileVersion,
-            createdAt,
-            binaryRealPath: process.command,
-            argvSignature,
-            envFingerprint: runtimeFingerprint,
-            generation: this.generation,
-            endpoint: this.dependencies.endpoint,
-          })
+        ? directAuthorityBound
+          ? await this.dependencies.runtimeFiles.prepareRun({
+              role: 'direct',
+              delegationId: run.delegationId,
+              adapterId: run.adapterId,
+              profileVersion,
+              createdAt,
+              binaryRealPath: process.command,
+              argvSignature,
+              fixedEnv: process.fixedEnv,
+              envFingerprint: runtimeFingerprint,
+              generation: this.generation,
+              privateArtifacts: Object.freeze([]),
+            })
+          : await this.dependencies.runtimeFiles.prepareRun({
+              delegationId: run.delegationId,
+              adapterId: run.adapterId,
+              profileVersion,
+              createdAt,
+              binaryRealPath: process.command,
+              argvSignature,
+              envFingerprint: runtimeFingerprint,
+              generation: this.generation,
+              endpoint: this.dependencies.endpoint,
+            })
         : await this.dependencies.runtimeFiles.prepareRun({
             role: 'delegation',
             delegationId: run.delegationId,
@@ -1441,7 +1339,6 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       run.runtimeOwned = true;
       this.throwIfStopped(run);
 
-      const environment = this.createEnvironment(process.fixedEnv, argvSignature);
       const options: SpawnInvocationOptions = Object.freeze({
         shell: false,
         detached: true,
@@ -1477,6 +1374,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       const identity = await this.resolveActivation(prepared.entry, supervisedChild.pid);
       this.throwIfStopped(run);
       const active = await this.dependencies.runtimeFiles.activateRun({
+        ...(prepared.entry.role === 'direct' ? { role: 'direct' as const } : {}),
         delegationId: run.delegationId,
         pid: supervisedChild.pid,
         processGroupId: identity.process.processGroupId,
@@ -1632,6 +1530,7 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     detection: AdapterDetection & { binary: NonNullable<AdapterDetection['binary']> },
     spec: SpawnSpec,
     runtimeScopes: readonly SpawnRuntimeScope[],
+    directScratchDirectory: string,
   ): void {
     const topologyProcesses = spec.topology.kind === 'direct'
       ? [spec.topology.task]
@@ -1641,6 +1540,18 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
     ));
     const processes = [...topologyProcesses, ...attestationProcesses];
     const privateRuntimes = spec.privateRuntimes ?? Object.freeze([]);
+    const descriptorBoundDirect = spec.preSpawnIdentityProbe !== undefined
+      && spec.effectiveAuthorityAttestation !== undefined;
+    const directTask = spec.topology.kind === 'direct' ? spec.topology.task : null;
+    if (
+      descriptorBoundDirect
+      && (
+        this.directRuntimeReference === null
+        || directTask === null
+        || directTask.privateFiles.length !== 0
+        || privateRuntimes.length !== 0
+      )
+    ) throw new Error('adapter_unavailable');
     if (privateRuntimes.length > 0) {
       if (
         privateRuntimes.length !== runtimeScopes.length
@@ -1667,7 +1578,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
       || spec.profileVersion !== detection.profileVersion
       || processes.some((process) => (
         process.command !== detection.binary.command
-        || process.cwd !== this.cwd
+        || process.cwd !== (
+          descriptorBoundDirect && process === directTask
+            ? directScratchDirectory
+            : this.cwd
+        )
         || !isPlainRecord(process.fixedEnv)
         || Object.keys(process.fixedEnv).some((key) => PROVIDER_KEY_NAMES.includes(
           key as typeof PROVIDER_KEY_NAMES[number],
@@ -2223,15 +2138,104 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
   private createEnvironment(
     fixedEnv: Readonly<Record<string, string>>,
     argvSignature: string,
-  ): NodeJS.ProcessEnv {
-    const environment = { ...this.environment };
-    for (const key of PROVIDER_KEY_NAMES) delete environment[key];
-    delete environment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
-    for (const [key, value] of Object.entries(fixedEnv)) environment[key] = value;
-    environment.FSB_AGENT_ARGV_SIGNATURE = argvSignature;
-    for (const key of PROVIDER_KEY_NAMES) delete environment[key];
-    delete environment[OPENCODE_SERVER_PASSWORD_ENV_KEY];
-    return environment;
+  ): SanitizedAgentEnvironment {
+    return buildSanitizedAgentEnvironment(
+      this.environment,
+      fixedEnv,
+      {
+        inheritedAllowRules: DELEGATION_AGENT_ENVIRONMENT_POLICY.inheritedAllowRules,
+        strippedKeys: DELEGATION_AGENT_ENVIRONMENT_POLICY.strippedKeys,
+        forcedValues: Object.freeze({ FSB_AGENT_ARGV_SIGNATURE: argvSignature }),
+      },
+    );
+  }
+
+  private async executePreSpawnAuthorityBarrier(
+    run: DelegationRun,
+    spec: SpawnSpec,
+    process: ProcessSpec,
+    environment: SanitizedAgentEnvironment,
+  ): Promise<boolean> {
+    const identityDescriptor = spec.preSpawnIdentityProbe;
+    const authorityDescriptor = spec.effectiveAuthorityAttestation;
+    if (identityDescriptor === undefined && authorityDescriptor === undefined) return false;
+    if (
+      identityDescriptor === undefined
+      || authorityDescriptor === undefined
+      || run.acceptedIdentity === null
+      || identityDescriptor.expectedAuthState !== run.acceptedIdentity.authState
+      || this.directRuntimeReference === null
+    ) throw new PolicyAttestationFailure();
+    const directRuntime = validateDirectRuntimeReference(
+      this.directRuntimeReference,
+      this.generation,
+    );
+
+    let identityResult: BoundedProcessProbeResult | null = null;
+    try {
+      identityResult = await this.processProbe(Object.freeze({
+        command: process.command,
+        argv: identityDescriptor.argv,
+        cwd: this.cwd,
+        environment,
+        timeoutMs: identityDescriptor.timeoutMs,
+        stdoutLimitBytes: identityDescriptor.stdoutLimitBytes,
+        stderrLimitBytes: identityDescriptor.stderrLimitBytes,
+        ...(run.routeSignal ? { signal: run.routeSignal } : {}),
+      }));
+      const classification = classifyPreSpawnIdentityProbe(
+        identityResult,
+        identityDescriptor,
+      );
+      if (
+        !Object.isFrozen(classification)
+        || !classification.matched
+        || classification.authState !== identityDescriptor.expectedAuthState
+        || classification.authState !== run.acceptedIdentity.authState
+      ) throw new PolicyAttestationFailure();
+    } catch (error) {
+      if (error instanceof PolicyAttestationFailure) throw error;
+      throw new PolicyAttestationFailure();
+    } finally {
+      identityResult?.zeroize();
+    }
+
+    let authorityResult: BoundedProcessProbeResult | null = null;
+    let document: unknown = null;
+    try {
+      authorityResult = await this.processProbe(Object.freeze({
+        command: process.command,
+        argv: authorityDescriptor.argv,
+        cwd: this.cwd,
+        environment,
+        timeoutMs: authorityDescriptor.timeoutMs,
+        stdoutLimitBytes: authorityDescriptor.stdoutLimitBytes,
+        stderrLimitBytes: authorityDescriptor.stderrLimitBytes,
+        ...(run.routeSignal ? { signal: run.routeSignal } : {}),
+      }));
+      if (
+        authorityResult.exit.code !== 0
+        || authorityResult.exit.signal !== null
+        || authorityResult.stderr.length !== 0
+      ) throw new PolicyAttestationFailure();
+      document = this.parseJsonDocument(authorityResult.stdout);
+      const classification = classifyEffectiveAuthority(
+        document,
+        authorityDescriptor,
+        directRuntime,
+      );
+      document = null;
+      if (!Object.isFrozen(classification) || !classification.pass) {
+        throw new PolicyAttestationFailure();
+      }
+    } catch (error) {
+      if (error instanceof PolicyAttestationFailure) throw error;
+      throw new PolicyAttestationFailure();
+    } finally {
+      document = null;
+      authorityResult?.zeroize();
+    }
+    return true;
   }
 
   private async resolveActivation(
@@ -3025,7 +3029,11 @@ class ExactOnceSpawnSupervisor implements SpawnSupervisor {
           throw new TreeUnsettledError();
         }
       }
-      await this.dependencies.runtimeFiles.removeRun(run.delegationId);
+      await this.dependencies.runtimeFiles.removeRun(
+        entry.role === 'direct'
+          ? Object.freeze({ delegationId: run.delegationId, role: 'direct' as const })
+          : run.delegationId,
+      );
       run.runtimeOwned = false;
       if (run.supervisedChild) this.entriesByPid.delete(run.supervisedChild.pid);
       run.entry = null;
@@ -3502,6 +3510,9 @@ export function createProductionSpawnSupervisor(
     platform,
     ...(options.environment ? { environment: options.environment } : {}),
     ...(options.processSeams?.spawn ? { spawn: options.processSeams.spawn } : {}),
+    ...(options.processSeams?.processProbe
+      ? { processProbe: options.processSeams.processProbe }
+      : {}),
     ...(options.networkSeams?.requestOwnedServer
       ? { requestOwnedServer: options.networkSeams.requestOwnedServer }
       : {}),

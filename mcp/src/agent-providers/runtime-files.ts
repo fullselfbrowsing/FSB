@@ -43,6 +43,7 @@ const SECRET_VALUE_PATTERNS = Object.freeze([
 ]);
 
 const RUNTIME_ROLES = Object.freeze([
+  'direct',
   'delegation',
   'provider_server',
   'policy_preflight',
@@ -419,7 +420,8 @@ function isAbsoluteBoundedPath(value: unknown): value is string {
 }
 
 function isRuntimeRole(value: unknown): value is RuntimeRole {
-  return value === 'delegation'
+  return value === 'direct'
+    || value === 'delegation'
     || value === 'provider_server'
     || value === 'policy_preflight';
 }
@@ -772,7 +774,9 @@ function validatePrivateArtifacts(
     return null;
   }
   const kinds = artifacts.map((artifact) => artifact.kind);
-  const expected = adapterId === CLAUDE_CODE_ADAPTER_ID && role === 'delegation'
+  const expected = role === 'direct'
+    ? []
+    : adapterId === CLAUDE_CODE_ADAPTER_ID && role === 'delegation'
     ? ['mcp_config']
     : adapterId === OPENCODE_ADAPTER_ID
       ? ['opencode_config', 'opencode_test_home', 'opencode_managed_config']
@@ -1199,6 +1203,7 @@ export class AgentRuntimeFiles {
   }
 
   private hasValidRuntimePaths(entry: JournalEntry): boolean {
+    if (entry.role === 'direct') return true;
     if (entry.adapterId !== OPENCODE_ADAPTER_ID) return entry.role === 'delegation';
     const paths = this.pathsFor(entry.delegationId);
     const fixedEnv = entry.fixedEnv;
@@ -1438,7 +1443,9 @@ export class AgentRuntimeFiles {
     if (!this.fs.existsSync(directory)) return;
     try {
       this.requireSecureDirectory(this.rootPath);
-      if (entry.adapterId === CLAUDE_CODE_ADAPTER_ID) {
+      if (entry.role === 'direct') {
+        this.requireSecureDirectory(directory, []);
+      } else if (entry.adapterId === CLAUDE_CODE_ADAPTER_ID) {
         this.requireSecureDirectory(directory, [MCP_CONFIG_FILENAME]);
         this.requireSecureFile(paths.mcpConfigPath);
         this.fs.unlinkSync(paths.mcpConfigPath);

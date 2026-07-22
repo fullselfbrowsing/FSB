@@ -35,6 +35,11 @@ const spawnEnvironmentBuildPath = path.join(
   'agent-providers',
   'spawn-environment.js',
 );
+const effectiveAuthorityBuildPath = path.join(
+  mcpBuildRoot,
+  'agent-providers',
+  'effective-authority.js',
+);
 
 const SELECTED_SECTION = (() => {
   const offset = process.argv.indexOf('--section');
@@ -123,6 +128,42 @@ function statusRequest(payload = {}, overrides = {}) {
 
 function normalizedEvent(type, payload = {}) {
   return { type, sessionId: 'session_fixture_0001', payload };
+}
+
+function authorityDocument(endpoint = 'http://127.0.0.1:7226/mcp', overrides = {}) {
+  return {
+    servers: [{
+      serverName: 'fsb',
+      endpoint,
+      required: true,
+      enabled: true,
+      enabledTools: ['fsb_fixture_tool'],
+      defaultToolsApprovalMode: 'approve',
+      ...overrides,
+    }],
+  };
+}
+
+function trackedProbeResult(stdout, stderr = Buffer.alloc(0), exit = { code: 0, signal: null }) {
+  const ownedStdout = Buffer.from(stdout);
+  const ownedStderr = Buffer.from(stderr);
+  const tracker = {
+    stdout: ownedStdout,
+    stderr: ownedStderr,
+    zeroizeCalls: 0,
+    result: null,
+  };
+  tracker.result = Object.freeze({
+    stdout: ownedStdout,
+    stderr: ownedStderr,
+    exit: Object.freeze({ ...exit }),
+    zeroize() {
+      tracker.zeroizeCalls += 1;
+      ownedStdout.fill(0);
+      ownedStderr.fill(0);
+    },
+  });
+  return tracker;
 }
 
 function deferred() {
@@ -259,6 +300,10 @@ function makeHarness(supervisorModule, options = {}) {
   const order = [];
   const emitted = [];
   const spawnCalls = [];
+  const probeCalls = [];
+  const prepareInputs = [];
+  const activateInputs = [];
+  const removeInputs = [];
   const children = new Map();
   const counters = { detect: 0, build: 0, prepare: 0, activate: 0, remove: 0 };
   const runtimeIdentityCalls = { fingerprint: 0, runtimeId: 0 };
@@ -291,6 +336,41 @@ function makeHarness(supervisorModule, options = {}) {
       if (options.buildGate) await options.buildGate.promise;
       if (options.buildError) throw new Error('fixture build failure');
       runtimeRuns.set(context.delegationId, 'config');
+      const authorityDescriptors = options.preSpawnAuthority
+        ? {
+            preSpawnIdentityProbe: Object.freeze({
+              source: 'retained_binary',
+              argv: Object.freeze(['identity-probe']),
+              timeoutMs: 250,
+              stdoutLimitBytes: 64,
+              stderrLimitBytes: 64,
+              expectedAuthState: 'unknown',
+              outcomes: Object.freeze([Object.freeze({
+                authState: 'unknown',
+                exitCode: 0,
+                stdout: Object.freeze({ kind: 'exact', bytes: Object.freeze([73]) }),
+                stderr: Object.freeze({ kind: 'empty' }),
+              })]),
+            }),
+            effectiveAuthorityAttestation: Object.freeze({
+              source: 'retained_binary',
+              argv: Object.freeze(['authority-probe']),
+              timeoutMs: 250,
+              stdoutLimitBytes: 4096,
+              stderrLimitBytes: 64,
+              classifier: 'effective_authority_json',
+              expectedServerName: 'fsb',
+              endpointRef: 'direct_runtime_endpoint',
+              required: true,
+              enabled: true,
+              enabledTools: Object.freeze(['fsb_fixture_tool']),
+              defaultToolsApprovalMode: 'approve',
+              headers: 'absent',
+              env: 'absent',
+              bearerToken: 'absent',
+            }),
+          }
+        : {};
       return Object.freeze({
         adapterId,
         profileVersion,
@@ -305,8 +385,12 @@ function makeHarness(supervisorModule, options = {}) {
               '--mcp-config', context.privateMcpConfigPath,
               '--output-format', 'stream-json',
             ]),
-            cwd: '/fixture/workspace',
-            privateFiles: Object.freeze([context.privateMcpConfigPath]),
+            cwd: options.preSpawnAuthority
+              ? path.dirname(context.privateMcpConfigPath)
+              : '/fixture/workspace',
+            privateFiles: options.preSpawnAuthority
+              ? Object.freeze([])
+              : Object.freeze([context.privateMcpConfigPath]),
             fixedEnv: Object.freeze({
               FSB_AGENT_ADAPTER: adapterId,
               FSB_AGENT_PROFILE: profileVersion,
@@ -319,6 +403,7 @@ function makeHarness(supervisorModule, options = {}) {
           }),
         }),
         attestations: Object.freeze([]),
+        ...authorityDescriptors,
       });
     },
     parseEvents(stream) {
@@ -351,6 +436,7 @@ function makeHarness(supervisorModule, options = {}) {
     async prepareRun(input) {
       counters.prepare += 1;
       order.push('prepare');
+      prepareInputs.push(input);
       if (options.prepareGate) await options.prepareGate.promise;
       if (options.prepareError) throw new Error('fixture prepare failure');
       const { endpoint: _endpoint, ...journalInput } = input;
@@ -365,6 +451,7 @@ function makeHarness(supervisorModule, options = {}) {
     async activateRun(input) {
       counters.activate += 1;
       order.push('activate');
+      activateInputs.push(input);
       if (options.activateGate) await options.activateGate.promise;
       assert.equal(spawnCalls.at(-1)?.child.stdinBytes.length ?? 0, 0, 'task is held before active journal commit');
       assert.equal(
@@ -384,8 +471,10 @@ function makeHarness(supervisorModule, options = {}) {
       runtimeRuns.set(input.delegationId, 'active');
       return activeEntry;
     },
-    async removeRun(delegationId) {
+    async removeRun(input) {
       counters.remove += 1;
+      removeInputs.push(input);
+      const delegationId = typeof input === 'string' ? input : input.delegationId;
       order.push(`remove:${delegationId}`);
       if (options.removeGate) await options.removeGate.promise;
       if (options.removeError) throw new Error('fixture remove failure');
@@ -507,6 +596,18 @@ function makeHarness(supervisorModule, options = {}) {
       OPENAI_API_KEY: 'openai_key_canary_0001',
       GEMINI_API_KEY: 'gemini_key_canary_0001',
     },
+    ...(options.directRuntimeReference
+      ? { directRuntimeReference: options.directRuntimeReference }
+      : {}),
+    ...(options.processProbe
+      ? {
+          async processProbe(descriptor) {
+            order.push(`probe:${descriptor.argv[0]}`);
+            probeCalls.push(descriptor);
+            return options.processProbe(descriptor, probeCalls.length - 1);
+          },
+        }
+      : {}),
     spawn(commandValue, argv, spawnOptions) {
       order.push('spawn');
       if (options.spawnError) throw new Error('fixture spawn failure');
@@ -598,6 +699,10 @@ function makeHarness(supervisorModule, options = {}) {
     order,
     emitted,
     spawnCalls,
+    probeCalls,
+    prepareInputs,
+    activateInputs,
+    removeInputs,
     children,
     counters,
     runtimeIdentityCalls,
@@ -2558,6 +2663,166 @@ async function runRouteLossStatusTests(supervisorModule) {
     'retained route-loss evidence reserves its exact id after completed-result eviction');
 }
 
+async function runPreSpawnAuthorityTests(supervisorModule, authorityModule) {
+  const directRuntimeReference = authorityModule.createDirectRuntimeReference(
+    'http://127.0.0.1:7226/mcp',
+    'generation_fixture_0001',
+  );
+
+  {
+    const results = [
+      trackedProbeResult(Buffer.from([73])),
+      trackedProbeResult(Buffer.from(JSON.stringify(authorityDocument()), 'utf8')),
+    ];
+    const harness = makeHarness(supervisorModule, {
+      preSpawnAuthority: true,
+      directRuntimeReference,
+      processProbe: (_descriptor, index) => results[index].result,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'generic pre-spawn authority success' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'succeeded');
+    const barrierOffsets = [
+      'build',
+      'probe:identity-probe',
+      'probe:authority-probe',
+      'prepare',
+      'spawn',
+      'stdin',
+    ].map((entry) => harness.order.indexOf(entry));
+    assert(barrierOffsets.every((offset, index) => (
+      offset >= 0 && (index === 0 || barrierOffsets[index - 1] < offset)
+    )), 'identity and authority probes precede journal, child creation, and task stdin');
+    assert.equal(harness.probeCalls.length, 2);
+    assert(harness.probeCalls.every((call) => (
+      call.command === '/fixture/bin/claude'
+      && call.cwd === '/fixture/workspace'
+      && call.environment === harness.spawnCalls[0].options.env
+    )), 'both probes share the retained command and exact sanitized spawn environment');
+    assert.equal(
+      harness.spawnCalls[0].options.cwd,
+      `/fixture/private/agent-runtime/${terminal.delegationId}`,
+    );
+    assert.deepEqual(harness.prepareInputs[0], {
+      role: 'direct',
+      delegationId: terminal.delegationId,
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      createdAt: 1001,
+      binaryRealPath: '/fixture/bin/claude',
+      argvSignature: harness.prepareInputs[0].argvSignature,
+      fixedEnv: harness.prepareInputs[0].fixedEnv,
+      envFingerprint: 'runtime_fingerprint_fixture_0001',
+      generation: 'generation_fixture_0001',
+      privateArtifacts: [],
+    });
+    assert.equal(harness.activateInputs[0].role, 'direct');
+    assert.deepEqual(harness.removeInputs, [{
+      delegationId: terminal.delegationId,
+      role: 'direct',
+    }]);
+    assert.equal(harness.runtimeRuns.size, 0, 'direct runtime ownership is removed before success');
+    for (const result of results) {
+      assert.equal(result.zeroizeCalls, 1);
+      assert(result.stdout.every((byte) => byte === 0));
+      assert(result.stderr.every((byte) => byte === 0));
+    }
+  }
+
+  {
+    const mismatch = trackedProbeResult(Buffer.from('IDENTITY_MISMATCH_CANARY', 'utf8'));
+    const harness = makeHarness(supervisorModule, {
+      preSpawnAuthority: true,
+      directRuntimeReference,
+      processProbe: () => mismatch.result,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'identity mismatch blocks child' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.equal(harness.probeCalls.length, 1);
+    assert.deepEqual(harness.counters, {
+      detect: 1, build: 1, prepare: 0, activate: 0, remove: 0,
+    });
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(harness.emitted.length, 0);
+    assert.equal(mismatch.zeroizeCalls, 1);
+    assert(mismatch.stdout.every((byte) => byte === 0));
+    assert.equal(JSON.stringify(terminal).includes('IDENTITY_MISMATCH_CANARY'), false);
+  }
+
+  {
+    const identity = trackedProbeResult(Buffer.from([73]));
+    const authority = trackedProbeResult(Buffer.from(JSON.stringify(
+      authorityDocument('http://127.0.0.1:7999/mcp'),
+    ), 'utf8'));
+    const results = [identity, authority];
+    const harness = makeHarness(supervisorModule, {
+      preSpawnAuthority: true,
+      directRuntimeReference,
+      processProbe: (_descriptor, index) => results[index].result,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'authority mismatch blocks child' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.equal(harness.probeCalls.length, 2);
+    assert.equal(harness.counters.prepare, 0);
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(harness.emitted.length, 0);
+    assert(results.every((result) => result.zeroizeCalls === 1));
+    assert(results.every((result) => result.stdout.every((byte) => byte === 0)));
+  }
+
+  {
+    const probeCanary = 'PROBE_TIMEOUT_SECRET_CANARY';
+    const harness = makeHarness(supervisorModule, {
+      preSpawnAuthority: true,
+      directRuntimeReference,
+      processProbe: async () => {
+        throw Object.assign(new Error(probeCanary), { code: 'timeout' });
+      },
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'probe timeout blocks child' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'adapter_unavailable');
+    assert.equal(harness.counters.prepare, 0);
+    assert.equal(harness.spawnCalls.length, 0);
+    assert.equal(JSON.stringify({ terminal, emitted: harness.emitted }).includes(probeCanary), false);
+  }
+
+  {
+    const results = [
+      trackedProbeResult(Buffer.from([73])),
+      trackedProbeResult(Buffer.from(JSON.stringify(authorityDocument()), 'utf8')),
+    ];
+    const harness = makeHarness(supervisorModule, {
+      preSpawnAuthority: true,
+      directRuntimeReference,
+      processProbe: (_descriptor, index) => results[index].result,
+      removeError: true,
+    });
+    const terminal = await harness.supervisor.handleExtRequest(
+      startRequest({ adapterId: 'claude-code', task: 'direct cleanup is terminal authority' }),
+      harness.emit,
+    );
+    assert.equal(terminal.status, 'failed');
+    assert.equal(terminal.terminal.code, 'runtime_cleanup_failed');
+    assert.equal(emittedResults(harness).length, 0);
+    assert.deepEqual(harness.degradations, ['runtime_cleanup_failed']);
+    assert.equal(harness.removeInputs[0].role, 'direct');
+  }
+}
+
 function runSharedEnvironmentTests(spawnEnvironmentModule) {
   const {
     DELEGATION_AGENT_ENVIRONMENT_POLICY,
@@ -2644,6 +2909,7 @@ async function main() {
   const protocolDriftModule = await import(pathToFileURL(protocolDriftBuildPath).href);
   const acceptedIdentityModule = await import(pathToFileURL(acceptedIdentityBuildPath).href);
   const spawnEnvironmentModule = await import(pathToFileURL(spawnEnvironmentBuildPath).href);
+  const effectiveAuthorityModule = await import(pathToFileURL(effectiveAuthorityBuildPath).href);
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     runAcceptedIdentityFoundationTests(acceptedIdentityModule);
     console.log('mcp-spawn-supervisor.test.js: PASS');
@@ -2656,6 +2922,11 @@ async function main() {
   }
   if (SELECTED_SECTION === 'shared-environment') {
     runSharedEnvironmentTests(spawnEnvironmentModule);
+    console.log('mcp-spawn-supervisor.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION === 'pre-spawn-authority') {
+    await runPreSpawnAuthorityTests(supervisorModule, effectiveAuthorityModule);
     console.log('mcp-spawn-supervisor.test.js: PASS');
     return;
   }
