@@ -293,19 +293,23 @@ export function runBoundedProcessProbe(
         fail('malformed_channel');
         return;
       }
-      const copy = Buffer.from(value);
-      const next = (channel === 'stdout' ? stdoutBytes : stderrBytes) + copy.length;
-      const limit = channel === 'stdout'
-        ? descriptor.stdoutLimitBytes
-        : descriptor.stderrLimitBytes;
-      if (next > limit) {
-        copy.fill(0);
-        fail(channel === 'stdout' ? 'stdout_overflow' : 'stderr_overflow');
-        return;
+      try {
+        const copy = Buffer.from(value);
+        const next = (channel === 'stdout' ? stdoutBytes : stderrBytes) + copy.length;
+        const limit = channel === 'stdout'
+          ? descriptor.stdoutLimitBytes
+          : descriptor.stderrLimitBytes;
+        if (next > limit) {
+          copy.fill(0);
+          fail(channel === 'stdout' ? 'stdout_overflow' : 'stderr_overflow');
+          return;
+        }
+        chunks.push(copy);
+        if (channel === 'stdout') stdoutBytes = next;
+        else stderrBytes = next;
+      } finally {
+        value.fill(0);
       }
-      chunks.push(copy);
-      if (channel === 'stdout') stdoutBytes = next;
-      else stderrBytes = next;
     };
 
     const onStdout = (value: unknown): void => append(value, stdoutChunks, 'stdout');

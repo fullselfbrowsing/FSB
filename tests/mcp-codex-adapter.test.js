@@ -321,6 +321,96 @@ async function runGenericProbeTests(
   assert(windowsPresencePids.length >= 1);
   assert(windowsPresencePids.every((pid) => pid === 42_002));
 
+  const sourceSuccessChild = fakeProbeChild(42_003);
+  const successSources = [
+    Buffer.from('RETAINED_SUCCESS_STDOUT'),
+    Buffer.from('RETAINED_SUCCESS_STDERR'),
+  ];
+  const sourceSuccess = runBoundedProcessProbe(descriptor(['synthetic']), {
+    spawn: () => sourceSuccessChild,
+  });
+  sourceSuccessChild.stdout.emit('data', successSources[0]);
+  sourceSuccessChild.stderr.emit('data', successSources[1]);
+  sourceSuccessChild.emit('close', 0, null);
+  const sourceSuccessResult = await sourceSuccess;
+  assert(successSources.every((source) => source.every((byte) => byte === 0)));
+  assert.equal(sourceSuccessResult.stdout.equals(Buffer.from('RETAINED_SUCCESS_STDOUT')), true);
+  assert.equal(sourceSuccessResult.stderr.equals(Buffer.from('RETAINED_SUCCESS_STDERR')), true);
+  sourceSuccessResult.zeroize();
+  assert.equal(ownedBuffersAreZero(sourceSuccessResult), true);
+
+  const sourceFailureCases = [
+    {
+      label: 'retained timeout source',
+      expectedCode: 'timeout',
+      overrides: { timeoutMs: 25 },
+      trigger: () => undefined,
+    },
+    {
+      label: 'retained abort source',
+      expectedCode: 'aborted',
+      controller: new AbortController(),
+      trigger: (_child, controller) => controller.abort(),
+    },
+    {
+      label: 'retained malformed source',
+      expectedCode: 'malformed_channel',
+      trigger: (child) => child.stdout.emit('data', { malformed: true }),
+    },
+    {
+      label: 'retained overflow source',
+      expectedCode: 'stdout_overflow',
+      overrides: { stdoutLimitBytes: 8 },
+      overflow: true,
+      trigger: () => undefined,
+    },
+    {
+      label: 'retained spawn failure source',
+      expectedCode: 'spawn_failed',
+      trigger: (child) => child.emit('error', new Error('synthetic')),
+    },
+    {
+      label: 'retained stream failure source',
+      expectedCode: 'malformed_channel',
+      trigger: (child) => child.stderr.emit('error', new Error('synthetic')),
+    },
+  ];
+  for (const testCase of sourceFailureCases) {
+    const child = fakeProbeChild(42_004);
+    const source = Buffer.from(testCase.overflow
+      ? 'RETAINED_OVERFLOW_SOURCE'
+      : 'RETAINED_FAILURE_SOURCE');
+    const operation = runBoundedProcessProbe(descriptor(['synthetic'], {
+      ...testCase.overrides,
+      ...(testCase.controller ? { signal: testCase.controller.signal } : {}),
+    }), {
+      spawn: () => child,
+      terminateTree: async (_pid, childClosed) => {
+        child.emit('close', null, 'SIGKILL');
+        await childClosed;
+      },
+    });
+    child.stdout.emit('data', source);
+    testCase.trigger(child, testCase.controller);
+    const keepAlive = testCase.expectedCode === 'timeout'
+      ? setInterval(() => undefined, 100)
+      : null;
+    try {
+      await assert.rejects(
+        operation,
+        (error) => error.code === testCase.expectedCode,
+        testCase.label,
+      );
+    } finally {
+      if (keepAlive !== null) clearInterval(keepAlive);
+    }
+    assert.equal(
+      source.every((byte) => byte === 0),
+      true,
+      `${testCase.label} exact emitted source is erased`,
+    );
+  }
+
   await assert.rejects(
     runBoundedProcessProbe({
       ...descriptor(['-e', 'process.exit(0);']),
