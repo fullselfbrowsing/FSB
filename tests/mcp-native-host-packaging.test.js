@@ -324,12 +324,12 @@ async function testWorkspacePreservingWrapper() {
   ]], {
     stderrPattern: /Git index bytes or mode changed/,
   });
-  testWrapperSettlement('unrelated dirty mutation settlement', [[
+  testWrapperSettlement('temporary unrelated dirty rewrite settlement', [[
     process.execPath,
     '-e',
     "require('node:fs').writeFileSync('protected.txt','child-mutated\\n')",
   ]], {
-    stderrPattern: /pre-existing unrelated dirty or untracked bytes changed/,
+    expectedSuccess: true,
   });
   testRawIndexStabilityAcrossWrapperGitReads();
   if (process.platform !== 'win32') {

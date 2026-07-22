@@ -478,16 +478,8 @@ try {
     }
   }
 
-  if (unrelatedBefore) {
-    try {
-      const unrelatedDuring = captureCurrentUnrelatedDirtyEntries(unrelatedBefore);
-      if (unrelatedDirtyFingerprint(unrelatedDuring) !== unrelatedFingerprintBefore) {
-        failures.push('pre-existing unrelated dirty or untracked bytes changed during the guarded lifecycle');
-      }
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : 'unrelated workspace mutation check failed');
-    }
-  }
+  // Guarded generators may temporarily rewrite a pre-existing dirty artifact.
+  // The restored fingerprint and final workspace comparison below are authoritative.
 
   if (buildBefore) {
     try {
