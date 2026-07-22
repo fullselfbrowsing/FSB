@@ -13,6 +13,12 @@
   var ENTRY_VERSION = 1;
   var NOT_REPORTED = 'Not reported';
   var BILLING_NOT_REPORTED = 'Billing not reported';
+  var ACCEPTED_BILLING_TEXT = Object.freeze({
+    'chatgpt:subscription': 'Included with your ChatGPT plan',
+    'api_key:api': 'Billed to the API key stored by Codex; dollar amount not reported.',
+    'unknown:subscription': 'Included in your subscription',
+    'unknown:unknown': BILLING_NOT_REPORTED
+  });
   var SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
   var VALID_STATES = Object.freeze({
     idle: true,
@@ -139,6 +145,13 @@
         || canonicalLabel !== providerLabel
         || (billingKind !== 'subscription' && billingKind !== 'unknown')) return null;
     return { id: canonicalId, label: canonicalLabel, billingKind: billingKind };
+  }
+
+  function _acceptedIdentity(value) {
+    var validate = _ownDataValue(delegationProviders, 'validateAcceptedAgentIdentity');
+    if (typeof validate !== 'function') return null;
+    try { return validate.call(delegationProviders, value); }
+    catch (_error) { return null; }
   }
 
   function _isNullableString(value, max) {
@@ -317,8 +330,8 @@
 
   function validateSnapshot(snapshot) {
     if (!_hasExactKeys(snapshot, [
-      'activeTab', 'connection', 'delegationId', 'entries', 'hold', 'hydrated',
-      'provider', 'state', 'summary', 'terminal', 'v'
+      'acceptedIdentity', 'activeTab', 'connection', 'delegationId', 'entries',
+      'hold', 'hydrated', 'provider', 'state', 'summary', 'terminal', 'v'
     ])
         || snapshot.v !== SNAPSHOT_VERSION
         || typeof snapshot.delegationId !== 'string'
@@ -333,14 +346,28 @@
         || !_validActiveTab(snapshot.activeTab)
         || !_validHold(snapshot.hold)
         || !_validTerminal(snapshot.terminal)) return false;
+    var acceptedIdentity = _acceptedIdentity(snapshot.acceptedIdentity);
+    var provider = _canonicalIdentity(snapshot.provider);
+    if (!acceptedIdentity
+        || !provider
+        || provider.id !== acceptedIdentity.providerId
+        || provider.label !== acceptedIdentity.label
+        || (snapshot.summary !== null
+          && (snapshot.summary.billingKind !== acceptedIdentity.billingKind
+            || snapshot.summary.usd !== null))) return false;
     for (var index = 0; index < snapshot.entries.length; index++) {
       var entry = snapshot.entries[index];
       if (!validateEntry(entry, snapshot.delegationId, index + 1)) return false;
-      if (snapshot.provider !== null
-          && entry.init
-          && entry.init.client !== null
-          && (_ownDataValue(snapshot.provider, 'id') !== _ownDataValue(entry.init.client, 'id')
-            || _ownDataValue(snapshot.provider, 'label') !== _ownDataValue(entry.init.client, 'label'))) {
+      if (entry.init
+          && (!entry.init.client
+            || _ownDataValue(entry.init.client, 'id') !== acceptedIdentity.providerId
+            || _ownDataValue(entry.init.client, 'label') !== acceptedIdentity.label
+            || entry.init.profileVersion !== acceptedIdentity.profileVersion)) {
+        return false;
+      }
+      if (entry.metrics
+          && (entry.metrics.billingKind !== acceptedIdentity.billingKind
+            || entry.metrics.usd !== null)) {
         return false;
       }
     }
@@ -435,7 +462,6 @@
       _entryHeading(article, 'Agent initialized', tone);
       var initList = _element('dl', 'delegation-definition-list');
       _definition(initList, 'Client', entry.init.client ? entry.init.client.label : null);
-      _definition(initList, 'Profile', entry.init.profileVersion);
       _definition(initList, 'Model', entry.init.model);
       _definition(initList, 'Session', entry.init.sessionId, 'delegation-machine-value');
       _definition(initList, 'Allowed tools', entry.init.allowedTools.length
@@ -488,7 +514,13 @@
     return article;
   }
 
-  function _billingText(summary) {
+  function _billingText(summary, acceptedIdentity) {
+    if (acceptedIdentity) {
+      var acceptedText = ACCEPTED_BILLING_TEXT[
+        acceptedIdentity.authState + ':' + acceptedIdentity.billingKind
+      ];
+      return acceptedText || BILLING_NOT_REPORTED;
+    }
     if (summary.billingKind === 'subscription') return 'Included in your subscription';
     if (summary.billingKind === 'api' && summary.usd !== null) {
       return '$' + Number(summary.usd).toFixed(4) + ' USD';
@@ -496,8 +528,15 @@
     return BILLING_NOT_REPORTED;
   }
 
-  function renderSummary(summary) {
+  function renderSummary(summary, acceptedIdentityValue) {
     if (!_validSummary(summary) || summary === null) return null;
+    var acceptedIdentity = null;
+    if (acceptedIdentityValue !== undefined) {
+      acceptedIdentity = _acceptedIdentity(acceptedIdentityValue);
+      if (!acceptedIdentity
+          || summary.billingKind !== acceptedIdentity.billingKind
+          || summary.usd !== null) return null;
+    }
     var tone = _toneForState(summary.state);
     var article = _element('article', 'delegation-summary');
     _applyTone(article, summary.state, tone);
@@ -509,7 +548,7 @@
     _definition(list, 'Turns', summary.turns);
     _definition(list, 'Duration', _duration(summary.durationMs));
     _definition(list, 'State', summary.state);
-    _definition(list, 'Billing', _billingText(summary));
+    _definition(list, 'Billing', _billingText(summary, acceptedIdentity));
     article.appendChild(list);
 
     var details = _element('details', 'delegation-tool-breakdown');
@@ -565,7 +604,7 @@
       container.appendChild(row);
     }
     if (snapshot.summary && authoritativeCompleted) {
-      var summary = renderSummary(snapshot.summary);
+      var summary = renderSummary(snapshot.summary, snapshot.acceptedIdentity);
       if (!summary) return { ok: false, lastSequence: null, hydrated: options.hydrated === true };
       container.appendChild(summary);
     }

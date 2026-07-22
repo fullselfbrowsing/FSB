@@ -1635,9 +1635,7 @@ function _renderDelegationPreflightFailure(result) {
   } else if (code === 'start_rejected') {
     headingText = providerLabel + ' cannot start this task';
     bodyText = providerLabel
-      + ' could not use a signed-in account and model. Open provider setup, confirm '
-      + providerLabel
-      + ' can run non-interactively, then try this message again.';
+      + ' sign-in changed before this run. Refresh provider status and review the billing method before trying again.';
     primaryLabel = 'Open provider setup';
     primaryAction = _openDelegationProviderSetup;
     secondaryLabel = 'Back to message';
@@ -2485,6 +2483,8 @@ async function _beginDelegationStart(challengeId) {
       ? response.code
       : 'start_rejected';
     if (_delegationUiState.errorCode === 'start_rejected') {
+      _delegationUiState.challengeId = null;
+      _delegationUiState.challengeExpiresAt = null;
       _renderDelegationPreflightFailure({
         ok: false,
         code: 'start_rejected',

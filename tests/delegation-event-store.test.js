@@ -36,6 +36,20 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
   authState: 'unknown',
   billingKind: 'unknown',
 });
+const CODEX_CHATGPT_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'chatgpt',
+  billingKind: 'subscription',
+});
+const CODEX_API_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'api_key',
+  billingKind: 'api',
+});
 const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
@@ -378,11 +392,135 @@ async function runAcceptedIdentityFoundation() {
   });
 }
 
+async function runCodexAcceptedIdentity() {
+  await test('persists both Codex auth modes with real profiles, null USD, and exact hydration identity', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const chatgptId = 'delegation_store_codex_chatgpt_6507';
+      const apiId = 'delegation_store_codex_api_6507';
+      for (const [delegationId, acceptedIdentity] of [
+        [chatgptId, CODEX_CHATGPT_ACCEPTED_IDENTITY],
+        [apiId, CODEX_API_ACCEPTED_IDENTITY],
+      ]) {
+        const init = await store.appendBeforeFanout(
+          delegationId,
+          fixtures.initEvent,
+          acceptedContext(acceptedIdentity, {
+            timestamp: 1720000000000,
+            state: 'starting',
+            allowedTools: [],
+          }),
+        );
+        const result = await store.appendBeforeFanout(
+          delegationId,
+          fixtures.resultEvent,
+          acceptedContext(acceptedIdentity, {
+            timestamp: 1720000000001,
+            state: 'completed',
+          }),
+        );
+        assert.deepStrictEqual(init.init.client, { id: 'codex', label: 'Codex' });
+        assert.strictEqual(init.init.profileVersion, '0.142.5');
+        assert.strictEqual(result.state, 'running');
+        assert.strictEqual(result.metrics.billingKind, acceptedIdentity.billingKind);
+        assert.strictEqual(result.metrics.usd, null);
+        assert.deepStrictEqual(
+          mock.data[storageKey(store, delegationId)].acceptedIdentity,
+          acceptedIdentity,
+        );
+      }
+
+      await store.markCleanupPending(chatgptId, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: null,
+      });
+      const terminal = await store.markTerminal(chatgptId, {
+        code: 'completed',
+        event: fixtures.terminalEvent,
+        context: { timestamp: 1720000000002 },
+      });
+      assert.deepStrictEqual(terminal.acceptedIdentity, CODEX_CHATGPT_ACCEPTED_IDENTITY);
+      assert.strictEqual(terminal.entries[2].state, 'completed');
+
+      store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated.length, 1, 'terminal ChatGPT ledger is excluded');
+      assert.strictEqual(hydrated[0].delegationId, apiId);
+      assert.deepStrictEqual(hydrated[0].acceptedIdentity, CODEX_API_ACCEPTED_IDENTITY);
+      assert.strictEqual(hydrated[0].entries[0].init.profileVersion, '0.142.5');
+      assert.strictEqual(hydrated[0].entries[1].metrics.billingKind, 'api');
+      assert.strictEqual(hydrated[0].entries[1].metrics.usd, null);
+      assert(Object.isFrozen(hydrated[0].acceptedIdentity));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('rejects Codex identity drift, hostile records, and event-provided USD', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const id = 'delegation_store_codex_drift_6507';
+      await store.appendBeforeFanout(
+        id,
+        fixtures.initEvent,
+        acceptedContext(CODEX_API_ACCEPTED_IDENTITY, {
+          timestamp: 1720000000000,
+          state: 'starting',
+          allowedTools: [],
+        }),
+      );
+      for (const acceptedIdentity of [
+        CODEX_CHATGPT_ACCEPTED_IDENTITY,
+        { ...CODEX_API_ACCEPTED_IDENTITY, billingKind: 'subscription' },
+        { ...CODEX_API_ACCEPTED_IDENTITY, profileVersion: '0.144.6' },
+        { ...CODEX_API_ACCEPTED_IDENTITY, extra: true },
+        Object.assign(Object.create({ inherited: true }), CODEX_API_ACCEPTED_IDENTITY),
+      ]) {
+        await expectCode(
+          store.appendBeforeFanout(
+            id,
+            fixtures.stateEvent,
+            acceptedContext(acceptedIdentity, { timestamp: 1720000000010 }),
+          ),
+          'delegation_persistence_failed',
+        );
+      }
+      await expectCode(
+        store.appendBeforeFanout(
+          id,
+          fixtures.resultEvent,
+          acceptedContext(CODEX_API_ACCEPTED_IDENTITY, {
+            timestamp: 1720000000020,
+            usd: 0.01,
+          }),
+        ),
+        'delegation_persistence_failed',
+      );
+      assert.strictEqual(mock.data[storageKey(store, id)].entries.length, 1);
+      assert.deepStrictEqual(mock.data[storageKey(store, id)].acceptedIdentity,
+        CODEX_API_ACCEPTED_IDENTITY);
+    } finally {
+      mock.restore();
+    }
+  });
+}
+
 (async () => {
   console.log('--- Phase 61 Plan 02: delegation event store ---');
 
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     await runAcceptedIdentityFoundation();
+    console.log('\n--- delegation event store summary ---');
+    console.log('  passed:', passed);
+    console.log('  failed:', failed);
+    process.exitCode = failed > 0 ? 1 : 0;
+    return;
+  }
+  if (SELECTED_SECTION === 'codex-accepted-identity') {
+    await runCodexAcceptedIdentity();
     console.log('\n--- delegation event store summary ---');
     console.log('  passed:', passed);
     console.log('  failed:', failed);

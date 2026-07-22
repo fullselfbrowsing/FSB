@@ -93,6 +93,10 @@ const Feed = require('../extension/ui/delegation-feed.js');
 const DelegationProviders = require('../extension/utils/delegation-providers.js');
 
 const DELEGATION_ID = 'delegation_fixture';
+const CLAUDE_ACCEPTED_IDENTITY = DelegationProviders.createAcceptedAgentIdentity(
+  'claude-code',
+  'unknown'
+);
 
 function entry(sequence, kind, payload) {
   const base = {
@@ -159,6 +163,7 @@ function snapshot(overrides) {
   return Object.assign({
     v: 1,
     delegationId: DELEGATION_ID,
+    acceptedIdentity: clone(CLAUDE_ACCEPTED_IDENTITY),
     provider: { id: 'claude-code', label: 'Claude Code' },
     state: 'completed',
     connection: 'connected',
@@ -225,11 +230,18 @@ function extractNamedFunction(source, name) {
   throw new Error('unbalanced function source for ' + name);
 }
 
-function canonicalProviderSnapshot(providerId, providerLabel, billingKind) {
+function canonicalProviderSnapshot(providerId, providerLabel, billingKind, authState) {
   const value = snapshot();
+  const acceptedIdentity = DelegationProviders.createAcceptedAgentIdentity(
+    providerId,
+    authState || 'unknown'
+  );
+  assert(acceptedIdentity, providerId + ' has a canonical accepted identity');
+  assert.equal(acceptedIdentity.billingKind, billingKind);
+  value.acceptedIdentity = clone(acceptedIdentity);
   value.provider = { id: providerId, label: providerLabel };
   value.entries[0].init.client = { id: providerId, label: providerLabel };
-  value.entries[0].init.profileVersion = null;
+  value.entries[0].init.profileVersion = acceptedIdentity.profileVersion;
   value.entries[0].init.model = null;
   value.entries[0].init.sessionId = null;
   value.entries[0].init.allowedTools = [];
@@ -288,6 +300,22 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   crossedIdentity.entries[0].init.client = { id: 'claude-code', label: 'Claude Code' };
   assert.equal(Feed.validateSnapshot(crossedIdentity), false,
     'snapshot and init provider identities cannot cross');
+  for (const [field, value] of [
+    ['providerId', 'claude-code'],
+    ['label', 'Claude Code'],
+    ['profileVersion', 'different-real-profile'],
+    ['authState', 'chatgpt'],
+    ['billingKind', 'subscription']
+  ]) {
+    const drifted = clone(openCode);
+    drifted.acceptedIdentity[field] = value;
+    assert.equal(Feed.validateSnapshot(drifted), false,
+      'snapshot rejects accepted identity drift in ' + field);
+  }
+  const identityExtra = clone(openCode);
+  identityExtra.acceptedIdentity.extra = true;
+  assert.equal(Feed.validateSnapshot(identityExtra), false,
+    'snapshot rejects extra accepted identity fields');
 
   let providerAccessorReads = 0;
   const accessorIdentity = { id: 'opencode' };
@@ -303,6 +331,21 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert.equal(Feed.validateSnapshot(accessorSnapshot), false,
     'provider identity accessors fail closed at the feed boundary');
   assert.equal(providerAccessorReads, 0, 'feed never invokes provider identity accessors');
+
+  let acceptedAccessorReads = 0;
+  const acceptedAccessor = clone(openCode.acceptedIdentity);
+  Object.defineProperty(acceptedAccessor, 'billingKind', {
+    enumerable: true,
+    get() {
+      acceptedAccessorReads += 1;
+      return 'unknown';
+    }
+  });
+  const acceptedAccessorSnapshot = clone(openCode);
+  acceptedAccessorSnapshot.acceptedIdentity = acceptedAccessor;
+  assert.equal(Feed.validateSnapshot(acceptedAccessorSnapshot), false,
+    'accepted identity accessors fail closed at the feed boundary');
+  assert.equal(acceptedAccessorReads, 0, 'feed never invokes accepted identity accessors');
 
   const nativeCanary = 'native://secret:port/path/model/auth/version/task';
   const nativeSnapshot = clone(openCode);
@@ -331,11 +374,13 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   );
   const text = container.textContent;
   [
-    'Claude Code', '2.1.177', 'claude-sonnet', 'session_fixture', 'mcp__fsb',
+    'Claude Code', 'claude-sonnet', 'session_fixture', 'mcp__fsb',
     'mcp__fsb__read_page', 'current tab', '42', 'succeeded', '150 ms',
     'api_retry', '250 ms', '11', '7', '18', '3', '900 ms',
     'Included in your subscription', 'Show tool-call breakdown'
   ].forEach((value) => assert(text.includes(value), 'renderer exposes typed field: ' + value));
+  assert(!text.includes('Profile') && !text.includes('2.1.177'),
+    'real internal profile data creates no visible term or value');
   assert(!text.includes('presentation string that must not be parsed'),
     'typed cards do not parse or substitute presentation title data');
 
@@ -405,14 +450,26 @@ console.log('\n--- Phase 61 delegation feed contract ---');
 {
   const claudeContainer = new TestNode('div');
   const openCodeContainer = new TestNode('div');
+  const codexChatgptContainer = new TestNode('div');
+  const codexApiContainer = new TestNode('div');
   const claude = canonicalProviderSnapshot('claude-code', 'Claude Code', 'subscription');
   const openCode = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
+  const codexChatgpt = canonicalProviderSnapshot(
+    'codex', 'Codex', 'subscription', 'chatgpt'
+  );
+  const codexApi = canonicalProviderSnapshot('codex', 'Codex', 'api', 'api_key');
   assert.equal(openCode.entries[3].state, 'running',
     'the stored OpenCode result remains a nonterminal candidate');
   assert.equal(Feed.render(claudeContainer, claude, { hydrated: false }).ok, true);
   assert.equal(Feed.render(openCodeContainer, openCode, { hydrated: false }).ok, true);
+  assert.equal(Feed.render(codexChatgptContainer, codexChatgpt, { hydrated: false }).ok, true);
+  assert.equal(Feed.render(codexApiContainer, codexApi, { hydrated: false }).ok, true);
   assert.deepEqual(domShape(openCodeContainer), domShape(claudeContainer),
     'Claude and OpenCode normalized inputs produce identical feed DOM structure');
+  assert.deepEqual(domShape(codexChatgptContainer), domShape(claudeContainer),
+    'Codex ChatGPT normalized input uses the shared feed DOM structure');
+  assert.deepEqual(domShape(codexApiContainer), domShape(claudeContainer),
+    'Codex API-key normalized input uses the shared feed DOM structure');
   assert(openCodeContainer.textContent.includes('OpenCode'));
   assert(openCodeContainer.textContent.includes('Outcomecompleted'),
     'authoritative completed terminal truth controls the result presentation');
@@ -421,6 +478,24 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   assert(!/Included in your subscription|\$\d|\bfree\b|\bunlimited\b/i.test(
     openCodeContainer.textContent
   ), 'unknown billing cannot imply a plan, price, or allowance');
+  assert(codexChatgptContainer.textContent.includes(
+    'BillingIncluded with your ChatGPT plan'
+  ), 'accepted ChatGPT identity drives the exact completed billing caption');
+  assert(codexApiContainer.textContent.includes(
+    'BillingBilled to the API key stored by Codex; dollar amount not reported.'
+  ), 'accepted API-key identity drives the exact completed billing caption');
+  for (const [container, value] of [
+    [codexChatgptContainer, codexChatgpt],
+    [codexApiContainer, codexApi]
+  ]) {
+    assert.equal(value.acceptedIdentity.profileVersion, '0.142.5');
+    assert.equal(value.entries[0].init.profileVersion, '0.142.5');
+    assert.equal(value.summary.usd, null);
+    assert(!container.textContent.includes('Profile')
+        && !container.textContent.includes('0.142.5')
+        && !/\$\s*\d/.test(container.textContent),
+      'Codex keeps profile and dollar values absent from the shared presentation');
+  }
 
   const hydratedContainer = new TestNode('div');
   const hydrated = clone(openCode);
@@ -486,14 +561,7 @@ console.log('\n--- Phase 61 delegation feed contract ---');
 }
 
 {
-  const missing = snapshot();
-  missing.entries[0].init = {
-    client: null,
-    profileVersion: null,
-    model: null,
-    sessionId: null,
-    allowedTools: []
-  };
+  const missing = canonicalProviderSnapshot('opencode', 'OpenCode', 'unknown');
   missing.entries[1].tool.callId = null;
   missing.entries[1].tool.tabId = null;
   missing.entries[1].tool.argsSummary = null;
@@ -511,6 +579,9 @@ console.log('\n--- Phase 61 delegation feed contract ---');
   const container = new TestNode('div');
   assert.equal(Feed.render(container, missing, {}).ok, true);
   assert(container.textContent.includes('Not reported'), 'missing nullable fields are explicit');
+  assert.equal(missing.entries[0].init.profileVersion, '1.14.25',
+    'nullable presentation fixture retains its real internal provider profile');
+  assert(!container.textContent.includes('Profile') && !container.textContent.includes('1.14.25'));
 
   const api = Feed.renderSummary(summary({ billingKind: 'api', usd: 1.25 }));
   assert(api.textContent.includes('$1.2500 USD'), 'real API USD is shown only for API billing');
@@ -602,8 +673,12 @@ assert(feedSource.includes('textContent') && feedSource.includes('createTextNode
   'delegation renderer uses only text DOM construction');
 assert(!/opencode/i.test(feedSource),
   'feed presentation contains no OpenCode-specific renderer or billing branch');
+assert(!/providerId\s*={2,3}\s*['"]codex['"]|delegation-(?:entry|summary)-codex/i.test(feedSource),
+  'feed presentation contains no Codex-specific branch, class, or renderer');
 assert(feedSource.includes("'Billing not reported'"),
   'feed source pins the exact unknown-billing phrase');
+assert(!/_definition\(initList,\s*['"]Profile['"]/.test(feedSource),
+  'shared init presentation removes both the Profile term and value row');
 assert(panelSource.includes("message.type !== 'FSB_DELEGATION_UPDATED'"),
   'side panel accepts only the canonical runtime update type');
 assert(!/opencode/i.test(panelSource),
@@ -914,6 +989,94 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
   'reduced-motion removes all spinner motion');
 
 (async function runInteractionContract() {
+  {
+    const previousChrome = globalThis.chrome;
+    const sessionData = Object.create(null);
+    globalThis.chrome = {
+      storage: {
+        session: {
+          async get(keys) {
+            if (keys == null) return clone(sessionData);
+            const out = {};
+            for (const key of Array.isArray(keys) ? keys : [keys]) {
+              if (Object.hasOwn(sessionData, key)) out[key] = clone(sessionData[key]);
+            }
+            return out;
+          },
+          async set(update) { Object.assign(sessionData, clone(update)); },
+          async remove(keys) {
+            for (const key of Array.isArray(keys) ? keys : [keys]) delete sessionData[key];
+          }
+        }
+      }
+    };
+    try {
+      const storePath = require.resolve('../extension/utils/delegation-event-store.js');
+      const controllerPath = require.resolve('../extension/utils/delegation-controller.js');
+      const matrix = [
+        ['claude-code', 'unknown', '2.1.177'],
+        ['opencode', 'unknown', '1.14.25'],
+        ['codex', 'chatgpt', '0.142.5']
+      ];
+      let canonicalShape = null;
+      for (let index = 0; index < matrix.length; index += 1) {
+        for (const key of Object.keys(sessionData)) delete sessionData[key];
+        delete require.cache[storePath];
+        delete require.cache[controllerPath];
+        const store = require(storePath);
+        const Controller = require(controllerPath);
+        const [providerId, authState, profileVersion] = matrix[index];
+        const identity = DelegationProviders.createAcceptedAgentIdentity(providerId, authState);
+        const deps = {
+          eventStore: store,
+          clock: {
+            now: () => 1720000000000 + index,
+            setTimeout: () => ({ unref() {} }),
+            clearTimeout() {}
+          },
+          registry: {
+            hydrate() {},
+            listDelegationMappings() { return []; },
+            getDelegationReleaseReceipt() { return null; }
+          }
+        };
+        let controller = Controller.create(deps);
+        await controller.hydrate();
+        const delegationId = 'delegation_real_feed_6507_' + index;
+        const started = await controller.start({ delegationId, acceptedIdentity: identity });
+        assert.equal(started.snapshot.acceptedIdentity.profileVersion, profileVersion);
+        assert.equal(started.snapshot.entries[0].init.profileVersion, profileVersion);
+        assert.equal(Feed.validateSnapshot(started.snapshot), true);
+        const liveContainer = new TestNode('div');
+        assert.equal(Feed.render(liveContainer, started.snapshot, { hydrated: false }).ok, true);
+        assert(!liveContainer.textContent.includes('Profile')
+            && !liveContainer.textContent.includes(profileVersion),
+          providerId + ' controller snapshot keeps its real profile internal');
+        if (canonicalShape === null) canonicalShape = domShape(liveContainer);
+        else assert.deepEqual(domShape(liveContainer), canonicalShape,
+          providerId + ' controller snapshot uses the provider-neutral DOM shape');
+
+        delete require.cache[storePath];
+        delete require.cache[controllerPath];
+        const hydratedStore = require(storePath);
+        const HydratedController = require(controllerPath);
+        controller = HydratedController.create({ ...deps, eventStore: hydratedStore });
+        const restored = await controller.hydrate();
+        assert.equal(restored.length, 1);
+        assert.equal(restored[0].acceptedIdentity.profileVersion, profileVersion);
+        const hydratedContainer = new TestNode('div');
+        const hydratedRender = Feed.render(hydratedContainer, restored[0], { hydrated: true });
+        assert.equal(hydratedRender.ok, true);
+        assert.equal(hydratedRender.hydrated, true);
+        assert.deepEqual(domShape(hydratedContainer), domShape(liveContainer),
+          providerId + ' hydration silently recreates the same feed DOM');
+      }
+    } finally {
+      if (previousChrome === undefined) delete globalThis.chrome;
+      else globalThis.chrome = previousChrome;
+    }
+  }
+
   {
     const intentId = 'intent_native_wake_0001';
     const rawText = '  Preserve\nthese bytes\u00a0 ';
@@ -1252,7 +1415,7 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     });
     assert.equal(findAll(stateCard, 'h2')[0].textContent, 'OpenCode cannot start this task');
     assert(stateCard.textContent.includes(
-      'OpenCode could not use a signed-in account and model. Open provider setup, confirm OpenCode can run non-interactively, then try this message again.'
+      'OpenCode sign-in changed before this run. Refresh provider status and review the billing method before trying again.'
     ));
     assert.deepEqual(findAll(stateCard, 'button').map((button) => button.textContent), [
       'Open provider setup', 'Back to message'
@@ -2210,7 +2373,8 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
     assert.equal(reservations.context._delegationUnboundCleanupByOrigin.size, 0);
 
     const rejectedStart = makeBindingFailureHarness([]);
-    rejectedStart.state.challengeId = null;
+    rejectedStart.state.challengeId = 'stale-auth-challenge';
+    rejectedStart.state.challengeExpiresAt = 99999;
     rejectedStart.context._sendDelegationCommand = async (message) => {
       rejectedStart.commands.push(clone(message));
       return { ok: false, code: 'start_rejected', snapshot: null };
@@ -2224,6 +2388,10 @@ assert(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.delegation-native-wak
       providerId: 'claude-code',
       providerLabel: 'Claude Code'
     }], 'not-ready start rejection reuses one existing provider-labelled failure surface');
+    assert.equal(rejectedStart.state.challengeId, null,
+      'immediate accepted-identity rejection clears the stale consent challenge');
+    assert.equal(rejectedStart.state.challengeExpiresAt, null,
+      'immediate accepted-identity rejection clears stale consent expiry');
 
     const committedBinding = makeBindingFailureHarness([]);
     committedBinding.context._writeDelegationConversationBinding = async () => {

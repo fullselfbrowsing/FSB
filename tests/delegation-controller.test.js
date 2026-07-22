@@ -24,6 +24,20 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
   authState: 'unknown',
   billingKind: 'unknown',
 });
+const CODEX_CHATGPT_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'chatgpt',
+  billingKind: 'subscription',
+});
+const CODEX_API_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'api_key',
+  billingKind: 'api',
+});
 const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
@@ -529,11 +543,134 @@ async function runAcceptedIdentityFoundation() {
   });
 }
 
+async function runCodexAcceptedIdentity() {
+  await test('round-trips both accepted Codex billing modes through result, terminal, and hydration', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      await controller.hydrate();
+      const chatgptId = 'delegation_codex_chatgpt_6507';
+      const apiId = 'delegation_codex_api_key_6507';
+
+      const chatgptStarted = await controller.start(acceptedStartInput(
+        chatgptId,
+        CODEX_CHATGPT_ACCEPTED_IDENTITY,
+      ));
+      const apiStarted = await controller.start(acceptedStartInput(
+        apiId,
+        CODEX_API_ACCEPTED_IDENTITY,
+      ));
+      for (const [started, identity] of [
+        [chatgptStarted, CODEX_CHATGPT_ACCEPTED_IDENTITY],
+        [apiStarted, CODEX_API_ACCEPTED_IDENTITY],
+      ]) {
+        assert.deepStrictEqual(started.snapshot.acceptedIdentity, identity);
+        assert.deepStrictEqual(started.snapshot.provider, { id: 'codex', label: 'Codex' });
+        assert.strictEqual(started.snapshot.entries[0].init.profileVersion, '0.142.5');
+        assert(Object.isFrozen(started.snapshot.acceptedIdentity));
+      }
+
+      await controller.acceptEvent(eventInput(chatgptId, fixtures.resultEvent, {
+        timestamp: 1720000000001,
+        state: 'completed',
+      }));
+      await controller.acceptEvent(eventInput(apiId, fixtures.resultEvent, {
+        timestamp: 1720000000002,
+        state: 'completed',
+      }));
+      assert.deepStrictEqual(
+        {
+          billingKind: controller.getSnapshot(chatgptId).summary.billingKind,
+          usd: controller.getSnapshot(chatgptId).summary.usd,
+        },
+        { billingKind: 'subscription', usd: null },
+      );
+      assert.deepStrictEqual(
+        {
+          billingKind: controller.getSnapshot(apiId).summary.billingKind,
+          usd: controller.getSnapshot(apiId).summary.usd,
+        },
+        { billingKind: 'api', usd: null },
+      );
+
+      await controller.acceptEvent(eventInput(chatgptId, fixtures.terminalEvent, {
+        timestamp: 1720000000003,
+        terminalCode: 'completed',
+        treeSettled: true,
+      }));
+      const settled = controller.getSnapshot(chatgptId);
+      assert.strictEqual(settled.state, 'completed');
+      assert.strictEqual(settled.summary.state, 'completed');
+      assert.deepStrictEqual(settled.acceptedIdentity, CODEX_CHATGPT_ACCEPTED_IDENTITY);
+
+      modules = freshModules();
+      controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      const hydrated = await controller.hydrate();
+      assert.strictEqual(hydrated.length, 1, 'settled ChatGPT run is not resurrected');
+      assert.strictEqual(hydrated[0].delegationId, apiId);
+      assert.deepStrictEqual(hydrated[0].acceptedIdentity, CODEX_API_ACCEPTED_IDENTITY);
+      assert.strictEqual(hydrated[0].entries[0].init.profileVersion, '0.142.5');
+      assert.strictEqual(hydrated[0].summary.billingKind, 'api');
+      assert.strictEqual(hydrated[0].summary.usd, null);
+      assert.strictEqual(hydrated[0].hydrated, true);
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('rejects Codex auth, billing, profile, shape, and USD drift before sequence mutation', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const controller = controllerModule.create(makeDeps(store).deps);
+      await controller.hydrate();
+      const id = 'delegation_codex_drift_6507';
+      await controller.start(acceptedStartInput(id, CODEX_API_ACCEPTED_IDENTITY));
+
+      for (const acceptedIdentity of [
+        CODEX_CHATGPT_ACCEPTED_IDENTITY,
+        { ...CODEX_API_ACCEPTED_IDENTITY, profileVersion: '0.144.6' },
+        { ...CODEX_API_ACCEPTED_IDENTITY, extra: true },
+      ]) {
+        await expectCode(
+          controller.acceptEvent(eventInput(id, fixtures.stateEvent, {
+            timestamp: 1720000000010,
+            acceptedIdentity,
+          })),
+          'unsupported_provider',
+        );
+      }
+      await expectCode(
+        controller.acceptEvent({
+          delegationId: id,
+          event: fixtures.resultEvent,
+          context: { timestamp: 1720000000020, usd: 0.01 },
+        }),
+        'invalid_delegation_event',
+      );
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 1);
+      assert.deepStrictEqual(controller.getSnapshot(id).acceptedIdentity,
+        CODEX_API_ACCEPTED_IDENTITY);
+    } finally {
+      storage.restore();
+    }
+  });
+}
+
 (async () => {
   console.log('--- Phase 61 Plan 02: delegation controller ---');
 
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
     await runAcceptedIdentityFoundation();
+    console.log('\n--- delegation controller summary ---');
+    console.log('  passed:', passed);
+    console.log('  failed:', failed);
+    process.exitCode = failed > 0 ? 1 : 0;
+    return;
+  }
+  if (SELECTED_SECTION === 'codex-accepted-identity') {
+    await runCodexAcceptedIdentity();
     console.log('\n--- delegation controller summary ---');
     console.log('  passed:', passed);
     console.log('  failed:', failed);

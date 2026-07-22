@@ -37,7 +37,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The 7 providers -- copied verbatim from tool-definitions-parity.test.js:37
 // (confirmed against universal-provider.js PROVIDER_CONFIGS).
 const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
-const SHIPPED_AGENT_IDS = ['claude-code', 'opencode'];
+const SHIPPED_AGENT_IDS = ['claude-code', 'opencode', 'codex'];
 const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
 const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
   ? null
@@ -96,8 +96,8 @@ const backgroundSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'back
 
 async function run() {
   // -------------------------------------------------------------------------
-  // Phase 65 Plan 01: accepted delegated runs bind provider, profile, auth,
-  // and billing into one exact immutable identity before Codex is exposed.
+  // Accepted delegated runs bind provider, profile, auth, and billing into one
+  // exact immutable identity across every shipped agent adapter.
   // -------------------------------------------------------------------------
   console.log('\n--- accepted identity foundation (MULTI-05) ---');
 
@@ -119,22 +119,28 @@ async function run() {
   const publicMetadataBefore = JSON.stringify([
     { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
     { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+    { id: 'codex', label: 'Codex', billingKind: 'unknown' },
   ]);
   check(JSON.stringify(delegationProviders.list()) === publicMetadataBefore
       && JSON.stringify(delegationProviders.get('claude-code'))
         === JSON.stringify({ id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' })
       && JSON.stringify(delegationProviders.get('opencode'))
-        === JSON.stringify({ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' }),
-    'Claude Code and OpenCode public metadata remain byte-for-byte equivalent');
+        === JSON.stringify({ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' })
+      && JSON.stringify(delegationProviders.get('codex'))
+        === JSON.stringify({ id: 'codex', label: 'Codex', billingKind: 'unknown' }),
+    'all shipped public metadata uses the same exact three-field shape');
   check(delegationProviders.resolveAgentBillingKind('claude-code', 'unknown') === 'subscription'
-      && delegationProviders.resolveAgentBillingKind('opencode', 'unknown') === 'unknown',
-    'existing providers retain their runnable unknown-auth billing behavior');
+      && delegationProviders.resolveAgentBillingKind('opencode', 'unknown') === 'unknown'
+      && delegationProviders.resolveAgentBillingKind('codex', 'chatgpt') === 'subscription'
+      && delegationProviders.resolveAgentBillingKind('codex', 'api_key') === 'api',
+    'each shipped provider retains its closed accepted auth-to-billing behavior');
   for (const [providerId, authState] of [
     ['claude-code', 'chatgpt'],
     ['claude-code', 'api_key'],
     ['opencode', 'unauthenticated'],
     ['opencode', '__proto__'],
     ['codex', 'unknown'],
+    ['codex', 'unauthenticated'],
     ['constructor', 'unknown'],
   ]) {
     check(delegationProviders.resolveAgentBillingKind(providerId, authState) === null,
@@ -217,11 +223,48 @@ async function run() {
       `hostile accepted-identity shape ${index + 1} fails closed`);
   });
   check(accessorReads === 0, 'accepted-identity validation never invokes caller accessors');
-  check(!delegationProviders.ids().includes('codex')
-      && !JSON.stringify(delegationProviders.list()).includes('codex'),
-    'the production roster remains exactly Claude Code and OpenCode');
+  check(JSON.stringify(delegationProviders.ids())
+      === JSON.stringify(['claude-code', 'opencode', 'codex']),
+    'the production roster is exactly Claude Code, OpenCode, and Codex');
 
   if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed > 0 ? 1 : 0);
+  }
+  if (SELECTED_SECTION === 'delegated-agent-parity') {
+    const identityMatrix = [
+      ['claude-code', 'unknown', '2.1.177', 'subscription'],
+      ['opencode', 'unknown', '1.14.25', 'unknown'],
+      ['codex', 'chatgpt', '0.142.5', 'subscription'],
+      ['codex', 'api_key', '0.142.5', 'api'],
+    ];
+    identityMatrix.forEach(([providerId, authState, profileVersion, billingKind]) => {
+      const identity = delegationProviders.createAcceptedAgentIdentity(providerId, authState);
+      check(identity
+          && identity.providerId === providerId
+          && identity.profileVersion === profileVersion
+          && identity.authState === authState
+          && identity.billingKind === billingKind
+          && Object.isFrozen(identity),
+      `${providerId}/${authState}: canonical accepted identity is exact and immutable`);
+    });
+    check(delegationProviders.list().every((metadata) => (
+      JSON.stringify(Object.keys(metadata)) === JSON.stringify(['id', 'label', 'billingKind'])
+    )), 'every agent exposes the same provider-neutral public metadata shape');
+
+    const feedSource = fs.readFileSync(
+      path.join(REPO_ROOT, 'extension', 'ui', 'delegation-feed.js'),
+      'utf8',
+    );
+    check(feedSource.includes("'acceptedIdentity', 'activeTab'")
+        && feedSource.includes('validateAcceptedAgentIdentity')
+        && feedSource.includes('renderSummary(snapshot.summary, snapshot.acceptedIdentity)'),
+      'shared feed validates and renders only the persisted accepted identity');
+    check(!/_definition\(initList,\s*['"]Profile['"]/.test(feedSource),
+      'shared init presentation has no visible Profile definition');
+    check(!/providerId\s*={2,3}\s*['"]codex['"]|delegation-(?:entry|summary)-codex/i.test(feedSource),
+      'Codex adds no provider-specific feed branch, class, or renderer');
+
     console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
     process.exit(failed > 0 ? 1 : 0);
   }
@@ -285,6 +328,10 @@ async function run() {
     'claude-code', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex',
     'xai', 'anthropic', '', '__proto__', 'constructor'
   ]) {
+    const acceptedIdentity = delegationProviders.createAcceptedAgentIdentity(
+      candidate,
+      candidate === 'codex' ? 'chatgpt' : 'unknown',
+    );
     const result = delegationPreflight.check({
       providerKind: 'agent',
       agentProviderId: candidate,
@@ -293,7 +340,8 @@ async function run() {
         status: 'connected', connected: true, pairingStatus: 'paired',
         delegationConnection: { state: 'connected' }
       },
-      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity,
     });
     const isShippedAgent = SHIPPED_AGENT_IDS.includes(candidate);
     check(result.ok === isShippedAgent
