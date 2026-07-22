@@ -25,6 +25,16 @@ const protocolDriftBuildPath = path.join(
   'agent-providers',
   'protocol-drift.js',
 );
+const acceptedIdentityBuildPath = path.join(
+  mcpBuildRoot,
+  'agent-providers',
+  'accepted-identity.js',
+);
+
+const SELECTED_SECTION = (() => {
+  const offset = process.argv.indexOf('--section');
+  return offset < 0 ? null : process.argv[offset + 1] || '';
+})();
 
 function startRequest(payload, overrides = {}) {
   return {
@@ -560,6 +570,136 @@ async function expectInvalid(operation) {
     assert.equal(error.code, 'invalid_ext_request');
     return true;
   });
+}
+
+function runAcceptedIdentityFoundationTests(identityModule) {
+  const claudeDetection = {
+    installed: true,
+    version: '2.1.177',
+    authState: 'unknown',
+    profileVersion: '2.1.177',
+    binary: {
+      command: '/fixture/bin/claude',
+      realPath: '/fixture/bin/claude',
+      argvPrefix: [],
+    },
+  };
+  const openCodeDetection = {
+    installed: true,
+    version: '1.14.25',
+    authState: 'unknown',
+    profileVersion: '1.14.25',
+    binary: {
+      command: '/fixture/bin/opencode',
+      realPath: '/fixture/bin/opencode',
+      argvPrefix: [],
+    },
+  };
+  const claude = identityModule.acceptedIdentityFromDetection(
+    'claude-code',
+    claudeDetection,
+  );
+  const openCode = identityModule.acceptedIdentityFromDetection(
+    'opencode',
+    openCodeDetection,
+  );
+  assert.deepEqual(claude, {
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription',
+  });
+  assert.deepEqual(openCode, {
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown',
+  });
+  assert(Object.isFrozen(claude));
+  assert(Object.isFrozen(openCode));
+  assert.deepEqual(Object.keys(claude), [
+    'providerId', 'label', 'profileVersion', 'authState', 'billingKind',
+  ]);
+
+  const nullPrototype = Object.assign(Object.create(null), claude);
+  const validatedNullPrototype = identityModule.validateAcceptedAgentIdentity(nullPrototype);
+  assert.deepEqual(validatedNullPrototype, claude);
+  assert(Object.isFrozen(validatedNullPrototype));
+  nullPrototype.profileVersion = 'mutated-after-validation';
+  assert.equal(validatedNullPrototype.profileVersion, '2.1.177');
+  assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, validatedNullPrototype), true);
+  assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, openCode), false);
+
+  const accessor = { ...claude };
+  Object.defineProperty(accessor, 'label', {
+    enumerable: true,
+    get() { throw new Error('identity accessor must not execute'); },
+  });
+  const symbolKey = { ...claude, [Symbol('identity')]: true };
+  const inherited = Object.assign(Object.create({ providerId: 'claude-code' }), claude);
+  const nonEnumerable = { ...claude };
+  Object.defineProperty(nonEnumerable, 'billingKind', {
+    enumerable: false,
+    value: 'subscription',
+  });
+  const hostileValues = [
+    null,
+    [],
+    { ...claude, extra: true },
+    { ...claude, label: undefined },
+    { ...claude, providerId: { toString: () => 'claude-code' } },
+    { ...claude, label: 'OpenCode' },
+    { ...claude, profileVersion: '' },
+    { ...claude, profileVersion: '🚀'.repeat(129) },
+    { ...claude, authState: 'chatgpt' },
+    { ...claude, authState: 'authenticated' },
+    { ...claude, billingKind: 'api' },
+    {
+      providerId: 'opencode',
+      label: 'OpenCode',
+      profileVersion: '1.14.25',
+      authState: 'unknown',
+      billingKind: 'subscription',
+    },
+    {
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: 'chatgpt',
+      billingKind: 'subscription',
+    },
+    accessor,
+    symbolKey,
+    inherited,
+    nonEnumerable,
+  ];
+  for (const value of hostileValues) {
+    assert.equal(identityModule.validateAcceptedAgentIdentity(value), null);
+    assert.equal(identityModule.acceptedAgentIdentitiesEqual(claude, value), false);
+  }
+
+  assert.throws(
+    () => identityModule.acceptedIdentityFromDetection('codex', openCodeDetection),
+    /adapter_unavailable/,
+  );
+  assert.throws(
+    () => identityModule.acceptedIdentityFromDetection('claude-code', {
+      ...claudeDetection,
+      authState: 'authenticated',
+    }),
+    /adapter_unavailable/,
+  );
+  const detectionAccessor = { ...claudeDetection };
+  Object.defineProperty(detectionAccessor, 'profileVersion', {
+    enumerable: true,
+    get() { throw new Error('detection accessor must not execute'); },
+  });
+  assert.throws(
+    () => identityModule.acceptedIdentityFromDetection('claude-code', detectionAccessor),
+    /adapter_unavailable/,
+  );
 }
 
 async function runStrictPayloadTests(supervisorModule) {
@@ -2199,6 +2339,15 @@ async function main() {
   const supervisorModule = await import(pathToFileURL(supervisorBuildPath).href);
   const registryModule = await import(pathToFileURL(registryBuildPath).href);
   const protocolDriftModule = await import(pathToFileURL(protocolDriftBuildPath).href);
+  const acceptedIdentityModule = await import(pathToFileURL(acceptedIdentityBuildPath).href);
+  if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    runAcceptedIdentityFoundationTests(acceptedIdentityModule);
+    console.log('mcp-spawn-supervisor.test.js: PASS');
+    return;
+  }
+  if (SELECTED_SECTION !== null) {
+    throw new Error(`Unknown mcp-spawn-supervisor section: ${SELECTED_SECTION}`);
+  }
   assert.equal(supervisorModule.DELEGATION_TASK_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_STDERR_LIMIT_BYTES, 64 * 1024);
   assert.equal(supervisorModule.DELEGATION_ACTIVE_STATUS_LIMIT, 64);
