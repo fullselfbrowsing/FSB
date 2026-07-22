@@ -26,7 +26,8 @@ if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
 }
 if (SELECTED_SECTION !== null
     && SELECTED_SECTION !== 'accepted-identity-preflight'
-    && SELECTED_SECTION !== 'immediate-start-identity') {
+    && SELECTED_SECTION !== 'immediate-start-identity'
+    && SELECTED_SECTION !== 'codex-auth-preflight') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -43,6 +44,20 @@ const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
   profileVersion: '1.14.25',
   authState: 'unknown',
   billingKind: 'unknown'
+});
+const CODEX_CHATGPT_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'chatgpt',
+  billingKind: 'subscription'
+});
+const CODEX_API_KEY_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'codex',
+  label: 'Codex',
+  profileVersion: '0.142.5',
+  authState: 'api_key',
+  billingKind: 'api'
 });
 
 function clone(value) {
@@ -61,6 +76,93 @@ function bridgeState(overrides = {}) {
 
 function supportedCompatibility(checkedAt = 100) {
   return { status: 'supported', reason: 'within_tested_range', checkedAt };
+}
+
+function degradedCompatibility(checkedAt = 100) {
+  return { status: 'degraded', reason: 'newer_than_tested_range', checkedAt };
+}
+
+function loadPreflightContract() {
+  const context = { Object };
+  context.globalThis = context;
+  vm.runInNewContext(`${delegationProvidersSource}\n${preflightSource}`, context, {
+    filename: 'delegation-preflight.js'
+  });
+  return {
+    canonical: context.FsbDelegationProviders,
+    preflight: context.FsbDelegationPreflight
+  };
+}
+
+function runCodexAuthPreflightContract() {
+  const { canonical, preflight } = loadPreflightContract();
+  assert.deepEqual(clone(canonical.ids()), ['claude-code', 'opencode', 'codex'],
+    'Codex is the exact third canonical agent provider');
+  for (const [identity, billingKind] of [
+    [CODEX_CHATGPT_ACCEPTED_IDENTITY, 'subscription'],
+    [CODEX_API_KEY_ACCEPTED_IDENTITY, 'api']
+  ]) {
+    assert.equal(canonical.resolveAgentBillingKind('codex', identity.authState), billingKind);
+    for (const compatibility of [supportedCompatibility(), degradedCompatibility()]) {
+      assert.deepEqual(clone(preflight.check({
+        providerKind: 'agent',
+        agentProviderId: 'codex',
+        modelProvider: 'xai',
+        bridgeState: bridgeState(),
+        compatibility,
+        acceptedIdentity: clone(identity)
+      })), {
+        ok: true,
+        kind: 'agent',
+        providerId: 'codex',
+        providerLabel: 'Codex',
+        acceptedIdentity: identity
+      }, `${identity.authState} Codex authority is runnable for fresh compatibility`);
+    }
+  }
+
+  for (const authState of ['unauthenticated', 'unknown']) {
+    assert.equal(canonical.createAcceptedAgentIdentity('codex', authState), null,
+      `${authState} cannot mint Codex authority`);
+    assert.deepEqual(clone(preflight.check({
+      providerKind: 'agent',
+      agentProviderId: 'codex',
+      modelProvider: 'xai',
+      bridgeState: bridgeState(),
+      compatibility: supportedCompatibility(),
+      acceptedIdentity: null
+    })), {
+      ok: false,
+      code: 'provider_status_refresh',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    });
+  }
+
+  for (const acceptedIdentity of [
+    { ...CODEX_CHATGPT_ACCEPTED_IDENTITY, billingKind: 'api' },
+    { ...CODEX_API_KEY_ACCEPTED_IDENTITY, billingKind: 'subscription' },
+    { ...CODEX_CHATGPT_ACCEPTED_IDENTITY, providerId: 'claude-code' },
+    { ...CODEX_CHATGPT_ACCEPTED_IDENTITY, authState: 'unknown', billingKind: 'unknown' }
+  ]) {
+    assert.equal(preflight.check({
+      providerKind: 'agent',
+      agentProviderId: 'codex',
+      modelProvider: 'xai',
+      bridgeState: bridgeState(),
+      compatibility: supportedCompatibility(),
+      acceptedIdentity
+    }).code, 'provider_status_refresh', 'invalid Codex identity pairs fail closed');
+  }
+  assert.equal(preflight.check({
+    providerKind: 'agent',
+    agentProviderId: 'codex',
+    modelProvider: 'xai',
+    bridgeState: bridgeState(),
+    compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+    acceptedIdentity: clone(CODEX_CHATGPT_ACCEPTED_IDENTITY)
+  }).code, 'unsupported_provider', 'stale Codex evidence cannot start');
+  runImmediateStartIdentityContract();
 }
 
 function sentDelegationRequestSource(messageType) {
@@ -161,6 +263,11 @@ function runImmediateStartIdentityContract() {
 }
 
 async function main() {
+  if (SELECTED_SECTION === 'codex-auth-preflight') {
+    runCodexAuthPreflightContract();
+    console.log('delegation-routing.test.js: PASS');
+    return;
+  }
   if (SELECTED_SECTION === 'immediate-start-identity') {
     runImmediateStartIdentityContract();
     console.log('delegation-routing.test.js: PASS');
@@ -468,7 +575,7 @@ async function main() {
   }
 
   for (const agentProviderId of [
-    '', 'Claude-Code', 'CLAUDE-CODE', 'OpenCode', 'OPENCode', 'codex', 'anthropic', '__proto__', 'constructor'
+    '', 'Claude-Code', 'CLAUDE-CODE', 'OpenCode', 'OPENCode', 'anthropic', '__proto__', 'constructor'
   ]) {
     const result = clone(preflight.check({
       providerKind: 'agent',
@@ -509,7 +616,7 @@ async function main() {
     bridgeState: bridgeState(), compatibility: supportedCompatibility()
   })).code);
   assert.deepEqual([...dispositionCodes].sort(), [
-    'agent_offline', 'agent_unpaired', 'unsupported_provider'
+    'agent_offline', 'agent_unpaired', 'provider_status_refresh'
   ]);
 
   for (const forbidden of [

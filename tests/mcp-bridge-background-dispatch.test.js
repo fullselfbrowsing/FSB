@@ -40,7 +40,9 @@ const SELECTED_SECTION = SECTION_ARGUMENT_INDEX < 0
 if (SECTION_ARGUMENT_INDEX >= 0 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
 }
-if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity') {
+if (SELECTED_SECTION !== null
+    && SELECTED_SECTION !== 'accepted-identity'
+    && SELECTED_SECTION !== 'codex-start-authority') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -58,6 +60,13 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     profileVersion: '1.14.25',
     authState: 'unknown',
     billingKind: 'unknown'
+  }),
+  codex: Object.freeze({
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription'
   })
 });
 
@@ -762,7 +771,7 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     agentProviderId: options.providerId || 'claude-code',
     modelProvider: 'xai'
   };
-  const compatibilityClients = {
+  const compatibilityClients = options.compatibilityClients || {
     'claude-code': {
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
       acceptedIdentity: acceptedIdentity('claude-code')
@@ -770,6 +779,10 @@ function buildDelegationProviderRoutingHarness(options = {}) {
     opencode: {
       compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
       acceptedIdentity: acceptedIdentity('opencode')
+    },
+    codex: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('codex')
     }
   };
 
@@ -2612,6 +2625,159 @@ async function runAcceptedIdentityBoundaryCases() {
   }
 }
 
+async function runCodexStartAuthorityCases() {
+  console.log('\n--- B11: Codex auth-bound start authority ---');
+
+  const identities = [
+    acceptedIdentity('codex'),
+    acceptedIdentity('codex', { authState: 'api_key', billingKind: 'api' })
+  ];
+  for (const identity of identities) {
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      identitySequence: [identity, identity]
+    });
+    const task = `Codex ${identity.authState} provider-free task`;
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task,
+      challengeId: `dch_codex_${identity.authState}`
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, `${identity.authState} reaches one authenticated daemon start`);
+    if (!request) continue;
+    assertDeepEqual(request.payload, {
+      acceptedIdentity: identity,
+      task
+    }, `${identity.authState} transports only consumed identity and task`);
+    assertEqual(Object.prototype.hasOwnProperty.call(request.payload, 'providerId'), false,
+      `${identity.authState} payload has no standalone provider selector`);
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, identity,
+      `${identity.authState} challenge consumes the second authoritative projection`);
+    assertEqual(harness.controllerCreates, 0,
+      `${identity.authState} creates no controller before daemon echo`);
+
+    const delegationId = `delegation_codex_${identity.authState}`;
+    const error = await harness.emitStarted(request, {
+      delegationId,
+      acceptedIdentity: identity
+    });
+    assertEqual(error, null, `${identity.authState} exact daemon echo is accepted`);
+    const result = await pending;
+    assertEqual(result.ok, true, `${identity.authState} starts one accepted Codex run`);
+    assertDeepEqual(harness.controllerStarts, [{
+      delegationId,
+      acceptedIdentity: identity,
+      connection: 'connected'
+    }], `${identity.authState} controller persists the echoed identity`);
+    assertDeepEqual(harness.contexts.get(delegationId), {
+      acceptedIdentity: identity,
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: identity.authState,
+      billingKind: identity.billingKind
+    }, `${identity.authState} run context retains exact Codex billing authority`);
+  }
+
+  {
+    const chatgptIdentity = acceptedIdentity('codex');
+    const apiKeyIdentity = acceptedIdentity('codex', {
+      authState: 'api_key', billingKind: 'api'
+    });
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      identitySequence: [chatgptIdentity, chatgptIdentity]
+    });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Reject changed Codex auth echo',
+      challengeId: 'dch_codex_echo_mismatch'
+    });
+    const request = await harness.waitForStartRequest();
+    const error = await harness.emitStarted(request, {
+      delegationId: 'delegation_codex_echo_mismatch',
+      acceptedIdentity: apiKeyIdentity
+    });
+    assert(error instanceof Error, 'changed Codex auth echo rejects acceptance');
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      'changed Codex auth echo returns one bounded rejection');
+    assertEqual(harness.controllerCreates, 0, 'changed auth echo creates no controller');
+    assertEqual(harness.startRequests.length, 1, 'changed auth echo is never replayed');
+  }
+
+  for (const authState of ['unauthenticated', 'unknown']) {
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      compatibilityClients: {
+        codex: {
+          compatibility: {
+            status: 'supported', reason: 'within_tested_range', checkedAt: 100
+          },
+          authState
+        }
+      }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: `Reject ${authState} Codex`,
+      challengeId: `dch_codex_${authState}`
+    });
+    assertDeepEqual(result, { ok: false, code: 'preflight_failed', snapshot: null },
+      `${authState} Codex evidence cannot reach consent or transport`);
+    assertEqual(harness.startRequests.length, 0, `${authState} sends no daemon start`);
+  }
+
+  {
+    const staleClients = {
+      codex: {
+        id: 'codex',
+        compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+        authState: 'chatgpt',
+        acceptedIdentity: acceptedIdentity('codex')
+      }
+    };
+    const refreshHarness = buildCompatibilityRefreshHarness({
+      clients: staleClients,
+      rejectRequest: true,
+      cachedSnapshot: { schemaVersion: 2, checkedAt: 100, adapters: [] }
+    });
+    const result = await refreshHarness.refresh();
+    assertEqual(result.refreshOutcome, 'stale', 'failed refresh uses only durable cached evidence');
+    assertDeepEqual(result.clients.codex.compatibility, {
+      status: 'degraded', reason: 'evidence_stale', checkedAt: 100
+    }, 'failed refresh closes fresh Codex compatibility');
+    assertEqual(result.clients.codex.authState, 'unknown',
+      'failed refresh forces Codex auth unknown');
+    assertEqual(Object.prototype.hasOwnProperty.call(
+      result.clients.codex, 'acceptedIdentity'
+    ), false, 'failed refresh strips accepted Codex start authority');
+  }
+
+  {
+    const checkedAt = 400;
+    const refreshHarness = buildCompatibilityRefreshHarness({
+      clients: {
+        codex: {
+          id: 'codex',
+          compatibility: {
+            status: 'degraded', reason: 'newer_than_tested_range', checkedAt
+          },
+          authState: 'api_key',
+          acceptedIdentity: acceptedIdentity('codex', {
+            authState: 'api_key', billingKind: 'api'
+          })
+        }
+      },
+      cachedSnapshot: { schemaVersion: 2, checkedAt, adapters: [] }
+    });
+    const cached = await refreshHarness.readCached();
+    assertEqual(cached.compatibilityExpiresAt, checkedAt + 15 * 60 * 1000,
+      'fresh newer-than-tested Codex evidence schedules the same expiry boundary');
+  }
+}
+
 async function runDelegationProviderRoutingCases() {
   console.log('\n--- B11: accepted delegation provider routing is immutable ---');
 
@@ -3146,6 +3312,11 @@ function runSourceContractCase() {
 // ---------------------------------------------------------------------------
 
 async function run() {
+  if (SELECTED_SECTION === 'codex-start-authority') {
+    await runCodexStartAuthorityCases();
+    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+    process.exit(failed > 0 ? 1 : 0);
+  }
   if (SELECTED_SECTION === 'accepted-identity') {
     await runAcceptedIdentityBoundaryCases();
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

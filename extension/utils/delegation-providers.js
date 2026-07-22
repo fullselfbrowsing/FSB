@@ -25,13 +25,22 @@
       id: 'claude-code',
       label: 'Claude Code',
       billingKind: 'subscription',
+      profileVersion: '2.1.177',
       authToBilling: { unknown: 'subscription' }
     },
     {
       id: 'opencode',
       label: 'OpenCode',
       billingKind: 'unknown',
+      profileVersion: '1.14.25',
       authToBilling: { unknown: 'unknown' }
+    },
+    {
+      id: 'codex',
+      label: 'Codex',
+      billingKind: 'unknown',
+      profileVersion: '0.142.5',
+      authToBilling: { chatgpt: 'subscription', api_key: 'api' }
     }
   ]);
   var byId = Object.create(null);
@@ -123,6 +132,22 @@
     });
   }
 
+  function createAcceptedAgentIdentity(providerId, authState) {
+    if (typeof providerId !== 'string'
+        || typeof authState !== 'string'
+        || !Object.prototype.hasOwnProperty.call(byId, providerId)) return null;
+    var metadata = byId[providerId];
+    var billingKind = resolveAgentBillingKind(providerId, authState);
+    if (!billingKind) return null;
+    return validateAcceptedAgentIdentity({
+      providerId: metadata.id,
+      label: metadata.label,
+      profileVersion: metadata.profileVersion,
+      authState: authState,
+      billingKind: billingKind
+    });
+  }
+
   function ids() {
     return Object.freeze(definitions.map(function(metadata) { return metadata.id; }));
   }
@@ -144,7 +169,8 @@
     list: list,
     isShippedId: isShippedId,
     resolveAgentBillingKind: resolveAgentBillingKind,
-    validateAcceptedAgentIdentity: validateAcceptedAgentIdentity
+    validateAcceptedAgentIdentity: validateAcceptedAgentIdentity,
+    createAcceptedAgentIdentity: createAcceptedAgentIdentity
   });
 
   global.FsbDelegationProviders = api;

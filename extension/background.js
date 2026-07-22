@@ -198,8 +198,9 @@ function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
     const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
     const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
     const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
-    if (status === 'supported'
-        && reason === 'within_tested_range'
+    const runnable = (status === 'supported' && reason === 'within_tested_range')
+      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    if (runnable
         && Number.isSafeInteger(checkedAt)
         && checkedAt >= 0
         && checkedAt <= Number.MAX_SAFE_INTEGER - maxAge) {
@@ -212,19 +213,38 @@ function fsbReadMcpCompatibilityExpiryAt(providers, clients) {
 function fsbProjectStaleMcpClients(clients) {
   const projected = {};
   if (!clients || typeof clients !== 'object' || Array.isArray(clients)) return projected;
+  const canonical = globalThis.FsbDelegationProviders;
+  let canonicalIds = [];
+  try {
+    canonicalIds = canonical && typeof canonical.ids === 'function'
+      ? canonical.ids()
+      : [];
+  } catch (_error) { /* no canonical rows can be projected */ }
   try {
     Object.keys(clients).forEach((providerId) => {
       const row = fsbCompatibilityOwnDataValue(clients, providerId);
       let nextRow = row;
+      if (canonicalIds.indexOf(providerId) === -1) {
+        Object.defineProperty(projected, providerId, {
+          value: nextRow,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+        return;
+      }
       const compatibility = fsbCompatibilityOwnDataValue(row, 'compatibility');
       const status = fsbCompatibilityOwnDataValue(compatibility, 'status');
       const reason = fsbCompatibilityOwnDataValue(compatibility, 'reason');
       const checkedAt = fsbCompatibilityOwnDataValue(compatibility, 'checkedAt');
-      if (status === 'supported'
-          && reason === 'within_tested_range'
+      nextRow = fsbCopyCompatibilityDataRecord(row);
+      nextRow.authState = 'unknown';
+      delete nextRow.acceptedIdentity;
+      const runnable = (status === 'supported' && reason === 'within_tested_range')
+        || (status === 'degraded' && reason === 'newer_than_tested_range');
+      if (runnable
           && Number.isSafeInteger(checkedAt)
           && checkedAt >= 0) {
-        nextRow = fsbCopyCompatibilityDataRecord(row);
         nextRow.compatibility = {
           status: 'degraded',
           reason: 'evidence_stale',

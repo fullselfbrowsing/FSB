@@ -7,7 +7,23 @@
   var FSB_COMPATIBILITY_MAX_STRING_LENGTH = 64;
   var FSB_COMPATIBILITY_ADAPTER_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
   var FSB_COMPATIBILITY_SNAPSHOT_KEYS = ['schemaVersion', 'checkedAt', 'adapters'];
-  var FSB_COMPATIBILITY_ROW_KEYS = ['adapterId', 'displayLabel', 'status', 'reason'];
+  var FSB_COMPATIBILITY_ROW_KEYS = [
+    'adapterId', 'displayLabel', 'status', 'reason', 'authState'
+  ];
+  var FSB_LEGACY_COMPATIBILITY_ROW_KEYS = [
+    'adapterId', 'displayLabel', 'status', 'reason'
+  ];
+  var FSB_LEGACY_COMPATIBILITY_ROSTER = Object.freeze(['claude-code', 'opencode']);
+  var FSB_LEGACY_COMPATIBILITY_LABELS = Object.freeze({
+    'claude-code': 'Claude Code',
+    opencode: 'OpenCode'
+  });
+  var FSB_COMPATIBILITY_AUTH_STATES = Object.freeze({
+    chatgpt: true,
+    api_key: true,
+    unauthenticated: true,
+    unknown: true
+  });
   var delegationProviders = global.FsbDelegationProviders;
   if (!delegationProviders
       && typeof module !== 'undefined'
@@ -20,9 +36,7 @@
       || typeof delegationProviders.get !== 'function') {
     throw new Error('canonical delegation providers are unavailable');
   }
-  var FSB_COMPATIBILITY_AGENT_IDS = {
-    codex: true
-  };
+  var FSB_COMPATIBILITY_AGENT_IDS = {};
   var FSB_SHIPPED_COMPATIBILITY_LABELS = {};
   var FSB_SHIPPED_COMPATIBILITY_ROSTER = delegationProviders.ids();
   FSB_SHIPPED_COMPATIBILITY_ROSTER.forEach(function(providerId) {
@@ -149,6 +163,26 @@
     if (!record
         || !boundedCompatibilityString(record.adapterId, FSB_COMPATIBILITY_ADAPTER_ID_PATTERN)
         || !boundedCompatibilityString(record.displayLabel)
+        || !validCompatibilityStatusReason(record.status, record.reason)
+        || typeof record.authState !== 'string'
+        || !Object.prototype.hasOwnProperty.call(
+          FSB_COMPATIBILITY_AUTH_STATES,
+          record.authState
+        )) return null;
+    return {
+      adapterId: record.adapterId,
+      displayLabel: record.displayLabel,
+      status: record.status,
+      reason: record.reason,
+      authState: record.authState
+    };
+  }
+
+  function parseLegacyCompatibilityRow(value) {
+    var record = ownDataRecord(value, FSB_LEGACY_COMPATIBILITY_ROW_KEYS);
+    if (!record
+        || !boundedCompatibilityString(record.adapterId, FSB_COMPATIBILITY_ADAPTER_ID_PATTERN)
+        || !boundedCompatibilityString(record.displayLabel)
         || !validCompatibilityStatusReason(record.status, record.reason)) return null;
     return {
       adapterId: record.adapterId,
@@ -158,12 +192,8 @@
     };
   }
 
-  function parseCompatibilitySnapshot(value) {
-    var record = ownDataRecord(value, FSB_COMPATIBILITY_SNAPSHOT_KEYS);
-    if (!record
-        || record.schemaVersion !== 1
-        || !Number.isSafeInteger(record.checkedAt)
-        || record.checkedAt < 0) return null;
+  function parseCurrentCompatibilitySnapshot(record) {
+    if (record.schemaVersion !== 2) return null;
     var values = denseDataArray(record.adapters, FSB_COMPATIBILITY_MAX_ADAPTERS);
     if (!values || values.length !== FSB_SHIPPED_COMPATIBILITY_ROSTER.length) return null;
     var adapters = [];
@@ -176,10 +206,52 @@
       adapters.push(row);
     }
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       checkedAt: record.checkedAt,
       adapters: adapters
     };
+  }
+
+  function parseLegacyCompatibilitySnapshot(record) {
+    if (record.schemaVersion !== 1) return null;
+    var values = denseDataArray(record.adapters, FSB_COMPATIBILITY_MAX_ADAPTERS);
+    if (!values || values.length !== FSB_LEGACY_COMPATIBILITY_ROSTER.length) return null;
+    var adapters = [];
+    for (var index = 0; index < values.length; index += 1) {
+      var row = parseLegacyCompatibilityRow(values[index]);
+      var expectedId = FSB_LEGACY_COMPATIBILITY_ROSTER[index];
+      if (!row
+          || row.adapterId !== expectedId
+          || row.displayLabel !== FSB_LEGACY_COMPATIBILITY_LABELS[expectedId]) return null;
+      adapters.push({
+        adapterId: expectedId,
+        displayLabel: FSB_LEGACY_COMPATIBILITY_LABELS[expectedId],
+        status: row.status === 'unsupported' ? 'unsupported' : 'degraded',
+        reason: row.status === 'unsupported' ? row.reason : 'evidence_stale',
+        authState: 'unknown'
+      });
+    }
+    adapters.push({
+      adapterId: 'codex',
+      displayLabel: 'Codex',
+      status: 'unsupported',
+      reason: 'matrix_invalid',
+      authState: 'unknown'
+    });
+    return {
+      schemaVersion: 2,
+      checkedAt: record.checkedAt,
+      adapters: adapters
+    };
+  }
+
+  function parseCompatibilitySnapshot(value, allowLegacy) {
+    var record = ownDataRecord(value, FSB_COMPATIBILITY_SNAPSHOT_KEYS);
+    if (!record
+        || !Number.isSafeInteger(record.checkedAt)
+        || record.checkedAt < 0) return null;
+    return parseCurrentCompatibilitySnapshot(record)
+      || (allowLegacy === true ? parseLegacyCompatibilitySnapshot(record) : null);
   }
 
   function cloneMap(value) {
@@ -268,7 +340,7 @@
     if (compatibilityDescriptor) {
       envelope.compatibility = compatibilityDescriptor.enumerable
           && Object.prototype.hasOwnProperty.call(compatibilityDescriptor, 'value')
-        ? parseCompatibilitySnapshot(compatibilityDescriptor.value)
+        ? parseCompatibilitySnapshot(compatibilityDescriptor.value, true)
         : null;
     }
     return envelope;
@@ -379,7 +451,7 @@
   }
 
   function replaceCompatibility(snapshot) {
-    var compatibility = parseCompatibilitySnapshot(snapshot);
+    var compatibility = parseCompatibilitySnapshot(snapshot, false);
     if (!compatibility) {
       return Promise.reject(new Error('Invalid MCP agent compatibility snapshot'));
     }
@@ -410,20 +482,31 @@
     };
   }
 
-  function projectedCompatibility(snapshot, adapterId, now) {
+  function adapterEvidenceProjection(status, reason, checkedAt, authState, acceptedIdentity) {
+    var projection = {
+      compatibility: compatibilityProjection(status, reason, checkedAt),
+      authState: authState
+    };
+    if (acceptedIdentity) projection.acceptedIdentity = acceptedIdentity;
+    return projection;
+  }
+
+  function projectedAdapterEvidence(snapshot, adapterId, now) {
     var validTime = Number.isSafeInteger(now) && now >= 0;
     var validSnapshot = snapshot
-      && snapshot.schemaVersion === 1
+      && snapshot.schemaVersion === 2
       && Number.isSafeInteger(snapshot.checkedAt)
       && snapshot.checkedAt >= 0;
     var checkedAt = validSnapshot && validTime && snapshot.checkedAt <= now
       ? snapshot.checkedAt
       : null;
     if (!Object.prototype.hasOwnProperty.call(FSB_SHIPPED_COMPATIBILITY_LABELS, adapterId)) {
-      return compatibilityProjection('unsupported', 'adapter_unshipped', checkedAt);
+      return adapterEvidenceProjection(
+        'unsupported', 'adapter_unshipped', checkedAt, 'unknown', null
+      );
     }
     if (!validSnapshot || !validTime || snapshot.checkedAt > now) {
-      return compatibilityProjection('unsupported', 'matrix_invalid', null);
+      return adapterEvidenceProjection('unsupported', 'matrix_invalid', null, 'unknown', null);
     }
 
     var row = null;
@@ -434,13 +517,32 @@
       }
     }
     if (!row || row.displayLabel !== FSB_SHIPPED_COMPATIBILITY_LABELS[adapterId]) {
-      return compatibilityProjection('unsupported', 'matrix_invalid', checkedAt);
+      return adapterEvidenceProjection(
+        'unsupported', 'matrix_invalid', checkedAt, 'unknown', null
+      );
     }
-    if (row.status === 'supported'
-        && now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS) {
-      return compatibilityProjection('degraded', 'evidence_stale', snapshot.checkedAt);
+    var runnable = (row.status === 'supported' && row.reason === 'within_tested_range')
+      || (row.status === 'degraded' && row.reason === 'newer_than_tested_range');
+    if (runnable && now - snapshot.checkedAt >= FSB_AGENT_COMPATIBILITY_MAX_AGE_MS) {
+      return adapterEvidenceProjection(
+        'degraded', 'evidence_stale', snapshot.checkedAt, 'unknown', null
+      );
     }
-    return compatibilityProjection(row.status, row.reason, snapshot.checkedAt);
+    if (!runnable) {
+      return adapterEvidenceProjection(
+        row.status, row.reason, snapshot.checkedAt, 'unknown', null
+      );
+    }
+    var identity = typeof delegationProviders.createAcceptedAgentIdentity === 'function'
+      ? delegationProviders.createAcceptedAgentIdentity(adapterId, row.authState)
+      : null;
+    return adapterEvidenceProjection(
+      row.status,
+      row.reason,
+      snapshot.checkedAt,
+      row.authState,
+      identity
+    );
   }
 
   function resolveProjectionTime(now) {
@@ -524,13 +626,18 @@
 
     Object.keys(merged).forEach(function(id) {
       if (!Object.prototype.hasOwnProperty.call(FSB_COMPATIBILITY_AGENT_IDS, id)) return;
-      merged[id].compatibility = projectedCompatibility(
+      var evidence = projectedAdapterEvidence(
         Object.prototype.hasOwnProperty.call(envelope, 'compatibility')
           ? envelope.compatibility
           : null,
         id,
         projectionTime
       );
+      merged[id].compatibility = evidence.compatibility;
+      merged[id].authState = evidence.authState;
+      if (evidence.acceptedIdentity) {
+        merged[id].acceptedIdentity = evidence.acceptedIdentity;
+      }
     });
 
     return merged;
@@ -548,7 +655,7 @@
     enumerable: false
   });
   Object.defineProperty(api, 'validateCompatibilitySnapshot', {
-    value: function(value) { return parseCompatibilitySnapshot(value); },
+    value: function(value) { return parseCompatibilitySnapshot(value, false); },
     enumerable: false
   });
   Object.defineProperty(api, 'getMergedClients', {

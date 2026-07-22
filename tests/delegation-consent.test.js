@@ -18,7 +18,9 @@ const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
 if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
   throw new Error('--section requires a value');
 }
-if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity-binding') {
+if (SELECTED_SECTION !== null
+    && SELECTED_SECTION !== 'accepted-identity-binding'
+    && SELECTED_SECTION !== 'codex-auth-binding') {
   throw new Error(`unknown section: ${SELECTED_SECTION}`);
 }
 
@@ -36,6 +38,20 @@ const ACCEPTED_IDENTITIES = Object.freeze({
     profileVersion: '1.14.25',
     authState: 'unknown',
     billingKind: 'unknown'
+  }),
+  'codex-chatgpt': Object.freeze({
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription'
+  }),
+  'codex-api-key': Object.freeze({
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'api_key',
+    billingKind: 'api'
   })
 });
 
@@ -139,7 +155,88 @@ async function issue(
   });
 }
 
+async function runCodexAuthBindingContract() {
+  const harness = createStorageHarness();
+  const localHarness = createStorageHarness();
+  installChrome(harness, localHarness);
+  const consent = loadFresh();
+  const chatgptIdentity = acceptedIdentity('codex-chatgpt');
+  const apiKeyIdentity = acceptedIdentity('codex-api-key');
+
+  const consumeDigest = digest('Codex auth-bound consume');
+  const chatgptChallenge = await consent.issueChallenge({
+    acceptedIdentity: chatgptIdentity,
+    taskDigest: consumeDigest,
+    ttlMs: 60_000
+  });
+  assert.equal(chatgptChallenge.ok, true);
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: chatgptChallenge.challengeId,
+    acceptedIdentity: apiKeyIdentity,
+    taskDigest: consumeDigest
+  }), { ok: false, code: 'provider_status_refresh' },
+  'changing only Codex auth and billing burns the challenge');
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: chatgptChallenge.challengeId,
+    acceptedIdentity: chatgptIdentity,
+    taskDigest: consumeDigest
+  }), { ok: false, code: 'challenge_not_found' },
+  'burned ChatGPT authority cannot be replayed');
+
+  const trustDigest = digest('Codex auth-bound trust');
+  const apiKeyChallenge = await consent.issueChallenge({
+    acceptedIdentity: apiKeyIdentity,
+    taskDigest: trustDigest,
+    ttlMs: 60_000
+  });
+  assert.equal(apiKeyChallenge.ok, true);
+  assert.deepEqual(await consent.writeTrustFromChallenge({
+    challengeId: apiKeyChallenge.challengeId,
+    acceptedIdentity: chatgptIdentity,
+    trusted: true
+  }), { ok: false, code: 'provider_status_refresh' },
+  'changed Codex auth cannot grant trust');
+  assert.equal(await consent.getTrusted('codex'), false);
+  assert.deepEqual(await consent.writeTrustFromChallenge({
+    challengeId: apiKeyChallenge.challengeId,
+    acceptedIdentity: apiKeyIdentity,
+    trusted: true
+  }), { ok: false, code: 'challenge_not_found' },
+  'a mismatched trust attempt cannot be retried with older authority');
+
+  const validChallenge = await consent.issueChallenge({
+    acceptedIdentity: chatgptIdentity,
+    taskDigest: trustDigest,
+    ttlMs: 60_000
+  });
+  assert.deepEqual(await consent.writeTrustFromChallenge({
+    challengeId: validChallenge.challengeId,
+    acceptedIdentity: chatgptIdentity,
+    trusted: true
+  }), { ok: true, providerId: 'codex', trusted: true });
+  assert.equal(await consent.getTrusted('codex'), true);
+  assert.equal((await consent.consumeChallenge({
+    challengeId: validChallenge.challengeId,
+    acceptedIdentity: chatgptIdentity,
+    taskDigest: trustDigest
+  })).ok, true, 'exact auth-bound trust still leaves one exact start consumption');
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: validChallenge.challengeId,
+    acceptedIdentity: chatgptIdentity,
+    taskDigest: trustDigest
+  }), { ok: false, code: 'challenge_not_found' });
+  assert.deepEqual(await consent.clearTrusted({ providerId: 'codex' }), {
+    ok: true, providerId: 'codex', trusted: false
+  });
+  delete globalThis.chrome;
+}
+
 async function main() {
+  if (SELECTED_SECTION === 'codex-auth-binding') {
+    await runCodexAuthBindingContract();
+    console.log('delegation-consent.test.js: PASS');
+    return;
+  }
   const harness = createStorageHarness();
   const localHarness = createStorageHarness();
   installChrome(harness, localHarness);
@@ -531,7 +628,6 @@ async function main() {
   }, 'canonical clear is idempotent');
   for (const request of [
     { providerId: 'Claude-Code' },
-    { providerId: 'codex' },
     { providerId: '__proto__' },
     { providerId: 'claude-code', trusted: false }
   ]) {

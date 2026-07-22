@@ -28,6 +28,7 @@ function compatibilityRow(overrides = {}) {
     displayLabel: 'Claude Code',
     status: 'supported',
     reason: 'within_tested_range',
+    authState: 'unknown',
     ...overrides
   };
 }
@@ -38,14 +39,39 @@ function openCodeCompatibilityRow(overrides = {}) {
     displayLabel: 'OpenCode',
     status: 'supported',
     reason: 'within_tested_range',
+    authState: 'unknown',
+    ...overrides
+  };
+}
+
+function codexCompatibilityRow(overrides = {}) {
+  return {
+    adapterId: 'codex',
+    displayLabel: 'Codex',
+    status: 'supported',
+    reason: 'within_tested_range',
+    authState: 'chatgpt',
     ...overrides
   };
 }
 
 function compatibilitySnapshot(
   checkedAt,
-  adapters = [compatibilityRow(), openCodeCompatibilityRow()]
+  adapters = [compatibilityRow(), openCodeCompatibilityRow(), codexCompatibilityRow()]
 ) {
+  return { schemaVersion: 2, checkedAt, adapters };
+}
+
+function legacyCompatibilitySnapshot(checkedAt, adapters = [
+  (() => {
+    const { authState: _authState, ...row } = compatibilityRow();
+    return row;
+  })(),
+  (() => {
+    const { authState: _authState, ...row } = openCodeCompatibilityRow();
+    return row;
+  })()
+]) {
   return { schemaVersion: 1, checkedAt, adapters };
 }
 
@@ -175,12 +201,22 @@ async function main() {
       'UMD and CommonJS expose one canonical helper');
     assert.equal(Object.isFrozen(canonical), true, 'canonical helper API is frozen');
     assert.deepEqual(Object.keys(canonical).sort(), [
-      'get', 'ids', 'isShippedId', 'list', 'validate'
+      'AGENT_AUTH_STATES',
+      'AGENT_BILLING_KINDS',
+      'createAcceptedAgentIdentity',
+      'get',
+      'ids',
+      'isShippedId',
+      'list',
+      'resolveAgentBillingKind',
+      'validate',
+      'validateAcceptedAgentIdentity'
     ], 'canonical helper exposes only closed lookup/copy/roster validators');
-    assert.deepEqual(canonical.ids(), ['claude-code', 'opencode']);
+    assert.deepEqual(canonical.ids(), ['claude-code', 'opencode', 'codex']);
     assert.deepEqual(canonical.list(), [
       { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
-      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' }
+      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+      { id: 'codex', label: 'Codex', billingKind: 'unknown' }
     ]);
     const firstRoster = canonical.list();
     const secondRoster = canonical.list();
@@ -204,7 +240,6 @@ async function main() {
       billingKind: { enumerable: true, value: 'unknown' }
     });
     for (const invalid of [
-      { id: 'codex', label: 'Codex', billingKind: 'unknown' },
       { id: 'OpenCode', label: 'OpenCode', billingKind: 'unknown' },
       { id: 'opencode', label: 'Claude Code', billingKind: 'unknown' },
       { id: 'opencode', label: 'OpenCode', billingKind: 'subscription' },
@@ -218,7 +253,27 @@ async function main() {
         'non-canonical metadata fails closed');
     }
     assert.equal(getterReads, 0, 'metadata validation never invokes accessors');
-    assert.equal(canonical.get('codex'), null, 'Codex remains outside the shipped roster');
+    assert.deepEqual(canonical.get('codex'), {
+      id: 'codex', label: 'Codex', billingKind: 'unknown'
+    }, 'Codex is the third canonical agent provider without exposing internal profile metadata');
+    assert.equal(canonical.resolveAgentBillingKind('codex', 'chatgpt'), 'subscription');
+    assert.equal(canonical.resolveAgentBillingKind('codex', 'api_key'), 'api');
+    assert.equal(canonical.resolveAgentBillingKind('codex', 'unauthenticated'), null);
+    assert.equal(canonical.resolveAgentBillingKind('codex', 'unknown'), null);
+    assert.deepEqual(canonical.createAcceptedAgentIdentity('codex', 'chatgpt'), {
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: 'chatgpt',
+      billingKind: 'subscription'
+    });
+    assert.deepEqual(canonical.createAcceptedAgentIdentity('codex', 'api_key'), {
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: 'api_key',
+      billingKind: 'api'
+    });
     assert.equal(canonical.isShippedId('OpenCode'), false, 'provider ids are case exact');
   }
 
@@ -486,7 +541,10 @@ async function main() {
   {
     const durable = compatibilitySnapshot(2_000_000, [
       compatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
-      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' })
+      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
+      codexCompatibilityRow({
+        status: 'unsupported', reason: 'binary_not_found', authState: 'unknown'
+      })
     ]);
     const { localArea } = installChrome({
       local: { fsbAgentProviders: { clicked: {}, connected: {}, installed: {}, compatibility: durable } }
@@ -503,7 +561,7 @@ async function main() {
       }
     });
     const poisonedRow = Object.assign(Object.create({ inherited: true }), compatibilityRow());
-    const sparseAdapters = new Array(2);
+    const sparseAdapters = new Array(3);
     const inheritedSnapshot = Object.assign(Object.create({ inherited: true }),
       compatibilitySnapshot(2_000_001));
     const compatibilitySentinels = [
@@ -523,27 +581,35 @@ async function main() {
     const invalidSnapshots = [
       { ...compatibilitySnapshot(2_000_001), extra: true },
       compatibilitySnapshot(2_000_001, [
-        { ...compatibilityRow(), extra: true }, openCodeCompatibilityRow()
+        { ...compatibilityRow(), extra: true },
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow()
       ]),
       compatibilitySnapshot(2_000_001, [
-        compatibilityRow({ reason: 'arbitrary_reason' }), openCodeCompatibilityRow()
+        compatibilityRow({ reason: 'arbitrary_reason' }),
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow()
       ]),
       compatibilitySnapshot(2_000_001, [compatibilityRow({
         status: 'supported',
         reason: 'evidence_stale'
-      }), openCodeCompatibilityRow()]),
+      }), openCodeCompatibilityRow(), codexCompatibilityRow()]),
       compatibilitySnapshot(2_000_001, [compatibilityRow()]),
-      compatibilitySnapshot(2_000_001, [compatibilityRow(), compatibilityRow()]),
-      compatibilitySnapshot(2_000_001, [openCodeCompatibilityRow(), compatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [
+        compatibilityRow(), compatibilityRow(), codexCompatibilityRow()
+      ]),
+      compatibilitySnapshot(2_000_001, [
+        openCodeCompatibilityRow(), compatibilityRow(), codexCompatibilityRow()
+      ]),
       compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
         adapterId: 'codex', displayLabel: 'Codex'
-      })]),
+      }), codexCompatibilityRow()]),
       compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
         adapterId: 'OpenCode'
-      })]),
+      }), codexCompatibilityRow()]),
       compatibilitySnapshot(2_000_001, [compatibilityRow(), openCodeCompatibilityRow({
         displayLabel: 'Open Code'
-      })]),
+      }), codexCompatibilityRow()]),
       compatibilitySnapshot(2_000_001, [compatibilityRow(), {
         ...openCodeCompatibilityRow(),
         executablePath: compatibilitySentinels[0],
@@ -558,14 +624,26 @@ async function main() {
         endpoint: compatibilitySentinels[9],
         port: compatibilitySentinels[10],
         secret: compatibilitySentinels[11]
-      }]),
+      }, codexCompatibilityRow()]),
       compatibilitySnapshot(2_000_001, sparseAdapters),
-      compatibilitySnapshot(2_000_001, [accessorRow, openCodeCompatibilityRow()]),
-      compatibilitySnapshot(2_000_001, [poisonedRow, openCodeCompatibilityRow()]),
+      compatibilitySnapshot(2_000_001, [
+        accessorRow, openCodeCompatibilityRow(), codexCompatibilityRow()
+      ]),
+      compatibilitySnapshot(2_000_001, [
+        poisonedRow, openCodeCompatibilityRow(), codexCompatibilityRow()
+      ]),
       inheritedSnapshot,
+      legacyCompatibilitySnapshot(2_000_001),
       compatibilitySnapshot(Number.NaN),
       compatibilitySnapshot(2_000_001, [
-        compatibilityRow({ adapterId: 'x'.repeat(65) }), openCodeCompatibilityRow()
+        compatibilityRow({ adapterId: 'x'.repeat(65) }),
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow()
+      ]),
+      compatibilitySnapshot(2_000_001, [
+        compatibilityRow(),
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow({ authState: 'oauth' })
       ])
     ];
 
@@ -585,6 +663,53 @@ async function main() {
       assert.equal(serializedEnvelope.includes(sentinel), false,
         `durable provider storage excludes ${sentinel}`);
     }
+  }
+
+  {
+    const checkedAt = 2_500_000;
+    const legacy = legacyCompatibilitySnapshot(checkedAt);
+    const { localArea } = installChrome({
+      local: {
+        fsbAgentProviders: {
+          clicked: {},
+          connected: {},
+          installed: {},
+          compatibility: legacy
+        }
+      }
+    });
+    const providers = freshProviders();
+    const hydrated = await providers.read();
+    assert.deepEqual(hydrated.compatibility, {
+      schemaVersion: 2,
+      checkedAt,
+      adapters: [
+        compatibilityRow({
+          status: 'degraded', reason: 'evidence_stale', authState: 'unknown'
+        }),
+        openCodeCompatibilityRow({
+          status: 'degraded', reason: 'evidence_stale', authState: 'unknown'
+        }),
+        codexCompatibilityRow({
+          status: 'unsupported', reason: 'matrix_invalid', authState: 'unknown'
+        })
+      ]
+    }, 'the exact historical two-row v1 cache migrates in memory to a closed v2 roster');
+    assert.equal(localArea.setCount, 0,
+      'read-only legacy hydration does not rewrite durable storage');
+    assert.deepEqual(localArea.dump().fsbAgentProviders.compatibility, legacy,
+      'the durable legacy payload remains byte-stable after hydration');
+    const merged = await providers.getMergedClients([], () => checkedAt);
+    for (const providerId of ['claude-code', 'opencode', 'codex']) {
+      assert.equal(merged[providerId].authState, 'unknown',
+        `${providerId} legacy evidence projects unknown auth`);
+      assert.equal(Object.prototype.hasOwnProperty.call(
+        merged[providerId], 'acceptedIdentity'
+      ), false, `${providerId} legacy evidence cannot mint an accepted identity`);
+    }
+    assert.deepEqual(merged.codex.compatibility, {
+      status: 'unsupported', reason: 'matrix_invalid', checkedAt
+    }, 'legacy migration synthesizes the closed Codex row');
   }
 
   {
@@ -665,7 +790,12 @@ async function main() {
       reason: 'within_tested_range',
       checkedAt
     }, 'snapshot-only OpenCode compatibility ships from its validated daemon row');
-    for (const providerId of ['claude-code', 'opencode']) {
+    assert.deepEqual(merged.codex.compatibility, {
+      status: 'supported',
+      reason: 'within_tested_range',
+      checkedAt
+    }, 'snapshot-only Codex compatibility ships from its validated daemon row');
+    for (const providerId of ['claude-code', 'opencode', 'codex']) {
       assert.deepEqual(providersPanel.getCompatibilityDisplayModel(
         providerId,
         merged[providerId],
@@ -678,20 +808,28 @@ async function main() {
         checkedText: `Checked absolute:${checkedAt}`
       }, `${providerId} safe storage projection reaches the shared Supported view model`);
     }
-    assert.deepEqual(merged.codex.compatibility, {
-      status: 'unsupported',
-      reason: 'adapter_unshipped',
-      checkedAt
-    }, 'snapshot-only Codex compatibility remains closed until its adapter ships');
-    assert.equal(
-      providersPanel.getCompatibilityDisplayModel(
-        'codex',
-        merged.codex,
-        (value) => `absolute:${value}`
-      ).label,
-      'Unsupported',
-      'Codex remains fail-closed Unsupported in the Providers view model'
-    );
+    assert.equal(merged.codex.authState, 'chatgpt');
+    assert.deepEqual(merged.codex.acceptedIdentity, {
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: 'chatgpt',
+      billingKind: 'subscription'
+    }, 'fresh supported Codex evidence mints the exact accepted identity');
+    assert.deepEqual(merged['claude-code'].acceptedIdentity, {
+      providerId: 'claude-code',
+      label: 'Claude Code',
+      profileVersion: '2.1.177',
+      authState: 'unknown',
+      billingKind: 'subscription'
+    });
+    assert.deepEqual(merged.opencode.acceptedIdentity, {
+      providerId: 'opencode',
+      label: 'OpenCode',
+      profileVersion: '1.14.25',
+      authState: 'unknown',
+      billingKind: 'unknown'
+    });
     for (const providerId of providersPanel.AGENT_PROVIDER_IDS) {
       assert.deepEqual({
         clicked: merged[providerId].clicked,
@@ -743,6 +881,10 @@ async function main() {
       reason: 'within_tested_range',
       checkedAt
     }, 'supported evidence remains supported one millisecond before expiry');
+    assert.equal(beforeBoundary.codex.authState, 'chatgpt');
+    assert.equal(Object.prototype.hasOwnProperty.call(
+      beforeBoundary.codex, 'acceptedIdentity'
+    ), true, 'fresh Codex evidence carries accepted start authority');
     const atBoundary = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS);
     assert.deepEqual(atBoundary['claude-code'].compatibility, {
       status: 'degraded',
@@ -755,10 +897,16 @@ async function main() {
       checkedAt
     }, 'OpenCode support follows the same closed freshness boundary as Claude');
     assert.deepEqual(atBoundary.codex.compatibility, {
-      status: 'unsupported',
-      reason: 'adapter_unshipped',
+      status: 'degraded',
+      reason: 'evidence_stale',
       checkedAt
-    }, 'Codex remains visibly unsupported until its adapter ships');
+    }, 'Codex auth-bound evidence closes at the same freshness boundary');
+    for (const providerId of ['claude-code', 'opencode', 'codex']) {
+      assert.equal(atBoundary[providerId].authState, 'unknown');
+      assert.equal(Object.prototype.hasOwnProperty.call(
+        atBoundary[providerId], 'acceptedIdentity'
+      ), false, `${providerId} stale evidence strips accepted start authority`);
+    }
     assert.equal(Object.prototype.hasOwnProperty.call(atBoundary.cursor, 'compatibility'), false,
       'API rows receive no compatibility projection');
 
@@ -778,18 +926,24 @@ async function main() {
 
     await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
       compatibilityRow({ status: 'degraded', reason: 'newer_than_tested_range' }),
-      openCodeCompatibilityRow()
+      openCodeCompatibilityRow(),
+      codexCompatibilityRow({ status: 'degraded', reason: 'newer_than_tested_range' })
     ]));
     const oldDegraded = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
     assert.deepEqual(oldDegraded['claude-code'].compatibility, {
       status: 'degraded',
-      reason: 'newer_than_tested_range',
+      reason: 'evidence_stale',
       checkedAt
-    }, 'already degraded evidence is never rewritten into a more permissive state');
+    }, 'newer-than-tested evidence also expires closed to evidence_stale');
+    assert.equal(oldDegraded['claude-code'].authState, 'unknown');
+    assert.equal(Object.prototype.hasOwnProperty.call(
+      oldDegraded['claude-code'], 'acceptedIdentity'
+    ), false);
 
     await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
       compatibilityRow({ status: 'unsupported', reason: 'wrong_major' }),
-      openCodeCompatibilityRow()
+      openCodeCompatibilityRow(),
+      codexCompatibilityRow()
     ]));
     const oldUnsupported = await providers.getMergedClients([], () => checkedAt + COMPATIBILITY_MAX_AGE_MS + 1);
     assert.deepEqual(oldUnsupported['claude-code'].compatibility, {
@@ -801,7 +955,8 @@ async function main() {
     await assert.rejects(
       providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
         compatibilityRow({ displayLabel: 'Matrix Mismatch' }),
-        openCodeCompatibilityRow()
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow()
       ])),
       /Invalid MCP agent compatibility snapshot/,
       'a canonical-id row with a mismatched display label rejects before storage'
@@ -812,6 +967,47 @@ async function main() {
       reason: 'wrong_major',
       checkedAt
     }, 'a rejected label mismatch preserves the last durably validated closed row');
+  }
+
+  {
+    const checkedAt = 5_500_000;
+    installChrome();
+    const providers = freshProviders();
+    for (const [authState, billingKind] of [
+      ['chatgpt', 'subscription'],
+      ['api_key', 'api']
+    ]) {
+      await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
+        compatibilityRow(),
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow({
+          status: 'degraded',
+          reason: 'newer_than_tested_range',
+          authState
+        })
+      ]));
+      const merged = await providers.getMergedClients([], () => checkedAt);
+      assert.equal(merged.codex.authState, authState);
+      assert.deepEqual(merged.codex.acceptedIdentity, {
+        providerId: 'codex',
+        label: 'Codex',
+        profileVersion: '0.142.5',
+        authState,
+        billingKind
+      }, `${authState} maps to one exact accepted Codex identity`);
+    }
+    for (const authState of ['unauthenticated', 'unknown']) {
+      await providers.replaceCompatibility(compatibilitySnapshot(checkedAt, [
+        compatibilityRow(),
+        openCodeCompatibilityRow(),
+        codexCompatibilityRow({ authState })
+      ]));
+      const merged = await providers.getMergedClients([], () => checkedAt);
+      assert.equal(merged.codex.authState, authState);
+      assert.equal(Object.prototype.hasOwnProperty.call(
+        merged.codex, 'acceptedIdentity'
+      ), false, `${authState} Codex evidence cannot mint start authority`);
+    }
   }
 
   {
@@ -842,7 +1038,10 @@ async function main() {
   {
     const oldSnapshot = compatibilitySnapshot(7_000_000, [
       compatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
-      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' })
+      openCodeCompatibilityRow({ status: 'unsupported', reason: 'binary_not_found' }),
+      codexCompatibilityRow({
+        status: 'unsupported', reason: 'binary_not_found', authState: 'unknown'
+      })
     ]);
     const { localArea } = installChrome({
       local: {
@@ -954,7 +1153,7 @@ async function main() {
       'browser compatibility parsing contains only the approved safe status grammar'
     );
     const compatibilityProjectionSource = source.slice(
-      source.indexOf('function projectedCompatibility'),
+      source.indexOf('function projectedAdapterEvidence'),
       source.indexOf('function resolveProjectionTime')
     );
     assert.doesNotMatch(

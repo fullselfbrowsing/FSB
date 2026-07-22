@@ -96,6 +96,10 @@ function retainedDetection(version, binaryPath, overrides = {}) {
   };
 }
 
+function safeCompatibilityRow(classification, authState = 'unknown') {
+  return { ...classification, authState };
+}
+
 function compatibilityRegistry(ids, detections, tracker = { requireCalls: 0 }) {
   return Object.freeze({
     ids() {
@@ -437,31 +441,37 @@ async function main() {
   const codexSupported = classifyAdapterCompatibility('codex', '0.142.5');
   const snapshot = createSafeCompatibilitySnapshot(
     1_784_222_000_000,
-    [supported, openCodeSupported, codexSupported],
+    [supported, openCodeSupported, codexSupported].map((candidate) => (
+      safeCompatibilityRow(candidate)
+    )),
   );
   assert.deepEqual(snapshot, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     checkedAt: 1_784_222_000_000,
     adapters: [{
       adapterId: 'claude-code',
       displayLabel: 'Claude Code',
       status: 'supported',
       reason: 'within_tested_range',
+      authState: 'unknown',
     }, {
       adapterId: 'opencode',
       displayLabel: 'OpenCode',
       status: 'supported',
       reason: 'within_tested_range',
+      authState: 'unknown',
     }, {
       adapterId: 'codex',
       displayLabel: 'Codex',
       status: 'supported',
       reason: 'within_tested_range',
+      authState: 'unknown',
     }],
   });
   assert.deepEqual(Object.keys(snapshot).sort(), ['adapters', 'checkedAt', 'schemaVersion']);
   assert.deepEqual(Object.keys(snapshot.adapters[0]).sort(), [
     'adapterId',
+    'authState',
     'displayLabel',
     'reason',
     'status',
@@ -484,6 +494,7 @@ async function main() {
     displayLabel: contract.displayLabel,
     status: 'unsupported',
     reason: 'matrix_invalid',
+    authState: 'unknown',
   }));
   const daemonSentinels = [
     '/private/CLAUDE_EXECUTABLE_SENTINEL',
@@ -533,6 +544,46 @@ async function main() {
       `daemon safe projection excludes ${sentinel}`);
   }
 
+  for (const authState of ['chatgpt', 'api_key', 'unauthenticated', 'unknown']) {
+    const projected = await requestServeCompatibility(
+      serveDelegation,
+      compatibilityRegistry(
+        ['claude-code', 'opencode', 'codex'],
+        {
+          'claude-code': retainedDetection('2.1.177', '/opt/claude'),
+          opencode: retainedDetection('1.14.25', '/opt/opencode'),
+          codex: retainedDetection('0.142.5', '/opt/codex', { authState }),
+        },
+      ),
+    );
+    assert.equal(projected.adapters[2].authState, authState,
+      `daemon preserves the bounded ${authState} auth state`);
+    assert.deepEqual(Object.keys(projected.adapters[2]).sort(), [
+      'adapterId',
+      'authState',
+      'displayLabel',
+      'reason',
+      'status',
+    ]);
+  }
+
+  const invalidAuthProjection = await requestServeCompatibility(
+    serveDelegation,
+    compatibilityRegistry(
+      ['claude-code', 'opencode', 'codex'],
+      {
+        'claude-code': retainedDetection('2.1.177', '/opt/claude'),
+        opencode: retainedDetection('1.14.25', '/opt/opencode'),
+        codex: retainedDetection('0.142.5', '/opt/codex', {
+          authState: 'PRIVATE_AUTH_SENTINEL',
+        }),
+      },
+    ),
+  );
+  assert.equal(invalidAuthProjection.adapters[2].authState, 'unknown',
+    'invalid auth evidence fails closed without leaking its value');
+  assert.equal(JSON.stringify(invalidAuthProjection).includes('PRIVATE_AUTH_SENTINEL'), false);
+
   const daemonEvidenceCases = [
     ['exact profile', retainedDetection('1.14.25', '/opt/opencode'), 'supported', 'within_tested_range'],
     ['newer retained profile', retainedDetection('1.14.26', '/opt/opencode', {
@@ -543,6 +594,7 @@ async function main() {
     ['missing binary', retainedDetection(null, null, {
       installed: false,
       profileVersion: null,
+      authState: 'chatgpt',
       diagnostic: { code: 'binary_missing', message: 'MISSING_MESSAGE_SENTINEL' },
     }), 'unsupported', 'binary_not_found'],
     ['malformed version', retainedDetection(null, '/opt/opencode', {
@@ -574,6 +626,7 @@ async function main() {
       displayLabel: 'OpenCode',
       status: expectedStatus,
       reason: expectedReason,
+      authState: 'unknown',
     }, `${label} produces one deterministic OpenCode safe row without omission`);
     assert.equal(projected.adapters.length, 3, `${label} preserves the exact three-provider roster`);
     for (const sentinel of [
@@ -589,20 +642,22 @@ async function main() {
 
   let detectionAccessorReads = 0;
   const accessorDetection = {};
-  for (const key of ['binary', 'version']) {
+  for (const key of ['binary', 'version', 'authState']) {
     Object.defineProperty(accessorDetection, key, {
       enumerable: true,
       get() {
         detectionAccessorReads += 1;
-        return key === 'binary'
-          ? retainedDetection('1.14.25', '/opt/opencode').binary
-          : '1.14.25';
+        if (key === 'binary') return retainedDetection('1.14.25', '/opt/opencode').binary;
+        return key === 'version' ? '1.14.25' : 'chatgpt';
       },
     });
   }
   for (const [label, unsafeDetection] of [
     ['accessor', accessorDetection],
     ['prototype', Object.create(retainedDetection('1.14.25', '/opt/opencode'))],
+    ['throwing proxy', new Proxy({}, {
+      getPrototypeOf() { throw new Error('PRIVATE_PROXY_TRAP_SENTINEL'); }
+    })],
   ]) {
     const projected = await requestServeCompatibility(
       serveDelegation,
@@ -620,6 +675,7 @@ async function main() {
       displayLabel: 'OpenCode',
       status: 'unsupported',
       reason: 'binary_not_found',
+      authState: 'unknown',
     }, `${label} detector evidence fails closed`);
   }
   assert.equal(detectionAccessorReads, 0, 'daemon projection never invokes detector accessors');
@@ -679,29 +735,39 @@ async function main() {
   );
 
   for (const badRow of [
-    { ...supported, extra: true },
-    { ...supported, adapterId: 'A'.repeat(65) },
-    { ...supported, displayLabel: 'L'.repeat(65) },
-    { ...supported, status: 'supported', reason: 'evidence_stale' },
-    { ...supported, status: 'degraded', reason: 'within_tested_range' },
-    { ...supported, status: 'unsupported', reason: 'newer_than_tested_range' },
+    { ...safeCompatibilityRow(supported), extra: true },
+    { ...safeCompatibilityRow(supported), adapterId: 'A'.repeat(65) },
+    { ...safeCompatibilityRow(supported), displayLabel: 'L'.repeat(65) },
+    { ...safeCompatibilityRow(supported), status: 'supported', reason: 'evidence_stale' },
+    { ...safeCompatibilityRow(supported), status: 'degraded', reason: 'within_tested_range' },
+    { ...safeCompatibilityRow(supported), status: 'unsupported', reason: 'newer_than_tested_range' },
+    { ...safeCompatibilityRow(supported), authState: 'oauth' },
   ]) {
     assert.throws(
       () => createSafeCompatibilitySnapshot(1, [badRow]),
       /Invalid safe compatibility snapshot/,
     );
   }
-  assert.throws(() => createSafeCompatibilitySnapshot(-1, [supported]), /Invalid safe/);
-  assert.throws(() => createSafeCompatibilitySnapshot(Number.NaN, [supported]), /Invalid safe/);
+  assert.throws(
+    () => createSafeCompatibilitySnapshot(-1, [safeCompatibilityRow(supported)]),
+    /Invalid safe/,
+  );
+  assert.throws(
+    () => createSafeCompatibilitySnapshot(Number.NaN, [safeCompatibilityRow(supported)]),
+    /Invalid safe/,
+  );
   assert.throws(
     () => createSafeCompatibilitySnapshot(1, Array.from({ length: 17 }, (_, index) => ({
-      ...supported,
+      ...safeCompatibilityRow(supported),
       adapterId: `adapter-${index}`,
     }))),
     /Invalid safe/,
   );
   assert.throws(
-    () => createSafeCompatibilitySnapshot(1, [supported, supported]),
+    () => createSafeCompatibilitySnapshot(1, [
+      safeCompatibilityRow(supported),
+      safeCompatibilityRow(supported),
+    ]),
     /Invalid safe/,
   );
   const sparseRows = [];

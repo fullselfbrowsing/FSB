@@ -3,6 +3,7 @@ import {
   CODEX_ADAPTER_ID,
   OPENCODE_ADAPTER_ID,
   type AdapterCapabilities,
+  type AdapterAuthState,
 } from './adapter.js';
 
 export type CompatibilityStatus = 'supported' | 'degraded' | 'unsupported';
@@ -50,10 +51,14 @@ export interface AdapterCompatibilityEvidence {
   readonly version: string | null;
 }
 
+export interface SafeAdapterCompatibilityRow extends AdapterCompatibilityClassification {
+  readonly authState: AdapterAuthState;
+}
+
 export interface SafeCompatibilitySnapshot {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly checkedAt: number;
-  readonly adapters: readonly AdapterCompatibilityClassification[];
+  readonly adapters: readonly SafeAdapterCompatibilityRow[];
 }
 
 export const COMPATIBILITY_STATUSES = Object.freeze([
@@ -96,7 +101,19 @@ const CAPABILITY_KEYS = Object.freeze([
   'taskMode',
 ] as const);
 const EVIDENCE_KEYS = Object.freeze(['binaryFound', 'version']);
-const SAFE_ROW_KEYS = Object.freeze(['adapterId', 'displayLabel', 'reason', 'status']);
+const SAFE_ROW_KEYS = Object.freeze([
+  'adapterId',
+  'authState',
+  'displayLabel',
+  'reason',
+  'status',
+]);
+const SAFE_AUTH_STATES = Object.freeze([
+  'chatgpt',
+  'api_key',
+  'unauthenticated',
+  'unknown',
+] as const);
 
 const MAX_ADAPTERS = 16;
 const MAX_FIELD_NAMES = 32;
@@ -623,18 +640,23 @@ function validStatusReason(status: unknown, reason: unknown): boolean {
     || reason === 'matrix_invalid';
 }
 
-function parseSafeRow(value: unknown): AdapterCompatibilityClassification | null {
+function parseSafeRow(value: unknown): SafeAdapterCompatibilityRow | null {
   const record = ownDataRecord(value, SAFE_ROW_KEYS);
   if (!record) return null;
   if (!boundedString(record.adapterId, MAX_ID_OR_LABEL_LENGTH, ADAPTER_ID_PATTERN)) return null;
   if (!boundedString(record.displayLabel, MAX_ID_OR_LABEL_LENGTH)) return null;
   if (!validStatusReason(record.status, record.reason)) return null;
-  return classification(
-    record.adapterId,
-    record.displayLabel,
-    record.status as CompatibilityStatus,
-    record.reason as CompatibilityReason,
-  );
+  if (
+    typeof record.authState !== 'string'
+    || !(SAFE_AUTH_STATES as readonly string[]).includes(record.authState)
+  ) return null;
+  return Object.freeze({
+    adapterId: record.adapterId,
+    displayLabel: record.displayLabel,
+    status: record.status as CompatibilityStatus,
+    reason: record.reason as CompatibilityReason,
+    authState: record.authState as AdapterAuthState,
+  });
 }
 
 export function createSafeCompatibilitySnapshot(
@@ -647,7 +669,7 @@ export function createSafeCompatibilitySnapshot(
   const values = denseDataArray(rows, MAX_ADAPTERS);
   if (!values) throw new Error('Invalid safe compatibility snapshot');
 
-  const adapters: AdapterCompatibilityClassification[] = [];
+  const adapters: SafeAdapterCompatibilityRow[] = [];
   const ids = new Set<string>();
   for (const value of values) {
     const row = parseSafeRow(value);
@@ -658,7 +680,7 @@ export function createSafeCompatibilitySnapshot(
     adapters.push(row);
   }
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     checkedAt,
     adapters: Object.freeze(adapters),
   });

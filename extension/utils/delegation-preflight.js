@@ -90,8 +90,11 @@
     } catch (_error) {
       return null;
     }
-    return record.status === 'supported'
-      && record.reason === 'within_tested_range'
+    var runnable = (record.status === 'supported'
+        && record.reason === 'within_tested_range')
+      || (record.status === 'degraded'
+        && record.reason === 'newer_than_tested_range');
+    return runnable
       && Number.isSafeInteger(record.checkedAt)
       && record.checkedAt >= 0
       ? record

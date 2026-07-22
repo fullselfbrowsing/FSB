@@ -20,7 +20,7 @@ import {
   type SpawnSupervisor,
   type SpawnSupervisorCloseResult,
 } from './spawn-supervisor.js';
-import type { DirectRuntimeReference } from './adapter.js';
+import type { AdapterAuthState, DirectRuntimeReference } from './adapter.js';
 import { createDirectRuntimeReference } from './effective-authority.js';
 
 export interface ServeDelegationBridge {
@@ -249,6 +249,18 @@ function compatibilityEvidence(detection: unknown): AdapterCompatibilityEvidence
   });
 }
 
+function safeAuthState(detection: unknown): AdapterAuthState {
+  if (!detection || typeof detection !== 'object' || Array.isArray(detection)) return 'unknown';
+  if (Object.getPrototypeOf(detection) !== Object.prototype) return 'unknown';
+  const authState = ownDataValue(detection, 'authState');
+  return authState === 'chatgpt'
+    || authState === 'api_key'
+    || authState === 'unauthenticated'
+    || authState === 'unknown'
+    ? authState
+    : 'unknown';
+}
+
 async function collectCompatibilitySnapshot(
   registry: AgentProviderRegistry,
   checkedAt: number,
@@ -278,6 +290,7 @@ async function collectCompatibilitySnapshot(
         displayLabel: contract.displayLabel,
         status: 'unsupported' as const,
         reason: 'matrix_invalid' as const,
+        authState: 'unknown' as const,
       })),
     );
   }
@@ -292,10 +305,22 @@ async function collectCompatibilitySnapshot(
     } catch {
       // Detection failure is a closed unsupported fact, never response detail.
     }
-    rows.push(classifyAdapterCompatibility(
-      contract.adapterId,
-      compatibilityEvidence(detection),
-    ));
+    let evidence: AdapterCompatibilityEvidence = Object.freeze({
+      binaryFound: false,
+      version: null,
+    });
+    let authState: AdapterAuthState = 'unknown';
+    try {
+      evidence = compatibilityEvidence(detection);
+      authState = safeAuthState(detection);
+    } catch {
+      // Hostile detector objects fail closed before the safe projection.
+    }
+    const classified = classifyAdapterCompatibility(contract.adapterId, evidence);
+    rows.push(Object.freeze({
+      ...classified,
+      authState: classified.status === 'unsupported' ? 'unknown' : authState,
+    }));
   }
   return createSafeCompatibilitySnapshot(checkedAt, rows);
 }
