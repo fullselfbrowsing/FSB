@@ -2465,6 +2465,13 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
   {
     const delegationId = 'Delegation_receipt_corrupt_ledger';
     const agentId = 'agent_receipt_corrupt_ledger';
+    const acceptedIdentity = {
+      providerId: 'claude-code',
+      label: 'Claude Code',
+      profileVersion: '2.1.177',
+      authState: 'unknown',
+      billingKind: 'subscription',
+    };
     const registryEnvelope = {
       v: 1,
       records: {},
@@ -2486,6 +2493,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         [ledgerKey]: {
           v: 1,
           delegationId,
+          acceptedIdentity,
           terminal: true,
           terminalCode: 'stopped',
           cleanupPending: null,
@@ -2512,6 +2520,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         [ledgerKey]: {
           v: 1,
           delegationId,
+          acceptedIdentity,
           terminal: true,
           terminalCode: 'provider_private_code',
           cleanupPending: null,
@@ -2527,6 +2536,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         [ledgerKey]: {
           v: 1,
           delegationId,
+          acceptedIdentity,
           terminal: false,
           terminalCode: null,
           cleanupPending: {
@@ -2546,6 +2556,7 @@ const UUID_PATTERN = /^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
         [ledgerKey]: {
           v: 1,
           delegationId,
+          acceptedIdentity,
           terminal: true,
           terminalCode: 'stopped',
           cleanupPending: null,
