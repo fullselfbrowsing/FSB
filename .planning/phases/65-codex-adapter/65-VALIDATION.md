@@ -2,7 +2,7 @@
 phase: 65
 slug: codex-adapter
 status: approved
-implementation_status: in_progress
+implementation_status: complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-07-22
@@ -15,7 +15,7 @@ validation_tasks: 16
 
 > Per-phase validation contract for the Codex 0.142.5 adapter, byte-safe auth disclosure, hermetic FSB-only execution, immutable auth/billing identity, strict JSONL drift handling, and shared Providers/delegation UI.
 
-This artifact preserves the approved pre-execution validation design byte-for-byte at the command, requirement, and threat-ownership boundaries. The first 15 implementation rows are now `✅ green`; only the preservation-safe closure runner remains `⬜ pending`. The three genuine external scenarios remain `human_needed` regardless of source-test results.
+This artifact preserves the approved pre-execution validation design byte-for-byte at the command, requirement, and threat-ownership boundaries. All 16 implementation rows are now `✅ green`, including the preservation-safe closure runner. The three genuine external scenarios remain `human_needed` regardless of source-test results.
 
 ---
 
@@ -82,7 +82,7 @@ Every implementation task appears exactly once. `✅ green` records a completed 
 | 65-07-01 | 07 | 7 | MULTI-04, MULTI-05, MULTI-06 | T65-02, T65-06, T65-08, T65-09, T65-10 | Durable accepted identity drives shared feed, no Profile row, USD null, authoritative terminal | `node tests/delegation-controller.test.js --section codex-accepted-identity && node tests/delegation-event-store.test.js --section codex-accepted-identity && node tests/delegation-sidepanel-ui.test.js --section codex-shared-feed && node tests/provider-parity.test.js --section delegated-agent-parity` | ✅ green |
 | 65-07-02 | 07 | 7 | MULTI-04, MULTI-05, MULTI-06 | T65-10 | Every delegated action is ≥44px with responsive/a11y/theme/motion parity | `node tests/delegation-sidepanel-ui.test.js --section delegated-targets-and-a11y && node tests/providers-panel-ui.test.js --section responsive-accessibility` | ✅ green |
 | 65-08-01 | 08 | 8 | MULTI-04, MULTI-05, MULTI-06 | T65-01, T65-02, T65-03, T65-04, T65-05, T65-06, T65-07, T65-08, T65-09, T65-10, T65-11, T65-12 | Exact graph/source/security/UAT contract verifies all ownership and preserves three pending rows | `node tests/delegation-phase-contract.test.js --section phase65-validation && node tests/delegation-phase-contract.test.js --section phase65-uat-ledger && node tests/agent-provider-forbidden-flags.test.js` | ✅ green |
-| 65-08-02 | 08 | 8 | MULTI-04, MULTI-05, MULTI-06 | T65-01, T65-02, T65-03, T65-04, T65-05, T65-06, T65-07, T65-08, T65-09, T65-10, T65-11, T65-12 | Authoritative runner preserves workspace on every settlement path and enforces root/CI order | `node tests/phase65-full-tests-harness.test.js && node scripts/run-phase65-full-tests.mjs` | ⬜ pending |
+| 65-08-02 | 08 | 8 | MULTI-04, MULTI-05, MULTI-06 | T65-01, T65-02, T65-03, T65-04, T65-05, T65-06, T65-07, T65-08, T65-09, T65-10, T65-11, T65-12 | Authoritative runner preserves workspace on every settlement path and enforces root/CI order | `node tests/phase65-full-tests-harness.test.js && node scripts/run-phase65-full-tests.mjs` | ✅ green |
 
 No three consecutive tasks lack deterministic automated verification; every task has one exact command.
 
@@ -213,6 +213,6 @@ Automated source/DOM assertions may protect the contract but must not change the
 - [x] Atomic Codex exposure is exactly task 65-05-01, one indivisible implementation commit after provider-neutral foundations.
 - [x] The approved UI-SPEC maps to shared source/DOM tests; no new renderer/markup/provider branch is planned.
 - [x] Exactly three genuine scenarios are owned by 65-08-01 and remain unchecked `human_needed` / `pending` / evidence-empty.
-- [ ] All 16 implementation commands are green and final closure-runner evidence is recorded (15/16 green; 65-08-02 pending).
+- [x] All 16 implementation commands are green and final closure-runner evidence is recorded.
 
-**Approval:** validation design preserved; 15 implementation tasks are green, the final preservation-safe runner task is pending, and genuine external UAT remains pending.
+**Approval:** automated validation complete; genuine external UAT remains pending.

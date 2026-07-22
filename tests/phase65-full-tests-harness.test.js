@@ -22,9 +22,44 @@ const os = require('node:os');
 const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const runnerPath = path.join(repositoryRoot, 'scripts/run-phase64-full-tests.mjs');
+const runnerPath = path.join(repositoryRoot, 'scripts/run-phase65-full-tests.mjs');
 const wrapperPath = path.join(repositoryRoot, 'scripts/run-mcp-build-preserving-workspace.mjs');
 const MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
+
+const EXPECTED_COMMAND_TOKENS = Object.freeze([
+  "['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-probe']",
+  "['node', 'tests/mcp-codex-adapter.test.js', '--section', 'generic-authority']",
+  "['node', 'tests/mcp-codex-adapter.test.js']",
+  "['node', 'tests/mcp-agent-orphan-recovery.test.js']",
+  "['node', 'tests/mcp-spawn-supervisor.test.js']",
+  "['node', 'tests/runtime-contracts.test.js']",
+  "['node', 'tests/mcp-agent-stream-fixture.test.js']",
+  "['node', 'tests/mcp-agent-drift-smoke.test.js']",
+  "['node', 'tests/mcp-agent-provider-contract.test.js']",
+  "['node', 'tests/mcp-adapter-compatibility.test.js']",
+  "['node', 'tests/mcp-version-parity.test.js']",
+  "['node', 'tests/mcp-diagnostics-status.test.js']",
+  "['node', 'tests/mcp-client-inventory.test.js']",
+  "['node', 'tests/mcp-bridge-topology.test.js']",
+  "['node', 'tests/mcp-reverse-channel-contract.test.js']",
+  "['node', 'tests/mcp-bridge-background-dispatch.test.js']",
+  "['node', 'tests/mcp-agent-providers-storage.test.js']",
+  "['node', 'tests/delegation-routing.test.js']",
+  "['node', 'tests/delegation-consent.test.js']",
+  "['node', 'tests/delegation-controller.test.js']",
+  "['node', 'tests/delegation-event-store.test.js']",
+  "['node', 'tests/providers-panel-logic.test.js']",
+  "['node', 'tests/providers-panel-ui.test.js']",
+  "['node', 'tests/delegation-sidepanel-ui.test.js']",
+  "['node', 'tests/provider-parity.test.js']",
+  "['node', 'tests/agent-protocol-drift-diagnostics.test.js']",
+  "['node', 'tests/agent-provider-forbidden-flags.test.js']",
+  "['node', 'tests/delegation-phase-contract.test.js', '--section', 'phase65-validation']",
+  "['node', 'tests/delegation-phase-contract.test.js', '--section', 'phase65-uat-ledger']",
+  "['node', 'scripts/verify-agent-provider-flags.mjs']",
+  "['npm', 'run', 'validate:extension']",
+  "['npm', 'test']",
+]);
 
 function hashFields(fields) {
   const hash = createHash('sha256');
@@ -110,7 +145,7 @@ function writeExecutable(target, source) {
 }
 
 function createFixture() {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'fsb-phase64-runner-'));
+  const root = mkdtempSync(path.join(os.tmpdir(), 'fsb-phase65-runner-'));
   mkdirSync(path.join(root, 'mcp/build/sub'), { recursive: true });
   writeFileSync(path.join(root, 'protected.txt'), 'tracked-clean\n');
   writeFileSync(path.join(root, 'staged.txt'), 'staged-clean\n');
@@ -118,8 +153,8 @@ function createFixture() {
   writeFileSync(path.join(root, 'mcp/build/sub/committed.js'), 'committed-build\n');
 
   git(root, ['init']);
-  git(root, ['config', 'user.email', 'phase64-fixture@example.invalid']);
-  git(root, ['config', 'user.name', 'Phase 64 fixture']);
+  git(root, ['config', 'user.email', 'phase65-fixture@example.invalid']);
+  git(root, ['config', 'user.name', 'Phase 65 fixture']);
   git(root, ['add', 'protected.txt', 'staged.txt', 'mcp/build/index.js', 'mcp/build/sub/committed.js']);
   git(root, ['commit', '-m', 'fixture baseline']);
 
@@ -163,9 +198,9 @@ function fixtureEnvironment(fixture, commands, extra = {}) {
   return {
     ...process.env,
     ...extra,
-    FSB_PHASE64_TEST_REPOSITORY_ROOT: fixture.root,
-    FSB_PHASE64_TEST_COMMANDS_JSON: JSON.stringify(commands),
-    FSB_PHASE64_TEST_SKIP_STATIC_CONTRACTS: '1',
+    FSB_PHASE65_TEST_REPOSITORY_ROOT: fixture.root,
+    FSB_PHASE65_TEST_COMMANDS_JSON: JSON.stringify(commands),
+    FSB_PHASE65_TEST_SKIP_STATIC_CONTRACTS: '1',
     FSB_MCP_BUILD_PRESERVING_REPOSITORY_ROOT: fixture.root,
     FSB_MCP_BUILD_PRESERVING_NPM_CLI: fixture.npmCli,
     PATH: `${fixture.bin}${path.delimiter}${process.env.PATH || ''}`,
@@ -201,7 +236,7 @@ function runFixture(label, commands, options = {}) {
 
 async function runSignalFixture(signal) {
   const fixture = createFixture();
-  const readyPath = path.join(fixture.root, 'mcp/build/phase64-signal-ready');
+  const readyPath = path.join(fixture.root, 'mcp/build/phase65-signal-ready');
   try {
     const holdCommand = [
       process.execPath,
@@ -240,7 +275,7 @@ async function runSignalFixture(signal) {
 }
 
 function assertRunnerSourceContract() {
-  assert.equal(existsSync(runnerPath), true, 'Phase 64 focused runner is missing');
+  assert.equal(existsSync(runnerPath), true, 'Phase 65 focused runner is missing');
   const source = readFileSync(runnerPath, 'utf8');
   assert.match(source, /run-mcp-build-preserving-workspace\.mjs/);
   assert.equal((source.match(/'--commands-json'/g) || []).length, 1,
@@ -248,38 +283,22 @@ function assertRunnerSourceContract() {
   assert.match(source, /shell:\s*false/);
   assert.doesNotMatch(source, /npm --prefix mcp run build/);
   assert.doesNotMatch(source, /git\s+(?:add|checkout|restore|reset|stash|clean)\b/);
-  assert.equal(source.split('name: Phase 65 Codex contract (sole Linux root invocation)').length - 1, 1,
-    'Phase 64 runner accepts exactly the coordinated Phase 65 CI root label');
-  assert.doesNotMatch(source, /name: Phase 64 OpenCode contract \(sole Linux root invocation\)/);
+  assert.match(source, /injected Phase 65 commands require an injected repository root/);
+  assert.match(source, /test wrapper override requires an injected repository root/);
+  assert.match(source, /root Phase 65 chain recursively invokes the guarded runner/);
 
-  for (const token of [
-    "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'first-commit-drift-gate']",
-    "['node', 'tests/mcp-agent-stream-fixture.test.js']",
-    "['node', 'tests/mcp-agent-drift-smoke.test.js']",
-    "['node', 'tests/mcp-opencode-adapter.test.js', '--section', 'adapter']",
-    "['node', 'tests/mcp-opencode-server-topology.test.js']",
-    "['node', 'tests/mcp-agent-provider-contract.test.js']",
-    "['node', 'tests/mcp-adapter-compatibility.test.js']",
-    "['node', 'tests/mcp-spawn-supervisor.test.js']",
-    "['node', 'tests/mcp-agent-orphan-recovery.test.js']",
-    "['node', 'tests/mcp-reverse-channel-contract.test.js']",
-    "['node', 'tests/mcp-bridge-topology.test.js']",
-    "['node', 'tests/mcp-bridge-background-dispatch.test.js']",
-    "['node', 'tests/mcp-client-inventory.test.js']",
-    "['node', 'tests/mcp-diagnostics-status.test.js']",
-    "['node', 'tests/mcp-agent-providers-storage.test.js']",
-    "['node', 'tests/delegation-consent.test.js']",
-    "['node', 'tests/delegation-routing.test.js']",
-    "['node', 'tests/delegation-controller.test.js']",
-    "['node', 'tests/delegation-event-store.test.js']",
-    "['node', 'tests/agent-protocol-drift-diagnostics.test.js']",
-    "['node', 'tests/providers-panel-logic.test.js']",
-    "['node', 'tests/providers-panel-ui.test.js']",
-    "['node', 'tests/delegation-sidepanel-ui.test.js']",
-    "['node', 'tests/agent-provider-forbidden-flags.test.js']",
-    "['node', 'tests/delegation-phase-contract.test.js', '--section', 'phase64-validation']",
-  ]) {
-    assert.equal(source.split(token).length - 1, 1, `runner command is not exact: ${token}`);
+  const commandBlock = (source.match(
+    /const PHASE65_COMMANDS = Object\.freeze\(\[([\s\S]*?)\n\]\);/,
+  ) || [null, ''])[1];
+  assert.equal((commandBlock.match(/Object\.freeze\(\[/g) || []).length,
+    EXPECTED_COMMAND_TOKENS.length, 'Phase 65 matrix command count is exact');
+  let previousIndex = -1;
+  for (const token of EXPECTED_COMMAND_TOKENS) {
+    assert.equal(commandBlock.split(token).length - 1, 1,
+      `runner command is not exact: ${token}`);
+    const index = commandBlock.indexOf(token);
+    assert(index > previousIndex, `runner command is out of order: ${token}`);
+    previousIndex = index;
   }
 }
 
@@ -289,21 +308,33 @@ async function main() {
   runFixture('success settlement', [[process.execPath, '-e', 'process.exit(0)']], {
     success: true,
   });
-  runFixture('nonzero settlement', [[process.execPath, '-e', 'process.exit(29)']], {
-    stderr: /guarded Phase 64 matrix exited 29/,
+  runFixture('temporary dirty rewrite settlement', [[
+    process.execPath,
+    '-e',
+    "require('node:fs').writeFileSync('protected.txt','child-mutated\\n')",
+  ]], {
+    success: true,
   });
-  runFixture('command spawn-error settlement', [['fsb-phase64-command-does-not-exist']], {
+  runFixture('nonzero settlement', [[process.execPath, '-e', 'process.exit(29)']], {
+    stderr: /guarded Phase 65 matrix exited 29/,
+  });
+  runFixture('command spawn-error settlement', [['fsb-phase65-command-does-not-exist']], {
     stderr: /command 1 could not be spawned/,
   });
   runFixture('wrapper spawn-error settlement', [[process.execPath, '-e', 'process.exit(0)']], {
-    env: { FSB_PHASE64_TEST_EXECUTABLE: path.join(os.tmpdir(), 'absent-phase64-executable') },
-    stderr: /guarded Phase 64 matrix could not be spawned/,
+    env: { FSB_PHASE65_TEST_EXECUTABLE: path.join(os.tmpdir(), 'absent-phase65-executable') },
+    stderr: /guarded Phase 65 matrix could not be spawned/,
+  });
+  runFixture('oversized injected command roster', Array.from(
+    { length: 33 }, () => [process.execPath, '-e', 'process.exit(0)'],
+  ), {
+    stderr: /injected Phase 65 commands must be a bounded non-empty array/,
   });
   if (process.platform !== 'win32') {
     await runSignalFixture('SIGINT');
     await runSignalFixture('SIGTERM');
   }
-  console.log('phase64-full-tests-harness: all assertions passed');
+  console.log('phase65-full-tests-harness: all assertions passed');
 }
 
 main().catch((error) => {
