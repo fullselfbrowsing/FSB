@@ -1,33 +1,41 @@
 ---
 phase: 65-codex-adapter
 reviewed: 2026-07-22
-status: warnings
+status: source_complete
 baseline: 65-UI-SPEC.md
-score_total: 19
+remediation_ledger: 65-UI-REVIEW-FIX.md
+remediation_commits:
+  UI65-W01: 4bf359a5
+  UI65-W02: 7fde3f2f
+score_total: 22
 score_max: 24
-score_copywriting: 3
+score_copywriting: 4
 score_visuals: 3
 score_color: 4
 score_typography: 3
 score_spacing: 4
-score_experience_design: 2
+score_experience_design: 4
 blockers: 0
-warnings: 2
+warnings: 0
+resolved_warnings: 2
 needs_human_review: true
 human_evidence_items: 3
-screenshots: not-captured-no-auditable-dev-server
+screenshots: not-captured-no-live-extension-surface
 playwright_available: false
+evidence_mode: code-and-deterministic-dom-only
 ---
 
 # Phase 65 — UI Review
 
-**Audited:** 2026-07-22
+**Re-audited:** 2026-07-22
 
 **Baseline:** approved `65-UI-SPEC.md` design contract
 
-**Screenshots:** Not captured. No Playwright capability was available. Ports 5173 and 8080 had no responding server; port 3000 returned an unauditable `401`, so no live extension surface was available.
+**Remediation reviewed:** `7fde3f2f` and `4bf359a5`, with `65-UI-REVIEW-FIX.md` as the implementation ledger
 
-**Evidence mode:** Code, deterministic DOM harnesses, and focused source-contract tests only. This review makes no claim of live rendering, contrast, keyboard, screen-reader, genuine Codex account, or genuine delegated-run evidence.
+**Screenshots:** Not captured. No Playwright capability or auditable live extension surface was available during this re-audit.
+
+**Evidence mode:** Code, canonical persistence/snapshot paths, deterministic DOM harnesses, and focused source-contract tests only. This review makes no claim of live Chrome rendering, computed contrast, keyboard behavior, screen-reader output or timing, genuine Codex account state, or genuine delegated-run/process evidence.
 
 ---
 
@@ -35,86 +43,95 @@ playwright_available: false
 
 | Pillar | Score | Key Finding |
 |--------|-------|-------------|
-| 1. Copywriting | 3/4 | Providers, consent, billing, lifecycle, and summary copy is exact, but unknown and unauthenticated Codex starts collapse to generic recovery copy instead of the two locked messages. |
-| 2. Visuals | 3/4 | Codex correctly reuses the existing third row and shared run/feed hierarchy with no brand or renderer fork; rendered hierarchy and wrapping remain unobserved. |
-| 3. Color | 4/4 | Compatibility and lifecycle states use the closed semantic-token palette with text, icon, and border redundancy in forced colors. |
-| 4. Typography | 3/4 | Source styles retain the approved 12/14/16/18 hierarchy and 400/600 weights, but computed type, fallback, zoom, and long-value wrapping were not observed. |
-| 5. Spacing | 4/4 | The provider rhythm, responsive stacks, 44px delegated actions, and 44px-square fixed Stop satisfy the source contract. |
-| 6. Experience Design | 2/4 | Authority, terminal gating, hydration, and shared controls are strong, but the feed still renders `argsSummary` into the DOM and auth-specific start recovery is missing. |
+| 1. Copywriting | 4/4 | Providers, billing, consent, lifecycle, summary, unauthenticated recovery, unknown-auth recovery, actions, and generic fallback now match the approved closed copy. |
+| 2. Visuals | 3/4 | Codex reuses the existing third row and shared run/feed hierarchy with no brand, markup, or renderer fork; live hierarchy, wrapping, and optical polish remain UAT65-03. |
+| 3. Color | 4/4 | Compatibility and lifecycle states stay on the closed semantic-token palette with text, icon, and forced-colors border redundancy. |
+| 4. Typography | 3/4 | Source styles retain the approved 12/14/16/18 hierarchy and 400/600 weights; computed fallback, zoom reflow, and rendered long-copy legibility remain UAT65-03. |
+| 5. Spacing | 4/4 | Provider rhythm, responsive stacks, every delegated action's 44px minimum, and the 44px-square fixed Stop satisfy the source contract. |
+| 6. Experience Design | 4/4 | Background-owned authority, auth-specific recovery, canonical payload-free storage/snapshots, safe DOM/announcements, hydration silence, and terminal gating are source-complete. |
 
-**Overall: 19/24**
+**Overall code-only score: 22/24**
 
-There are no BLOCKER findings. Two source-actionable WARNING findings must be resolved before the Phase 65 UI contract is complete.
-
----
-
-## Top 3 Priority Fixes
-
-1. **Remove tool arguments from the presentation boundary** — A validated feed snapshot can place arbitrary bounded `argsSummary` text, including secret-like content, in a visible definition row — force tool arguments/results to `null` or omit them in the event-store/view-model boundary, remove the **Arguments** row from the renderer, and invert the DOM test so such content must be absent.
-2. **Preserve a closed Codex auth-failure reason through preflight** — Both `unauthenticated` and `unknown` currently become `provider_status_refresh`, leaving the side panel unable to render the two exact recovery messages — return a safe closed reason (not native auth bytes), map it to the approved heading/body copy, and add DOM tests for both states.
-3. **Complete the three live UAT scenarios** — Source tests cannot establish genuine auth projection, browser delegation/process cleanup, rendered contrast/wrapping, keyboard focus, screen-reader timing, or motion behavior — perform UAT65-01 through UAT65-03 in the milestone-end sweep and record only sanitized outcomes in `65-HUMAN-UAT.md`.
+There are **0 BLOCKER** and **0 WARNING** findings. The two prior source warnings are closed. The two unawarded points are evidence caps tied to the already-deferred live UAT, not new source defects.
 
 ---
 
 ## Findings Ledger
 
-| ID | Pillar | Severity | Finding | needs_human_review |
-|----|--------|----------|---------|--------------------|
-| UI65-W01 | Copywriting / Experience Design | WARNING | Unknown and unauthenticated accepted-identity failures share `provider_status_refresh`, which renders generic start-recovery copy rather than either auth-specific UI-SPEC message. | false |
-| UI65-W02 | Experience Design / Data Presentation | WARNING | The shared feed validates and visibly renders `entry.tool.argsSummary`; its DOM test explicitly proves secret-like argument text appears, contradicting the locked rule that tool arguments/results never enter DOM or accessibility output. | false |
+No open source-verifiable findings remain.
+
+| ID | Pillar | Prior severity | Final status | Closure |
+|----|--------|----------------|--------------|---------|
+| UI65-W01 | Copywriting / Experience Design | WARNING | RESOLVED | Background-owned safe auth evidence now yields exact `auth_unauthenticated` or `auth_unknown` codes; the shared recovery card renders the approved heading, body, actions, and focus behavior, while malformed/inconsistent evidence keeps the generic safe fallback. |
+| UI65-W02 | Experience Design / Data Presentation | WARNING | RESOLVED | Tool arguments/results are non-representable in new persisted entries and feed snapshots; legacy `argsSummary` is discarded before validation/fan-out and rewritten out of storage; the renderer, attributes, live regions, and announcer have no payload path. |
 
 ---
 
-## Detailed Findings
+## Remediation Verification
 
-### Pillar 1: Copywriting (3/4)
+### UI65-W01 — Closed Codex auth recovery is complete
 
-- **PASS — exact safe Providers copy.** Codex maps the four closed auth states to **ChatGPT**, **API key**, **Not signed in**, and **Status unavailable**, with the approved help text (`extension/ui/providers-panel.js:68-85`). Its billing labels are exactly **Included with your ChatGPT plan**, **Billed to the API key stored by Codex; dollar amount not reported.**, **Sign in to Codex first.**, and **Billing not reported** (`extension/ui/providers-panel.js:86-91`). The mapper accepts only a plain safe projection and fails invalid data to `unknown` (`extension/ui/providers-panel.js:367-400`).
-- **PASS — exact compatibility and provider description.** The shared closed copy for Supported, Degraded, stale evidence, and Unsupported is centralized in the existing display models (`extension/ui/providers-panel.js:41-64`). The Codex detail description and repository-owned billing link use the approved wording (`extension/ui/providers-panel.js:120-126`).
-- **PASS — honest accepted-run billing.** Feed summaries derive the caption from the immutable accepted auth/billing pair and never format Codex USD; accepted snapshots reject non-null USD (`extension/ui/delegation-feed.js:331-374`, `extension/ui/delegation-feed.js:517-551`).
-- **WARNING UI65-W01.** The contract requires **Codex cannot start this task** plus distinct unauthenticated and unknown-auth bodies (`65-UI-SPEC.md:182-185`). Preflight reduces any missing/invalid accepted identity to `{code: "provider_status_refresh"}` without a safe auth reason (`extension/utils/delegation-preflight.js:111-117`, `extension/utils/delegation-preflight.js:154-165`). The side panel has no branch for that code and therefore uses **Agent could not start this task** / **Keep this message in the composer, review the provider settings, and try again.** (`extension/ui/sidepanel.js:1605-1650`). Existing DOM coverage asserts offline, unpaired, and OpenCode `start_rejected`, but neither locked Codex auth state (`tests/delegation-sidepanel-ui.test.js:1384-1443`).
-- **Remediation.** Add a closed, background-owned reason such as `auth_unauthenticated` or `auth_unknown` to the exact preflight failure schema; do not expose provider-native bytes. Render the two approved bodies through the shared recovery card, keep **Open provider setup** / **Back to message**, managed focus, and non-optimistic behavior, and source-test both states.
+- **Background authority remains the only source.** Side-panel preflight sends only `{type, task, intentId}` and no provider/auth/billing choice (`extension/ui/sidepanel.js:3884-3888`). Background reloads saved provider configuration, reads the safe merged provider row through own-data descriptors, reduces auth to the exact four-state vocabulary, rejects accepted-identity/auth mismatches to `unknown`, and supplies that closed state to preflight (`extension/background.js:1667-1765`).
+- **The codes are exact and fail closed.** Codex with no runnable identity maps `unauthenticated` to `auth_unauthenticated` and `unknown` to `auth_unknown`; invalid, inconsistent, or non-Codex identity evidence retains `provider_status_refresh` (`extension/utils/delegation-preflight.js:154-176`). No native status bytes are accepted as a recovery code.
+- **The presentation is exact and shared.** The client validates a closed preflight-code allowlist and canonical provider identity (`extension/ui/sidepanel.js:635-668`). The existing recovery card renders **Codex cannot start this task**, the exact unauthenticated or unknown-auth body, **Open provider setup**, and **Back to message** (`extension/ui/sidepanel.js:1615-1675`). It clears prior state/feed content, sets `tabIndex=-1`, focuses the heading, leaves the composer non-optimistic, and creates no Codex-specific component (`extension/ui/sidepanel.js:1678-1722`).
+- **The generic safe fallback remains intact.** `provider_status_refresh` renders **Agent could not start this task** and **Keep this message in the composer, review the provider settings, and try again.**, with the same two actions and focused heading (`extension/ui/sidepanel.js:1669-1675`; `tests/delegation-sidepanel-ui.test.js:1483-1496`). Malformed/native response codes fail client validation and converge to the existing bounded offline fallback without rendering the supplied bytes (`tests/delegation-sidepanel-ui.test.js:1719-1759`).
+- **No client or compatibility authority was introduced.** Compatibility is checked before accepted identity but cannot mint identity, and the immediate start path re-reads background authority. Unknown/unauthenticated states cannot reach consent, controller creation, transport, or task stdin (`tests/delegation-routing.test.js:124-155`; `tests/mcp-bridge-background-dispatch.test.js:2720-2764`).
 
-### Pillar 2: Visuals (3/4)
+### UI65-W02 — Tool payload exclusion is complete
 
-- **PASS — exact roster order and unchanged visual pattern.** The roster remains Claude Code, OpenCode, then Codex. The Codex row retains separate name, evidence badges, compatibility cluster/description, and one trailing native radio (`extension/ui/control_panel.html:164-218`). The canonical roster is likewise closed to those three IDs (`extension/ui/providers-panel.js:13-17`).
-- **PASS — shared details and delegation hierarchy.** Codex populates the existing selected-agent facts and sections rather than adding a card, logo, profile badge, or model picker (`extension/ui/control_panel.html:521-599`, `extension/ui/options.js:1043-1125`). Consent, lifecycle, run, feed, control, and summary use the existing provider-neutral mounts and renderer (`extension/ui/sidepanel.js:1448-1529`, `extension/ui/sidepanel.js:2291-2380`).
-- **PASS — no visible Profile row or Codex renderer fork.** Init renders Client, Model, Session, and Allowed tools only (`extension/ui/delegation-feed.js:461-470`). The parity suite confirms the production roster, canonical identities, identical provider-neutral feed boundary, no visible Profile definition, and no Codex-specific class/renderer branch (`tests/provider-parity.test.js:214-270`).
-- **Human evidence boundary.** Source structure is coherent, but no screenshot or live extension render established optical hierarchy, icon alignment, dense-feed balance, long auth/billing wrapping, or narrow-layout clipping. That unobserved polish boundary holds Visuals at 3/4; it is not a fabricated failure.
+- **New persistence is payload-free by construction.** The canonical tool shape is exactly `callId`, `durationMs`, `name`, `status`, and `tabId`; `argsSummary` is absent from both `TOOL_KEYS` and the accepted event context (`extension/utils/delegation-event-store.js:37-87`). `_projectTool` copies only approved identity/status metadata and ignores native argument/result fields (`extension/utils/delegation-event-store.js:507-523`). A caller-provided `argsSummary` is now an unknown context field and fails before a storage write (`tests/delegation-event-store.test.js:958-968`).
+- **Native Codex results cannot cross the adapter boundary.** Codex emits tool start with only id/name and tool completion with only id/error state; it validates but does not emit the native MCP result (`mcp/src/agent-providers/codex-stream.ts:249-337`). The background supplies only timestamp and immutable accepted identity to the event store (`extension/background.js:2455-2510`), so native payload data cannot be reintroduced by browser-side context.
+- **Legacy persistence is sanitized before any snapshot or fan-out.** The migration recognizes only the old exact six-field tool row, never reads/stringifies/clones `argsSummary`, reconstructs the five approved fields, validates the canonical entry, and returns a normalized envelope (`extension/utils/delegation-event-store.js:740-836`). Hydration and terminal-ledger reads rewrite every migrated row before returning canonical data (`extension/utils/delegation-event-store.js:883-912`, `extension/utils/delegation-event-store.js:985-1029`); append, cleanup, and terminal paths likewise use the normalized envelope before cloning or emission.
+- **Snapshots reject payload-bearing rows.** The feed validator accepts only the exact five-field tool record and rejects any `argsSummary`, `result`, or other extra key before clearing or rendering the container (`extension/ui/delegation-feed.js:190-199`, `extension/ui/delegation-feed.js:242-274`, `extension/ui/delegation-feed.js:330-374`, `extension/ui/delegation-feed.js:589-615`). Controller snapshots clone only entries already returned by the canonical store (`extension/utils/delegation-controller.js:470-484`, `extension/utils/delegation-controller.js:679-708`).
+- **DOM text, attributes, accessibility output, and announcements have no payload slot.** Tool DOM contains only name, call id, reported tab, status, and duration; the **Arguments** term/value is gone (`extension/ui/delegation-feed.js:449-488`). Dynamic attributes derive only validated sequence, kind, state, and tone. The polite announcer names a tool call using only the canonical tool name, and `_renderDelegationSnapshot` announces only after full snapshot validation and a strictly newer sequence (`extension/ui/sidepanel.js:2253-2259`, `extension/ui/sidepanel.js:2317-2393`; `extension/ui/sidepanel.html:59-76`). Hydration remains silent.
+- **Regression tests cover the closed chain.** The store asserts exact five-field projection, absence of the argument and result/task canaries, legacy hydration sanitization, rewritten storage, and rejection of argument context (`tests/delegation-event-store.test.js:640-700`, `tests/delegation-event-store.test.js:958-968`). The DOM suite asserts there is no **Arguments** row, payload-bearing snapshots fail validation, their canaries produce no DOM text, hostile safe metadata creates no URL/style/handler attributes, and hydration/live-sequence announcement behavior remains ordered (`tests/delegation-sidepanel-ui.test.js:358-448`, `tests/delegation-sidepanel-ui.test.js:541-574`, `tests/delegation-sidepanel-ui.test.js:2656-2727`).
 
-### Pillar 3: Color (4/4)
+---
 
-- **PASS — closed semantic palette.** Provider compatibility maps only to supported/success, degraded/warning, and unsupported/error treatments; selected rows and focus use the existing accent rather than a Codex/OpenAI brand color (`extension/ui/options.css:5880-6000`, `extension/ui/options.css:6231-6244`).
-- **PASS — provider-neutral lifecycle tones.** Shared cards map active, info, success, warning, danger, and neutral states to existing FSB tokens (`extension/ui/sidepanel.css:1728-1854`). Tool/feed headings pair color with explicit text and a decorative semantic icon (`extension/ui/delegation-feed.js:411-447`).
-- **PASS — non-color redundancy.** Forced-colors mode gives compatibility states visible solid, dashed, or double border differences while retaining text and icon identity (`extension/ui/options.css:6329-6355`). No Phase 65 source introduces a raw Codex-specific color.
-- **Human evidence boundary.** Actual contrast in light, dark, and OS forced-colors output remains UAT65-03; the 4/4 score is for the source contract, not a live WCAG contrast claim.
+## Detailed Six-Pillar Assessment
 
-### Pillar 4: Typography (3/4)
+### 1. Copywriting (4/4)
 
-- **PASS — approved source hierarchy.** The provider block uses the established 18px roster legend, 16px group/detail headings, 14px provider/body text, and 12px badge/help metadata with 400/600 weights (`extension/ui/options.css:5716-6215`). The side panel uses 16px/600 headings, 14px/400 body copy, and 12px definitions, disclosures, metadata, and actions (`extension/ui/sidepanel.css:1815-1881`, `extension/ui/sidepanel.css:1938-2043`).
-- **PASS — machine typography remains scoped.** Monospace is confined to doctor commands and machine/session identifiers (`extension/ui/sidepanel.css:1904-1913`, `extension/ui/sidepanel.css:1957-1959`); Codex auth, billing, and provider copy use normal inherited text and wrap rather than a branded wordmark treatment.
-- **Human evidence boundary.** No rendered evidence established computed font fallback, exact rasterized hierarchy, zoom reflow, or long/provider-derived value legibility. Typography remains 3/4 until UAT65-03; no extra font or weight defect was found in the audited Phase 65 source.
+- Exact Providers auth labels/help and billing copy remain centralized in the safe display models (`extension/ui/providers-panel.js:68-91`, `extension/ui/providers-panel.js:367-400`).
+- Compatibility, description, billing-link, consent, lifecycle, Stop, and accepted-run billing language remain the approved source-owned copy (`extension/ui/providers-panel.js:41-64`, `extension/ui/providers-panel.js:120-126`, `extension/ui/delegation-feed.js:515-550`).
+- UI65-W01 is resolved as documented above. Both locked recovery variants and the generic safe fallback have deterministic DOM coverage.
 
-### Pillar 5: Spacing (4/4)
+### 2. Visuals (3/4)
 
-- **PASS — roster scale and responsive wrap.** Provider rows keep the approved 64px minimum, 16px exterior padding, legacy 12px internal gap, and 20px native radio while detail controls use the existing 44px target (`extension/ui/options.css:5716-5873`, `extension/ui/options.css:6037-6215`). At `<=640px`, content and compatibility stack at full width without semantic reordering (`extension/ui/options.css:6273-6327`).
-- **PASS — corrected delegated targets.** Every `.delegation-action` has `min-height: 44px`; the fixed delegated Stop is explicitly 44px by 44px (`extension/ui/sidepanel.css:2024-2043`). Narrow actions remain full-width and at least 44px high (`extension/ui/sidepanel.css:2118-2152`).
-- **PASS — shared rhythm and motion-safe geometry.** Run cards, feed rows, summaries, actions, and control bars use the existing 4/8/16px spacing tokens and responsive grids (`extension/ui/sidepanel.css:1714-1755`, `extension/ui/sidepanel.css:1916-2022`). The focused side-panel suite passed its target-size and responsive source tripwires.
+- Roster order remains Claude Code, OpenCode, Codex, with the existing evidence cluster, compatibility group/description, and one trailing native radio (`extension/ui/control_panel.html:164-218`).
+- Codex reuses the selected-agent fact/detail region, consent card, lifecycle card, feed, controls, and summary. No new logo, auth card, profile badge, model picker, or provider-specific renderer exists (`extension/ui/control_panel.html:521-599`, `extension/ui/options.js:1043-1125`, `tests/provider-parity.test.js:234-269`).
+- Init still shows Client, Model, Session, and Allowed tools only; no visible or announced **Profile** row exists (`extension/ui/delegation-feed.js:460-469`).
+- The remaining point requires the already-owned UAT65-03 live render: optical hierarchy, dense-feed balance, icon alignment, long-copy wrapping, zoom, and clipping were not observed here.
 
-### Pillar 6: Experience Design (2/4)
+### 3. Color (4/4)
 
-- **PASS — authority and lifecycle truth.** Feed snapshots require exact immutable accepted identity, matching provider, auth-specific billing kind, and null USD (`extension/ui/delegation-feed.js:331-374`). Result and summary stay hidden until completed snapshot, completed terminal, completed summary, and a result entry agree (`extension/ui/delegation-feed.js:579-609`). Side-panel hydration is silent and only strictly newer matching entries announce (`extension/ui/sidepanel.js:2291-2380`).
-- **PASS — control accessibility at source level.** Consent and recovery use managed heading focus; Take control, Resume, and both Stop controls share visible labels, disabled states, and one action path (`extension/ui/sidepanel.js:1605-1695`, `extension/ui/sidepanel.js:1787-1825`, `extension/ui/sidepanel.js:1880-1929`). Focus-visible styles and reduced-motion suppression cover actions, disclosures, scrolling, tint, pulse, and Stop motion (`extension/ui/sidepanel.css:2068-2076`, `extension/ui/sidepanel.css:2178-2205`).
-- **WARNING UI65-W02 — tool arguments enter visible DOM.** The design lock says raw MCP arguments/results never appear in normal UI or accessibility output and never enter DOM (`65-UI-SPEC.md:52-53`, `65-UI-SPEC.md:267-272`). The feed accepts `argsSummary` as a bounded nullable string and renders it as an **Arguments** definition (`extension/ui/delegation-feed.js:191-196`, `extension/ui/delegation-feed.js:471-490`). More decisively, the DOM test supplies `<svg onload=steal()>https://evil.invalid/?secret=1</svg>` and asserts that exact secret-like value is visible in `container.textContent` (`tests/delegation-sidepanel-ui.test.js:541-560`). Text-only construction prevents script execution, but inert text is still disclosure and still violates the locked presentation boundary.
-- **Current Codex producer behavior does not close UI65-W02.** The Codex parser currently emits only tool id/name for `tool_use` and id/error state for `tool_result` (`mcp/src/agent-providers/codex-stream.ts:249-274`, `mcp/src/agent-providers/codex-stream.ts:317-337`). However, the shared event store still accepts and persists `argsSummary` (`extension/utils/delegation-event-store.js:505-522`, `extension/utils/delegation-event-store.js:656-671`), and the UI boundary/test explicitly permits display. Phase 65's cross-adapter lock is therefore not enforced.
-- **Remediation.** Remove `argsSummary` from the presentation view model if a schema migration is acceptable; otherwise force it to `null` at projection/validation, omit the **Arguments** term/value from `renderEntry`, and change the hostile-data test to assert that argument/result strings are absent from all text, attributes, live regions, and persisted presentation snapshots. Retain safe tool name, call id, reported tab, status, and duration only if they remain approved.
-- **WARNING UI65-W01 also affects recovery experience.** Unknown and unauthenticated users are correctly blocked before consent/run, but receive the same generic failure instead of state-specific next steps. The copy remediation above closes both the writing and recovery-path gap.
+- Selected rows and focus use the existing accent; compatibility uses only supported/success, degraded/warning, and unsupported/error tokens, with no Codex/OpenAI brand-color fork (`extension/ui/options.css:5803-6000`, `extension/ui/options.css:6231-6244`).
+- Delegated lifecycle and semantic icons use the established active/info/success/warning/danger/neutral tokens (`extension/ui/sidepanel.css:1728-1854`).
+- Forced-colors states retain visible text/icon identity plus solid, dashed, or double borders (`extension/ui/options.css:6329-6355`). Actual OS-rendered contrast remains part of UAT65-03, not a source warning.
+
+### 4. Typography (3/4)
+
+- Providers preserve the approved 18px roster legend, 16px headings, 14px names/body, and 12px metadata/help with only 400/600 weights (`extension/ui/options.css:5716-6215`).
+- The side panel preserves 16px/600 headings, 14px/400 body, and 12px definitions/actions; monospace remains scoped to machine/session identifiers and doctor commands (`extension/ui/sidepanel.css:1815-2010`).
+- The remaining point requires UAT65-03 observation of computed font fallback, rasterized hierarchy, zoom reflow, and long auth/billing-copy legibility.
+
+### 5. Spacing (4/4)
+
+- Provider rows retain the approved 64px minimum, 16px exterior padding, legacy 12px internal gap, 20px native radio, and responsive full-width compatibility stack (`extension/ui/options.css:5803-5873`, `extension/ui/options.css:6273-6327`).
+- Every `.delegation-action` has a 44px minimum height; fixed delegated Stop is exactly 44px square; narrow delegated actions stay full width and at least 44px high (`extension/ui/sidepanel.css:2024-2043`, `extension/ui/sidepanel.css:2118-2152`).
+- Shared cards, feed, summaries, controls, and disclosures retain the established 4/8/16px rhythm without a Phase 65 layout fork.
+
+### 6. Experience Design (4/4)
+
+- Accepted identity and billing remain immutable; summary/result rendering waits for authoritative completed state, terminal, summary, and result evidence (`extension/ui/delegation-feed.js:330-374`, `extension/ui/delegation-feed.js:577-615`).
+- Consent/recovery keep managed heading focus, shared visible actions, disabled semantics, and non-optimistic start behavior. Live updates are sequence-deduplicated and hydration is silent (`extension/ui/sidepanel.js:1678-1722`, `extension/ui/sidepanel.js:2317-2393`).
+- UI65-W01 and UI65-W02 are both resolved. No provider-specific renderer, client-selected authority, native auth/error copy, or tool argument/result presentation path remains in the audited source.
 
 ---
 
 ## Pending Human UAT
 
-All three rows remain `human_needed`, `pending`, and evidence-empty. This code-only review did not promote or check any scenario.
+Exactly three scenarios remain `human_needed`, `pending`, and evidence-empty. This code-only re-audit did not promote, check, or supplement any scenario.
 
 | Scenario | Status | Result | Evidence |
 |----------|--------|--------|----------|
@@ -122,32 +139,39 @@ All three rows remain `human_needed`, `pending`, and evidence-empty. This code-o
 | UAT65-02 — Genuine Codex-to-browser delegation, cancellation, cleanup, and summary | human_needed | pending | empty |
 | UAT65-03 — Keyboard, screen-reader, theme, motion, zoom, and narrow-layout behavior | human_needed | pending | empty |
 
-The authoritative steps, sanitization rules, and milestone-end ownership remain in `65-HUMAN-UAT.md:11-87`.
+The authoritative prerequisites, sanitized steps, expected outcomes, and evidence policy remain unchanged in `65-HUMAN-UAT.md:11-87`.
 
 ---
 
-## Verification Executed
+## Verification Executed During Re-audit
 
-The following focused checks passed during this audit:
+- `node scripts/run-mcp-build-preserving-workspace.mjs --commands-json '[["node","tests/delegation-event-store.test.js"]]'` — **35 passed, 0 failed**; MCP build and workspace identity preserved.
+- `node tests/delegation-sidepanel-ui.test.js` — **PASS**.
+- `node tests/delegation-routing.test.js` — **PASS**.
+- `node tests/mcp-bridge-background-dispatch.test.js` — **355 passed, 0 failed**.
+- `node tests/providers-panel-logic.test.js --section codex-safe-evidence` — **PASS**.
+- `node tests/providers-panel-ui.test.js --section codex-existing-row` — **PASS**.
+- `node tests/provider-parity.test.js --section delegated-agent-parity` — **36 passed, 0 failed**.
+- `node tests/phase65-full-tests-harness.test.js` — **all assertions passed**.
+- `node tests/delegation-phase-contract.test.js --section phase65-validation` — **41 passed, 0 failed**.
+- `node tests/delegation-phase-contract.test.js --section phase65-uat-ledger` — **10 passed, 0 failed**.
+- `node tests/agent-provider-forbidden-flags.test.js` — **all assertions passed**.
 
-- `node tests/providers-panel-logic.test.js --section codex-safe-evidence`
-- `node tests/providers-panel-ui.test.js --section codex-existing-row`
-- `node tests/delegation-sidepanel-ui.test.js --section codex-shared-feed`
-- `node tests/provider-parity.test.js --section delegated-agent-parity` — 36 passed, 0 failed
-
-Passing tests establish the checked source/DOM contracts. They do not negate UI65-W01; for UI65-W02, the passing hostile-data assertion is direct evidence of the contract conflict.
+The remediation ledger additionally records a successful authoritative Phase 65 full runner. This re-audit independently reran the focused source, storage, DOM, routing, background, parity, validation, and UAT-honesty gates above. None is treated as live UAT evidence.
 
 ## Audit Outcome
 
+- Source/UI contract: complete
 - BLOCKER findings: 0
-- WARNING findings: 2
-- Pending human-evidence scenarios: 3
-- Overall score: 19/24
+- WARNING findings: 0
+- Resolved prior warnings: 2
+- Pending human-evidence scenarios: exactly 3
+- Overall code-only score: 22/24
 - Human review required: yes
-- Screenshots: none captured
-- Registry audit: skipped; shadcn is not initialized and `components.json` is absent
-- Implementation edits made by this audit: none
-- Audit artifact created: `.planning/phases/65-codex-adapter/65-UI-REVIEW.md`
+- Screenshots/live extension evidence: none captured
+- Registry audit: not applicable; shadcn is not initialized and `components.json` is absent
+- Implementation edits made by this re-audit: none
+- Audit artifact updated: `.planning/phases/65-codex-adapter/65-UI-REVIEW.md`
 
 ## Files Audited
 
@@ -155,12 +179,12 @@ Passing tests establish the checked source/DOM contracts. They do not negate UI6
 - `.planning/phases/65-codex-adapter/65-UI-SPEC.md`
 - `.planning/phases/65-codex-adapter/65-VALIDATION.md`
 - `.planning/phases/65-codex-adapter/65-HUMAN-UAT.md`
-- `.planning/phases/65-codex-adapter/65-{01..08}-PLAN.md`
-- `.planning/phases/65-codex-adapter/65-{01..08}-SUMMARY.md`
+- `.planning/phases/65-codex-adapter/65-UI-REVIEW-FIX.md`
 - `extension/ui/control_panel.html`
 - `extension/ui/options.css`
 - `extension/ui/options.js`
 - `extension/ui/providers-panel.js`
+- `extension/ui/sidepanel.html`
 - `extension/ui/sidepanel.js`
 - `extension/ui/sidepanel.css`
 - `extension/ui/delegation-feed.js`
@@ -169,11 +193,8 @@ Passing tests establish the checked source/DOM contracts. They do not negate UI6
 - `extension/utils/delegation-controller.js`
 - `extension/utils/delegation-event-store.js`
 - `extension/utils/mcp-agent-providers.js`
+- `extension/background.js`
 - `mcp/src/agent-providers/codex-stream.ts`
-- `tests/providers-panel-logic.test.js`
-- `tests/providers-panel-ui.test.js`
-- `tests/delegation-sidepanel-ui.test.js`
-- `tests/provider-parity.test.js`
-- relevant Codex provider, delegation controller, event-store, and parity tests referenced by the Phase 65 plans and summaries
+- the focused provider, routing, background, controller/store, DOM, parity, validation, runner, and UAT-ledger tests listed above
 
 ## UI REVIEW COMPLETE
