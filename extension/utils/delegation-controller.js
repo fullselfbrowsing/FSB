@@ -26,6 +26,9 @@
   var STATUS_RESTART_LOSS_LIMIT = 128;
   var STATUS_ROUTE_LOSS_LIMIT = 128;
   var SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+  var ACCEPTED_IDENTITY_KEYS = [
+    'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+  ];
 
   var VALID_STATES = Object.freeze({
     idle: true,
@@ -208,20 +211,25 @@
     return copied.ok ? copied.value : null;
   }
 
-  function _closedProvider(value) {
-    try {
-      if (!value || Object.getPrototypeOf(value) !== Object.prototype) return null;
-    } catch (_errorIgnored) {
-      return null;
+  function _acceptedIdentity(value) {
+    return delegationProviders
+      && typeof delegationProviders.validateAcceptedAgentIdentity === 'function'
+      ? delegationProviders.validateAcceptedAgentIdentity(value)
+      : null;
+  }
+
+  function _sameAcceptedIdentity(left, right) {
+    if (!left || !right) return false;
+    for (var index = 0; index < ACCEPTED_IDENTITY_KEYS.length; index += 1) {
+      var key = ACCEPTED_IDENTITY_KEYS[index];
+      if (left[key] !== right[key]) return false;
     }
-    if (!_hasExactKeys(value, ['id', 'label'])
-        || !delegationProviders
-        || typeof delegationProviders.get !== 'function') return null;
-    var id = Object.getOwnPropertyDescriptor(value, 'id').value;
-    var label = Object.getOwnPropertyDescriptor(value, 'label').value;
-    var metadata = delegationProviders.get(id);
-    return metadata && metadata.label === label
-      ? _deepFreeze({ id: metadata.id, label: metadata.label })
+    return true;
+  }
+
+  function _providerFromAcceptedIdentity(identity) {
+    return identity
+      ? _deepFreeze({ id: identity.providerId, label: identity.label })
       : null;
   }
 
@@ -281,24 +289,6 @@
       toolCalls: _clone(entry.metrics.toolCalls),
       state: _summaryState(entry.state)
     };
-  }
-
-  function _providerFromEntries(entries) {
-    var accepted = null;
-    for (var i = 0; i < entries.length; i++) {
-      var init = entries[i] && entries[i].init;
-      if (!init || init.client === null || init.client === undefined) continue;
-      var provider = _closedProvider(init.client);
-      if (!provider) {
-        throw _error('delegation_ledger_corrupt', 'persisted provider identity is invalid');
-      }
-      if (accepted
-        && (accepted.id !== provider.id || accepted.label !== provider.label)) {
-        throw _error('delegation_ledger_corrupt', 'persisted provider identity changed');
-      }
-      accepted = provider;
-    }
-    return accepted;
   }
 
   function _latestSummary(entries) {
@@ -438,16 +428,12 @@
 
   function _newRecord(delegationId, options) {
     options = options || {};
-    var provider = _closedProvider(options.provider);
-    var providerMetadata = provider
-      && delegationProviders
-      && typeof delegationProviders.get === 'function'
-      ? delegationProviders.get(provider.id)
-      : null;
+    var acceptedIdentity = _acceptedIdentity(options.acceptedIdentity);
+    var provider = _providerFromAcceptedIdentity(acceptedIdentity);
     return {
       delegationId: delegationId,
+      acceptedIdentity: acceptedIdentity,
       provider: provider,
-      providerBillingKind: providerMetadata ? providerMetadata.billingKind : null,
       state: _hasOwn(VALID_STATES, options.state) ? options.state : 'starting',
       connection: _hasOwn(VALID_CONNECTIONS, options.connection) ? options.connection : 'connected',
       entries: Array.isArray(options.entries) ? options.entries.slice() : [],
@@ -485,6 +471,7 @@
     return _deepFreeze({
       v: SNAPSHOT_VERSION,
       delegationId: record.delegationId,
+      acceptedIdentity: record.acceptedIdentity ? _clone(record.acceptedIdentity) : null,
       provider: record.provider ? _clone(record.provider) : null,
       state: record.state,
       connection: record.connection,
@@ -661,41 +648,32 @@
       if (!context) {
         throw _error('invalid_delegation_event', 'event context must be an exact own-data record');
       }
-      var hasClient = Object.prototype.hasOwnProperty.call(context, 'client')
-        && context.client !== null
-        && context.client !== undefined;
-      var claimedProvider = hasClient ? _closedProvider(context.client) : null;
-      if (hasClient && !claimedProvider) {
-        throw _error('unsupported_provider', 'event provider identity is invalid');
+      var forbiddenIdentityFields = [
+        'authState', 'billingKind', 'client', 'label', 'profileVersion',
+        'providerId', 'usd'
+      ];
+      for (var index = 0; index < forbiddenIdentityFields.length; index += 1) {
+        if (Object.prototype.hasOwnProperty.call(context, forbiddenIdentityFields[index])) {
+          throw _error(
+            'invalid_delegation_event',
+            'event context cannot introduce accepted identity fields or usd'
+          );
+        }
       }
-      if (record.provider && claimedProvider
-        && (record.provider.id !== claimedProvider.id
-          || record.provider.label !== claimedProvider.label)) {
-        throw _error('unsupported_provider', 'event provider identity changed');
+      if (!record.acceptedIdentity) {
+        throw _error('delegation_ledger_corrupt', 'accepted identity authority is missing');
       }
-      var acceptedProvider = record.provider || claimedProvider;
-      var billingKind = record.providerBillingKind;
-      if (!billingKind && acceptedProvider) {
-        var metadata = delegationProviders.get(acceptedProvider.id);
-        billingKind = metadata ? metadata.billingKind : null;
+      if (Object.prototype.hasOwnProperty.call(context, 'acceptedIdentity')) {
+        var claimedIdentity = _acceptedIdentity(context.acceptedIdentity);
+        if (!claimedIdentity || !_sameAcceptedIdentity(record.acceptedIdentity, claimedIdentity)) {
+          throw _error('unsupported_provider', 'event accepted identity changed');
+        }
       }
-      if (Object.prototype.hasOwnProperty.call(context, 'billingKind')
-        && context.billingKind !== undefined
-        && billingKind
-        && context.billingKind !== billingKind) {
-        throw _error('unsupported_provider', 'event billing identity changed');
-      }
-      if (acceptedProvider) {
-        context.client = _deepFreeze({
-          id: acceptedProvider.id,
-          label: acceptedProvider.label
-        });
-      }
-      if (billingKind) context.billingKind = billingKind;
+      context.acceptedIdentity = record.acceptedIdentity;
       if (!Number.isSafeInteger(context.timestamp) || context.timestamp < 0) {
         context.timestamp = now();
       }
-      return Object.freeze(context);
+      return _deepFreeze(context);
     }
 
     function _applyEntry(record, entry, options) {
@@ -706,26 +684,25 @@
         || entry.sequence !== expected) {
         throw _error('delegation_ledger_corrupt', 'canonical entry sequence or identity is invalid');
       }
-      var entryProvider = entry.init && entry.init.client
-        ? _closedProvider(entry.init.client)
-        : null;
-      if (entry.init && entry.init.client && !entryProvider) {
-        throw _error('delegation_ledger_corrupt', 'canonical entry provider is invalid');
+      if (!record.acceptedIdentity) {
+        throw _error('delegation_ledger_corrupt', 'canonical accepted identity is missing');
       }
-      if (record.provider && entryProvider
-        && (record.provider.id !== entryProvider.id
-          || record.provider.label !== entryProvider.label)) {
-        throw _error('delegation_ledger_corrupt', 'canonical entry provider changed');
+      if (entry.init
+        && (!entry.init.client
+          || entry.init.client.id !== record.acceptedIdentity.providerId
+          || entry.init.client.label !== record.acceptedIdentity.label
+          || entry.init.profileVersion !== record.acceptedIdentity.profileVersion)) {
+        throw _error('delegation_ledger_corrupt', 'canonical entry accepted identity changed');
+      }
+      if (entry.metrics
+        && (entry.metrics.billingKind !== record.acceptedIdentity.billingKind
+          || entry.metrics.usd !== null)) {
+        throw _error('delegation_ledger_corrupt', 'canonical entry billing identity changed');
       }
       record.entries.push(entry);
       if (options.deferTerminalState !== true) record.state = entry.state;
       var summary = _summaryFromEntry(entry);
       if (summary) record.summary = summary;
-      if (!record.provider && entryProvider) {
-        record.provider = entryProvider;
-        var metadata = delegationProviders.get(entryProvider.id);
-        record.providerBillingKind = metadata ? metadata.billingKind : null;
-      }
       if (options.refreshSilence !== false) _refreshSilence(record, entry.timestamp);
       if (options.notify === false) return null;
       return _emit(record, entry.sequence);
@@ -895,13 +872,15 @@
       var envelope = await eventStore.markCleanupPending(record.delegationId, {
         code: code,
         cancellationConfirmed: cancellationConfirmed === true,
-        agentId: record.agentId || null
+        agentId: record.agentId || null,
+        acceptedIdentity: record.acceptedIdentity
       });
       var marker = envelope && _normalizeCleanupPending(envelope.cleanupPending, eventStore);
       if (!marker
         || marker.code !== code
         || marker.cancellationConfirmed !== (cancellationConfirmed === true)
         || marker.agentId !== (record.agentId || null)
+        || !_sameAcceptedIdentity(envelope.acceptedIdentity, record.acceptedIdentity)
         || envelope.terminal !== false) {
         throw _error('delegation_ledger_corrupt', 'cleanup marker did not commit exactly');
       }
@@ -922,6 +901,7 @@
         code: code,
         event: { type: 'terminal', sessionId: null, payload: {} },
         context: {
+          acceptedIdentity: record.acceptedIdentity,
           timestamp: Number.isSafeInteger(options.timestamp) ? options.timestamp : now(),
           title: 'Delegation ended',
           detail: null
@@ -931,6 +911,7 @@
         || envelope.terminal !== true
         || envelope.terminalCode !== code
         || envelope.cleanupPending !== null
+        || !_sameAcceptedIdentity(envelope.acceptedIdentity, record.acceptedIdentity)
         || !Array.isArray(envelope.entries)
         || (envelope.entries.length !== beforeLength
           && envelope.entries.length !== beforeLength + 1)) {
@@ -1099,6 +1080,10 @@
             throw _error('delegation_ledger_corrupt', 'hydrated ledger identity is invalid');
           }
           var entries = Array.isArray(ledger.entries) ? ledger.entries.slice() : [];
+          var acceptedIdentity = _acceptedIdentity(ledger.acceptedIdentity);
+          if (!acceptedIdentity) {
+            throw _error('delegation_ledger_corrupt', 'hydrated accepted identity is invalid');
+          }
           var cleanupPending = _normalizeCleanupPending(ledger.cleanupPending, eventStore);
           if (ledger.cleanupPending !== undefined
             && ledger.cleanupPending !== null
@@ -1109,7 +1094,7 @@
             ? 'stopping'
             : (entries.length > 0 ? entries[entries.length - 1].state : 'idle');
           var record = _newRecord(ledger.delegationId, {
-            provider: _providerFromEntries(entries),
+            acceptedIdentity: acceptedIdentity,
             state: state,
             connection: 'disconnected',
             entries: entries,
@@ -1208,16 +1193,14 @@
       _requireHydrated();
       input = input || {};
       var delegationId = _requireId(input.delegationId);
-      var acceptedProvider = _closedProvider(input.provider);
-      if (!acceptedProvider) {
-        throw _error('unsupported_provider', 'a canonical provider is required');
+      var acceptedIdentity = _acceptedIdentity(input.acceptedIdentity);
+      if (!acceptedIdentity) {
+        throw _error('unsupported_provider', 'an exact accepted identity is required');
       }
       if (records.has(delegationId)) {
         var existing = records.get(delegationId);
-        if (!existing.provider
-          || existing.provider.id !== acceptedProvider.id
-          || existing.provider.label !== acceptedProvider.label) {
-          throw _error('unsupported_provider', 'delegation provider identity changed');
+        if (!_sameAcceptedIdentity(existing.acceptedIdentity, acceptedIdentity)) {
+          throw _error('unsupported_provider', 'delegation accepted identity changed');
         }
         if (existing.startPromise) return existing.startPromise;
         existing.startPromise = Promise.resolve(_deepFreeze({
@@ -1232,7 +1215,7 @@
       }
       provisional = { delegationId: delegationId };
       var record = _newRecord(delegationId, {
-        provider: acceptedProvider,
+        acceptedIdentity: acceptedIdentity,
         state: 'starting',
         connection: _hasOwn(VALID_CONNECTIONS, input.connection) ? input.connection : 'connected',
         hydrated: true
@@ -1249,8 +1232,7 @@
             {
               timestamp: record.startedAt,
               state: 'starting',
-              client: { id: acceptedProvider.id, label: acceptedProvider.label },
-              profileVersion: input.profileVersion === undefined ? null : input.profileVersion,
+              acceptedIdentity: record.acceptedIdentity,
               model: null,
               allowedTools: []
             }

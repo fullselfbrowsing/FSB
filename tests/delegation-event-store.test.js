@@ -22,6 +22,28 @@ const OPENCODE_STREAM_PATH = path.join(
   'agent-providers',
   'opencode-stream.js',
 );
+const CLAUDE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'claude-code',
+  label: 'Claude Code',
+  profileVersion: '2.1.177',
+  authState: 'unknown',
+  billingKind: 'subscription',
+});
+const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'opencode',
+  label: 'OpenCode',
+  profileVersion: '1.14.25',
+  authState: 'unknown',
+  billingKind: 'unknown',
+});
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
 
 let passed = 0;
 let failed = 0;
@@ -107,7 +129,25 @@ function installSessionStorage(initial = {}) {
 }
 
 function context(overrides = {}) {
-  return { ...jsonClone(fixtures.baseContext), ...overrides };
+  const merged = { ...jsonClone(fixtures.baseContext), ...overrides };
+  const client = merged.client || fixtures.canonicalClients.claudeCode;
+  const acceptedIdentity = merged.acceptedIdentity || {
+    providerId: client.id,
+    label: client.label,
+    profileVersion: typeof merged.profileVersion === 'string'
+      ? merged.profileVersion
+      : (client.id === 'opencode' ? '1.14.25' : '2.1.177'),
+    authState: 'unknown',
+    billingKind: merged.billingKind === undefined
+      ? (client.id === 'claude-code' ? 'subscription' : 'unknown')
+      : merged.billingKind,
+  };
+  for (const legacyField of ['authState', 'billingKind', 'client', 'label',
+    'profileVersion', 'providerId', 'usd']) {
+    delete merged[legacyField];
+  }
+  merged.acceptedIdentity = acceptedIdentity;
+  return merged;
 }
 
 function exactKeys(value, keys) {
@@ -135,8 +175,221 @@ function project(store, event, overrides = {}) {
   return store.project(event, context(overrides));
 }
 
+function acceptedContext(acceptedIdentity, overrides = {}) {
+  return { acceptedIdentity, ...overrides };
+}
+
+function persistedEnvelope(entries, overrides = {}) {
+  const envelope = fixtures.makePersistedEnvelope(entries, overrides);
+  return {
+    ...envelope,
+    acceptedIdentity: overrides.acceptedIdentity || CLAUDE_ACCEPTED_IDENTITY,
+    cleanupPending: envelope.cleanupPending === undefined ? null : envelope.cleanupPending,
+  };
+}
+
+async function runAcceptedIdentityFoundation() {
+  await test('persists and hydrates one frozen exact identity without re-deriving billing', async () => {
+    const mock = installSessionStorage();
+    try {
+      let store = freshStore();
+      const claudeId = 'delegation_store_claude_6501';
+      const openCodeId = 'delegation_store_opencode_6501';
+      const mutableIdentity = jsonClone(OPENCODE_ACCEPTED_IDENTITY);
+      const gate = mock.deferWrites();
+      const openCodeAppend = store.appendBeforeFanout(
+        openCodeId,
+        fixtures.initEvent,
+        acceptedContext(mutableIdentity, {
+          timestamp: 1720000000000,
+          state: 'starting',
+          allowedTools: [],
+        }),
+      );
+      mutableIdentity.providerId = 'claude-code';
+      mutableIdentity.label = 'Claude Code';
+      mutableIdentity.profileVersion = 'mutated-after-append';
+      await gate.started;
+      gate.resolve();
+      const openCodeInit = await openCodeAppend;
+      assert.deepStrictEqual(openCodeInit.init.client, { id: 'opencode', label: 'OpenCode' });
+      assert.strictEqual(openCodeInit.init.profileVersion, '1.14.25');
+
+      await store.appendBeforeFanout(
+        openCodeId,
+        fixtures.hostileOpenCodeResultEvent,
+        acceptedContext(OPENCODE_ACCEPTED_IDENTITY, {
+          timestamp: 1720000000001,
+          state: 'completed',
+        }),
+      );
+      await store.appendBeforeFanout(
+        claudeId,
+        fixtures.initEvent,
+        acceptedContext(CLAUDE_ACCEPTED_IDENTITY, {
+          timestamp: 1720000000000,
+          state: 'starting',
+          allowedTools: [],
+        }),
+      );
+
+      const openCodeEnvelope = mock.data[storageKey(store, openCodeId)];
+      exactKeys(openCodeEnvelope, [
+        'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
+        'cleanupPending', 'entries',
+      ]);
+      assert.deepStrictEqual(openCodeEnvelope.acceptedIdentity, OPENCODE_ACCEPTED_IDENTITY);
+      assert.strictEqual(openCodeEnvelope.entries[1].metrics.billingKind, 'unknown');
+      assert.strictEqual(openCodeEnvelope.entries[1].metrics.usd, null);
+
+      store = freshStore();
+      const hydrated = await store.hydrateNonterminal();
+      assert.strictEqual(hydrated.length, 2);
+      const byId = new Map(hydrated.map((ledger) => [ledger.delegationId, ledger]));
+      assert.deepStrictEqual(byId.get(openCodeId).acceptedIdentity, OPENCODE_ACCEPTED_IDENTITY);
+      assert.deepStrictEqual(byId.get(claudeId).acceptedIdentity, CLAUDE_ACCEPTED_IDENTITY);
+      assert(Object.isFrozen(byId.get(openCodeId).acceptedIdentity));
+      assert(Object.isFrozen(byId.get(claudeId).acceptedIdentity));
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('rejects drift, hostile identity records, legacy ledgers, and event USD', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const id = 'delegation_store_drift_6501';
+      await store.appendBeforeFanout(
+        id,
+        fixtures.initEvent,
+        acceptedContext(CLAUDE_ACCEPTED_IDENTITY, {
+          timestamp: 1720000000000,
+          state: 'starting',
+          allowedTools: [],
+        }),
+      );
+
+      const hostileIdentities = [
+        { ...CLAUDE_ACCEPTED_IDENTITY, profileVersion: 'different-real-profile' },
+        { ...CLAUDE_ACCEPTED_IDENTITY, billingKind: 'api' },
+        { ...CLAUDE_ACCEPTED_IDENTITY, extra: true },
+        Object.assign(Object.create({ polluted: true }), CLAUDE_ACCEPTED_IDENTITY),
+        Object.assign({ ...CLAUDE_ACCEPTED_IDENTITY }, { [Symbol('identity')]: true }),
+      ];
+      for (const [index, acceptedIdentity] of hostileIdentities.entries()) {
+        await expectCode(
+          store.appendBeforeFanout(
+            id,
+            fixtures.stateEvent,
+            acceptedContext(acceptedIdentity, { timestamp: 1720000000010 + index }),
+          ),
+          'delegation_persistence_failed',
+        );
+      }
+
+      let accessorReads = 0;
+      const accessorIdentity = { ...CLAUDE_ACCEPTED_IDENTITY };
+      Object.defineProperty(accessorIdentity, 'billingKind', {
+        enumerable: true,
+        get() { accessorReads += 1; return 'subscription'; },
+      });
+      await expectCode(
+        store.appendBeforeFanout(
+          id,
+          fixtures.stateEvent,
+          acceptedContext(accessorIdentity, { timestamp: 1720000000020 }),
+        ),
+        'delegation_persistence_failed',
+      );
+      assert.strictEqual(accessorReads, 0);
+      await expectCode(
+        store.appendBeforeFanout(id, fixtures.resultEvent, acceptedContext(
+          CLAUDE_ACCEPTED_IDENTITY,
+          { timestamp: 1720000000021, usd: 0.01 },
+        )),
+        'delegation_persistence_failed',
+      );
+      assert.strictEqual(mock.data[storageKey(store, id)].entries.length, 1);
+
+      const legacyId = 'delegation_store_legacy_6501';
+      const legacy = jsonClone(mock.data[storageKey(store, id)]);
+      legacy.delegationId = legacyId;
+      delete legacy.acceptedIdentity;
+      for (const entry of legacy.entries) entry.delegationId = legacyId;
+      mock.data[storageKey(store, legacyId)] = legacy;
+      await expectCode(store.hydrateNonterminal(), 'delegation_ledger_corrupt');
+      delete mock.data[storageKey(store, legacyId)];
+
+      const driftedProfile = mock.data[storageKey(store, id)];
+      driftedProfile.entries[0].init.profileVersion = 'forged-profile';
+      await expectCode(store.hydrateNonterminal(), 'delegation_ledger_corrupt');
+    } finally {
+      mock.restore();
+    }
+  });
+
+  await test('preserves sequence and exact-once terminal behavior with immutable identity', async () => {
+    const mock = installSessionStorage();
+    try {
+      const store = freshStore();
+      const id = 'delegation_store_terminal_6501';
+      const first = await store.appendBeforeFanout(
+        id,
+        fixtures.initEvent,
+        acceptedContext(CLAUDE_ACCEPTED_IDENTITY, {
+          timestamp: 1720000000000,
+          state: 'starting',
+          allowedTools: [],
+        }),
+      );
+      const second = await store.appendBeforeFanout(
+        id,
+        fixtures.resultEvent,
+        acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000001 }),
+      );
+      assert.deepStrictEqual([first.sequence, second.sequence], [1, 2]);
+      await store.markCleanupPending(id, {
+        code: 'completed',
+        cancellationConfirmed: true,
+        agentId: null,
+      });
+      const terminal = await store.markTerminal(id, {
+        code: 'completed',
+        event: fixtures.terminalEvent,
+        context: { timestamp: 1720000000002 },
+      });
+      assert.strictEqual(terminal.entries[2].sequence, 3);
+      assert.deepStrictEqual(terminal.acceptedIdentity, CLAUDE_ACCEPTED_IDENTITY);
+      const repeated = await store.markTerminal(id, 'completed');
+      assert.deepStrictEqual(repeated, terminal);
+      await expectCode(
+        store.appendBeforeFanout(
+          id,
+          fixtures.stateEvent,
+          acceptedContext(CLAUDE_ACCEPTED_IDENTITY, { timestamp: 1720000000003 }),
+        ),
+        'delegation_persistence_failed',
+      );
+      assert.deepStrictEqual(await store.hydrateNonterminal(), []);
+    } finally {
+      mock.restore();
+    }
+  });
+}
+
 (async () => {
   console.log('--- Phase 61 Plan 02: delegation event store ---');
+
+  if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    await runAcceptedIdentityFoundation();
+    console.log('\n--- delegation event store summary ---');
+    console.log('  passed:', passed);
+    console.log('  failed:', failed);
+    process.exitCode = failed > 0 ? 1 : 0;
+    return;
+  }
+  if (SELECTED_SECTION !== null) throw new Error(`unknown section: ${SELECTED_SECTION}`);
 
   await test('exports the closed store contract and pinned limits', () => {
     const store = freshStore();
@@ -201,42 +454,38 @@ function project(store, event, overrides = {}) {
     assert(Object.isFrozen(entry.init.client));
   });
 
-  await test('projects only exact immutable canonical Claude and OpenCode clients', async () => {
+  await test('projects clients only from exact immutable accepted identities', async () => {
     const store = freshStore();
-    const mutableClient = { id: 'opencode', label: 'OpenCode' };
+    const mutableIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
     const openCode = project(store, fixtures.initEvent, {
-      client: mutableClient,
-      profileVersion: '1.14.25',
+      acceptedIdentity: mutableIdentity,
       sessionId: 'synthetic-opencode-session-01',
       model: null,
     });
-    mutableClient.id = 'claude-code';
-    mutableClient.label = 'forged after projection';
+    mutableIdentity.providerId = 'claude-code';
+    mutableIdentity.label = 'forged after projection';
     assert.deepStrictEqual(openCode.init.client, fixtures.canonicalClients.openCode);
     assert.strictEqual(openCode.init.profileVersion, '1.14.25');
     assert.strictEqual(openCode.init.model, null);
     assert(Object.isFrozen(openCode.init.client));
 
-    const invalidClients = [
-      { id: 'opencode', label: 'Claude Code' },
-      { id: 'codex', label: 'Codex' },
-      { id: 'OpenCode', label: 'OpenCode' },
-      { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
-      Object.create(null, {
-        id: { enumerable: true, value: 'opencode' },
-        label: { enumerable: true, value: 'OpenCode' },
-      }),
+    const invalidIdentities = [
+      { ...OPENCODE_ACCEPTED_IDENTITY, label: 'Claude Code' },
+      { ...OPENCODE_ACCEPTED_IDENTITY, providerId: 'codex', label: 'Codex' },
+      { ...OPENCODE_ACCEPTED_IDENTITY, providerId: 'OpenCode' },
+      { ...OPENCODE_ACCEPTED_IDENTITY, extra: true },
+      Object.assign(Object.create({ polluted: true }), OPENCODE_ACCEPTED_IDENTITY),
     ];
-    for (const client of invalidClients) {
+    for (const acceptedIdentity of invalidIdentities) {
       await expectCode(
-        () => project(store, fixtures.initEvent, { client }),
+        () => project(store, fixtures.initEvent, { acceptedIdentity }),
         'delegation_persistence_failed',
       );
     }
 
     let accessorReads = 0;
-    const accessorClient = { id: 'opencode' };
-    Object.defineProperty(accessorClient, 'label', {
+    const accessorIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
+    Object.defineProperty(accessorIdentity, 'label', {
       enumerable: true,
       get() {
         accessorReads += 1;
@@ -244,13 +493,10 @@ function project(store, event, overrides = {}) {
       },
     });
     await expectCode(
-      () => project(store, fixtures.initEvent, { client: accessorClient }),
+      () => project(store, fixtures.initEvent, { acceptedIdentity: accessorIdentity }),
       'delegation_persistence_failed',
     );
-    assert.strictEqual(accessorReads, 0, 'client accessors are rejected without invocation');
-
-    const noClient = project(store, fixtures.initEvent, { client: null });
-    assert.strictEqual(noClient.init.client, null);
+    assert.strictEqual(accessorReads, 0, 'identity accessors are rejected without invocation');
   });
 
   await test('projects exact running and terminal tool-call fields', () => {
@@ -696,18 +942,19 @@ function project(store, event, overrides = {}) {
       const store = freshStore();
       const delegationId = fixtures.baseContext.delegationId;
       const entries = await Promise.all(Array.from({ length: 24 }, (_, index) => (
-        store.appendBeforeFanout(delegationId, fixtures.stateEvent, {
+        store.appendBeforeFanout(delegationId, fixtures.stateEvent, context({
           timestamp: fixtures.baseContext.timestamp + index,
           state: 'running',
           title: `event-${index}`,
-        })
+        }))
       )));
       assert.deepStrictEqual(entries.map((entry) => entry.sequence),
         Array.from({ length: 24 }, (_, index) => index + 1));
       assert.strictEqual(mock.setCalls, 24);
       const persisted = mock.data[storageKey(store)];
       exactKeys(persisted, [
-        'v', 'delegationId', 'terminal', 'terminalCode', 'cleanupPending', 'entries',
+        'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
+        'cleanupPending', 'entries',
       ]);
       assert.strictEqual(persisted.cleanupPending, null);
       assert.deepStrictEqual(persisted.entries.map((entry) => entry.sequence),
@@ -751,12 +998,11 @@ function project(store, event, overrides = {}) {
     const mock = installSessionStorage();
     try {
       const store = freshStore();
-      const mutableClient = { id: 'opencode', label: 'OpenCode' };
+      const mutableIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
       const mutableContext = {
         timestamp: fixtures.baseContext.timestamp,
         state: 'starting',
-        client: mutableClient,
-        profileVersion: '1.14.25',
+        acceptedIdentity: mutableIdentity,
         model: null,
         sessionId: 'synthetic-opencode-session-01',
         allowedTools: [],
@@ -766,9 +1012,9 @@ function project(store, event, overrides = {}) {
         fixtures.initEvent,
         mutableContext,
       );
-      mutableClient.id = 'claude-code';
-      mutableClient.label = 'Claude Code';
-      mutableContext.profileVersion = 'mutated-after-call';
+      mutableIdentity.providerId = 'claude-code';
+      mutableIdentity.label = 'Claude Code';
+      mutableIdentity.profileVersion = 'mutated-after-call';
       mutableContext.allowedTools.push('hostile_after_call');
       const entry = await append;
       assert.deepStrictEqual(entry.init.client, fixtures.canonicalClients.openCode);
@@ -834,7 +1080,7 @@ function project(store, event, overrides = {}) {
       ...jsonClone(template),
       sequence: index + 1,
     }));
-    const envelope = fixtures.makePersistedEnvelope(entries, { delegationId });
+    const envelope = persistedEnvelope(entries, { delegationId });
     const mock = installSessionStorage({ [storageKey(bootstrap, delegationId)]: envelope });
     try {
       const store = freshStore();
@@ -842,7 +1088,7 @@ function project(store, event, overrides = {}) {
       assert.strictEqual(hydrated.length, 1);
       assert.strictEqual(hydrated[0].entries.length, store.MAX_ENTRIES_PER_DELEGATION);
       await expectCode(
-        store.appendBeforeFanout(delegationId, fixtures.stateEvent, { title: 'overflow' }),
+        store.appendBeforeFanout(delegationId, fixtures.stateEvent, context({ title: 'overflow' })),
         'delegation_quota_exceeded',
       );
       assert.strictEqual(mock.data[storageKey(store, delegationId)].entries.length, 2000);
@@ -869,15 +1115,15 @@ function project(store, event, overrides = {}) {
     assert(bootstrap.serializedBytes(template) < bootstrap.MAX_ENTRY_BYTES);
 
     const entries = [];
-    const emptyEnvelope = fixtures.makePersistedEnvelope([], { delegationId: otherId });
+    const emptyEnvelope = persistedEnvelope([], { delegationId: otherId });
     let envelopeBytes = bootstrap.serializedBytes(emptyEnvelope);
-    const newEntry = bootstrap.project(fixtures.stateEvent, {
+    const newEntry = bootstrap.project(fixtures.stateEvent, context({
       delegationId: newId,
       sequence: 1,
       timestamp: fixtures.baseContext.timestamp,
       title: 'new aggregate row',
-    });
-    const newEnvelope = fixtures.makePersistedEnvelope([newEntry], { delegationId: newId });
+    }));
+    const newEnvelope = persistedEnvelope([newEntry], { delegationId: newId });
     const crossingBytes = bootstrap.serializedBytes(newEnvelope);
     for (let index = 0; index < bootstrap.MAX_ENTRIES_PER_DELEGATION; index += 1) {
       const candidate = { ...jsonClone(template), sequence: index + 1 };
@@ -932,7 +1178,7 @@ function project(store, event, overrides = {}) {
       entries.push(jsonClone(tail));
       envelopeBytes += commaBytes + bootstrap.serializedBytes(tail);
     }
-    const envelope = fixtures.makePersistedEnvelope(entries, { delegationId: otherId });
+    const envelope = persistedEnvelope(entries, { delegationId: otherId });
     const existingBytes = bootstrap.serializedBytes(envelope);
     assert.strictEqual(existingBytes, envelopeBytes);
     assert(existingBytes <= bootstrap.MAX_AGGREGATE_BYTES);
@@ -943,10 +1189,10 @@ function project(store, event, overrides = {}) {
     try {
       const store = freshStore();
       await expectCode(
-        store.appendBeforeFanout(newId, fixtures.stateEvent, {
+        store.appendBeforeFanout(newId, fixtures.stateEvent, context({
           timestamp: fixtures.baseContext.timestamp,
           title: 'new aggregate row',
-        }),
+        })),
         'delegation_quota_exceeded',
       );
       assert.strictEqual(mock.data[storageKey(store, newId)], undefined);
@@ -979,7 +1225,7 @@ function project(store, event, overrides = {}) {
     }
   });
 
-  await test('legacy Claude envelopes remain readable while new projection omits provider model values', async () => {
+  await test('legacy Claude envelopes fail closed while new projection omits provider model values', async () => {
     const bootstrap = freshStore();
     const legacyInit = jsonClone(project(bootstrap, fixtures.initEvent));
     legacyInit.init.model = 'legacy-claude-model';
@@ -987,9 +1233,7 @@ function project(store, event, overrides = {}) {
     const mock = installSessionStorage({ [storageKey(bootstrap)]: legacy });
     try {
       const store = freshStore();
-      const ledgers = await store.hydrateNonterminal();
-      assert.deepStrictEqual(ledgers, [legacy]);
-      assert.strictEqual(ledgers[0].entries[0].init.model, 'legacy-claude-model');
+      await expectCode(store.hydrateNonterminal(), 'delegation_ledger_corrupt');
 
       const projected = project(store, fixtures.initEvent, {
         model: null,
@@ -1008,10 +1252,8 @@ function project(store, event, overrides = {}) {
       let store = freshStore();
       const delegationId = 'delegation_opencode_result_before_terminal';
       const openCodeContext = {
+        acceptedIdentity: OPENCODE_ACCEPTED_IDENTITY,
         timestamp: fixtures.baseContext.timestamp,
-        client: fixtures.canonicalClients.openCode,
-        profileVersion: '1.14.25',
-        billingKind: 'unknown',
       };
       await store.appendBeforeFanout(delegationId, fixtures.initEvent, {
         ...openCodeContext,
@@ -1024,7 +1266,6 @@ function project(store, event, overrides = {}) {
         ...openCodeContext,
         timestamp: fixtures.baseContext.timestamp + 1,
         state: 'completed',
-        usd: 999,
       });
 
       store = freshStore();
@@ -1103,7 +1344,8 @@ function project(store, event, overrides = {}) {
         agentId: 'agent-cleanup-01',
       });
       exactKeys(pending, [
-        'v', 'delegationId', 'terminal', 'terminalCode', 'cleanupPending', 'entries',
+        'v', 'delegationId', 'acceptedIdentity', 'terminal', 'terminalCode',
+        'cleanupPending', 'entries',
       ]);
       assert.deepStrictEqual(pending.cleanupPending, {
         code: 'stopped',
@@ -1233,7 +1475,7 @@ function project(store, event, overrides = {}) {
       ...jsonClone(template),
       sequence: index + 1,
     }));
-    const envelope = fixtures.makePersistedEnvelope(entries, { delegationId });
+    const envelope = persistedEnvelope(entries, { delegationId });
     const mock = installSessionStorage({ [storageKey(bootstrap, delegationId)]: envelope });
     try {
       const store = freshStore();
@@ -1287,23 +1529,23 @@ function project(store, event, overrides = {}) {
     const result = project(bootstrap, fixtures.resultEvent, { sequence: 1 });
     const key = storageKey(bootstrap);
     const cases = [
-      ['byte-identical duplicate sequence', fixtures.makePersistedEnvelope(
+      ['byte-identical duplicate sequence', persistedEnvelope(
         fixtures.makeDuplicateSequenceEntries(first),
       )],
-      ['conflicting duplicate sequence', fixtures.makePersistedEnvelope(
+      ['conflicting duplicate sequence', persistedEnvelope(
         fixtures.makeConflictingSequenceEntries(first),
       )],
-      ['sequence gap', fixtures.makePersistedEnvelope([first, { ...second, sequence: 3 }])],
-      ['sequence reversal', fixtures.makePersistedEnvelope([{ ...first, sequence: 2 }, { ...second, sequence: 1 }])],
-      ['entry identity mismatch', fixtures.makePersistedEnvelope([
+      ['sequence gap', persistedEnvelope([first, { ...second, sequence: 3 }])],
+      ['sequence reversal', persistedEnvelope([{ ...first, sequence: 2 }, { ...second, sequence: 1 }])],
+      ['entry identity mismatch', persistedEnvelope([
         { ...first, delegationId: 'delegation_other' },
       ])],
-      ['envelope identity mismatch', fixtures.makePersistedEnvelope([first], {
+      ['envelope identity mismatch', persistedEnvelope([first], {
         delegationId: 'delegation_other',
       })],
-      ['extra envelope key', { ...fixtures.makePersistedEnvelope([first]), extra: true }],
-      ['extra entry key', fixtures.makePersistedEnvelope([{ ...first, extra: true }])],
-      ['typed payload overlap', fixtures.makePersistedEnvelope([{ ...first, tool: {
+      ['extra envelope key', { ...persistedEnvelope([first]), extra: true }],
+      ['extra entry key', persistedEnvelope([{ ...first, extra: true }])],
+      ['typed payload overlap', persistedEnvelope([{ ...first, tool: {
         callId: null,
         name: 'unknown',
         tabId: null,
@@ -1311,35 +1553,35 @@ function project(store, event, overrides = {}) {
         status: 'unknown',
         durationMs: null,
       } }])],
-      ['prototype-named entry kind', fixtures.makePersistedEnvelope([
+      ['prototype-named entry kind', persistedEnvelope([
         { ...first, kind: 'constructor' },
       ])],
-      ['prototype-named entry state', fixtures.makePersistedEnvelope([
+      ['prototype-named entry state', persistedEnvelope([
         { ...first, state: '__proto__' },
       ])],
-      ['prototype-named tool status', fixtures.makePersistedEnvelope([
+      ['prototype-named tool status', persistedEnvelope([
         { ...tool, tool: { ...tool.tool, status: 'toString' } },
       ])],
-      ['prototype-named retry class', fixtures.makePersistedEnvelope([
+      ['prototype-named retry class', persistedEnvelope([
         { ...retry, retry: { ...retry.retry, class: 'constructor' } },
       ])],
-      ['prototype-named billing kind', fixtures.makePersistedEnvelope([
+      ['prototype-named billing kind', persistedEnvelope([
         { ...result, metrics: { ...result.metrics, billingKind: '__proto__' } },
       ])],
-      ['prototype-named terminal code', fixtures.makePersistedEnvelope([first], {
+      ['prototype-named terminal code', persistedEnvelope([first], {
         terminal: true,
         terminalCode: 'constructor',
       })],
-      ['prototype-named cleanup code', fixtures.makePersistedEnvelope([first], {
+      ['prototype-named cleanup code', persistedEnvelope([first], {
         cleanupPending: {
           agentId: 'agent_enum_fixture',
           cancellationConfirmed: true,
           code: 'toString',
         },
       })],
-      ['invalid version', { ...fixtures.makePersistedEnvelope([first]), v: 99 }],
+      ['invalid version', { ...persistedEnvelope([first]), v: 99 }],
       ['terminal disagreement', {
-        ...fixtures.makePersistedEnvelope([first]),
+        ...persistedEnvelope([first]),
         terminal: true,
         terminalCode: null,
       }],
@@ -1374,7 +1616,7 @@ function project(store, event, overrides = {}) {
       }),
       project(bootstrap, fixtures.stateEvent, { sequence: 5, state: 'stopping' }),
     ];
-    const envelope = fixtures.makePersistedEnvelope(entries);
+    const envelope = persistedEnvelope(entries);
     const mock = installSessionStorage({ [storageKey(bootstrap)]: envelope });
     try {
       const store = freshStore();

@@ -10,6 +10,28 @@ const REGISTRY_PATH = path.join(__dirname, '..', 'extension', 'utils', 'agent-re
 
 const CLAUDE_PROVIDER = Object.freeze({ id: 'claude-code', label: 'Claude Code' });
 const OPENCODE_PROVIDER = Object.freeze({ id: 'opencode', label: 'OpenCode' });
+const CLAUDE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'claude-code',
+  label: 'Claude Code',
+  profileVersion: '2.1.177',
+  authState: 'unknown',
+  billingKind: 'subscription',
+});
+const OPENCODE_ACCEPTED_IDENTITY = Object.freeze({
+  providerId: 'opencode',
+  label: 'OpenCode',
+  profileVersion: '1.14.25',
+  authState: 'unknown',
+  billingKind: 'unknown',
+});
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
 
 let passed = 0;
 let failed = 0;
@@ -232,11 +254,55 @@ async function seedRunningLedger(store, controllerModule, delegationId) {
 }
 
 function eventInput(delegationId, event, context = {}) {
-  return { delegationId, event, context };
+  let canonicalContext = context;
+  if (context && Object.getPrototypeOf(context) === Object.prototype) {
+    const keys = Reflect.ownKeys(context);
+    const hasOnlyDataKeys = keys.every((key) => {
+      if (typeof key !== 'string') return false;
+      const descriptor = Object.getOwnPropertyDescriptor(context, key);
+      return descriptor && Object.hasOwn(descriptor, 'value');
+    });
+    if (hasOnlyDataKeys) {
+      canonicalContext = { ...context };
+      for (const legacyField of ['authState', 'billingKind', 'client', 'label',
+        'profileVersion', 'providerId', 'usd']) {
+        delete canonicalContext[legacyField];
+      }
+    }
+  }
+  return { delegationId, event, context: canonicalContext };
 }
 
 function startInput(delegationId, extra = {}) {
-  return { delegationId, provider: CLAUDE_PROVIDER, ...extra };
+  const input = { ...extra };
+  const provider = input.provider || CLAUDE_PROVIDER;
+  const profileVersion = input.profileVersion || '2.1.177';
+  delete input.provider;
+  delete input.profileVersion;
+  return {
+    delegationId,
+    acceptedIdentity: {
+      providerId: provider.id,
+      label: provider.label,
+      profileVersion,
+      authState: 'unknown',
+      billingKind: provider.id === 'claude-code' ? 'subscription' : 'unknown',
+    },
+    ...input,
+  };
+}
+
+function acceptedStartInput(delegationId, acceptedIdentity = CLAUDE_ACCEPTED_IDENTITY, extra = {}) {
+  return { delegationId, acceptedIdentity, ...extra };
+}
+
+function acceptedStoreContext(value = {}, acceptedIdentity = CLAUDE_ACCEPTED_IDENTITY) {
+  const out = { ...value, acceptedIdentity };
+  for (const legacyField of ['authState', 'billingKind', 'client', 'label',
+    'profileVersion', 'providerId', 'usd']) {
+    delete out[legacyField];
+  }
+  return out;
 }
 
 async function acceptSuccessfulFinal(controller, delegationId, timestamp) {
@@ -325,8 +391,156 @@ function terminalState(code) {
   return 'failed';
 }
 
+async function runAcceptedIdentityFoundation() {
+  await test('accepts, snapshots, settles, and hydrates one immutable exact identity', async () => {
+    const storage = installSessionStorage();
+    try {
+      let modules = freshModules();
+      let controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      await controller.hydrate();
+      const claudeId = 'delegation_identity_claude_6501';
+      const openCodeId = 'delegation_identity_opencode_6501';
+      const mutableOpenCodeIdentity = clone(OPENCODE_ACCEPTED_IDENTITY);
+      const write = storage.deferWrites();
+      const openCodeStarting = controller.start(acceptedStartInput(
+        openCodeId,
+        mutableOpenCodeIdentity,
+      ));
+      mutableOpenCodeIdentity.providerId = 'claude-code';
+      mutableOpenCodeIdentity.label = 'Claude Code';
+      mutableOpenCodeIdentity.profileVersion = 'mutated-after-acceptance';
+      await write.started;
+      write.resolve();
+      const openCodeStarted = await openCodeStarting;
+      await controller.start(acceptedStartInput(claudeId));
+
+      exactKeys(openCodeStarted.snapshot, [
+        'v', 'delegationId', 'acceptedIdentity', 'provider', 'state', 'connection',
+        'entries', 'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
+      ]);
+      assert.deepStrictEqual(openCodeStarted.snapshot.acceptedIdentity, OPENCODE_ACCEPTED_IDENTITY);
+      assert.deepStrictEqual(openCodeStarted.snapshot.provider, OPENCODE_PROVIDER);
+      assert.strictEqual(openCodeStarted.snapshot.entries[0].init.profileVersion, '1.14.25');
+      assert(Object.isFrozen(openCodeStarted.snapshot.acceptedIdentity));
+
+      const result = await controller.acceptEvent(eventInput(
+        openCodeId,
+        fixtures.hostileOpenCodeResultEvent,
+        { timestamp: 1720000000001, state: 'completed' },
+      ));
+      assert.strictEqual(result.sequence, 2);
+      assert.strictEqual(result.metrics.billingKind, 'unknown');
+      assert.strictEqual(result.metrics.usd, null);
+      const terminal = await controller.acceptEvent(eventInput(
+        openCodeId,
+        fixtures.terminalEvent,
+        { timestamp: 1720000000002, terminalCode: 'completed', treeSettled: true },
+      ));
+      assert.strictEqual(terminal.sequence, 3);
+      assert.deepStrictEqual(controller.getSnapshot(openCodeId).acceptedIdentity,
+        OPENCODE_ACCEPTED_IDENTITY);
+
+      modules = freshModules();
+      controller = modules.controllerModule.create(makeDeps(modules.store).deps);
+      const restored = await controller.hydrate();
+      assert.strictEqual(restored.length, 1, 'terminal OpenCode run is not resurrected');
+      assert.strictEqual(restored[0].delegationId, claudeId);
+      assert.deepStrictEqual(restored[0].acceptedIdentity, CLAUDE_ACCEPTED_IDENTITY);
+      assert.deepStrictEqual(restored[0].provider, CLAUDE_PROVIDER);
+      assert.strictEqual(restored[0].entries[0].init.profileVersion, '2.1.177');
+      assert(Object.isFrozen(restored[0].acceptedIdentity));
+    } finally {
+      storage.restore();
+    }
+  });
+
+  await test('rejects invalid starts, identity drift, legacy identity fields, and USD attempts', async () => {
+    const storage = installSessionStorage();
+    try {
+      const { store, controllerModule } = freshModules();
+      const controller = controllerModule.create(makeDeps(store).deps);
+      await controller.hydrate();
+
+      for (const [index, acceptedIdentity] of [
+        null,
+        { ...CLAUDE_ACCEPTED_IDENTITY, profileVersion: null },
+        { ...CLAUDE_ACCEPTED_IDENTITY, billingKind: 'api' },
+        { ...CLAUDE_ACCEPTED_IDENTITY, extra: true },
+        Object.assign(Object.create({ polluted: true }), CLAUDE_ACCEPTED_IDENTITY),
+        Object.assign({ ...CLAUDE_ACCEPTED_IDENTITY }, { [Symbol('identity')]: true }),
+      ].entries()) {
+        await expectCode(
+          () => controller.start(acceptedStartInput(
+            `delegation_invalid_identity_${index}_6501`,
+            acceptedIdentity,
+          )),
+          'unsupported_provider',
+        );
+      }
+
+      let accessorReads = 0;
+      const accessorIdentity = { ...CLAUDE_ACCEPTED_IDENTITY };
+      Object.defineProperty(accessorIdentity, 'billingKind', {
+        enumerable: true,
+        get() { accessorReads += 1; return 'subscription'; },
+      });
+      await expectCode(
+        () => controller.start(acceptedStartInput(
+          'delegation_accessor_identity_6501',
+          accessorIdentity,
+        )),
+        'unsupported_provider',
+      );
+      assert.strictEqual(accessorReads, 0);
+
+      const id = 'delegation_identity_drift_6501';
+      await controller.start(acceptedStartInput(id));
+      for (const [index, acceptedIdentity] of [
+        OPENCODE_ACCEPTED_IDENTITY,
+        { ...CLAUDE_ACCEPTED_IDENTITY, profileVersion: 'different-real-profile' },
+      ].entries()) {
+        await expectCode(
+          controller.acceptEvent(eventInput(id, fixtures.stateEvent, {
+            timestamp: 1720000000010 + index,
+            acceptedIdentity,
+          })),
+          'unsupported_provider',
+        );
+      }
+      for (const context of [
+        { client: CLAUDE_PROVIDER },
+        { profileVersion: '2.1.177' },
+        { billingKind: 'subscription' },
+        { authState: 'unknown' },
+        { usd: 0 },
+      ]) {
+        await expectCode(
+          controller.acceptEvent({ delegationId: id, event: fixtures.stateEvent, context }),
+          'invalid_delegation_event',
+        );
+      }
+      assert.strictEqual(controller.getSnapshot(id).entries.length, 1,
+        'rejected drift cannot consume a sequence or mutate the run');
+      assert.deepStrictEqual(controller.getSnapshot(id).acceptedIdentity,
+        CLAUDE_ACCEPTED_IDENTITY);
+    } finally {
+      storage.restore();
+    }
+  });
+}
+
 (async () => {
   console.log('--- Phase 61 Plan 02: delegation controller ---');
+
+  if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    await runAcceptedIdentityFoundation();
+    console.log('\n--- delegation controller summary ---');
+    console.log('  passed:', passed);
+    console.log('  failed:', failed);
+    process.exitCode = failed > 0 ? 1 : 0;
+    return;
+  }
+  if (SELECTED_SECTION !== null) throw new Error(`unknown section: ${SELECTED_SECTION}`);
 
   await test('exports one closed controller factory and exact instance API', async () => {
     const storage = installSessionStorage();
@@ -351,7 +565,7 @@ function terminalState(code) {
     }
   });
 
-  await test('start accepts only exact canonical provider pairs and captures an immutable copy', async () => {
+  await test('start accepts only exact canonical identities and captures an immutable copy', async () => {
     const storage = installSessionStorage();
     try {
       const { store, controllerModule } = freshModules();
@@ -362,51 +576,49 @@ function terminalState(code) {
         () => controller.start({ delegationId: 'delegation_missing_provider_6410' }),
         'unsupported_provider',
       );
-      for (const [index, provider] of [
+      for (const [index, acceptedIdentity] of [
         null,
-        { id: 'opencode', label: 'Open Code' },
-        { id: 'OpenCode', label: 'OpenCode' },
-        { id: 'codex', label: 'Codex' },
-        { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
-        Object.assign(Object.create(null), OPENCODE_PROVIDER),
+        { ...OPENCODE_ACCEPTED_IDENTITY, label: 'Open Code' },
+        { ...OPENCODE_ACCEPTED_IDENTITY, providerId: 'OpenCode' },
+        { ...OPENCODE_ACCEPTED_IDENTITY, providerId: 'codex', label: 'Codex' },
+        { ...OPENCODE_ACCEPTED_IDENTITY, extra: true },
+        Object.assign(Object.create({ polluted: true }), OPENCODE_ACCEPTED_IDENTITY),
       ].entries()) {
         await expectCode(
           () => controller.start({
             delegationId: `delegation_invalid_provider_${index}_6410`,
-            provider,
+            acceptedIdentity,
           }),
           'unsupported_provider',
         );
       }
 
       let getterCalls = 0;
-      const accessorProvider = {};
-      Object.defineProperties(accessorProvider, {
-        id: { enumerable: true, get() { getterCalls += 1; return 'opencode'; } },
-        label: { enumerable: true, get() { getterCalls += 1; return 'OpenCode'; } },
+      const accessorIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
+      Object.defineProperties(accessorIdentity, {
+        providerId: { enumerable: true, get() { getterCalls += 1; return 'opencode'; } },
       });
       await expectCode(
         () => controller.start({
           delegationId: 'delegation_accessor_provider_6410',
-          provider: accessorProvider,
+          acceptedIdentity: accessorIdentity,
         }),
         'unsupported_provider',
       );
       assert.strictEqual(getterCalls, 0, 'provider validation never invokes caller accessors');
 
-      const mutableProvider = { id: 'opencode', label: 'OpenCode' };
+      const mutableIdentity = { ...OPENCODE_ACCEPTED_IDENTITY };
       const starting = controller.start({
         delegationId: 'delegation_mutable_provider_6410',
-        provider: mutableProvider,
-        profileVersion: 'opencode-profile-6410',
+        acceptedIdentity: mutableIdentity,
       });
-      mutableProvider.id = 'claude-code';
-      mutableProvider.label = 'Claude Code';
+      mutableIdentity.providerId = 'claude-code';
+      mutableIdentity.label = 'Claude Code';
       const started = await starting;
       assert.deepStrictEqual(started.snapshot.provider, OPENCODE_PROVIDER);
       assert(Object.isFrozen(started.snapshot.provider));
       assert.deepStrictEqual(started.snapshot.entries[0].init.client, OPENCODE_PROVIDER);
-      assert.strictEqual(started.snapshot.entries[0].init.profileVersion, 'opencode-profile-6410');
+      assert.strictEqual(started.snapshot.entries[0].init.profileVersion, '1.14.25');
     } finally {
       storage.restore();
     }
@@ -424,8 +636,10 @@ function terminalState(code) {
         controller.start(startInput(claudeId, { profileVersion: 'claude-profile-6410' })),
         controller.start({
           delegationId: openCodeId,
-          provider: OPENCODE_PROVIDER,
-          profileVersion: 'opencode-profile-6410',
+          acceptedIdentity: {
+            ...OPENCODE_ACCEPTED_IDENTITY,
+            profileVersion: 'opencode-profile-6410',
+          },
         }),
       ]);
 
@@ -549,8 +763,9 @@ function terminalState(code) {
       assert.strictEqual(runtimeEvent.type, 'FSB_DELEGATION_UPDATED');
       assert.strictEqual(runtimeEvent.announceSequence, 1);
       exactKeys(runtimeEvent.snapshot, [
-        'v', 'delegationId', 'provider', 'state', 'connection', 'entries',
-        'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
+        'v', 'delegationId', 'acceptedIdentity', 'provider', 'state',
+        'connection', 'entries', 'summary', 'activeTab', 'hold', 'terminal',
+        'hydrated',
       ]);
       assert.strictEqual(runtimeEvent.snapshot.entries.length, 1);
       assert.deepStrictEqual(runtimeEvent.snapshot.entries[0], entry);
@@ -883,20 +1098,24 @@ function terminalState(code) {
   await test('2,000-row recovered run terminalizes without row 2,001 or replay', async () => {
     const bootstrap = freshModules();
     const id = 'delegation_controller_terminal_boundary';
-    const template = bootstrap.store.project(fixtures.stateEvent, {
+    const template = bootstrap.store.project(fixtures.stateEvent, acceptedStoreContext({
       delegationId: id,
       sequence: 1,
       timestamp: 1720000000000,
       state: 'running',
       title: 'bounded state',
-    });
+    }));
     const entries = Array.from(
       { length: bootstrap.store.MAX_ENTRIES_PER_DELEGATION },
       (_, index) => ({ ...clone(template), sequence: index + 1 }),
     );
     const key = `${bootstrap.store.STORAGE_KEY_PREFIX}${id}`;
     const storage = installSessionStorage({
-      [key]: fixtures.makePersistedEnvelope(entries, { delegationId: id }),
+      [key]: {
+        ...fixtures.makePersistedEnvelope(entries, { delegationId: id }),
+        acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY,
+        cleanupPending: null,
+      },
     });
     try {
       const { store, controllerModule } = freshModules();
@@ -965,9 +1184,14 @@ function terminalState(code) {
           return {
             v: 1,
             delegationId: id,
+            acceptedIdentity: clone(cleanup.acceptedIdentity),
             terminal: false,
             terminalCode: null,
-            cleanupPending: clone(cleanup),
+            cleanupPending: {
+              code: cleanup.code,
+              cancellationConfirmed: cleanup.cancellationConfirmed,
+              agentId: cleanup.agentId,
+            },
             entries: clone(persistedEntries),
           };
         },
@@ -982,6 +1206,7 @@ function terminalState(code) {
           return {
             v: 1,
             delegationId: id,
+            acceptedIdentity: clone(terminal.context.acceptedIdentity),
             terminal: true,
             terminalCode: terminal.code,
             cleanupPending: null,
@@ -1044,8 +1269,9 @@ function terminalState(code) {
       const restored = await controller.hydrate();
       assert.strictEqual(restored.length, 1);
       exactKeys(restored[0], [
-        'v', 'delegationId', 'provider', 'state', 'connection', 'entries',
-        'summary', 'activeTab', 'hold', 'terminal', 'hydrated',
+        'v', 'delegationId', 'acceptedIdentity', 'provider', 'state',
+        'connection', 'entries', 'summary', 'activeTab', 'hold', 'terminal',
+        'hydrated',
       ]);
       assert.strictEqual(restored[0].delegationId, id);
       assert.strictEqual(restored[0].hydrated, true);
@@ -1097,11 +1323,11 @@ function terminalState(code) {
       bootstrapStorage.restore();
     }
     const id = fixtures.baseContext.delegationId;
-    const first = bootstrap.project(fixtures.initEvent, fixtures.baseContext);
-    const second = bootstrap.project(fixtures.stateEvent, {
+    const first = bootstrap.project(fixtures.initEvent, acceptedStoreContext(fixtures.baseContext));
+    const second = bootstrap.project(fixtures.stateEvent, acceptedStoreContext({
       ...fixtures.baseContext,
       sequence: 2,
-    });
+    }));
     const key = `${bootstrap.STORAGE_KEY_PREFIX}${id}`;
     const cases = [
       [first, clone(first)],
@@ -1109,7 +1335,11 @@ function terminalState(code) {
       [first, { ...clone(second), sequence: 3 }],
     ];
     for (const entries of cases) {
-      const envelope = fixtures.makePersistedEnvelope(entries);
+      const envelope = {
+        ...fixtures.makePersistedEnvelope(entries),
+        acceptedIdentity: CLAUDE_ACCEPTED_IDENTITY,
+        cleanupPending: null,
+      };
       const storage = installSessionStorage({ [key]: envelope });
       try {
         const { store, controllerModule } = freshModules();
@@ -1477,15 +1707,20 @@ function terminalState(code) {
       let modules = freshModules();
       const base = 1720000000000;
       const wallId = 'delegation_absolute_wall_deadline';
-      await modules.store.appendBeforeFanout(wallId, fixtures.initEvent, {
+      await modules.store.appendBeforeFanout(wallId, fixtures.initEvent, acceptedStoreContext({
         timestamp: base,
         state: 'running',
         client: { id: 'claude-code', label: 'Claude Code' },
-      });
+      }));
       await modules.store.appendBeforeFanout(
         wallId,
         { type: 'state', sessionId: null, payload: {} },
-        { timestamp: base + 1, state: 'held', title: 'Delegation held', detail: null },
+        acceptedStoreContext({
+          timestamp: base + 1,
+          state: 'held',
+          title: 'Delegation held',
+          detail: null,
+        }),
       );
 
       modules = freshModules();
@@ -1515,11 +1750,11 @@ function terminalState(code) {
       });
 
       const silenceId = 'delegation_absolute_silence_deadline';
-      await modules.store.appendBeforeFanout(silenceId, fixtures.initEvent, {
+      await modules.store.appendBeforeFanout(silenceId, fixtures.initEvent, acceptedStoreContext({
         timestamp: base + 3000000,
         state: 'running',
         client: { id: 'claude-code', label: 'Claude Code' },
-      });
+      }));
       modules = freshModules();
       const silenceBase = base + 3000000;
       const reconnectClock = createFakeClock(silenceBase + 60000);
@@ -1565,7 +1800,7 @@ function terminalState(code) {
       const secondId = 'delegation_parallel_second';
       await Promise.all([
         controller.start(startInput(firstId)),
-        controller.start({ delegationId: secondId, provider: OPENCODE_PROVIDER }),
+        controller.start(acceptedStartInput(secondId, OPENCODE_ACCEPTED_IDENTITY)),
       ]);
       await controller.acceptEvent(eventInput(firstId, fixtures.initEvent, {}));
       await controller.acceptEvent(eventInput(secondId, fixtures.initEvent, {}));
@@ -2674,15 +2909,20 @@ function terminalState(code) {
       const exactId = 'delegation_wake_held_exact';
       const mismatchId = 'delegation_wake_held_mismatch';
       for (const id of [exactId, mismatchId]) {
-        await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+        await modules.store.appendBeforeFanout(id, fixtures.initEvent, acceptedStoreContext({
           timestamp: 1720000000000,
           state: 'running',
           client: { id: 'claude-code', label: 'Claude Code' },
-        });
+        }));
         await modules.store.appendBeforeFanout(
           id,
           { type: 'state', sessionId: null, payload: {} },
-          { timestamp: 1720000000001, state: 'held', title: 'Delegation held', detail: null },
+          acceptedStoreContext({
+            timestamp: 1720000000001,
+            state: 'held',
+            title: 'Delegation held',
+            detail: null,
+          }),
         );
       }
 
@@ -2782,17 +3022,17 @@ function terminalState(code) {
     try {
       let modules = freshModules();
       const id = 'delegation_wake_missing_registry_authority';
-      await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+      await modules.store.appendBeforeFanout(id, fixtures.initEvent, acceptedStoreContext({
         timestamp: 1720000000000,
         state: 'running',
         client: { id: 'claude-code', label: 'Claude Code' },
-      });
-      await modules.store.appendBeforeFanout(id, fixtures.toolUseEvent, {
+      }));
+      await modules.store.appendBeforeFanout(id, fixtures.toolUseEvent, acceptedStoreContext({
         timestamp: 1720000000001,
         state: 'running',
         toolName: 'mcp__fsb__navigate',
         tabId: 71,
-      });
+      }));
 
       modules = freshModules();
       const registry = {
@@ -2874,11 +3114,11 @@ function terminalState(code) {
     const storage = installSessionStorage();
     try {
       let modules = freshModules();
-      await modules.store.appendBeforeFanout('bad.id', fixtures.initEvent, {
+      await modules.store.appendBeforeFanout('bad.id', fixtures.initEvent, acceptedStoreContext({
         timestamp: 1720000000000,
         state: 'running',
         client: { id: 'claude-code', label: 'Claude Code' },
-      });
+      }));
       modules = freshModules();
       const harness = makeRecoveryDeps(modules.store);
       const controller = modules.controllerModule.create(harness.deps);
@@ -2899,11 +3139,11 @@ function terminalState(code) {
       let modules = freshModules();
       for (let index = 0; index < 65; index += 1) {
         const id = `delegation_hydration_cap_${String(index).padStart(2, '0')}`;
-        await modules.store.appendBeforeFanout(id, fixtures.initEvent, {
+        await modules.store.appendBeforeFanout(id, fixtures.initEvent, acceptedStoreContext({
           timestamp: 1720000000000 + index,
           state: 'running',
           client: { id: 'claude-code', label: 'Claude Code' },
-        });
+        }));
       }
 
       modules = freshModules();

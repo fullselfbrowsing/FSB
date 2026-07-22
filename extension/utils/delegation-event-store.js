@@ -38,9 +38,12 @@
     'delegationId', 'detail', 'init', 'kind', 'metrics', 'retry', 'sequence',
     'state', 'timestamp', 'title', 'tool', 'v'
   ];
-  var LEGACY_ENVELOPE_KEYS = ['delegationId', 'entries', 'terminal', 'terminalCode', 'v'];
+  var ACCEPTED_IDENTITY_KEYS = [
+    'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+  ];
   var ENVELOPE_KEYS = [
-    'cleanupPending', 'delegationId', 'entries', 'terminal', 'terminalCode', 'v'
+    'acceptedIdentity', 'cleanupPending', 'delegationId', 'entries',
+    'terminal', 'terminalCode', 'v'
   ];
   var CLEANUP_PENDING_KEYS = ['agentId', 'cancellationConfirmed', 'code'];
   var INIT_KEYS = ['allowedTools', 'client', 'model', 'profileVersion', 'sessionId'];
@@ -53,12 +56,11 @@
   ];
   var TOOL_COUNT_KEYS = ['count', 'name'];
   var CONTEXT_KEYS = Object.freeze({
+    acceptedIdentity: true,
     allowedTools: true,
     argsSummary: true,
     attempt: true,
-    billingKind: true,
     callId: true,
-    client: true,
     delayMs: true,
     delegationId: true,
     detail: true,
@@ -67,7 +69,6 @@
     maxAttempts: true,
     model: true,
     outputTokens: true,
-    profileVersion: true,
     retryClass: true,
     sequence: true,
     sessionId: true,
@@ -81,7 +82,6 @@
     toolStatus: true,
     totalTokens: true,
     turns: true,
-    usd: true
   });
 
   var VALID_STATES = Object.freeze({
@@ -336,11 +336,29 @@
     }
   }
 
-  function _normalizeClient(value) {
-    if (value === null || value === undefined) return null;
-    var metadata = _canonicalProviderForClient(value);
-    if (!metadata) _persistence('client must be an exact canonical provider pair');
-    return Object.freeze({ id: metadata.id, label: metadata.label });
+  function _normalizeAcceptedIdentity(value, corruptMode) {
+    var identity = delegationProviders
+      && typeof delegationProviders.validateAcceptedAgentIdentity === 'function'
+      ? delegationProviders.validateAcceptedAgentIdentity(value)
+      : null;
+    if (!identity) {
+      if (corruptMode) _corrupt('accepted identity is invalid');
+      _persistence('accepted identity must be one exact canonical five-field record');
+    }
+    return identity;
+  }
+
+  function _sameAcceptedIdentity(left, right) {
+    if (!left || !right) return false;
+    for (var index = 0; index < ACCEPTED_IDENTITY_KEYS.length; index += 1) {
+      var key = ACCEPTED_IDENTITY_KEYS[index];
+      if (left[key] !== right[key]) return false;
+    }
+    return true;
+  }
+
+  function _clientFromAcceptedIdentity(identity) {
+    return Object.freeze({ id: identity.providerId, label: identity.label });
   }
 
   function _normalizeAllowedTools(value) {
@@ -396,8 +414,8 @@
       } catch (_error) {
         _persistence('context descriptor inspection failed');
       }
-      if (key === 'client') {
-        out.client = _normalizeClient(fieldValue);
+      if (key === 'acceptedIdentity') {
+        out.acceptedIdentity = _normalizeAcceptedIdentity(fieldValue, false);
       } else if (key === 'allowedTools') {
         out.allowedTools = _normalizeAllowedTools(fieldValue);
       } else if (key === 'toolCalls') {
@@ -456,8 +474,7 @@
     if (typeof name !== 'string' || name.length === 0) name = 'unknown';
     switch (type) {
       case 'init': {
-        var client = _normalizeClient(_value(context, payload, 'client'));
-        return (client ? client.label : 'Agent') + ' connected';
+        return context.acceptedIdentity.label + ' connected';
       }
       case 'tool_use': return 'Tool started: ' + name;
       case 'tool_result': return 'Tool finished: ' + name;
@@ -473,11 +490,12 @@
   }
 
   function _projectInit(event, payload, context) {
+    var identity = context.acceptedIdentity;
     return {
-      client: _normalizeClient(_value(context, payload, 'client')),
-      profileVersion: _boundedId(_value(context, payload, 'profileVersion', 'profile_version'), 'profileVersion', true),
-      // The key remains for version-1 envelope compatibility, but provider
-      // model identity is never accepted into new durable entries.
+      client: _clientFromAcceptedIdentity(identity),
+      profileVersion: identity.profileVersion,
+      // The closed entry shape remains stable, but provider model identity is
+      // never accepted into new durable entries.
       model: null,
       sessionId: _boundedId(_value(context, { sessionId: event.sessionId }, 'sessionId', 'session_id'), 'sessionId', true),
       allowedTools: _normalizeAllowedTools(_value(context, payload, 'allowedTools', 'tools'))
@@ -533,13 +551,7 @@
       var sum = inputTokens + outputTokens;
       totalTokens = Number.isSafeInteger(sum) ? sum : null;
     }
-    var provider = _canonicalProviderForClient(context.client);
-    if (!provider) _persistence('result metrics require canonical provider context');
-    var claimedBillingKind = context.billingKind;
-    if (claimedBillingKind !== undefined && claimedBillingKind !== provider.billingKind) {
-      _persistence('billingKind does not match canonical provider context');
-    }
-    var billingKind = provider.billingKind;
+    var billingKind = context.acceptedIdentity.billingKind;
     // Neither shipped agent provider exposes authoritative dollar billing.
     // Payload/context dollar claims are deliberately non-representable.
     var usd = null;
@@ -558,6 +570,9 @@
   /** Pure, closed projection. Sequence/timestamp are supplied by the caller. */
   function project(event, context) {
     context = _snapshotContext(context);
+    if (!context.acceptedIdentity) {
+      _persistence('projection requires accepted identity authority');
+    }
     if (!_hasExactKeys(event, ['payload', 'sessionId', 'type'])) {
       _persistence('normalized event must have exact type/sessionId/payload keys');
     }
@@ -726,8 +741,7 @@
   }
 
   function _assertValidEnvelope(envelope, delegationId) {
-    var legacy = _hasExactKeys(envelope, LEGACY_ENVELOPE_KEYS);
-    if (!legacy && !_hasExactKeys(envelope, ENVELOPE_KEYS)) {
+    if (!_hasExactKeys(envelope, ENVELOPE_KEYS)) {
       _corrupt('ledger envelope shape is invalid');
     }
     if (envelope.v !== PAYLOAD_VERSION || envelope.delegationId !== delegationId) {
@@ -740,7 +754,8 @@
       _corrupt('ledger terminal code is invalid');
     }
     if (envelope.terminal !== (envelope.terminalCode !== null)) _corrupt('ledger terminal fields disagree');
-    var cleanupPending = legacy ? null : envelope.cleanupPending;
+    var acceptedIdentity = _normalizeAcceptedIdentity(envelope.acceptedIdentity, true);
+    var cleanupPending = envelope.cleanupPending;
     if (cleanupPending !== null) {
       if (!_hasExactKeys(cleanupPending, CLEANUP_PENDING_KEYS)
         || typeof cleanupPending.cancellationConfirmed !== 'boolean'
@@ -758,7 +773,20 @@
       _corrupt('ledger entries are invalid');
     }
     for (var i = 0; i < envelope.entries.length; i++) {
-      _assertValidEntry(envelope.entries[i], delegationId, i + 1, true);
+      var entry = envelope.entries[i];
+      _assertValidEntry(entry, delegationId, i + 1, true);
+      if (entry.init !== null
+        && (!entry.init.client
+          || entry.init.client.id !== acceptedIdentity.providerId
+          || entry.init.client.label !== acceptedIdentity.label
+          || entry.init.profileVersion !== acceptedIdentity.profileVersion)) {
+        _corrupt('persisted init identity changed');
+      }
+      if (entry.metrics !== null
+        && (entry.metrics.billingKind !== acceptedIdentity.billingKind
+          || entry.metrics.usd !== null)) {
+        _corrupt('persisted billing identity changed');
+      }
     }
     return envelope;
   }
@@ -795,10 +823,11 @@
     return STORAGE_KEY_PREFIX + delegationId;
   }
 
-  function _emptyEnvelope(delegationId) {
+  function _emptyEnvelope(delegationId, acceptedIdentity) {
     return {
       v: PAYLOAD_VERSION,
       delegationId: delegationId,
+      acceptedIdentity: acceptedIdentity,
       terminal: false,
       terminalCode: null,
       cleanupPending: null,
@@ -850,11 +879,18 @@
     // Capture and validate caller-owned data synchronously, before the first
     // storage await can give mutable references a chance to drift.
     context = _snapshotContext(context);
+    var acceptedIdentity = context.acceptedIdentity;
+    if (!acceptedIdentity) _persistence('append requires accepted identity authority');
     return _withStorageLock(async function() {
       var key = _key(delegationId);
       var stored = await _read(null);
-      var current = stored[key] === undefined ? _emptyEnvelope(delegationId) : stored[key];
+      var current = stored[key] === undefined
+        ? _emptyEnvelope(delegationId, acceptedIdentity)
+        : stored[key];
       _assertValidEnvelope(current, delegationId);
+      if (!_sameAcceptedIdentity(current.acceptedIdentity, acceptedIdentity)) {
+        _persistence('accepted identity changed after delegation acceptance');
+      }
       if (current.terminal) _persistence('cannot append to a terminal ledger');
       if (current.cleanupPending) _persistence('cannot append while cleanup is pending');
       if (current.entries.length >= MAX_ENTRIES_PER_DELEGATION) {
@@ -871,6 +907,7 @@
       var next = {
         v: PAYLOAD_VERSION,
         delegationId: delegationId,
+        acceptedIdentity: current.acceptedIdentity,
         terminal: false,
         terminalCode: null,
         cleanupPending: null,
@@ -938,12 +975,20 @@
    */
   async function markCleanupPending(delegationId, cleanup) {
     delegationId = _boundedId(delegationId, 'delegationId', false);
+    var cleanupIdentity = cleanup && cleanup.acceptedIdentity !== undefined
+      ? _normalizeAcceptedIdentity(cleanup.acceptedIdentity, false)
+      : null;
     return _withStorageLock(async function() {
       var key = _key(delegationId);
       var all = await _read(null);
       var current = all[key] === undefined
-        ? _emptyEnvelope(delegationId)
+        ? (cleanupIdentity ? _emptyEnvelope(delegationId, cleanupIdentity) : null)
         : _assertValidEnvelope(all[key], delegationId);
+      if (!current) _persistence('cannot quarantine a delegation without accepted identity');
+      if (cleanupIdentity
+        && !_sameAcceptedIdentity(current.acceptedIdentity, cleanupIdentity)) {
+        _persistence('cleanup accepted identity changed');
+      }
       if (current.terminal) _persistence('cannot quarantine a terminal ledger');
       var marker = {
         code: _normalizeTerminalCode(cleanup && cleanup.code),
@@ -965,6 +1010,7 @@
         var promoted = {
           v: PAYLOAD_VERSION,
           delegationId: delegationId,
+          acceptedIdentity: current.acceptedIdentity,
           terminal: false,
           terminalCode: null,
           cleanupPending: marker,
@@ -982,6 +1028,7 @@
       var next = {
         v: PAYLOAD_VERSION,
         delegationId: delegationId,
+        acceptedIdentity: current.acceptedIdentity,
         terminal: false,
         terminalCode: null,
         cleanupPending: marker,
@@ -1007,8 +1054,13 @@
       var key = _key(delegationId);
       var all = await _read(null);
       var current = all[key] === undefined
-        ? _emptyEnvelope(delegationId)
+        ? null
         : _assertValidEnvelope(all[key], delegationId);
+      if (!current) _persistence('cannot terminate a delegation without accepted identity');
+      if (terminalContext.acceptedIdentity
+        && !_sameAcceptedIdentity(current.acceptedIdentity, terminalContext.acceptedIdentity)) {
+        _persistence('terminal accepted identity changed');
+      }
       var candidate = typeof terminal === 'string'
         ? terminal
         : terminal && terminal.code;
@@ -1034,6 +1086,7 @@
         projectedTerminalContext.delegationId = delegationId;
         projectedTerminalContext.sequence = entries.length + 1;
         projectedTerminalContext.terminalCode = code;
+        projectedTerminalContext.acceptedIdentity = current.acceptedIdentity;
         projectedTerminalContext.timestamp = Number.isSafeInteger(terminalContext.timestamp)
           && terminalContext.timestamp >= 0
           ? terminalContext.timestamp
@@ -1043,6 +1096,7 @@
       var next = {
         v: PAYLOAD_VERSION,
         delegationId: delegationId,
+        acceptedIdentity: current.acceptedIdentity,
         terminal: true,
         terminalCode: code,
         cleanupPending: null,
