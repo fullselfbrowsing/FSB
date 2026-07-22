@@ -16,12 +16,15 @@
   var UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
   var SHA256_DIGEST_PATTERN = /^[0-9a-f]{64}$/;
   var CHALLENGE_ID_PATTERN = /^dch_([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
+  var ACCEPTED_IDENTITY_KEYS = Object.freeze([
+    'providerId', 'label', 'profileVersion', 'authState', 'billingKind'
+  ]);
   var RECORD_KEYS = Object.freeze([
+    'acceptedIdentity',
     'challengeId',
     'expiresAt',
     'issuedAt',
     'nonce',
-    'providerId',
     'taskDigest',
     'trustWriteUsed',
     'v'
@@ -41,15 +44,31 @@
 
   function _isPlainRecord(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    var prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
+    try {
+      var prototype = Object.getPrototypeOf(value);
+      return prototype === Object.prototype || prototype === null;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function _hasExactKeys(value, keys) {
     if (!_isPlainRecord(value)) return false;
-    var actual = Object.keys(value).sort();
-    return actual.length === keys.length
-      && actual.every(function(key, index) { return key === keys[index]; });
+    try {
+      var actual = Reflect.ownKeys(value);
+      if (actual.length !== keys.length) return false;
+      for (var index = 0; index < keys.length; index += 1) {
+        var descriptor = Object.getOwnPropertyDescriptor(value, keys[index]);
+        if (!descriptor
+            || !descriptor.enumerable
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return false;
+      }
+      return actual.every(function(key) {
+        return typeof key === 'string' && keys.indexOf(key) !== -1;
+      });
+    } catch (_error) {
+      return false;
+    }
   }
 
   function _emptyChallenges() {
@@ -64,6 +83,22 @@
     return !!delegationProviders
       && typeof delegationProviders.isShippedId === 'function'
       && delegationProviders.isShippedId(providerId);
+  }
+
+  function _acceptedIdentity(value) {
+    if (!delegationProviders
+        || typeof delegationProviders.validateAcceptedAgentIdentity !== 'function') return null;
+    try {
+      return delegationProviders.validateAcceptedAgentIdentity(value);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function _sameAcceptedIdentity(left, right) {
+    return !!left && !!right && ACCEPTED_IDENTITY_KEYS.every(function(key) {
+      return left[key] === right[key];
+    });
   }
 
   function _storageError(code) {
@@ -125,7 +160,7 @@
     if (typeof record.challengeId !== 'string' || record.challengeId !== storageKey) return false;
     var match = CHALLENGE_ID_PATTERN.exec(record.challengeId);
     if (!match || record.nonce !== match[1] || !UUID_PATTERN.test(record.nonce)) return false;
-    if (!_isCanonicalProviderId(record.providerId)) return false;
+    if (!_acceptedIdentity(record.acceptedIdentity)) return false;
     if (typeof record.taskDigest !== 'string' || !SHA256_DIGEST_PATTERN.test(record.taskDigest)) return false;
     if (!Number.isFinite(record.issuedAt) || !Number.isFinite(record.expiresAt)) return false;
     if (record.issuedAt < 0 || record.expiresAt <= record.issuedAt) return false;
@@ -138,8 +173,7 @@
     if (raw === undefined) {
       return { v: PAYLOAD_VERSION, challenges: _emptyChallenges() };
     }
-    if (!_isPlainRecord(raw)
-        || Object.keys(raw).sort().join(',') !== 'challenges,v'
+    if (!_hasExactKeys(raw, ['challenges', 'v'])
         || raw.v !== PAYLOAD_VERSION
         || !_isPlainRecord(raw.challenges)) {
       throw _storageError('challenge_storage_corrupt');
@@ -182,8 +216,7 @@
   function _parseTrustEnvelope(stored) {
     var raw = stored ? stored[TRUST_STORAGE_KEY] : undefined;
     if (raw === undefined) return { v: PAYLOAD_VERSION, providers: _emptyTrustProviders() };
-    if (!_isPlainRecord(raw)
-        || Object.keys(raw).sort().join(',') !== 'providers,v'
+    if (!_hasExactKeys(raw, ['providers', 'v'])
         || raw.v !== PAYLOAD_VERSION
         || !_isPlainRecord(raw.providers)) {
       throw _storageError('trust_storage_corrupt');
@@ -229,12 +262,23 @@
 
   function _isExactRequest(value, allowedKeys, requiredKeys) {
     if (!_isPlainRecord(value)) return false;
-    var actual = Object.keys(value).sort();
-    var allowed = allowedKeys.slice().sort();
-    if (actual.some(function(key) { return allowed.indexOf(key) === -1; })) return false;
-    return requiredKeys.every(function(key) {
-      return Object.prototype.hasOwnProperty.call(value, key);
-    });
+    try {
+      var actual = Reflect.ownKeys(value);
+      if (actual.some(function(key) {
+        return typeof key !== 'string' || allowedKeys.indexOf(key) === -1;
+      })) return false;
+      for (var index = 0; index < actual.length; index += 1) {
+        var descriptor = Object.getOwnPropertyDescriptor(value, actual[index]);
+        if (!descriptor
+            || !descriptor.enumerable
+            || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return false;
+      }
+      return requiredKeys.every(function(key) {
+        return Object.prototype.hasOwnProperty.call(value, key);
+      });
+    } catch (_error) {
+      return false;
+    }
   }
 
   function _normalizeTtl(value) {
@@ -244,10 +288,15 @@
   }
 
   function issueChallenge(request) {
-    if (!_isExactRequest(request, ['providerId', 'taskDigest', 'ttlMs'], ['providerId', 'taskDigest'])) {
+    if (!_isExactRequest(
+      request,
+      ['acceptedIdentity', 'taskDigest', 'ttlMs'],
+      ['acceptedIdentity', 'taskDigest']
+    )) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
-    if (!_isCanonicalProviderId(request.providerId)
+    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
+    if (!acceptedIdentity
         || typeof request.taskDigest !== 'string'
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
@@ -277,7 +326,7 @@
           v: PAYLOAD_VERSION,
           challengeId: challengeId,
           nonce: nonce,
-          providerId: request.providerId,
+          acceptedIdentity: acceptedIdentity,
           taskDigest: request.taskDigest,
           issuedAt: now,
           expiresAt: now + ttlMs,
@@ -287,7 +336,7 @@
         return {
           ok: true,
           challengeId: challengeId,
-          providerId: request.providerId,
+          acceptedIdentity: acceptedIdentity,
           taskDigest: request.taskDigest,
           expiresAt: now + ttlMs
         };
@@ -300,18 +349,18 @@
   function consumeChallenge(request) {
     if (!_isExactRequest(
       request,
-      ['challengeId', 'providerId', 'taskDigest'],
-      ['challengeId', 'providerId', 'taskDigest']
+      ['acceptedIdentity', 'challengeId', 'taskDigest'],
+      ['acceptedIdentity', 'challengeId', 'taskDigest']
     )) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
     if (typeof request.challengeId !== 'string'
         || !CHALLENGE_ID_PATTERN.test(request.challengeId)
-        || !_isCanonicalProviderId(request.providerId)
         || typeof request.taskDigest !== 'string'
         || !SHA256_DIGEST_PATTERN.test(request.taskDigest)) {
       return Promise.resolve(_resultError('invalid_challenge_request'));
     }
+    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
 
     return _withChallengeLock(async function() {
       try {
@@ -339,7 +388,12 @@
           await _writeEnvelope(envelope);
           return _resultError('challenge_expired');
         }
-        if (record.providerId !== request.providerId) return _resultError('challenge_provider_mismatch');
+        var storedIdentity = _acceptedIdentity(record.acceptedIdentity);
+        if (!acceptedIdentity || !_sameAcceptedIdentity(storedIdentity, acceptedIdentity)) {
+          delete envelope.challenges[request.challengeId];
+          await _writeEnvelope(envelope);
+          return _resultError('provider_status_refresh');
+        }
         delete envelope.challenges[request.challengeId];
         await _writeEnvelope(envelope);
         if (record.taskDigest !== request.taskDigest) {
@@ -348,7 +402,7 @@
         return {
           ok: true,
           challengeId: record.challengeId,
-          providerId: record.providerId,
+          acceptedIdentity: storedIdentity,
           taskDigest: record.taskDigest
         };
       } catch (error) {
@@ -372,15 +426,15 @@
   function writeTrustFromChallenge(request) {
     if (!_isExactRequest(
       request,
-      ['challengeId', 'providerId', 'trusted'],
-      ['challengeId', 'providerId', 'trusted']
+      ['acceptedIdentity', 'challengeId', 'trusted'],
+      ['acceptedIdentity', 'challengeId', 'trusted']
     )
         || typeof request.challengeId !== 'string'
         || !CHALLENGE_ID_PATTERN.test(request.challengeId)
-        || !_isCanonicalProviderId(request.providerId)
         || request.trusted !== true) {
       return Promise.resolve(_resultError('invalid_trust_request'));
     }
+    var acceptedIdentity = _acceptedIdentity(request.acceptedIdentity);
 
     return _withChallengeLock(async function() {
       try {
@@ -399,8 +453,11 @@
           await _writeEnvelope(challengeEnvelope);
           return _resultError('challenge_expired');
         }
-        if (record.providerId !== request.providerId) {
-          return _resultError('challenge_provider_mismatch');
+        var storedIdentity = _acceptedIdentity(record.acceptedIdentity);
+        if (!acceptedIdentity || !_sameAcceptedIdentity(storedIdentity, acceptedIdentity)) {
+          delete challengeEnvelope.challenges[request.challengeId];
+          await _writeEnvelope(challengeEnvelope);
+          return _resultError('provider_status_refresh');
         }
         if (record.trustWriteUsed === true) {
           return _resultError('trust_challenge_replayed');
@@ -410,9 +467,9 @@
         await _writeEnvelope(challengeEnvelope);
 
         var trustEnvelope = await _readTrustEnvelope();
-        trustEnvelope.providers[request.providerId] = true;
+        trustEnvelope.providers[storedIdentity.providerId] = true;
         await _writeTrustEnvelope(trustEnvelope);
-        return { ok: true, providerId: request.providerId, trusted: true };
+        return { ok: true, providerId: storedIdentity.providerId, trusted: true };
       } catch (error) {
         return _resultError(error && error.code ? error.code : 'trust_storage_error');
       }

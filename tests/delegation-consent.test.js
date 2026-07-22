@@ -10,6 +10,34 @@ const delegationProvidersPath = path.join(repoRoot, 'extension', 'utils', 'deleg
 const modulePath = path.join(repoRoot, 'extension', 'utils', 'delegation-consent.js');
 const source = fs.readFileSync(modulePath, 'utf8');
 const storageKey = 'fsbDelegationConsentChallenges';
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
+if (SELECTED_SECTION !== null && SELECTED_SECTION !== 'accepted-identity-binding') {
+  throw new Error(`unknown section: ${SELECTED_SECTION}`);
+}
+
+const ACCEPTED_IDENTITIES = Object.freeze({
+  'claude-code': Object.freeze({
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription'
+  }),
+  opencode: Object.freeze({
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown'
+  })
+});
 
 function digest(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -92,13 +120,23 @@ function getOnlyRecord(harness) {
   return envelope.challenges[keys[0]];
 }
 
+function acceptedIdentity(providerId = 'claude-code') {
+  const identity = ACCEPTED_IDENTITIES[providerId];
+  assert.ok(identity, `known accepted identity for ${providerId}`);
+  return clone(identity);
+}
+
 async function issue(
   consent,
   taskDigest = digest('open a background tab'),
   ttlMs = 60_000,
   providerId = 'claude-code'
 ) {
-  return consent.issueChallenge({ providerId, taskDigest, ttlMs });
+  return consent.issueChallenge({
+    acceptedIdentity: acceptedIdentity(providerId),
+    taskDigest,
+    ttlMs
+  });
 }
 
 async function main() {
@@ -129,14 +167,17 @@ async function main() {
   const issued = await issue(consent, taskDigest);
   assert.equal(issued.ok, true);
   assert.match(issued.challengeId, /^dch_[0-9a-f-]{36}$/);
+  assert.deepEqual(issued.acceptedIdentity, ACCEPTED_IDENTITIES['claude-code']);
+  assert.equal(Object.isFrozen(issued.acceptedIdentity), true,
+    'issuance returns an immutable validator-owned identity');
   const persisted = getOnlyRecord(harness);
   assert.deepEqual(Object.keys(persisted).sort(), [
-    'challengeId', 'expiresAt', 'issuedAt', 'nonce', 'providerId',
+    'acceptedIdentity', 'challengeId', 'expiresAt', 'issuedAt', 'nonce',
     'taskDigest', 'trustWriteUsed', 'v'
   ]);
   assert.equal(persisted.challengeId, issued.challengeId);
   assert.equal(persisted.challengeId, `dch_${persisted.nonce}`);
-  assert.equal(persisted.providerId, 'claude-code');
+  assert.deepEqual(persisted.acceptedIdentity, ACCEPTED_IDENTITIES['claude-code']);
   assert.equal(persisted.taskDigest, taskDigest);
   assert.equal(persisted.trustWriteUsed, false);
   assert.doesNotMatch(JSON.stringify(getEnvelope(harness)), new RegExp(taskText));
@@ -147,26 +188,28 @@ async function main() {
 
   const consumed = await consent.consumeChallenge({
     challengeId: issued.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest
   });
   assert.deepEqual(consumed, {
     ok: true,
     challengeId: issued.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: ACCEPTED_IDENTITIES['claude-code'],
     taskDigest
   });
+  assert.equal(Object.isFrozen(consumed.acceptedIdentity), true,
+    'successful one-time consumption returns the stored validated identity');
   assert.equal(harness.values.has(storageKey), false, 'consume removes the last persisted challenge');
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: issued.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest
   }), { ok: false, code: 'challenge_not_found' }, 'replay is denied');
 
   const concurrent = await issue(consent, digest('concurrent'));
   const concurrentRequest = {
     challengeId: concurrent.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('concurrent')
   };
   const outcomes = await Promise.all([
@@ -180,7 +223,7 @@ async function main() {
   const unknown = `dch_${crypto.randomUUID()}`;
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: unknown,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest
   }), { ok: false, code: 'challenge_not_found' });
 
@@ -192,26 +235,71 @@ async function main() {
   );
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: providerMismatch.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity('claude-code'),
     taskDigest: digest('provider mismatch')
-  }), { ok: false, code: 'challenge_provider_mismatch' });
-  assert.equal(harness.values.has(storageKey), true,
-    'cross-provider mismatch cannot consume authority for the bound provider');
+  }), { ok: false, code: 'provider_status_refresh' });
+  assert.equal(harness.values.has(storageKey), false,
+    'any changed accepted identity burns stale authority');
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: providerMismatch.challengeId,
-    providerId: 'opencode',
+    acceptedIdentity: acceptedIdentity('opencode'),
     taskDigest: digest('provider mismatch')
-  }), {
-    ok: true,
-    challengeId: providerMismatch.challengeId,
-    providerId: 'opencode',
-    taskDigest: digest('provider mismatch')
-  }, 'the originally bound provider can still consume after a cross-provider attempt');
+  }), { ok: false, code: 'challenge_not_found' },
+  'a stale identity mismatch cannot be retried with older authority');
+
+  const identityMutations = [
+    ['providerId', 'opencode'],
+    ['label', 'Claude'],
+    ['profileVersion', '2.1.178'],
+    ['authState', 'chatgpt'],
+    ['billingKind', 'api']
+  ];
+  for (const [field, value] of identityMutations) {
+    const mutationDigest = digest(`identity mutation ${field}`);
+    const mutationChallenge = await issue(consent, mutationDigest);
+    const mutatedIdentity = acceptedIdentity();
+    mutatedIdentity[field] = value;
+    assert.deepEqual(await consent.consumeChallenge({
+      challengeId: mutationChallenge.challengeId,
+      acceptedIdentity: mutatedIdentity,
+      taskDigest: mutationDigest
+    }), { ok: false, code: 'provider_status_refresh' },
+    `${field} mutation requires provider-status refresh`);
+    assert.equal(harness.values.has(storageKey), false,
+      `${field} mutation consumes stale challenge authority`);
+    assert.deepEqual(await consent.consumeChallenge({
+      challengeId: mutationChallenge.challengeId,
+      acceptedIdentity: acceptedIdentity(),
+      taskDigest: mutationDigest
+    }), { ok: false, code: 'challenge_not_found' },
+    `${field} mutation cannot be retried`);
+  }
+
+  let identityAccessorReads = 0;
+  const accessorAcceptedIdentity = acceptedIdentity();
+  Object.defineProperty(accessorAcceptedIdentity, 'authState', {
+    enumerable: true,
+    get() {
+      identityAccessorReads += 1;
+      return 'unknown';
+    }
+  });
+  const hostileIdentityDigest = digest('hostile accepted identity');
+  const hostileIdentityChallenge = await issue(consent, hostileIdentityDigest);
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: hostileIdentityChallenge.challengeId,
+    acceptedIdentity: accessorAcceptedIdentity,
+    taskDigest: hostileIdentityDigest
+  }), { ok: false, code: 'provider_status_refresh' });
+  assert.equal(identityAccessorReads, 0,
+    'hostile accepted-identity accessors are never invoked');
+  assert.equal(harness.values.has(storageKey), false,
+    'hostile accepted identity burns stale challenge authority');
 
   const taskMismatch = await issue(consent, digest('task one'));
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: taskMismatch.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('task two')
   }), { ok: false, code: 'challenge_task_mismatch' });
   assert.equal(harness.values.has(storageKey), false, 'task mismatch burns the exact challenge');
@@ -224,7 +312,7 @@ async function main() {
     now = boundary.expiresAt;
     assert.deepEqual(await consent.consumeChallenge({
       challengeId: boundary.challengeId,
-      providerId: 'claude-code',
+      acceptedIdentity: acceptedIdentity(),
       taskDigest: digest('expiry boundary')
     }), { ok: false, code: 'challenge_expired' });
     assert.equal(harness.values.has(storageKey), false, 'expired challenge is removed');
@@ -241,7 +329,7 @@ async function main() {
   getOnlyRecord(harness).nonce = crypto.randomUUID();
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: alteredNonce.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('altered nonce')
   }), { ok: false, code: 'challenge_malformed' });
   assert.equal(harness.values.has(storageKey), false, 'malformed exact record is removed fail closed');
@@ -250,7 +338,7 @@ async function main() {
   getOnlyRecord(harness).challengeId = `dch_${crypto.randomUUID()}`;
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: alteredId.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('altered id')
   }), { ok: false, code: 'challenge_malformed' });
   assert.equal(harness.values.has(storageKey), false, 'id-tampered exact record is removed fail closed');
@@ -273,8 +361,30 @@ async function main() {
     assert.deepEqual(await consent.issueChallenge({ providerId, taskDigest }),
       { ok: false, code: 'invalid_challenge_request' });
   }
+  const hostileIssueIdentity = acceptedIdentity();
+  Object.defineProperty(hostileIssueIdentity, 'billingKind', {
+    enumerable: true,
+    get() { throw new Error('identity accessor must not run'); }
+  });
+  for (const value of [
+    undefined,
+    null,
+    {},
+    { ...ACCEPTED_IDENTITIES['claude-code'], extra: true },
+    { ...ACCEPTED_IDENTITIES['claude-code'], label: 'Claude' },
+    { ...ACCEPTED_IDENTITIES['claude-code'], profileVersion: '' },
+    { ...ACCEPTED_IDENTITIES['claude-code'], authState: 'chatgpt' },
+    { ...ACCEPTED_IDENTITIES['claude-code'], billingKind: 'api' },
+    hostileIssueIdentity
+  ]) {
+    assert.deepEqual(await consent.issueChallenge({
+      acceptedIdentity: value,
+      taskDigest
+    }), { ok: false, code: 'invalid_challenge_request' },
+    'challenge issuance rejects incomplete, hostile, or disallowed identity evidence');
+  }
   assert.deepEqual(await consent.issueChallenge({
-    providerId: 'claude-code', taskDigest, ttlMs: 1000, consentGranted: true
+    acceptedIdentity: acceptedIdentity(), taskDigest, ttlMs: 1000, consentGranted: true
   }), { ok: false, code: 'invalid_challenge_request' }, 'caller consent booleans are rejected');
 
   harness.failures.get = true;
@@ -290,7 +400,7 @@ async function main() {
   harness.failures.remove = true;
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: removeFailure.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('remove failure')
   }), { ok: false, code: 'challenge_storage_error' });
   harness.failures.remove = false;
@@ -307,7 +417,7 @@ async function main() {
   consent = loadFresh();
   assert.equal((await consent.consumeChallenge({
     challengeId: reloadIssue.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('reload-safe')
   })).ok, true, 'session challenge survives a forced module reload');
 
@@ -318,11 +428,25 @@ async function main() {
     assert.equal(await consent.getTrusted(providerId), false, `${providerId || 'empty'} is never trusted`);
   }
 
+  const trustMismatchChallenge = await issue(consent, digest('trust identity mismatch'));
+  const trustMismatchIdentity = acceptedIdentity();
+  trustMismatchIdentity.profileVersion = '2.1.178';
+  assert.deepEqual(await consent.writeTrustFromChallenge({
+    challengeId: trustMismatchChallenge.challengeId,
+    acceptedIdentity: trustMismatchIdentity,
+    trusted: true
+  }), { ok: false, code: 'provider_status_refresh' },
+  'trust evaluation binds the complete accepted identity');
+  assert.equal(await consent.getTrusted('claude-code'), false,
+    'identity drift cannot grant provider trust');
+  assert.equal(harness.values.has(storageKey), false,
+    'trust identity drift consumes stale challenge authority');
+
   const trustDigest = digest('enable provider-local trust');
   const trustChallenge = await issue(consent, trustDigest);
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: trustChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: true, providerId: 'claude-code', trusted: true });
   assert.equal(getOnlyRecord(harness).trustWriteUsed, true,
@@ -341,7 +465,7 @@ async function main() {
   );
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: openCodeTrustChallenge.challengeId,
-    providerId: 'opencode',
+    acceptedIdentity: acceptedIdentity('opencode'),
     trusted: true
   }), { ok: true, providerId: 'opencode', trusted: true });
   assert.deepEqual(localHarness.values.get(consent.TRUST_STORAGE_KEY), {
@@ -358,24 +482,34 @@ async function main() {
     'clearing OpenCode cannot copy or clear Claude trust');
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: trustChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: false, code: 'trust_challenge_replayed' }, 'one challenge enables trust at most once');
   assert.equal((await consent.consumeChallenge({
     challengeId: trustChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: trustDigest
   })).ok, true, 'trust write does not consume the start challenge');
+
+  const trustedIdentityMismatch = await issue(consent, digest('trusted identity changed'));
+  const changedTrustedIdentity = acceptedIdentity();
+  changedTrustedIdentity.profileVersion = '2.1.178';
+  assert.deepEqual(await consent.consumeChallenge({
+    challengeId: trustedIdentityMismatch.challengeId,
+    acceptedIdentity: changedTrustedIdentity,
+    taskDigest: digest('trusted identity changed')
+  }), { ok: false, code: 'provider_status_refresh' },
+  'provider-local trust never bypasses identity drift');
 
   const trustedStart = await issue(consent, digest('trusted path still consumes'));
   assert.equal((await consent.consumeChallenge({
     challengeId: trustedStart.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('trusted path still consumes')
   })).ok, true, 'trusted path still requires a freshly minted internal challenge');
   assert.deepEqual(await consent.consumeChallenge({
     challengeId: trustedStart.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('trusted path still consumes')
   }), { ok: false, code: 'challenge_not_found' });
 
@@ -389,7 +523,7 @@ async function main() {
   }, 'authority-reducing clear cannot grant or start a run');
   assert.equal((await consent.consumeChallenge({
     challengeId: postClearChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('confirmation after clear')
   })).ok, true, 'clear does not consume the fresh challenge required after trust is removed');
   assert.deepEqual(await consent.clearTrusted({ providerId: 'claude-code' }), {
@@ -407,10 +541,15 @@ async function main() {
 
   const invalidTrustChallenge = await issue(consent, digest('invalid trust requests'));
   for (const request of [
-    { challengeId: invalidTrustChallenge.challengeId, providerId: 'claude-code', trusted: false },
+    { challengeId: invalidTrustChallenge.challengeId, acceptedIdentity: acceptedIdentity(), trusted: false },
     { challengeId: invalidTrustChallenge.challengeId, providerId: 'codex', trusted: true },
     { challengeId: invalidTrustChallenge.challengeId, providerId: 'Claude-Code', trusted: true },
-    { challengeId: invalidTrustChallenge.challengeId, providerId: 'claude-code', trusted: true, extra: true }
+    {
+      challengeId: invalidTrustChallenge.challengeId,
+      acceptedIdentity: acceptedIdentity(),
+      trusted: true,
+      extra: true
+    }
   ]) {
     assert.deepEqual(await consent.writeTrustFromChallenge(request),
       { ok: false, code: 'invalid_trust_request' });
@@ -419,7 +558,7 @@ async function main() {
   }
   await consent.consumeChallenge({
     challengeId: invalidTrustChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     taskDigest: digest('invalid trust requests')
   });
 
@@ -431,7 +570,7 @@ async function main() {
     trustNow = expiredTrust.expiresAt;
     assert.deepEqual(await consent.writeTrustFromChallenge({
       challengeId: expiredTrust.challengeId,
-      providerId: 'claude-code',
+      acceptedIdentity: acceptedIdentity(),
       trusted: true
     }), { ok: false, code: 'challenge_expired' });
     assert.equal(await consent.getTrusted('claude-code'), false);
@@ -443,7 +582,7 @@ async function main() {
   localHarness.failures.get = true;
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: localGetFailure.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: false, code: 'trust_storage_error' });
   assert.equal(await consent.getTrusted('claude-code'), false);
@@ -452,7 +591,7 @@ async function main() {
     'local read failure never defaults trust to true');
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: localGetFailure.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: false, code: 'trust_challenge_replayed' },
   'failed local trust access cannot reopen the one-use trust-write slot');
@@ -461,7 +600,7 @@ async function main() {
   localHarness.failures.set = true;
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: localSetFailure.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: false, code: 'trust_storage_error' });
   localHarness.failures.set = false;
@@ -471,7 +610,7 @@ async function main() {
   const clearFailureChallenge = await issue(consent, digest('clear write failure'));
   assert.equal((await consent.writeTrustFromChallenge({
     challengeId: clearFailureChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   })).ok, true);
   localHarness.failures.remove = true;
@@ -492,7 +631,7 @@ async function main() {
   installChrome(harness, null);
   assert.deepEqual(await consent.writeTrustFromChallenge({
     challengeId: noLocalChallenge.challengeId,
-    providerId: 'claude-code',
+    acceptedIdentity: acceptedIdentity(),
     trusted: true
   }), { ok: false, code: 'trust_storage_unavailable' });
   assert.equal(await consent.getTrusted('claude-code'), false);
