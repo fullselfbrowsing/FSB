@@ -25,6 +25,62 @@ const PHASE64_UAT_PATH = `${PHASE64_DIR}/64-HUMAN-UAT.md`;
 const PHASE64_VALIDATION_PATH = `${PHASE64_DIR}/64-VALIDATION.md`;
 const PHASE65_DIR = '.planning/phases/65-codex-adapter';
 const PHASE65_PLAN05_PATH = `${PHASE65_DIR}/65-05-PLAN.md`;
+const PHASE65_UAT_PATH = `${PHASE65_DIR}/65-HUMAN-UAT.md`;
+const PHASE65_VALIDATION_PATH = `${PHASE65_DIR}/65-VALIDATION.md`;
+
+const PHASE65_PLAN_TASK_COUNTS = Object.freeze([2, 2, 2, 3, 1, 2, 2, 2]);
+const PHASE65_EXPECTED_TASK_IDS = Object.freeze(PHASE65_PLAN_TASK_COUNTS.flatMap(
+  (count, planIndex) => Array.from({ length: count }, (_, taskIndex) => (
+    `65-${String(planIndex + 1).padStart(2, '0')}-${String(taskIndex + 1).padStart(2, '0')}`
+  )),
+));
+const PHASE65_EXPECTED_WAVES = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8]);
+const PHASE65_EXPECTED_REQUIREMENTS = Object.freeze(['MULTI-04', 'MULTI-05', 'MULTI-06']);
+const PHASE65_EXPECTED_DECISIONS = Object.freeze(Array.from(
+  { length: 24 }, (_, index) => `D65-${String(index + 1).padStart(2, '0')}`,
+));
+const PHASE65_EXPECTED_UI_LOCKS = Object.freeze(Array.from(
+  { length: 10 }, (_, index) => `UI65-${String(index + 1).padStart(2, '0')}`,
+));
+const PHASE65_EXPECTED_THREATS = Object.freeze(Array.from(
+  { length: 12 }, (_, index) => `T65-${String(index + 1).padStart(2, '0')}`,
+));
+const PHASE65_TASK_REQUIREMENTS = Object.freeze([
+  ['MULTI-05'],
+  ['MULTI-05'],
+  ['MULTI-05'],
+  ['MULTI-05'],
+  ['MULTI-05'],
+  ['MULTI-05'],
+  ['MULTI-04', 'MULTI-05'],
+  ['MULTI-04'],
+  ['MULTI-04', 'MULTI-05'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+  ['MULTI-05'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+  ['MULTI-04', 'MULTI-05', 'MULTI-06'],
+]);
+const PHASE65_TASK_THREATS = Object.freeze([
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-03', 'T65-09', 'T65-10'],
+  ['T65-01', 'T65-02', 'T65-05'],
+  ['T65-04', 'T65-05'],
+  ['T65-03', 'T65-04', 'T65-08'],
+  ['T65-01', 'T65-02', 'T65-04', 'T65-05', 'T65-06', 'T65-07', 'T65-08', 'T65-11', 'T65-12'],
+  ['T65-02', 'T65-03', 'T65-09', 'T65-10', 'T65-11'],
+  ['T65-02', 'T65-09', 'T65-10', 'T65-11'],
+  ['T65-02', 'T65-06', 'T65-08', 'T65-09', 'T65-10'],
+  ['T65-10'],
+  [...PHASE65_EXPECTED_THREATS],
+  [...PHASE65_EXPECTED_THREATS],
+]);
 
 const PHASE65_ATOMIC_EXPOSURE_FILES = Object.freeze([
   'mcp/src/agent-providers/adapter.ts',
@@ -622,7 +678,7 @@ function runPhase64WiringContract() {
     'root tests retain one MCP build boundary');
 
   const ci64 = read('.github/workflows/ci.yml');
-  check(exactOccurrences(ci64, 'name: Phase 64 OpenCode contract (sole Linux root invocation)') === 1
+  check(exactOccurrences(ci64, 'name: Phase 65 Codex contract (sole Linux root invocation)') === 1
       && exactOccurrences(ci64, 'run: npm test') === 1
       && !ci64.includes('run: node scripts/run-phase64-full-tests.mjs'),
   'CI retains one source-pinned Linux root invocation without a duplicate focused run');
@@ -1516,6 +1572,513 @@ function runPhase65AtomicExposureContract() {
   'registry, matrix, fixture parser, and drift roster expose Codex together');
 }
 
+const PHASE65_UAT_DISCLAIMER = 'No schema-derived fixture, fake process, injected account state, source inspection, DOM harness, screenshot, or automated result is live provenance; none may check or promote a scenario.';
+
+function phase65UatViolations(source) {
+  const violations = [];
+  const requireContract = (condition, message) => {
+    if (!condition) violations.push(message);
+  };
+
+  requireContract(/^phase: 65$/m.test(source)
+      && /^status: human_needed$/m.test(source)
+      && /^deferred_until: milestone-end$/m.test(source)
+      && /^deferred_by: user$/m.test(source)
+      && /^automated_verification: required-before-advance$/m.test(source)
+      && /^results_recorded: false$/m.test(source)
+      && /^live_checks: 3$/m.test(source),
+  'frontmatter is the exact unexecuted three-check milestone-end queue');
+  requireContract(source.includes(PHASE65_UAT_DISCLAIMER),
+    'schema-derived and automated evidence is explicitly barred from live provenance');
+  requireContract(source.includes('External side-effect caution:'),
+    'the ledger carries an explicit external side-effect caution');
+  for (const sensitiveKind of [
+    'task text',
+    'credentials',
+    'raw login-status bytes',
+    'raw Codex events',
+    'local paths',
+    'MCP endpoint',
+    'browser content',
+  ]) {
+    requireContract(source.includes(sensitiveKind),
+      `sanitization policy prohibits retaining ${sensitiveKind}`);
+  }
+
+  const headings = Array.from(
+    source.matchAll(/^### \[([^\]]*)\] (UAT65-\d{2})\b[^\n]*$/gm),
+    (match) => ({ marker: match[1], id: match[2] }),
+  );
+  const expectedHeadings = Array.from({ length: 3 }, (_, index) => ({
+    marker: ' ',
+    id: `UAT65-${String(index + 1).padStart(2, '0')}`,
+  }));
+  requireContract(JSON.stringify(headings) === JSON.stringify(expectedHeadings),
+    'ledger contains exactly three ordered unchecked UAT ids');
+
+  const blocks = source.split(/^### \[ \] /m).slice(1);
+  requireContract(blocks.length === 3, 'each UAT65 heading owns exactly one scenario block');
+  for (const block of blocks) {
+    const id = (block.match(/^(UAT65-\d{2})\b/) || [null, 'unknown'])[1];
+    requireContract(exactOccurrences(block, 'status: human_needed') === 1,
+      `${id} remains status human_needed exactly once`);
+    requireContract(exactOccurrences(block, 'result: pending') === 1,
+      `${id} remains result pending exactly once`);
+    requireContract(/^evidence:[ \t]*\n[ \t]*\nreferences:/m.test(block),
+      `${id} keeps evidence empty`);
+    requireContract(/^prerequisites:\s+\S+/m.test(block)
+        && /^steps:\s*$/m.test(block)
+        && /^expected:\s+\S+/m.test(block)
+        && /^\d+\. /m.test(block),
+    `${id} retains prerequisites, ordered steps, and expected results`);
+  }
+  requireContract(exactOccurrences(source, 'status: human_needed') === 4
+      && exactOccurrences(source, 'result: pending') === 3
+      && exactOccurrences(source, 'evidence:') === 3,
+  'status, result, and evidence field counts are exact');
+  requireContract(!/^### \[[^ ]\] UAT65-/m.test(source)
+      && !/^status:\s*(?:complete|green|passed)\b/im.test(source)
+      && !/^result:\s*(?!pending\s*$)\S+/im.test(source)
+      && !/^evidence:[ \t]+\S+/m.test(source)
+      && !/^evidence:[ \t]*\n(?![ \t]*\nreferences:)/m.test(source),
+  'no scenario is checked, completed, nonpending, or evidence-populated');
+  requireContract(!/(?:https?:\/\/|localhost|127\.0\.0\.1|\/Users\/|[A-Za-z]:\\)/.test(source),
+    'ledger retains no endpoint or absolute local path value');
+
+  const scenarioTokens = [
+    ['UAT65-01', [
+      'Genuine ChatGPT, API-key, and unauthenticated auth matrix',
+      'Included with your ChatGPT plan',
+      'Billed to the API key stored by Codex; dollar amount not reported.',
+      'Sign in to Codex first.',
+      'immediate re-probe',
+      'USD is never claimed',
+    ]],
+    ['UAT65-02', [
+      'Genuine Codex-to-browser delegation',
+      'Stop agent',
+      'Stopping agent…',
+      'authoritative child-tree and scratch cleanup',
+      'tokens, turns, duration',
+      'schema-derived contract',
+    ]],
+    ['UAT65-03', [
+      'keyboard',
+      'screen reader',
+      'forced-colors',
+      'reduced motion',
+      'at least 44px',
+      'no visible or announced `Profile`',
+    ]],
+  ];
+  for (let index = 0; index < scenarioTokens.length; index += 1) {
+    const [id, tokens] = scenarioTokens[index];
+    const block = blocks[index] || '';
+    for (const token of tokens) {
+      requireContract(block.toLowerCase().includes(token.toLowerCase()),
+        `${id} retains genuine scenario coverage: ${token}`);
+    }
+  }
+
+  return Object.freeze(violations);
+}
+
+function phase65RemoveScenario(source, id) {
+  const start = source.indexOf(`### [ ] ${id}`);
+  if (start < 0) return source;
+  const next = source.indexOf('\n### [ ] ', start + 1);
+  const gate = source.indexOf('\n## Gate policy', start + 1);
+  const end = next >= 0 ? next : gate;
+  return end >= 0 ? source.slice(0, start) + source.slice(end + 1) : source.slice(0, start);
+}
+
+function runPhase65UatLedgerContract() {
+  console.log('\n--- Phase 65 milestone-end human UAT ledger ---');
+  check(exists(PHASE65_UAT_PATH), 'Phase 65 human UAT ledger exists');
+  if (!exists(PHASE65_UAT_PATH)) return;
+
+  const source = read(PHASE65_UAT_PATH);
+  const violations = phase65UatViolations(source);
+  check(violations.length === 0,
+    `Phase 65 ledger satisfies every honesty rule${violations.length ? `: ${violations.join('; ')}` : ''}`);
+
+  const firstScenarioStart = source.indexOf('### [ ] UAT65-01');
+  const secondScenarioStart = source.indexOf('\n### [ ] UAT65-02');
+  const firstScenario = source.slice(firstScenarioStart, secondScenarioStart);
+  const gateIndex = source.indexOf('\n## Gate policy');
+  const negativeFixtures = Object.freeze({
+    'checked heading': source.replace('### [ ] UAT65-01', '### [x] UAT65-01'),
+    'completed status': source.replace('status: human_needed\nresult: pending',
+      'status: complete\nresult: pending'),
+    'nonpending result': source.replace('result: pending', 'result: passed'),
+    'populated evidence': source.replace('evidence:\n\nreferences:',
+      'evidence: synthetic-pass\n\nreferences:'),
+    'missing scenario': phase65RemoveScenario(source, 'UAT65-02'),
+    'duplicate scenario': source.slice(0, gateIndex) + `\n${firstScenario}` + source.slice(gateIndex),
+    'extra scenario': source.slice(0, gateIndex)
+      + '\n### [ ] UAT65-04 — synthetic extra\n\nstatus: human_needed\nresult: pending\n\nprerequisites: none\n\nsteps:\n\n1. none\n\nexpected: none\n\nevidence:\n\nreferences: none.\n'
+      + source.slice(gateIndex),
+    'synthetic promotion': source.replace(PHASE65_UAT_DISCLAIMER,
+      'A schema-derived fixture is live provenance and may check or promote a scenario.'),
+  });
+  for (const [label, candidate] of Object.entries(negativeFixtures)) {
+    check(phase65UatViolations(candidate).length > 0,
+      `Phase 65 honesty parser rejects ${label}`);
+  }
+}
+
+function phase65PlanGraph() {
+  const planNames = fs.readdirSync(path.join(ROOT, PHASE65_DIR))
+    .filter((name) => /^65-\d{2}-PLAN\.md$/.test(name))
+    .sort((left, right) => left.localeCompare(right));
+  const plans = planNames.map((name) => {
+    const source = read(`${PHASE65_DIR}/${name}`);
+    const plan = (name.match(/^65-(\d{2})-/) || [null, null])[1];
+    const wave = Number((source.match(/^wave:\s*(\d+)$/m) || [null, NaN])[1]);
+    const dependencyBlock = (source.match(/^depends_on:\s*(?:\[\])?\s*\n([\s\S]*?)^files_modified:/m)
+      || [null, ''])[1];
+    const dependencies = Array.from(
+      dependencyBlock.matchAll(/^\s+- ["']65-(\d{2})["']\s*$/gm),
+      (match) => match[1],
+    );
+    const requirementBlock = (source.match(/^requirements:\s*\n([\s\S]*?)^must_haves:/m)
+      || [null, ''])[1];
+    const requirements = Array.from(
+      requirementBlock.matchAll(/^\s+- (MULTI-\d{2})\s*$/gm),
+      (match) => match[1],
+    );
+    const threatModel = (source.match(/<threat_model>([\s\S]*?)<\/threat_model>/)
+      || [null, ''])[1];
+    const threats = Array.from(
+      threatModel.matchAll(/<threat id="(T65-\d{2})"/g),
+      (match) => match[1],
+    );
+    const taskRecords = Array.from(source.matchAll(/<task\b[\s\S]*?<\/task>/g), (match) => {
+      const block = match[0];
+      const id = (block.match(/<task id="(65-\d{2}-\d{2})"/) || [null, null])[1];
+      const automated = (block.match(/<automated>([\s\S]*?)<\/automated>/)
+        || [null, null])[1];
+      return Object.freeze({
+        id,
+        command: automated === null ? null : decodeXml(automated),
+        block,
+      });
+    });
+    return Object.freeze({
+      name,
+      plan,
+      wave,
+      dependencies,
+      requirements,
+      threats,
+      taskRecords,
+      tasks: taskRecords.map((task) => task.id),
+      commands: taskRecords.map((task) => task.command),
+      source,
+    });
+  });
+  return Object.freeze({ planNames, plans });
+}
+
+function phase65ExpandIds(value, prefix) {
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exact = new RegExp(`^${escapedPrefix}(\\d{2})$`);
+  const range = new RegExp(`^${escapedPrefix}(\\d{2})[–-](?:${escapedPrefix})?(\\d{2})$`);
+  const ids = [];
+  for (const token of String(value).split(',').map((item) => item.trim()).filter(Boolean)) {
+    const exactMatch = token.match(exact);
+    if (exactMatch) {
+      ids.push(`${prefix}${exactMatch[1]}`);
+      continue;
+    }
+    const rangeMatch = token.match(range);
+    if (!rangeMatch) {
+      ids.push(`invalid:${token}`);
+      continue;
+    }
+    const first = Number(rangeMatch[1]);
+    const last = Number(rangeMatch[2]);
+    if (first > last || last - first > 64) {
+      ids.push(`invalid:${token}`);
+      continue;
+    }
+    for (let index = first; index <= last; index += 1) {
+      ids.push(`${prefix}${String(index).padStart(2, '0')}`);
+    }
+  }
+  return Array.from(new Set(ids)).sort((left, right) => left.localeCompare(right));
+}
+
+function phase65ValidationRows(source) {
+  return Array.from(source.matchAll(/^\| (65-\d{2}-\d{2}) \|[^\n]*$/gm), (match) => {
+    const cells = match[0].slice(1, -1).split('|').map((cell) => cell.trim());
+    const commandMatch = (cells[6] || '').match(/^`([\s\S]*)`$/);
+    return Object.freeze({
+      line: match[0],
+      cells,
+      id: cells[0],
+      plan: cells[1],
+      wave: Number(cells[2]),
+      requirements: phase65ExpandIds(cells[3], 'MULTI-'),
+      threats: phase65ExpandIds(cells[4], 'T65-'),
+      secureBehavior: cells[5],
+      command: commandMatch ? commandMatch[1] : null,
+      status: cells[7],
+    });
+  });
+}
+
+function phase65PlanGraphViolations(plans) {
+  const violations = [];
+  const planIds = plans.map((plan) => plan.plan);
+  const expectedPlanIds = Array.from({ length: 8 }, (_, index) =>
+    String(index + 1).padStart(2, '0'));
+  if (JSON.stringify(planIds) !== JSON.stringify(expectedPlanIds)) {
+    violations.push('plan ids do not match the exact eight-plan roster');
+  }
+  if (JSON.stringify(plans.map((plan) => plan.wave)) !== JSON.stringify(PHASE65_EXPECTED_WAVES)) {
+    violations.push('plan waves do not match the approved dependency sequence');
+  }
+  if (JSON.stringify(plans.flatMap((plan) => plan.tasks))
+      !== JSON.stringify(PHASE65_EXPECTED_TASK_IDS)) {
+    violations.push('plan task ids do not match the exact sixteen-task roster');
+  }
+  for (let index = 0; index < plans.length; index += 1) {
+    const plan = plans[index];
+    const expectedDependencies = index === 0 ? [] : [String(index).padStart(2, '0')];
+    if (JSON.stringify(plan.dependencies) !== JSON.stringify(expectedDependencies)) {
+      violations.push(`Plan ${plan.plan} does not retain the exact sequential dependency`);
+    }
+    if (plan.tasks.length !== plan.taskRecords.length
+        || plan.taskRecords.some((task) => task.id === null || task.command === null)) {
+      violations.push(`Plan ${plan.plan} has a task without one automated command`);
+    }
+    if (plan.commands.some((command) => command && /(^|&&\s*)npm --prefix mcp run build(?:\s|$)/.test(command))) {
+      violations.push(`Plan ${plan.plan} contains an unwrapped MCP build`);
+    }
+    if (plan.requirements.length === 0
+        || plan.requirements.some((requirement) => !PHASE65_EXPECTED_REQUIREMENTS.includes(requirement))) {
+      violations.push(`Plan ${plan.plan} has invalid requirement ownership`);
+    }
+    if (plan.threats.length === 0 || plan.threats.length !== new Set(plan.threats).size) {
+      violations.push(`Plan ${plan.plan} has missing or duplicate threat ownership`);
+    }
+  }
+  const atomicPlan = plans.find((plan) => plan.plan === '05');
+  if (JSON.stringify(atomicPlan?.tasks) !== JSON.stringify(['65-05-01'])) {
+    violations.push('Plan 05 is not the sole atomic exposure task');
+  }
+  return violations;
+}
+
+function phase65ValidationViolations(source) {
+  const violations = [];
+  const requireContract = (condition, message) => {
+    if (!condition) violations.push(message);
+  };
+  const { plans } = phase65PlanGraph();
+  const plansById = new Map(plans.map((plan) => [plan.plan, plan]));
+  const expectedRecords = plans.flatMap((plan) => plan.taskRecords.map((task) => {
+    const taskIndex = PHASE65_EXPECTED_TASK_IDS.indexOf(task.id);
+    return {
+      ...task,
+      plan: plan.plan,
+      wave: plan.wave,
+      requirements: PHASE65_TASK_REQUIREMENTS[taskIndex],
+      threats: PHASE65_TASK_THREATS[taskIndex],
+    };
+  }));
+  const implementationStatus = (source.match(/^implementation_status:\s*(\S+)$/m)
+    || [null, null])[1];
+
+  requireContract(/^status: approved$/m.test(source)
+      && ['in_progress', 'complete'].includes(implementationStatus)
+      && /^nyquist_compliant: true$/m.test(source)
+      && /^wave_0_complete: true$/m.test(source)
+      && /^reviewed: 2026-07-22$/m.test(source)
+      && /^plan_count: 8$/m.test(source)
+      && /^validation_tasks: 16$/m.test(source),
+  'frontmatter records approved, current 8-plan/16-task validation');
+  requireContract(!/\bTBD\b/i.test(source), 'validation contains no TBD placeholder');
+  for (const violation of phase65PlanGraphViolations(plans)) violations.push(violation);
+
+  const rows = phase65ValidationRows(source);
+  requireContract(rows.length === 16, 'validation contains exactly 16 task rows');
+  requireContract(new Set(rows.map((row) => row.id)).size === rows.length,
+    'validation task ids are unique');
+  requireContract(JSON.stringify(rows.map((row) => row.id))
+      === JSON.stringify(PHASE65_EXPECTED_TASK_IDS),
+  'validation task ids are complete and ordered');
+  for (let index = 0; index < expectedRecords.length; index += 1) {
+    const expected = expectedRecords[index];
+    const row = rows[index];
+    if (!row) continue;
+    const plan = plansById.get(expected.plan);
+    requireContract(row.cells.length === 8, `${expected.id} has exactly eight columns`);
+    requireContract(row.id === expected.id && row.plan === expected.plan,
+      `${expected.id} maps to its declaring plan`);
+    requireContract(row.wave === expected.wave, `${expected.id} maps to its declaring wave`);
+    requireContract(JSON.stringify(row.requirements) === JSON.stringify(expected.requirements),
+      `${expected.id} maps every declaring requirement exactly`);
+    requireContract(JSON.stringify(row.threats) === JSON.stringify(expected.threats)
+        && row.threats.every((threat) => plan.threats.includes(threat)),
+    `${expected.id} maps the exact approved declared threats`);
+    requireContract(row.command === expected.command,
+      `${expected.id} command is byte-equal to PLAN automated verification`);
+    const expectedStatus = implementationStatus === 'complete' || index < 15
+      ? '✅ green'
+      : '⬜ pending';
+    requireContract(row.status === expectedStatus,
+      `${expected.id} retains the exact ${implementationStatus} evidence state`);
+    requireContract(row.secureBehavior.length >= 24 && !/planned|TBD/i.test(row.secureBehavior),
+      `${expected.id} retains concrete secure behavior`);
+  }
+  for (const plan of plans) {
+    const coveredThreats = Array.from(new Set(rows
+      .filter((row) => row.plan === plan.plan)
+      .flatMap((row) => row.threats))).sort((left, right) => left.localeCompare(right));
+    const declaredThreats = [...plan.threats].sort((left, right) => left.localeCompare(right));
+    requireContract(JSON.stringify(coveredThreats) === JSON.stringify(declaredThreats),
+      `Plan ${plan.plan} validation rows cover every declared threat exactly`);
+  }
+
+  const requirementSection = between(source, '## Requirement Verification', '## Decision Coverage');
+  const decisionSection = between(source, '## Decision Coverage', '## UI Lock Coverage');
+  const uiSection = between(source, '## UI Lock Coverage', '## Focused Command Inventory');
+  const threatSection = between(source, '## Security Test Obligations', '## Manual-Only Verifications');
+  const manualSection = between(source, '## Manual-Only Verifications', '## Validation Sign-Off');
+  requireContract(JSON.stringify(Array.from(
+    requirementSection.matchAll(/^\| (MULTI-\d{2}) \|/gm), (match) => match[1],
+  )) === JSON.stringify(PHASE65_EXPECTED_REQUIREMENTS),
+  'requirement table maps MULTI-04 through MULTI-06 exactly once');
+  requireContract(JSON.stringify(Array.from(
+    decisionSection.matchAll(/^\| (D65-\d{2})\b/gm), (match) => match[1],
+  )) === JSON.stringify(PHASE65_EXPECTED_DECISIONS),
+  'decision table maps D65-01 through D65-24 exactly once');
+  requireContract(JSON.stringify(Array.from(
+    uiSection.matchAll(/^\| (UI65-\d{2})\b/gm), (match) => match[1],
+  )) === JSON.stringify(PHASE65_EXPECTED_UI_LOCKS),
+  'UI table maps UI65-01 through UI65-10 exactly once');
+  requireContract(JSON.stringify(Array.from(
+    threatSection.matchAll(/^\| (T65-\d{2})\b/gm), (match) => match[1],
+  )) === JSON.stringify(PHASE65_EXPECTED_THREATS),
+  'security table maps T65-01 through T65-12 exactly once');
+  requireContract(!/<threat\b[^>]*(?:severity="(?:HIGH|CRITICAL)")[^>]*disposition="(?:accept|defer)"/i
+    .test(plans.map((plan) => plan.source).join('\n')),
+  'no HIGH or CRITICAL plan threat is accepted or deferred');
+
+  const manualRows = Array.from(
+    manualSection.matchAll(/^\| (UAT65-\d{2}) \|[^\n]*$/gm),
+    (match) => match[0].slice(1, -1).split('|').map((cell) => cell.trim()),
+  );
+  requireContract(JSON.stringify(manualRows.map((row) => row[0]))
+      === JSON.stringify(['UAT65-01', 'UAT65-02', 'UAT65-03'])
+      && manualRows.every((row) => row.length === 6
+        && row[4] === '`human_needed` / `pending`'
+        && row[5] === '*(empty)*'),
+  'manual table retains exactly three pending evidence-empty external scenarios');
+  requireContract(source.includes('Automated source/DOM assertions may protect the contract but must not change these rows to passed.'),
+    'automated evidence cannot promote genuine UAT');
+  if (implementationStatus === 'complete') {
+    requireContract(rows.every((row) => row.status === '✅ green')
+        && source.includes('All 16 implementation commands are green')
+        && source.includes('**Approval:** automated validation complete; genuine external UAT remains pending.'),
+    'complete prose separates deterministic evidence from genuine pending UAT');
+  } else {
+    requireContract(rows.slice(0, 15).every((row) => row.status === '✅ green')
+        && rows[15]?.status === '⬜ pending'
+        && source.includes('15/16 green; 65-08-02 pending')
+        && source.includes('genuine external UAT remains pending'),
+    'in-progress prose records exactly one remaining closure task');
+  }
+
+  return Object.freeze(violations);
+}
+
+function runPhase65SourceContract() {
+  console.log('\n--- Phase 65 source, security, provenance, and shared UI locks ---');
+  const manifest = JSON.parse(read('tests/fixtures/agent-streams/codex-0.142.5/manifest.json'));
+  check(manifest.profileVersion === '0.142.5'
+      && manifest.provenance === 'schema-derived-contract'
+      && manifest.liveCapturePending === true
+      && manifest.recordedProvenanceStatus === 'human_needed'
+      && manifest.sanitized === true,
+  'Codex fixture retains exact schema-derived, live-pending, sanitized provenance');
+  const providerPanel = read('extension/ui/providers-panel.js');
+  const feed = read('extension/ui/delegation-feed.js');
+  const css = read('extension/ui/sidepanel.css');
+  const providerMetadata = read('extension/utils/delegation-providers.js');
+  for (const copy of [
+    'Included with your ChatGPT plan',
+    'Billed to the API key stored by Codex; dollar amount not reported.',
+  ]) {
+    check(exactOccurrences(providerPanel, copy) === 1 && exactOccurrences(feed, copy) === 1,
+      `Providers and feed share exact billing copy: ${copy}`);
+  }
+  check(!/_definition\([^\n]*['"]Profile['"]/.test(feed)
+      && !/providerId\s*===\s*['"]codex['"]|case\s+['"]codex['"]/.test(feed),
+  'shared feed has no visible Profile definition or Codex renderer branch');
+  check(feed.includes("summary.billingKind !== acceptedIdentity.billingKind")
+      && feed.includes('summary.usd !== null'),
+  'accepted Codex summaries fail closed unless billing is immutable and USD is null');
+  check(/\.delegation-action\s*\{[\s\S]*?min-height:\s*44px/.test(css)
+      && /\.stop-btn\[data-delegation-action="stop"\]\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(css)
+      && /@media \(max-width: 350px\)[\s\S]*?\.delegation-action\s*\{[\s\S]*?min-height:\s*44px/.test(css),
+  'shared delegated actions retain desktop, fixed-stop, and narrow 44px targets');
+  check(providerMetadata.indexOf("id: 'claude-code'")
+      < providerMetadata.indexOf("id: 'opencode'")
+      && providerMetadata.indexOf("id: 'opencode'")
+        < providerMetadata.indexOf("id: 'codex'"),
+  'canonical metadata retains Codex as the existing third agent-provider row');
+}
+
+function runPhase65ValidationContract() {
+  console.log('\n--- Phase 65 exact graph, Nyquist, decision, threat, and UI closure ---');
+  check(exists(PHASE65_VALIDATION_PATH), 'Phase 65 validation artifact exists');
+  if (!exists(PHASE65_VALIDATION_PATH)) return;
+  const source = read(PHASE65_VALIDATION_PATH);
+  const violations = phase65ValidationViolations(source);
+  check(violations.length === 0,
+    `Phase 65 validation satisfies every exact-map rule${violations.length ? `: ${violations.join('; ')}` : ''}`);
+
+  if (violations.length === 0) {
+    const rows = phase65ValidationRows(source);
+    const firstLine = rows[0].line;
+    const firstLineEnd = source.indexOf(firstLine) + firstLine.length;
+    const negativeFixtures = Object.freeze({
+      'missing task row': source.replace(`${firstLine}\n`, ''),
+      'duplicate task row': source.slice(0, firstLineEnd)
+        + `\n${firstLine}` + source.slice(firstLineEnd),
+      'wrong plan': source.replace('| 65-01-01 | 01 |', '| 65-01-01 | 02 |'),
+      'wrong wave': source.replace('| 65-01-01 | 01 | 1 |', '| 65-01-01 | 01 | 2 |'),
+      'wrong requirement': source.replace('| MULTI-05 | T65-03,', '| MULTI-04 | T65-03,'),
+      'missing threat': source.replace('T65-03, T65-09, T65-10', 'T65-03, T65-09'),
+      'wrong command': source.replace(rows[0].command, 'node tests/missing-phase65-suite.test.js'),
+      'wrong status': source.replace('| ✅ green |', '| ⬜ pending |'),
+      'TBD placeholder': source.replace(rows[0].secureBehavior, 'TBD'),
+      'missing decision': source.replace('| D65-24 ', '| D65-23 '),
+      'missing UI lock': source.replace('| UI65-10 ', '| UI65-09 '),
+      'missing security threat': source.replace('| T65-12 partial exposure', '| T65-11 partial exposure'),
+      'promoted manual row': source.replace(
+        '| `human_needed` / `pending` | *(empty)* |',
+        '| `passed` / `complete` | synthetic |',
+      ),
+    });
+    for (const [label, candidate] of Object.entries(negativeFixtures)) {
+      check(phase65ValidationViolations(candidate).length > 0,
+        `Phase 65 validation parser rejects ${label}`);
+    }
+    const { plans } = phase65PlanGraph();
+    const invalidWavePlans = plans.map((plan) => (
+      plan.plan === '02' ? { ...plan, wave: 1 } : plan
+    ));
+    check(phase65PlanGraphViolations(invalidWavePlans).length > 0,
+      'Phase 65 plan parser rejects an invalid dependency wave');
+  }
+  runPhase65AtomicExposureContract();
+  runPhase65SourceContract();
+}
+
 const sectionArgs = process.argv.slice(2);
 if (sectionArgs.length > 0) {
   if (sectionArgs.length !== 2
@@ -1526,12 +2089,17 @@ if (sectionArgs.length > 0) {
         'phase64-uat-ledger',
         'phase64-validation',
         'phase65-atomic-exposure',
+        'phase65-uat-ledger',
+        'phase65-validation',
       ].includes(sectionArgs[1])) {
-    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger|phase64-validation|phase65-atomic-exposure]');
+    console.error('Usage: node tests/delegation-phase-contract.test.js [--section phase63-uat-ledger|phase63-final-contract|phase64-uat-ledger|phase64-validation|phase65-atomic-exposure|phase65-uat-ledger|phase65-validation]');
     process.exit(2);
   }
   if (sectionArgs[1] === 'phase65-atomic-exposure') {
     runPhase65AtomicExposureContract();
+  } else if (sectionArgs[1].startsWith('phase65-')) {
+    runPhase65UatLedgerContract();
+    if (sectionArgs[1] === 'phase65-validation') runPhase65ValidationContract();
   } else if (sectionArgs[1].startsWith('phase64-')) {
     runPhase64UatLedgerContract();
     if (sectionArgs[1] === 'phase64-validation') {
@@ -1554,6 +2122,8 @@ runPhase63FinalContract();
 runPhase64UatLedgerContract();
 runPhase64WiringContract();
 runPhase64FinalContract();
+runPhase65UatLedgerContract();
+runPhase65ValidationContract();
 
 // The live ledger is a hard prerequisite. No other contract assertion runs if
 // it is absent, so the test cannot become the mechanism that silently invents it.
@@ -2486,7 +3056,7 @@ check(phase63BuildIndex >= 0
   && phase63RootIndexes.every((index) => index > phase63BuildIndex && index < firstDependentMcpIndex)
   && phase63RootIndexes.every((index, position) => position === 0 || index > phase63RootIndexes[position - 1]),
 'all six Phase 63 root gates occupy one ordered slot after build and before dependent seams');
-check(exactOccurrences(ciSource, 'name: Phase 64 OpenCode contract (sole Linux root invocation)') === 1
+check(exactOccurrences(ciSource, 'name: Phase 65 Codex contract (sole Linux root invocation)') === 1
   && exactOccurrences(ciSource, 'run: npm test') === 1
   && !ciSource.includes('run: node scripts/run-phase63-focused-tests.mjs'),
 'CI source-pins the sole Linux root invocation without a duplicate focused run');

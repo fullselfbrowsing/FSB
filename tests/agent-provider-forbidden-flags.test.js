@@ -196,6 +196,32 @@ try {
     'tests',
     'providers-panel-ui.test.js',
   ), 'utf8');
+  const providersPanelSource = fs.readFileSync(path.join(
+    repoRoot,
+    'extension',
+    'ui',
+    'providers-panel.js',
+  ), 'utf8');
+  const delegationFeedSource = fs.readFileSync(path.join(
+    repoRoot,
+    'extension',
+    'ui',
+    'delegation-feed.js',
+  ), 'utf8');
+  const sidepanelCssSource = fs.readFileSync(path.join(
+    repoRoot,
+    'extension',
+    'ui',
+    'sidepanel.css',
+  ), 'utf8');
+  const codexManifest = JSON.parse(fs.readFileSync(path.join(
+    repoRoot,
+    'tests',
+    'fixtures',
+    'agent-streams',
+    'codex-0.142.5',
+    'manifest.json',
+  ), 'utf8'));
   for (const sourceFlag of [
     'OPENCODE_DISABLE_PROJECT_CONFIG',
     'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
@@ -397,6 +423,38 @@ try {
   assert(codexProfileSource.includes("'invoke_capability'"));
   assert(codexProfileSource.includes("kind: 'masked_token' as const"));
   assert(codexDetectorSource.includes('result.zeroize()'));
+  assert.deepEqual({
+    profileVersion: codexManifest.profileVersion,
+    provenance: codexManifest.provenance,
+    liveCapturePending: codexManifest.liveCapturePending,
+    recordedProvenanceStatus: codexManifest.recordedProvenanceStatus,
+    sanitized: codexManifest.sanitized,
+  }, {
+    profileVersion: '0.142.5',
+    provenance: 'schema-derived-contract',
+    liveCapturePending: true,
+    recordedProvenanceStatus: 'human_needed',
+    sanitized: true,
+  }, 'Codex fixture provenance remains schema-derived, sanitized, and live-capture pending');
+  for (const exactBillingCopy of [
+    'Included with your ChatGPT plan',
+    'Billed to the API key stored by Codex; dollar amount not reported.',
+  ]) {
+    assert.strictEqual(providersPanelSource.split(exactBillingCopy).length - 1, 1,
+      `Providers contains exact billing copy once: ${exactBillingCopy}`);
+    assert.strictEqual(delegationFeedSource.split(exactBillingCopy).length - 1, 1,
+      `delegation feed contains exact billing copy once: ${exactBillingCopy}`);
+  }
+  assert(!/_definition\([^\n]*['"]Profile['"]/.test(delegationFeedSource),
+    'shared delegation feed renders no Profile row');
+  assert(!/providerId\s*===\s*['"]codex['"]|case\s+['"]codex['"]/.test(delegationFeedSource),
+    'shared delegation feed has no Codex-specific renderer branch');
+  assert(delegationFeedSource.includes('summary.usd !== null'),
+    'accepted identity summaries reject non-null USD');
+  assert(/\.delegation-action\s*\{[\s\S]*?min-height:\s*44px/.test(sidepanelCssSource));
+  assert(/\.stop-btn\[data-delegation-action="stop"\]\s*\{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(
+    sidepanelCssSource,
+  ));
 
   console.log('agent-provider-forbidden-flags: all assertions passed');
 } finally {
