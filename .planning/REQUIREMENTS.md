@@ -86,7 +86,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **MULTI-02**: The OpenCode adapter ships a pinned agent definition (equivalent to Claude Code's `--agents fsb`) using OpenCode's `agent create` / `agents` config surface, keyed to a version pinned during phase spike.
 - [x] **MULTI-03**: A recorded OpenCode JSONL fixture under `tests/fixtures/agent-streams/opencode-1.14.25/` (or the latest pinned version) proves the adapter's event schema in CI without a live CLI.
 - [ ] **MULTI-04**: A Codex adapter (`mcp/src/agent-providers/codex.ts`) implements the `AgentProviderAdapter` contract, invoking `codex exec --json` with the current-verified flag set (v0.142.5 as baseline: use `--ephemeral` + `--ignore-user-config` for hermeticity; do not use the deprecated `--full-auto`).
-- [ ] **MULTI-05**: The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth vs API key vs unauthenticated and surfaces the state in the provider panel so the user knows which billing bucket a run will hit.
+- [x] **MULTI-05**: The Codex adapter's `detect()` correctly identifies auth via ChatGPT OAuth vs API key vs unauthenticated and surfaces the state in the provider panel so the user knows which billing bucket a run will hit.
 - [ ] **MULTI-06**: A recorded Codex JSONL fixture pins the event schema in CI, and the adapter's `caps()` correctly reports `chatMode: false` for v0.9.91 (task-mode only across all adapters).
 
 ## v2 Requirements
@@ -179,7 +179,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | MULTI-02 | Phase 64 | Complete |
 | MULTI-03 | Phase 64 | Complete |
 | MULTI-04 | Phase 65 | Pending |
-| MULTI-05 | Phase 65 | Pending |
+| MULTI-05 | Phase 65 | Complete |
 | MULTI-06 | Phase 65 | Pending |
 
 **Coverage:**
