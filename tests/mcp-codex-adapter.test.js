@@ -109,6 +109,21 @@ function descendantProbeScript(pidPath, markerPath, channel) {
   ].join('');
 }
 
+function successfulDescendantProbeScript(pidPath, markerPath) {
+  const descendant = [
+    "const fs = require('node:fs');",
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerPath)}, 'escaped'), 750);`,
+    'setInterval(() => {}, 1000);',
+  ].join('');
+  return [
+    "const fs = require('node:fs');",
+    "const { spawn } = require('node:child_process');",
+    `const descendant = spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], { stdio: 'ignore' });`,
+    `fs.writeFileSync(${JSON.stringify(pidPath)}, JSON.stringify({ root: process.pid, descendant: descendant.pid }));`,
+    'process.exit(0);',
+  ].join('');
+}
+
 function fakeProbeChild(pid) {
   const child = new EventEmitter();
   child.pid = pid;
@@ -329,6 +344,82 @@ async function runGenericProbeTests(
   assert.deepEqual(windowsTaskkillPids, [42_002]);
   assert(windowsPresencePids.length >= 1);
   assert(windowsPresencePids.every((pid) => pid === 42_002));
+
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'fsb-probe-success-tree-'));
+    const pidPath = path.join(temporaryDirectory, 'pids.json');
+    const markerPath = path.join(temporaryDirectory, 'escaped.marker');
+    let releaseSettlement;
+    let settlementStarted = false;
+    let resolved = false;
+    try {
+      const operation = runBoundedProcessProbe(descriptor([
+        '-e',
+        successfulDescendantProbeScript(pidPath, markerPath),
+      ]), {
+        terminateTree: async (pid, childClosed) => {
+          settlementStarted = true;
+          await new Promise((resolve) => { releaseSettlement = resolve; });
+          await processTreeModule.terminateDetachedProcessTree(pid, childClosed);
+        },
+      });
+      operation.then(() => { resolved = true; }, () => undefined);
+      await waitForCondition(() => fs.existsSync(pidPath) && settlementStarted);
+      const pids = JSON.parse(fs.readFileSync(pidPath, 'utf8'));
+      assert.equal(processIsPresent(pids.descendant), true,
+        'successful root leaves a real same-group descendant before settlement');
+      assert.equal(resolved, false, 'successful probe cannot resolve while its descendant exists');
+      releaseSettlement();
+      const result = await operation;
+      assert.equal(processIsPresent(pids.root), false, 'successful probe root is absent on resolve');
+      assert.equal(processIsPresent(pids.descendant), false,
+        'successful probe descendant is absent on resolve');
+      result.zeroize();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      assert.equal(fs.existsSync(markerPath), false,
+        'settled successful descendant cannot perform a delayed marker write');
+    } finally {
+      releaseSettlement?.();
+      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+
+  const windowsSuccessChild = fakeProbeChild(42_005);
+  const windowsSuccessTree = { root: true, descendant: true };
+  const windowsSuccess = runBoundedProcessProbe(descriptor(['synthetic']), {
+    spawn: () => windowsSuccessChild,
+    terminateTree: (pid, childClosed) => processTreeModule.terminateDetachedProcessTree(
+      pid,
+      childClosed,
+      {
+        platform: 'win32',
+        taskkill: async (targetPid) => {
+          assert.equal(targetPid, 42_005);
+          windowsSuccessTree.root = false;
+          windowsSuccessTree.descendant = false;
+        },
+        processPresent: () => windowsSuccessTree.root || windowsSuccessTree.descendant,
+        wait: async () => undefined,
+      },
+    ),
+  });
+  windowsSuccessChild.emit('close', 0, null);
+  const windowsSuccessResult = await windowsSuccess;
+  assert.deepEqual(windowsSuccessTree, { root: false, descendant: false },
+    'successful Windows probes invoke the supported full-tree mechanism');
+  windowsSuccessResult.zeroize();
+
+  const unsettledSuccessChild = fakeProbeChild(42_006);
+  const unsettledSuccessSource = Buffer.from('UNSETTLED_SUCCESS_SOURCE');
+  const unsettledSuccess = runBoundedProcessProbe(descriptor(['synthetic']), {
+    spawn: () => unsettledSuccessChild,
+    terminateTree: async () => { throw new Error('synthetic unsettled tree'); },
+  });
+  unsettledSuccessChild.stdout.emit('data', unsettledSuccessSource);
+  unsettledSuccessChild.emit('close', 0, null);
+  await assert.rejects(unsettledSuccess, (error) => error.code === 'tree_unsettled');
+  assert.equal(unsettledSuccessSource.every((byte) => byte === 0), true,
+    'failed success-path absence proof erases the exact emitted source');
 
   const sourceSuccessChild = fakeProbeChild(42_003);
   const successSources = [

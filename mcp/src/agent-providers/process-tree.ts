@@ -735,12 +735,14 @@ export async function terminateDetachedProcessTree(
   const signalGroup = dependencies.signalGroup
     ?? ((group, signal) => process.kill(group, signal));
   const groupPresent = dependencies.groupPresent ?? nativeGroupPresent;
+  let signaled = false;
   try {
     signalGroup(negativeGroupId, 'SIGTERM');
+    signaled = true;
   } catch (error) {
     if (errorCode(error) !== 'ESRCH') throw new TreeUnsettledError();
   }
-  await wait(Math.min(100, DEFAULT_FINAL_WAIT_MS));
+  if (signaled) await wait(Math.min(100, DEFAULT_FINAL_WAIT_MS));
   if (groupPresent(negativeGroupId)) {
     try {
       signalGroup(negativeGroupId, 'SIGKILL');

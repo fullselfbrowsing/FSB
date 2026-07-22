@@ -270,6 +270,7 @@ export function runBoundedProcessProbe(
     let stderrBytes = 0;
     let settled = false;
     let failureStarted = false;
+    let completionStarted = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let stdinBuffer: Buffer | null = descriptor.stdinBytes
       ? Buffer.from(descriptor.stdinBytes)
@@ -295,7 +296,7 @@ export function runBoundedProcessProbe(
     };
 
     const fail = (code: ProcessProbeFailureCode): void => {
-      if (settled || failureStarted) return;
+      if (settled || failureStarted || completionStarted) return;
       failureStarted = true;
       if (timer !== null) clearTimeout(timer);
       timer = null;
@@ -360,7 +361,7 @@ export function runBoundedProcessProbe(
     const onClose = (code: number | null, signal: NodeJS.Signals | null): void => {
       closePromiseResolve?.();
       closePromiseResolve = null;
-      if (settled || failureStarted) return;
+      if (settled || failureStarted || completionStarted) return;
       if (
         (code !== null && !Number.isSafeInteger(code))
         || (signal !== null && (typeof signal !== 'string' || signal.length === 0))
@@ -368,38 +369,62 @@ export function runBoundedProcessProbe(
         fail('invalid_exit');
         return;
       }
+      completionStarted = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      descriptor.signal?.removeEventListener('abort', onAbort);
+      child.stdout.removeListener('data', onStdout);
+      child.stderr.removeListener('data', onStderr);
+      stdinBuffer?.fill(0);
+      stdinBuffer = null;
 
-      let stdout: Buffer | null = null;
-      let stderr: Buffer | null = null;
-      try {
-        stdout = Buffer.concat(stdoutChunks, stdoutBytes);
-        stderr = Buffer.concat(stderrChunks, stderrBytes);
-      } catch {
-        if (stdout) stdout.fill(0);
-        if (stderr) stderr.fill(0);
-        fail('invalid_exit');
-        return;
-      } finally {
-        zeroBuffers(stdoutChunks);
-        zeroBuffers(stderrChunks);
-      }
+      const terminateTree = dependencies.terminateTree ?? terminateDetachedProcessTree;
+      void terminateTree(child.pid ?? 0, childClosed).then(
+        () => {
+          if (settled) return;
+          let stdout: Buffer | null = null;
+          let stderr: Buffer | null = null;
+          try {
+            stdout = Buffer.concat(stdoutChunks, stdoutBytes);
+            stderr = Buffer.concat(stderrChunks, stderrBytes);
+          } catch {
+            stdout?.fill(0);
+            stderr?.fill(0);
+            settled = true;
+            cleanup();
+            reject(new ProcessProbeError('invalid_exit'));
+            return;
+          } finally {
+            zeroBuffers(stdoutChunks);
+            zeroBuffers(stderrChunks);
+          }
 
-      settled = true;
-      cleanup();
-      let zeroed = false;
-      const ownedStdout = stdout;
-      const ownedStderr = stderr;
-      resolve(Object.freeze({
-        stdout: ownedStdout,
-        stderr: ownedStderr,
-        exit: Object.freeze({ code, signal }),
-        zeroize(): void {
-          if (zeroed) return;
-          zeroed = true;
-          ownedStdout.fill(0);
-          ownedStderr.fill(0);
+          settled = true;
+          cleanup();
+          let zeroed = false;
+          const ownedStdout = stdout;
+          const ownedStderr = stderr;
+          resolve(Object.freeze({
+            stdout: ownedStdout,
+            stderr: ownedStderr,
+            exit: Object.freeze({ code, signal }),
+            zeroize(): void {
+              if (zeroed) return;
+              zeroed = true;
+              ownedStdout.fill(0);
+              ownedStderr.fill(0);
+            },
+          }));
         },
-      }));
+        () => {
+          if (settled) return;
+          settled = true;
+          zeroBuffers(stdoutChunks);
+          zeroBuffers(stderrChunks);
+          cleanup();
+          reject(new ProcessProbeError('tree_unsettled'));
+        },
+      );
     };
 
     child.stdout.on('data', onStdout);
