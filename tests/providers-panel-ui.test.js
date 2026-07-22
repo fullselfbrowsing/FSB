@@ -84,6 +84,7 @@ function assertBalancedHtmlFragment(fragment, label) {
 const HTML = read('extension/ui/control_panel.html');
 const CSS = read('extension/ui/options.css');
 const JS = read('extension/ui/options.js');
+const SIDE_PANEL_CSS = read('extension/ui/sidepanel.css');
 const DELEGATION_PROVIDERS = require('../extension/utils/delegation-providers.js');
 const PROVIDERS = require('../extension/ui/providers-panel.js');
 
@@ -554,6 +555,21 @@ assert.match(narrowCompatibilityLayout[1],
   'narrow provider names and evidence stack without horizontal overflow');
 assert.doesNotMatch(narrowCompatibilityLayout[1], /\border\s*:/,
   'responsive CSS preserves native trailing DOM order instead of visually reordering children');
+assert.match(SIDE_PANEL_CSS,
+  /\.delegation-action\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*var\(--fsb-space-2\) var\(--fsb-space-4\)/s,
+  'shared delegated actions meet the 44px target without changing their spacing');
+assert.match(SIDE_PANEL_CSS,
+  /\.stop-btn\[data-delegation-action="stop"\]\s*\{[^}]*min-width:\s*44px[^}]*width:\s*44px[^}]*min-height:\s*44px[^}]*height:\s*44px/s,
+  'only the delegated fixed Stop receives the 44px-square composer override');
+assert.match(SIDE_PANEL_CSS,
+  /@media \(max-width: 350px\)[\s\S]*?\.delegation-state-actions,[\s\S]*?flex-direction:\s*column[\s\S]*?\.delegation-action\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/s,
+  'the <=350px delegated layout remains full-width, stacked, and 44px high');
+assert.match(SIDE_PANEL_CSS,
+  /\.delegation-action:focus-visible,[\s\S]*?box-shadow:\s*var\(--fsb-focus-ring\)/,
+  'delegated target sizing preserves the shared visible focus treatment');
+assert.match(SIDE_PANEL_CSS,
+  /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.stop-btn\[data-delegation-action="stop"\][\s\S]*?animation:\s*none !important/,
+  'delegated fixed Stop remains motionless under reduced-motion preference');
 
 const forcedColorsCompatibility = providerCss.match(/@media \(forced-colors: active\)\s*\{([\s\S]*?)\n\}/);
 assert.ok(forcedColorsCompatibility, 'compatibility defines a forced-colors treatment');

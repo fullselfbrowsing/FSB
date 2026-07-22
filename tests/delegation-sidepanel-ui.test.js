@@ -607,8 +607,8 @@ assert.equal(sha256(htmlSource.replace(delegationProviderScript, '')),
   '6185330e1d4d978f049684e469f8e8cd842f55086d338685358f9b4e5a7f19ba',
   'the nonvisual helper dependency is the only side-panel HTML delta');
 assert.equal(sha256(cssSource),
-  '88cdcf60a6a8e5087a3f910e158d5ebb8c81c513c674d19c064a04625b2c16bb',
-  'OpenCode adds no delegated side-panel CSS');
+  'e5ce10787a66e525123937fa6bef0d151c84c4c29b53333baeb8309d48d2c3ca',
+  'the intentional delegated target-size CSS delta is exact');
 
 {
   const context = { FsbDelegationProviders: DelegationProviders };
@@ -720,6 +720,17 @@ const delegationCssEnd = cssSource.indexOf(
   delegationCssStart
 );
 const delegationCss = cssSource.slice(delegationCssStart, delegationCssEnd);
+assert(/\.delegation-action\s*\{[^}]*min-height:\s*44px[^}]*padding:\s*var\(--fsb-space-2\) var\(--fsb-space-4\)/s.test(
+  delegationCss
+), 'every shared rectangular delegated action is at least 44px high without padding changes');
+assert(/\.stop-btn\[data-delegation-action="stop"\]\s*\{[^}]*min-width:\s*44px[^}]*width:\s*44px[^}]*min-height:\s*44px[^}]*height:\s*44px/s.test(
+  delegationCss
+), 'the fixed delegated Stop is at least 44px square');
+assert(/\.send-btn, \.stop-btn\s*\{[^}]*width:\s*36px[^}]*height:\s*36px/s.test(cssSource),
+  'the legacy non-delegated composer controls retain their established dimensions');
+assert(/@media \(max-width: 350px\)[\s\S]*?\.delegation-state-actions,[\s\S]*?flex-direction:\s*column[\s\S]*?\.delegation-action\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/s.test(
+  delegationCss
+), 'narrow delegated actions stack full-width without shrinking their target height');
 const spacingDeclarations = Array.from(delegationCss.matchAll(
   /^\s*(gap|margin(?:-[a-z-]+)?|padding(?:-[a-z-]+)?)\s*:\s*([^;]+);/gm
 ));
@@ -865,6 +876,7 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
 
   const claudeConsent = renderConsent(DelegationProviders.get('claude-code'));
   const openCodeConsent = renderConsent(DelegationProviders.get('opencode'));
+  const codexConsent = renderConsent(DelegationProviders.get('codex'));
   assert.equal(findAll(openCodeConsent.stateCard, 'h2')[0].textContent,
     'Let OpenCode control this browser?');
   assert(openCodeConsent.stateCard.textContent.includes(
@@ -881,6 +893,11 @@ assert(/e\.key === 'Escape'[\s\S]{0,120}_backToDelegationMessage\(\)/.test(panel
     findAll(claudeConsent.stateCard, 'button').map((button) => button.className),
     'Claude and OpenCode consent reuse identical actions and classes'
   );
+  assert.deepEqual(findAll(codexConsent.stateCard, 'button').map((button) => button.textContent),
+    ['Allow & start Codex', 'Back to message']);
+  assert(findAll(codexConsent.stateCard, 'button').every((button) => (
+    String(button.className).split(/\s+/).includes('delegation-action')
+  )), 'Codex Allow and Back reuse the shared 44px delegated action class');
   assert.equal(openCodeConsent.control.classList.contains('hidden'), true,
     'consent retains the existing hidden control bar');
 }

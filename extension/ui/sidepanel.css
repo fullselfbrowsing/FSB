@@ -2021,8 +2021,15 @@ body[data-sidepanel-view="history"] .author-footer {
   margin-top: var(--fsb-space-4);
 }
 
+.stop-btn[data-delegation-action="stop"] {
+  min-width: 44px;
+  width: 44px;
+  min-height: 44px;
+  height: 44px;
+}
+
 .delegation-action {
-  min-height: 36px;
+  min-height: 44px;
   padding: var(--fsb-space-2) var(--fsb-space-4);
   border: 1px solid var(--fsb-border-subtle);
   border-radius: 10px;
@@ -2130,6 +2137,7 @@ body[data-sidepanel-view="history"] .author-footer {
 
   .delegation-action {
     width: 100%;
+    min-height: 44px;
   }
 
   .delegation-result-grid {
