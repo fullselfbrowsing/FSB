@@ -112,10 +112,18 @@ async function main() {
       platforms: {
         'claude-code': {},
         opencode: {},
+        codex: {},
       },
       now: () => 700,
       execFile: (_file, _args, _options, callback) => callback(new Error('missing'), '', ''),
       detectOpenCode: async () => ({
+        installed: false,
+        version: null,
+        authState: 'unknown',
+        binary: null,
+        profileVersion: null,
+      }),
+      detectCodex: async () => ({
         installed: false,
         version: null,
         authState: 'unknown',
@@ -136,6 +144,7 @@ async function main() {
         platforms: {
           'claude-code': { detected: false, checkedAt: 700 },
           opencode: { detected: false, checkedAt: 700 },
+          codex: { detected: false, checkedAt: 700 },
         },
       }, 'createRuntime injects a lazy SDK client-version supplier');
     } finally {

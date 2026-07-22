@@ -258,10 +258,17 @@ async function main() {
 
   __configureClientInventoryForTests({
     platform: 'linux',
-    platforms: { 'claude-code': fakePlatform(), opencode: fakePlatform() },
+    platforms: { 'claude-code': fakePlatform(), opencode: fakePlatform(), codex: fakePlatform() },
     now: () => 1_783_900_000_000,
     execFile: (_file, _args, _options, callback) => callback(null, 'Claude Code 2.1.177', ''),
     detectOpenCode: async () => ({
+      installed: false,
+      version: null,
+      authState: 'unknown',
+      binary: null,
+      profileVersion: null
+    }),
+    detectCodex: async () => ({
       installed: false,
       version: null,
       authState: 'unknown',
@@ -286,6 +293,10 @@ async function main() {
           checkedAt: 1_783_900_000_000
         },
         opencode: {
+          detected: false,
+          checkedAt: 1_783_900_000_000
+        },
+        codex: {
           detected: false,
           checkedAt: 1_783_900_000_000
         }
@@ -389,6 +400,7 @@ async function main() {
   const systemInventory = {
     'claude-code': { detected: true, checkedAt: 1_783_900_001_000 },
     opencode: { detected: false, checkedAt: 1_783_900_001_000 },
+    codex: { detected: false, checkedAt: 1_783_900_001_000 },
     cursor: { detected: false, checkedAt: 1_783_900_001_000 }
   };
   const inventoryBridge = loadInventoryBridge(providers);
@@ -438,8 +450,11 @@ async function main() {
     reason: 'matrix_invalid',
     checkedAt: null
   }, 'absent offline compatibility evidence remains an explicit fail-closed projection');
+  assert.equal(claude.authState, 'unknown',
+    'absent offline compatibility evidence cannot infer provider authentication');
   assert.deepEqual(Object.keys(claude), [
-    'id', 'raw', 'displayName', 'clicked', 'installed', 'connected', 'live', 'compatibility'
+    'id', 'raw', 'displayName', 'clicked', 'installed', 'connected', 'live', 'compatibility',
+    'authState'
   ], 'final canonical row preserves all bounded evidence objects and exact shape');
 
   const rawUnknown = queryResponse.clients['raw:futuremcp'];

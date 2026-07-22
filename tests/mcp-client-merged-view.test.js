@@ -169,6 +169,12 @@ function assertExactRow(row, expected, message) {
   if (Object.prototype.hasOwnProperty.call(expected, 'compatibility')) {
     expectedKeys.push('compatibility');
   }
+  if (Object.prototype.hasOwnProperty.call(expected, 'authState')) {
+    expectedKeys.push('authState');
+  }
+  if (Object.prototype.hasOwnProperty.call(expected, 'acceptedIdentity')) {
+    expectedKeys.push('acceptedIdentity');
+  }
   assert.deepEqual(Object.keys(row), expectedKeys, `${message}: exact row keys`);
   assert.deepEqual(plain(row), expected, message);
 }
@@ -272,9 +278,10 @@ async function main() {
     live: null,
     compatibility: {
       status: 'unsupported',
-      reason: 'adapter_unshipped',
+      reason: 'matrix_invalid',
       checkedAt: null
-    }
+    },
+    authState: 'unknown'
   }, 'stale installed checkedAt is preserved without interpretation');
   assertExactRow(merged['claude-code'], {
     id: 'claude-code',
@@ -288,7 +295,8 @@ async function main() {
       status: 'unsupported',
       reason: 'matrix_invalid',
       checkedAt: null
-    }
+    },
+    authState: 'unknown'
   }, 'connected and live alias evidence joins without flattening');
   assertExactRow(merged['raw:novelagent'], {
     id: 'raw:novelagent',
