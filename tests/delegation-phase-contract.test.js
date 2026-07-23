@@ -13,7 +13,7 @@ const PRE_PHASE61_ROOT_TEST_HASH = '1f02d3f54f3136054ccb26f10dbff97e1c30ed7118ca
 const PHASE62_DIR = '.planning/phases/62-ci-drift-smoke-gate-doctor-extensions';
 const PHASE62_VALIDATION_PATH = `${PHASE62_DIR}/62-VALIDATION.md`;
 const PHASE62_UAT_PATH = `${PHASE62_DIR}/62-HUMAN-UAT.md`;
-const PRE_PHASE62_ROOT_TEST_HASH = 'cc320c1dfb3fefb292ebb8edc789993ec5fcd42a2b2ec2a057a37d4c49281808';
+const PRE_PHASE62_ROOT_TEST_HASH = '8069c2f916171cd373a073d52c5874aa29bad9a0710c7104efde6ce21ee9e282';
 const PHASE63_DIR = '.planning/phases/63-native-messaging-host';
 const PHASE63_UAT_PATH = `${PHASE63_DIR}/63-HUMAN-UAT.md`;
 const PHASE63_VALIDATION_PATH = `${PHASE63_DIR}/63-VALIDATION.md`;
@@ -2336,9 +2336,9 @@ check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
 check(rootCommands.indexOf('node tests/phase60-full-tests-harness.test.js')
   < rootCommands.indexOf('node tests/delegation-routing.test.js'),
 'the fail-safe workspace harness runs before Phase 61 focused gates');
-check(rootCommands.indexOf('node tests/delegation-phase-contract.test.js')
-  < rootCommands.indexOf('npm --prefix mcp run build'),
-'the artifact contract runs before the existing compiled MCP gate');
+check(rootCommands.indexOf('npm --prefix mcp run build')
+  < rootCommands.indexOf('node tests/delegation-event-store.test.js'),
+'the MCP build runs before the delegation event-store imports generated parser modules');
 
 console.log('\n--- roadmap goal, requirements, decisions, and threats ---');
 
