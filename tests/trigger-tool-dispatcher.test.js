@@ -192,6 +192,47 @@ async function caseMcpQueueCompanionsBypassPendingMutation() {
   }
 }
 
+async function caseMcpQueueLifecycleWaitsForPendingMutation() {
+  const queueModule = await import(pathToFileURL(MCP_BUILD_QUEUE_PATH).href);
+
+  for (const toolName of ['complete_task', 'partial_task', 'fail_task']) {
+    const queue = new queueModule.TaskQueue();
+    const events = [];
+    let releaseMutation;
+    const mutationGate = new Promise((resolve) => {
+      releaseMutation = resolve;
+    });
+
+    const mutation = queue.enqueue('click', async () => {
+      events.push('mutation:start');
+      await mutationGate;
+      events.push('mutation:end');
+      return 'mutation:done';
+    });
+    const lifecycle = queue.enqueue(toolName, async () => {
+      events.push(`${toolName}:run`);
+      return `${toolName}:done`;
+    });
+
+    const beforeRelease = await Promise.race([
+      lifecycle.then(() => `${toolName}:early`),
+      new Promise((resolve) => setTimeout(() => resolve(`${toolName}:waiting`), 25)),
+    ]);
+    assert.strictEqual(beforeRelease, `${toolName}:waiting`, `${toolName} waits behind a pending mutation`);
+    assert.deepStrictEqual(events, ['mutation:start'], `${toolName} has not run before the mutation finishes`);
+
+    releaseMutation();
+    const [mutationResult, lifecycleResult] = await Promise.all([mutation, lifecycle]);
+    assert.strictEqual(mutationResult, 'mutation:done', 'mutation resolves normally');
+    assert.strictEqual(lifecycleResult, `${toolName}:done`, `${toolName} resolves after the mutation`);
+    assert.deepStrictEqual(
+      events,
+      ['mutation:start', 'mutation:end', `${toolName}:run`],
+      `${toolName} runs only after the mutation completes`
+    );
+  }
+}
+
 async function caseMcpDispatcherTriggerRoutesDelegateToBackground() {
   const src = readSource(MCP_DISPATCHER_PATH);
   for (const messageType of ['mcp:trigger', 'mcp:stop-trigger', 'mcp:get-trigger-status', 'mcp:list-triggers']) {
@@ -1156,6 +1197,7 @@ async function caseAutopilotRejectsForeignOwner() {
   await runCase('MCP runtime registers trigger tools before manual tools', caseMcpRuntimeRegistersTriggerTools);
   await runCase('MCP TaskQueue derives read-only names from registry', caseMcpQueueDerivesReadOnlyTools);
   await runCase('MCP TaskQueue trigger companions bypass pending mutation', caseMcpQueueCompanionsBypassPendingMutation);
+  await runCase('MCP TaskQueue lifecycle outcomes wait behind pending mutation', caseMcpQueueLifecycleWaitsForPendingMutation);
   await runCase('MCP dispatcher trigger routes delegate to background helper', caseMcpDispatcherTriggerRoutesDelegateToBackground);
   await runCase('tool executor trigger routes delegate to background helper', caseToolExecutorTriggerRoutesDelegateToBackground);
   await runCase('tool executor runtime strips untrusted autopilot trigger fields', caseToolExecutorRuntimeStripsUntrustedAutopilotFields);

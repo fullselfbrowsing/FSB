@@ -137,6 +137,10 @@ jobs:
         run: npm --prefix showcase/angular run lint:i18n
       - name: Verify translation source drift (Phase 55 / CI-02..CI-04)
         run: npm --prefix showcase/angular run verify:translation-drift
+      - name: Exercise translation-tool adversarial fixtures
+        run: npm --prefix showcase/angular run test:translation-tools
+      - name: Reject English-copy and cross-locale-identical targets
+        run: npm --prefix showcase/angular run verify:translation-quality
       - name: Verify ng extract-i18n produces no diff (CI-02)
         run: |
           mkdir -p /tmp/extract-check

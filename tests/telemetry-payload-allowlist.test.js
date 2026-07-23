@@ -4,7 +4,7 @@
  * of comments.
  *
  * Phase 272 / v0.9.69. Enforces CONTEXT decision "Privacy gate" + BEAT-04 + the
- * 9-field allowlist (event_id, install_uuid, ts_minute, mcp_client, model,
+ * versioned allowlist (event_id, install_uuid, ts_minute, mcp_client, model,
  * tokens_in, tokens_out, active_agent_count, event_type). The collector is
  * the sole site that constructs the outbound beat payload, and the construction
  * MUST come from a narrow allowlist. Phase 271 row fields (tool, cost_usd,

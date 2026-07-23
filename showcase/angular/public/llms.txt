@@ -1,7 +1,7 @@
-<!-- generated 2026-07-07 by build-crawler-files.mjs; edit llms.source.md -->
+<!-- generated 2026-07-20 by build-crawler-files.mjs; edit llms.source.md -->
 # FSB (Full Self-Browsing)
 
-FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 56 browser tools, a 66-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.90 (extension) with fsb-mcp-server 0.10.0 (npm).
+FSB (Full Self-Browsing) is an open-source Chrome extension that automates the browser through natural language. You describe a task; FSB plans the clicks, types, and navigation to complete it. Multi-model AI (xAI, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, local), 56 browser tools, a 66-tool MCP surface, 142+ site guides, local-first execution, and BYO API keys. Current release: FSB v0.9.91 (extension) with fsb-mcp-server 0.11.0 (npm).
 
 FSB also works as an MCP browser layer for AI agents. Claude Code, Codex, Cursor, VS Code, Windsurf, OpenClaw, Hermes, and other MCP clients can use FSB to operate a real Chrome browser, inspect page state, verify outcomes, and keep the calling agent in the loop. The MCP surface includes trigger watchers (`trigger`, `stop_trigger`, `get_trigger_status`, `list_triggers`) for reactive DOM monitoring, real local file uploads (`upload_file`) and synthetic dropzone support (`drop_file`), and a 128-app native capability catalog where `search_capabilities` finds verified first-party API actions and `invoke_capability` runs them against the user's logged-in sessions with readiness labels such as `t1-ready`, `t1-guarded-fail-closed`, `learn-pending`, and `discovery-pending`, plus audit records.
 

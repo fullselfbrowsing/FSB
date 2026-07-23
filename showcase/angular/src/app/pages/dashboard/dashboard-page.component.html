@@ -6,27 +6,27 @@
         <i class="fa-solid fa-qrcode"></i>
       </div>
       <div class="dash-login-title">
-        <h2>Dashboard</h2>
-        <span class="dash-beta-badge">Beta</span>
+        <h2 i18n="@@dashboard.template.001">Dashboard</h2>
+        <span i18n="@@dashboard.template.002" class="dash-beta-badge">Beta</span>
       </div>
-      <p>Connect to your FSB extension</p>
+      <p i18n="@@dashboard.template.003">Connect to your FSB extension</p>
       <div class="dash-login-tabs">
-        <button class="dash-tab active" data-tab="scan" id="dash-tab-scan">Scan QR</button>
-        <button class="dash-tab" data-tab="paste" id="dash-tab-paste">Paste Key</button>
+        <button i18n="@@dashboard.template.004" class="dash-tab active" data-tab="scan" id="dash-tab-scan">Scan QR</button>
+        <button i18n="@@dashboard.template.005" class="dash-tab" data-tab="paste" id="dash-tab-paste">Paste Key</button>
       </div>
       <div class="dash-tab-content" id="tab-scan">
-        <p class="dash-scan-instruction">Point camera at QR code in FSB extension</p>
-        <div id="qr-reader" class="dash-qr-reader" aria-label="QR code camera viewfinder"></div>
+        <p i18n="@@dashboard.template.006" class="dash-scan-instruction">Point camera at QR code in FSB extension</p>
+        <div id="qr-reader" class="dash-qr-reader" aria-label="QR code camera viewfinder" i18n-aria-label="@@dashboard.template.007.ariaLabel"></div>
         <p id="dash-scan-error" class="dash-scan-error" style="display: none;"></p>
       </div>
       <div class="dash-tab-content" id="tab-paste" style="display: none;">
         <div class="dash-login-form">
-          <input type="text" id="dash-key-input" class="dash-input" placeholder="Enter your hash key..." spellcheck="false" autocomplete="off">
-          <button id="dash-connect-btn" class="btn btn-primary">
+          <input type="text" id="dash-key-input" class="dash-input" placeholder="Enter your hash key..." i18n-placeholder="@@dashboard.template.008.placeholder" spellcheck="false" autocomplete="off">
+          <button id="dash-connect-btn" class="btn btn-primary" i18n="@@dashboard.template.068">
             <i class="fa-solid fa-plug"></i> Connect with Key
           </button>
         </div>
-        <p class="dash-login-hint">Open the Sync tab in FSB to find your hash key and pair this dashboard.</p>
+        <p i18n="@@dashboard.template.009" class="dash-login-hint">Open the Sync tab in FSB to find your hash key and pair this dashboard.</p>
       </div>
       <p id="dash-login-message" class="dash-login-message" style="display: none;"></p>
     </div>
@@ -40,15 +40,15 @@
     <!-- Header -->
     <div class="dash-header">
       <div class="dash-header-left">
-        <h2>FSB Dashboard</h2>
-        <span id="dash-paired-badge" class="dash-paired-badge">Paired</span>
-        <span id="dash-sse-status" class="dash-sse-badge dash-sse-disconnected">offline</span>
-        <button id="dash-wake-btn" class="btn btn-sm dash-wake-btn" style="display: none;" title="Wake up the extension service worker">
+        <h2 i18n="@@dashboard.template.010">FSB Dashboard</h2>
+        <span i18n="@@dashboard.template.011" id="dash-paired-badge" class="dash-paired-badge">Paired</span>
+        <span i18n="@@dashboard.template.012" id="dash-sse-status" class="dash-sse-badge dash-sse-disconnected">offline</span>
+        <button id="dash-wake-btn" class="btn btn-sm dash-wake-btn" style="display: none;" title="Wake up the extension service worker" i18n-title="@@dashboard.template.013.title" i18n="@@dashboard.template.069">
           <i class="fa-solid fa-bell"></i> Wake Extension
         </button>
       </div>
       <button id="dash-disconnect-btn" class="btn btn-outline btn-sm dash-disconnect-btn">
-        <i class="fa-solid fa-right-from-bracket"></i><span class="dash-disconnect-label"> Disconnect</span>
+        <i class="fa-solid fa-right-from-bracket"></i><span i18n="@@dashboard.template.014" class="dash-disconnect-label"> Disconnect</span>
       </button>
     </div>
 
@@ -56,8 +56,8 @@
     <div id="dash-task-area" class="dash-task-area dash-task-idle" style="display: none;">
       <!-- Idle state: input bar -->
       <div class="dash-task-input-row" id="dash-task-input-row">
-        <input type="text" id="dash-task-input" class="dash-task-input" placeholder="What should FSB do?" autocomplete="off" spellcheck="false">
-        <button id="dash-task-submit" class="btn btn-primary dash-task-submit" aria-label="Submit task">
+        <input type="text" id="dash-task-input" class="dash-task-input" placeholder="What should FSB do?" i18n-placeholder="@@dashboard.template.015.placeholder" autocomplete="off" spellcheck="false">
+        <button id="dash-task-submit" class="btn btn-primary dash-task-submit" aria-label="Submit task" i18n-aria-label="@@dashboard.template.016.ariaLabel">
           <i class="fa-solid fa-arrow-right"></i>
         </button>
       </div>
@@ -79,7 +79,7 @@
         <div class="dash-task-recovery-status" id="dash-task-recovery-status" style="display: none;"></div>
         <div class="dash-task-action" id="dash-task-action"></div>
         <div class="dash-action-feed" id="dash-action-feed"></div>
-        <button id="dash-task-stop" class="btn btn-outline btn-sm dash-task-stop-btn"><i class="fa-solid fa-stop"></i> Stop Task</button>
+        <button id="dash-task-stop" class="btn btn-outline btn-sm dash-task-stop-btn" i18n="@@dashboard.template.070"><i class="fa-solid fa-stop"></i> Stop Task</button>
       </div>
 
       <!-- Success state: result view -->
@@ -87,38 +87,38 @@
         <div class="dash-task-status dash-task-status-success" id="dash-task-success-status"></div>
         <div class="dash-task-result" id="dash-task-result-text"></div>
         <div class="dash-task-input-row dash-task-input-again">
-          <input type="text" class="dash-task-input" id="dash-task-input-next" placeholder="What should FSB do?" autocomplete="off" spellcheck="false">
-          <button class="btn btn-primary dash-task-submit" id="dash-task-submit-next" aria-label="Submit task" disabled>
+          <input type="text" class="dash-task-input" id="dash-task-input-next" placeholder="What should FSB do?" i18n-placeholder="@@dashboard.template.017.placeholder" autocomplete="off" spellcheck="false">
+          <button class="btn btn-primary dash-task-submit" id="dash-task-submit-next" aria-label="Submit task" i18n-aria-label="@@dashboard.template.018.ariaLabel" disabled>
             <i class="fa-solid fa-arrow-right"></i>
           </button>
         </div>
         <!-- Save as Agent (post-task) -->
         <div id="dash-task-save-agent" class="dash-task-save-agent" style="display: none;">
-          <button id="dash-save-agent-trigger" class="dash-save-agent-trigger">
+          <button id="dash-save-agent-trigger" class="dash-save-agent-trigger" i18n="@@dashboard.template.071">
             Save as Agent <i class="fa-solid fa-chevron-down"></i>
           </button>
           <div id="dash-save-agent-fields" class="dash-save-agent-fields" style="display: none;">
             <div class="dash-save-agent-field">
-              <label>Agent Name</label>
-              <input type="text" id="dash-save-agent-name" class="dash-input" placeholder="e.g., Check stock prices">
+              <label i18n="@@dashboard.template.019">Agent Name</label>
+              <input type="text" id="dash-save-agent-name" class="dash-input" placeholder="e.g., Check stock prices" i18n-placeholder="@@dashboard.template.020.placeholder">
             </div>
             <div class="dash-save-agent-field">
-              <label>Target URL</label>
-              <input type="text" id="dash-save-agent-url" class="dash-input dash-input-mono" placeholder="https://example.com">
+              <label i18n="@@dashboard.template.021">Target URL</label>
+              <input type="text" id="dash-save-agent-url" class="dash-input dash-input-mono" placeholder="https://example.com" i18n-placeholder="@@dashboard.template.022.placeholder">
             </div>
             <div class="dash-save-agent-field">
-              <label>Schedule</label>
+              <label i18n="@@dashboard.template.023">Schedule</label>
               <div class="dash-schedule-type-row">
-                <button class="dash-schedule-pill active" data-type="interval">Interval</button>
-                <button class="dash-schedule-pill" data-type="daily">Daily</button>
-                <button class="dash-schedule-pill" data-type="once">Once</button>
+                <button i18n="@@dashboard.template.024" class="dash-schedule-pill active" data-type="interval">Interval</button>
+                <button i18n="@@dashboard.template.025" class="dash-schedule-pill" data-type="daily">Daily</button>
+                <button i18n="@@dashboard.template.026" class="dash-schedule-pill" data-type="once">Once</button>
               </div>
             </div>
             <div id="dash-save-agent-schedule-config" class="dash-schedule-config">
               <!-- Populated by JS based on schedule type -->
             </div>
             <div class="dash-save-agent-actions">
-              <button id="dash-save-agent-btn" class="btn btn-primary btn-sm">Save Agent</button>
+              <button i18n="@@dashboard.template.027" id="dash-save-agent-btn" class="btn btn-primary btn-sm">Save Agent</button>
             </div>
           </div>
         </div>
@@ -129,13 +129,13 @@
         <div class="dash-task-status dash-task-status-failed" id="dash-task-failed-status"></div>
         <div class="dash-task-error" id="dash-task-error-text"></div>
         <div class="dash-task-retry-row">
-          <button class="btn btn-outline btn-sm dash-task-retry" id="dash-task-retry">
+          <button class="btn btn-outline btn-sm dash-task-retry" id="dash-task-retry" i18n="@@dashboard.template.072">
             <i class="fa-solid fa-rotate-right"></i> Retry Task
           </button>
         </div>
         <div class="dash-task-input-row dash-task-input-again">
-          <input type="text" class="dash-task-input" id="dash-task-input-retry" placeholder="What should FSB do?" autocomplete="off" spellcheck="false">
-          <button class="btn btn-primary dash-task-submit" id="dash-task-submit-retry" aria-label="Submit task" disabled>
+          <input type="text" class="dash-task-input" id="dash-task-input-retry" placeholder="What should FSB do?" i18n-placeholder="@@dashboard.template.028.placeholder" autocomplete="off" spellcheck="false">
+          <button class="btn btn-primary dash-task-submit" id="dash-task-submit-retry" aria-label="Submit task" i18n-aria-label="@@dashboard.template.029.ariaLabel" disabled>
             <i class="fa-solid fa-arrow-right"></i>
           </button>
         </div>
@@ -148,43 +148,38 @@
         <div class="dash-preview-status-wrap">
           <div class="dash-preview-status" id="dash-preview-status"></div>
           <div class="dash-preview-rc-state" id="dash-preview-rc-state" style="display: none;"></div>
-          <span class="dash-preview-tooltip" id="dash-preview-tooltip">No stream data</span>
+          <span i18n="@@dashboard.template.030" class="dash-preview-tooltip" id="dash-preview-tooltip">No stream data</span>
         </div>
         <div class="dash-preview-controls">
-          <!-- Phase 276 STREAM-04: Resync button. Forces a fresh dom-stream-start
-               via the existing requestPreviewResync pathway. Reuses the same
-               recovery surface the stale-mutation watchdog already triggers.
-               No i18n attributes -- aria/title strings live in this static
-               control surface (parity with the existing PiP/Maximize buttons
-               which are also untranslated). -->
-          <button class="dash-preview-btn dash-preview-resync-btn" id="dash-preview-resync-btn" title="Resync stream" aria-label="Resync stream">
+          <!-- Forces a fresh stream through the same recovery path used by the stale-mutation watchdog. -->
+          <button class="dash-preview-btn dash-preview-resync-btn" id="dash-preview-resync-btn" title="Resync stream" i18n-title="@@dashboard.template.031.title" aria-label="Resync stream" i18n-aria-label="@@dashboard.template.032.ariaLabel">
             <i class="fa-solid fa-rotate"></i>
           </button>
-          <button class="dash-preview-btn" id="dash-preview-rc-btn" title="Remote control" disabled>
+          <button class="dash-preview-btn" id="dash-preview-rc-btn" title="Remote control" i18n-title="@@dashboard.template.033.title" disabled>
             <i class="fa-solid fa-hand-pointer"></i>
           </button>
-          <button class="dash-preview-btn" id="dash-preview-pip-btn" title="Picture-in-picture">
+          <button class="dash-preview-btn" id="dash-preview-pip-btn" title="Picture-in-picture" i18n-title="@@dashboard.template.034.title">
             <i class="fa-solid fa-window-restore"></i>
           </button>
-          <button class="dash-preview-btn" id="dash-preview-maximize-btn" title="Maximize">
+          <button class="dash-preview-btn" id="dash-preview-maximize-btn" title="Maximize" i18n-title="@@dashboard.template.035.title">
             <i class="fa-solid fa-expand"></i>
           </button>
-          <button class="dash-preview-btn" id="dash-preview-fullscreen-btn" title="Fullscreen">
+          <button class="dash-preview-btn" id="dash-preview-fullscreen-btn" title="Fullscreen" i18n-title="@@dashboard.template.036.title">
             <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
           </button>
-          <button class="dash-preview-btn dash-preview-toggle" id="dash-preview-toggle" title="Pause stream">
+          <button class="dash-preview-btn dash-preview-toggle" id="dash-preview-toggle" title="Pause stream" i18n-title="@@dashboard.template.037.title">
             <i class="fa-solid fa-pause"></i>
           </button>
         </div>
       </div>
       <div class="dash-preview-urlbar" id="dash-preview-urlbar">
-        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-back" type="button" title="Back" aria-label="Back">
+        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-back" type="button" title="Back" i18n-title="@@dashboard.template.038.title" aria-label="Back" i18n-aria-label="@@dashboard.template.039.ariaLabel">
           <i class="fa-solid fa-arrow-left"></i>
         </button>
-        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-forward" type="button" title="Forward" aria-label="Forward">
+        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-forward" type="button" title="Forward" i18n-title="@@dashboard.template.040.title" aria-label="Forward" i18n-aria-label="@@dashboard.template.041.ariaLabel">
           <i class="fa-solid fa-arrow-right"></i>
         </button>
-        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-reload" type="button" title="Reload" aria-label="Reload">
+        <button class="dash-preview-urlbar-btn" id="dash-preview-urlbar-reload" type="button" title="Reload" i18n-title="@@dashboard.template.042.title" aria-label="Reload" i18n-aria-label="@@dashboard.template.043.ariaLabel">
           <i class="fa-solid fa-rotate-right"></i>
         </button>
         <form class="dash-preview-urlbar-form" id="dash-preview-urlbar-form" autocomplete="off">
@@ -192,29 +187,29 @@
             type="text"
             id="dash-preview-urlbar-input"
             class="dash-preview-urlbar-input"
-            placeholder="Enter URL or search..."
+            placeholder="Enter URL or search..." i18n-placeholder="@@dashboard.template.044.placeholder"
             autocomplete="off"
             spellcheck="false"
-            aria-label="Navigate browser to URL"
+            aria-label="Navigate browser to URL" i18n-aria-label="@@dashboard.template.045.ariaLabel"
           />
-          <button class="dash-preview-urlbar-go" id="dash-preview-urlbar-go" type="submit" title="Go" aria-label="Go">
+          <button class="dash-preview-urlbar-go" id="dash-preview-urlbar-go" type="submit" title="Go" i18n-title="@@dashboard.template.046.title" aria-label="Go" i18n-aria-label="@@dashboard.template.047.ariaLabel">
             <i class="fa-solid fa-arrow-right"></i>
           </button>
         </form>
       </div>
       <div class="dash-preview-loading" id="dash-preview-loading">
         <div class="dash-spinner"></div>
-        <span>Connecting to browser...</span>
+        <span i18n="@@dashboard.template.048">Connecting to browser...</span>
       </div>
       <div id="dash-preview-restricted" class="dash-preview-restricted" style="display: none;">
         <div class="dash-preview-restricted-card">
           <div class="dash-preview-restricted-icon"><i class="fa-solid fa-window-maximize"></i></div>
-          <div class="dash-preview-restricted-title" id="dash-preview-restricted-title">New Tab</div>
+          <div i18n="@@dashboard.template.049" class="dash-preview-restricted-title" id="dash-preview-restricted-title">New Tab</div>
           <div class="dash-preview-restricted-url" id="dash-preview-restricted-url"></div>
-          <div class="dash-preview-restricted-hint">This page can't be streamed. Use the URL bar above to open a website.</div>
+          <div i18n="@@dashboard.template.050" class="dash-preview-restricted-hint">This page can't be streamed. Use the URL bar above to open a website.</div>
         </div>
       </div>
-      <div id="dash-preview-viewer" class="dash-preview-viewer" aria-label="Live page preview"></div>
+      <div id="dash-preview-viewer" class="dash-preview-viewer" aria-label="Live page preview" i18n-aria-label="@@dashboard.template.051.ariaLabel"></div>
       <div id="dash-preview-glow" class="dash-preview-glow" style="display: none;"></div>
       <div id="dash-remote-overlay" class="dash-remote-overlay" style="display: none;"></div>
       <div id="dash-preview-progress" class="dash-preview-progress" style="display: none;">
@@ -229,27 +224,27 @@
           <div class="dash-preview-dialog-icon">
             <i class="fa-solid fa-message"></i>
           </div>
-          <div class="dash-preview-dialog-type" id="dash-preview-dialog-type">Alert</div>
+          <div i18n="@@dashboard.template.052" class="dash-preview-dialog-type" id="dash-preview-dialog-type">Alert</div>
           <div class="dash-preview-dialog-message" id="dash-preview-dialog-message"></div>
         </div>
       </div>
       <div id="dash-preview-disconnected" class="dash-preview-disconnected" style="display: none;">
-        <span>Stream disconnected</span>
+        <span i18n="@@dashboard.template.053">Stream disconnected</span>
       </div>
       <div id="dash-preview-error" class="dash-preview-error" style="display: none;">
         <i class="fa-solid fa-exclamation-triangle"></i>
-        <p>Could not load page preview</p>
-        <span>The extension may have navigated to a restricted page</span>
+        <p i18n="@@dashboard.template.054">Could not load page preview</p>
+        <span i18n="@@dashboard.template.055">The extension may have navigated to a restricted page</span>
       </div>
       <div id="dash-preview-fs-exit" class="dash-preview-fs-exit" style="display: none;">
-        <button class="dash-preview-fs-exit-btn" title="Exit fullscreen">
+        <button class="dash-preview-fs-exit-btn" title="Exit fullscreen" i18n-title="@@dashboard.template.056.title">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
       <div id="dash-preview-frozen-overlay" class="dash-preview-frozen-overlay" style="display: none;">
         <div class="dash-preview-frozen-stack">
           <span id="dash-preview-frozen-badge" class="dash-preview-client-badge dash-preview-client-badge-frozen" style="display: none;"></span>
-          <span class="dash-preview-frozen-label">Disconnected</span>
+          <span i18n="@@dashboard.template.057" class="dash-preview-frozen-label">Disconnected</span>
         </div>
       </div>
     </div>
@@ -258,32 +253,32 @@
     <div class="dash-stats-bar">
       <div class="dash-stat-card">
         <div class="dash-stat-value" id="stat-enabled">0</div>
-        <div class="dash-stat-label">Total Tokens</div>
+        <div i18n="@@dashboard.template.058" class="dash-stat-label">Total Tokens</div>
       </div>
       <div class="dash-stat-card">
         <div class="dash-stat-value" id="stat-runs-today">0</div>
-        <div class="dash-stat-label">Requests</div>
+        <div i18n="@@dashboard.template.059" class="dash-stat-label">Requests</div>
       </div>
       <div class="dash-stat-card">
         <div class="dash-stat-value" id="stat-success-rate">0%</div>
-        <div class="dash-stat-label">Success Rate</div>
+        <div i18n="@@dashboard.template.060" class="dash-stat-label">Success Rate</div>
       </div>
       <div class="dash-stat-card">
         <div class="dash-stat-value" id="stat-total-cost">$0.00</div>
-        <div class="dash-stat-label">Total Cost</div>
+        <div i18n="@@dashboard.template.061" class="dash-stat-label">Total Cost</div>
       </div>
       <div class="dash-stat-card">
-        <div class="dash-stat-value" id="stat-cost-saved">Offline</div>
-        <div class="dash-stat-label">Remote</div>
+        <div i18n="@@dashboard.template.062" class="dash-stat-value" id="stat-cost-saved">Offline</div>
+        <div i18n="@@dashboard.template.063" class="dash-stat-label">Remote</div>
       </div>
     </div>
 
     <!-- DEPRECATED v0.9.45rc1: superseded by OpenClaw / Claude Routines -- see PROJECT.md -->
     <section class="dash-section dash-section-card" id="dash-agents-sunset">
       <div class="dash-empty-state">
-        <h3>Background agents have moved.</h3>
-        <p>FSB no longer ships scheduled or recurring agent runs. For that work, the recommended successors are <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer">OpenClaw</a> (open-source agent loop) and <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer">Claude Routines</a> (managed long-running automations). The dashboard above continues to show live remote-control state and DOM streaming for one-shot task execution.</p>
-        <p class="dash-empty-state-footer"><small>Retired in v0.9.45rc1 (April 2026)</small></p>
+        <h3 i18n="@@dashboard.template.064">Background agents have moved.</h3>
+        <p i18n="@@dashboard.template.073">FSB no longer ships scheduled or recurring agent runs. For that work, the recommended successors are <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener noreferrer">OpenClaw</a> (open-source agent loop) and <a href="https://www.anthropic.com/claude/routines" target="_blank" rel="noopener noreferrer">Claude Routines</a> (managed long-running automations). The dashboard above continues to show live remote-control state and DOM streaming for one-shot task execution.</p>
+        <p class="dash-empty-state-footer"><small i18n="@@dashboard.template.067">Retired in v0.9.45rc1 (April 2026)</small></p>
       </div>
     </section>
   </div>

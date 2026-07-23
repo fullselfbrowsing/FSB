@@ -618,8 +618,8 @@ function testManifestAndBackgroundAuthority() {
     .digest('hex');
   assertEqual(
     baselineHash,
-    '838c12927d31d5595e827d137feed455ac4f1d6d8866915b9bb219c3379c0476',
-    'every other manifest byte remains unchanged'
+    '2f4ab2e6cb3e412afa0b6351dc07f3f715f0931451b0198a327c8de1e0da2eaf',
+    'every other manifest byte matches the merged 0.9.91 release baseline'
   );
 
   console.log('\n--- manifest-and-authority: background-only native surface ---');

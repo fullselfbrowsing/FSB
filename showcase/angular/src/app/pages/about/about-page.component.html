@@ -114,7 +114,7 @@
             @for (category of categories; track category.name) {
               <span class="cat-legend-item">
                 <span class="cat-dot" [style.background]="category.color" aria-hidden="true"></span>
-                <span [attr.translate]="'no'">{{ category.name }}</span>
+                <span>{{ category.name }}</span>
                 <span class="cat-count" [attr.translate]="'no'">{{ category.count }}</span>
               </span>
             }

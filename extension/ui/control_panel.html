@@ -814,6 +814,43 @@
               </div>
             </div>
 
+            <div class="settings-card full-width" id="mcpSessionReplaySettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-clock-rotate-left"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>MCP Session Replay</h3>
+                  <p>Local, exact-fidelity history for MCP agent actions</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="fsbMcpSessionRecordingEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Record MCP sessions for replay</span>
+                      <span class="toggle-desc">Stores replay data locally while redacting secret-bearing fields and sensitive inputs. Ordinary typed text and action results remain available for replay. MCP clients can save a local task memory by providing a secret-free completion, partial, or failure summary; no separate AI-provider call is made. Turning this off stops future MCP recording and saves any open recording. Existing MCP replay history stores up to the 50 most recent sessions, and no session is kept longer than the configured retention period. Autopilot history is unaffected.</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-label">
+                    <span>MCP replay retention (days)</span>
+                    <div class="fsb-stepper" data-min="1" data-max="365" data-step="1">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease MCP replay retention"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbMcpSessionRetentionDays" value="30" aria-label="MCP replay retention days">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase MCP replay retention"><i class="fas fa-plus"></i></button>
+                    </div>
+                  </div>
+                  <div class="setting-hint">Default 30. Range 1 to 365 days. This automatically deletes expired MCP replay sessions only; Autopilot history is never pruned by this setting.</div>
+                </div>
+              </div>
+            </div>
+
             <!-- Performance Card -->
             <div class="settings-card full-width">
               <div class="settings-card-header">
@@ -1264,7 +1301,7 @@
               </div>
               <div class="site-graph-detail-toggle" id="knowledgeDetailToggle">
                 <button class="detail-btn active" data-level="simple">Overview</button>
-                <button class="detail-btn" data-level="full">Full Detail</button>
+                <button class="detail-btn" data-level="full">Expanded</button>
               </div>
             </div>
 
@@ -2037,7 +2074,7 @@
           <div class="branding-section">
             <div class="branding-content">
               <div class="fsb-foot-brand">
-                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.90</span>
+                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.91</span>
               </div>
             </div>
           </div>

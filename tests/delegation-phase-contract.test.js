@@ -128,6 +128,24 @@ const PHASE65_NEW_ROOT_COMMANDS = Object.freeze([
   'node tests/mcp-codex-adapter.test.js',
 ]);
 
+const REFINEMENT_ROOT_TEST_COMMANDS = Object.freeze([
+  'node tests/mcp-session-recorder.test.js',
+  'node tests/automation-logger-mcp-retention.test.js',
+  'node tests/mcp-session-settings-ui.test.js',
+  'node tests/knowledge-graph-dedup.test.js',
+  'node tests/telemetry-registry-bootstrap.test.js',
+  'node tests/server-telemetry-parser-rate-limit.test.js',
+  'node tests/server-telemetry-ip-daily-budget.test.js',
+  'node tests/telemetry-active-tracker-bounds.test.js',
+  'node tests/telemetry-uuid-budget-memory.test.js',
+  'node tests/stats-view-state.test.js',
+  'node tests/showcase-route-fallback.test.js',
+  'node tests/server-legacy-html-redirects.test.js',
+  'node tests/settings-card-select-clipping.test.js',
+  'node tests/control-panel-scroll-containment.test.js',
+  'node --test tests/google-sheets-session.test.js tests/google-sheets-content-actions.test.js tests/gsheets-handler.test.js tests/google-sheets-wiring.test.js tests/spreadsheet-record-redaction.test.js',
+]);
+
 const PHASE64_RETAINED_ROOT_COMMANDS = Object.freeze([
   'node tests/agent-provider-forbidden-flags.test.js',
   'node tests/delegation-routing.test.js',
@@ -2297,6 +2315,10 @@ check(planSources[7].includes('  - "61-07"'), 'Plan 08 evidence gate follows the
 console.log('\n--- serial root-chain inclusion and prior-gate preservation ---');
 
 const rootCommands = packageJson.scripts.test.split(' && ');
+for (const command of REFINEMENT_ROOT_TEST_COMMANDS) {
+  check(rootCommands.filter((candidate) => candidate === command).length === 1,
+    `${command} appears exactly once in the refinements root chain`);
+}
 for (const command of PHASE61_NEW_TEST_COMMANDS) {
   check(rootCommands.filter((candidate) => candidate === command).length === 1,
     `${command} appears exactly once in the serial root chain`);
@@ -2307,6 +2329,7 @@ const prePhase61Commands = rootCommands.filter((command) => (
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
+  && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase61Commands.join(' && ')) === PRE_PHASE61_ROOT_TEST_HASH,
   'removing the six new Phase 61 gates reproduces the exact prior serial chain');
@@ -3058,6 +3081,7 @@ const prePhase62Commands = rootCommands.filter((command) => (
   && !PHASE63_NEW_TEST_COMMANDS.includes(command)
   && !PHASE64_NEW_ROOT_COMMANDS.includes(command)
   && !PHASE65_NEW_ROOT_COMMANDS.includes(command)
+  && !REFINEMENT_ROOT_TEST_COMMANDS.includes(command)
 ));
 check(digest(prePhase62Commands.join(' && ')) === PRE_PHASE62_ROOT_TEST_HASH,
   'removing the three Phase 62 gates reproduces the exact prior serial chain');

@@ -162,6 +162,309 @@
       "backing": "recipe"
     },
     {
+      "slug": "gsheets.append_values",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "append rows to google sheets",
+        "add spreadsheet values",
+        "insert rows in sheets"
+      ],
+      "description": "Append rows after the table found in an explicit A1 notation range.",
+      "actionVerb": "append",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{10,200}$",
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "A1 notation range."
+          },
+          "values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {
+              "type": "array",
+              "maxItems": 10000,
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "description": "Two-dimensional rows of JSON scalar cell values."
+          },
+          "valueInputOption": {
+            "type": "string",
+            "enum": [
+              "RAW",
+              "USER_ENTERED"
+            ]
+          },
+          "insertDataOption": {
+            "type": "string",
+            "enum": [
+              "OVERWRITE",
+              "INSERT_ROWS"
+            ]
+          }
+        },
+        "required": [
+          "range",
+          "values"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "handler",
+      "provenance": {
+        "source": "fsb",
+        "sourcePath": "catalog/handlers/gsheets.js",
+        "license": "Apache-2.0",
+        "signals": {
+          "transportHelper": "page-gapi-ui-sheets-session",
+          "httpMethod": "POST",
+          "opNameVerb": "append"
+        }
+      }
+    },
+    {
+      "slug": "gsheets.clear_values",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "clear google sheet cells",
+        "erase a spreadsheet range",
+        "delete values in sheets"
+      ],
+      "description": "Clear values from an explicit A1 notation range while preserving formatting.",
+      "actionVerb": "clear",
+      "sideEffectClass": "destructive",
+      "params": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{10,200}$",
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "A1 notation range."
+          }
+        },
+        "required": [
+          "range"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "handler",
+      "provenance": {
+        "source": "fsb",
+        "sourcePath": "catalog/handlers/gsheets.js",
+        "license": "Apache-2.0",
+        "signals": {
+          "transportHelper": "page-gapi-ui-sheets-session",
+          "httpMethod": "POST",
+          "opNameVerb": "clear"
+        }
+      }
+    },
+    {
+      "slug": "gsheets.get_spreadsheet",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "get spreadsheet metadata",
+        "inspect a google sheet",
+        "list sheets in a spreadsheet"
+      ],
+      "description": "Get spreadsheet properties and sheet metadata without loading cell grids.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{10,200}$",
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
+          }
+        },
+        "additionalProperties": false
+      },
+      "backing": "handler",
+      "provenance": {
+        "source": "fsb",
+        "sourcePath": "catalog/handlers/gsheets.js",
+        "license": "Apache-2.0",
+        "signals": {
+          "transportHelper": "page-gapi-ui-sheets-session",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "gsheets.get_values",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "read google sheet cells",
+        "get spreadsheet values",
+        "read a range in sheets"
+      ],
+      "description": "Read values from an explicit A1 notation range.",
+      "actionVerb": "get",
+      "sideEffectClass": "read",
+      "params": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{10,200}$",
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "A1 notation range."
+          },
+          "majorDimension": {
+            "type": "string",
+            "enum": [
+              "ROWS",
+              "COLUMNS"
+            ]
+          },
+          "valueRenderOption": {
+            "type": "string",
+            "enum": [
+              "FORMATTED_VALUE",
+              "UNFORMATTED_VALUE",
+              "FORMULA"
+            ]
+          },
+          "dateTimeRenderOption": {
+            "type": "string",
+            "enum": [
+              "SERIAL_NUMBER",
+              "FORMATTED_STRING"
+            ]
+          }
+        },
+        "required": [
+          "range"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "handler",
+      "provenance": {
+        "source": "fsb",
+        "sourcePath": "catalog/handlers/gsheets.js",
+        "license": "Apache-2.0",
+        "signals": {
+          "transportHelper": "page-gapi-ui-sheets-session",
+          "httpMethod": "GET",
+          "opNameVerb": "get"
+        }
+      }
+    },
+    {
+      "slug": "gsheets.update_values",
+      "service": "docs.google.com",
+      "intentSynonyms": [
+        "write google sheet cells",
+        "update spreadsheet values",
+        "set a range in sheets"
+      ],
+      "description": "Replace values in an explicit A1 notation range.",
+      "actionVerb": "update",
+      "sideEffectClass": "write",
+      "params": {
+        "type": "object",
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{10,200}$",
+            "description": "Spreadsheet ID. When provided, it must match the spreadsheet open in the agent-owned Google Sheets tab."
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "A1 notation range."
+          },
+          "values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {
+              "type": "array",
+              "maxItems": 10000,
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "description": "Two-dimensional rows of JSON scalar cell values."
+          },
+          "valueInputOption": {
+            "type": "string",
+            "enum": [
+              "RAW",
+              "USER_ENTERED"
+            ]
+          }
+        },
+        "required": [
+          "range",
+          "values"
+        ],
+        "additionalProperties": false
+      },
+      "backing": "handler",
+      "provenance": {
+        "source": "fsb",
+        "sourcePath": "catalog/handlers/gsheets.js",
+        "license": "Apache-2.0",
+        "signals": {
+          "transportHelper": "page-gapi-ui-sheets-session",
+          "httpMethod": "PUT",
+          "opNameVerb": "update"
+        }
+      }
+    },
+    {
       "slug": "notion.loadPage",
       "service": "app.notion.com",
       "intentSynonyms": [

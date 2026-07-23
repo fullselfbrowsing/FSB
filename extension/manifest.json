@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "FSB v0.9.90",
-  "version": "0.9.90",
+  "name": "FSB v0.9.91",
+  "version": "0.9.91",
   "minimum_chrome_version": "116",
   "description": "FSB - Universal AI-powered browser automation assistant with multi-model support",
   "homepage_url": "https://full-selfbrowsing.com",

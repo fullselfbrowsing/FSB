@@ -1,37 +1,54 @@
 # Showcase i18n boundaries
 
-Policy for which Angular templates must pass `npm run lint:i18n` and which are permanently excluded.
+Policy for Angular templates covered by `npm run lint:i18n`.
+
+> **Current-policy note (2026-07-15):** This document supersedes the completed
+> v1.2.0 CI-05 decision that excluded the dashboard from localization. The
+> v1.2.0 planning artifacts retain that original scope as historical record.
 
 ## In scope (must pass `lint:i18n`)
 
-All marketing and public showcase HTML under `src/app/**`, including:
+All showcase HTML under `src/app/**`, including:
 
 - Home, about, agents, privacy, support, legal, sitemaps
 - Product pages: lattice, phantom-stream, prometheus
+- Dashboard (authenticated application surface)
 - **Stats** (`src/app/pages/stats/**`) — included as of Phase 54 (CI-01), after Phase 53 verified live XLIFF coverage at 100%/100% across es/de/ja/zh-CN/zh-TW (see `.planning/phases/53-trans-unit-resync-stats-translation-transcreation-review/53-STATS-RECONCILIATION.md`)
 
 The npm script is:
 
 ```text
-eslint "src/**/*.html" --ignore-pattern "src/app/pages/dashboard/**"
+eslint "src/**/*.html"
 ```
 
-## Permanently out of scope: dashboard
+The former dashboard exemption was removed after it allowed an English-only route to
+sit behind a localized shell. Static dashboard copy now follows the same marker and
+catalog requirements as every other route; runtime-generated copy uses `$localize`.
 
-**Path:** `src/app/pages/dashboard/**`  
-**Requirement:** CI-05 (v1.2.0 Showcase i18n Completeness)
+The same requirement applies to user-facing TypeScript strings, metadata, JSON-LD,
+and labels supplied to JavaScript-rendered UI. Those strings use `$localize` even
+when they do not appear directly in an Angular template.
 
-The dashboard is an **authenticated app surface**, not marketing content. It stays on the `lint:i18n` ignore-pattern **by design**, not as deferred translation debt.
+`npm run verify:translation-quality` rejects missing targets, stale/orphan units,
+placeholder changes, protected-literal changes, copied-English targets, retained
+English prose, over-broad non-code `translate=no` prose, translator annotations,
+unbalanced parentheses, invariant technical-term corruption, and targets shared
+across every locale. Only genuine
+invariants (brands, commands, code identifiers, versions, and similar tokens) may
+remain source-equal. Exact-copy exceptions in `same-source-allowlist.json` are
+bound to the current source hash; locale-specific punctuation equivalents are
+bound to both the source and target hashes. A wording change therefore requires a
+fresh review instead of silently inheriting an old exception.
 
-Rationale:
-
-- Copy and UX track the logged-in product experience, not the public locale marketing site.
-- Translating it would imply the same six-locale marketing bar without a product decision to ship a localized app shell.
-- REQUIREMENTS.md lists “Dashboard page translation” under Out of Scope as an explicit permanent boundary.
-
-Do **not** remove the dashboard ignore-pattern without a new milestone that deliberately scopes dashboard localization.
+Captured web-page DOM and arbitrary text supplied by users, web pages, extensions,
+or AI providers remain producer-owned and are not rewritten. Package-owned viewer
+chrome and known runtime status values are localized before presentation. This
+boundary prevents localization from corrupting mirrored pages or changing the raw
+dashboard/extension protocol payload.
 
 ## Related docs
 
 - `DO-NOT-TRANSLATE.md` — brand/term rules for XLIFF targets
-- `.planning/REQUIREMENTS.md` — CI-01, CI-05
+- `same-source-allowlist.json` — hash-bound invariant and punctuation-equivalent exceptions
+- `.planning/REQUIREMENTS.md` — historical v1.2.0 requirements; CI-05 is
+  superseded for the current dashboard policy

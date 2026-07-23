@@ -1,4 +1,4 @@
-// Background service worker for FSB v0.9.90
+// Background service worker for FSB v0.9.91
 
 // Import configuration and AI integration modules
 // Phase 269 / v0.9.69: install-identity.js MUST load FIRST so that any
@@ -70,6 +70,7 @@ try { importScripts('utils/trigger-lifecycle.js'); } catch (e) { console.error('
 // remain DOM-bound but are not invoked here -- SW reaches them via
 // chrome.scripting.executeScript injection inside wrapWithChangeReport.
 try { importScripts('utils/action-verification.js'); } catch (e) { console.error('[FSB] Failed to load action-verification.js:', e.message); }
+try { importScripts('utils/spreadsheet-record-redaction.js'); } catch (e) { console.error('[FSB] Failed to load spreadsheet-record-redaction.js:', e.message); }
 try { importScripts('ws/mcp-tool-dispatcher.js'); } catch (e) { console.error('[FSB] Failed to load mcp-tool-dispatcher.js:', e.message); }
 // Phase 270 / v0.9.69 -- price resolver. Must load BEFORE mcp-metrics-recorder
 // so the recorder's try/catch can call globalThis.fsbMcpPricing.estimateMcpCost.
@@ -80,12 +81,20 @@ try { importScripts('utils/mcp-pricing.js'); } catch (e) { console.error('[FSB] 
 // (it calls fsbMcpPricing) and AFTER mcp-tool-dispatcher.js (dispatcher hooks
 // call globalThis.fsbMcpMetricsRecorder).
 try { importScripts('utils/mcp-metrics-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-metrics-recorder.js:', e.message); }
+// Session history owns the shared local-storage mutation chain. Load it before
+// the MCP recorder so startup redaction can serialize with every history/log
+// writer instead of racing a stale read-modify-write snapshot.
+importScripts('utils/automation-logger.js');
+// Quick 260707-7id -- MCP session recorder. Loaded AFTER the dispatcher,
+// metrics recorder, and automation logger: the dispatcher's finally-block
+// sibling hooks resolve the recorder lazily, while recorder startup can use the
+// logger's storage mutation chain before any WS dispatch fires.
+try { importScripts('utils/mcp-session-recorder.js'); } catch (e) { console.error('[FSB] Failed to load mcp-session-recorder.js:', e.message); }
 // Phase 272 / v0.9.69 -- TelemetryCollector. Loaded AFTER mcp-metrics-recorder
 // (collector reads the rows the recorder writes to fsbUsageData). The alarm
 // handler in chrome.alarms.onAlarm + the install_announce setTimeout in
 // chrome.runtime.onInstalled are wired below.
 try { importScripts('utils/telemetry-collector.js'); } catch (e) { console.error('[FSB] Failed to load telemetry-collector.js:', e.message); }
-importScripts('utils/automation-logger.js');
 importScripts('utils/analytics.js');
 importScripts('utils/keyboard-emulator.js');
 importScripts('utils/site-explorer.js');
@@ -428,6 +437,7 @@ try {
 // before the router's post-fetch classify hook runs.
 try { importScripts('utils/capability-rot-detector.js'); } catch (e) { console.error('[FSB] Failed to load capability-rot-detector.js:', e.message); }
 try { importScripts('utils/capability-catalog.js'); } catch (e) { console.error('[FSB] Failed to load capability-catalog.js:', e.message); }
+try { importScripts('utils/google-sheets-session.js'); } catch (e) { console.error('[FSB] Failed to load google-sheets-session.js:', e.message); }
 try { importScripts('utils/capability-router.js'); } catch (e) { console.error('[FSB] Failed to load capability-router.js:', e.message); }
 
 // Phase 29 Plan 03 (v0.9.99 CAT-02): the bundled-head T1a handler modules. These
@@ -536,6 +546,7 @@ try { importScripts('catalog/handlers/ganalytics.js'); } catch (e) { console.err
 try { importScripts('catalog/handlers/figma.js'); } catch (e) { console.error('[FSB] Failed to load handlers/figma.js:', e.message); }
 try { importScripts('catalog/handlers/gdrive.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdrive.js:', e.message); }
 try { importScripts('catalog/handlers/gdocs.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gdocs.js:', e.message); }
+try { importScripts('catalog/handlers/gsheets.js'); } catch (e) { console.error('[FSB] Failed to load handlers/gsheets.js:', e.message); }
 try { importScripts('catalog/handlers/powerpoint.js'); } catch (e) { console.error('[FSB] Failed to load handlers/powerpoint.js:', e.message); }
 try { importScripts('catalog/handlers/outlook.js'); } catch (e) { console.error('[FSB] Failed to load handlers/outlook.js:', e.message); }
 try { importScripts('catalog/handlers/teams.js'); } catch (e) { console.error('[FSB] Failed to load handlers/teams.js:', e.message); }
@@ -825,6 +836,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/dom-stream.js',
   'content/trigger-observe.js',
   'content/accessibility.js',
+  'utils/google-sheets-ui.js',
   'content/actions.js',
   'content/dom-analysis.js',
   'content/messaging.js',
@@ -1132,6 +1144,15 @@ function getMcpVisualSessionManager() {
     throw new Error('MCP visual session manager unavailable');
   }
   return mcpVisualSessionManager;
+}
+
+function resolveMcpVisualSessionTabId(sessionToken) {
+  const token = String(sessionToken || '').trim();
+  if (!token) return null;
+  const session = getMcpVisualSessionManager().getSession(token);
+  return session && Number.isFinite(session.tabId) && session.tabId > 0
+    ? Number(session.tabId)
+    : null;
 }
 
 function getMcpVisualSessionFinalClearDelayMs() {
@@ -3223,6 +3244,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.handleStartMcpVisualSession = handleStartMcpVisualSession;
   globalThis.handleEndMcpVisualSession = handleEndMcpVisualSession;
   globalThis.handleMcpVisualSessionTaskStatus = handleMcpVisualSessionTaskStatus;
+  globalThis.resolveMcpVisualSessionTabId = resolveMcpVisualSessionTabId;
 }
 
 /**
@@ -4333,7 +4355,11 @@ async function restoreSessionsFromStorage() {
       }
     }
 
-    // Restore conversation session mappings after sessions are restored
+    // Restore conversation session mappings after sessions are restored.
+    // Agent-registry bootstrap is intentionally NOT chained here: this whole
+    // restore can fail before reaching this point (for example, session.get
+    // or conversation restore), while registry reconciliation is required on
+    // every service-worker wake for telemetry and dispatch correctness.
     await restoreConversationSessions();
     await restorePersistedMcpVisualSessions();
 
@@ -4384,20 +4410,28 @@ async function restoreSessionsFromStorage() {
 }
 
 // Start unrelated session recovery and delegation authority recovery as
-// independent wake chains. A malformed legacy session must not prevent the
-// registry/controller pair from hydrating and opening the inbound bridge gate.
+// independent wake chains. Registry readiness is published for consumers such
+// as telemetry, while delegation remains fail-closed behind successful registry
+// hydration.
 function restoreServiceWorkerStateOnWake() {
+  const registry = Promise.resolve()
+    .then(() => bootstrapAgentRegistry());
+  globalThis.fsbAgentRegistryReady = registry.catch((error) => {
+    console.warn('FSB: Failed to bootstrap agent registry on wake:', error);
+  });
+
   const sessions = Promise.resolve()
     .then(() => restoreSessionsFromStorage())
     .catch((error) => {
       console.warn('FSB: Failed to restore sessions on wake:', error);
     });
-  const delegation = Promise.resolve()
+
+  const delegation = registry
     .then(() => bootstrapDelegationController())
     .catch((error) => {
       console.warn('[FSB] Delegation controller bootstrap failed:', error && error.message);
     });
-  return Promise.all([sessions, delegation]);
+  return Promise.all([sessions, globalThis.fsbAgentRegistryReady, delegation]);
 }
 
 // Immediately restore service-worker state on both worker restarts and browser
@@ -9548,6 +9582,38 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
       chrome.action.setBadgeText({ text: '!' });
       sendResponse({ success: true });
       break;
+
+    case 'deleteSessionHistory': {
+      const sessionId = typeof request.sessionId === 'string' ? request.sessionId.trim() : '';
+      if (!sessionId) {
+        sendResponse({ success: false, error: 'Session ID is required' });
+        break;
+      }
+      (async () => {
+        try {
+          const deleted = await automationLogger.deleteSession(sessionId);
+          sendResponse(deleted
+            ? { success: true }
+            : { success: false, error: 'Failed to delete session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to delete session history' });
+        }
+      })();
+      return true;
+    }
+
+    case 'clearSessionHistory':
+      (async () => {
+        try {
+          const cleared = await automationLogger.clearAllSessions();
+          sendResponse(cleared
+            ? { success: true }
+            : { success: false, error: 'Failed to clear session history' });
+        } catch (error) {
+          sendResponse({ success: false, error: error?.message || 'Failed to clear session history' });
+        }
+      })();
+      return true;
 
     case 'getSessionReplayData':
       // Get structured replay data for session visualization
@@ -17474,6 +17540,21 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // MCP replay recorder idle + retention alarms. The recorder owns the
+  // fsbMcpSession: namespace so open sessions survive service-worker
+  // eviction and daily MCP-only pruning has one durable wake-up path.
+  if (globalThis.fsbMcpSessionRecorder
+      && alarm
+      && typeof alarm.name === 'string'
+      && alarm.name.startsWith(globalThis.fsbMcpSessionRecorder.FSB_MCP_SESSION_ALARM_PREFIX)) {
+    try {
+      await globalThis.fsbMcpSessionRecorder.handleAlarm(alarm);
+    } catch (err) {
+      console.warn('[FSB MCP] session recorder alarm failed (non-blocking):', err && err.message);
+    }
+    return;
+  }
+
   // Phase 256 Plan 03 -- visual-session sliding-window death-timer alarm.
   // Alarm names of the form 'mcpVisualDeath:<tabId>' route to the lifecycle
   // helper which deletes the storage entry and sends the v0.9.36 clear

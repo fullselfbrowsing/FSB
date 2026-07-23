@@ -1,4 +1,4 @@
-// FSB v0.9.90 - Modern Dashboard Control Panel Script
+// FSB v0.9.91 - Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
@@ -39,7 +39,11 @@ const defaultSettings = {
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
-  fsbChangeReportsEnabled: true
+  fsbChangeReportsEnabled: true,
+  // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
+  // independently of Autopilot history.
+  fsbMcpSessionRecordingEnabled: true,
+  fsbMcpSessionRetentionDays: 30
 };
 
 let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
@@ -61,6 +65,15 @@ function clampAgentCapValue(value, fallbackValue) {
   if (raw < 1) return 1;
   if (raw > 64) return 64;
   return raw;
+}
+
+function clampMcpSessionRetentionDays(value) {
+  let days = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(days)) days = defaultSettings.fsbMcpSessionRetentionDays;
+  days = Math.floor(days);
+  if (days < 1) return 1;
+  if (days > 365) return 365;
+  return days;
 }
 
 async function resolveRecommendedAgentCap() {
@@ -324,6 +337,8 @@ function cacheElements() {
   elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
+  elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
+  elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
   elements.animatedActionHighlights = document.getElementById('animatedActionHighlights');
   elements.showSidepanelProgress = document.getElementById('showSidepanelProgress');
@@ -1672,7 +1687,9 @@ function setupEventListeners() {
     elements.enableLogin,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
-    elements.sttProvider
+    elements.sttProvider,
+    elements.fsbMcpSessionRecordingEnabled,
+    elements.fsbMcpSessionRetentionDays
   ];
 
   formInputs.forEach(input => {
@@ -2068,7 +2085,7 @@ function setupEventListeners() {
   if (elements.fullApiTest) {
     elements.fullApiTest.addEventListener('click', runFullApiTest);
   }
-  
+
   // Save bar
   if (elements.saveBtn) {
     elements.saveBtn.addEventListener('click', saveSettings);
@@ -2401,6 +2418,19 @@ function syncFsbSelectLabels() {
   });
 }
 
+function setFsbSelectCardOpen(wrap, open) {
+  const card = typeof wrap.closest === 'function' ? wrap.closest('.settings-card') : null;
+  if (card) card.classList.toggle('settings-card--select-open', open);
+}
+
+function closeFsbSelect(wrap) {
+  const menu = wrap.querySelector('.fsb-select__menu'); if (menu) menu.hidden = true;
+  const btn = wrap.querySelector('.fsb-select__btn'); if (btn) btn.classList.remove('is-open');
+  const chev = wrap.querySelector('.fsb-select__chev');
+  if (chev) { chev.classList.add('fa-chevron-down'); chev.classList.remove('fa-chevron-up'); }
+  setFsbSelectCardOpen(wrap, false);
+}
+
 function initFsbSelects() {
   document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
     if (sel.getAttribute('data-enh') === '1'
@@ -2432,6 +2462,7 @@ function initFsbSelects() {
       btn.classList.toggle('is-open', open);
       chev.classList.toggle('fa-chevron-up', open);
       chev.classList.toggle('fa-chevron-down', !open);
+      setFsbSelectCardOpen(wrap, open);
     }
     function sync() {
       const v = sel.value;
@@ -2473,8 +2504,9 @@ function initFsbSelects() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const willOpen = menu.hidden;
-      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
-      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w !== wrap) closeFsbSelect(w);
+      });
       setOpen(willOpen);
     });
     btn.addEventListener('keydown', (e) => {
@@ -2488,11 +2520,7 @@ function initFsbSelects() {
     _fsbSelectOutsideClickBound = true;
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.fsb-select').forEach((w) => {
-        if (w.contains(e.target)) return;
-        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
-        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
-        const c = w.querySelector('.fsb-select__chev');
-        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+        if (!w.contains(e.target)) closeFsbSelect(w);
       });
     });
   }
@@ -2870,6 +2898,15 @@ function loadSettings() {
       elements.fsbChangeReportsEnabled.checked = settings.fsbChangeReportsEnabled ?? true;
     }
 
+    if (elements.fsbMcpSessionRecordingEnabled) {
+      elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
+    }
+    if (elements.fsbMcpSessionRetentionDays) {
+      const retentionDays = clampMcpSessionRetentionDays(settings.fsbMcpSessionRetentionDays);
+      elements.fsbMcpSessionRetentionDays.value = String(retentionDays);
+      refreshStepper(elements.fsbMcpSessionRetentionDays);
+    }
+
     // Credential Manager
     if (elements.enableLogin) {
       elements.enableLogin.checked = settings.enableLogin ?? false;
@@ -3073,7 +3110,9 @@ function saveSettings() {
     })(),
     // Phase 245 D-07: persist Action Change Reports toggle. Default true so
     // builds where the user has never visited the toggle still emit reports.
-    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true
+    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
+    fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
+    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
   };
   
   chrome.storage.local.set(settings, () => {
@@ -4183,6 +4222,9 @@ async function loadSessionList() {
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
             <span><i class="fas fa-play-circle"></i> ${session.actionCount || 0} actions</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(session.startTime, session.endTime)}</span>
+            ${session.mode === 'mcp-agent'
+              ? `<span class="session-source-badge mcp">MCP · ${escapeHtml(session.mcpClient || 'Agent')}</span>`
+              : `<span class="session-source-badge">Autopilot</span>`}
           </div>
         </div>
         <div class="session-item-status">
@@ -4511,21 +4553,11 @@ async function deleteSession(sessionId) {
   }
 
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-
-    // Remove from storage
-    delete sessionStorage[sessionId];
-
-    // Remove from index
-    const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-
-    // Save changes
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
 
     // Close detail panel if viewing this session
     if (currentViewingSession && currentViewingSession.id === sessionId) {
@@ -4553,7 +4585,8 @@ async function clearAllSessions() {
   }
 
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
 
     closeSessionDetail();
     loadSessionList();

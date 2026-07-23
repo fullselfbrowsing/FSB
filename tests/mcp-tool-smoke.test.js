@@ -37,6 +37,9 @@ const requiredSmokeTools = [
   'end_visual_session',
   'run_task',
   'stop_task',
+  'complete_task',
+  'partial_task',
+  'fail_task',
   'trigger',
   'stop_trigger',
   'get_trigger_status',
@@ -113,6 +116,22 @@ async function run() {
       }),
       'mcp:start-automation': { success: true, sessionId: 'smoke-session', status: 'started' },
       'mcp:stop-automation': { success: true, stopped: true },
+      'mcp:task-status': ({ payload }) => {
+        if (payload.tool === 'fail_task') {
+          return {
+            success: false,
+            tool: 'fail_task',
+            status: 'failed',
+            error: payload.params.reason,
+            reason: payload.params.reason,
+          };
+        }
+        return {
+          success: true,
+          tool: payload.tool,
+          status: payload.tool === 'complete_task' ? 'completed' : 'partial',
+        };
+      },
       'mcp:trigger': ({ payload }) => ({ success: true, trigger_id: 'trg_smoke', status: 'armed', owner: payload.agentId }),
       'mcp:stop-trigger': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, stopped: true }),
       'mcp:get-trigger-status': ({ payload }) => ({ success: true, trigger_id: payload.trigger_id, status: 'armed' }),
@@ -255,6 +274,84 @@ async function run() {
     stopTaskCall && stopTaskCall.message,
     { type: 'mcp:stop-automation', payload: { agentId: 'agent_test_smoke', ownershipToken: 'token_test_smoke' } },
     'stop_task routes through mcp:stop-automation with agentId payload (Phase 238 includes agentId; Phase 240 strengthens with ownershipToken)',
+  );
+
+  const completeTaskCall = await invokeTool(harness, 'complete_task', {
+    summary: 'Smoke task completed',
+    tab_id: 7,
+  });
+  assertDeepEqual(
+    completeTaskCall && completeTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'complete_task',
+        params: { summary: 'Smoke task completed', tab_id: 7 },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'complete_task routes its client-authored summary with agent identity and tab_id',
+  );
+
+  const partialTaskCall = await invokeTool(harness, 'partial_task', {
+    summary: 'Useful work completed',
+    blocker: 'Manual approval required',
+    next_step: 'Approve the operation',
+  });
+  assertDeepEqual(
+    partialTaskCall && partialTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'partial_task',
+        params: {
+          summary: 'Useful work completed',
+          blocker: 'Manual approval required',
+          next_step: 'Approve the operation',
+        },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'partial_task routes summary, blocker, and next step through mcp:task-status',
+  );
+
+  const failTaskHandler = harness.getHandler('fail_task');
+  assert(typeof failTaskHandler === 'function', 'fail_task registers a callable MCP handler');
+  const failTaskCallStart = harness.bridgeCalls.length;
+  const failTaskResult = await failTaskHandler(
+    { reason: 'Unrecoverable test failure' },
+    harness.createExtra(),
+  );
+  const failTaskCall = harness.bridgeCalls[failTaskCallStart];
+  assertDeepEqual(
+    failTaskCall && failTaskCall.message,
+    {
+      type: 'mcp:task-status',
+      payload: {
+        tool: 'fail_task',
+        params: { reason: 'Unrecoverable test failure' },
+        agentId: 'agent_test_smoke',
+        ownershipToken: 'token_test_smoke',
+      },
+    },
+    'fail_task routes the client-authored reason through mcp:task-status',
+  );
+  assert(
+    failTaskResult && failTaskResult.isError !== true,
+    'a recorded fail_task outcome is returned as a normal MCP acknowledgement',
+  );
+  assertDeepEqual(
+    JSON.parse(failTaskResult.content[0].text),
+    {
+      success: false,
+      tool: 'fail_task',
+      status: 'failed',
+      error: 'Unrecoverable test failure',
+      reason: 'Unrecoverable test failure',
+    },
+    'fail_task acknowledgement preserves the recorded failure details',
   );
 
   const getLogsCall = await invokeTool(harness, 'get_logs', { sessionId: 'smoke-session', count: 10 });

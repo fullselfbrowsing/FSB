@@ -87,7 +87,7 @@
     </ul>
 
     <h3>Anonymous Usage Telemetry</h3>
-    <p><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a href="/stats">/stats</a>) without ever touching the pages you browse. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
+    <p><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a routerLink="/stats">/stats</a>) without ever touching the pages you browse. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
 
     <h3>What we collect</h3>
     <ul>
@@ -109,7 +109,7 @@
     </ul>
 
     <h3>Retention</h3>
-    <p>Raw events are retained for 7 days. Daily rollups (one row per install per day) are retained for 365 days. Global aggregates (one row per day, no per-install dimension) are retained indefinitely so historical charts on <a href="/stats">/stats</a> remain stable.</p>
+    <p>Raw events are retained for 7 days. Daily rollups (one row per install per day) are retained for 365 days. Global aggregates (one row per day, no per-install dimension) are retained indefinitely so historical charts on <a routerLink="/stats">/stats</a> remain stable.</p>
 
     <h3>How to opt out</h3>
     <p>Open the <span [attr.translate]="'no'">FSB</span> Control Panel, scroll to Advanced Settings, and toggle <strong>Send anonymous usage data</strong> off. The change takes effect immediately; no further events will be sent from your install.</p>
@@ -121,10 +121,10 @@
   https://full-selfbrowsing.com/api/telemetry/forget</code></pre>
 
     <h3>Limited Use affirmation</h3>
-    <p><span [attr.translate]="'no'">FSB</span>'s anonymous usage telemetry is used only to compute aggregate usage statistics displayed publicly at <a href="/stats" [attr.translate]="'no'">full-selfbrowsing.com/stats</a>. The data is never sold, never shared with third parties, never used for advertising, and never used to train any machine-learning models. This commitment satisfies the <span [attr.translate]="'no'">Chrome Web Store</span>'s <span [attr.translate]="'no'">Limited Use</span> requirement.</p>
+    <p><span [attr.translate]="'no'">FSB</span>'s anonymous usage telemetry is used only to compute aggregate usage statistics displayed publicly at <a routerLink="/stats" [attr.translate]="'no'">full-selfbrowsing.com/stats</a>. The data is never sold, never shared with third parties, never used for advertising, and never used to train any machine-learning models. This commitment satisfies the <span [attr.translate]="'no'">Chrome Web Store</span>'s <span [attr.translate]="'no'">Limited Use</span> requirement.</p>
 
     <h3>Aggregated public metrics</h3>
-    <p>We publish aggregated metrics derived from this telemetry pipeline at <a href="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
+    <p>We publish aggregated metrics derived from this telemetry pipeline at <a routerLink="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
 
     <h3>Legal Posture and Consent Model</h3>
     <p><span [attr.translate]="'no'">FSB</span>'s automation posture, audit-log retention, and per-origin consent model were presented as explicit product controls. <span [attr.translate]="'no'">FSB</span> does nothing on an origin until you explicitly allow it, automated read access never implies write access, and a conservative service denylist blocks automation on sensitive categories (financial and government services) outright.</p>
@@ -213,7 +213,7 @@
 
     <h3>Open Source</h3>
     <p><span [attr.translate]="'no'">FSB</span> is fully open source under the <span [attr.translate]="'no'">MIT</span> License. You can audit every line of code to verify these privacy claims. The source code is available on <span [attr.translate]="'no'">GitHub</span>.</p>
-    <p><a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener" [attr.translate]="'no'">View the source code on GitHub</a></p>
+    <p><a href="https://github.com/lakshmanturlapati/FSB" target="_blank" rel="noopener">View the source code on <span [attr.translate]="'no'">GitHub</span></a></p>
 
     <h3>Summary</h3>
     <p><span [attr.translate]="'no'">FSB</span> processes data locally, encrypts sensitive information, never exposes passwords to AI models, defends against prompt injection attacks, communicates only with AI providers you choose, includes no tracking, and is fully auditable as open source software.</p>

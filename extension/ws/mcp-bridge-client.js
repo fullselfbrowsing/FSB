@@ -38,6 +38,34 @@ const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close
 const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
 const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
+
+function isMcpGoogleSheetsDocumentUrl(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  if (typeof URL !== 'function') return true;
+  try {
+    const parsed = new URL(value);
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      parsed.hostname === 'docs.google.com' &&
+      /^\/spreadsheets\/d\/[^/]+(?:\/|$)/.test(parsed.pathname);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function isMcpSpreadsheetRecord(payload, response) {
+  const tool = payload && payload.tool;
+  if (tool === 'fill_sheet' || tool === 'read_sheet' || tool === 'fillsheet' || tool === 'readsheet') {
+    return true;
+  }
+  const responseUrl = response && response.change_report && response.change_report.url;
+  return [
+    payload && payload.params && payload.params.url,
+    response && response.url,
+    responseUrl && responseUrl.before,
+    responseUrl && responseUrl.after
+  ].some(isMcpGoogleSheetsDocumentUrl);
+}
+
 // Phase 241 D-07 / D-08 -- mirror of agent-registry.js RECONNECT_GRACE_MS.
 // On bridge _ws.onclose the bridge asks the registry to stage release for
 // every agent stamped with the current connection_id; that staged release
@@ -1181,6 +1209,23 @@ class MCPBridgeClient {
       case 'mcp:end-visual-session':
         return this._handleEndVisualSession(payload);
 
+      case 'mcp:task-status': {
+        const taskParams = (payload.params && typeof payload.params === 'object')
+          ? { ...payload.params }
+          : {};
+        // The dispatcher ownership gate consumes camelCase tabId while the
+        // public MCP schema remains snake_case tab_id.
+        if (Number.isFinite(taskParams.tab_id) && !Number.isFinite(taskParams.tabId)) {
+          taskParams.tabId = taskParams.tab_id;
+        }
+        return dispatchMcpToolRoute({
+          tool: payload.tool,
+          params: taskParams,
+          client: this,
+          payload
+        });
+      }
+
       case 'mcp:execute-action':
         return this._handleExecuteAction(payload);
 
@@ -1459,6 +1504,75 @@ class MCPBridgeClient {
     }
   }
 
+  /**
+   * Session-recorder tap at the bridge level so content- and cdp-routed
+   * action tools are recorded too -- the dispatcher choke points only ever
+   * see background-routed actions (executeFn's default branch sends straight
+   * to the content script). The target-origin lookup is best-effort and its
+   * failure only drops the diagnostic record; recording remains fire-and-forget,
+   * whole-body guarded, and never alters the action result. Placed ABOVE
+   * _handleExecuteAction so the 4500-char source gates
+   * in tests/action-tool-agent-scoped.test.js and
+   * tests/ownership-error-codes.test.js keep resolveAgentTabOrError in view.
+   */
+  async _resolveMcpSessionRecordTarget(resolvedTabId, knownUrl) {
+    const unresolved = { targetOriginResolved: false, spreadsheetTarget: false };
+    try {
+      if (!Number.isFinite(resolvedTabId)) return unresolved;
+      let targetUrl = typeof knownUrl === 'string' && knownUrl.length > 0 ? knownUrl : '';
+      if (!targetUrl) {
+        const tab = await chrome.tabs.get(resolvedTabId);
+        targetUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+      }
+      if (!targetUrl) return unresolved;
+      return {
+        targetOriginResolved: true,
+        spreadsheetTarget: isMcpGoogleSheetsDocumentUrl(targetUrl)
+      };
+    } catch (_e) {
+      return unresolved;
+    }
+  }
+
+  _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
+    try {
+      if (typeof globalThis === 'undefined' ||
+          !globalThis.fsbMcpSessionRecorder ||
+          typeof globalThis.fsbMcpSessionRecorder.recordAction !== 'function') {
+        return;
+      }
+      let sessionRecordEntry = {
+        client: (typeof globalThis.resolveMcpClientLabel === 'function')
+          ? globalThis.resolveMcpClientLabel(payload)
+          : null,
+        tool: payload && payload.tool,
+        params: (payload && payload.params) || {},
+        payload: payload,
+        response: response,
+        success: !(response && typeof response === 'object' && response.success === false),
+        tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null,
+        requireTargetOrigin: true,
+        targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
+        spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true
+      };
+      const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
+      const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
+        isMcpSpreadsheetRecord(payload, response);
+      const unresolvedRecordTarget = sessionRecordEntry.targetOriginResolved !== true;
+      if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
+        if (!spreadsheetTool && !unresolvedRecordTarget) {
+          globalThis.fsbMcpSessionRecorder.recordAction(sessionRecordEntry);
+        }
+      } else {
+        spreadsheetRedactor.recordSafely(
+          globalThis.fsbMcpSessionRecorder,
+          'recordAction',
+          sessionRecordEntry
+        );
+      }
+    } catch (_e) { /* never let session recording break the action */ }
+  }
+
   async _handleExecuteAction(payload) {
     // Phase 246 D-13: resolver replaces _getActiveTab; legacy:* surfaces fall
     // through to active-tab via the resolver's first-line branch.
@@ -1515,6 +1629,8 @@ class MCPBridgeClient {
       if (dispatched && dispatched.success === true) {
         const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
         if (resolvedTabId !== null) {
+          const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
+          this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
           await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
           // Phase 257 -- explicit completion. When the caller marks this
           // bootstrap call as the final action of the task, clear the visual
@@ -1540,6 +1656,8 @@ class MCPBridgeClient {
         if (dispatched && dispatched.success === true) {
           const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
           if (resolvedTabId !== null) {
+            const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
+            this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
             await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
             await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
           }
@@ -1591,6 +1709,11 @@ class MCPBridgeClient {
       });
     };
 
+    // Inspect the resolver-approved target as close as possible to execution.
+    // A failed lookup resolves to an unresolved recorder context and never
+    // prevents the browser action from running.
+    const recordTarget = await this._resolveMcpSessionRecordTarget(tabId);
+
     let actionResult;
     if (typeof wrapWithChangeReport === 'function' && !usesDispatcherSyntheticChangeReport) {
       actionResult = await wrapWithChangeReport({
@@ -1602,6 +1725,11 @@ class MCPBridgeClient {
     } else {
       actionResult = await executeFn();
     }
+
+    // Session-recorder action tap: all three routes (content, cdp,
+    // background) converge here with the resolver-approved tab identity.
+    // Resolver-failure returns above record nothing (nothing executed).
+    this._recordMcpSessionAction(payload, actionResult, tabId, recordTarget);
 
     // Phase 257 -- explicit completion. When the caller marks this action as
     // the final action of the task, clear the visual session immediately

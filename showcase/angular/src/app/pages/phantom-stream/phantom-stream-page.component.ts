@@ -15,6 +15,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { HOST, buildLocaleUrl, emitLocaleHead } from '../../core/seo/locale-seo';
+import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
 
 type PhantomSection = 'overview' | 'problem' | 'whydom' | 'architecture' | 'features' | 'security' | 'quickstart' | 'docs';
 type QuickstartTab = 'capture' | 'viewer' | 'relay';
@@ -22,11 +23,30 @@ type CopyTarget = 'install' | 'code';
 
 const ROUTE_PATH = '/phantom-stream';
 const OG_IMAGE = `${HOST}/assets/fsb_logo_dark.png`;
-const OG_IMAGE_ALT = 'FSB Full Self-Browsing logo';
-const SITE_NAME = 'FSB - Full Self-Browsing';
+const OG_IMAGE_ALT = $localize`:@@phantomStream.og.imageAlt:FSB Full Self-Browsing logo`;
+const SITE_NAME = $localize`:@@site.name:FSB - Full Self-Browsing`;
 const COPY_RESET_MS = 1600;
 const SCROLL_SPY_OFFSET = 360;
 const INSTALL_COMMAND = 'npm install @full-self-browsing/phantom-stream';
+
+function escapeCodeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeSingleQuotedCode(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+const CODE_EXCLUDE_OWN_UI = $localize`:@@phantomStream.code.excludeOwnUi:exclude your own UI`;
+const CODE_STREAM_DIFFS = $localize`:@@phantomStream.code.streamDiffs:snapshot once, then stream diffs`;
+const CODE_VIEWER_IS = $localize`:@@phantomStream.code.viewerIs:viewer is`;
+const CODE_RELAY_LIMIT = $localize`:@@phantomStream.code.relayLimit:1 MiB per-message cap, backpressure drop`;
+const CODE_CLIENTS_JOIN = $localize`:@@phantomStream.code.clientsJoin:clients join with`;
 
 const CAPTURE_CODE_TEXT = `import { createCapture } from '@full-self-browsing/phantom-stream/capture';
 import { createWebSocketTransport } from '@full-self-browsing/phantom-stream/transport/websocket';
@@ -38,10 +58,10 @@ const transport = createWebSocketTransport({
 
 const capture = createCapture({
   transport,
-  skipElement: (el) => el.id === 'my-own-overlay' // exclude your own UI
+  skipElement: (el) => el.id === 'my-own-overlay' // ${CODE_EXCLUDE_OWN_UI}
 });
 
-capture.start(); // snapshot once, then stream diffs`;
+capture.start(); // ${CODE_STREAM_DIFFS}`;
 
 const VIEWER_CODE_TEXT = `import { createViewer } from '@full-self-browsing/phantom-stream/renderer';
 import { createWebSocketTransport } from '@full-self-browsing/phantom-stream/transport/websocket';
@@ -56,18 +76,18 @@ const viewer = createViewer({
   transport
 });
 
-viewer.on('state', (e) => console.log('viewer is', e.state));
+viewer.on('state', (e) => console.log('${escapeSingleQuotedCode(CODE_VIEWER_IS)}', e.state));
 // connecting | live | stale | disconnected`;
 
 const RELAY_CODE_TEXT = `import http from 'node:http';
 import { createRelay, createWebSocketRelayBackend } from '@full-self-browsing/phantom-stream/relay';
 
-const relay = createRelay();   // 1 MiB per-message cap, backpressure drop
+const relay = createRelay();   // ${CODE_RELAY_LIMIT}
 const server = http.createServer();
 createWebSocketRelayBackend({ server, relay, path: '/ws' });
 server.listen(8787);
 
-// clients join with ?room=<id>&role=source|viewer`;
+// ${CODE_CLIENTS_JOIN} ?room=<id>&role=source|viewer`;
 
 const CAPTURE_CODE_HTML = `<span class="tk-k">import</span> { createCapture } <span class="tk-k">from</span> <span class="tk-s">'@full-self-browsing/phantom-stream/capture'</span>;
 <span class="tk-k">import</span> { createWebSocketTransport } <span class="tk-k">from</span> <span class="tk-s">'@full-self-browsing/phantom-stream/transport/websocket'</span>;
@@ -79,10 +99,10 @@ const CAPTURE_CODE_HTML = `<span class="tk-k">import</span> { createCapture } <s
 
 <span class="tk-k">const</span> capture = <span class="tk-f">createCapture</span>({
   transport,
-  skipElement: (el) =&gt; el.id === <span class="tk-s">'my-own-overlay'</span> <span class="tk-c">// exclude your own UI</span>
+  skipElement: (el) =&gt; el.id === <span class="tk-s">'my-own-overlay'</span> <span class="tk-c">// ${escapeCodeHtml(CODE_EXCLUDE_OWN_UI)}</span>
 });
 
-capture.<span class="tk-f">start</span>(); <span class="tk-c">// snapshot once, then stream diffs</span>`;
+capture.<span class="tk-f">start</span>(); <span class="tk-c">// ${escapeCodeHtml(CODE_STREAM_DIFFS)}</span>`;
 
 const VIEWER_CODE_HTML = `<span class="tk-k">import</span> { createViewer } <span class="tk-k">from</span> <span class="tk-s">'@full-self-browsing/phantom-stream/renderer'</span>;
 <span class="tk-k">import</span> { createWebSocketTransport } <span class="tk-k">from</span> <span class="tk-s">'@full-self-browsing/phantom-stream/transport/websocket'</span>;
@@ -97,23 +117,23 @@ const VIEWER_CODE_HTML = `<span class="tk-k">import</span> { createViewer } <spa
   transport
 });
 
-viewer.<span class="tk-f">on</span>(<span class="tk-s">'state'</span>, (e) =&gt; console.<span class="tk-f">log</span>(<span class="tk-s">'viewer is'</span>, e.state));
+viewer.<span class="tk-f">on</span>(<span class="tk-s">'state'</span>, (e) =&gt; console.<span class="tk-f">log</span>(<span class="tk-s">'${escapeCodeHtml(escapeSingleQuotedCode(CODE_VIEWER_IS))}'</span>, e.state));
 <span class="tk-c">// connecting | live | stale | disconnected</span>`;
 
 const RELAY_CODE_HTML = `<span class="tk-k">import</span> http <span class="tk-k">from</span> <span class="tk-s">'node:http'</span>;
 <span class="tk-k">import</span> { createRelay, createWebSocketRelayBackend } <span class="tk-k">from</span> <span class="tk-s">'@full-self-browsing/phantom-stream/relay'</span>;
 
-<span class="tk-k">const</span> relay = <span class="tk-f">createRelay</span>();   <span class="tk-c">// 1 MiB per-message cap, backpressure drop</span>
+<span class="tk-k">const</span> relay = <span class="tk-f">createRelay</span>();   <span class="tk-c">// ${escapeCodeHtml(CODE_RELAY_LIMIT)}</span>
 <span class="tk-k">const</span> server = http.<span class="tk-f">createServer</span>();
 <span class="tk-f">createWebSocketRelayBackend</span>({ server, relay, path: <span class="tk-s">'/ws'</span> });
 server.<span class="tk-f">listen</span>(<span class="tk-n">8787</span>);
 
-<span class="tk-c">// clients join with ?room=&lt;id&gt;&amp;role=source|viewer</span>`;
+<span class="tk-c">// ${escapeCodeHtml(CODE_CLIENTS_JOIN)} ?room=&lt;id&gt;&amp;role=source|viewer</span>`;
 
 @Component({
   selector: 'app-phantom-stream-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LanguagePickerComponent],
   templateUrl: './phantom-stream-page.component.html',
   styleUrl: './phantom-stream-page.component.scss',
 })
@@ -270,9 +290,6 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
     emitLocaleHead(this.renderer, this.doc, this.localeId, ROUTE_PATH);
   }
 
-  // Structured data stays English-only on purpose: angular.json sets
-  // i18nMissingTranslation=error, so new $localize units would break every
-  // locale build until all five xlf targets are hand-updated.
   private injectPhantomStreamJsonLd(): void {
     if (this.doc.head.querySelector('script[data-ld="phantom-stream-page"]')) {
       return;
@@ -283,9 +300,9 @@ export class PhantomStreamPageComponent implements OnInit, AfterViewInit, OnDest
       '@id': `${HOST}/phantom-stream#phantom-stream`,
       name: 'PhantomStream',
       url: `${HOST}/phantom-stream`,
-      description: 'PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels. Ships capture, renderer, relay, and transport modules as @full-self-browsing/phantom-stream.',
+      description: $localize`:@@phantomStream.schema.description:PhantomStream is DOM-native live browser mirroring: one style-inlined snapshot, then MutationObserver diffs instead of pixels. Ships capture, renderer, relay, and transport modules as @full-self-browsing/phantom-stream.`,
       programmingLanguage: 'TypeScript',
-      runtimePlatform: 'Browser, Node.js 18+',
+      runtimePlatform: $localize`:@@phantomStream.schema.runtimePlatform:Browser, Node.js 18+`,
       publisher: { '@id': `${HOST}/#org` },
     };
     const json = JSON.stringify(payload).replace(/</g, '\\u003c');

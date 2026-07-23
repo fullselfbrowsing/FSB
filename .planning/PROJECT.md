@@ -14,6 +14,11 @@ FSB is an AI-powered browser automation Chrome extension that executes tasks thr
 
 **Last completed:** v1.2.0 Showcase i18n Completeness — Phases 52-56 shipped 2026-07-09. Full-page translation audit, 5-id resync + stats-274 retirement + hero/CTA transcreation, stats lint gate flip, permanent `verify-translation-drift` CI gate, and WARNING-02 locale-cookie redirect fix. VISUAL-01 browser UAT remains human_needed (`53-VISUAL-QA.md`).
 
+> **Post-v1.2 supersession (2026-07-15):** The showcase localization follow-up
+> localized the dashboard and removed its `lint:i18n` exclusion. The v1.2.0
+> scope statements below remain historical; the current policy is
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
+
 **Recent shipping cadence:**
 - v1.2.0 Showcase i18n Completeness -- archived 2026-07-09
 - v1.1.0 T1 App Execution Expansion -- archived 2026-06-30; remaining tail rows carry explicit proof requirements before direct execution

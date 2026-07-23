@@ -26,7 +26,9 @@ const { initializeDatabase } = require(path.join(__dirname, '..', 'showcase', 's
 const Queries = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'db', 'queries'));
 const { hashIp } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'utils', 'telemetry-hash'));
 const createTelemetryRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'telemetry'));
-const createPublicStatsRouter = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'public-stats'));
+const publicStatsModule = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'routes', 'public-stats'));
+const createPublicStatsRouter = publicStatsModule;
+const { buildHeadlineJson } = publicStatsModule;
 const activeTracker = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'telemetry', 'active-tracker'));
 const { resetPerUuidBudget } = require(path.join(__dirname, '..', 'showcase', 'server', 'src', 'middleware', 'telemetry-rate-limit'));
 
@@ -115,8 +117,8 @@ function getJson(path_, extraHeaders = {}) {
   const popularAgentToday = JSON.stringify([
     { label: 'agent-x', uniq: 8 },
   ]);
-  queries.upsertGlobalAggregateRow(TODAY, 3, 350, 175, 6, popularMcpToday, popularAgentToday);
-  queries.upsertGlobalAggregateRow(YESTERDAY, 1, 30, 20, 1, '[]', '[]');
+  queries.upsertGlobalAggregateV2.run(TODAY, 3, 350, 175, 6, popularMcpToday, popularAgentToday, '[]', 0, 2, 3);
+  queries.upsertGlobalAggregateV2.run(YESTERDAY, 1, 30, 20, 1, '[]', '[]', '[]', 0, 2, 1);
 
   // --- POST 3 telemetry events so active-tracker has 3 distinct UUIDs. ---
   // Use the active-tracker's _resetForTest to keep state hermetic.
@@ -132,6 +134,7 @@ function getJson(path_, extraHeaders = {}) {
       tokens_out: 5,
       active_agent_count: uuid === UUID_A ? 2 : uuid === UUID_B ? 1 : 3,
       event_type: 'periodic',
+      active_count_version: 2,
     };
     const r = await postJson('/api/telemetry/events', { events: [ev] });
     if (r.statusCode !== 200) {
@@ -142,6 +145,17 @@ function getJson(path_, extraHeaders = {}) {
     `got ${activeTracker.countActiveUsers(5 * 60 * 1000)}`);
   check('active-tracker agent-sum is 6 (2+1+3)', activeTracker.getActiveAgentSum(10 * 60 * 1000) === 6,
     `got ${activeTracker.getActiveAgentSum(10 * 60 * 1000)}`);
+
+  // A heartbeat seven minutes old is outside the former 5m user window but
+  // inside the 10m agent window. The headline must use one shared 10m cohort,
+  // otherwise its ratio divides 10 agents by only 3 users.
+  const UUID_D = '44444444-4444-4444-8444-444444444444';
+  const activeSnapshot = Date.now();
+  activeTracker.recordSeen(UUID_D, 4, activeSnapshot - 7 * 60 * 1000);
+  check('7m-old heartbeat is outside 5m but inside the shared 10m cohort',
+    activeTracker.countActiveUsers(5 * 60 * 1000, activeSnapshot) === 3
+      && activeTracker.countActiveUsers(10 * 60 * 1000, activeSnapshot) === 4,
+    'active cohort boundaries did not match');
 
   // --- GET /api/public-stats/global. ---
   const r = await getJson('/api/public-stats/global');
@@ -163,20 +177,37 @@ function getJson(path_, extraHeaders = {}) {
   check('body parses as JSON', body !== null, `body=${r.body.slice(0, 200)}`);
   if (body) {
     const expectedFields = [
+      'generated_at', 'aggregate_as_of_day', 'aggregate_updated_at',
       'active_users_now', 'active_agents_now', 'active_agents_bucket',
-      'total_users', 'total_agents_lifetime', 'tokens_total_lifetime',
-      'tokens_24h', 'popular_mcp_clients', 'popular_agents', 'avg_agents_per_user',
+      'active_agents_reporting_users_now', 'active_agents_coverage',
+      'active_count_version', 'active_history_since', 'active_history_complete',
+      'users_365d', 'total_users', 'agent_days_lifetime',
+      'total_agents_lifetime', 'agent_days_since_active_v2', 'tokens_total_lifetime',
+      'tokens_24h', 'popular_mcp_clients', 'popular_agents',
+      'avg_agents_per_user', 'avg_agents_per_reporting_user',
     ];
     for (const f of expectedFields) {
       check(`body has field '${f}'`, f in body, `body keys=${Object.keys(body)}`);
     }
-    check('active_users_now === 3', body.active_users_now === 3, `got ${body.active_users_now}`);
-    check('active_agents_now === 6', body.active_agents_now === 6, `got ${body.active_agents_now}`);
-    check('active_agents_bucket === "5-8"', body.active_agents_bucket === '5-8', `got ${body.active_agents_bucket}`);
+    check('generated_at is a valid request-generation timestamp',
+      typeof body.generated_at === 'string' && Number.isFinite(Date.parse(body.generated_at)),
+      `got ${body.generated_at}`);
+    check('aggregate source age is explicit even for legacy rows without an update timestamp',
+      body.aggregate_as_of_day === TODAY && body.aggregate_updated_at === null,
+      `got day=${body.aggregate_as_of_day} updated=${body.aggregate_updated_at}`);
+    check('active_users_now === 4 (same 10m cohort as agents)', body.active_users_now === 4, `got ${body.active_users_now}`);
+    check('active_agents_now === 10', body.active_agents_now === 10, `got ${body.active_agents_now}`);
+    check('active_agents_bucket === "9-16"', body.active_agents_bucket === '9-16', `got ${body.active_agents_bucket}`);
+    check('all four active installs supplied v2 agent counts',
+      body.active_agents_reporting_users_now === 4 && body.active_agents_coverage === 1,
+      `got reporters=${body.active_agents_reporting_users_now} coverage=${body.active_agents_coverage}`);
+    check('users_365d === 3 (DISTINCT retained UUIDs)', body.users_365d === 3, `got ${body.users_365d}`);
     check('total_users === 3 (DISTINCT UUIDs in rollups: A,B,C)', body.total_users === 3, `got ${body.total_users}`);
-    // total_agents_lifetime: SUM(max_active_agents) = 2 + 1 + 3 + 1 = 7
-    check('total_agents_lifetime === 7 (sum of max_active_agents across 4 rollup rows)',
-      body.total_agents_lifetime === 7, `got ${body.total_agents_lifetime}`);
+    check('known-corrupt lifetime fields are null while v2 daily peaks sum to 7',
+      body.agent_days_lifetime === null
+        && body.total_agents_lifetime === null
+        && body.agent_days_since_active_v2 === 7,
+      `got ${JSON.stringify({ lifetime: body.agent_days_lifetime, v2: body.agent_days_since_active_v2 })}`);
     // tokens lifetime: today (350+175) + yesterday (30+20) = 575
     check('tokens_total_lifetime === 575',
       body.tokens_total_lifetime === 575, `got ${body.tokens_total_lifetime}`);
@@ -193,10 +224,68 @@ function getJson(path_, extraHeaders = {}) {
       Array.isArray(body.popular_agents) && body.popular_agents.every(
         (x) => typeof x.label === 'string' && Number.isInteger(x.uniq)),
       `got ${JSON.stringify(body.popular_agents)}`);
-    check('avg_agents_per_user === 2.0 (6/3)',
-      body.avg_agents_per_user === 2 || body.avg_agents_per_user === 2.0,
-      `got ${body.avg_agents_per_user}`);
+    check('avg_agents_per_user === 2.5 (10/4 from one cohort)',
+      body.avg_agents_per_user === 2.5 && body.avg_agents_per_reporting_user === 2.5,
+      `got ${body.avg_agents_per_user}/${body.avg_agents_per_reporting_user}`);
   }
+
+  // During the rollout, legacy heartbeats still prove user liveness but their
+  // leaked counter is not a valid active-agent report. Coverage and the
+  // average denominator must make that partial cohort explicit.
+  activeTracker._resetForTest();
+  activeTracker.recordSeen(UUID_A, 4, Date.now(), 'mixed-source-a', 2);
+  activeTracker.recordSeen(UUID_B, 4_472, Date.now(), 'mixed-source-b', 0);
+  const mixedHeadline = buildHeadlineJson(queries);
+  check('mixed-version cohort quarantines legacy agents and exposes partial coverage',
+    mixedHeadline.active_users_now === 2
+      && mixedHeadline.active_agents_now === 4
+      && mixedHeadline.active_agents_reporting_users_now === 1
+      && mixedHeadline.active_agents_coverage === 0.5,
+    `got ${JSON.stringify({
+      users: mixedHeadline.active_users_now,
+      agents: mixedHeadline.active_agents_now,
+      reporters: mixedHeadline.active_agents_reporting_users_now,
+      coverage: mixedHeadline.active_agents_coverage,
+    })}`);
+  check('mixed-version average divides only by current v2 reporters',
+    mixedHeadline.avg_agents_per_reporting_user === 4
+      && mixedHeadline.avg_agents_per_user === 4,
+    `got ${mixedHeadline.avg_agents_per_reporting_user}/${mixedHeadline.avg_agents_per_user}`);
+
+  // Exact rolling-24h semantics use trusted receive time, include both
+  // endpoints, and reject events just outside or in the future.
+  const TOKENS_NOW = Date.UTC(2030, 0, 2, 12, 0, 0);
+  const TOKEN_UUID = '55555555-5555-4555-8555-555555555555';
+  const H24 = 24 * 60 * 60 * 1000;
+  const tokenBoundaryRows = [
+    ['aaaaaaaa-0000-4000-8000-000000000001', TOKENS_NOW - H24, 10],
+    ['aaaaaaaa-0000-4000-8000-000000000002', TOKENS_NOW - H24 - 1, 100],
+    ['aaaaaaaa-0000-4000-8000-000000000003', TOKENS_NOW, 20],
+    ['aaaaaaaa-0000-4000-8000-000000000004', TOKENS_NOW + 1, 1000],
+  ];
+  for (const [eventId, receivedAt, tokens] of tokenBoundaryRows) {
+    queries.insertTelemetryEvent.run(
+      eventId, TOKEN_UUID, receivedAt, 'Claude', 'm', tokens, 0, 0,
+      'periodic', 'boundary-hash', receivedAt
+    );
+  }
+  const exact24h = queries.getPublicHeadlineRows(TOKENS_NOW).tokens_24h;
+  check('tokens_24h includes exact endpoints only (10 + 20 = 30)', exact24h === 30,
+    `got ${exact24h}`);
+
+  activeTracker._resetForTest();
+  const ACTIVE_BOUNDARY_NOW = Date.UTC(2030, 0, 2, 12, 0, 0);
+  const ACTIVE_WINDOW = 10 * 60 * 1000;
+  activeTracker.recordSeen(UUID_C, 20, ACTIVE_BOUNDARY_NOW + 1);
+  activeTracker.recordSeen(UUID_B, 10, ACTIVE_BOUNDARY_NOW - ACTIVE_WINDOW - 1);
+  activeTracker.recordSeen(UUID_A, 2, ACTIVE_BOUNDARY_NOW - ACTIVE_WINDOW);
+  const invalidNowIsSafe = activeTracker.countActiveUsers(ACTIVE_WINDOW, Infinity) === 0
+    && activeTracker.getActiveAgentSum(ACTIVE_WINDOW, Infinity) === 0;
+  check('active cohort includes the exact lower endpoint and excludes older/future entries',
+    invalidNowIsSafe
+      && activeTracker.countActiveUsers(ACTIVE_WINDOW, ACTIVE_BOUNDARY_NOW) === 1
+      && activeTracker.getActiveAgentSum(ACTIVE_WINDOW, ACTIVE_BOUNDARY_NOW) === 2,
+    'invalid now mutated state or active exact-boundary cohort was not {A}');
 
   // --- T-274-01 privacy: no PII in body. ---
   const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;

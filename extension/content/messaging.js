@@ -886,7 +886,13 @@
         case 'executeAction':
           const { tool, params, visualContext, source } = request;
           const isManualMCP = source === 'mcp-manual';
-          const SENSITIVE_TOOLS = new Set(['fillCredentialFields', 'fillPaymentFields']);
+          const SENSITIVE_TOOLS = new Set([
+            'fillCredentialFields',
+            'fillPaymentFields',
+            'fillsheet',
+            'readsheet',
+            'sheetsSession'
+          ]);
           const safeParams = SENSITIVE_TOOLS.has(tool) ? '***' : params;
           logger.logActionExecution(FSB.sessionId, tool, 'start', safeParams);
 
@@ -988,7 +994,7 @@
             }
 
             // Timeout wrapper
-            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet'];
+            const longTimeoutTools = ['solveCaptcha', 'fillsheet', 'readsheet', 'sheetsSession'];
             const actionTimeout = longTimeoutTools.includes(tool) ? 120000 : 10000;
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error(`Action ${tool} timed out after ${actionTimeout / 1000} seconds`)), actionTimeout);

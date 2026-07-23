@@ -10,7 +10,7 @@
 
       <!-- TLDR -->
       <div class="privacy-callout">
-        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> operates entirely within your browser. No browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers, and AI calls go directly from your browser to the provider you choose. API keys are encrypted locally with <span [attr.translate]="'no'">AES-GCM</span>, and memory data stays on your device. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a href="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
+        <p i18n="@@privacy.tldr.body"><strong>TLDR:</strong>&nbsp;<span [attr.translate]="'no'">FSB</span> operates entirely within your browser. No browsing data is collected by <span [attr.translate]="'no'">FSB</span> servers, and AI calls go directly from your browser to the provider you choose. API keys are encrypted locally with <span [attr.translate]="'no'">AES-GCM</span>, and memory data stays on your device. The only data that ever leaves your machine for <span [attr.translate]="'no'">FSB</span> is opt-out anonymous usage telemetry that powers the public <a routerLink="/stats">/stats</a> page. If you pair <span [attr.translate]="'no'">Remote Dashboard</span>, transient live-preview frames can pass through the relay during the session, but they are not stored. Everything is open source and auditable.</p>
       </div>
 
       <!-- Data Collection -->
@@ -69,7 +69,7 @@
 
       <!-- No Third-Party Tracking -->
       <h2 i18n="@@privacy.section.noTracking.title">No Third-Party Tracking</h2>
-      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any third-party analytics, ad trackers, or cross-site fingerprinting. There are no cookies and no third-party scripts beyond the <span [attr.translate]="'no'">AI</span> provider <span [attr.translate]="'no'">APIs</span> you explicitly configure. The one piece of first-party data <span [attr.translate]="'no'">FSB</span> sends home is the opt-out Anonymous Usage Telemetry described below, used solely to power the public <a href="/stats">/stats</a> dashboard.</p>
+      <p i18n="@@privacy.section.noTracking.body"><span [attr.translate]="'no'">FSB</span> does not include any third-party analytics, ad trackers, or cross-site fingerprinting. There are no cookies and no third-party scripts beyond the <span [attr.translate]="'no'">AI</span> provider <span [attr.translate]="'no'">APIs</span> you explicitly configure. The one piece of first-party data <span [attr.translate]="'no'">FSB</span> sends home is the opt-out Anonymous Usage Telemetry described below, used solely to power the public <a routerLink="/stats">/stats</a> dashboard.</p>
 
       <!-- API Keys -->
       <h2 i18n="@@privacy.section.apiKeys.title">API Keys</h2>
@@ -150,7 +150,7 @@
 
       <!-- Anonymous Usage Telemetry (v0.9.69 / Phase 275) -->
       <h2 id="telemetry-disclosure" i18n="@@PRIVACY_TELEMETRY_HEADING">Anonymous Usage Telemetry</h2>
-      <p i18n="@@PRIVACY_TELEMETRY_INTRO"><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a href="/stats">/stats</a>) without ever touching the pages you browse. The only location signal is a coarse country/state label the server derives from your request <span [attr.translate]="'no'">IP</span> at ingest (never from page content), kept only in aggregate &mdash; see <a href="#telemetry-region">Region (state-level) metric</a> below. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
+      <p i18n="@@PRIVACY_TELEMETRY_INTRO"><span [attr.translate]="'no'">FSB</span> v0.9.69 introduced an opt-out anonymous usage telemetry pipeline so the project can publish aggregate adoption numbers (see <a routerLink="/stats">/stats</a>) without ever touching the pages you browse. The only location signal is a coarse country/state label the server derives from your request <span [attr.translate]="'no'">IP</span> at ingest (never from page content), kept only in aggregate &mdash; see <a href="#telemetry-region">Region (state-level) metric</a> below. Telemetry is on by default but can be disabled with a single toggle, and the per-install data can be erased on request.</p>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_COLLECT_HEADING">What we collect</h3>
       <ul>
@@ -179,7 +179,7 @@
       </ul>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_RETENTION_HEADING">Retention</h3>
-      <p i18n="@@PRIVACY_TELEMETRY_RETENTION_TEXT">Raw events are retained for 7 days. Daily rollups (one row per install per day) are retained for 365 days. Global aggregates (one row per day, no per-install dimension) are retained indefinitely so historical charts on <a href="/stats">/stats</a> remain stable.</p>
+      <p i18n="@@PRIVACY_TELEMETRY_RETENTION_TEXT">Raw events are retained for 7 days. Daily rollups (one row per install per day) are retained for 365 days. Global aggregates (one row per day, no per-install dimension) are retained indefinitely so historical charts on <a routerLink="/stats">/stats</a> remain stable.</p>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_OPTOUT_HEADING">How to opt out</h3>
       <p i18n="@@PRIVACY_TELEMETRY_OPTOUT_TEXT">Open the <span [attr.translate]="'no'">FSB</span> Control Panel, scroll to Advanced Settings, and toggle <strong>Send anonymous usage data</strong> off. The change takes effect immediately; no further events will be sent from your install.</p>
@@ -191,10 +191,10 @@
   https://full-selfbrowsing.com/api/telemetry/forget</code></pre>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_LIMITED_USE_HEADING">Limited Use affirmation</h3>
-      <p i18n="@@PRIVACY_TELEMETRY_LIMITED_USE_TEXT"><span [attr.translate]="'no'">FSB</span>'s anonymous usage telemetry is used only to compute aggregate usage statistics displayed publicly at <a href="/stats" [attr.translate]="'no'">full-selfbrowsing.com/stats</a>. The data is never sold, never shared with third parties, never used for advertising, and never used to train any machine-learning models. This commitment satisfies the <span [attr.translate]="'no'">Chrome Web Store</span>'s <span [attr.translate]="'no'">Limited Use</span> requirement.</p>
+      <p i18n="@@PRIVACY_TELEMETRY_LIMITED_USE_TEXT"><span [attr.translate]="'no'">FSB</span>'s anonymous usage telemetry is used only to compute aggregate usage statistics displayed publicly at <a routerLink="/stats" [attr.translate]="'no'">full-selfbrowsing.com/stats</a>. The data is never sold, never shared with third parties, never used for advertising, and never used to train any machine-learning models. This commitment satisfies the <span [attr.translate]="'no'">Chrome Web Store</span>'s <span [attr.translate]="'no'">Limited Use</span> requirement.</p>
 
       <h3 i18n="@@PRIVACY_TELEMETRY_AGGREGATED_HEADING">Aggregated public metrics</h3>
-      <p i18n="@@PRIVACY_TELEMETRY_AGGREGATED_TEXT">We publish aggregated metrics derived from this telemetry pipeline at <a href="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
+      <p i18n="@@PRIVACY_TELEMETRY_AGGREGATED_TEXT">We publish aggregated metrics derived from this telemetry pipeline at <a routerLink="/stats">/stats</a>. Only counts and totals are shown; no per-install row is ever exposed.</p>
 
       <!-- Consent and Audit Controls -->
       <h2 id="legal-posture" i18n="@@PRIVACY_LEGAL_POSTURE_HEADING">Consent and Audit Controls</h2>

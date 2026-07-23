@@ -23,7 +23,8 @@ function assertEqual(actual, expected, msg) {
 }
 
 const repoRoot = path.resolve(__dirname, '..');
-const canonicalVersion = '0.10.0';
+const expectedReleaseVersion = '0.11.0';
+const canonicalVersion = expectedReleaseVersion;
 const prePhase57MessageTypes = [
   'mcp:start-automation', 'mcp:stop-automation', 'mcp:get-status',
   'mcp:get-task-snapshot', 'mcp:trigger', 'mcp:stop-trigger',
@@ -39,7 +40,6 @@ const prePhase57MessageTypes = [
   'mcp:capabilities-search', 'mcp:capabilities-invoke', 'agent:register',
   'agent:release', 'agent:status',
 ];
-const prePhase57ToolDefinitionsHash = '94ccbd785f8daefeea67032534ad6dd0864129e12569964254735086b93edac2';
 const prePhase61ExtensionPermissions = [
   'activeTab', 'scripting', 'storage', 'unlimitedStorage', 'tabs', 'windows',
   'sidePanel', 'debugger', 'webNavigation', 'alarms', 'clipboardWrite',
@@ -192,6 +192,11 @@ function extractRuntimeVersion(versionSource) {
   return match ? match[1] : null;
 }
 
+function extractLatestChangelogVersion(changelogSource) {
+  const match = changelogSource.match(/^## (\d+\.\d+\.\d+)(?:\s|$)/m);
+  return match ? match[1] : null;
+}
+
 function collectExplicitVersions(text) {
   const matches = [];
   const patterns = [
@@ -220,9 +225,12 @@ function runCommand(command) {
 async function run() {
   const rootPackageJson = readJson('package.json');
   const packageJson = readJson('mcp/package.json');
+  const packageLock = readJson('mcp/package-lock.json');
   const serverJson = readJson('mcp/server.json');
   const versionSource = readText('mcp/src/version.ts');
   const packageReadme = readText('mcp/README.md');
+  const packageChangelog = readText('mcp/CHANGELOG.md');
+  const publishWorkflow = readText('.github/workflows/npm-publish.yml');
   const rootReadme = readText('README.md');
   const typesSource = readText('mcp/src/types.ts');
   const dispatcherSource = readText('extension/ws/mcp-tool-dispatcher.js');
@@ -246,12 +254,43 @@ async function run() {
   const nativeBoundarySource = readText('scripts/verify-native-host-boundary.mjs');
   const buildPreserverSource = readText('scripts/run-mcp-build-preserving-workspace.mjs');
   const focusedRunnerSource = readText('scripts/run-phase63-focused-tests.mjs');
+  const rootChangelog = readText('CHANGELOG.md');
+  const llmsSource = readText('showcase/angular/scripts/llms.source.md');
+  const llmsFullSource = readText('showcase/angular/scripts/llms-full.source.md');
+  const llmsPublic = readText('showcase/angular/public/llms.txt');
+  const llmsFullPublic = readText('showcase/angular/public/llms-full.txt');
 
   console.log('\n--- metadata parity ---');
-  assertEqual(packageJson.version, canonicalVersion, 'mcp/package.json version stays on canonical version parity target');
+  assertEqual(canonicalVersion, expectedReleaseVersion, 'mcp/package.json advances to the intended release version');
+  assertEqual(packageLock.version, canonicalVersion, 'mcp/package-lock.json top-level version matches canonical package version');
+  assertEqual(packageLock.packages[''].version, canonicalVersion, 'mcp/package-lock.json root package version matches canonical package version');
   assertEqual(extractRuntimeVersion(versionSource), canonicalVersion, 'FSB_MCP_VERSION matches canonical package version');
   assertEqual(serverJson.version, canonicalVersion, 'server.json top-level version matches canonical package version');
   assertEqual(serverJson.packages[0].version, canonicalVersion, 'server.json package version matches canonical package version');
+
+  console.log('\n--- release documentation parity ---');
+  assertEqual(extractLatestChangelogVersion(packageChangelog), canonicalVersion, 'latest MCP changelog entry matches canonical package version');
+  assert(packageChangelog.includes('`mcp:task-status`'), 'MCP changelog documents the new task-status wire contract');
+  assert(packageChangelog.includes(`fsb-mcp-server@${canonicalVersion}`), 'MCP changelog names the current publish artifact');
+  assert(packageReadme.includes(`### What's New In v${canonicalVersion}`), 'MCP README has a current release summary');
+  assert(packageReadme.includes(`### Releasing ${canonicalVersion}`), 'MCP README release instructions match canonical package version');
+  assert(packageReadme.includes(`git tag mcp-v${canonicalVersion} && git push origin mcp-v${canonicalVersion}`), 'MCP README uses the MCP-only release tag');
+  assert(!packageReadme.includes(`git tag v${canonicalVersion}`), 'MCP README does not use a repository milestone tag for npm publishing');
+  assert(packageReadme.includes('requires FSB extension 0.9.91 or newer'), 'MCP README documents extension compatibility for task-status');
+  assert(publishWorkflow.includes("- 'mcp-v*'"), 'npm publish workflow is restricted to MCP release tags');
+  const currentProductRelease = rootChangelog
+    .split(/^## /m)
+    .find(section => section.startsWith('v0.9.91 '));
+  assert(currentProductRelease && currentProductRelease.includes(`fsb-mcp-server\` advances to \`${canonicalVersion}`),
+    'current product changelog names the independently versioned MCP release');
+  for (const [name, content] of [
+    ['LLM summary source', llmsSource],
+    ['LLM full source', llmsFullSource],
+    ['generated LLM summary', llmsPublic],
+    ['generated LLM full text', llmsFullPublic],
+  ]) {
+    assert(content.includes(`fsb-mcp-server ${canonicalVersion}`), `${name} advertises the canonical MCP release`);
+  }
 
   console.log('\n--- cli output parity ---');
   const helpOutput = runCommand('node mcp/build/index.js help');
@@ -275,22 +314,28 @@ async function run() {
 
   console.log('\n--- Phase 57 additive wire freeze ---');
   const messageTypes = extractMcpMessageTypes(typesSource);
+  const mergedAdditiveMessageTypes = ['mcp:task-status', 'system:client-inventory'];
+  const historicalMessageTypes = messageTypes.filter(
+    (type) => !mergedAdditiveMessageTypes.includes(type),
+  );
   assert(
-    JSON.stringify(messageTypes.slice(0, prePhase57MessageTypes.length)) === JSON.stringify(prePhase57MessageTypes),
+    JSON.stringify(historicalMessageTypes) === JSON.stringify(prePhase57MessageTypes),
     'every pre-Phase-57 MCPMessageType remains present, unchanged, and in order',
   );
   assert(
-    JSON.stringify(messageTypes.slice(prePhase57MessageTypes.length)) === JSON.stringify(['system:client-inventory']),
-    'system:client-inventory is the only Phase 57 MCPMessageType addition',
+    JSON.stringify(messageTypes.filter((type) => mergedAdditiveMessageTypes.includes(type)))
+      === JSON.stringify(mergedAdditiveMessageTypes),
+    'the merged branch retains only task-status and client-inventory as additive MCPMessageType values',
   );
   assert(
     /type: 'mcp:result' \| 'mcp:progress' \| 'mcp:error';/.test(typesSource),
     'the MCP response type union remains byte-stable',
   );
-  assertEqual(sha256('extension/ai/tool-definitions.js'), prePhase57ToolDefinitionsHash,
-    'extension MCP tool definitions retain the pre-Phase-57 hash');
-  assertEqual(sha256('mcp/ai/tool-definitions.cjs'), prePhase57ToolDefinitionsHash,
-    'server MCP tool definitions retain the pre-Phase-57 hash');
+  assertEqual(
+    sha256('extension/ai/tool-definitions.js'),
+    sha256('mcp/ai/tool-definitions.cjs'),
+    'extension and server MCP tool definitions remain byte-identical after the Sheets additions',
+  );
   assert(
     dispatcherSource.includes('return { success: true, agentId, agentIdShort, ownershipTokens: {}, connectionId: connectionId };'),
     'agent:register response remains the exact established envelope',

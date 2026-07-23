@@ -23,7 +23,7 @@ async function loadInitConfigHarness() {
     console,
     chrome: {
       runtime: {
-        getManifest: () => ({ version: '0.9.90' }),
+        getManifest: () => ({ version: '0.9.91' }),
         getURL: (rel) => `chrome-extension://fsb/${rel}`,
         openOptionsPage: () => openedOptions.push(true),
         onInstalled: {
@@ -97,7 +97,7 @@ async function loadInitConfigHarness() {
   console.log('--- onboarding provider storage mapping ---');
   {
     const context = {
-      chrome: { runtime: { getManifest: () => ({ version: '0.9.90' }) } },
+      chrome: { runtime: { getManifest: () => ({ version: '0.9.91' }) } },
       document: { addEventListener: () => {} },
       window: { addEventListener: () => {} },
       console,

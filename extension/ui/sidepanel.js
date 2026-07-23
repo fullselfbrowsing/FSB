@@ -1,4 +1,4 @@
-// Side Panel Script for FSB v0.9.90 - Persistent UI
+// Side Panel Script for FSB v0.9.91 - Persistent UI
 
 // Phase 243 plan 03 (UI-02): the sidepanel's surface id (matches the
 // legacy:sidepanel agent synthesized by ensureLegacySidepanelAgent below).
@@ -5976,6 +5976,9 @@ async function loadHistoryList() {
             '<span>' + formatSessionDate(session.startTime) + '</span>' +
             '<span>' + (session.actionCount || 0) + ' actions</span>' +
             costDisplay +
+            (session.mode === 'mcp-agent'
+              ? '<span class="history-source-badge mcp">MCP · ' + escapeHtml(session.mcpClient || 'Agent') + '</span>'
+              : '<span class="history-source-badge">Autopilot</span>') +
             '<span class="history-status ' + (session.status || '') + '">' + escapeHtml(session.status || 'unknown') + '</span>' +
           '</div>' +
         '</div>' +
@@ -6041,15 +6044,11 @@ async function startReplay(sessionId) {
 
 async function deleteHistorySession(sessionId) {
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-    delete sessionStorage[sessionId];
-    const updatedIndex = sessionIndex.filter(function(s) { return s.id !== sessionId; });
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId: sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
     loadHistoryList();
   } catch (error) {
     console.error('Failed to delete session:', error);
@@ -6113,7 +6112,8 @@ async function loadSessionView(sessionId) {
 async function clearAllHistorySessions() {
   if (!confirm('Delete all session history? This cannot be undone.')) return;
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
     loadHistoryList();
   } catch (error) {
     console.error('Failed to clear all sessions:', error);

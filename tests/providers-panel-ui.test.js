@@ -150,8 +150,8 @@ assert.match(HTML,
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 assert.strictEqual(
   sha256(HTML.replace(canonicalHelperScript, '')),
-  'effea844924badc6cf0bae22d3a98a75d4a4f12506bb1e4b1897dd51b01b667e',
-  'the canonical helper line is the only control-panel HTML delta'
+  'bb53e93e4d4b4f0031e24d458a21b4efc71ad7da3dd4e6eb066be6baaebb8aa1',
+  'the merged control-panel shell retains the canonical provider and MCP replay bytes'
 );
 assert.strictEqual(
   sha256(providersSection),

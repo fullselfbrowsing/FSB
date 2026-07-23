@@ -3,7 +3,7 @@
  *
  * Two GET endpoints with NO auth middleware (anonymous-by-design per STATS-04):
  *
- *   - GET /global          -- FSBTelemetryHeadline response (10 fields).
+ *   - GET /global          -- FSBTelemetryHeadline response.
  *   - GET /global/series   -- FSBTelemetrySeries response (30d/90d/365d windows).
  *
  * Caching:
@@ -42,10 +42,15 @@ const MEMO_TTL_MS = 30 * 1000;
 const MEMO_MAX_ENTRIES = 100;
 // HTTP Cache-Control header value.
 const CACHE_CONTROL = 'public, max-age=60';
+// A complete last-known-good GitHub snapshot remains useful during a short
+// upstream outage, but it is never served indefinitely.
+const GITHUB_CACHE_FRESH_MS = 15 * 60 * 1000;
+const GITHUB_CACHE_MAX_STALE_MS = 24 * 60 * 60 * 1000;
 
-// Active-now windows (per CONTEXT decisions §"Active right now" sources).
-const ACTIVE_USERS_WINDOW_MS = 5 * 60 * 1000;   // 5 min
-const ACTIVE_AGENTS_WINDOW_MS = 10 * 60 * 1000; // 10 min
+// One cohort and one timestamp for all active-now fields. The collector beats
+// every five minutes, so a ten-minute window tolerates one delayed heartbeat
+// without dividing an agent total by a different user population.
+const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * Compute the ETag for a JSON body. Per RFC 7232 we wrap the hex digest
@@ -77,6 +82,10 @@ function safeParseArray(json) {
   }
 }
 
+function isoFromMsOrNull(value) {
+  return Number.isFinite(value) && value > 0 ? new Date(value).toISOString() : null;
+}
+
 /**
  * Build the FSBTelemetryHeadline JSON object.
  *
@@ -84,9 +93,14 @@ function safeParseArray(json) {
  * @returns {Object}
  */
 function buildHeadlineJson(queries) {
-  const rows = queries.getPublicHeadlineRows();
-  const active_users_now = activeTracker.countActiveUsers(ACTIVE_USERS_WINDOW_MS);
-  const active_agents_now = activeTracker.getActiveAgentSum(ACTIVE_AGENTS_WINDOW_MS);
+  const activeSnapshotMs = Date.now();
+  const rows = queries.getPublicHeadlineRows(activeSnapshotMs);
+  const active_users_now = activeTracker.countActiveUsers(ACTIVE_WINDOW_MS, activeSnapshotMs);
+  const active_agents_now = activeTracker.getActiveAgentSum(ACTIVE_WINDOW_MS, activeSnapshotMs);
+  const active_agents_reporting_users_now = activeTracker.countActiveAgentReporters(
+    ACTIVE_WINDOW_MS,
+    activeSnapshotMs,
+  );
 
   // popular_mcp_json rows look like {mcp_client, uniq}; rename to {label, uniq}
   // for the public-facing FSBTelemetryHeadline contract. popular_agent_json
@@ -116,22 +130,51 @@ function buildHeadlineJson(queries) {
     uniq: Number.isInteger(r.uniq) ? r.uniq : 0,
   }));
 
-  const avg_agents_per_user = active_users_now > 0
-    ? Math.round((active_agents_now / active_users_now) * 10) / 10
+  const avg_agents_per_reporting_user = active_agents_reporting_users_now > 0
+    ? Math.round((active_agents_now / active_agents_reporting_users_now) * 10) / 10
     : 0;
+  const active_agents_coverage = active_users_now > 0
+    ? active_agents_reporting_users_now / active_users_now
+    : 1;
+  const aggregateUsers = Number(rows.latest_global.unique_installs) || 0;
+  const aggregateReportingUsers = Number(rows.latest_global.trusted_active_installs) || 0;
+  const aggregate_active_coverage = aggregateUsers > 0
+    ? aggregateReportingUsers / aggregateUsers
+    : rows.latest_global.active_count_version >= 2 ? 1 : 0;
 
   return {
+    generated_at: new Date(activeSnapshotMs).toISOString(),
+    aggregate_as_of_day: rows.latest_global.day_utc || null,
+    aggregate_updated_at: isoFromMsOrNull(rows.latest_global.updated_at),
     active_users_now,
     active_agents_now,
+    active_agents_reporting_users_now,
+    active_agents_coverage,
     active_agents_bucket: activeTracker.bucketAgents(active_agents_now),
+    active_count_version: activeTracker.ACTIVE_COUNT_VERSION,
+    active_history_since: rows.active_history_since,
+    active_history_complete: false,
+    active_metric_semantics: 'reported_registry_count_v2',
+    users_365d: rows.users_365d,
+    // Deprecated compatibility alias. Per-install rollups are retained for
+    // 365 days, so this is not a lifetime distinct-user count.
     total_users: rows.total_users,
+    agent_days_lifetime: rows.agent_days_lifetime,
+    // Deprecated compatibility alias. It stays null because pre-v2 history is
+    // corrupt and anonymous snapshots cannot count distinct lifetime agents.
     total_agents_lifetime: rows.total_agents_lifetime,
+    agent_days_since_active_v2: rows.agent_days_since_active_v2,
     tokens_total_lifetime: rows.tokens_total_lifetime,
     tokens_24h: rows.tokens_24h,
     popular_mcp_clients,
     popular_agents,
     popular_regions,
-    avg_agents_per_user,
+    avg_agents_per_reporting_user,
+    // Compatibility alias now uses the only valid denominator: installs that
+    // supplied a v2 active count in the same ten-minute cohort.
+    avg_agents_per_user: avg_agents_per_reporting_user,
+    aggregate_active_reporting_installs: aggregateReportingUsers,
+    aggregate_active_coverage,
   };
 }
 
@@ -142,14 +185,36 @@ function buildHeadlineJson(queries) {
  * @returns {Object}
  */
 function buildSeriesJson(queries) {
-  const rows = queries.getPublicSeriesRows();
-  const mapRow = (r) => ({
-    day_utc: r.day_utc,
-    unique_installs: r.unique_installs || 0,
-    tokens: (r.tokens_in_sum || 0) + (r.tokens_out_sum || 0),
-    agents_active: r.agents_active_sum || 0,
-  });
+  const generatedAtMs = Date.now();
+  const rows = queries.getPublicSeriesRows(generatedAtMs);
+  const mapRow = (r) => {
+    const uniqueInstalls = Number(r.unique_installs) || 0;
+    const reportingInstalls = Number(r.trusted_active_installs) || 0;
+    const hasV2Semantics = Number(r.active_count_version) >= activeTracker.ACTIVE_COUNT_VERSION;
+    const coverage = uniqueInstalls > 0
+      ? reportingInstalls / uniqueInstalls
+      : hasV2Semantics ? 1 : 0;
+    return {
+      day_utc: r.day_utc,
+      unique_installs: uniqueInstalls,
+      tokens: (r.tokens_in_sum || 0) + (r.tokens_out_sum || 0),
+      // Deprecated ambiguous field. A daily sum of per-install maxima is not
+      // concurrency, so consumers must use the explicitly named v2 field.
+      agents_active: null,
+      reported_agent_daily_peak_sum: hasV2Semantics ? (r.agents_active_sum || 0) : null,
+      active_reporting_installs: reportingInstalls,
+      active_coverage: coverage,
+      active_data_state: !hasV2Semantics ? 'unavailable' : coverage < 1 ? 'partial' : 'ready',
+    };
+  };
   return {
+    generated_at: new Date(generatedAtMs).toISOString(),
+    aggregate_as_of_day: rows.latest_global.day_utc || null,
+    aggregate_updated_at: isoFromMsOrNull(rows.latest_global.updated_at),
+    active_count_version: activeTracker.ACTIVE_COUNT_VERSION,
+    active_history_since: rows.active_history_since,
+    active_history_complete: false,
+    active_metric_semantics: 'sum_of_per_install_daily_peaks',
     d30:  rows.d30.map(mapRow),
     d90:  rows.d90.map(mapRow),
     d365: rows.d365.map(mapRow),
@@ -220,14 +285,38 @@ function createPublicStatsRouter(db, queries) {
   router.get('/global', makeHandler('/global', () => buildHeadlineJson(queries), memo));
   router.get('/global/series', makeHandler('/global/series', () => buildSeriesJson(queries), memo));
 
-  // Quick task 260516-7l5 -- server-side GitHub stats cache route.
-  // The poller (src/telemetry/github-poller.js) populates github_cache every
-  // 5 min; this handler serves the cached JSON STRING verbatim with the same
-  // memo + ETag + Cache-Control + no-Set-Cookie posture as /global. First-boot
-  // empty-cache case returns 503 + Retry-After: 60 (NOT 404) so the client
-  // recognises "data not ready yet" vs "endpoint does not exist".
-  const { GITHUB_ENDPOINT_IDS } = require('../telemetry/github-poller');
+  // Server-side GitHub stats cache route. The response is rebuilt through the
+  // poller's public-payload sanitizer even for legacy database rows, so raw
+  // GitHub identities and bulky nested objects can never be republished.
+  const { GITHUB_ENDPOINT_IDS, sanitizePublicPayload } = require('../telemetry/github-poller');
   const GITHUB_ALLOW = new Set(GITHUB_ENDPOINT_IDS);
+
+  function pendingResponse(res, endpointId, error, row, now) {
+    const nextRetryAt = row && Number.isFinite(row.nextRetryAt) ? row.nextRetryAt : null;
+    const retrySeconds = nextRetryAt && nextRetryAt > now
+      ? Math.max(60, Math.ceil((nextRetryAt - now) / 1000))
+      : 60;
+    res.set('Retry-After', String(retrySeconds));
+    return res.status(503).json({ error, endpoint_id: endpointId });
+  }
+
+  function parsedCacheRow(row) {
+    try { return JSON.parse(row.payload); } catch { return null; }
+  }
+
+  function repoStarSnapshot(now, minimumFetchedAt = 0) {
+    const summaryRow = queries.getGithubCachePayload('repo-summary');
+    if (
+      !summaryRow || summaryRow.fetchedAt <= 0 ||
+      summaryRow.fetchedAt < minimumFetchedAt ||
+      now - summaryRow.fetchedAt > GITHUB_CACHE_MAX_STALE_MS
+    ) {
+      return null;
+    }
+    const parsed = parsedCacheRow(summaryRow);
+    if (!parsed || !Number.isInteger(parsed.stargazers_count) || parsed.stargazers_count < 0) return null;
+    return { total: parsed.stargazers_count, fetchedAt: summaryRow.fetchedAt };
+  }
 
   router.get('/github/:endpoint_id', (req, res) => {
     const endpointId = req.params.endpoint_id;
@@ -244,27 +333,90 @@ function createPublicStatsRouter(db, queries) {
     let entry = memo.get(memoKey);
 
     if (!entry || entry.expiresAt <= now) {
-      // Rebuild from DB. If cache row absent, return 503 (first-boot pending).
+      // Rebuild from DB. If cache row is absent, this is a first-boot pending
+      // condition, not a missing API endpoint.
       const row = queries.getGithubCachePayload(endpointId);
       if (!row) {
-        res.set('Retry-After', '60');
-        return res.status(503).json({ error: 'cache pending', endpoint_id: endpointId });
+        return pendingResponse(res, endpointId, 'cache pending', null, now);
       }
+
+      // Legacy star and commit arrays are reduced safely at response time and
+      // carry their own history_complete=false marker.
+      if (!Number.isFinite(row.fetchedAt) || row.fetchedAt <= 0) {
+        return pendingResponse(res, endpointId, 'cache pending', row, now);
+      }
+
+      // A repository summary may repair a legacy/incomplete star row, but an
+      // older summary must never overwrite a newer aggregate from a complete
+      // stargazer traversal.
+      const starSnapshot = endpointId === 'stars'
+        ? repoStarSnapshot(now, row.isComplete ? row.fetchedAt : 0)
+        : null;
+      if (endpointId === 'stars' && !row.isComplete && !starSnapshot) {
+        return pendingResponse(res, endpointId, 'cache incomplete', row, now);
+      }
+      const effectiveFetchedAt = starSnapshot
+        ? Math.max(row.fetchedAt, starSnapshot.fetchedAt)
+        : row.fetchedAt;
+      const newerCountOnlyStarSnapshot = endpointId === 'stars' && Boolean(
+        starSnapshot && starSnapshot.fetchedAt > row.fetchedAt
+      );
+      const ageMs = Math.max(0, now - effectiveFetchedAt);
+      if (ageMs > GITHUB_CACHE_MAX_STALE_MS) {
+        return pendingResponse(res, endpointId, 'cache stale', row, now);
+      }
+
+      const parsed = parsedCacheRow(row);
+      if (parsed === null) {
+        return pendingResponse(res, endpointId, 'cache invalid', row, now);
+      }
+
+      let publicPayload;
+      try {
+        publicPayload = sanitizePublicPayload(endpointId, parsed, {
+          nowMs: effectiveFetchedAt,
+          repoTotal: starSnapshot ? starSnapshot.total : undefined,
+          historyComplete: row.isComplete && !newerCountOnlyStarSnapshot,
+        });
+      } catch {
+        return pendingResponse(res, endpointId, 'cache invalid', row, now);
+      }
+
       // LRU eviction (mirrors the existing makeHandler behavior).
       if (memo.size >= MEMO_MAX_ENTRIES) {
         const oldest = memo.keys().next().value;
         if (oldest !== undefined) memo.delete(oldest);
       }
-      // payload_json is already a JSON STRING; etag is sha256 over it (matches
-      // /global path's etag-over-stringified-body contract).
-      const body = row.payload;
+      const body = JSON.stringify(publicPayload);
       const etag = etagFor(body);
-      entry = { body, etag, expiresAt: now + MEMO_TTL_MS };
+      const checkedAt = Number.isFinite(row.lastAttemptAt) && row.lastAttemptAt > 0
+        ? row.lastAttemptAt
+        : effectiveFetchedAt;
+      const refreshFailed = Number.isFinite(row.lastErrorStatus) && row.lastErrorStatus !== null;
+      entry = {
+        body,
+        etag,
+        expiresAt: now + MEMO_TTL_MS,
+        fetchedAt: effectiveFetchedAt,
+        checkedAt,
+        upstreamStatus: refreshFailed ? row.lastErrorStatus : row.status,
+        cacheState: !refreshFailed && ageMs <= GITHUB_CACHE_FRESH_MS ? 'fresh' : 'stale',
+        nextRetryAt: row.nextRetryAt,
+        payloadAsOf: typeof publicPayload.as_of === 'string' ? publicPayload.as_of : null,
+      };
       memo.set(memoKey, entry);
     }
 
     res.set('ETag', entry.etag);
     res.set('Cache-Control', CACHE_CONTROL);
+    res.set('X-FSB-Stats-Cache', entry.cacheState);
+    res.set('X-FSB-Stats-Fetched-At', new Date(entry.fetchedAt).toISOString());
+    res.set('X-FSB-Stats-Checked-At', new Date(entry.checkedAt).toISOString());
+    res.set('X-FSB-Stats-Upstream-Status', String(entry.upstreamStatus));
+    if (entry.payloadAsOf) res.set('X-FSB-Stats-Payload-As-Of', entry.payloadAsOf);
+    if (entry.nextRetryAt) {
+      res.set('X-FSB-Stats-Next-Retry-At', new Date(entry.nextRetryAt).toISOString());
+    }
 
     const inm = req.get('If-None-Match');
     if (inm && inm === entry.etag) return res.status(304).end();
@@ -288,3 +440,6 @@ module.exports.buildHeadlineJson = buildHeadlineJson;
 module.exports.buildSeriesJson = buildSeriesJson;
 module.exports.etagFor = etagFor;
 module.exports.MEMO_TTL_MS = MEMO_TTL_MS;
+module.exports.GITHUB_CACHE_FRESH_MS = GITHUB_CACHE_FRESH_MS;
+module.exports.GITHUB_CACHE_MAX_STALE_MS = GITHUB_CACHE_MAX_STALE_MS;
+module.exports.ACTIVE_WINDOW_MS = ACTIVE_WINDOW_MS;

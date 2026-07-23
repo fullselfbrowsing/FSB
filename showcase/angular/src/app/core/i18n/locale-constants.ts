@@ -11,7 +11,7 @@ export type LocaleCode = typeof LOCALES[number];
 
 export const LOCALE_NATIVE_LABELS: Record<LocaleCode, string> = {
   'en':    'English',
-  'es':    'Espanol',
+  'es':    'Español',
   'de':    'Deutsch',
   'ja':    '\u65e5\u672c\u8a9e',
   'zh-CN': '\u7b80\u4f53\u4e2d\u6587',

@@ -1,4 +1,4 @@
-// Modern Chat Interface Script for FSB v0.9.90
+// Modern Chat Interface Script for FSB v0.9.91
 
 // Phase 243 plan 03 (UI-02): the popup's surface id (matches the legacy:popup
 // agent synthesized by ensureLegacyPopupAgent below). When the active tab is

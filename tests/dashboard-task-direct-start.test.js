@@ -105,6 +105,29 @@ runTest('start_failure_relayed_as_task_complete', () => {
   );
 });
 
+runTest('start_precondition_failures_have_stable_error_codes', () => {
+  const expected = [
+    ['dashboard_task_missing', "error: 'No task provided'"],
+    ['dashboard_task_already_running', "error: 'Another task is already running'"],
+    ['dashboard_task_no_usable_tab', "error: 'No usable browser tab found for automation'"],
+    ['dashboard_task_start_failed', "error: (result && result.error) || 'Failed to start automation'"],
+    ['dashboard_task_start_exception', 'error: err.message'],
+  ];
+
+  expected.forEach(function(pair) {
+    const code = pair[0];
+    const errorExpression = pair[1];
+    const codeIdx = body.indexOf("errorCode: '" + code + "'");
+    const errorIdx = body.indexOf(errorExpression, codeIdx);
+
+    assert.ok(codeIdx >= 0, 'missing stable errorCode ' + code);
+    assert.ok(
+      errorIdx > codeIdx && errorIdx - codeIdx < 160,
+      code + ' must remain paired with its compatibility error string'
+    );
+  });
+});
+
 console.log('');
 console.log('Results: ' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) {

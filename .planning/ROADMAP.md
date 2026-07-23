@@ -1,5 +1,11 @@
 # Roadmap: FSB (Full Self-Browsing)
 
+> **Historical-scope note (2026-07-15):** The Phase 54 dashboard-exclusion
+> entries below preserve the completed v1.2.0 roadmap. A later showcase
+> localization follow-up superseded that policy by localizing the dashboard and
+> removing its lint exclusion. Current policy lives in
+> `showcase/angular/src/locale/I18N-BOUNDARIES.md`.
+
 ## Milestones
 
 - 🚧 **v0.9.91 MCP Clients as Providers** — Phases 57-65, planning 2026-07-11. Extends the Chrome MV3 extension + `fsb-mcp-server` so installed agent CLIs (Claude Code first, then OpenCode + Codex) become first-class side-panel providers: FSB captures which MCP clients the user copies/installs/connects, presents them as key-less providers in a renamed Providers panel, and delegates side-panel tasks to a spawned agent CLI that drives the browser back through FSB's own MCP tools — with a security-first reverse-request channel, an `AgentProviderAdapter` contract, task-mode only (chat-mode deferred), CI drift-smoke gate, native-messaging wake-host, and INV-01 (byte-stable existing MCP wire) preserved end-to-end.

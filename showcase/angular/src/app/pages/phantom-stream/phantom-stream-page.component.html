@@ -77,35 +77,35 @@
       <div class="ps-mirror" aria-hidden="true">
         <div class="ps-frame ps-frame-mir">
           <div class="ps-fbar"><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-flabel" i18n="@@phantomStream.hero.mirrorLabel" [attr.translate]="'no'">DOM mirror</span></div>
-          <div class="ps-mini" i18n="@@phantomStream.hero.mirrorMini" [attr.translate]="'no'">
+          <div class="ps-mini" i18n="@@phantomStream.hero.mirrorMini">
             <span class="ps-mini-badge"><span class="ps-mini-dot"></span> In progress</span>
-            <div class="ps-mini-word"><span class="pro">Pro</span><span class="rest">metheus</span></div>
+            <div class="ps-mini-word"><span class="pro" [attr.translate]="'no'">Pro</span><span class="rest" [attr.translate]="'no'">metheus</span></div>
             <div class="ps-mini-sub">The Future of Autonomous Browsing</div>
             <div class="ps-mini-count">
-              <div class="ps-mini-unit"><span class="ps-mini-num">36</span><span class="ps-mini-ul">Days</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">36</span><span class="ps-mini-ul">Days</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num">11</span><span class="ps-mini-ul">Hrs</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">11</span><span class="ps-mini-ul">Hrs</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num">42</span><span class="ps-mini-ul">Min</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">42</span><span class="ps-mini-ul">Min</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs" [attr.translate]="'no'">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
             </div>
           </div>
         </div>
         <div class="ps-frame ps-frame-src">
           <div class="ps-fbar"><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-fdot"></span><span class="ps-flabel" i18n="@@phantomStream.hero.sourceLabel" [attr.translate]="'no'">Source tab</span></div>
-          <div class="ps-mini" i18n="@@phantomStream.hero.sourceMini" [attr.translate]="'no'">
+          <div class="ps-mini" i18n="@@phantomStream.hero.sourceMini">
             <span class="ps-mini-badge"><span class="ps-mini-dot"></span> In progress</span>
-            <div class="ps-mini-word"><span class="pro">Pro</span><span class="rest">metheus</span></div>
+            <div class="ps-mini-word"><span class="pro" [attr.translate]="'no'">Pro</span><span class="rest" [attr.translate]="'no'">metheus</span></div>
             <div class="ps-mini-sub">The Future of Autonomous Browsing</div>
             <div class="ps-mini-count">
-              <div class="ps-mini-unit"><span class="ps-mini-num">36</span><span class="ps-mini-ul">Days</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">36</span><span class="ps-mini-ul">Days</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num">11</span><span class="ps-mini-ul">Hrs</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">11</span><span class="ps-mini-ul">Hrs</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num">42</span><span class="ps-mini-ul">Min</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num" [attr.translate]="'no'">42</span><span class="ps-mini-ul">Min</span></div>
               <span class="ps-mini-colon">:</span>
-              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
+              <div class="ps-mini-unit"><span class="ps-mini-num ps-mini-secs" [attr.translate]="'no'">{{ miniSeconds }}</span><span class="ps-mini-ul">Sec</span></div>
             </div>
           </div>
         </div>
@@ -179,7 +179,7 @@
           <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.bandwidth.phantom">One snapshot, then tiny diffs only when the page changes</div>
           <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.latency.key">Latency</div>
           <div class="ps-cmp-cell" i18n="@@phantomStream.compare.latency.video">Encode, transmit, then decode per frame</div>
-          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.latency.phantom"><span [attr.translate]="'no'">A text mutation is one small JSON op</span></div>
+          <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.latency.phantom">A text mutation is one small <span [attr.translate]="'no'">JSON</span> op</div>
           <div class="ps-cmp-cell ps-cmp-k" i18n="@@phantomStream.compare.fidelity.key">Fidelity</div>
           <div class="ps-cmp-cell" i18n="@@phantomStream.compare.fidelity.video">Lossy and resolution bound</div>
           <div class="ps-cmp-cell ps-cmp-col3" i18n="@@phantomStream.compare.fidelity.phantom">Exact <span [attr.translate]="'no'">DOM</span>, native text rendering, resolution independent</div>
@@ -244,13 +244,13 @@
               <li i18n="@@phantomStream.security.tick.media"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Fail-closed media fetch: https-only, private-range deny, no-referrer</span></li>
             </ul>
           </div>
-          <div class="ps-contract" i18n="@@phantomStream.security.contract" [attr.translate]="'no'">
-            <div class="ps-contract-top"><span class="seal"><i class="fa-solid fa-lock" aria-hidden="true"></i></span><h4>Sandbox guarantees</h4></div>
-            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> iframe sandbox = allow-same-origin only</div>
-            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> CSP meta tag + post-parse scrub</div>
-            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> Capture-side sanitization on wire clone</div>
-            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> String-layer gate before srcdoc parse</div>
-            <div class="ps-crow"><i class="fa-solid fa-check" aria-hidden="true"></i> Document-level no-referrer policy</div>
+          <div class="ps-contract">
+            <div class="ps-contract-top" i18n="@@phantomStream.security.contract.title"><span class="seal"><i class="fa-solid fa-lock" aria-hidden="true"></i></span><h4>Sandbox guarantees</h4></div>
+            <div class="ps-crow" i18n="@@phantomStream.security.contract.sandbox"><i class="fa-solid fa-check" aria-hidden="true"></i> <span [attr.translate]="'no'">iframe sandbox = allow-same-origin</span> only</div>
+            <div class="ps-crow" i18n="@@phantomStream.security.contract.csp"><i class="fa-solid fa-check" aria-hidden="true"></i> <span [attr.translate]="'no'">CSP</span> meta tag + post-parse scrub</div>
+            <div class="ps-crow" i18n="@@phantomStream.security.contract.capture"><i class="fa-solid fa-check" aria-hidden="true"></i> Capture-side sanitization on wire clone</div>
+            <div class="ps-crow" i18n="@@phantomStream.security.contract.srcdoc"><i class="fa-solid fa-check" aria-hidden="true"></i> String-layer gate before <span [attr.translate]="'no'">srcdoc</span> parse</div>
+            <div class="ps-crow" i18n="@@phantomStream.security.contract.referrer"><i class="fa-solid fa-check" aria-hidden="true"></i> Document-level <span [attr.translate]="'no'">no-referrer</span> policy</div>
           </div>
         </div>
       </section>
@@ -371,7 +371,8 @@
       </div>
       <div class="footer-bottom">
         <p i18n="@@phantomStream.footer.credit">Made by <span [attr.translate]="'no'">Lakshman Turlapati</span></p>
-        <p><span class="version-tag" [attr.translate]="'no'">▽0.9.90</span></p>
+        <p><span class="version-tag" [attr.translate]="'no'">▽0.9.91</span></p>
+        <app-language-picker [mode]="'text'"></app-language-picker>
       </div>
     </div>
   </footer>

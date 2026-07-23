@@ -1,36 +1,7 @@
-// GitHub stats service for the /stats Easter-egg page.
-//
-// Design notes (quick task 260516-7l5 server-side-cache rewrite):
-//
-//  * Source: same-origin /api/public-stats/github/<endpoint_id> served by
-//    showcase/server/src/routes/public-stats.js. The server polls GitHub
-//    once per 5 min into a SQLite cache (showcase/server/src/telemetry/
-//    github-poller.js) so individual visitors do not burn their own per-IP
-//    GitHub rate limit. Pagination, vendor Accept types, and 403 rate-limit
-//    handling all live server-side now -- this client only consumes JSON.
-//
-//  * Polling: every POLL_INTERVAL_MS = 5 min while the document is visible.
-//    visibilitychange pauses + resumes via clear/setInterval. ngOnDestroy
-//    calls stop() to guarantee no leak across route changes.
-//
-//  * SSR safety: every fetch + every `document` reference is gated by
-//    `isPlatformBrowser(PLATFORM_ID)`. Server-side rendering stays at
-//    { kind: 'loading' } for all subjects -- afterNextRender bootstraps
-//    start() only on the browser.
-//
-//  * ETag cache: per-URL If-None-Match round-trip against the server's
-//    sha256-based ETag (showcase/server/.../public-stats.js etagFor). A 304
-//    returns the cached body without re-parsing.
-//
-//  * First-boot 503: when the server cache row is cold (poller not yet
-//    completed its first tick), the endpoint returns 503 + Retry-After. The
-//    client treats 503 as transient (returns null, leaves the subject as-is
-//    or loading); the next 5-min poll cycle retries automatically.
-//
-//  * Maintenance signal: same as before -- releases-per-month over 12 months
-//    when releases is non-empty; falls back to commits-per-week from
-//    /commits. Aggregator logic in this file is UNCHANGED post-rewrite; only
-//    the source URLs moved.
+// Browser lifecycle + aggregate GitHub data for the /stats page. Only the
+// two GitHub datasets rendered by the current UI are requested. A route-session
+// generation and AbortControllers prevent a completion from an old visit
+// from repopulating the singleton service after stop()/start().
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
@@ -40,14 +11,20 @@ import {
   CommitEvent,
   DatasetState,
   ForkEvent,
-  IssueEvent,
+  GitHubCommitsStats,
+  GitHubStarsStats,
   PullEvent,
   ReleaseEvent,
-  RepoSummary,
   StarEvent,
   TimeSeriesPoint,
   WeeklyDelta,
 } from './github-stats.types';
+import {
+  normalizeGitHubCommits,
+  normalizeGitHubStars,
+  StatsResponseFreshness,
+  statsResponseFreshness,
+} from './stats-view.model';
 
 // Quick task 260516-7l5 -- same-origin server-side cache. The server polls
 // GitHub once per 5 min into showcase/server/.../github_cache and serves each
@@ -61,10 +38,13 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 min (matches server poll cadence)
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
-interface EtagCacheEntry {
+interface EtagCacheEntry<T = unknown> {
   etag: string;
-  body: unknown;
-  fetchedAt: number;
+  body: T;
+}
+
+interface FetchResult<T> extends StatsResponseFreshness {
+  data: T;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -74,25 +54,16 @@ export class GitHubStatsService {
   /** ETag store keyed by full request URL. */
   private readonly etagCache = new Map<string, EtagCacheEntry>();
 
-  /** Active polling timer handle; null when polling is paused or stopped. */
   private pollHandle: ReturnType<typeof setInterval> | null = null;
-
-  /** Bound visibilitychange listener so we can remove it cleanly in stop(). */
+  private retryHandle: ReturnType<typeof setTimeout> | null = null;
   private visibilityListener: (() => void) | null = null;
-
-  /** Whether start() has been called and resources are wired. */
   private started = false;
+  private generation = 0;
+  private readonly controllers = new Set<AbortController>();
+  private refreshInFlight: Promise<void> | null = null;
 
-  // --- Per-dataset state streams. All start at { kind: 'loading' } on both
-  // server and browser cold start. SSR never advances them. ---
-  readonly repoSummary$ = new BehaviorSubject<DatasetState<RepoSummary>>({ kind: 'loading' });
-  readonly stars$ = new BehaviorSubject<DatasetState<StarEvent[]>>({ kind: 'loading' });
-  readonly weeklyStars$ = new BehaviorSubject<DatasetState<WeeklyDelta[]>>({ kind: 'loading' });
-  readonly issues$ = new BehaviorSubject<DatasetState<IssueEvent[]>>({ kind: 'loading' });
-  readonly forks$ = new BehaviorSubject<DatasetState<ForkEvent[]>>({ kind: 'loading' });
-  readonly prs$ = new BehaviorSubject<DatasetState<PullEvent[]>>({ kind: 'loading' });
-  readonly commits$ = new BehaviorSubject<DatasetState<CommitEvent[]>>({ kind: 'loading' });
-  readonly releases$ = new BehaviorSubject<DatasetState<ReleaseEvent[]>>({ kind: 'loading' });
+  readonly stars$ = new BehaviorSubject<DatasetState<GitHubStarsStats>>({ kind: 'loading' });
+  readonly commits$ = new BehaviorSubject<DatasetState<GitHubCommitsStats>>({ kind: 'loading' });
 
   /**
    * Idempotent boot. Called by the page component inside `afterNextRender`.
@@ -103,30 +74,24 @@ export class GitHubStatsService {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.started) return;
     this.started = true;
+    this.generation += 1;
+    this.stars$.next({ kind: 'loading' });
+    this.commits$.next({ kind: 'loading' });
 
-    // Immediate first refresh -- do not block on it.
     void this.refreshAll();
-
-    this.pollHandle = setInterval(() => {
-      void this.refreshAll();
-    }, POLL_INTERVAL_MS);
+    this.startPoller();
 
     this.visibilityListener = () => {
       if (typeof document === 'undefined') return;
       if (document.hidden) {
-        // Tab backgrounded -- stop the interval. Resume on focus.
         if (this.pollHandle !== null) {
           clearInterval(this.pollHandle);
           this.pollHandle = null;
         }
       } else {
-        // Tab refocused -- if we have no active interval, fire an immediate
-        // refresh and restart the schedule.
         if (this.pollHandle === null && this.started) {
           void this.refreshAll();
-          this.pollHandle = setInterval(() => {
-            void this.refreshAll();
-          }, POLL_INTERVAL_MS);
+          this.startPoller();
         }
       }
     };
@@ -144,143 +109,162 @@ export class GitHubStatsService {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
     }
+    if (this.retryHandle !== null) {
+      clearTimeout(this.retryHandle);
+      this.retryHandle = null;
+    }
     if (this.visibilityListener !== null && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.visibilityListener);
     }
     this.visibilityListener = null;
     this.started = false;
+    this.generation += 1;
+    for (const controller of this.controllers) controller.abort();
+    this.controllers.clear();
+    this.refreshInFlight = null;
   }
 
   /**
-   * Kick off all 7 dataset fetches in parallel. Each updates its own subject.
-   * Uses Promise.allSettled so one endpoint failing does NOT cascade.
+   * Refresh the two GitHub datasets actually rendered by the page. Concurrent calls
+   * coalesce, so a focus event cannot race an interval tick.
    */
   async refreshAll(): Promise<void> {
-    if (!isPlatformBrowser(this.platformId)) return;
+    if (!isPlatformBrowser(this.platformId) || !this.started) return;
+    if (this.refreshInFlight) return this.refreshInFlight;
 
-    const tasks: Array<Promise<unknown>> = [
-      this.fetchRepoSummary(),
-      this.fetchStars(),
-      this.fetchIssues(),
-      this.fetchForks(),
-      this.fetchPulls(),
-      this.fetchCommits(),
-      this.fetchReleases(),
-    ];
-
-    await Promise.allSettled(tasks);
-  }
-
-  // --- Endpoint fetches. Each updates its own subject; errors stay scoped. ---
-
-  private async fetchRepoSummary(): Promise<void> {
+    const generation = this.generation;
+    const refresh = Promise.allSettled([
+      this.fetchDataset(
+        `${API_ROOT}/stars`,
+        this.stars$,
+        normalizeGitHubStars,
+        generation
+      ),
+      this.fetchDataset(
+        `${API_ROOT}/commits`,
+        this.commits$,
+        normalizeGitHubCommits,
+        generation
+      ),
+    ]).then(() => undefined);
+    this.refreshInFlight = refresh;
     try {
-      const data = await this.fetchJson<RepoSummary>(`${API_ROOT}/repo-summary`);
-      if (data === null) return;
-      this.repoSummary$.next({ kind: 'ready', data, fetchedAt: Date.now() });
-    } catch (err) {
-      this.repoSummary$.next({ kind: 'error', message: humanError(err) });
+      await refresh;
+    } finally {
+      if (this.refreshInFlight === refresh) this.refreshInFlight = null;
     }
   }
 
-  private async fetchStars(): Promise<void> {
-    try {
-      const stars = await this.fetchJson<StarEvent[]>(`${API_ROOT}/stars`);
-      if (stars === null) return;
-      this.stars$.next({ kind: 'ready', data: stars, fetchedAt: Date.now() });
-      this.weeklyStars$.next({ kind: 'ready', data: weeklyStarsDelta(stars), fetchedAt: Date.now() });
-    } catch (err) {
-      const msg = humanError(err);
-      this.stars$.next({ kind: 'error', message: msg });
-      this.weeklyStars$.next({ kind: 'error', message: msg });
-    }
+  private startPoller(): void {
+    if (this.pollHandle !== null) return;
+    this.pollHandle = setInterval(() => void this.refreshAll(), POLL_INTERVAL_MS);
   }
 
-  private async fetchIssues(): Promise<void> {
+  private async fetchDataset<T>(
+    url: string,
+    subject: BehaviorSubject<DatasetState<T>>,
+    normalize: (value: unknown) => T,
+    generation: number
+  ): Promise<void> {
     try {
-      const issues = await this.fetchJson<IssueEvent[]>(`${API_ROOT}/issues`);
-      if (issues === null) return;
-      this.issues$.next({ kind: 'ready', data: issues, fetchedAt: Date.now() });
+      const result = await this.fetchJson(url, normalize);
+      if (!this.isCurrent(generation)) return;
+      if (result.cacheState === 'stale') {
+        subject.next({
+          kind: 'stale',
+          data: result.data,
+          fetchedAt: result.fetchedAt,
+          message: 'The server is showing its last known snapshot.',
+        });
+      } else if (hasIncompleteHistory(result.data)) {
+        subject.next({
+          kind: 'partial',
+          data: result.data,
+          fetchedAt: result.fetchedAt,
+          message: 'Historical coverage is incomplete.',
+        });
+      } else {
+        subject.next({ kind: 'ready', data: result.data, fetchedAt: result.fetchedAt });
+      }
     } catch (err) {
-      this.issues$.next({ kind: 'error', message: humanError(err) });
+      if (!this.isCurrent(generation) || isAbortError(err)) return;
+      const message = humanError(err);
+      const previous = subject.value;
+      if (previous.kind === 'ready' || previous.kind === 'partial' || previous.kind === 'stale') {
+        subject.next({
+          kind: 'stale',
+          data: previous.data,
+          fetchedAt: previous.fetchedAt,
+          message,
+        });
+      } else {
+        subject.next({ kind: 'error', message });
+      }
     }
   }
-
-  private async fetchForks(): Promise<void> {
-    try {
-      const forks = await this.fetchJson<ForkEvent[]>(`${API_ROOT}/forks`);
-      if (forks === null) return;
-      this.forks$.next({ kind: 'ready', data: forks, fetchedAt: Date.now() });
-    } catch (err) {
-      this.forks$.next({ kind: 'error', message: humanError(err) });
-    }
-  }
-
-  private async fetchPulls(): Promise<void> {
-    try {
-      const pulls = await this.fetchJson<PullEvent[]>(`${API_ROOT}/pulls`);
-      if (pulls === null) return;
-      this.prs$.next({ kind: 'ready', data: pulls, fetchedAt: Date.now() });
-    } catch (err) {
-      this.prs$.next({ kind: 'error', message: humanError(err) });
-    }
-  }
-
-  private async fetchCommits(): Promise<void> {
-    try {
-      const commits = await this.fetchJson<CommitEvent[]>(`${API_ROOT}/commits`);
-      if (commits === null) return;
-      this.commits$.next({ kind: 'ready', data: commits, fetchedAt: Date.now() });
-    } catch (err) {
-      this.commits$.next({ kind: 'error', message: humanError(err) });
-    }
-  }
-
-  private async fetchReleases(): Promise<void> {
-    try {
-      const releases = await this.fetchJson<ReleaseEvent[]>(`${API_ROOT}/releases`);
-      if (releases === null) return;
-      this.releases$.next({ kind: 'ready', data: releases, fetchedAt: Date.now() });
-    } catch (err) {
-      this.releases$.next({ kind: 'error', message: humanError(err) });
-    }
-  }
-
-  // --- Low-level fetch + ETag cache. ---
 
   /**
    * Fetch a single JSON resource same-origin with ETag round-trip support.
-   * Returns:
-   *  - the parsed body on 200 or 304 (cache hit),
-   *  - null on 503 (server cache cold; transient -- next poll cycle retries).
-   * Throws on any other non-OK status.
+   * Returns the validated body on 200 or 304. A cold-cache 503 schedules an
+   * earlier Retry-After refresh and throws into the dataset's honest
+   * error/stale state.
    */
-  private async fetchJson<T>(url: string): Promise<T | null> {
-    if (!isPlatformBrowser(this.platformId)) return null;
+  private async fetchJson<T>(
+    url: string,
+    normalize: (value: unknown) => T
+  ): Promise<FetchResult<T>> {
+    if (!isPlatformBrowser(this.platformId)) throw new Error('Stats are browser-only');
 
     const headers: Record<string, string> = { 'Accept': 'application/json' };
-    const cached = this.etagCache.get(url);
+    const cached = this.etagCache.get(url) as EtagCacheEntry<T> | undefined;
     if (cached) headers['If-None-Match'] = cached.etag;
 
-    const response = await fetch(url, { headers, credentials: 'same-origin' });
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers,
+        credentials: 'same-origin',
+        signal: controller.signal,
+      });
+    } finally {
+      this.controllers.delete(controller);
+    }
 
     if (response.status === 304 && cached) {
-      return cached.body as T;
+      return { data: cached.body, ...statsResponseFreshness(response.headers) };
     }
     if (response.status === 503) {
-      // Server cache cold (first boot). Treat as transient error -- next poll cycle retries.
-      return null;
+      this.scheduleRetry(response.headers.get('retry-after'));
+      throw new Error('Stats are warming up; retrying shortly.');
     }
     if (!response.ok) {
       throw new Error(`stats ${response.status} on ${url}`);
     }
 
-    const parsed = (await response.json()) as T;
+    const parsed = normalize(await response.json());
     const etag = response.headers.get('etag');
     if (etag) {
-      this.etagCache.set(url, { etag, body: parsed, fetchedAt: Date.now() });
+      this.etagCache.set(url, { etag, body: parsed });
     }
-    return parsed;
+    return { data: parsed, ...statsResponseFreshness(response.headers) };
+  }
+
+  private scheduleRetry(retryAfter: string | null): void {
+    if (!this.started || this.retryHandle !== null) return;
+    const seconds = Number(retryAfter);
+    const delay = Number.isFinite(seconds) && seconds > 0
+      ? Math.min(seconds * 1000, POLL_INTERVAL_MS)
+      : 30_000;
+    this.retryHandle = setTimeout(() => {
+      this.retryHandle = null;
+      if (this.started) void this.refreshAll();
+    }, delay);
+  }
+
+  private isCurrent(generation: number): boolean {
+    return this.started && generation === this.generation;
   }
 
   // --- Pure aggregators (public so the page component can re-derive on view
@@ -293,10 +277,6 @@ export class GitHubStatsService {
 
   weeklyStarsDelta(stars: StarEvent[]): WeeklyDelta[] {
     return weeklyStarsDelta(stars);
-  }
-
-  issuesOpenVsClosed(issues: IssueEvent[]): { opened: TimeSeriesPoint[]; closed: TimeSeriesPoint[] } {
-    return issuesOpenVsClosed(issues);
   }
 
   forksGrowth(forks: ForkEvent[]): TimeSeriesPoint[] {
@@ -430,27 +410,6 @@ export function weeklyStarsDelta(stars: StarEvent[]): WeeklyDelta[] {
   return out;
 }
 
-export function issuesOpenVsClosed(issues: IssueEvent[]): { opened: TimeSeriesPoint[]; closed: TimeSeriesPoint[] } {
-  // Filter out PRs (GitHub returns them in the issues stream).
-  const real = issues.filter((i) => i?.pull_request === undefined);
-  const opened = new Map<string, number>();
-  const closed = new Map<string, number>();
-  for (const i of real) {
-    if (isValidIsoString(i.created_at)) {
-      const k = isoDate(startOfUtcDay(new Date(i.created_at)));
-      opened.set(k, (opened.get(k) ?? 0) + 1);
-    }
-    if (isValidIsoString(i.closed_at)) {
-      const k = isoDate(startOfUtcDay(new Date(i.closed_at)));
-      closed.set(k, (closed.get(k) ?? 0) + 1);
-    }
-  }
-  return {
-    opened: mapToSortedSeries(opened),
-    closed: mapToSortedSeries(closed),
-  };
-}
-
 export function forksGrowth(forks: ForkEvent[]): TimeSeriesPoint[] {
   const valid = forks.filter((f) => isValidIsoString(f?.created_at));
   if (valid.length === 0) return [];
@@ -582,4 +541,14 @@ function mapToSortedSeries(m: Map<string, number>): TimeSeriesPoint[] {
 function humanError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function isAbortError(err: unknown): boolean {
+  return typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError';
+}
+
+function hasIncompleteHistory(value: unknown): boolean {
+  return typeof value === 'object' && value !== null &&
+    'history_complete' in value &&
+    (value as { history_complete?: unknown }).history_complete === false;
 }
