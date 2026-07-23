@@ -49,10 +49,8 @@ import {
   FSBTelemetrySeries,
 } from '../../core/stats/fsb-telemetry.types';
 import {
-  AGGREGATE_FRESHNESS_SLA_MS,
   activeSnapshotDatasetState,
   aggregateDatasetState,
-  GITHUB_FRESHNESS_SLA_MS,
   initialStatsSourceStates,
   rollingSevenDayStars,
   selectedStatsViewState,
@@ -99,12 +97,6 @@ interface TabMetric {
 interface AccessibleDatum {
   label: string;
   value: string;
-}
-
-interface StatsQualityNotice {
-  id: string;
-  message: string;
-  kind: 'quality' | 'retry';
 }
 
 // Redesigned fan-picker tab item -- `dy` is a vertical arc offset (px) so the
@@ -228,120 +220,9 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       this.latestFsbHeadline.popular_mcp_clients.length === 0;
   }
 
-  get stateBadgeTitle(): string {
-    return this.formatStateTitle(this.viewState);
-  }
-
-  get stateBadgeAriaLabel(): string {
-    const status = (() => {
-      switch (this.viewState.kind) {
-        case 'ready': return $localize`:@@stats.live.label:Live`;
-        case 'partial': return $localize`:@@stats.status.partial:Partial`;
-        case 'loading': return $localize`:@@stats.status.loadingLabel:Loading`;
-        case 'error': return $localize`:@@stats.status.unavailableLabel:Unavailable`;
-      }
-    })();
-    return `${status}. ${this.stateBadgeTitle}`;
-  }
-
-  private formatStateTitle(state: StatsViewDataState): string {
-    if (state.kind === 'ready' || state.kind === 'partial') {
-      const checkedAt = this.formatDateTime(state.checkedAt);
-      if (state.snapshotAt === null) {
-        return $localize`:@@stats.status.snapshotUnknownChecked:Latest snapshot update time unavailable; last checked ${checkedAt}:checkedAt:`;
-      }
-      const snapshotAt = this.formatDateTime(state.snapshotAt);
-      return $localize`:@@stats.status.snapshotAndChecked:Latest snapshot from ${snapshotAt}:snapshotAt:; last checked ${checkedAt}:checkedAt:`;
-    }
-    return state.kind === 'loading'
-      ? $localize`:@@stats.status.loading:Loading selected stats`
-      : $localize`:@@stats.status.unavailable:Selected stats unavailable`;
-  }
-
   get errorMessage(): string {
     const state = this.viewState;
     return state.kind === 'error' ? state.message : '';
-  }
-
-  get partialFreshnessMessage(): string {
-    const state = this.viewState;
-    if (state.kind !== 'partial') return '';
-    if (state.snapshotAt === null) {
-      return $localize`:@@stats.partial.unknownTime:Showing the latest available snapshot; its update time is unavailable. A fresh update is temporarily unavailable.`;
-    }
-    const snapshotAt = this.formatDateTime(state.snapshotAt);
-    return $localize`:@@stats.partial.notice:Showing the latest available snapshot from ${snapshotAt}:snapshotAt:; a fresh update is temporarily unavailable.`;
-  }
-
-  get qualityNotices(): readonly StatsQualityNotice[] {
-    const notices: StatsQualityNotice[] = [];
-    if (this.selectedView === 'stars-cumulative' && this.latestStars?.history_complete === false) {
-      notices.push({
-        id: 'stars-history',
-        kind: 'quality',
-        message: $localize`:@@stats.quality.starsHistory:The latest star total is available. Exact dates are unavailable for some star changes.`,
-      });
-    }
-    if (this.selectedView === 'commits-cumulative' && this.latestCommits?.history_complete === false) {
-      notices.push({
-        id: 'commits-history',
-        kind: 'quality',
-        message: $localize`:@@stats.quality.commitsHistory:Commit history is incomplete, so totals and the chart may omit older commits.`,
-      });
-    }
-
-    if (this.selectedView === 'stars-cumulative' || this.selectedView === 'commits-cumulative') {
-      const source = this.sourceStates[
-        this.selectedView === 'stars-cumulative' ? 'stars' : 'commits'
-      ];
-      if (
-        this.viewState.kind === 'ready' &&
-        source.kind === 'ready' &&
-        source.availability.snapshotAt !== null &&
-        Date.now() - source.availability.snapshotAt <= GITHUB_FRESHNESS_SLA_MS &&
-        !this.isSuccessfulUpstreamStatus(source.availability.upstreamStatus)
-      ) {
-        notices.push({
-          id: 'github-retry',
-          kind: 'retry',
-          message: $localize`:@@stats.quality.githubRetry:GitHub refresh is delayed. This snapshot is still current, and another check is scheduled.`,
-        });
-      }
-    }
-
-    if (this.selectedView === 'fsb-active-now') {
-      const activeUsers = Math.max(0, Math.trunc(Number(this.latestFsbHeadline?.active_users_now) || 0));
-      const rawReporters = Number(this.latestFsbHeadline?.active_agents_reporting_users_now);
-      const hasTrustedCoverage = Number(this.latestFsbHeadline?.active_count_version) >= 2 &&
-        this.latestFsbHeadline?.active_metric_semantics === 'reported_registry_count_v2' &&
-        Number.isInteger(rawReporters) && rawReporters >= 0 && rawReporters <= activeUsers;
-      const reporters = hasTrustedCoverage
-        ? Math.min(activeUsers, rawReporters)
-        : 0;
-      if (activeUsers > 0 && reporters < activeUsers) {
-        const reporterCount = this.fmtNum(reporters);
-        const activeUserCount = this.fmtNum(activeUsers);
-        notices.push({
-          id: 'active-coverage',
-          kind: 'quality',
-          message: $localize`:@@stats.quality.activeCoverage:Agent totals include ${reporterCount}:reporters: of ${activeUserCount}:activeUsers: active users in this snapshot that reported an agent count.`,
-        });
-      }
-      if (this.regionAggregateState === 'missing') {
-        notices.push({
-          id: 'regions-missing',
-          kind: 'quality',
-          message: $localize`:@@stats.quality.regionsMissing:The regional aggregate is not available yet.`,
-        });
-      } else if (this.regionAggregateState === 'delayed') {
-        notices.push({
-          id: 'regions-delayed',
-          kind: 'quality',
-          message: $localize`:@@stats.quality.regionsDelayed:The regional breakdown is older than two hours.`,
-        });
-      }
-    }
-    return notices;
   }
 
   get chartAriaLabel(): string {
@@ -506,14 +387,6 @@ export class StatsPageComponent implements OnInit, OnDestroy {
   get hasPlottableRegions(): boolean {
     const regions = this.latestFsbHeadline?.popular_regions ?? [];
     return regions.some((r) => regionCentroid(r.label) !== null);
-  }
-
-  get regionAggregateState(): 'ready' | 'missing' | 'delayed' {
-    const aggregateUpdatedAt = Date.parse(this.latestFsbHeadline?.aggregate_updated_at ?? '');
-    if (!Number.isFinite(aggregateUpdatedAt)) return 'missing';
-    return Date.now() - aggregateUpdatedAt > AGGREGATE_FRESHNESS_SLA_MS
-      ? 'delayed'
-      : 'ready';
   }
 
   get fanItemsLeft(): readonly FanItem[] {
@@ -746,13 +619,6 @@ export class StatsPageComponent implements OnInit, OnDestroy {
     return new Intl.NumberFormat(this.localeId).format(Math.round(value || 0));
   }
 
-  private formatDateTime(value: number): string {
-    return new Intl.DateTimeFormat(this.localeId, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(value);
-  }
-
   private fmtBig(value: number): string {
     if (value >= 1_000) {
       return new Intl.NumberFormat(this.localeId, {
@@ -761,10 +627,6 @@ export class StatsPageComponent implements OnInit, OnDestroy {
       }).format(value);
     }
     return this.fmtNum(value);
-  }
-
-  private isSuccessfulUpstreamStatus(status: string): boolean {
-    return status === '200' || status === '304';
   }
 
   private bootstrapData(): void {

@@ -300,7 +300,7 @@ describe('StatsPageComponent visualization lifecycle', () => {
   });
 });
 
-describe('StatsPageComponent freshness and quality', () => {
+describe('StatsPageComponent public status presentation', () => {
   let github: FakeGitHubStatsService;
   let fsb: FakeFSBTelemetryService;
 
@@ -352,61 +352,58 @@ describe('StatsPageComponent freshness and quality', () => {
       .trim();
   }
 
-  it('shows Live with a separate notice for incomplete star dates', async () => {
+  it('shows Live without exposing incomplete star history', async () => {
     const fixture = await createFixture();
 
     github.stars$.next(starState(Date.now(), '200', false));
     await render(fixture);
 
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
-    expect(
-      fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('title')
-    ).toMatch(/Latest snapshot from .+; last checked .+/);
-    expect(
-      fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('aria-label')
-    ).toMatch(/^Live\. Latest snapshot from .+; last checked .+/);
-    expect(text(fixture, '.quality-notice')).toBe(
-      'The latest star total is available. Exact dates are unavailable for some star changes.'
-    );
+    expect(fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('title'))
+      .toBeNull();
+    expect(fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('aria-label'))
+      .toBeNull();
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
   });
 
-  it('shows Live with a neutral retry notice after a failed fresh GitHub check', async () => {
+  it('shows Live without exposing a failed fresh GitHub check', async () => {
     const fixture = await createFixture();
 
     github.stars$.next(starState(Date.now() - 5 * 60 * 1000, '403'));
     await render(fixture);
 
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
-    expect(fixture.nativeElement.querySelector('.retry-notice')).not.toBeNull();
-    expect(text(fixture, '.retry-notice')).toContain('This snapshot is still current');
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
   });
 
-  it('does not call a future-skewed failed snapshot current', async () => {
+  it('keeps the public badge Live for a future-skewed usable snapshot', async () => {
     const fixture = await createFixture();
 
     github.stars$.next(starState(Date.now() + 6 * 60 * 1000, '403'));
     await render(fixture);
 
-    expect(text(fixture, '.stats-live-badge')).toBe('Partial');
-    expect(fixture.nativeElement.querySelector('.retry-notice')).toBeNull();
+    expect(fixture.componentInstance.viewState.kind).toBe('partial');
+    expect(text(fixture, '.stats-live-badge')).toBe('Live');
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
   });
 
-  it('maps an old usable snapshot to Partial and a snapshot over 24 hours to Unavailable', async () => {
+  it('keeps the badge Live for partial and error states while preserving the hard-error card', async () => {
     const fixture = await createFixture();
 
     github.stars$.next(starState(Date.now() - 16 * 60 * 1000));
     await render(fixture);
-    expect(text(fixture, '.stats-live-badge')).toBe('Partial');
-    expect(text(fixture, '.freshness-notice')).toContain(
-      'a fresh update is temporarily unavailable'
-    );
+    expect(fixture.componentInstance.viewState.kind).toBe('partial');
+    expect(text(fixture, '.stats-live-badge')).toBe('Live');
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
 
     github.stars$.next(starState(Date.now() - 24 * 60 * 60 * 1000 - 1));
     await render(fixture);
-    expect(text(fixture, '.stats-live-badge')).toBe('Unavailable');
+    expect(fixture.componentInstance.viewState.kind).toBe('error');
+    expect(text(fixture, '.stats-live-badge')).toBe('Live');
+    expect(fixture.nativeElement.querySelector('.error-card')).not.toBeNull();
   });
 
-  it('shows Live and coverage quality for Active now with 0 of 32 reporters', async () => {
+  it('does not expose Active now reporting coverage or missing regions', async () => {
     const fixture = await createFixture('fsb-active-now');
     fsb.headline$.next(readyState(fsbHeadline({
       active_users_now: 32,
@@ -420,12 +417,7 @@ describe('StatsPageComponent freshness and quality', () => {
     await render(fixture);
 
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
-    expect(text(fixture, '.quality-notice')).toContain(
-      'Agent totals include 0 of 32 active users in this snapshot that reported an agent count.'
-    );
-    expect(text(fixture, '.quality-notice:nth-of-type(2)')).toContain(
-      'regional aggregate is not available'
-    );
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
     const metricValues = Array.from(
       fixture.nativeElement.querySelectorAll('.stats-tab-metrics strong')
     ).map((node) => (node as HTMLElement).textContent?.trim());
@@ -447,7 +439,7 @@ describe('StatsPageComponent freshness and quality', () => {
     expect(text(fixture, '.stats-headline')).not.toContain('tokens (24h)');
   });
 
-  it('does not let a delayed regional aggregate downgrade Active now', async () => {
+  it('does not expose a delayed regional aggregate', async () => {
     const fixture = await createFixture('fsb-active-now');
     fsb.headline$.next(readyState(fsbHeadline({
       aggregate_updated_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
@@ -455,12 +447,10 @@ describe('StatsPageComponent freshness and quality', () => {
     await render(fixture);
 
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
-    expect(text(fixture, '.quality-notice')).toContain(
-      'The regional breakdown is older than two hours.'
-    );
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
   });
 
-  it('shows Active now as Partial when the request timestamp is missing', async () => {
+  it('keeps Active now publicly Live when its internal state is partial', async () => {
     const fixture = await createFixture('fsb-active-now');
     fsb.headline$.next(readyState(
       fsbHeadline({ generated_at: 'not-a-date' }),
@@ -468,32 +458,32 @@ describe('StatsPageComponent freshness and quality', () => {
     ));
     await render(fixture);
 
-    expect(text(fixture, '.stats-live-badge')).toBe('Partial');
-    expect(
-      fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('aria-label')
-    ).toContain('Partial. Latest snapshot update time unavailable');
+    expect(fixture.componentInstance.viewState.kind).toBe('partial');
+    expect(text(fixture, '.stats-live-badge')).toBe('Live');
+    expect(fixture.nativeElement.querySelector('.stats-live-badge').getAttribute('aria-label'))
+      .toBeNull();
   });
 
-  it('keeps Tokens loading until independently ordered required responses arrive', async () => {
+  it('keeps the badge Live while Tokens waits for independently ordered responses', async () => {
     const fixture = await createFixture('fsb-tokens');
 
     fsb.series$.next(readyState(fsbSeries()));
     await render(fixture);
-    expect(text(fixture, '.stats-live-badge')).toBe('Loading');
+    expect(fixture.componentInstance.viewState.kind).toBe('loading');
+    expect(text(fixture, '.stats-live-badge')).toBe('Live');
+    expect(fixture.nativeElement.querySelector('.skeleton')).not.toBeNull();
 
     fsb.headline$.next(readyState(fsbHeadline()));
     await render(fixture);
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
   });
 
-  it('shows commit history quality without downgrading a fresh snapshot', async () => {
+  it('does not expose incomplete commit history', async () => {
     const fixture = await createFixture('commits-cumulative');
     github.commits$.next(readyState(commits(false)));
     await render(fixture);
 
     expect(text(fixture, '.stats-live-badge')).toBe('Live');
-    expect(text(fixture, '.quality-notice')).toBe(
-      'Commit history is incomplete, so totals and the chart may omit older commits.'
-    );
+    expect(fixture.nativeElement.querySelector('.stats-notice')).toBeNull();
   });
 });
