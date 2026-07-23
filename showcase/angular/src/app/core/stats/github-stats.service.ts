@@ -9,6 +9,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import {
   CommitEvent,
+  DatasetAvailability,
   DatasetState,
   ForkEvent,
   GitHubCommitsStats,
@@ -25,6 +26,12 @@ import {
   StatsResponseFreshness,
   statsResponseFreshness,
 } from './stats-view.model';
+import {
+  availabilityAfterFailure,
+  httpStatsFetchError,
+  retryAfterTimestamp,
+  statsFailureMetadata,
+} from './stats-fetch-error';
 
 // Quick task 260516-7l5 -- same-origin server-side cache. The server polls
 // GitHub once per 5 min into showcase/server/.../github_cache and serves each
@@ -169,36 +176,24 @@ export class GitHubStatsService {
     try {
       const result = await this.fetchJson(url, normalize);
       if (!this.isCurrent(generation)) return;
-      if (result.cacheState === 'stale') {
-        subject.next({
-          kind: 'stale',
-          data: result.data,
-          fetchedAt: result.fetchedAt,
-          message: 'The server is showing its last known snapshot.',
-        });
-      } else if (hasIncompleteHistory(result.data)) {
-        subject.next({
-          kind: 'partial',
-          data: result.data,
-          fetchedAt: result.fetchedAt,
-          message: 'Historical coverage is incomplete.',
-        });
-      } else {
-        subject.next({ kind: 'ready', data: result.data, fetchedAt: result.fetchedAt });
-      }
+      subject.next({
+        kind: 'ready',
+        data: result.data,
+        availability: availabilityFromResponse(result),
+      });
     } catch (err) {
       if (!this.isCurrent(generation) || isAbortError(err)) return;
       const message = humanError(err);
+      const failure = statsFailureMetadata(err);
       const previous = subject.value;
-      if (previous.kind === 'ready' || previous.kind === 'partial' || previous.kind === 'stale') {
+      if (previous.kind === 'ready') {
         subject.next({
-          kind: 'stale',
+          kind: 'ready',
           data: previous.data,
-          fetchedAt: previous.fetchedAt,
-          message,
+          availability: availabilityAfterFailure(previous.availability, err),
         });
       } else {
-        subject.next({ kind: 'error', message });
+        subject.next({ kind: 'error', message, failure });
       }
     }
   }
@@ -206,8 +201,8 @@ export class GitHubStatsService {
   /**
    * Fetch a single JSON resource same-origin with ETag round-trip support.
    * Returns the validated body on 200 or 304. A cold-cache 503 schedules an
-   * earlier Retry-After refresh and throws into the dataset's honest
-   * error/stale state.
+   * earlier Retry-After refresh and throws into either Unavailable or a
+   * metadata-noted last-known-good snapshot.
    */
   private async fetchJson<T>(
     url: string,
@@ -235,12 +230,22 @@ export class GitHubStatsService {
     if (response.status === 304 && cached) {
       return { data: cached.body, ...statsResponseFreshness(response.headers) };
     }
+    const retryAfter = response.headers.get('retry-after');
     if (response.status === 503) {
-      this.scheduleRetry(response.headers.get('retry-after'));
-      throw new Error('Stats are warming up; retrying shortly.');
+      this.scheduleRetry(retryAfter);
+      throw httpStatsFetchError(
+        'Stats are warming up; retrying shortly.',
+        response.status,
+        retryAfter
+      );
     }
     if (!response.ok) {
-      throw new Error(`stats ${response.status} on ${url}`);
+      if (retryAfter !== null) this.scheduleRetry(retryAfter);
+      throw httpStatsFetchError(
+        `stats ${response.status} on ${url}`,
+        response.status,
+        retryAfter
+      );
     }
 
     const parsed = normalize(await response.json());
@@ -253,9 +258,10 @@ export class GitHubStatsService {
 
   private scheduleRetry(retryAfter: string | null): void {
     if (!this.started || this.retryHandle !== null) return;
-    const seconds = Number(retryAfter);
-    const delay = Number.isFinite(seconds) && seconds > 0
-      ? Math.min(seconds * 1000, POLL_INTERVAL_MS)
+    const now = Date.now();
+    const requestedRetryAt = retryAfterTimestamp(retryAfter, now);
+    const delay = requestedRetryAt !== undefined
+      ? Math.min(Math.max(0, requestedRetryAt - now), POLL_INTERVAL_MS)
       : 30_000;
     this.retryHandle = setTimeout(() => {
       this.retryHandle = null;
@@ -547,8 +553,11 @@ function isAbortError(err: unknown): boolean {
   return typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError';
 }
 
-function hasIncompleteHistory(value: unknown): boolean {
-  return typeof value === 'object' && value !== null &&
-    'history_complete' in value &&
-    (value as { history_complete?: unknown }).history_complete === false;
+function availabilityFromResponse(result: StatsResponseFreshness): DatasetAvailability {
+  return {
+    snapshotAt: result.snapshotAt,
+    checkedAt: result.checkedAt,
+    upstreamStatus: result.upstreamStatus,
+    ...(result.nextRetryAt === undefined ? {} : { nextRetryAt: result.nextRetryAt }),
+  };
 }

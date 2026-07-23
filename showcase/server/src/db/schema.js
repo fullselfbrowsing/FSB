@@ -128,7 +128,8 @@ function scrubLegacyGithubCache(db) {
     UPDATE github_cache
     SET payload_json = ?, etag = NULL, is_complete = 0, payload_version = ?,
         last_attempt_at = COALESCE(last_attempt_at, fetched_at),
-        last_error_status = NULL, consecutive_failures = 0, next_retry_at = NULL
+        last_error_status = NULL, consecutive_failures = 0, next_retry_at = NULL,
+        poll_state_json = NULL
     WHERE endpoint_id = ?
   `);
   const remove = db.prepare('DELETE FROM github_cache WHERE endpoint_id = ?');
@@ -313,6 +314,8 @@ function initializeDatabase(db) {
     -- the public, field-allowlisted representation used by /stats. A completed
     -- page walk is committed atomically; failures update attempt metadata while
     -- preserving the last-known-good payload and fetched_at timestamp.
+    -- poll_state_json is server-private incremental polling state and is never
+    -- copied into the public payload or API response.
     CREATE TABLE IF NOT EXISTS github_cache (
       endpoint_id TEXT PRIMARY KEY,
       payload_json TEXT NOT NULL,
@@ -326,7 +329,8 @@ function initializeDatabase(db) {
       last_attempt_at INTEGER,
       last_error_status INTEGER,
       consecutive_failures INTEGER NOT NULL DEFAULT 0,
-      next_retry_at INTEGER
+      next_retry_at INTEGER,
+      poll_state_json TEXT
     );
   `);
 
@@ -366,7 +370,7 @@ function initializeDatabase(db) {
 
   // Existing GitHub cache rows predate traversal-completeness metadata. They
   // intentionally migrate as incomplete so the poller performs a full walk
-  // before trusting their page-1 ETag as a whole-cache freshness sentinel.
+  // before seeding an incremental cursor or trusting a conditional validator.
   try {
     db.exec(`ALTER TABLE github_cache ADD COLUMN is_complete INTEGER NOT NULL DEFAULT 0`);
   } catch { /* column already exists */ }
@@ -384,6 +388,9 @@ function initializeDatabase(db) {
   } catch { /* column already exists */ }
   try {
     db.exec(`ALTER TABLE github_cache ADD COLUMN next_retry_at INTEGER`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE github_cache ADD COLUMN poll_state_json TEXT`);
   } catch { /* column already exists */ }
 
   // Pre-migration cache rows stored raw GitHub list responses. Scrub them in

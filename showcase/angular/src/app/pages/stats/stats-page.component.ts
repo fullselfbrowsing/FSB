@@ -15,9 +15,11 @@
 //     suspenders for the rare case a crawler stumbles in via the footer link.
 
 import {
-  AfterViewInit,
+  AfterRenderRef,
   Component,
   ElementRef,
+  InjectionToken,
+  Injector,
   LOCALE_ID,
   NgZone,
   OnDestroy,
@@ -49,7 +51,6 @@ import {
 import {
   activeSnapshotDatasetState,
   aggregateDatasetState,
-  combineDatasetStates,
   initialStatsSourceStates,
   rollingSevenDayStars,
   selectedStatsViewState,
@@ -63,6 +64,16 @@ import { regionCentroid } from '../../core/stats/region-geo';
 import { GlobeVisualizationService } from '../../core/globe/globe-visualization.service';
 import { GlobeRegion } from '../../core/globe/globe-visualization.types';
 import { LanguagePickerComponent } from '../../layout/language-picker/language-picker.component';
+
+type StatsChartLoader = () => Promise<any>;
+
+export const STATS_CHART_LOADER = new InjectionToken<StatsChartLoader>(
+  'STATS_CHART_LOADER',
+  {
+    providedIn: 'root',
+    factory: () => () => import('chart.js/auto'),
+  }
+);
 
 // The picker combines two GitHub aggregate views with three FSB telemetry
 // views. The local union keeps component switches limited to those five.
@@ -103,7 +114,7 @@ interface FanItem {
   templateUrl: './stats-page.component.html',
   styleUrl: './stats-page.component.scss',
 })
-export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
+export class StatsPageComponent implements OnInit, OnDestroy {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly doc = inject(DOCUMENT);
@@ -114,6 +125,8 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly fsbService = inject(FSBTelemetryService);
   private readonly globeService = inject(GlobeVisualizationService);
   private readonly zone = inject(NgZone);
+  private readonly injector = inject(Injector);
+  private readonly chartLoader = inject(STATS_CHART_LOADER);
 
   readonly appVersion = APP_VERSION;
   readonly fallbackErrorMessage = $localize`:@@stats.error.default:Network or parse error.`;
@@ -182,54 +195,29 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get isViewRenderable(): boolean {
     return this.viewState.kind === 'ready' ||
-      this.viewState.kind === 'partial' ||
-      this.viewState.kind === 'stale';
-  }
-
-  get fsbSummaryState(): StatsViewDataState {
-    return combineDatasetStates([
-      this.sourceStates['fsb-active'],
-      this.sourceStates['fsb-headline'],
-    ]);
+      this.viewState.kind === 'partial';
   }
 
   get hasFsbHeadlineSnapshot(): boolean {
-    const state = this.fsbSummaryState;
-    return this.latestFsbHeadline !== null &&
-      (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale');
+    if (this.latestFsbHeadline === null) return false;
+    const activeState = selectedStatsViewState('fsb-active-now', this.sourceStates);
+    return activeState.kind === 'ready' || activeState.kind === 'partial' ||
+      this.hasFsbAggregateSnapshot;
+  }
+
+  get hasFsbAggregateSnapshot(): boolean {
+    const aggregateState = selectedStatsViewState('fsb-popular-mcp', this.sourceStates);
+    return aggregateState.kind === 'ready' || aggregateState.kind === 'partial';
   }
 
   get isFsbActiveSnapshotCurrent(): boolean {
-    const state = this.sourceStates['fsb-active'];
-    return state.kind === 'ready' || state.kind === 'partial';
+    return selectedStatsViewState('fsb-active-now', this.sourceStates).kind === 'ready';
   }
 
   get isMcpEmpty(): boolean {
     return this.selectedView === 'fsb-popular-mcp' &&
       this.latestFsbHeadline !== null &&
       this.latestFsbHeadline.popular_mcp_clients.length === 0;
-  }
-
-  get stateBadgeTitle(): string {
-    return this.formatStateTitle(this.viewState);
-  }
-
-  private formatStateTitle(state: StatsViewDataState): string {
-    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
-      const formatted = new Intl.DateTimeFormat(this.localeId, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(state.fetchedAt);
-      if (state.kind === 'ready') {
-        return $localize`:@@stats.status.freshAt:Fresh snapshot checked ${formatted}:checkedAt:`;
-      }
-      return state.kind === 'partial'
-        ? $localize`:@@stats.status.partialAt:Partial snapshot checked ${formatted}:checkedAt:`
-        : $localize`:@@stats.status.staleAt:Stale snapshot from ${formatted}:fetchedAt:`;
-    }
-    return state.kind === 'loading'
-      ? $localize`:@@stats.status.loading:Loading selected stats`
-      : $localize`:@@stats.status.unavailable:Selected stats unavailable`;
   }
 
   get errorMessage(): string {
@@ -401,14 +389,6 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return regions.some((r) => regionCentroid(r.label) !== null);
   }
 
-  get regionAggregateState(): 'ready' | 'partial' | 'stale' | 'unavailable' {
-    const state = this.sourceStates['fsb-headline'];
-    if (state.kind === 'ready') return 'ready';
-    if (state.kind === 'partial') return 'partial';
-    if (state.kind === 'stale') return 'stale';
-    return 'unavailable';
-  }
-
   get fanItemsLeft(): readonly FanItem[] {
     return this.computeFanSplit().left;
   }
@@ -431,7 +411,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   // lets redrawChart() keep the globe spinning across redraws that don't
   // change the region data. Meaningful only while stopGlobe is set.
   private lastGlobeKey = '';
-  private pendingViewRedrawFrame: number | null = null;
+  private pendingViewRedraw: AfterRenderRef | null = null;
 
   private subs: Subscription[] = [];
   // Set by ngOnDestroy so the async bootstrap() can tell when it lost the
@@ -476,12 +456,6 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       content: $localize`:@@stats.meta.description:Live aggregate adoption, usage, and repository signals for FSB.`,
     });
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
-  }
-
-  ngAfterViewInit(): void {
-    // No-op -- chart bootstrap is handled inside afterNextRender so the
-    // canvas may not exist yet on first ngAfterViewInit (template @if
-    // skeleton state). bootstrap() handles canvas availability defensively.
   }
 
   ngOnDestroy(): void {
@@ -665,41 +639,53 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.statsService.start();
     this.fsbService.start();
     this.subs.push(
-      this.statsService.stars$.subscribe((state) => this.onSourceUpdate('stars', state)),
-      this.statsService.commits$.subscribe((state) => this.onSourceUpdate('commits', state)),
-      this.fsbService.headline$.subscribe((state) => this.onFsbHeadlineUpdate(state)),
-      this.fsbService.series$.subscribe((state) => this.onFsbSeriesUpdate(state))
+      this.statsService.stars$.subscribe((state) =>
+        this.zone.run(() => this.onSourceUpdate('stars', state))
+      ),
+      this.statsService.commits$.subscribe((state) =>
+        this.zone.run(() => this.onSourceUpdate('commits', state))
+      ),
+      this.fsbService.headline$.subscribe((state) =>
+        this.zone.run(() => this.onFsbHeadlineUpdate(state))
+      ),
+      this.fsbService.series$.subscribe((state) =>
+        this.zone.run(() => this.onFsbSeriesUpdate(state))
+      )
     );
   }
 
   private async bootstrapChart(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      const chartMod = await import('chart.js/auto');
+      const chartMod = await this.chartLoader();
       if (this.destroyed) return;
-      this.ChartCtor = chartMod.default ?? chartMod;
-      this.chartLibraryState = 'ready';
-      this.scheduleViewRedraw();
+      this.zone.run(() => {
+        if (this.destroyed) return;
+        this.ChartCtor = chartMod.default ?? chartMod;
+        this.chartLibraryState = 'ready';
+        this.scheduleViewRedraw();
+      });
     } catch (err) {
       console.warn('[stats-page] failed to load chart.js', err);
       if (this.destroyed) return;
-      this.chartLibraryState = 'error';
-      this.scheduleViewRedraw();
+      this.zone.run(() => {
+        if (this.destroyed) return;
+        this.chartLibraryState = 'error';
+        this.scheduleViewRedraw();
+      });
     }
   }
 
   private onFsbHeadlineUpdate(state: FSBDatasetState<FSBTelemetryHeadline>): void {
-    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
-      this.latestFsbHeadline = state.data;
-    }
     if (state.kind === 'ready') {
+      this.latestFsbHeadline = state.data;
       this.onSourceState(
         'fsb-active',
-        activeSnapshotDatasetState(state.data, state.fetchedAt)
+        activeSnapshotDatasetState(state.data, state.availability)
       );
       this.onSourceState(
         'fsb-headline',
-        aggregateDatasetState(state.data, state.fetchedAt)
+        aggregateDatasetState(state.data, state.availability)
       );
     } else {
       this.onSourceState('fsb-active', state);
@@ -708,17 +694,17 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onFsbSeriesUpdate(state: FSBDatasetState<FSBTelemetrySeries>): void {
-    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+    if (state.kind === 'ready') {
       this.latestFsbSeries = state.data;
     }
     this.onSourceState(
       'fsb-series',
-      state.kind === 'ready' ? aggregateDatasetState(state.data, state.fetchedAt) : state
+      state.kind === 'ready' ? aggregateDatasetState(state.data, state.availability) : state
     );
   }
 
   private onSourceUpdate(key: 'stars' | 'commits', state: DatasetState<unknown>): void {
-    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+    if (state.kind === 'ready') {
     switch (key) {
       case 'stars':
           this.latestStars = state.data as GitHubStarsStats;
@@ -741,7 +727,7 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       state as DatasetState<unknown>
     );
     if (!sourcesForStatsView(this.selectedView).includes(source)) return;
-    if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'stale') {
+    if (state.kind === 'ready') {
       this.clearChartRenderError(this.selectedView);
     }
     if (!this.isViewRenderable) this.teardownVisualization();
@@ -750,29 +736,22 @@ export class StatsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private scheduleViewRedraw(): void {
     this.cancelPendingViewRedraw();
-    if (
-      !isPlatformBrowser(this.platformId) ||
-      typeof window === 'undefined' ||
-      typeof window.requestAnimationFrame !== 'function'
-    ) {
-      this.redrawChart();
-      return;
-    }
-    this.pendingViewRedrawFrame = window.requestAnimationFrame(() => {
-      this.pendingViewRedrawFrame = null;
-      this.redrawChart();
-    });
+    if (!isPlatformBrowser(this.platformId) || this.destroyed) return;
+    this.pendingViewRedraw = afterNextRender(
+      {
+        mixedReadWrite: () => {
+          this.pendingViewRedraw = null;
+          if (this.destroyed) return;
+          this.zone.runOutsideAngular(() => this.redrawChart());
+        },
+      },
+      { injector: this.injector }
+    );
   }
 
   private cancelPendingViewRedraw(): void {
-    if (
-      this.pendingViewRedrawFrame !== null &&
-      typeof window !== 'undefined' &&
-      typeof window.cancelAnimationFrame === 'function'
-    ) {
-      window.cancelAnimationFrame(this.pendingViewRedrawFrame);
-    }
-    this.pendingViewRedrawFrame = null;
+    this.pendingViewRedraw?.destroy();
+    this.pendingViewRedraw = null;
   }
 
   private redrawChart(): void {

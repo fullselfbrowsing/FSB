@@ -151,24 +151,6 @@
   animation: stats-live-pulse 2.2s ease-in-out infinite;
 }
 
-.stats-live-badge.is-stale {
-  color: #d97706;
-  border-color: color-mix(in srgb, #d97706 45%, var(--border-color));
-}
-
-.stats-live-badge.is-stale::before {
-  background: #d97706;
-}
-
-.stats-live-badge.is-partial {
-  color: #2563eb;
-  border-color: color-mix(in srgb, #2563eb 45%, var(--border-color));
-}
-
-.stats-live-badge.is-partial::before {
-  background: #2563eb;
-}
-
 @keyframes stats-live-pulse {
   0%,
   100% {
@@ -289,35 +271,6 @@
   margin: 0;
   color: var(--text-secondary);
   text-align: center;
-}
-
-.stale-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid color-mix(in srgb, #d97706 38%, var(--border-color));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, #d97706 9%, transparent);
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.45;
-}
-
-.stale-notice i {
-  flex: 0 0 auto;
-  color: #d97706;
-  margin-top: 0.1rem;
-}
-
-.partial-notice {
-  border-color: color-mix(in srgb, #2563eb 38%, var(--border-color));
-  background: color-mix(in srgb, #2563eb 9%, transparent);
-}
-
-.partial-notice i {
-  color: #2563eb;
 }
 
 .chart-mount canvas {

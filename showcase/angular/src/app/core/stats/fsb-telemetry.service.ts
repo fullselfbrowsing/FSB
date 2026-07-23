@@ -1,16 +1,23 @@
 // Browser lifecycle for the two aggregate FSB endpoints. Each route visit
-// begins in loading state; failed refreshes preserve a prior snapshot as
-// explicitly stale, and stop() aborts in-flight work from the old visit.
+// begins in loading state; failed refreshes preserve a prior snapshot with
+// updated check metadata, and stop() aborts in-flight work from the old visit.
 
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { BehaviorSubject } from 'rxjs';
 
 import {
+  DatasetAvailability,
   DatasetState,
   FSBTelemetryHeadline,
   FSBTelemetrySeries,
 } from './fsb-telemetry.types';
+import {
+  availabilityAfterFailure,
+  httpStatsFetchError,
+  retryAfterTimestamp,
+  statsFailureMetadata,
+} from './stats-fetch-error';
 
 const API_ROOT = '/api/public-stats';
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -18,6 +25,11 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 interface EtagCacheEntry {
   etag: string;
   body: unknown;
+}
+
+interface FetchResult<T> {
+  data: T;
+  availability: DatasetAvailability;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -131,22 +143,26 @@ export class FSBTelemetryService {
     generation: number
   ): Promise<void> {
     try {
-      const data = await this.fetchJson<T>(url);
+      const result = await this.fetchJson<T>(url);
       if (!this.isCurrent(generation)) return;
-      subject.next({ kind: 'ready', data, fetchedAt: generatedAt(data) ?? Date.now() });
+      subject.next({
+        kind: 'ready',
+        data: result.data,
+        availability: result.availability,
+      });
     } catch (err) {
       if (!this.isCurrent(generation) || isAbortError(err)) return;
       const message = humanError(err);
+      const failure = statsFailureMetadata(err);
       const previous = subject.value;
-      if (previous.kind === 'ready' || previous.kind === 'partial' || previous.kind === 'stale') {
+      if (previous.kind === 'ready') {
         subject.next({
-          kind: 'stale',
+          kind: 'ready',
           data: previous.data,
-          fetchedAt: previous.fetchedAt,
-          message,
+          availability: availabilityAfterFailure(previous.availability, err),
         });
       } else {
-        subject.next({ kind: 'error', message });
+        subject.next({ kind: 'error', message, failure });
       }
     }
   }
@@ -163,7 +179,7 @@ export class FSBTelemetryService {
    * rate-limited. If a 500 ever fires, the caller surfaces it as an error
    * state and the next poll retries.
    */
-  private async fetchJson<T>(url: string): Promise<T> {
+  private async fetchJson<T>(url: string): Promise<FetchResult<T>> {
     if (!isPlatformBrowser(this.platformId)) throw new Error('Stats are browser-only');
 
     const headers: Record<string, string> = {
@@ -189,15 +205,29 @@ export class FSBTelemetryService {
 
     if (response.status === 304 && cached) {
       // ETag match: reuse cached body, don't read response.
-      return cached.body as T;
+      const data = cached.body as T;
+      return {
+        data,
+        availability: fsbAvailability(data, response.status),
+      };
     }
 
+    const retryAfter = response.headers.get('retry-after');
     if (response.status === 503) {
-      this.scheduleRetry(response.headers.get('retry-after'));
-      throw new Error('FSB stats are warming up; retrying shortly.');
+      this.scheduleRetry(retryAfter);
+      throw httpStatsFetchError(
+        'FSB stats are warming up; retrying shortly.',
+        response.status,
+        retryAfter
+      );
     }
     if (!response.ok) {
-      throw new Error(`FSB stats ${response.status} on ${url}`);
+      if (retryAfter !== null) this.scheduleRetry(retryAfter);
+      throw httpStatsFetchError(
+        `FSB stats ${response.status} on ${url}`,
+        response.status,
+        retryAfter
+      );
     }
 
     const parsed = (await response.json()) as T;
@@ -205,14 +235,18 @@ export class FSBTelemetryService {
     if (etag) {
       this.etagCache.set(url, { etag, body: parsed });
     }
-    return parsed;
+    return {
+      data: parsed,
+      availability: fsbAvailability(parsed, response.status),
+    };
   }
 
   private scheduleRetry(retryAfter: string | null): void {
     if (!this.started || this.retryHandle !== null) return;
-    const seconds = Number(retryAfter);
-    const delay = Number.isFinite(seconds) && seconds > 0
-      ? Math.min(seconds * 1000, POLL_INTERVAL_MS)
+    const now = Date.now();
+    const requestedRetryAt = retryAfterTimestamp(retryAfter, now);
+    const delay = requestedRetryAt !== undefined
+      ? Math.min(Math.max(0, requestedRetryAt - now), POLL_INTERVAL_MS)
       : 30_000;
     this.retryHandle = setTimeout(() => {
       this.retryHandle = null;
@@ -238,4 +272,13 @@ function generatedAt(value: unknown): number | null {
   if (typeof value !== 'object' || value === null || !('generated_at' in value)) return null;
   const parsed = Date.parse(String((value as { generated_at?: unknown }).generated_at ?? ''));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function fsbAvailability(value: unknown, status: number): DatasetAvailability {
+  const checkedAt = Date.now();
+  return {
+    snapshotAt: generatedAt(value),
+    checkedAt,
+    upstreamStatus: String(status),
+  };
 }
