@@ -453,16 +453,61 @@
     return clone;
   }
 
+  function _countCharacter(value, character) {
+    var count = 0;
+    for (var i = 0; i < value.length; i++) {
+      if (value.charAt(i) === character) count++;
+    }
+    return count;
+  }
+
+  function _splitTrailingSummaryPunctuation(value) {
+    var core = value;
+    var suffix = '';
+    var openingByClosing = { ')': '(', ']': '[', '}': '{' };
+    while (core) {
+      var tail = core.charAt(core.length - 1);
+      var strip = /[.,;:!?]/.test(tail);
+      if (!strip && openingByClosing[tail]) {
+        strip = _countCharacter(core, tail) > _countCharacter(core, openingByClosing[tail]);
+      }
+      if (!strip) break;
+      suffix = tail + suffix;
+      core = core.slice(0, -1);
+    }
+    return { core: core, suffix: suffix };
+  }
+
+  function _sanitizeEmbeddedSummaryUrls(text) {
+    return text.replace(/\bhttps?:\/\/[^\s<>"']+/gi, function (candidate) {
+      var parts = _splitTrailingSummaryPunctuation(candidate);
+      var sanitized = _sanitizeUrlForPersistence(parts.core);
+      return sanitized ? sanitized + parts.suffix : candidate;
+    });
+  }
+
+  function _sanitizeStandaloneSummaryTokens(text) {
+    return text.replace(/[A-Za-z0-9][A-Za-z0-9._!~-]+/g, function (candidate) {
+      var parts = _splitTrailingSummaryPunctuation(candidate);
+      return _urlValueLooksTokenShaped(parts.core)
+        ? REDACTED_VALUE + parts.suffix
+        : candidate;
+    });
+  }
+
   function _sanitizeSummaryText(value, maxLength) {
     if (typeof value !== 'string') return '';
-    var text = value.trim().slice(0, maxLength || 2000);
-    // Preserve the summary while masking common inline secret assignments and
-    // bearer credentials. Tool descriptions separately instruct clients not
-    // to include sensitive form values in the first place.
+    var limit = maxLength || 2000;
+    // Bound attacker-controlled work before parsing, then enforce the public
+    // field cap again after URL normalization and redaction.
+    var text = value.trim().slice(0, limit);
     text = text.replace(/\b(password|passwd|secret|access[_ -]?token|refresh[_ -]?token|api[_ -]?key|authorization|credential|private[_ -]?key)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, function (_match, label) {
       return label + ': ' + REDACTED_VALUE;
     });
-    return text.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer ' + REDACTED_VALUE);
+    text = text.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer ' + REDACTED_VALUE);
+    text = _sanitizeEmbeddedSummaryUrls(text);
+    text = _sanitizeStandaloneSummaryTokens(text);
+    return text.slice(0, limit);
   }
 
   function _sanitizeSummaryTextList(values, maxLength) {

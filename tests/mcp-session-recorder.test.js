@@ -1348,6 +1348,12 @@ function readDispatch(o) {
   console.log('\n--- Test 21: client-authored completion creates one local Task Memory ---');
   {
     const { logger, memories, taskMemories } = await freshSection(1750000500000);
+    const signedUrlSecret = 's3-summary-secret';
+    const signedUrl = 'https://storage.example.com/report?X-Amz-Signature=' +
+      signedUrlSecret + '&X-Amz-Date=20260720T000000Z&view=summary';
+    const sanitizedSignedUrl = 'https://storage.example.com/report?view=summary';
+    const standaloneSecret = 'ghp_1234567890abcdefghijklmnop';
+    const benignSummaryUrl = 'https://example.com/report?id=123#status';
     recorder.recordAction(bridgeAction({
       agentId: 'agent-memory', tool: 'type',
       params: { tab_id: 7, selector: 'input[type="password"]', text: 'do-not-copy' }, tabId: 7,
@@ -1358,7 +1364,11 @@ function readDispatch(o) {
 
     recorder.recordTaskOutcome({
       tool: 'complete_task',
-      params: { summary: 'Report submitted; api_key=summary-secret', tab_id: 7 },
+      params: {
+        summary: 'Report submitted; api_key=summary-secret; download ' + signedUrl +
+          '. Reference ' + benignSummaryUrl + '; trace ' + standaloneSecret + '.',
+        tab_id: 7
+      },
       payload: { agentId: 'agent-memory' },
       response: { status: 'completed' }
     });
@@ -1372,6 +1382,12 @@ function readDispatch(o) {
     passAssertEqual(memory.typeData.session.outcome, 'success', 'completed summary maps to success outcome');
     passAssert(memory.text.includes('[REDACTED]') && !memory.text.includes('summary-secret'),
       'obvious secret assignments are sanitized from the client summary');
+    passAssert(!memory.text.includes(signedUrlSecret) && !memory.text.includes(standaloneSecret),
+      'signed URL credentials and standalone recognized tokens are sanitized from Task Memory');
+    passAssert(memory.text.includes(sanitizedSignedUrl + '.'),
+      'signed URL sanitization preserves its surrounding sentence punctuation');
+    passAssert(memory.text.includes(benignSummaryUrl),
+      'benign URLs remain byte-exact in Task Memory summaries');
     passAssert(!JSON.stringify(memory).includes('do-not-copy'), 'memory contains no raw action params or results');
     passAssertEqual(Object.keys(recorder._peekMemoryCandidates()).length, 0,
       'successful terminal outcome consumes the pending candidate');
@@ -1381,6 +1397,12 @@ function readDispatch(o) {
       'closed completion patches the history row for the matched replay session');
     passAssertEqual(logger.calls.updateSessionOutcome[0].sessionData.outcome, 'success',
       'closed completion persists a success outcome');
+    const persistedOutcome = JSON.stringify(logger.calls.updateSessionOutcome[0].sessionData);
+    passAssert(!persistedOutcome.includes(signedUrlSecret) &&
+      !persistedOutcome.includes(standaloneSecret) &&
+      persistedOutcome.includes(sanitizedSignedUrl) &&
+      persistedOutcome.includes(benignSummaryUrl),
+    'history updates sanitize URL/token credentials while preserving benign URL state');
 
     recorder.recordTaskOutcome({
       tool: 'complete_task',
@@ -1397,6 +1419,10 @@ function readDispatch(o) {
   console.log('\n--- Test 22: partial and failure summaries map to local outcomes ---');
   {
     let section = await freshSection(1750000600000);
+    const azureSecret = 'azure-summary-secret';
+    const azureSignedUrl = 'https://account.blob.core.windows.net/file?sv=2026-01-01' +
+      '&se=2026-07-21&sp=r&sig=' + azureSecret + '&view=summary';
+    const sanitizedAzureUrl = 'https://account.blob.core.windows.net/file?view=summary';
     recorder.recordAction(bridgeAction({
       agentId: 'agent-partial', tool: 'click', params: { tab_id: 3, selector: '#continue' }, tabId: 3,
       visualReason: 'Complete checkout', client: 'Claude'
@@ -1404,7 +1430,7 @@ function readDispatch(o) {
     recorder.recordTaskOutcome({
       tool: 'partial_task',
       params: {
-        summary: 'Cart prepared', blocker: 'Manual approval required',
+        summary: 'Cart prepared', blocker: 'Manual approval required at ' + azureSignedUrl + '.',
         next_step: 'Approve the purchase', tab_id: 3
       },
       payload: { agentId: 'agent-partial' }
@@ -1421,8 +1447,14 @@ function readDispatch(o) {
     passAssert(section.taskMemories.calls[0].text.includes('Manual approval required') &&
       section.taskMemories.calls[0].text.includes('Approve the purchase'),
     'partial memory preserves blocker and next step');
+    passAssert(!JSON.stringify(section.logger.calls.saveSession[0].sessionData).includes(azureSecret) &&
+      !section.taskMemories.calls[0].text.includes(azureSecret),
+    'partial history and Task Memory remove Azure SAS credentials');
+    passAssert(section.taskMemories.calls[0].text.includes(sanitizedAzureUrl + '.'),
+      'partial summary keeps the sanitized Azure URL and sentence punctuation');
 
     section = await freshSection(1750000700000);
+    const failedTaskSecret = 'ya29.failedTaskSummarySecret';
     recorder.recordAction(bridgeAction({
       agentId: 'agent-failed', tool: 'click', params: { tab_id: 4 }, tabId: 4,
       visualReason: 'Find unavailable data', client: 'Codex', isFinal: true
@@ -1430,7 +1462,7 @@ function readDispatch(o) {
     await recorder._drainForTests();
     recorder.recordTaskOutcome({
       tool: 'fail_task',
-      params: { reason: 'The requested data does not exist', tab_id: 4 },
+      params: { reason: 'The requested data does not exist; trace ' + failedTaskSecret + '.', tab_id: 4 },
       payload: { agentId: 'agent-failed' }
     });
     await recorder._drainForTests();
@@ -1443,6 +1475,9 @@ function readDispatch(o) {
       'closed failure persists failed history status');
     passAssertEqual(section.logger.calls.updateSessionOutcome[0].sessionData.outcome, 'failure',
       'closed failure persists failure history outcome');
+    passAssert(!section.taskMemories.calls[0].text.includes(failedTaskSecret) &&
+      !JSON.stringify(section.logger.calls.updateSessionOutcome[0].sessionData).includes(failedTaskSecret),
+    'failure summaries remove standalone recognized credentials from memory and history');
 
     section = await freshSection(1750000750000);
     recorder.recordAction(bridgeAction({
