@@ -151,15 +151,6 @@
   animation: stats-live-pulse 2.2s ease-in-out infinite;
 }
 
-.stats-live-badge.is-partial {
-  color: #d97706;
-  border-color: color-mix(in srgb, #d97706 45%, var(--border-color));
-}
-
-.stats-live-badge.is-partial::before {
-  background: #d97706;
-}
-
 @keyframes stats-live-pulse {
   0%,
   100% {
@@ -280,44 +271,6 @@
   margin: 0;
   color: var(--text-secondary);
   text-align: center;
-}
-
-.stats-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid color-mix(in srgb, #d97706 38%, var(--border-color));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, #d97706 9%, transparent);
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.45;
-}
-
-.stats-notice i {
-  flex: 0 0 auto;
-  color: #d97706;
-  margin-top: 0.1rem;
-}
-
-.quality-notice {
-  border-color: color-mix(in srgb, #2563eb 38%, var(--border-color));
-  background: color-mix(in srgb, #2563eb 9%, transparent);
-}
-
-.quality-notice i {
-  color: #2563eb;
-}
-
-.retry-notice {
-  border-color: var(--border-color);
-  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
-}
-
-.retry-notice i {
-  color: var(--text-muted);
 }
 
 .chart-mount canvas {

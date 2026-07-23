@@ -11,15 +11,8 @@
           <h1><span i18n="@@stats.header.title">Stats</span> <span class="muted" i18n="@@stats.header.muted">for nerds</span></h1>
           <p class="stats-sub" i18n="@@stats.header.subtitle">Live signals from <code [attr.translate]="'no'">fullselfbrowsing/FSB</code>.</p>
         </div>
-        <span class="stats-live-badge" [class.is-live]="viewState.kind === 'ready'"
-              [class.is-partial]="viewState.kind === 'partial'"
-              [attr.title]="stateBadgeTitle" [attr.aria-label]="stateBadgeAriaLabel" role="status">
-          @switch (viewState.kind) {
-            @case ('ready') { <span i18n="@@stats.live.label">Live</span> }
-            @case ('partial') { <span i18n="@@stats.status.partial">Partial</span> }
-            @case ('loading') { <span i18n="@@stats.status.loadingLabel">Loading</span> }
-            @case ('error') { <span i18n="@@stats.status.unavailableLabel">Unavailable</span> }
-          }
+        <span class="stats-live-badge is-live" role="status">
+          <span i18n="@@stats.live.label">Live</span>
         </span>
       </header>
 
@@ -70,20 +63,6 @@
           </div>
         }
         @if (isViewRenderable) {
-          @if (viewState.kind === 'partial') {
-            <div class="stats-notice freshness-notice" role="status" aria-live="polite">
-              <i class="ph ph-clock" aria-hidden="true"></i>
-              <span>{{ partialFreshnessMessage }}</span>
-            </div>
-          }
-          @for (notice of qualityNotices; track notice.id) {
-            <div class="stats-notice quality-notice" [class.retry-notice]="notice.kind === 'retry'"
-                 role="status" aria-live="polite">
-              <i class="ph" [class.ph-info]="notice.kind === 'quality'"
-                 [class.ph-arrows-clockwise]="notice.kind === 'retry'" aria-hidden="true"></i>
-              <span>{{ notice.message }}</span>
-            </div>
-          }
           <div class="chart-mount" [class.chart-mount-hidden]="selectedView === 'fsb-active-now'">
             <canvas #chartCanvas role="img" [attr.aria-label]="chartAriaLabel"
                     [attr.aria-describedby]="accessibleChartData.length ? 'stats-chart-data' : null">
