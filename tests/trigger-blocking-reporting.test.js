@@ -292,6 +292,8 @@ this.__phase19 = {
   vm.runInNewContext(`${source}\n${footer}`, context, { filename: 'ws/mcp-bridge-client.js' });
 
   const client = context.__phase19.mcpBridgeClient;
+  client.setInboundAuthorityReady(true);
+  client.setDelegationAuthorityReady(true);
   client._sendProgress = (id, payload) => {
     progressCalls.push({ id, payload });
   };

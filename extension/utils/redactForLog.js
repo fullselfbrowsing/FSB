@@ -26,6 +26,14 @@
 (function() {
   'use strict';
 
+  var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+  var FSB_BRIDGE_SECRET_REPLACEMENT = '[REDACTED_FSB_BRIDGE_SECRET]';
+
+  function redactBridgeSecretsInString(value) {
+    if (typeof value !== 'string') return value;
+    return value.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
+  }
+
   function redactForLog(value, hint) {
     if (value === null || value === undefined) {
       return { kind: 'empty' };
@@ -43,7 +51,11 @@
       return { kind: hint || 'text', length: value.length };
     }
     if (value instanceof Error) {
-      return { kind: 'error', name: value.name, message: value.message || '' };
+      return {
+        kind: 'error',
+        name: value.name,
+        message: redactBridgeSecretsInString(value.message || '')
+      };
     }
     if (Array.isArray(value)) {
       return { kind: 'array', length: value.length };
@@ -68,6 +80,9 @@
 
   function rateLimitedWarn(prefix, category, message, redactedContext) {
     var key = String(prefix) + '::' + String(category);
+    var safePrefix = redactBridgeSecretsInString(String(prefix));
+    var safeCategory = redactBridgeSecretsInString(String(category));
+    var safeMessage = redactBridgeSecretsInString(String(message));
     var now = Date.now();
     var entry = _rateLimitTable.get(key);
     var shouldEmit = !entry || (now - entry.lastWarnTs >= WINDOW_MS);
@@ -76,7 +91,7 @@
       var suppressedSuffix = (entry && entry.suppressedCount > 0)
         ? ' (suppressed ' + entry.suppressedCount + ' in last 10s)' : '';
       try {
-        console.warn('[FSB ' + prefix + '] ' + message + suppressedSuffix, redactedContext || {});
+        console.warn('[FSB ' + safePrefix + '] ' + safeMessage + suppressedSuffix, redactedContext || {});
       } catch (e) { /* console may be missing in exotic contexts */ }
       _rateLimitTable.set(key, { lastWarnTs: now, suppressedCount: 0 });
     } else {
@@ -93,9 +108,9 @@
         diag.append({
           ts: now,
           level: 'warn',
-          prefix: String(prefix),
-          category: String(category),
-          message: String(message),
+          prefix: safePrefix,
+          category: safeCategory,
+          message: safeMessage,
           redactedContext: redactedContext || {}
         });
       }
@@ -112,9 +127,9 @@
         diag.append({
           ts: Date.now(),
           level: 'debug',
-          prefix: String(prefix),
-          category: String(category),
-          message: String(message),
+          prefix: redactBridgeSecretsInString(String(prefix)),
+          category: redactBridgeSecretsInString(String(category)),
+          message: redactBridgeSecretsInString(String(message)),
           redactedContext: redactedContext || {}
         });
       }
@@ -128,6 +143,7 @@
 
   // Expose on globalThis so SW and content-script contexts can both use it.
   if (typeof globalThis !== 'undefined') {
+    globalThis.redactBridgeSecretsInString = redactBridgeSecretsInString;
     globalThis.redactForLog = redactForLog;
     globalThis.rateLimitedWarn = rateLimitedWarn;
     globalThis.logDebugToRing = logDebugToRing;
@@ -137,6 +153,7 @@
   // Also export for CommonJS so tests can require() this file directly.
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+      redactBridgeSecretsInString: redactBridgeSecretsInString,
       redactForLog: redactForLog,
       rateLimitedWarn: rateLimitedWarn,
       logDebugToRing: logDebugToRing,

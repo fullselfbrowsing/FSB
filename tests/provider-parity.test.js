@@ -37,6 +37,15 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The 7 providers -- copied verbatim from tool-definitions-parity.test.js:37
 // (confirmed against universal-provider.js PROVIDER_CONFIGS).
 const PROVIDER_KEYS = ['xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'];
+const SHIPPED_AGENT_IDS = ['claude-code', 'opencode', 'codex'];
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX === -1
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1];
+
+if (SECTION_ARGUMENT_INDEX !== -1 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
 
 // The two capability tools that MUST stay out-of-registry (INV-01) and therefore
 // can never appear in any provider's formatted tool envelope.
@@ -55,6 +64,13 @@ function check(cond, msg) {
   }
 }
 
+function sourceBetween(source, start, end) {
+  const startIndex = source.indexOf(start);
+  if (startIndex < 0) return '';
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  return endIndex < 0 ? source.slice(startIndex) : source.slice(startIndex, endIndex);
+}
+
 // formattedToolNames -- copied verbatim from tool-definitions-parity.test.js:75-84.
 // Handles the gemini functionDeclarations / anthropic flat / OpenAI function.name
 // shape differences.
@@ -71,8 +87,305 @@ function formattedToolNames(formatted, provider) {
 
 const { formatToolsForProvider } = require(path.join(REPO_ROOT, 'extension', 'ai', 'tool-use-adapter.js'));
 const agentLoop = require(path.join(REPO_ROOT, 'extension', 'ai', 'agent-loop.js'));
+const { EXECUTION_MODES } = require(path.join(REPO_ROOT, 'extension', 'ai', 'engine-config.js'));
+const delegationPreflight = require(path.join(REPO_ROOT, 'extension', 'utils', 'delegation-preflight.js'));
+const { Config } = require(path.join(REPO_ROOT, 'extension', 'config', 'config.js'));
+const optionsSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 'options.js'), 'utf8');
+const sidepanelSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'ui', 'sidepanel.js'), 'utf8');
+const backgroundSource = fs.readFileSync(path.join(REPO_ROOT, 'extension', 'background.js'), 'utf8');
 
 async function run() {
+  // -------------------------------------------------------------------------
+  // Accepted delegated runs bind provider, profile, auth, and billing into one
+  // exact immutable identity across every shipped agent adapter.
+  // -------------------------------------------------------------------------
+  console.log('\n--- accepted identity foundation (MULTI-05) ---');
+
+  const delegationProviders = require(path.join(
+    REPO_ROOT,
+    'extension',
+    'utils',
+    'delegation-providers.js',
+  ));
+  check(JSON.stringify(delegationProviders.AGENT_AUTH_STATES)
+      === JSON.stringify(['chatgpt', 'api_key', 'unauthenticated', 'unknown'])
+      && Object.isFrozen(delegationProviders.AGENT_AUTH_STATES),
+    'auth states are the exact frozen four-value provider-neutral vocabulary');
+  check(JSON.stringify(delegationProviders.AGENT_BILLING_KINDS)
+      === JSON.stringify(['subscription', 'api', 'unknown'])
+      && Object.isFrozen(delegationProviders.AGENT_BILLING_KINDS),
+    'billing kinds are the exact frozen three-value provider-neutral vocabulary');
+
+  const publicMetadataBefore = JSON.stringify([
+    { id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' },
+    { id: 'opencode', label: 'OpenCode', billingKind: 'unknown' },
+    { id: 'codex', label: 'Codex', billingKind: 'unknown' },
+  ]);
+  check(JSON.stringify(delegationProviders.list()) === publicMetadataBefore
+      && JSON.stringify(delegationProviders.get('claude-code'))
+        === JSON.stringify({ id: 'claude-code', label: 'Claude Code', billingKind: 'subscription' })
+      && JSON.stringify(delegationProviders.get('opencode'))
+        === JSON.stringify({ id: 'opencode', label: 'OpenCode', billingKind: 'unknown' })
+      && JSON.stringify(delegationProviders.get('codex'))
+        === JSON.stringify({ id: 'codex', label: 'Codex', billingKind: 'unknown' }),
+    'all shipped public metadata uses the same exact three-field shape');
+  check(delegationProviders.resolveAgentBillingKind('claude-code', 'unknown') === 'subscription'
+      && delegationProviders.resolveAgentBillingKind('opencode', 'unknown') === 'unknown'
+      && delegationProviders.resolveAgentBillingKind('codex', 'chatgpt') === 'subscription'
+      && delegationProviders.resolveAgentBillingKind('codex', 'api_key') === 'api',
+    'each shipped provider retains its closed accepted auth-to-billing behavior');
+  for (const [providerId, authState] of [
+    ['claude-code', 'chatgpt'],
+    ['claude-code', 'api_key'],
+    ['opencode', 'unauthenticated'],
+    ['opencode', '__proto__'],
+    ['codex', 'unknown'],
+    ['codex', 'unauthenticated'],
+    ['constructor', 'unknown'],
+  ]) {
+    check(delegationProviders.resolveAgentBillingKind(providerId, authState) === null,
+      `${providerId}/${authState}: invalid or unshipped auth-to-billing pair fails closed`);
+  }
+
+  const acceptedIdentity = {
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown',
+  };
+  const validatedIdentity = delegationProviders.validateAcceptedAgentIdentity(acceptedIdentity);
+  acceptedIdentity.providerId = 'claude-code';
+  acceptedIdentity.label = 'Claude Code';
+  acceptedIdentity.profileVersion = 'mutated-after-validation';
+  check(validatedIdentity
+      && JSON.stringify(validatedIdentity) === JSON.stringify({
+        providerId: 'opencode',
+        label: 'OpenCode',
+        profileVersion: '1.14.25',
+        authState: 'unknown',
+        billingKind: 'unknown',
+      })
+      && Object.isFrozen(validatedIdentity),
+    'validator returns one immutable canonical copy unaffected by caller mutation');
+
+  const nullPrototypeIdentity = Object.assign(Object.create(null), {
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription',
+  });
+  check(JSON.stringify(delegationProviders.validateAcceptedAgentIdentity(nullPrototypeIdentity))
+      === JSON.stringify({
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion: '2.1.177',
+        authState: 'unknown',
+        billingKind: 'subscription',
+      }),
+    'validator accepts an exact null-prototype own-data record');
+
+  let accessorReads = 0;
+  const accessorIdentity = {
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+  };
+  Object.defineProperty(accessorIdentity, 'billingKind', {
+    enumerable: true,
+    get() {
+      accessorReads += 1;
+      return 'unknown';
+    },
+  });
+  const symbolIdentity = { ...nullPrototypeIdentity };
+  symbolIdentity[Symbol('extra')] = true;
+  const inheritedIdentity = Object.assign(Object.create({ inherited: true }), nullPrototypeIdentity);
+  const hostileIdentities = [
+    null,
+    [],
+    { ...nullPrototypeIdentity, extra: true },
+    Object.fromEntries(Object.entries(nullPrototypeIdentity).filter(([key]) => key !== 'authState')),
+    { ...nullPrototypeIdentity, providerId: 'codex', label: 'Codex' },
+    { ...nullPrototypeIdentity, label: 'Open Code' },
+    { ...nullPrototypeIdentity, profileVersion: null },
+    { ...nullPrototypeIdentity, profileVersion: '' },
+    { ...nullPrototypeIdentity, authState: 'chatgpt' },
+    { ...nullPrototypeIdentity, billingKind: 'api' },
+    accessorIdentity,
+    symbolIdentity,
+    inheritedIdentity,
+  ];
+  hostileIdentities.forEach((identity, index) => {
+    check(delegationProviders.validateAcceptedAgentIdentity(identity) === null,
+      `hostile accepted-identity shape ${index + 1} fails closed`);
+  });
+  check(accessorReads === 0, 'accepted-identity validation never invokes caller accessors');
+  check(JSON.stringify(delegationProviders.ids())
+      === JSON.stringify(['claude-code', 'opencode', 'codex']),
+    'the production roster is exactly Claude Code, OpenCode, and Codex');
+
+  if (SELECTED_SECTION === 'accepted-identity-foundation') {
+    console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed > 0 ? 1 : 0);
+  }
+  if (SELECTED_SECTION === 'delegated-agent-parity') {
+    const identityMatrix = [
+      ['claude-code', 'unknown', '2.1.177', 'subscription'],
+      ['opencode', 'unknown', '1.14.25', 'unknown'],
+      ['codex', 'chatgpt', '0.142.5', 'subscription'],
+      ['codex', 'api_key', '0.142.5', 'api'],
+    ];
+    identityMatrix.forEach(([providerId, authState, profileVersion, billingKind]) => {
+      const identity = delegationProviders.createAcceptedAgentIdentity(providerId, authState);
+      check(identity
+          && identity.providerId === providerId
+          && identity.profileVersion === profileVersion
+          && identity.authState === authState
+          && identity.billingKind === billingKind
+          && Object.isFrozen(identity),
+      `${providerId}/${authState}: canonical accepted identity is exact and immutable`);
+    });
+    check(delegationProviders.list().every((metadata) => (
+      JSON.stringify(Object.keys(metadata)) === JSON.stringify(['id', 'label', 'billingKind'])
+    )), 'every agent exposes the same provider-neutral public metadata shape');
+
+    const feedSource = fs.readFileSync(
+      path.join(REPO_ROOT, 'extension', 'ui', 'delegation-feed.js'),
+      'utf8',
+    );
+    check(feedSource.includes("'acceptedIdentity', 'activeTab'")
+        && feedSource.includes('validateAcceptedAgentIdentity')
+        && feedSource.includes('renderSummary(snapshot.summary, snapshot.acceptedIdentity)'),
+      'shared feed validates and renders only the persisted accepted identity');
+    check(!/_definition\(initList,\s*['"]Profile['"]/.test(feedSource),
+      'shared init presentation has no visible Profile definition');
+    check(!/providerId\s*={2,3}\s*['"]codex['"]|delegation-(?:entry|summary)-codex/i.test(feedSource),
+      'Codex adds no provider-specific feed branch, class, or renderer');
+
+    console.log('\nprovider-parity: ' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed > 0 ? 1 : 0);
+  }
+  if (SELECTED_SECTION !== null) {
+    throw new Error('unknown section: ' + SELECTED_SECTION);
+  }
+
+  // -------------------------------------------------------------------------
+  // (0) Phase 61 provider namespace parity. The seven BYOK ids remain the only
+  // API surface, while each shipped agent provider requires its exact
+  // authoritative kind/id pair. A latent agent choice under API kind is inert.
+  // -------------------------------------------------------------------------
+  console.log('\n--- (0) API and delegated provider namespaces remain disjoint (INV-03 / UX-01) ---');
+
+  check(JSON.stringify(PROVIDER_KEYS) === JSON.stringify([
+    'xai', 'openai', 'anthropic', 'gemini', 'openrouter', 'lmstudio', 'custom'
+  ]), 'the universal provider matrix remains exactly the existing seven API ids');
+  const defaults = new Config().defaults;
+  check(defaults.providerKind === 'api' && defaults.agentProviderId === '',
+    'background config keeps API kind and the canonical empty agent id as defaults');
+  check(/providerKind:\s*'api'/.test(optionsSource) && /agentProviderId:\s*''/.test(optionsSource),
+    'options keeps its canonical API/empty-agent default storage shape');
+
+  const modeNames = Object.keys(EXECUTION_MODES);
+  check(JSON.stringify(modeNames) === JSON.stringify([
+    'autopilot', 'mcp-manual', 'mcp-agent', 'dashboard-remote', 'delegated'
+  ]), 'delegated is exactly the fifth execution mode without renaming the four established modes');
+  check(EXECUTION_MODES.delegated.name === 'delegated'
+      && JSON.stringify(Object.keys(EXECUTION_MODES.delegated.safetyLimits))
+        === JSON.stringify(['wallClockMs', 'eventSilenceMs'])
+      && EXECUTION_MODES.delegated.safetyLimits.wallClockMs === 2700000
+      && EXECUTION_MODES.delegated.safetyLimits.eventSilenceMs === 120000,
+    'the fifth mode has its separate lifecycle namespace and no legacy iteration/cost cap');
+  check(PROVIDER_KEYS.every((provider) => !modeNames.includes(provider))
+      && !PROVIDER_KEYS.includes('delegated')
+      && !PROVIDER_KEYS.includes('claude-code'),
+    'execution modes, API providers, and executable agent ids remain disjoint namespaces');
+
+  for (const modelProvider of PROVIDER_KEYS) {
+    for (const storedAgentId of ['', ...SHIPPED_AGENT_IDS]) {
+      const apiInput = {
+        providerKind: 'api',
+        agentProviderId: storedAgentId,
+        modelProvider,
+        bridgeState: {
+          status: 'connected', connected: true, pairingStatus: 'paired',
+          delegationConnection: { state: 'connected' }
+        }
+      };
+      const apiResult = delegationPreflight.check(apiInput);
+      check(apiResult.ok === true
+          && apiResult.kind === 'api'
+          && apiResult.providerId === modelProvider
+          && apiResult.agentProviderId === '',
+      modelProvider + ': API routing preserves ' + (storedAgentId || 'empty-string')
+        + ' storage compatibility without write-back');
+    }
+  }
+
+  for (const candidate of [
+    'claude-code', 'Claude-Code', 'CLAUDE-CODE', 'opencode', 'codex',
+    'xai', 'anthropic', '', '__proto__', 'constructor'
+  ]) {
+    const acceptedIdentity = delegationProviders.createAcceptedAgentIdentity(
+      candidate,
+      candidate === 'codex' ? 'chatgpt' : 'unknown',
+    );
+    const result = delegationPreflight.check({
+      providerKind: 'agent',
+      agentProviderId: candidate,
+      modelProvider: 'xai',
+      bridgeState: {
+        status: 'connected', connected: true, pairingStatus: 'paired',
+        delegationConnection: { state: 'connected' }
+      },
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity,
+    });
+    const isShippedAgent = SHIPPED_AGENT_IDS.includes(candidate);
+    check(result.ok === isShippedAgent
+        && (isShippedAgent
+          ? result.kind === 'agent' && result.providerId === candidate
+          : result.code === 'unsupported_provider'),
+    (candidate || 'empty') + ': only an exact shipped agent provider pair is executable');
+  }
+
+  const sendHandler = sourceBetween(
+    sidepanelSource,
+    'async function handleSendMessage() {',
+    'async function _handleLegacySendMessage(message) {',
+  );
+  const legacySend = sourceBetween(
+    sidepanelSource,
+    'async function _handleLegacySendMessage(message) {',
+    '// Stop automation',
+  );
+  check(sendHandler.indexOf("preflight.kind === 'api'")
+      < sendHandler.indexOf("preflight.kind !== 'agent'")
+      && /preflight\.kind === 'api'[\s\S]*await _handleLegacySendMessage\(message\);[\s\S]*return;/.test(sendHandler),
+    'normal API side-panel sends fall through to the established legacy handler before agent UI mutation');
+  check(/action: 'startAutomation'/.test(legacySend)
+      && /addMessage\(message, 'user'\)/.test(legacySend)
+      && !/FSB_DELEGATION_(?:CONSENT|START)/.test(legacySend),
+    'the established API side-panel send envelope remains behaviorally separate from delegation');
+
+  const backgroundStart = sourceBetween(
+    backgroundSource,
+    'async function handleStartAutomation(request, sender, sendResponse) {',
+    'async function handleStopAutomation',
+  );
+  const agentBranch = sourceBetween(
+    backgroundStart,
+    "if (authoritativeProvider.providerKind === 'agent') {",
+    '// Get the target tab ID',
+  );
+  check(agentBranch.includes('fsbDelegationConsentCommand')
+      && !/agentProviderId|modelProvider/.test(agentBranch)
+      && backgroundStart.indexOf("providerKind === 'agent'")
+        < backgroundStart.indexOf('chrome.sidePanel.setOptions'),
+    'background diverts only authoritative agent kind while API start ordering remains intact');
+
   // -------------------------------------------------------------------------
   // (a) FORMAT half (INV-01) -- the capability surface is provider-independent.
   // For each of the 7 providers the public tools format without error and NEITHER

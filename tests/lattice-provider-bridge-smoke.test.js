@@ -615,8 +615,16 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // landed handlers).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 mention
   // (the ai/lattice-runtime-adapter.js importScripts() call) -> 309.
+  // Phase 57 Plan 02 adds the durable MCP-agent provider helper -> 310.
+  // Phase 57 Plan 03 adds the exact MCP client alias helper -> 311.
+  // Phase 61 Plan 06 composes preflight, consent, event-store, and controller
+  // modules in the service worker -> 315. Phase 62 Plan 04 loads the protocol
+  // drift diagnostics pre-throttle -> 316. Phase 63 Plan 08 loads the native
+  // wake controller -> 317. Phase 64 Plan 09 loads the canonical delegation
+  // provider helper -> 318. PR #105 adds the MCP session recorder plus three
+  // Google Sheets support loads -> 322.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 309, 'background.js importScripts count = 309 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCount, 322, 'background.js importScripts count = 322 (provider/delegation plus PR #105 loads)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -649,8 +657,15 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (+14 handler importScripts() calls vs. the pre-review 290 pin).
   // FINT-13 "actually load the adapter in SW" (commit a3c03e6a) adds 1 call site
   // (ai/lattice-runtime-adapter.js) -> 305.
+  // Phase 57 Plan 02 adds one helper call site -> 306.
+  // Phase 57 Plan 03 adds the alias helper call site -> 307.
+  // Phase 61 Plan 06 adds four delegation composition call sites -> 311.
+  // Phase 62 Plan 04 adds the protocol drift diagnostics call site -> 312.
+  // Phase 63 Plan 08 adds the native wake controller call site -> 313.
+  // Phase 64 Plan 09 adds the canonical delegation provider helper -> 314.
+  // PR #105 adds four call sites -> 318.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 305, 'background.js importScripts() call sites = 305 (current head set including Google Cloud, parallel T1 handlers, and the FINT-13 lattice-runtime-adapter load)');
+  passAssertEqual(importScriptsCallSites, 318, 'background.js importScripts() call sites = 318 (provider/delegation plus PR #105 loads)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
@@ -804,8 +819,10 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // (after apiKey + provider + modelName are all populated).
   passAssertEqual((optionsSrc.match(/\/\/ Check API connection/g) || []).length, 0,
     "options.js dropped the premature page-init '// Check API connection' call (load-order fix)");
-  passAssert(/checkApiConnection\(\);\s*\}, 100\);/.test(optionsSrc),
-    'checkApiConnection() now runs as the last statement of the loadSettings model-name setTimeout (inputs populated first)');
+  passAssert(
+    /if\s*\(settings\.providerKind\s*===\s*['"]api['"]\)\s*\{[\s\S]*?checkApiConnection\(\);\s*\}\s*\}, 100\);/.test(optionsSrc),
+    'checkApiConnection() stays last in the loadSettings model-name timer and is guarded to API kind'
+  );
 
   // ---- Part 6: INV byte-freeze regression assertions (Plan 06-05 fill) ----
   console.log('\n--- Part 6: INV-04 / INV-01 / INV-02 / INV-05 / INV-06 byte-freeze ---');

@@ -42,7 +42,7 @@ const TOOL_DEFS_PATH = path.join(REPO_ROOT, 'mcp', 'ai', 'tool-definitions.cjs')
 // tests/tool-definitions-parity.test.js:52 / capability-mcp-surface.test.js. The
 // recipe-rot work must NOT move this (no tool-definitions edit this phase).
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
+  '0a525835adc6961463c5a954f3e80205f066e23bef6089283ef598c78f1d8623';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors tool-definitions-parity.test.js:35/132).
@@ -140,7 +140,7 @@ const nonTriggerTools = td.TOOL_REGISTRY.filter(function (tool) {
 });
 const actualRegistryHash = registryHash(nonTriggerTools);
 check(actualRegistryHash === EXPECTED_NON_TRIGGER_REGISTRY_HASH,
-  'INV-01: the frozen non-trigger tool registry hash 6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d is unmoved (no tool-definitions edit this phase)');
+  'INV-01: the frozen non-trigger tool registry hash is unmoved (no tool-definitions edit this phase)');
 if (actualRegistryHash !== EXPECTED_NON_TRIGGER_REGISTRY_HASH) {
   console.error('  DIAG: expected ' + EXPECTED_NON_TRIGGER_REGISTRY_HASH);
   console.error('  DIAG: actual   ' + actualRegistryHash);

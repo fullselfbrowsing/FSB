@@ -11,12 +11,30 @@
 // the FSB family ([FSB AGT], [FSB DLG], [FSB BG], ...).
 
 import type { WebSocketBridge } from './bridge.js';
+import type { McpClientInventory } from './client-inventory.js';
 
 const SCOPE_LOG_PREFIX = '[FSB AgentScope]';
+const DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+export type ClientInfo = {
+  name?: string;
+  version?: string;
+};
+
+export type ClientInfoSupplier = () => ClientInfo | null;
+export type ClientInventorySupplier = () => McpClientInventory | Promise<McpClientInventory>;
+
+export type AgentScopeEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type AgentScopeOptions = {
+  environment?: AgentScopeEnvironment;
+};
 
 export class AgentScope {
   private agentId: string | null = null;
   private pending: Promise<string> | null = null;
+  private clientInfoSupplier: ClientInfoSupplier | null = null;
+  private clientInventorySupplier: ClientInventorySupplier | null = null;
   // Phase 240 Open Q1 resolution: ownership tokens are minted per-bindTab on
   // the extension side. Each bindTab-firing handler returns the freshly
   // minted token in its response under `ownershipToken`. AgentScope captures
@@ -41,6 +59,22 @@ export class AgentScope {
   // Single-slot model (one bridge per process for v0.9.60) -- mirrors the
   // lastOwnershipToken pattern.
   private connectionId: string | null = null;
+  private readonly environment: AgentScopeEnvironment;
+
+  constructor(options: AgentScopeOptions = {}) {
+    // Capture the process environment once. A delegated child receives the
+    // daemon-minted id at spawn time; later ambient mutations must not change
+    // the identity carried by this process's one registration handshake.
+    this.environment = { ...(options.environment ?? process.env) };
+  }
+
+  setClientInfoSupplier(supplier: ClientInfoSupplier): void {
+    this.clientInfoSupplier = supplier;
+  }
+
+  setClientInventorySupplier(supplier: ClientInventorySupplier): void {
+    this.clientInventorySupplier = supplier;
+  }
 
   /**
    * Returns the per-process agent_id, lazy-minting on first call via the
@@ -56,8 +90,46 @@ export class AgentScope {
 
     this.pending = (async () => {
       try {
+        const payload: {
+          clientInfo?: ClientInfo;
+          platforms?: McpClientInventory;
+          delegationId?: string;
+        } = {};
+        const delegationId = this.environment.FSB_DELEGATION_ID;
+        if (delegationId !== undefined) {
+          if (!DELEGATION_ID_PATTERN.test(delegationId)) {
+            throw new Error('Invalid FSB_DELEGATION_ID');
+          }
+          // Registration-only correlation sidecar. It is intentionally not
+          // stored as agent identity and never participates in MCP tool args.
+          payload.delegationId = delegationId;
+        }
+        const suppliedClientInfo = this.clientInfoSupplier?.();
+        if (suppliedClientInfo) {
+          const clientInfo: ClientInfo = {};
+          if (typeof suppliedClientInfo.name === 'string') {
+            clientInfo.name = suppliedClientInfo.name;
+          }
+          if (typeof suppliedClientInfo.version === 'string') {
+            clientInfo.version = suppliedClientInfo.version;
+          }
+          if (Object.keys(clientInfo).length > 0) {
+            payload.clientInfo = clientInfo;
+          }
+        }
+
+        const suppliedPlatforms = await this.clientInventorySupplier?.();
+        if (
+          suppliedPlatforms &&
+          typeof suppliedPlatforms === 'object' &&
+          !Array.isArray(suppliedPlatforms) &&
+          Object.keys(suppliedPlatforms).length > 0
+        ) {
+          payload.platforms = { ...suppliedPlatforms };
+        }
+
         const result = await bridge.sendAndWait(
-          { type: 'agent:register', payload: {} },
+          { type: 'agent:register', payload },
           { timeout: 10_000 },
         );
         if (!result || result.success !== true || typeof result.agentId !== 'string') {

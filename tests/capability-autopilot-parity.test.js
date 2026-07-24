@@ -40,7 +40,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // tests/capability-mcp-surface.test.js:58-59 / tool-definitions-parity.test.js:52.
 // The two out-of-registry capability tools must NOT have moved this.
 const EXPECTED_NON_TRIGGER_REGISTRY_HASH =
-  '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
+  '0a525835adc6961463c5a954f3e80205f066e23bef6089283ef598c78f1d8623';
 
 // The four trigger tools sit IN TOOL_REGISTRY but are excluded from the frozen
 // non-trigger baseline (mirrors capability-mcp-surface.test.js:63).

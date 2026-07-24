@@ -11,14 +11,61 @@
 
 const MCP_BRIDGE_URL = 'ws://localhost:7225';
 const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
+const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+const FSB_EXT_PROTOCOL = 'fsb-ext-v1';
+const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
+const DEFAULT_EXT_REQUEST_TIMEOUT_MS = 30000;
+const MIN_EXT_REQUEST_TIMEOUT_MS = 1000;
+const MAX_EXT_REQUEST_TIMEOUT_MS = 120000;
+// delegate.start is a run-lifecycle request, not a short RPC. The controller's
+// 45-minute watchdog is authoritative; this transport ceiling leaves a bounded
+// two-minute cleanup window for the exact-id cancellation/final response.
+const DELEGATION_START_REQUEST_TIMEOUT_MS = (45 * 60 * 1000) + (2 * 60 * 1000);
+const AUTH_STATUS_TIMEOUT_MS = 5000;
+const ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS = 5000;
+const EXT_METHOD_PATTERN = /^[a-z][a-z0-9_.:-]{0,127}$/;
 const MCP_RECONNECT_ALARM = 'fsb-mcp-bridge-reconnect';
 const MCP_RECONNECT_BASE_MS = 2000;
 const MCP_RECONNECT_MAX_MS = 30000;
 const MCP_PING_INTERVAL_MS = 25000;
+const DELEGATION_HEARTBEAT_INTERVAL_MS = 20000;
+const DELEGATION_HEARTBEAT_MISS_LIMIT = 3;
+const DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH = 16;
+const DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH = 64;
+const DELEGATION_HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
+const MCP_DELEGATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const MCP_DISPATCHER_SYNTHETIC_CHANGE_REPORT_TOOLS = new Set(['open_tab', 'close_tab']);
 const TRIGGER_HEARTBEAT_INTERVAL_MS = 30000;
 const TRIGGER_BLOCKING_TIMEOUT_DEFAULT_MS = 120000;
 const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
+
+function isMcpGoogleSheetsDocumentUrl(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  if (typeof URL !== 'function') return true;
+  try {
+    const parsed = new URL(value);
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      parsed.hostname === 'docs.google.com' &&
+      /^\/spreadsheets\/d\/[^/]+(?:\/|$)/.test(parsed.pathname);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function isMcpSpreadsheetRecord(payload, response) {
+  const tool = payload && payload.tool;
+  if (tool === 'fill_sheet' || tool === 'read_sheet' || tool === 'fillsheet' || tool === 'readsheet') {
+    return true;
+  }
+  const responseUrl = response && response.change_report && response.change_report.url;
+  return [
+    payload && payload.params && payload.params.url,
+    response && response.url,
+    responseUrl && responseUrl.before,
+    responseUrl && responseUrl.after
+  ].some(isMcpGoogleSheetsDocumentUrl);
+}
+
 // Phase 241 D-07 / D-08 -- mirror of agent-registry.js RECONNECT_GRACE_MS.
 // On bridge _ws.onclose the bridge asks the registry to stage release for
 // every agent stamped with the current connection_id; that staged release
@@ -29,12 +76,26 @@ const TRIGGER_BLOCKING_SAFETY_CEILING_MS = 240000;
 // SW-eviction-during-grace case via the persisted stagedReleases envelope.
 const RECONNECT_GRACE_MS = 10000;
 
+function isPlainMcpClientInventory(value) {
+  return !!value && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.prototype.toString.call(value) === '[object Object]';
+}
+
 class MCPBridgeClient {
-  constructor() {
+  constructor(options = {}) {
     this._ws = null;
     this._reconnectDelay = MCP_RECONNECT_BASE_MS;
     this._reconnectTimer = null;
     this._pingTimer = null;
+    this._delegationHeartbeatTimer = null;
+    this._delegationHeartbeatOwners = new Set();
+    this._delegationHeartbeatNonce = null;
+    this._delegationHeartbeatNonceCounter = 0;
+    this._delegationHeartbeatConsecutiveMisses = 0;
+    this._delegationHeartbeatLastAckAt = null;
+    this._delegationConnectionState = 'disconnected';
+    this._delegationConnectionObservers = [];
     this._intentionalClose = false;
     this._connected = false;
     this._status = 'idle';
@@ -54,12 +115,27 @@ class MCPBridgeClient {
     // can be cancelled on a fast reconnect (within RECONNECT_GRACE_MS).
     this._connectionId = null;
     this._lastKnownConnectionId = null;
+    this._pairingCode = null;
+    this._pairingLoaded = false;
+    this._pairingLoadPromise = null;
+    this._pairingReloadPromise = null;
+    this._pairingStatus = 'unpaired';
+    this._pairingStatusObservers = [];
+    this._authProbePromise = null;
+    this._extPending = new Map();
+    this._extEventObservers = [];
+    this._inboundAuthorityReady = !!(options && options.inboundAuthorityReady === true);
+    this._delegationAuthorityReady = !!(options && options.delegationAuthorityReady === true);
+    this._extRequestCounter = 0;
+    this._replacementSockets = new Set();
+    this._socketWaiters = new Set();
   }
 
   getState() {
     return {
       status: this._status,
       connected: this._connected,
+      pairingStatus: this._pairingStatus,
       url: MCP_BRIDGE_URL,
       reconnectDelayMs: this._reconnectDelay,
       maxReconnectDelayMs: MCP_RECONNECT_MAX_MS,
@@ -71,6 +147,7 @@ class MCPBridgeClient {
       lastConnectedAt: this._lastConnectedAt,
       lastDisconnectedAt: this._lastDisconnectedAt,
       lastDisconnectReason: this._lastDisconnectReason,
+      delegationConnection: this.getDelegationConnectionSnapshot(),
       updatedAt: this._timestamp()
     };
   }
@@ -85,6 +162,11 @@ class MCPBridgeClient {
    * Start the connection. Safe to call multiple times.
    */
   connect() {
+    if (!this._pairingLoaded) {
+      this._ensurePairingLoaded().then(() => this.connect()).catch(() => this.connect());
+      return;
+    }
+
     if (this._ws && (this._ws.readyState === WebSocket.OPEN || this._ws.readyState === WebSocket.CONNECTING)) {
       this._persistState();
       return;
@@ -96,20 +178,26 @@ class MCPBridgeClient {
     this._persistState();
 
     try {
-      this._ws = new WebSocket(MCP_BRIDGE_URL);
+      this._ws = this._pairingCode
+        ? new WebSocket(MCP_BRIDGE_URL, [FSB_EXT_PROTOCOL, this._pairingCode])
+        : new WebSocket(MCP_BRIDGE_URL);
     } catch (err) {
-      console.log('[FSB MCP Bridge] WebSocket construction failed:', err.message);
+      console.log('[FSB MCP Bridge] WebSocket construction failed');
       this._ws = null;
       this._connected = false;
       this._status = 'disconnected';
       this._lastDisconnectedAt = this._timestamp();
-      this._lastDisconnectReason = 'construct_failed:' + (err.message || 'unknown');
+      this._lastDisconnectReason = 'construct_failed';
       this._persistState();
       this._scheduleReconnect();
+      this._notifySocketWaiters('offline', null);
       return;
     }
 
-    this._ws.onopen = () => {
+    const socket = this._ws;
+
+    socket.onopen = () => {
+      if (this._ws !== socket) return;
       console.log('[FSB MCP Bridge] Connected to local MCP bridge');
       this._connected = true;
       this._status = 'connected';
@@ -118,8 +206,16 @@ class MCPBridgeClient {
       this._lastConnectedAt = this._timestamp();
       this._lastDisconnectReason = null;
       this._clearReconnectAlarm();
+      this._delegationHeartbeatNonce = null;
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = 'connected';
+      this._notifyDelegationConnectionObservers();
       this._persistState();
-      this._startPing();
+      if (this._delegationHeartbeatOwners.size > 0) {
+        this._startDelegationHeartbeat();
+      } else {
+        this._startPing();
+      }
       // Phase 241 D-08 -- mint a fresh connection_id at onopen.
       // crypto.randomUUID is available in MV3 service workers and Node 18+.
       // The defensive fallback ensures the bridge never throws even if the
@@ -160,13 +256,28 @@ class MCPBridgeClient {
       // run_task snapshots that survived an SW eviction. Authoritative
       // settle still lives server-side in autopilot.ts via sw_evicted.
       try { this._reconcileInFlightTasksOnConnect(); } catch (_e) { /* best-effort */ }
+      if (this._pairingCode) {
+        this._setPairingStatus('configured');
+        this._authProbePromise = this._probePairingStatus(socket);
+      } else {
+        this._setPairingStatus('unpaired');
+        this._authProbePromise = null;
+      }
+      this._notifySocketWaiters('open', socket);
     };
 
-    this._ws.onmessage = (event) => {
+    socket.onmessage = (event) => {
       this._handleMessage(event.data);
     };
 
-    this._ws.onclose = () => {
+    socket.onclose = () => {
+      const wasReplacement = this._replacementSockets.delete(socket);
+      if (this._ws !== socket) {
+        this._rejectExtPendingForSocket(socket);
+        this._notifySocketWaiters('close', socket);
+        return;
+      }
+      this._ws = null;
       console.log('[FSB MCP Bridge] Disconnected from local MCP bridge');
       this._connected = false;
       this._status = 'disconnected';
@@ -191,15 +302,25 @@ class MCPBridgeClient {
       } catch (_e) { /* best-effort */ }
       // Phase 239 plan 03 -- arm reconciler for the next connect cycle.
       this._inFlightTasksReconciled = false;
+      this._rejectAllExtPending();
+      if (this._pairingStatus === 'paired') {
+        this._setPairingStatus(this._pairingCode ? 'configured' : 'unpaired');
+      }
       this._persistState();
       this._stopPing();
-      if (!this._intentionalClose) {
+      this._stopDelegationHeartbeat();
+      this._delegationConnectionState = 'disconnected';
+      this._notifyDelegationConnectionObservers();
+      this._persistState();
+      this._notifySocketWaiters('close', socket);
+      if (!this._intentionalClose && !wasReplacement) {
         this._scheduleReconnect();
       }
     };
 
-    this._ws.onerror = (err) => {
+    socket.onerror = () => {
       // Errors are followed by onclose, so reconnect happens there
+      if (this._ws !== socket) return;
       this._lastDisconnectReason = 'socket_error';
     };
   }
@@ -210,6 +331,7 @@ class MCPBridgeClient {
   disconnect() {
     this._intentionalClose = true;
     this._stopPing();
+    this._stopDelegationHeartbeat();
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
@@ -219,10 +341,12 @@ class MCPBridgeClient {
       this._ws.close();
       this._ws = null;
     }
+    this._rejectAllExtPending();
     this._connected = false;
     this._status = 'disconnected';
     this._lastDisconnectedAt = this._timestamp();
     this._lastDisconnectReason = 'intentional_close';
+    this._delegationConnectionState = 'disconnected';
     this._nextReconnectAt = null;
     this._persistState();
   }
@@ -241,6 +365,423 @@ class MCPBridgeClient {
    */
   getConnectionId() {
     return this._connectionId || null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Pairing and extension reverse requests
+  // --------------------------------------------------------------------------
+
+  _isPlainRecord(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    if (Object.prototype.toString.call(value) !== '[object Object]') return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === null
+      || (prototype.constructor && prototype.constructor.name === 'Object');
+  }
+
+  _isValidPairingRecord(value) {
+    if (!this._isPlainRecord(value)) return false;
+    const keys = Object.keys(value).sort();
+    return keys.length === 2
+      && keys[0] === 'pairingCode'
+      && keys[1] === 'storedAt'
+      && typeof value.pairingCode === 'string'
+      && MCP_BRIDGE_PAIRING_PATTERN.test(value.pairingCode)
+      && Number.isFinite(value.storedAt);
+  }
+
+  _setPairingStatus(status) {
+    if (!['unpaired', 'configured', 'paired', 'expired'].includes(status)) return;
+    const changed = this._pairingStatus !== status;
+    this._pairingStatus = status;
+    this._persistState({ pairingStatus: status });
+    if (changed) this._notifyPairingStatusObservers(status);
+  }
+
+  addPairingStatusObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Pairing status observer must be a function');
+    }
+    this._pairingStatusObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._pairingStatusObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._pairingStatusObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _notifyPairingStatusObservers(status) {
+    for (const observer of [...this._pairingStatusObservers]) {
+      try {
+        const pending = observer(status);
+        if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+      } catch (_error) { /* observer isolation */ }
+    }
+  }
+
+  async _readPairingFromSession() {
+    let record = null;
+    try {
+      const area = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+      if (area && typeof area.get === 'function') {
+        const stored = await area.get([MCP_BRIDGE_PAIRING_KEY]);
+        record = stored && stored[MCP_BRIDGE_PAIRING_KEY];
+      }
+    } catch (_error) {
+      record = null;
+    }
+
+    this._pairingCode = this._isValidPairingRecord(record) ? record.pairingCode : null;
+    this._pairingLoaded = true;
+    this._setPairingStatus(this._pairingCode ? 'configured' : 'unpaired');
+    return this._pairingCode;
+  }
+
+  _ensurePairingLoaded() {
+    if (this._pairingLoaded) return Promise.resolve(this._pairingCode);
+    if (this._pairingLoadPromise) return this._pairingLoadPromise;
+    this._pairingLoadPromise = this._readPairingFromSession()
+      .catch(() => {
+        this._pairingCode = null;
+        this._pairingLoaded = true;
+        this._setPairingStatus('unpaired');
+        return null;
+      })
+      .finally(() => {
+        this._pairingLoadPromise = null;
+      });
+    return this._pairingLoadPromise;
+  }
+
+  _notifySocketWaiters(event, socket) {
+    for (const waiter of [...this._socketWaiters]) {
+      try { waiter(event, socket); } catch (_error) { /* isolated waiter */ }
+    }
+  }
+
+  _waitForReplacementSocket() {
+    const current = this._ws;
+    if (current && current.readyState === WebSocket.OPEN) {
+      return Promise.resolve({ event: 'open', socket: current });
+    }
+    if (!current) return Promise.resolve({ event: 'offline', socket: null });
+
+    return new Promise((resolve) => {
+      let timer = null;
+      const finish = (event, socket) => {
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        resolve({ event, socket });
+      };
+      const waiter = (event, socket) => {
+        if (socket !== current && event !== 'offline') return;
+        if (event === 'open' || event === 'close' || event === 'offline') finish(event, socket);
+      };
+      this._socketWaiters.add(waiter);
+      timer = setTimeout(() => finish('offline', null), AUTH_STATUS_TIMEOUT_MS);
+    });
+  }
+
+  async _closeSocketForPairingReload() {
+    const socket = this._ws;
+    if (!socket || (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING)) {
+      this._ws = null;
+      return;
+    }
+
+    this._replacementSockets.add(socket);
+    await new Promise((resolve) => {
+      let timer = null;
+      const waiter = (event, closedSocket) => {
+        if (event !== 'close' || closedSocket !== socket) return;
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        resolve();
+      };
+      this._socketWaiters.add(waiter);
+      timer = setTimeout(() => {
+        this._socketWaiters.delete(waiter);
+        if (this._ws === socket) this._ws = null;
+        resolve();
+      }, 1000);
+      try {
+        socket.close();
+      } catch (_error) {
+        if (timer) clearTimeout(timer);
+        this._socketWaiters.delete(waiter);
+        if (this._ws === socket) this._ws = null;
+        resolve();
+      }
+    });
+  }
+
+  reloadPairingAndReconnect() {
+    if (this._pairingReloadPromise) return this._pairingReloadPromise;
+    this._pairingReloadPromise = this._reloadPairingAndReconnect()
+      .finally(() => {
+        this._pairingReloadPromise = null;
+      });
+    return this._pairingReloadPromise;
+  }
+
+  async _reloadPairingAndReconnect() {
+    this._pairingLoaded = false;
+    this._pairingLoadPromise = null;
+    await this._ensurePairingLoaded();
+
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    this._clearReconnectAlarm();
+    await this._closeSocketForPairingReload();
+    this._intentionalClose = false;
+    this.connect();
+
+    if (!this._pairingCode) {
+      this._setPairingStatus('unpaired');
+      return { pairingStatus: 'unpaired' };
+    }
+
+    this._setPairingStatus('configured');
+    const outcome = await this._waitForReplacementSocket();
+    if (outcome.event !== 'open' || !outcome.socket) {
+      return { pairingStatus: 'configured' };
+    }
+
+    const probe = this._authProbePromise;
+    if (probe) await probe;
+    return { pairingStatus: this._pairingStatus };
+  }
+
+  async _probePairingStatus(socket) {
+    if (!this._pairingCode || this._ws !== socket || socket.readyState !== WebSocket.OPEN) {
+      return this._pairingStatus;
+    }
+    try {
+      const response = await this.sendExtRequest('bridge.auth-status', {}, { timeout: AUTH_STATUS_TIMEOUT_MS });
+      const exactAuthorized = this._isPlainRecord(response)
+        && Object.keys(response).length === 1
+        && response.authorized === true;
+      if (this._ws !== socket) return this._pairingStatus;
+      this._setPairingStatus(exactAuthorized ? 'paired' : 'expired');
+    } catch (_error) {
+      if (this._ws === socket) this._setPairingStatus('expired');
+    }
+    return this._pairingStatus;
+  }
+
+  _boundedExtTimeout(value) {
+    if (value === undefined) return DEFAULT_EXT_REQUEST_TIMEOUT_MS;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return DEFAULT_EXT_REQUEST_TIMEOUT_MS;
+    return Math.max(MIN_EXT_REQUEST_TIMEOUT_MS, Math.min(MAX_EXT_REQUEST_TIMEOUT_MS, numeric));
+  }
+
+  _makeExtError(message, code, retryable) {
+    const error = new Error(message);
+    error.code = code;
+    error.retryable = retryable === true;
+    return error;
+  }
+
+  addEventObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Extension event observer must be a function');
+    }
+    this._extEventObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._extEventObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._extEventObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _makeExtObserverError(error) {
+    const typed = this._makeExtError(
+      'Extension event observer failed',
+      'ext_event_observer_failed',
+      false,
+    );
+    if (error !== undefined) typed.cause = error;
+    return typed;
+  }
+
+  async _runExtEventObservers(pending, id, eventName, payload, observers) {
+    const event = Object.freeze({
+      id,
+      method: pending.method,
+      event: eventName,
+      payload,
+    });
+    for (const observer of observers) {
+      await observer(event);
+    }
+    if (pending.onEvent) {
+      await pending.onEvent(eventName, payload);
+    }
+  }
+
+  _appendExtEvent(pending, id, eventName, payload) {
+    const observers = [...this._extEventObservers];
+    pending.eventTail = pending.eventTail
+      .then(async () => {
+        if (pending.observerError) return;
+        await this._runExtEventObservers(pending, id, eventName, payload, observers);
+      })
+      .catch((error) => {
+        if (!pending.observerError) {
+          pending.observerError = this._makeExtObserverError(error);
+        }
+      });
+  }
+
+  async _settleExtResponseAfterEvents(pending, response) {
+    await pending.eventTail;
+    if (pending.observerError) {
+      pending.reject(pending.observerError);
+      return;
+    }
+    if (response.hasPayload) {
+      pending.resolve(response.payload);
+      return;
+    }
+    if (response.error.code === 'ext_unauthorized') this._setPairingStatus('expired');
+    pending.reject(this._makeExtError(
+      response.error.message,
+      response.error.code,
+      response.error.retryable,
+    ));
+  }
+
+  sendExtRequest(method, payload, options = {}) {
+    if (typeof method !== 'string' || !EXT_METHOD_PATTERN.test(method)) {
+      return Promise.reject(this._makeExtError('Invalid extension request method', 'invalid_ext_request', false));
+    }
+    if (!this._isPlainRecord(payload) || Object.keys(payload).length > 100) {
+      return Promise.reject(this._makeExtError('Invalid extension request payload', 'invalid_ext_request', false));
+    }
+    const socket = this._ws;
+    if (!this._connected || !socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.reject(this._makeExtError('Local bridge is not connected', 'agent_provider_offline', true));
+    }
+
+    const connectionPart = this._connectionId
+      || (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2, 10));
+    const id = `ext_${connectionPart}_${++this._extRequestCounter}_${Date.now()}`;
+    const timeoutMs = method === 'delegate.start'
+      ? DELEGATION_START_REQUEST_TIMEOUT_MS
+      : this._boundedExtTimeout(options.timeout);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const pending = this._extPending.get(id);
+        if (!pending) return;
+        this._extPending.delete(id);
+        reject(this._makeExtError('Extension request timed out', 'ext_request_timeout', true));
+      }, timeoutMs);
+
+      this._extPending.set(id, {
+        resolve,
+        reject,
+        timer,
+        socket,
+        method,
+        onEvent: typeof options.onEvent === 'function' ? options.onEvent : null,
+        eventTail: Promise.resolve(),
+        observerError: null,
+      });
+
+      try {
+        this._send({ id, type: 'ext:request', method, payload });
+      } catch (_error) {
+        clearTimeout(timer);
+        this._extPending.delete(id);
+        reject(this._makeExtError('Local bridge send failed', 'bridge_topology_changed', true));
+      }
+    });
+  }
+
+  requestAdapterCompatibility() {
+    if (this._pairingStatus !== 'paired') {
+      return Promise.reject(this._makeExtError(
+        'Extension pairing is not authenticated',
+        'ext_unauthorized',
+        false,
+      ));
+    }
+    return this.sendExtRequest('adapter.compatibility', {}, { timeout: ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS });
+  }
+
+  _handleExtFrame(msg) {
+    if (!msg || (msg.type !== 'ext:event' && msg.type !== 'ext:response') || typeof msg.id !== 'string') {
+      return false;
+    }
+    const pending = this._extPending.get(msg.id);
+    if (!pending || pending.socket !== this._ws) return true;
+
+    if (msg.type === 'ext:event') {
+      if (typeof msg.event !== 'string' || !this._isPlainRecord(msg.payload)) return true;
+      this._appendExtEvent(pending, msg.id, msg.event, msg.payload);
+      return true;
+    }
+
+    const hasPayload = Object.prototype.hasOwnProperty.call(msg, 'payload');
+    const hasError = Object.prototype.hasOwnProperty.call(msg, 'error');
+    if (hasPayload === hasError) return true;
+    if (hasPayload && !this._isPlainRecord(msg.payload)) return true;
+    if (hasError && !this._isPlainRecord(msg.error)) return true;
+    clearTimeout(pending.timer);
+    this._extPending.delete(msg.id);
+    const response = hasPayload
+      ? { hasPayload: true, payload: msg.payload }
+      : {
+          hasPayload: false,
+          error: {
+            code: typeof msg.error.code === 'string' ? msg.error.code : 'invalid_ext_request',
+            message: typeof msg.error.message === 'string' ? msg.error.message : 'Extension request failed',
+            retryable: msg.error.retryable === true,
+          },
+        };
+    this._settleExtResponseAfterEvents(pending, response).catch((error) => {
+      pending.reject(this._makeExtObserverError(error));
+    });
+    return true;
+  }
+
+  _rejectAllExtPending() {
+    for (const [id, pending] of this._extPending) {
+      clearTimeout(pending.timer);
+      this._extPending.delete(id);
+      pending.reject(this._makeExtError(
+        'Bridge topology changed before the extension request completed',
+        'bridge_topology_changed',
+        true,
+      ));
+    }
+  }
+
+  _rejectExtPendingForSocket(socket) {
+    for (const [id, pending] of this._extPending) {
+      if (pending.socket !== socket) continue;
+      clearTimeout(pending.timer);
+      this._extPending.delete(id);
+      pending.reject(this._makeExtError(
+        'Bridge topology changed before the extension request completed',
+        'bridge_topology_changed',
+        true,
+      ));
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -325,6 +866,7 @@ class MCPBridgeClient {
 
   _startPing() {
     this._stopPing();
+    if (this._delegationHeartbeatOwners.size > 0) return;
     this._pingTimer = setInterval(() => {
       if (this._ws && this._ws.readyState === WebSocket.OPEN) {
         this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now() }));
@@ -339,9 +881,225 @@ class MCPBridgeClient {
     }
   }
 
+  _isValidDelegationHeartbeatOwner(ownerId) {
+    return typeof ownerId === 'string'
+      && ownerId.length > 0
+      && ownerId.length <= 200
+      && ownerId.trim() === ownerId;
+  }
+
+  _isValidDelegationHeartbeatNonce(nonce) {
+    return typeof nonce === 'string'
+      && nonce.length >= DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH
+      && nonce.length <= DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH
+      && DELEGATION_HEARTBEAT_NONCE_PATTERN.test(nonce);
+  }
+
+  _mintDelegationHeartbeatNonce() {
+    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID().replace(/-/g, '');
+    }
+    this._delegationHeartbeatNonceCounter += 1;
+    const entropy = Math.random().toString(36).slice(2);
+    return `${Date.now().toString(36)}_${this._delegationHeartbeatNonceCounter.toString(36)}_${entropy}`
+      .padEnd(DELEGATION_HEARTBEAT_NONCE_MIN_LENGTH, '0')
+      .slice(0, DELEGATION_HEARTBEAT_NONCE_MAX_LENGTH);
+  }
+
+  getDelegationConnectionSnapshot() {
+    return {
+      state: this._delegationConnectionState,
+      consecutiveMisses: this._delegationHeartbeatConsecutiveMisses,
+      lastAckAt: this._delegationHeartbeatLastAckAt,
+    };
+  }
+
+  addDelegationConnectionObserver(observer) {
+    if (typeof observer !== 'function') {
+      throw new TypeError('Delegation connection observer must be a function');
+    }
+    this._delegationConnectionObservers.push(observer);
+    let removed = false;
+    return () => {
+      if (removed) return false;
+      removed = true;
+      const index = this._delegationConnectionObservers.indexOf(observer);
+      if (index === -1) return false;
+      this._delegationConnectionObservers.splice(index, 1);
+      return true;
+    };
+  }
+
+  _notifyDelegationConnectionObservers() {
+    const snapshot = Object.freeze(this.getDelegationConnectionSnapshot());
+    for (const observer of [...this._delegationConnectionObservers]) {
+      try {
+        const pending = observer(snapshot);
+        if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+      } catch (_error) { /* observer isolation */ }
+    }
+  }
+
+  retainDelegationHeartbeat(ownerId) {
+    if (!this._isValidDelegationHeartbeatOwner(ownerId)) return false;
+    if (this._delegationHeartbeatOwners.has(ownerId)) return false;
+    const wasEmpty = this._delegationHeartbeatOwners.size === 0;
+    this._delegationHeartbeatOwners.add(ownerId);
+    if (wasEmpty) {
+      this._stopPing();
+      this._delegationHeartbeatNonce = null;
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = this._connected ? 'connected' : 'disconnected';
+      this._startDelegationHeartbeat();
+      this._persistState();
+    }
+    return true;
+  }
+
+  releaseDelegationHeartbeat(ownerId) {
+    if (!this._isValidDelegationHeartbeatOwner(ownerId)) return false;
+    if (!this._delegationHeartbeatOwners.delete(ownerId)) return false;
+    if (this._delegationHeartbeatOwners.size === 0) {
+      this._stopDelegationHeartbeat();
+      this._delegationHeartbeatConsecutiveMisses = 0;
+      this._delegationConnectionState = this._connected ? 'connected' : 'disconnected';
+      if (this._connected) this._startPing();
+      this._persistState();
+    }
+    return true;
+  }
+
+  _startDelegationHeartbeat() {
+    if (this._delegationHeartbeatTimer || this._delegationHeartbeatOwners.size === 0) return;
+    this._delegationHeartbeatTimer = setInterval(
+      () => this._delegationHeartbeatTick(),
+      DELEGATION_HEARTBEAT_INTERVAL_MS,
+    );
+  }
+
+  _stopDelegationHeartbeat() {
+    if (this._delegationHeartbeatTimer) {
+      clearInterval(this._delegationHeartbeatTimer);
+      this._delegationHeartbeatTimer = null;
+    }
+    this._delegationHeartbeatNonce = null;
+  }
+
+  _delegationHeartbeatTick() {
+    if (this._delegationHeartbeatOwners.size === 0) {
+      this._stopDelegationHeartbeat();
+      return;
+    }
+    if (this._delegationHeartbeatNonce !== null) {
+      this._delegationHeartbeatConsecutiveMisses += 1;
+      this._delegationHeartbeatNonce = null;
+      if (this._delegationHeartbeatConsecutiveMisses >= DELEGATION_HEARTBEAT_MISS_LIMIT) {
+        if (this._delegationConnectionState !== 'disconnected') {
+          this._delegationConnectionState = 'disconnected';
+          this._notifyDelegationConnectionObservers();
+        }
+      }
+      this._persistState();
+    }
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+
+    const nonce = this._mintDelegationHeartbeatNonce();
+    if (!this._isValidDelegationHeartbeatNonce(nonce)) return;
+    this._delegationHeartbeatNonce = nonce;
+    try {
+      this._ws.send(JSON.stringify({ type: 'mcp:ping', ts: Date.now(), nonce }));
+    } catch (_error) {
+      // The outstanding nonce is counted as missed on the next heartbeat.
+    }
+  }
+
+  _handleDelegationHeartbeatPong(msg) {
+    if (!this._isPlainRecord(msg)) return;
+    const keys = Object.keys(msg).sort();
+    if (keys.length !== 3 || keys[0] !== 'nonce' || keys[1] !== 'ts' || keys[2] !== 'type') return;
+    if (msg.type !== 'mcp:pong' || !Number.isSafeInteger(msg.ts) || msg.ts < 0) return;
+    if (!this._isValidDelegationHeartbeatNonce(msg.nonce)) return;
+    if (msg.nonce !== this._delegationHeartbeatNonce) return;
+
+    this._delegationHeartbeatNonce = null;
+    this._delegationHeartbeatConsecutiveMisses = 0;
+    this._delegationHeartbeatLastAckAt = Date.now();
+    const wasDisconnected = this._delegationConnectionState !== 'connected';
+    this._delegationConnectionState = 'connected';
+    if (wasDisconnected) this._notifyDelegationConnectionObservers();
+    this._persistState();
+  }
+
   // --------------------------------------------------------------------------
   // Message handling
   // --------------------------------------------------------------------------
+
+  setInboundAuthorityReady(ready) {
+    this._inboundAuthorityReady = ready === true;
+    return this._inboundAuthorityReady;
+  }
+
+  isInboundAuthorityReady() {
+    return this._inboundAuthorityReady === true;
+  }
+
+  setDelegationAuthorityReady(ready) {
+    this._delegationAuthorityReady = ready === true;
+    return this._delegationAuthorityReady;
+  }
+
+  isDelegationAuthorityReady() {
+    return this._delegationAuthorityReady === true;
+  }
+
+  _isDelegationScopedInbound(type, payload) {
+    if (type === 'agent:register'
+        && payload
+        && typeof payload === 'object'
+        && Object.prototype.hasOwnProperty.call(payload, 'delegationId')) {
+      return true;
+    }
+    const agentId = payload
+      && typeof payload === 'object'
+      && Object.prototype.hasOwnProperty.call(payload, 'agentId')
+      && typeof payload.agentId === 'string'
+      ? payload.agentId
+      : null;
+    if (!agentId) return false;
+    const registry = globalThis.fsbAgentRegistryInstance;
+    if (!registry || typeof registry.listDelegationMappings !== 'function') return true;
+    let mappings;
+    try {
+      mappings = registry.listDelegationMappings();
+    } catch (_error) {
+      return true;
+    }
+    if (!Array.isArray(mappings) || mappings.length > 64) return true;
+    const delegationIds = new Set();
+    const agentIds = new Set();
+    let mapped = false;
+    for (const row of mappings) {
+      if (!row
+          || typeof row !== 'object'
+          || Array.isArray(row)
+          || Object.keys(row).length !== 2
+          || !Object.prototype.hasOwnProperty.call(row, 'delegationId')
+          || !Object.prototype.hasOwnProperty.call(row, 'agentId')
+          || typeof row.delegationId !== 'string'
+          || !MCP_DELEGATION_ID_PATTERN.test(row.delegationId)
+          || typeof row.agentId !== 'string'
+          || row.agentId.length === 0
+          || row.agentId.length > 128
+          || delegationIds.has(row.delegationId)
+          || agentIds.has(row.agentId)) {
+        return true;
+      }
+      delegationIds.add(row.delegationId);
+      agentIds.add(row.agentId);
+      if (row.agentId === agentId) mapped = true;
+    }
+    return mapped;
+  }
 
   _send(data) {
     if (this._ws && this._ws.readyState === WebSocket.OPEN) {
@@ -369,8 +1127,17 @@ class MCPBridgeClient {
       return;
     }
 
-    // Ignore pong responses
-    if (msg.type === 'mcp:pong') return;
+    // Reverse-channel responses/events are correlated independently from
+    // inbound MCP commands and must never reach the MCP dispatcher.
+    if (msg && (msg.type === 'ext:event' || msg.type === 'ext:response')) {
+      this._handleExtFrame(msg);
+      return;
+    }
+
+    if (msg.type === 'mcp:pong') {
+      this._handleDelegationHeartbeatPong(msg);
+      return;
+    }
 
     const { id, type, payload } = msg;
     if (!id || !type) return;
@@ -388,7 +1155,26 @@ class MCPBridgeClient {
    * Returns the result payload.
    */
   async _routeMessage(type, payload, id) {
+    if (type !== 'system:client-inventory' && this._inboundAuthorityReady !== true) {
+      throw new Error('mcp_authority_not_ready');
+    }
+    if (this._delegationAuthorityReady !== true
+        && this._isDelegationScopedInbound(type, payload)) {
+      throw new Error('delegation_authority_not_ready');
+    }
     switch (type) {
+      case 'system:client-inventory': {
+        if (!isPlainMcpClientInventory(payload && payload.platforms)) {
+          throw new Error('Invalid MCP client inventory payload');
+        }
+        const providers = globalThis.FsbMcpAgentProviders;
+        if (!providers || typeof providers.replaceInstalled !== 'function') {
+          throw new Error('MCP client inventory storage unavailable');
+        }
+        await providers.replaceInstalled(payload.platforms);
+        return { accepted: true };
+      }
+
       // Phase 240/246 agent lifecycle handshake. Server opens every connection
       // with agent:register; without these cases the switch's default throws
       // "Unknown MCP message type" and every subsequent tool rejects.
@@ -422,6 +1208,23 @@ class MCPBridgeClient {
 
       case 'mcp:end-visual-session':
         return this._handleEndVisualSession(payload);
+
+      case 'mcp:task-status': {
+        const taskParams = (payload.params && typeof payload.params === 'object')
+          ? { ...payload.params }
+          : {};
+        // The dispatcher ownership gate consumes camelCase tabId while the
+        // public MCP schema remains snake_case tab_id.
+        if (Number.isFinite(taskParams.tab_id) && !Number.isFinite(taskParams.tabId)) {
+          taskParams.tabId = taskParams.tab_id;
+        }
+        return dispatchMcpToolRoute({
+          tool: payload.tool,
+          params: taskParams,
+          client: this,
+          payload
+        });
+      }
 
       case 'mcp:execute-action':
         return this._handleExecuteAction(payload);
@@ -701,6 +1504,75 @@ class MCPBridgeClient {
     }
   }
 
+  /**
+   * Session-recorder tap at the bridge level so content- and cdp-routed
+   * action tools are recorded too -- the dispatcher choke points only ever
+   * see background-routed actions (executeFn's default branch sends straight
+   * to the content script). The target-origin lookup is best-effort and its
+   * failure only drops the diagnostic record; recording remains fire-and-forget,
+   * whole-body guarded, and never alters the action result. Placed ABOVE
+   * _handleExecuteAction so the 4500-char source gates
+   * in tests/action-tool-agent-scoped.test.js and
+   * tests/ownership-error-codes.test.js keep resolveAgentTabOrError in view.
+   */
+  async _resolveMcpSessionRecordTarget(resolvedTabId, knownUrl) {
+    const unresolved = { targetOriginResolved: false, spreadsheetTarget: false };
+    try {
+      if (!Number.isFinite(resolvedTabId)) return unresolved;
+      let targetUrl = typeof knownUrl === 'string' && knownUrl.length > 0 ? knownUrl : '';
+      if (!targetUrl) {
+        const tab = await chrome.tabs.get(resolvedTabId);
+        targetUrl = (tab && (tab.url || tab.pendingUrl)) || '';
+      }
+      if (!targetUrl) return unresolved;
+      return {
+        targetOriginResolved: true,
+        spreadsheetTarget: isMcpGoogleSheetsDocumentUrl(targetUrl)
+      };
+    } catch (_e) {
+      return unresolved;
+    }
+  }
+
+  _recordMcpSessionAction(payload, response, resolvedTabId, targetContext) {
+    try {
+      if (typeof globalThis === 'undefined' ||
+          !globalThis.fsbMcpSessionRecorder ||
+          typeof globalThis.fsbMcpSessionRecorder.recordAction !== 'function') {
+        return;
+      }
+      let sessionRecordEntry = {
+        client: (typeof globalThis.resolveMcpClientLabel === 'function')
+          ? globalThis.resolveMcpClientLabel(payload)
+          : null,
+        tool: payload && payload.tool,
+        params: (payload && payload.params) || {},
+        payload: payload,
+        response: response,
+        success: !(response && typeof response === 'object' && response.success === false),
+        tabId: Number.isFinite(resolvedTabId) ? resolvedTabId : null,
+        requireTargetOrigin: true,
+        targetOriginResolved: targetContext && targetContext.targetOriginResolved === true,
+        spreadsheetTarget: targetContext && targetContext.spreadsheetTarget === true
+      };
+      const spreadsheetRedactor = globalThis.FsbSpreadsheetRecordRedaction;
+      const spreadsheetTool = sessionRecordEntry.spreadsheetTarget === true ||
+        isMcpSpreadsheetRecord(payload, response);
+      const unresolvedRecordTarget = sessionRecordEntry.targetOriginResolved !== true;
+      if (!spreadsheetRedactor || typeof spreadsheetRedactor.recordSafely !== 'function') {
+        if (!spreadsheetTool && !unresolvedRecordTarget) {
+          globalThis.fsbMcpSessionRecorder.recordAction(sessionRecordEntry);
+        }
+      } else {
+        spreadsheetRedactor.recordSafely(
+          globalThis.fsbMcpSessionRecorder,
+          'recordAction',
+          sessionRecordEntry
+        );
+      }
+    } catch (_e) { /* never let session recording break the action */ }
+  }
+
   async _handleExecuteAction(payload) {
     // Phase 246 D-13: resolver replaces _getActiveTab; legacy:* surfaces fall
     // through to active-tab via the resolver's first-line branch.
@@ -757,6 +1629,8 @@ class MCPBridgeClient {
       if (dispatched && dispatched.success === true) {
         const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
         if (resolvedTabId !== null) {
+          const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
+          this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
           await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
           // Phase 257 -- explicit completion. When the caller marks this
           // bootstrap call as the final action of the task, clear the visual
@@ -782,6 +1656,8 @@ class MCPBridgeClient {
         if (dispatched && dispatched.success === true) {
           const resolvedTabId = Number.isFinite(dispatched && dispatched.tabId) ? dispatched.tabId : null;
           if (resolvedTabId !== null) {
+            const recordTarget = await this._resolveMcpSessionRecordTarget(resolvedTabId, dispatched.url);
+            this._recordMcpSessionAction(payload, dispatched, resolvedTabId, recordTarget);
             await this._recordVisualSessionTickIfPresent(resolvedTabId, agentId, payload);
             await this._clearVisualSessionIfFinal(resolvedTabId, agentId, payload);
           }
@@ -833,6 +1709,11 @@ class MCPBridgeClient {
       });
     };
 
+    // Inspect the resolver-approved target as close as possible to execution.
+    // A failed lookup resolves to an unresolved recorder context and never
+    // prevents the browser action from running.
+    const recordTarget = await this._resolveMcpSessionRecordTarget(tabId);
+
     let actionResult;
     if (typeof wrapWithChangeReport === 'function' && !usesDispatcherSyntheticChangeReport) {
       actionResult = await wrapWithChangeReport({
@@ -844,6 +1725,11 @@ class MCPBridgeClient {
     } else {
       actionResult = await executeFn();
     }
+
+    // Session-recorder action tap: all three routes (content, cdp,
+    // background) converge here with the resolver-approved tab identity.
+    // Resolver-failure returns above record nothing (nothing executed).
+    this._recordMcpSessionAction(payload, actionResult, tabId, recordTarget);
 
     // Phase 257 -- explicit completion. When the caller marks this action as
     // the final action of the task, clear the visual session immediately
@@ -1924,4 +2810,7 @@ class MCPBridgeClient {
 }
 
 // Global instance
-const mcpBridgeClient = new MCPBridgeClient();
+const mcpBridgeClient = new MCPBridgeClient({
+  inboundAuthorityReady: false,
+  delegationAuthorityReady: false,
+});

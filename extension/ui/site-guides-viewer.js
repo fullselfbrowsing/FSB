@@ -44,7 +44,7 @@
       });
     }
 
-    // Wire detail toggle (Overview / Full Detail)
+    // Wire detail toggle (Overview / Expanded)
     var toggleContainer = document.getElementById('knowledgeDetailToggle');
     if (toggleContainer) {
       toggleContainer.addEventListener('click', function (e) {

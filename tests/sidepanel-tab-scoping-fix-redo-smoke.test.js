@@ -251,12 +251,14 @@ function runPart3() {
     isRunning: false,
     livenessFailCount: 0,
     livenessInterval: null,
+    _delegationUiState: { snapshot: null },
     sendBtn: { disabled: false, classList: { add: function () {}, remove: function () {} } },
     stopBtn: { classList: { add: function () {}, remove: function () {} } },
     statusDot: { classList: { add: function () {}, remove: function () {} } },
     statusText: { textContent: '' },
     chatInput: { textContent: '' },
     updateSendButtonState: function () {},
+    _syncDelegationStopControls: function () {},
     checkSessionLiveness: function () {},
     clearInterval: function () {},
     setInterval: function () { return 1; }
@@ -267,7 +269,8 @@ function runPart3() {
       'tabId', 'sessionId',
       '_tabRunningMap', '_activeTabIdSnapshot', 'currentSessionId', 'isRunning', 'livenessFailCount', 'livenessInterval',
       'sendBtn', 'stopBtn', 'statusDot', 'statusText', 'chatInput',
-      'updateSendButtonState', 'checkSessionLiveness', 'clearInterval', 'setInterval',
+      'updateSendButtonState', '_syncDelegationStopControls', '_delegationUiState',
+      'checkSessionLiveness', 'clearInterval', 'setInterval',
       '_getTabRunningEntry',
       // Return a tuple of mutated locals so the test can inspect them.
       setRunningBody + ' ; return { _tabRunningMap: _tabRunningMap, isRunning: isRunning, currentSessionId: currentSessionId };'
@@ -285,7 +288,8 @@ function runPart3() {
       sandboxState.livenessFailCount, sandboxState.livenessInterval,
       sandboxState.sendBtn, sandboxState.stopBtn, sandboxState.statusDot,
       sandboxState.statusText, sandboxState.chatInput,
-      sandboxState.updateSendButtonState, sandboxState.checkSessionLiveness,
+      sandboxState.updateSendButtonState, sandboxState._syncDelegationStopControls,
+      sandboxState._delegationUiState, sandboxState.checkSessionLiveness,
       sandboxState.clearInterval, sandboxState.setInterval,
       _getTabRunningEntry
     );

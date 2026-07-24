@@ -30,6 +30,50 @@ const path = require('path');
 const util = require('util');
 const vm = require('vm');
 
+const delegationProviders = require(path.join(
+  __dirname, '..', 'extension', 'utils', 'delegation-providers.js'
+));
+const SECTION_ARGUMENT_INDEX = process.argv.indexOf('--section');
+const SELECTED_SECTION = SECTION_ARGUMENT_INDEX < 0
+  ? null
+  : process.argv[SECTION_ARGUMENT_INDEX + 1] || '';
+if (SECTION_ARGUMENT_INDEX >= 0 && !SELECTED_SECTION) {
+  throw new Error('--section requires a value');
+}
+if (SELECTED_SECTION !== null
+    && SELECTED_SECTION !== 'accepted-identity'
+    && SELECTED_SECTION !== 'codex-start-authority') {
+  throw new Error(`unknown section: ${SELECTED_SECTION}`);
+}
+
+const ACCEPTED_IDENTITIES = Object.freeze({
+  'claude-code': Object.freeze({
+    providerId: 'claude-code',
+    label: 'Claude Code',
+    profileVersion: '2.1.177',
+    authState: 'unknown',
+    billingKind: 'subscription'
+  }),
+  opencode: Object.freeze({
+    providerId: 'opencode',
+    label: 'OpenCode',
+    profileVersion: '1.14.25',
+    authState: 'unknown',
+    billingKind: 'unknown'
+  }),
+  codex: Object.freeze({
+    providerId: 'codex',
+    label: 'Codex',
+    profileVersion: '0.142.5',
+    authState: 'chatgpt',
+    billingKind: 'subscription'
+  })
+});
+
+function acceptedIdentity(providerId = 'claude-code', overrides = {}) {
+  return { ...ACCEPTED_IDENTITIES[providerId], ...overrides };
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -60,6 +104,20 @@ function assertDeepEqual(actual, expected, msg) {
 function assertNoSecrets(value, msg) {
   const serialized = JSON.stringify(value || {});
   assert(!/password|cardNumber|cvv|apiKey/i.test(serialized), msg);
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks() {
+  for (let index = 0; index < 20; index += 1) await Promise.resolve();
 }
 
 function createStorageArea(initial = {}) {
@@ -231,6 +289,7 @@ function buildClientHarness(options = {}) {
     setInterval: timers.setInterval,
     clearInterval: timers.clearInterval,
     dispatchMcpMessageRoute: options.dispatchMcpMessageRoute || (async () => ({ success: true })),
+    dispatchMcpToolRoute: options.dispatchMcpToolRoute || (async () => ({ success: true })),
     globalThis: {}
   };
   context.globalThis = context;
@@ -246,6 +305,10 @@ this.__dispatchTest = {
 };
 `;
   vm.runInNewContext(`${source}\n${footer}`, context, { filename: 'ws/mcp-bridge-client.js' });
+  if (options.inboundAuthorityReady !== false) {
+    context.__dispatchTest.mcpBridgeClient.setInboundAuthorityReady(true);
+    context.__dispatchTest.mcpBridgeClient.setDelegationAuthorityReady(true);
+  }
 
   return {
     chrome,
@@ -383,14 +446,44 @@ async function runAgentActionDeprecationCase() {
   assertEqual(dispatchCalls.length, 0, 'no agent action reaches the dispatch path');
 }
 
+async function runTaskStatusRouteCase() {
+  console.log('\n--- A7: mcp:task-status preserves agent ownership context ---');
+
+  const routeCalls = [];
+  const harness = buildClientHarness({
+    async dispatchMcpToolRoute(input) {
+      routeCalls.push(input);
+      return { success: true, tool: input.tool, status: 'completed' };
+    }
+  });
+  const client = harness.exports.mcpBridgeClient;
+  const payload = {
+    tool: 'complete_task',
+    params: { summary: 'Finished locally', tab_id: 22 },
+    agentId: 'agent-task-status',
+    ownershipToken: 'owner-token-22',
+    connectionId: 'connection-task-status'
+  };
+
+  const result = await client._routeMessage('mcp:task-status', payload, 'msg-task-status');
+  assertEqual(routeCalls.length, 1, 'task status dispatches through the direct tool route exactly once');
+  assertEqual(routeCalls[0].tool, 'complete_task', 'task status preserves the public lifecycle tool name');
+  assertEqual(routeCalls[0].params.tab_id, 22, 'public snake_case tab_id remains available to the recorder');
+  assertEqual(routeCalls[0].params.tabId, 22, 'bridge adds camelCase tabId for the ownership gate');
+  assertEqual(routeCalls[0].payload.agentId, 'agent-task-status', 'agent identity remains top-level for the ownership gate');
+  assertEqual(routeCalls[0].payload.ownershipToken, 'owner-token-22', 'ownership token remains top-level for the ownership gate');
+  assertEqual(routeCalls[0].client, client, 'task status dispatch carries the active bridge client');
+  assertDeepEqual(result, { success: true, tool: 'complete_task', status: 'completed' },
+    'task status response passes through unchanged');
+}
+
 // ---------------------------------------------------------------------------
 // Part B -- fsbDispatchInternalMessage wrapper (extracted from background.js)
 // ---------------------------------------------------------------------------
 
-function extractWrapperSource(backgroundSource) {
-  const anchor = 'function fsbDispatchInternalMessage(request) {';
+function extractNamedFunctionSource(backgroundSource, anchor) {
   const start = backgroundSource.indexOf(anchor);
-  if (start === -1) throw new Error('fsbDispatchInternalMessage anchor not found in background.js');
+  if (start === -1) throw new Error(`${anchor} not found in background.js`);
   let depth = 0;
   for (let i = start + anchor.length - 1; i < backgroundSource.length; i++) {
     const ch = backgroundSource[i];
@@ -400,7 +493,674 @@ function extractWrapperSource(backgroundSource) {
       if (depth === 0) return backgroundSource.slice(start, i + 1);
     }
   }
-  throw new Error('Unbalanced braces while extracting fsbDispatchInternalMessage');
+  throw new Error(`Unbalanced braces while extracting ${anchor}`);
+}
+
+function extractWrapperSource(backgroundSource) {
+  return extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbDispatchInternalMessage(request) {'
+  );
+}
+
+function extractDelegationCompositionSource(backgroundSource) {
+  const startMarker = 'let fsbDelegationBootPromise = null;';
+  const endMarker = '\nfunction findActiveAutomationSessionForTab(tabId) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('delegation composition extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function extractCompatibilityCompositionSource(backgroundSource) {
+  const startMarker = 'let fsbMcpCompatibilityRefreshPromise = null;';
+  const endMarker = '\nfunction armMcpBridge(reason) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('compatibility composition extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function buildCompatibilityRefreshHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractCompatibilityCompositionSource(backgroundSource);
+  const calls = [];
+  let pairingStatus = options.pairingStatus || 'paired';
+  let pairingObserver = null;
+  let cachedSnapshot = Object.prototype.hasOwnProperty.call(options, 'cachedSnapshot')
+    ? options.cachedSnapshot
+    : {
+        schemaVersion: 1,
+        checkedAt: 100,
+        adapters: [{
+          adapterId: 'claude-code',
+          displayLabel: 'Claude Code',
+          status: 'supported',
+          reason: 'within_tested_range'
+        }]
+      };
+  const clients = options.clients || {
+    'claude-code': {
+      id: 'claude-code',
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+    }
+  };
+  const providers = {
+    COMPATIBILITY_MAX_AGE_MS: 15 * 60 * 1000,
+    validateCompatibilitySnapshot(value) {
+      calls.push(['validate', toPlainObject(value)]);
+      if (value === null || value === undefined || options.rejectValidation) return null;
+      return value;
+    },
+    async replaceCompatibility(value) {
+      calls.push(['replace:start', toPlainObject(value)]);
+      if (options.replaceGate) await options.replaceGate.promise;
+      if (options.rejectReplace) throw new Error('storage rejected');
+      cachedSnapshot = value;
+      calls.push(['replace:done']);
+      return { compatibility: value };
+    },
+    async read() {
+      calls.push(['read']);
+      return cachedSnapshot ? { compatibility: cachedSnapshot } : {};
+    },
+    async getMergedClients(liveRecords) {
+      calls.push(['merge', toPlainObject(liveRecords)]);
+      return clients;
+    }
+  };
+  const bridge = {
+    getState() { return { pairingStatus }; },
+    requestAdapterCompatibility() {
+      calls.push(['request']);
+      if (typeof options.requestCompatibility === 'function') {
+        return options.requestCompatibility();
+      }
+      if (options.rejectRequest) return Promise.reject(new Error('bridge unavailable'));
+      return Promise.resolve(options.response || {
+        schemaVersion: 1,
+        checkedAt: 200,
+        adapters: [{
+          adapterId: 'claude-code',
+          displayLabel: 'Claude Code',
+          status: 'supported',
+          reason: 'within_tested_range'
+        }]
+      });
+    },
+    addPairingStatusObserver(observer) {
+      calls.push(['observe-pairing']);
+      pairingObserver = observer;
+      return () => {};
+    }
+  };
+  const registry = {
+    listAgents() {
+      calls.push(['listAgents']);
+      return [{ agentId: 'agent_fixture', clientInfo: { name: 'Claude Code' } }];
+    }
+  };
+  const context = {
+    mcpBridgeClient: bridge,
+    FsbMcpAgentProviders: providers,
+    FsbDelegationProviders: delegationProviders,
+    fsbAgentRegistryInstance: registry,
+    Promise,
+    Object,
+    Array,
+    Number,
+    Date,
+    Error,
+    console
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\n`
+      + 'this.__readCachedClients = typeof fsbReadCachedMcpClients === \'function\' '
+      + '? fsbReadCachedMcpClients : null;\n'
+      + 'this.__refreshCompatibility = fsbRefreshMcpCompatibility;',
+    context,
+    { filename: 'background.js#compatibility-refresh' }
+  );
+  return {
+    readCached: context.__readCachedClients,
+    refresh: context.__refreshCompatibility,
+    calls,
+    clients,
+    get pairingObserver() { return pairingObserver; },
+    setPairingStatus(value) { pairingStatus = value; }
+  };
+}
+
+function buildMcpClientsRuntimeHarness({ readCachedImpl, refreshImpl }) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
+  const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('runtime handler extraction markers missing');
+  const handlerSource = backgroundSource.slice(start, end);
+  const context = {
+    chrome: { runtime: { id: 'mcp-clients-runtime-extension' } },
+    armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
+    automationLogger: { logComm() {} },
+    fsbReadCachedMcpClients: readCachedImpl,
+    fsbRefreshMcpCompatibility: refreshImpl,
+    Promise,
+    Object,
+    console
+  };
+  context.globalThis = context;
+  vm.runInNewContext(`${handlerSource}\nthis.__handler = fsbHandleRuntimeMessage;`, context, {
+    filename: 'background.js#getMcpClients'
+  });
+  return context.__handler;
+}
+
+function buildDelegationCommandHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const preflight = require(path.join(__dirname, '..', 'extension', 'utils', 'delegation-preflight.js'));
+  const calls = [];
+  let inboundAuthorityReady = true;
+  let delegationAuthorityReady = true;
+  const providerConfig = {
+    providerKind: 'agent',
+    agentProviderId: 'claude-code',
+    modelProvider: 'xai',
+    ...(options.providerConfig || {})
+  };
+  const consent = {
+    async getTrusted(providerId) {
+      calls.push(['getTrusted', providerId]);
+      return options.trusted === true;
+    },
+    async issueChallenge(input) {
+      calls.push(['issueChallenge', toPlainObject(input)]);
+      return { ok: true, challengeId: 'dch_fixture', expiresAt: 12345 };
+    },
+    async consumeChallenge(input) {
+      calls.push(['consumeChallenge', toPlainObject(input)]);
+      return {
+        ok: true,
+        acceptedIdentity: acceptedIdentity(input.acceptedIdentity.providerId)
+      };
+    },
+    async writeTrustFromChallenge(input) {
+      calls.push(['writeTrustFromChallenge', toPlainObject(input)]);
+      return options.writeTrustResult || {
+        ok: true,
+        providerId: input.acceptedIdentity.providerId,
+        trusted: true
+      };
+    },
+    async clearTrusted(input) {
+      calls.push(['clearTrusted', toPlainObject(input)]);
+      return options.clearTrustResult || { ok: true, providerId: input.providerId, trusted: false };
+    }
+  };
+  const context = {
+    chrome: {
+      storage: { local: { async get() { return { ...providerConfig }; } } },
+      runtime: { async sendMessage() {} },
+      tabs: { async query() { return []; } }
+    },
+    FsbDelegationPreflight: preflight,
+    FsbDelegationProviders: delegationProviders,
+    FsbMcpAgentProviders: {
+      async getMergedClients() {
+        calls.push(['getMergedClients']);
+        return options.compatibilityClients || {
+          'claude-code': {
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+            acceptedIdentity: acceptedIdentity('claude-code')
+          },
+          opencode: {
+            compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+            acceptedIdentity: acceptedIdentity('opencode')
+          }
+        };
+      }
+    },
+    FsbDelegationConsent: consent,
+    FsbDelegationController: { create() { throw new Error('controller must not boot in authority-only cases'); } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: null,
+    bootstrapAgentRegistry: async () => {},
+    mcpBridgeClient: {
+      setInboundAuthorityReady(value) {
+        inboundAuthorityReady = value === true;
+        calls.push(['setInboundAuthorityReady', inboundAuthorityReady]);
+        return inboundAuthorityReady;
+      },
+      isInboundAuthorityReady() { return inboundAuthorityReady; },
+      setDelegationAuthorityReady(value) {
+        delegationAuthorityReady = value === true;
+        calls.push(['setDelegationAuthorityReady', delegationAuthorityReady]);
+        return delegationAuthorityReady;
+      },
+      isDelegationAuthorityReady() { return delegationAuthorityReady; },
+      getState() {
+        return {
+          connected: true,
+          status: 'connected',
+          pairingStatus: 'paired',
+          delegationConnection: { state: 'connected' }
+        };
+      },
+      sendExtRequest(method, payload) {
+        calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+        return Promise.reject(new Error('unexpected transport call'));
+      },
+      addEventObserver() { calls.push(['addEventObserver']); }
+    },
+    crypto: require('node:crypto').webcrypto,
+    TextEncoder,
+    Uint8Array,
+    Map,
+    Set,
+    Object,
+    Array,
+    Promise,
+    Date,
+    Number,
+    Error,
+    JSON,
+    console,
+    setTimeout,
+    clearTimeout
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\nthis.__delegationCommand = fsbHandleDelegationCommand;`,
+    context,
+    { filename: 'background.js#delegation-composition' }
+  );
+  return {
+    command: context.__delegationCommand,
+    calls,
+    setProviderId(providerId) { providerConfig.agentProviderId = providerId; }
+  };
+}
+
+function buildDelegationProviderRoutingHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const calls = [];
+  const startRequests = [];
+  const controllerStarts = [];
+  const acceptedEvents = [];
+  const snapshots = new Map();
+  let controllerCreates = 0;
+  let controllerHydrates = 0;
+  let evidenceReadCount = 0;
+  let bridgeObserver = null;
+  let inboundAuthorityReady = true;
+  let delegationAuthorityReady = true;
+  const providerConfig = {
+    providerKind: 'agent',
+    agentProviderId: options.providerId || 'claude-code',
+    modelProvider: 'xai'
+  };
+  const compatibilityClients = options.compatibilityClients || {
+    'claude-code': {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('claude-code')
+    },
+    opencode: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('opencode')
+    },
+    codex: {
+      compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+      acceptedIdentity: acceptedIdentity('codex')
+    }
+  };
+
+  const hydratedSnapshots = (options.hydratedSnapshots || []).map(toPlainObject);
+  hydratedSnapshots.forEach((snapshot) => snapshots.set(snapshot.delegationId, snapshot));
+  const controller = {
+    async hydrate() {
+      controllerHydrates += 1;
+      return hydratedSnapshots;
+    },
+    subscribe() {},
+    async start(input) {
+      controllerStarts.push(toPlainObject(input));
+      const snapshot = {
+        delegationId: input.delegationId,
+        acceptedIdentity: toPlainObject(input.acceptedIdentity),
+        provider: {
+          id: input.acceptedIdentity.providerId,
+          label: input.acceptedIdentity.label
+        },
+        terminal: null
+      };
+      snapshots.set(input.delegationId, snapshot);
+      return { ok: true, snapshot };
+    },
+    getSnapshot(delegationId) {
+      return snapshots.get(delegationId) || null;
+    },
+    async reconcile(input) {
+      return snapshots.get(input.delegationId) || null;
+    },
+    async refreshActiveTab() {},
+    async acceptEvent(input) {
+      acceptedEvents.push(toPlainObject(input));
+      if (input.event.type === 'terminal') {
+        const snapshot = snapshots.get(input.delegationId);
+        if (snapshot) snapshot.terminal = { code: input.context.terminalCode };
+      }
+      return { ok: true };
+    }
+  };
+  const registry = {
+    listAgents() { return []; },
+    getAgentForDelegation() { return null; },
+    listDelegationMappings() { return []; },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() {}
+  };
+  const consent = {
+    async getTrusted(providerId) {
+      calls.push(['getTrusted', providerId]);
+      if (options.getTrustedGate) await options.getTrustedGate.promise;
+      return options.trusted === true;
+    },
+    async issueChallenge(input) {
+      calls.push(['issueChallenge', toPlainObject(input)]);
+      return { ok: true, challengeId: 'dch_internal', expiresAt: 999999 };
+    },
+    async consumeChallenge(input) {
+      calls.push(['consumeChallenge', toPlainObject(input)]);
+      return options.consumeResult || {
+        ok: true,
+        acceptedIdentity: toPlainObject(input.acceptedIdentity)
+      };
+    },
+    async getTrustedEnvelope() { return false; }
+  };
+  const mcpBridgeClient = {
+    isConnected: true,
+    getState() {
+      return {
+        connected: true,
+        status: 'connected',
+        pairingStatus: 'paired',
+        delegationConnection: { state: 'connected' }
+      };
+    },
+    getDelegationConnectionSnapshot() { return { state: 'connected' }; },
+    setInboundAuthorityReady(value) {
+      inboundAuthorityReady = value === true;
+      return inboundAuthorityReady;
+    },
+    isInboundAuthorityReady() { return inboundAuthorityReady; },
+    setDelegationAuthorityReady(value) {
+      delegationAuthorityReady = value === true;
+      return delegationAuthorityReady;
+    },
+    isDelegationAuthorityReady() { return delegationAuthorityReady; },
+    addEventObserver(observer) { bridgeObserver = observer; },
+    addDelegationConnectionObserver() {},
+    retainDelegationHeartbeat() {},
+    releaseDelegationHeartbeat() {},
+    sendExtRequest(method, payload, requestOptions = {}) {
+      calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+      if (method === 'delegate.status') {
+        return Promise.resolve({
+          generation: 'generation_provider_routing',
+          active: Array.from(snapshots.values())
+            .filter((snapshot) => !snapshot.terminal)
+            .map((snapshot) => ({ delegationId: snapshot.delegationId, state: 'running' })),
+          restartLosses: [],
+          routeLosses: []
+        });
+      }
+      if (method !== 'delegate.start') return Promise.reject(new Error('unexpected transport method'));
+      const final = deferred();
+      startRequests.push({
+        id: `ext_provider_route_${startRequests.length + 1}`,
+        payload: toPlainObject(payload),
+        options: requestOptions,
+        final
+      });
+      return final.promise;
+    }
+  };
+  const context = {
+    chrome: {
+      storage: {
+        local: { async get() { return { ...providerConfig }; } },
+        session: { async get() { return {}; }, async set() {}, async remove() {} }
+      },
+      runtime: { async sendMessage() {} },
+      tabs: { async query() { return []; }, async get() { return null; } }
+    },
+    FsbDelegationProviders: delegationProviders,
+    FsbDelegationPreflight: require(path.join(
+      __dirname, '..', 'extension', 'utils', 'delegation-preflight.js'
+    )),
+    FsbMcpAgentProviders: {
+      async getMergedClients() {
+        calls.push(['getMergedClients']);
+        const sequence = options.identitySequence;
+        if (Array.isArray(sequence) && sequence.length > 0) {
+          const selected = sequence[Math.min(evidenceReadCount, sequence.length - 1)];
+          compatibilityClients[providerConfig.agentProviderId].acceptedIdentity = toPlainObject(selected);
+        }
+        evidenceReadCount += 1;
+        return compatibilityClients;
+      }
+    },
+    FsbDelegationConsent: consent,
+    FsbDelegationController: {
+      create() {
+        controllerCreates += 1;
+        return controller;
+      }
+    },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge() {},
+    mcpBridgeClient,
+    crypto: require('node:crypto').webcrypto,
+    TextEncoder,
+    Uint8Array,
+    Map,
+    Set,
+    Object,
+    Array,
+    Promise,
+    Date,
+    Number,
+    Error,
+    JSON,
+    console,
+    setTimeout,
+    clearTimeout
+  };
+  context.globalThis = context;
+  vm.runInNewContext(
+    `${source}\n`
+      + 'this.__delegationCommand = fsbHandleDelegationCommand;\n'
+      + 'this.__delegationBoot = bootstrapDelegationController;\n'
+      + 'this.__runContexts = typeof fsbDelegationRunContexts !== \'undefined\' '
+      + '? fsbDelegationRunContexts : fsbDelegationProfiles;',
+    context,
+    { filename: 'background.js#delegation-provider-routing' }
+  );
+
+  async function emit(request, eventName, payload) {
+    const bridgeEvent = {
+      id: request.id,
+      method: 'delegate.start',
+      event: eventName,
+      payload
+    };
+    try {
+      if (bridgeObserver) await bridgeObserver(bridgeEvent);
+      if (typeof request.options.onEvent === 'function') {
+        await request.options.onEvent(eventName, payload);
+      }
+      return null;
+    } catch (error) {
+      request.final.reject(error);
+      return error;
+    }
+  }
+
+  return {
+    command: context.__delegationCommand,
+    boot: context.__delegationBoot,
+    contexts: context.__runContexts,
+    calls,
+    startRequests,
+    controllerStarts,
+    acceptedEvents,
+    get controllerCreates() { return controllerCreates; },
+    get controllerHydrates() { return controllerHydrates; },
+    setProviderId(providerId) { providerConfig.agentProviderId = providerId; },
+    async waitForStartRequest(index = 0) {
+      for (let attempt = 0; attempt < 20 && !startRequests[index]; attempt++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      return startRequests[index] || null;
+    },
+    emitStarted(request, payload) { return emit(request, 'delegation.started', payload); },
+    emitDelegationEvent(request, payload) { return emit(request, 'delegation.event', payload); },
+    async resolveFinal(request, value) {
+      request.final.resolve(value);
+      await new Promise((resolve) => setImmediate(resolve));
+      await flushMicrotasks();
+    }
+  };
+}
+
+function extractDriftSettlementSource(backgroundSource) {
+  const startMarker = 'const FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT = 512;';
+  const endMarker = '\nasync function fsbDelegationStartCommand(request) {';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('drift settlement extraction markers missing');
+  return backgroundSource.slice(start, end);
+}
+
+function buildDriftSettlementHarness(options = {}) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDriftSettlementSource(backgroundSource);
+  const driftDiagnostics = require(path.join(
+    __dirname,
+    '..',
+    'extension',
+    'utils',
+    'agent-protocol-drift-diagnostics.js'
+  ));
+  const reporterCalls = [];
+  const settlementCalls = [];
+  const snapshots = new Map();
+  const runContexts = new Map();
+  const controller = {
+    getSnapshot(delegationId) {
+      if (options.snapshotThrows === true) throw new Error('snapshot failed');
+      return snapshots.get(delegationId) || null;
+    },
+    async acceptEvent(input) {
+      settlementCalls.push(toPlainObject(input));
+      if (options.controllerThrows === true) throw new Error('controller rejected terminal');
+      const snapshot = snapshots.get(input.delegationId);
+      if (snapshot) snapshot.terminal = { code: input.context.terminalCode };
+      return { ok: true };
+    }
+  };
+  const diagnostics = options.missingDiagnostics === true ? undefined : {
+    validateAgentProtocolDriftDetail(detail) {
+      if (options.validatorThrows === true) throw new Error('validator failed');
+      return driftDiagnostics.validateAgentProtocolDriftDetail(detail);
+    },
+    reportAgentProtocolDrift(detail) {
+      reporterCalls.push(toPlainObject(detail));
+      if (options.reporterThrows === true) throw new Error('reporter failed');
+      return true;
+    }
+  };
+  const sandbox = {
+    FsbAgentProtocolDriftDiagnostics: diagnostics,
+    fsbDelegationControllerInstance: controller,
+    fsbDelegationRunContexts: runContexts,
+    Date: { now: () => 4242 },
+    Map,
+    Set,
+    Object,
+    Array,
+    Number,
+    Promise,
+    Error
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__settle = fsbSettleDelegationFromFinal;\n`
+      + 'this.__seen = fsbAgentProtocolDriftSeenDelegationIds;\n'
+      + 'this.__seenLimit = FSB_AGENT_PROTOCOL_DRIFT_SEEN_LIMIT;',
+    sandbox,
+    { filename: 'background.js#drift-settlement' }
+  );
+  return {
+    settle: sandbox.__settle,
+    seen: sandbox.__seen,
+    seenLimit: sandbox.__seenLimit,
+    reporterCalls,
+    settlementCalls,
+    profiles: runContexts,
+    activate(delegationId, profileVersion = '2.1.177', providerId = 'claude-code') {
+      const provider = delegationProviders.get(providerId);
+      if (!provider) throw new Error('test provider is invalid');
+      snapshots.set(delegationId, { delegationId, terminal: null });
+      const identity = Object.freeze(acceptedIdentity(providerId, { profileVersion }));
+      runContexts.set(delegationId, Object.freeze({
+        acceptedIdentity: identity,
+        providerId: provider.id,
+        label: provider.label,
+        profileVersion,
+        billingKind: provider.billingKind
+      }));
+    },
+    resetActive(delegationId, profileVersion = '2.1.177', providerId = 'claude-code') {
+      const provider = delegationProviders.get(providerId);
+      if (!provider) throw new Error('test provider is invalid');
+      snapshots.set(delegationId, { delegationId, terminal: null });
+      const identity = Object.freeze(acceptedIdentity(providerId, { profileVersion }));
+      runContexts.set(delegationId, Object.freeze({
+        acceptedIdentity: identity,
+        providerId: provider.id,
+        label: provider.label,
+        profileVersion,
+        billingKind: provider.billingKind
+      }));
+    }
+  };
+}
+
+function driftFinal(detail = {
+  adapterId: 'claude-code',
+  profileVersion: '2.1.177',
+  reason: 'invalid_json',
+  expected: 'bounded_jsonl',
+  eventIndex: 7,
+  issuePaths: ['message.content.0.type']
+}) {
+  return {
+    status: 'failed',
+    terminal: {
+      type: 'diagnostic',
+      code: 'agent_protocol_drift',
+      profileVersion: detail.profileVersion || '2.1.177',
+      detail
+    }
+  };
 }
 
 function buildWrapperHarness(handlerImpl) {
@@ -430,6 +1190,215 @@ function buildWrapperHarness(handlerImpl) {
   );
 
   return { dispatch: context.__wrapper, timers, handlerCalls };
+}
+
+async function runDriftSettlementCases() {
+  console.log('\n--- B0: authoritative drift finals report exactly once ---');
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const delegationId = 'delegation_drift_primary';
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+
+    assertEqual(harness.reporterCalls.length, 1,
+      'first authoritative valid drift final invokes the reporter once');
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
+      expected: 'bounded_jsonl',
+      eventIndex: 7,
+      issuePaths: ['message.content.0.type']
+    }, 'reporter receives only the exact sanitized drift detail');
+    assert(!JSON.stringify(harness.reporterCalls).includes(delegationId),
+      'delegation id never enters diagnostic context');
+    assertEqual(harness.settlementCalls.length, 1,
+      'diagnostic reporting preserves one controller settlement');
+    assertDeepEqual(harness.settlementCalls[0], {
+      delegationId,
+      event: { type: 'terminal', sessionId: null, payload: {} },
+      context: {
+        timestamp: 4242,
+        terminalCode: 'agent_protocol_drift',
+        treeSettled: true,
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
+      }
+    }, 'controller terminal input remains byte-for-shape unchanged');
+    assertEqual(harness.profiles.has(delegationId), false,
+      'profile cleanup still occurs after drift settlement');
+
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.reporterCalls.length, 1,
+      'duplicate final against a terminal snapshot cannot multiply reporting');
+
+    harness.resetActive(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.reporterCalls.length, 1,
+      'replayed final against a refreshed active snapshot remains deduplicated');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    harness.activate('delegation_malformed');
+    await harness.settle('delegation_malformed', driftFinal({
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
+      expected: 'bounded_jsonl',
+      eventIndex: 7,
+      issuePaths: ['shape'],
+      providerOutput: 'prompt=session-token-/private/path'
+    }), null);
+    assertEqual(harness.reporterCalls.length, 0,
+      'malformed or secret-bearing drift detail never reaches the reporter');
+    assertEqual(harness.settlementCalls[0].context.terminalCode, 'agent_protocol_drift',
+      'malformed diagnostic detail cannot alter authoritative terminal settlement');
+
+    harness.activate('delegation_non_drift');
+    await harness.settle('delegation_non_drift', {
+      status: 'failed',
+      terminal: { type: 'diagnostic', code: 'agent_failed' }
+    }, null);
+    assertEqual(harness.reporterCalls.length, 0,
+      'non-drift final never invokes the drift reporter');
+    assertEqual(harness.settlementCalls.at(-1).context.terminalCode, 'agent_failed',
+      'non-drift final retains its existing controller code');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const openCodeId = 'delegation_drift_opencode';
+    harness.activate(openCodeId, '1.14.25', 'opencode');
+    await harness.settle(openCodeId, driftFinal({
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      reason: 'invalid_order',
+      expected: 'known_event_shape',
+      eventIndex: 4097,
+      issuePaths: ['part.state', 'messageID']
+    }), null);
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'opencode',
+      profileVersion: '1.14.25',
+      reason: 'invalid_order',
+      expected: 'known_event_shape',
+      eventIndex: 4097,
+      issuePaths: ['part.state', 'messageID']
+    }, 'matching accepted OpenCode context reports its exact safe detail');
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.providerId, 'opencode',
+      'OpenCode drift terminal retains the accepted provider identity');
+    assertEqual(harness.settlementCalls[0].context.acceptedIdentity.billingKind, 'unknown',
+      'OpenCode drift terminal retains unknown billing');
+
+    for (const [delegationId, detail] of [
+      ['delegation_drift_provider_mismatch', {
+        adapterId: 'claude-code',
+        profileVersion: '1.14.25',
+        reason: 'invalid_json',
+        expected: 'bounded_jsonl',
+        eventIndex: 1,
+        issuePaths: []
+      }],
+      ['delegation_drift_profile_mismatch', {
+        adapterId: 'opencode',
+        profileVersion: '1.14.26',
+        reason: 'invalid_order',
+        expected: 'known_event_shape',
+        eventIndex: 1,
+        issuePaths: []
+      }]
+    ]) {
+      harness.activate(delegationId, '1.14.25', 'opencode');
+      await harness.settle(delegationId, driftFinal(detail), null);
+    }
+    assertEqual(harness.reporterCalls.length, 1,
+      'cross-provider and changed-profile details never report');
+    assertEqual(harness.settlementCalls.length, 3,
+      'diagnostic identity mismatch cannot block authoritative terminal settlement');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    const delegationId = 'delegation_drift_legacy_wire';
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal({
+      adapterId: 'claude-code',
+      expected: 'bounded_jsonl',
+      observed: 'invalid_json'
+    }), null);
+    assertDeepEqual(harness.reporterCalls[0], {
+      adapterId: 'claude-code',
+      profileVersion: '2.1.177',
+      reason: 'invalid_json',
+      expected: 'bounded_jsonl',
+      eventIndex: 1,
+      issuePaths: []
+    }, 'compact MCP drift tuples upgrade to the closed browser detail without raw data');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    for (const delegationId of ['delegation_distinct_a', 'delegation_distinct_b']) {
+      harness.activate(delegationId);
+      await harness.settle(delegationId, driftFinal(), null);
+    }
+    assertEqual(harness.reporterCalls.length, 2,
+      'different delegation ids independently invoke the reporter');
+    assertEqual(harness.seen.size, 2,
+      'exact-once state tracks distinct authoritative delegations');
+  }
+
+  {
+    const harness = buildDriftSettlementHarness();
+    assertEqual(harness.seenLimit, 512, 'seen-id FIFO has the exact 512-entry bound');
+    const ids = Array.from({ length: 513 }, (_, index) => `delegation_fifo_${String(index).padStart(3, '0')}`);
+    for (const delegationId of ids) {
+      harness.activate(delegationId);
+      await harness.settle(delegationId, driftFinal(), null);
+    }
+    assertEqual(harness.seen.size, 512, 'seen-id state never exceeds 512 entries');
+    assertEqual(harness.seen.has(ids[0]), false, 'capacity evicts the oldest inserted delegation id');
+    assertEqual(harness.seen.has(ids[1]), true, 'capacity preserves the next-oldest delegation id');
+    assertEqual(harness.seen.has(ids[512]), true, 'capacity preserves the newest delegation id');
+  }
+
+  for (const [name, options] of [
+    ['missing diagnostics module', { missingDiagnostics: true }],
+    ['throwing validator', { validatorThrows: true }],
+    ['throwing reporter', { reporterThrows: true }]
+  ]) {
+    const harness = buildDriftSettlementHarness(options);
+    const delegationId = `delegation_isolation_${name.replace(/\s+/g, '_')}`;
+    harness.activate(delegationId);
+    await harness.settle(delegationId, driftFinal(), null);
+    assertEqual(harness.settlementCalls.length, 1,
+      `${name} cannot prevent controller settlement`);
+    assertEqual(harness.settlementCalls[0].context.terminalCode, 'agent_protocol_drift',
+      `${name} cannot alter the controller terminal code`);
+  }
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const reportReferences = backgroundSource.match(/fsbReportAgentProtocolDriftOnce\s*\(/g) || [];
+  assertEqual(reportReferences.length, 2,
+    'report helper has one definition and one authoritative final-settlement call site');
+  const connectionObserver = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbObserveDelegationConnection(connection) {'
+  );
+  const snapshotCommand = extractNamedFunctionSource(
+    backgroundSource,
+    'async function fsbDelegationSnapshotCommand(request) {'
+  );
+  assert(!connectionObserver.includes('fsbReportAgentProtocolDriftOnce')
+      && !snapshotCommand.includes('fsbReportAgentProtocolDriftOnce'),
+    'reconnect and panel snapshot/reopen paths cannot report drift');
+
+  const redactorImport = backgroundSource.indexOf("importScripts('utils/redactForLog.js')");
+  const reporterImport = backgroundSource.indexOf("importScripts('utils/agent-protocol-drift-diagnostics.js')");
+  const webSocketImport = backgroundSource.indexOf("importScripts('ws/ws-client.js')");
+  assert(redactorImport >= 0 && redactorImport < reporterImport && reporterImport < webSocketImport,
+    'drift reporter loads after diagnostics/redaction and before final-capable runtime code');
 }
 
 async function runWrapperBehaviorCases() {
@@ -501,6 +1470,1571 @@ async function runWrapperBehaviorCases() {
     assertEqual(result.success, false, 'timeout yields success:false');
     assert(/timed out after 20000ms for action: getFullPaymentMethod/.test(result.error || ''), 'timeout envelope names the timeout and action');
   }
+
+  // B8: the Phase 57 client inventory action uses the same exact async path.
+  {
+    const clients = {
+      cursor: {
+        id: 'cursor', raw: false, displayName: 'Cursor',
+        clicked: null, installed: null, connected: null,
+        live: { agentId: 'agent_cursor', clientInfo: { name: 'Cursor' } }
+      }
+    };
+    const harness = buildWrapperHarness((request, sender, sendResponse) => {
+      assertEqual(request.action, 'getMcpClients', 'inventory wrapper forwards the exact action');
+      Promise.resolve().then(() => sendResponse({ success: true, clients }));
+      return true;
+    });
+    const result = await harness.dispatch({ action: 'getMcpClients' });
+    assertDeepEqual(result, { success: true, clients }, 'same-context inventory response passes through unchanged');
+    assertEqual(harness.handlerCalls[0].sender.fsbInternal, 'mcp-bridge', 'inventory wrapper uses the synthetic MCP bridge sender');
+  }
+}
+
+async function runCompatibilityRefreshCases() {
+  console.log('\n--- B1: Phase 62 bounded compatibility refresh orchestration ---');
+
+  {
+    const harness = buildCompatibilityRefreshHarness({
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 500 }
+        },
+        opencode: {
+          id: 'opencode',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 }
+        },
+        codex: {
+          id: 'codex',
+          compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 1 }
+        }
+      }
+    });
+    const result = await harness.readCached();
+    assertEqual(result.compatibilityExpiresAt, 900_001,
+      'compatibility expiry uses the earliest exact shipped-provider row including Codex');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+      'expiry projection cannot write compatibility or provider selection');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness();
+    assertEqual(typeof harness.readCached, 'function',
+      'background exposes a cache-only merged-client inventory path');
+    if (typeof harness.readCached === 'function') {
+      const result = await harness.readCached();
+      assertDeepEqual(result, {
+        clients: harness.clients,
+        refreshOutcome: 'stale',
+        compatibilityExpiresAt: 900_100
+      },
+        'cache-only inventory projects durable rows without changing the closed outcome');
+      assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
+        'cache-only inventory never requests daemon compatibility');
+      assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+        'cache-only inventory never writes compatibility storage');
+    }
+  }
+
+  {
+    const replaceGate = deferred();
+    const harness = buildCompatibilityRefreshHarness({ replaceGate });
+    const pending = harness.refresh();
+    await flushMicrotasks();
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 1,
+      'fresh paired refresh issues one adapter compatibility request');
+    assertEqual(harness.calls.filter((call) => call[0] === 'validate').length, 1,
+      'daemon response is exact-validated once before replacement');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 1,
+      'validated response enters one durable replacement');
+    assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 0,
+      'merged rows cannot fan out while durable replacement is pending');
+    replaceGate.resolve();
+    const result = await pending;
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'refreshed',
+      compatibilityExpiresAt: 900_100
+    },
+      'durable success returns clients plus the exact refreshed outcome');
+    assert(harness.calls.findIndex((call) => call[0] === 'replace:done')
+        < harness.calls.findIndex((call) => call[0] === 'merge'),
+      'durable replacement completes before merged-client fan-out');
+  }
+
+  {
+    const requestGate = deferred();
+    const harness = buildCompatibilityRefreshHarness({
+      requestCompatibility() { return requestGate.promise; }
+    });
+    const first = harness.refresh();
+    const second = harness.refresh();
+    assertEqual(first, second, 'simultaneous manual/cold refresh callers share one promise');
+    await flushMicrotasks();
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 1,
+      'coalesced callers issue one live compatibility request');
+    requestGate.resolve({
+      schemaVersion: 1,
+      checkedAt: 300,
+      adapters: [{
+        adapterId: 'claude-code', displayLabel: 'Claude Code',
+        status: 'supported', reason: 'within_tested_range'
+      }]
+    });
+    await Promise.all([first, second]);
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ pairingStatus: 'configured' });
+    const result = await harness.refresh();
+    assertDeepEqual(result, {
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+          authState: 'unknown'
+        }
+      },
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
+    }, 'unpaired/offline refresh degrades retained supported compatibility coherently');
+    assertEqual(harness.calls.filter((call) => call[0] === 'request').length, 0,
+      'unpaired refresh never enters reverse-channel transport');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectRequest: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result.clients['claude-code'].compatibility,
+      { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+      'daemon refresh failure degrades fresh retained support to stale evidence');
+    assertEqual(result.refreshOutcome, 'stale',
+      'daemon refresh failure returns the coherent stale outcome');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectValidation: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'unavailable',
+      compatibilityExpiresAt: null
+    },
+      'malformed response with no validated cache returns unavailable rows');
+    assertEqual(harness.calls.filter((call) => call[0] === 'replace:start').length, 0,
+      'malformed response never reaches durable replacement');
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({ rejectReplace: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result, {
+      clients: {
+        'claude-code': {
+          id: 'claude-code',
+          compatibility: { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 },
+          authState: 'unknown'
+        }
+      },
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
+    }, 'storage rejection degrades prior supported cache and reports stale');
+    assertEqual(harness.calls.filter((call) => call[0] === 'merge').length, 1,
+      'storage rejection still returns existing provider rows once');
+  }
+
+  for (const [label, compatibility, expectedCompatibility] of [
+    [
+      'degraded',
+      { status: 'degraded', reason: 'newer_than_tested_range', checkedAt: 100 },
+      { status: 'degraded', reason: 'evidence_stale', checkedAt: 100 }
+    ],
+    [
+      'unsupported',
+      { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 },
+      { status: 'unsupported', reason: 'wrong_major', checkedAt: 100 }
+    ]
+  ]) {
+    const clients = {
+      'claude-code': { id: 'claude-code', compatibility }
+    };
+    const harness = buildCompatibilityRefreshHarness({ clients, rejectRequest: true });
+    const result = await harness.refresh();
+    assertDeepEqual(result.clients['claude-code'].compatibility, expectedCompatibility,
+      `refresh failure safely projects retained ${label} compatibility truth`);
+  }
+
+  {
+    const harness = buildCompatibilityRefreshHarness({
+      cachedSnapshot: null,
+      rejectRequest: true
+    });
+    const result = await harness.refresh();
+    assertDeepEqual(result, {
+      clients: harness.clients,
+      refreshOutcome: 'unavailable',
+      compatibilityExpiresAt: null
+    },
+      'transport failure with no cache returns existing rows as unavailable');
+  }
+
+  {
+    let requests = 0;
+    const harness = buildCompatibilityRefreshHarness({
+      requestCompatibility() {
+        requests++;
+        return Promise.resolve({
+          schemaVersion: 1,
+          checkedAt: 400 + requests,
+          adapters: [{
+            adapterId: 'claude-code', displayLabel: 'Claude Code',
+            status: 'supported', reason: 'within_tested_range'
+          }]
+        });
+      }
+    });
+    assertEqual(typeof harness.pairingObserver, 'function',
+      'background installs one pairing observer for silent cold refresh');
+    harness.pairingObserver('configured');
+    harness.pairingObserver('paired');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 1,
+      'duplicate paired notification cannot multiply a cold-boot request');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 1,
+      'settled duplicate paired notification remains idempotent');
+    harness.pairingObserver('configured');
+    harness.pairingObserver('paired');
+    await flushMicrotasks();
+    assertEqual(requests, 2,
+      'a genuine authenticated reconnect issues exactly one fresh request');
+  }
+
+  {
+    const clients = { cursor: { id: 'cursor' } };
+    let cacheReads = 0;
+    let liveRefreshes = 0;
+    const handler = buildMcpClientsRuntimeHarness({
+      readCachedImpl: async () => {
+        cacheReads++;
+        return { clients, refreshOutcome: 'stale', compatibilityExpiresAt: null };
+      },
+      refreshImpl: async () => {
+        liveRefreshes++;
+        return { clients, refreshOutcome: 'refreshed', compatibilityExpiresAt: null };
+      }
+    });
+    const response = await new Promise((resolve) => {
+      const keepOpen = handler(
+        { action: 'getMcpClients' },
+        { id: 'mcp-clients-runtime-extension' },
+        resolve
+      );
+      assertEqual(keepOpen, true, 'cache-only inventory keeps its runtime channel open');
+    });
+    assertDeepEqual(response, {
+      success: true,
+      clients,
+      refreshOutcome: 'stale',
+      compatibilityExpiresAt: null
+    },
+      'getMcpClients returns cache-only rows plus one closed refresh outcome');
+    assertEqual(cacheReads, 1, 'getMcpClients invokes the cache-only reader once');
+    assertEqual(liveRefreshes, 0, 'getMcpClients cannot invoke live compatibility refresh');
+
+    let refreshResponse = null;
+    const refreshKeepOpen = handler(
+      { action: 'refreshMcpCompatibility' },
+      { id: 'mcp-clients-runtime-extension' },
+      (value) => { refreshResponse = value; }
+    );
+    assertEqual(refreshKeepOpen, true,
+      'explicit compatibility refresh keeps its runtime channel open');
+    await flushMicrotasks();
+    assertDeepEqual(refreshResponse, {
+      success: true,
+      clients,
+      refreshOutcome: 'refreshed',
+      compatibilityExpiresAt: null
+    },
+      'explicit compatibility action returns the live refresh projection');
+    assertEqual(cacheReads, 1, 'explicit live refresh does not re-enter cache-only route dispatch');
+    assertEqual(liveRefreshes, 1, 'explicit compatibility action invokes one live refresh');
+
+    let malformedResponse = null;
+    const malformedKeepOpen = handler(
+      { action: 'refreshMcpCompatibility', extra: true },
+      { id: 'mcp-clients-runtime-extension' },
+      (value) => { malformedResponse = value; }
+    );
+    assertEqual(malformedKeepOpen, false,
+      'compatibility refresh rejects non-exact runtime requests synchronously');
+    assertDeepEqual(malformedResponse, {
+      success: false,
+      error: 'mcp_client_inventory_unavailable'
+    }, 'compatibility refresh rejects unknown request keys with the bounded error');
+    assertEqual(liveRefreshes, 1, 'malformed refresh cannot reach daemon compatibility');
+  }
+}
+
+async function runAgentRegistryBootstrapFailureCase() {
+  console.log('\n--- B2: corrupt registry hydration blocks dependent authority boot ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractNamedFunctionSource(
+    backgroundSource,
+    'async function bootstrapAgentRegistry() {'
+  );
+  const warnings = [];
+  const sandbox = {
+    FsbAgentRegistry: {
+      AgentRegistry: class AgentRegistry {
+        async hydrate() {
+          throw new Error('corrupt registry proof');
+        }
+      }
+    },
+    fsbAgentRegistryInstance: null,
+    rateLimitedWarn(...args) {
+      warnings.push(args);
+    },
+    redactForLog() {
+      return { kind: 'error' };
+    }
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(`${source}\nthis.__bootstrapAgentRegistry = bootstrapAgentRegistry;`, sandbox);
+
+  let rejected = null;
+  try {
+    await sandbox.__bootstrapAgentRegistry();
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'corrupt registry proof',
+    'registry hydration rejection propagates to dependent boot');
+  assertEqual(warnings.length, 1, 'registry hydration rejection is logged once');
+
+  const missingSandbox = {};
+  missingSandbox.globalThis = missingSandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapAgentRegistry = bootstrapAgentRegistry;`,
+    missingSandbox,
+  );
+  rejected = null;
+  try {
+    await missingSandbox.__bootstrapAgentRegistry();
+  } catch (error) {
+    rejected = error;
+  }
+  assertEqual(rejected && rejected.message, 'agent registry dependency is unavailable',
+    'a missing registry module rejects instead of silently booting empty');
+}
+
+async function runDelegationBootQuarantineCase() {
+  console.log('\n--- B3: registry authority quarantines on ledger/mapping disagreement ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const cases = [
+    ['delegation_binding_rejected', 'persisted tab authority has no registry mapping'],
+    ['delegation_ledger_corrupt', 'persisted delegation ledger is corrupt'],
+  ];
+  for (const [code, message] of cases) {
+    const calls = [];
+    let inboundAuthorityReady = true;
+    let delegationAuthorityReady = true;
+    const hydrateError = new Error(message);
+    hydrateError.code = code;
+    const controller = {
+      async hydrate() { throw hydrateError; },
+      subscribe() { calls.push('subscribe'); },
+    };
+    const registry = {
+      getAgentForDelegation() { return null; },
+      listDelegationMappings() { return []; },
+      getDelegationReleaseReceipt() { return null; },
+      quarantineAuthority() { calls.push('quarantine'); },
+    };
+    const sandbox = {
+      bootstrapAgentRegistry: async () => {},
+      FsbDelegationController: { create() { calls.push('create'); return controller; } },
+      FsbDelegationEventStore: {},
+      fsbAgentRegistryInstance: registry,
+      mcpBridgeClient: {
+        setInboundAuthorityReady(value) {
+          const next = value === true;
+          if (next !== inboundAuthorityReady) calls.push(`authority:${next}`);
+          inboundAuthorityReady = next;
+          return inboundAuthorityReady;
+        },
+        isInboundAuthorityReady() { return inboundAuthorityReady; },
+        setDelegationAuthorityReady(value) {
+          const next = value === true;
+          if (next !== delegationAuthorityReady) calls.push(`delegation-authority:${next}`);
+          delegationAuthorityReady = next;
+          return delegationAuthorityReady;
+        },
+        isDelegationAuthorityReady() { return delegationAuthorityReady; },
+        sendExtRequest() { throw new Error('transport must not run'); },
+        addEventObserver() { calls.push('event-observer'); },
+        addDelegationConnectionObserver() { calls.push('connection-observer'); },
+        retainDelegationHeartbeat() {},
+        releaseDelegationHeartbeat() {},
+        getDelegationConnectionSnapshot() { return { state: 'disconnected' }; },
+      },
+      chrome: {
+        runtime: { async sendMessage() {} },
+        storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+        tabs: { async query() { return []; }, async get() { return null; } },
+      },
+      Map,
+      Set,
+      Promise,
+      Date,
+      Number,
+      Object,
+      Array,
+      Error,
+      JSON,
+      console,
+    };
+    sandbox.globalThis = sandbox;
+    vm.runInNewContext(
+      `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+      sandbox,
+    );
+
+    let rejected = null;
+    try {
+      await sandbox.__bootstrapDelegationController();
+    } catch (error) {
+      rejected = error;
+    }
+    assertEqual(rejected && rejected.code, code,
+      `${code} rejects controller boot without rewriting the evidence class`);
+    assertEqual(calls.filter((call) => call === 'create').length, 1,
+      `${code} reaches controller hydration before quarantine`);
+    assertEqual(calls.filter((call) => call === 'quarantine').length, 1,
+      `${code} clears registry maps and staged timers once`);
+    assertEqual(inboundAuthorityReady, false,
+      `${code} closes inbound authority before returning the boot failure`);
+    assertEqual(calls.filter((call) => call === 'authority:false').length, 1,
+      `${code} closes inbound authority exactly once`);
+    assertEqual(delegationAuthorityReady, false,
+      `${code} closes delegation-scoped authority before returning the boot failure`);
+    assertEqual(calls.filter((call) => call === 'delegation-authority:false').length, 1,
+      `${code} closes delegation-scoped authority exactly once`);
+    assert(!calls.includes('subscribe') && !calls.includes('event-observer')
+        && !calls.includes('connection-observer'),
+      `${code} installs no subscriber or bridge observer`);
+  }
+}
+
+async function runDelegationBootReadinessCase() {
+  console.log('\n--- B4: structural and delegated authority open at their exact boundaries ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const hydrateGate = deferred();
+  const statusGate = deferred();
+  const calls = [];
+  let inboundAuthorityReady = false;
+  let delegationAuthorityReady = false;
+  const snapshot = { delegationId: 'delegation_boot_readiness_6108', terminal: null };
+  const controller = {
+    hydrate() { calls.push('hydrate'); return hydrateGate.promise; },
+    subscribe() { calls.push('subscribe'); },
+    async reconcile(input) { calls.push(['reconcile', toPlainObject(input)]); },
+    getSnapshot(delegationId) {
+      return delegationId === snapshot.delegationId ? snapshot : null;
+    },
+  };
+  const registry = {
+    getAgentForDelegation() { return null; },
+    listDelegationMappings() { return []; },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() { calls.push('quarantine'); },
+  };
+  const sandbox = {
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge(reason) { calls.push(['arm', reason]); },
+    FsbDelegationController: { create() { calls.push('create'); return controller; } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    mcpBridgeClient: {
+      isConnected: true,
+      setInboundAuthorityReady(value) {
+        inboundAuthorityReady = value === true;
+        calls.push(['authority', inboundAuthorityReady]);
+        return inboundAuthorityReady;
+      },
+      isInboundAuthorityReady() { return inboundAuthorityReady; },
+      setDelegationAuthorityReady(value) {
+        delegationAuthorityReady = value === true;
+        calls.push(['delegation-authority', delegationAuthorityReady]);
+        return delegationAuthorityReady;
+      },
+      isDelegationAuthorityReady() { return delegationAuthorityReady; },
+      sendExtRequest(method, payload) {
+        calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+        return statusGate.promise;
+      },
+      addEventObserver() { calls.push('event-observer'); },
+      addDelegationConnectionObserver() { calls.push('connection-observer'); },
+      retainDelegationHeartbeat() {},
+      releaseDelegationHeartbeat() {},
+      getDelegationConnectionSnapshot() { return { state: 'connected' }; },
+    },
+    chrome: {
+      runtime: { async sendMessage() {} },
+      storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+      tabs: { async query() { return []; }, async get() { return null; } },
+    },
+    setTimeout,
+    clearTimeout,
+    Map,
+    Set,
+    Promise,
+    Date,
+    Number,
+    Object,
+    Array,
+    Error,
+    JSON,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+    sandbox,
+  );
+
+  const boot = sandbox.__bootstrapDelegationController();
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, false,
+    'inbound authority stays closed while controller hydration is pending');
+  assertEqual(delegationAuthorityReady, false,
+    'delegation-scoped authority stays closed while controller hydration is pending');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 0,
+    'daemon status is not requested before persisted controller hydration');
+
+  hydrateGate.resolve([snapshot]);
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'persisted hydration opens ordinary inbound traffic before daemon status settles');
+  assertEqual(delegationAuthorityReady, false,
+    'delegation-scoped authority stays closed while daemon status reconciliation is pending');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 1,
+    'one shared daemon status request follows successful hydration');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'reconcile').length, 0,
+    'controller reconcile waits for the authoritative status response');
+
+  statusGate.resolve({ generation: 'generation_boot_readiness_6108', active: [], restartLosses: [], routeLosses: [] });
+  await boot;
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'reconcile').length, 1,
+    'hydrated snapshot reconciles exactly once against daemon status');
+  assertEqual(inboundAuthorityReady, true,
+    'ordinary inbound authority remains open after daemon state agrees');
+  assertEqual(delegationAuthorityReady, true,
+    'delegation-scoped authority opens only after persisted and daemon state agree');
+  assertEqual(calls.filter((call) => Array.isArray(call)
+      && call[0] === 'arm' && call[1] === 'delegation-authority-ready').length, 1,
+    'successful boot records one authority-ready wake');
+  assert(!calls.includes('quarantine'), 'successful combined hydration keeps registry authority live');
+}
+
+async function runIndependentDelegationWakeBootstrapCase() {
+  console.log('\n--- B5: delegation wake boot is independent from legacy session recovery ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractNamedFunctionSource(
+    backgroundSource,
+    'function restoreServiceWorkerStateOnWake() {',
+  );
+  const calls = [];
+  let inboundAuthorityReady = false;
+  const sandbox = {
+    async restoreSessionsFromStorage() {
+      calls.push('sessions');
+      throw new Error('malformed legacy session');
+    },
+    async bootstrapAgentRegistry() {
+      calls.push('registry');
+      return { registry: {} };
+    },
+    async bootstrapDelegationController() {
+      calls.push('delegation');
+      inboundAuthorityReady = true;
+      return { controller: {} };
+    },
+    Promise,
+    console: { warn(message) { calls.push(['warn', message]); } },
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__restoreServiceWorkerStateOnWake = restoreServiceWorkerStateOnWake;`,
+    sandbox,
+  );
+
+  await sandbox.__restoreServiceWorkerStateOnWake();
+  assertEqual(calls.filter((call) => call === 'sessions').length, 1,
+    'legacy session recovery is attempted once');
+  assertEqual(calls.filter((call) => call === 'registry').length, 1,
+    'registry readiness is published once before dependent delegation hydration');
+  assertEqual(calls.filter((call) => call === 'delegation').length, 1,
+    'delegation hydration is attempted even when legacy session recovery rejects');
+  assertEqual(inboundAuthorityReady, true,
+    'successful independent delegation boot can open inbound authority after a session failure');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'warn').length, 1,
+    'the unrelated session failure remains contained to its own wake chain');
+}
+
+async function runDelegationLateConnectFenceCase() {
+  console.log('\n--- B6: active delegation stays fenced across offline boot and reconnect ---');
+
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const source = extractDelegationCompositionSource(backgroundSource);
+  const calls = [];
+  const snapshot = { delegationId: 'delegation_late_connect_6108', terminal: null };
+  let statusGate = deferred();
+  let connectionState = 'disconnected';
+  let connectionObserver = null;
+  let inboundAuthorityReady = false;
+  let delegationAuthorityReady = false;
+  const controller = {
+    async hydrate() { calls.push('hydrate'); return [snapshot]; },
+    subscribe() { calls.push('subscribe'); },
+    async reconcile(input) {
+      calls.push(['reconcile', toPlainObject(input)]);
+      return snapshot;
+    },
+    getSnapshot(delegationId) {
+      return delegationId === snapshot.delegationId ? snapshot : null;
+    },
+  };
+  const registry = {
+    getAgentForDelegation() { return 'agent_late_connect_6108'; },
+    listDelegationMappings() {
+      return [{ delegationId: snapshot.delegationId, agentId: 'agent_late_connect_6108' }];
+    },
+    getDelegationReleaseReceipt() { return null; },
+    quarantineAuthority() { calls.push('quarantine'); },
+  };
+  const mcpBridgeClient = {
+    isConnected: false,
+    setInboundAuthorityReady(value) {
+      inboundAuthorityReady = value === true;
+      calls.push(['inbound-authority', inboundAuthorityReady]);
+      return inboundAuthorityReady;
+    },
+    isInboundAuthorityReady() { return inboundAuthorityReady; },
+    setDelegationAuthorityReady(value) {
+      delegationAuthorityReady = value === true;
+      calls.push(['delegation-authority', delegationAuthorityReady]);
+      return delegationAuthorityReady;
+    },
+    isDelegationAuthorityReady() { return delegationAuthorityReady; },
+    sendExtRequest(method, payload) {
+      calls.push(['sendExtRequest', method, toPlainObject(payload)]);
+      return statusGate.promise;
+    },
+    addEventObserver() { calls.push('event-observer'); },
+    addDelegationConnectionObserver(observer) {
+      connectionObserver = observer;
+      calls.push('connection-observer');
+    },
+    retainDelegationHeartbeat() {},
+    releaseDelegationHeartbeat() {},
+    getDelegationConnectionSnapshot() { return { state: connectionState }; },
+  };
+  const sandbox = {
+    bootstrapAgentRegistry: async () => {},
+    armMcpBridge(reason) { calls.push(['arm', reason]); },
+    FsbDelegationController: { create() { calls.push('create'); return controller; } },
+    FsbDelegationEventStore: {},
+    fsbAgentRegistryInstance: registry,
+    mcpBridgeClient,
+    chrome: {
+      runtime: { async sendMessage() {} },
+      storage: { session: { async get() { return {}; }, async set() {}, async remove() {} } },
+      tabs: { async query() { return []; }, async get() { return null; } },
+    },
+    setTimeout(callback) { callback(); return 1; },
+    clearTimeout() {},
+    Map,
+    Set,
+    Promise,
+    Date,
+    Number,
+    Object,
+    Array,
+    Error,
+    JSON,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(
+    `${source}\nthis.__bootstrapDelegationController = bootstrapDelegationController;`,
+    sandbox,
+  );
+
+  await sandbox.__bootstrapDelegationController();
+  assertEqual(inboundAuthorityReady, true,
+    'offline boot opens ordinary inbound traffic after persisted hydration');
+  assertEqual(delegationAuthorityReady, false,
+    'offline boot with an active delegation keeps delegated sends fenced');
+  assertEqual(calls.filter((call) => Array.isArray(call) && call[0] === 'sendExtRequest').length, 0,
+    'offline boot cannot fabricate an authoritative daemon status response');
+  assertEqual(typeof connectionObserver, 'function',
+    'successful persisted hydration installs the reconnect observer');
+
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const firstReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'late connect preserves ordinary inbound traffic while status is pending');
+  assertEqual(delegationAuthorityReady, false,
+    'late connect keeps delegated sends fenced while status is pending');
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+  });
+  await firstReconnect;
+  assertEqual(inboundAuthorityReady, true,
+    'canonical late-connect status opens structural inbound authority');
+  assertEqual(delegationAuthorityReady, true,
+    'canonical late-connect status opens delegated sends');
+
+  connectionState = 'disconnected';
+  mcpBridgeClient.isConnected = false;
+  await connectionObserver({ state: 'disconnected' });
+  assertEqual(inboundAuthorityReady, true,
+    'runtime delegation disconnect preserves unrelated MCP compatibility');
+  assertEqual(delegationAuthorityReady, false,
+    'runtime delegation disconnect synchronously fences mapped agents');
+
+  statusGate = deferred();
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const secondReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  assertEqual(inboundAuthorityReady, true,
+    'runtime reconnect leaves ordinary inbound traffic available');
+  assertEqual(delegationAuthorityReady, false,
+    'runtime reconnect keeps mapped agents fenced until fresh status arrives');
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+  });
+  await secondReconnect;
+  assertEqual(delegationAuthorityReady, true,
+    'fresh canonical reconnect status reopens mapped-agent dispatch');
+
+  connectionState = 'disconnected';
+  mcpBridgeClient.isConnected = false;
+  await connectionObserver({ state: 'disconnected' });
+  statusGate = deferred();
+  connectionState = 'connected';
+  mcpBridgeClient.isConnected = true;
+  const malformedReconnect = connectionObserver({ state: 'connected' });
+  await flushMicrotasks();
+  statusGate.resolve({
+    generation: 'generation_late_connect_6108',
+    active: [{ delegationId: snapshot.delegationId, state: 'running' }],
+    restartLosses: [],
+    routeLosses: [],
+    providerDiagnostic: 'must-not-authorize',
+  });
+  await malformedReconnect;
+  assertEqual(inboundAuthorityReady, true,
+    'malformed daemon status cannot disrupt unrelated MCP compatibility');
+  assertEqual(delegationAuthorityReady, false,
+    'malformed daemon status cannot reopen mapped-agent dispatch');
+}
+
+function buildPairingRuntimeHarness(reloadImpl) {
+  const backgroundSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8');
+  const startMarker = 'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {';
+  const endMarker = '\nchrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);';
+  const start = backgroundSource.indexOf(startMarker);
+  const end = backgroundSource.indexOf(endMarker, start);
+  if (start < 0 || end <= start) throw new Error('runtime handler extraction markers missing');
+  const handlerSource = backgroundSource.slice(start, end);
+  const calls = [];
+  const context = {
+    chrome: { runtime: { id: 'pairing-runtime-extension' } },
+    armMcpBridge() {},
+    fsbHandleDelegationCommand() { return null; },
+    automationLogger: { logComm() {} },
+    mcpBridgeClient: {
+      reloadPairingAndReconnect() {
+        calls.push(true);
+        return reloadImpl();
+      },
+      getState() { return { pairingStatus: 'configured' }; }
+    },
+    console,
+    Promise,
+    Object
+  };
+  context.globalThis = context;
+  vm.runInNewContext(`${handlerSource}\nthis.__handler = fsbHandleRuntimeMessage;`, context, {
+    filename: 'background.js#reloadMcpBridgePairing'
+  });
+  return { handler: context.__handler, calls };
+}
+
+function dispatchPairingRuntime(harness, request) {
+  return new Promise((resolve) => {
+    const keepOpen = harness.handler(
+      request,
+      { id: 'pairing-runtime-extension' },
+      resolve
+    );
+    if (keepOpen !== true && request.action === 'reloadMcpBridgePairing') {
+      Promise.resolve().then(() => {});
+    }
+  });
+}
+
+async function runPairingRuntimeActionCases() {
+  console.log('\n--- B9: reloadMcpBridgePairing is secret-free ---');
+
+  {
+    const harness = buildPairingRuntimeHarness(async () => ({ pairingStatus: 'paired' }));
+    const response = await dispatchPairingRuntime(harness, { action: 'reloadMcpBridgePairing' });
+    assertDeepEqual(response, { success: true, pairingStatus: 'paired' }, 'secret-free reload returns only success and pairingStatus');
+    assertEqual(harness.calls.length, 1, 'secret-free reload invokes the bridge client exactly once');
+  }
+
+  for (const field of ['pairingCode', 'secret', 'token']) {
+    const harness = buildPairingRuntimeHarness(async () => ({ pairingStatus: 'paired' }));
+    const response = await dispatchPairingRuntime(harness, {
+      action: 'reloadMcpBridgePairing',
+      [field]: 'must-not-cross-runtime'
+    });
+    assertDeepEqual(response, { success: false, errorCode: 'pairing_secret_in_runtime_message' }, `${field}-bearing reload is rejected with a bounded code`);
+    assertEqual(harness.calls.length, 0, `${field}-bearing reload rejects before bridge invocation`);
+  }
+
+  {
+    const error = new Error('private detail');
+    error.code = 'bridge_topology_changed';
+    const harness = buildPairingRuntimeHarness(async () => { throw error; });
+    const response = await dispatchPairingRuntime(harness, { action: 'reloadMcpBridgePairing' });
+    assertDeepEqual(response, { success: false, errorCode: 'bridge_topology_changed' }, 'reload failure returns only the stable errorCode');
+    assert(!JSON.stringify(response).includes('private detail'), 'reload failure omits private error text');
+  }
+}
+
+async function runDelegationAuthorityCases() {
+  console.log('\n--- B10: delegated runtime authority is exact and fail closed ---');
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Use the browser tools for this task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      kind: 'agent',
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
+    }, 'preflight returns only the pure closed agent disposition');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getMergedClients'],
+      'preflight reads compatibility without consent/controller/transport mutation');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'OpenCode-bound consent task'
+    });
+    assertEqual(result.providerId, 'opencode',
+      'consent returns the exact authoritative OpenCode provider');
+    assertEqual(result.providerLabel, 'OpenCode',
+      'consent returns only the canonical OpenCode label');
+    assertDeepEqual(harness.calls.find((call) => call[0] === 'issueChallenge')[1], {
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
+      taskDigest: harness.calls.find((call) => call[0] === 'issueChallenge')[1].taskDigest
+    }, 'challenge issuance binds the authoritative OpenCode identity and task digest only');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: 'Use OpenCode for this task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      kind: 'agent',
+      providerId: 'opencode',
+      providerLabel: 'OpenCode',
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode
+    }, 'background preflight authorizes OpenCode from saved settings and compatibility');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const first = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'opencode'
+    });
+    const second = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'opencode'
+    });
+    assertDeepEqual(first, { ok: true, providerId: 'opencode', trusted: false },
+      'OpenCode clear returns the exact authority-reducing result');
+    assertDeepEqual(second, first, 'OpenCode clear remains idempotent');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: 'dch_fixture',
+      providerId: 'opencode',
+      trusted: true
+    });
+    assertDeepEqual(result, { ok: true, providerId: 'opencode', trusted: true },
+      'OpenCode trust grant returns the exact authoritative provider');
+    assertDeepEqual(harness.calls.map((call) => call[0]), [
+      'getMergedClients', 'writeTrustFromChallenge'
+    ], 'selection/preflight recheck precedes provider-local trust mutation');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'opencode' }
+    });
+    const issued = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Selection changes after challenge issue'
+    });
+    harness.calls.length = 0;
+    harness.setProviderId('claude-code');
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_SET_TRUST',
+      challengeId: issued.challengeId,
+      providerId: 'opencode',
+      trusted: true
+    });
+    assertDeepEqual(result, { ok: false, code: 'trust_provider_changed' },
+      'saved-provider change fails before challenge trust authority is consumed');
+    assertEqual(harness.calls.some((call) => call[0] === 'writeTrustFromChallenge'), false,
+      'provider-changed trust grant never reaches the challenge mutation primitive');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Bound consent task'
+    });
+    assertEqual(result.ok, true, 'untrusted consent mints a background challenge');
+    assertEqual(result.trusted, false, 'untrusted consent remains explicit');
+    assertEqual(typeof result.challengeId, 'string', 'consent returns the background challenge id');
+    assertDeepEqual(harness.calls.map((call) => call[0]), [
+      'getMergedClients', 'getTrusted', 'issueChallenge'
+    ],
+      'consent reads trust then mints exactly one task-bound challenge');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({ trusted: true });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CONSENT',
+      task: 'Trusted consent task'
+    });
+    assertDeepEqual(result, {
+      ok: true,
+      providerId: 'claude-code',
+      providerLabel: 'Claude Code',
+      trusted: true,
+      challengeId: null,
+      expiresAt: null
+    }, 'trusted consent discloses no reusable challenge');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['getMergedClients', 'getTrusted'],
+      'trusted consent does not mint a caller-visible challenge');
+  }
+
+  {
+    const harness = buildDelegationCommandHarness();
+    const first = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    const second = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    assertDeepEqual(first, { ok: true, providerId: 'claude-code', trusted: false },
+      'canonical clear returns the exact authority-reducing result');
+    assertDeepEqual(second, first, 'canonical clear remains idempotent');
+    assertDeepEqual(harness.calls.map((call) => call[0]), ['clearTrusted', 'clearTrusted'],
+      'clear invokes only provider-local clear authority');
+  }
+
+  for (const request of [
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'Claude-Code' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'future-agent' },
+    { type: 'FSB_DELEGATION_CLEAR_TRUST', providerId: 'claude-code', trusted: false }
+  ]) {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command(request);
+    assertDeepEqual(result, { ok: false, code: 'unsupported_provider' },
+      'unknown, case-variant, and extra-key trust clear requests fail closed');
+    assertEqual(harness.calls.length, 0, 'rejected trust clear touches no authority primitive');
+  }
+
+  for (const request of [
+    { type: 'FSB_DELEGATION_SET_TRUST', challengeId: 'dch_fixture', providerId: 'claude-code', trusted: false },
+    { type: 'FSB_DELEGATION_SET_TRUST', challengeId: 'dch_fixture', providerId: 'claude-code', trusted: true, task: 'extra' },
+    { type: 'FSB_DELEGATION_START', challengeId: null, task: 'forbidden caller boolean', trusted: true },
+    { type: 'FSB_DELEGATION_CONSENT', task: 'extra-key consent', consentGranted: true },
+    { type: 'FSB_DELEGATION_TAKE_CONTROL', delegationId: 'delegation_fixture', activeTabId: 42 },
+    { type: 'FSB_DELEGATION_RESUME', delegationId: 'delegation_fixture', liveTabIds: [42] },
+    { type: 'FSB_DELEGATION_STOP', delegationId: 'delegation_fixture', agentId: 'caller-agent' },
+    { type: 'FSB_DELEGATION_SNAPSHOT', delegationId: null, adopt: true }
+  ]) {
+    const harness = buildDelegationCommandHarness();
+    const result = await harness.command(request);
+    assertEqual(result.ok, false, `${request.type} rejects caller authority or lifecycle extras`);
+    assertEqual(harness.calls.length, 0, `${request.type} extra-key rejection occurs before side effects`);
+  }
+
+  {
+    const harness = buildDelegationCommandHarness({
+      clearTrustResult: { ok: false, code: 'trust_storage_error' }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: 'claude-code'
+    });
+    assertDeepEqual(result, { ok: false, code: 'trust_storage_failed' },
+      'clear storage failure remains a bounded trust failure');
+  }
+}
+
+async function runAcceptedIdentityBoundaryCases() {
+  console.log('\n--- B11: accepted identity is consent-bound before visible state ---');
+
+  for (const providerId of ['claude-code', 'opencode']) {
+    const harness = buildDelegationProviderRoutingHarness({ providerId });
+    const task = `${providerId} accepted identity`;
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task,
+      challengeId: `dch_${providerId.replace('-', '_')}`
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, `${providerId} sends one authenticated start request`);
+    if (!request) continue;
+    assertDeepEqual(request.payload, {
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      task
+    }, `${providerId} transports only consumed identity and task`);
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, ACCEPTED_IDENTITIES[providerId],
+      `${providerId} challenge consumption uses the second preflight identity`);
+    assertEqual(harness.controllerCreates, 0,
+      `${providerId} does not create a controller before daemon identity echo`);
+    assertEqual(harness.controllerStarts.length, 0,
+      `${providerId} has no visible state before daemon identity echo`);
+
+    const delegationId = `delegation_identity_${providerId.replace('-', '_')}`;
+    const error = await harness.emitStarted(request, {
+      delegationId,
+      acceptedIdentity: acceptedIdentity(providerId)
+    });
+    assertEqual(error, null, `${providerId} exact echo is accepted`);
+    const result = await pending;
+    assertEqual(result.ok, true, `${providerId} exact echo creates one accepted run`);
+    assertEqual(harness.controllerCreates, 1, `${providerId} boots one controller after equality`);
+    assertEqual(harness.controllerHydrates, 1, `${providerId} hydrates once after equality`);
+    assertDeepEqual(harness.controllerStarts, [{
+      delegationId,
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      connection: 'connected'
+    }], `${providerId} persists only daemon-confirmed identity`);
+    assertDeepEqual(harness.contexts.get(delegationId), {
+      acceptedIdentity: ACCEPTED_IDENTITIES[providerId],
+      providerId,
+      label: ACCEPTED_IDENTITIES[providerId].label,
+      profileVersion: ACCEPTED_IDENTITIES[providerId].profileVersion,
+      authState: 'unknown',
+      billingKind: ACCEPTED_IDENTITIES[providerId].billingKind
+    }, `${providerId} run context retains the immutable five-field echo`);
+  }
+
+  const echoMutations = [
+    ['providerId', 'opencode'],
+    ['label', 'OpenCode'],
+    ['profileVersion', '2.1.178'],
+    ['authState', 'chatgpt'],
+    ['billingKind', 'api']
+  ];
+  for (const [field, value] of echoMutations) {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'claude-code' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: `reject ${field} echo mutation`,
+      challengeId: `dch_echo_${field}`
+    });
+    const request = await harness.waitForStartRequest();
+    const error = await harness.emitStarted(request, {
+      delegationId: `delegation_echo_${field}`,
+      acceptedIdentity: acceptedIdentity('claude-code', { [field]: value })
+    });
+    assert(error instanceof Error, `${field} echo mutation rejects request acceptance`);
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      `${field} echo mutation has one bounded start rejection`);
+    assertEqual(harness.controllerCreates, 0, `${field} mismatch creates no controller`);
+    assertEqual(harness.controllerHydrates, 0, `${field} mismatch hydrates no controller`);
+    assertEqual(harness.controllerStarts.length, 0, `${field} mismatch persists no run`);
+    assertEqual(harness.contexts.size, 0, `${field} mismatch creates no feed context`);
+    await flushMicrotasks();
+    assertEqual(harness.startRequests.length, 1, `${field} mismatch is never replayed`);
+  }
+
+  {
+    let accessorReads = 0;
+    const hostileIdentity = acceptedIdentity();
+    Object.defineProperty(hostileIdentity, 'authState', {
+      enumerable: true,
+      get() {
+        accessorReads += 1;
+        return 'unknown';
+      }
+    });
+    const harness = buildDelegationProviderRoutingHarness();
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'reject hostile echo identity',
+      challengeId: 'dch_hostile_echo'
+    });
+    const request = await harness.waitForStartRequest();
+    await harness.emitStarted(request, {
+      delegationId: 'delegation_hostile_echo',
+      acceptedIdentity: hostileIdentity
+    });
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      'hostile echo has one bounded start rejection');
+    assertEqual(accessorReads, 0, 'hostile echo validation never invokes accessors');
+    assertEqual(harness.controllerCreates, 0, 'hostile echo creates no controller');
+    assertEqual(harness.controllerStarts.length, 0, 'hostile echo creates no visible state');
+  }
+
+  {
+    const firstIdentity = acceptedIdentity();
+    const currentIdentity = acceptedIdentity('claude-code', { profileVersion: '2.1.178' });
+    const harness = buildDelegationProviderRoutingHarness({
+      identitySequence: [firstIdentity, currentIdentity],
+      consumeResult: { ok: true, acceptedIdentity: firstIdentity }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'consumed identity changed before transport',
+      challengeId: 'dch_preflight_drift'
+    });
+    assertDeepEqual(result, { ok: false, code: 'provider_changed', snapshot: null },
+      'consumed identity must still equal the second preflight result');
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, currentIdentity,
+      'one-time consumption receives only the current second-preflight identity');
+    assertEqual(harness.startRequests.length, 0,
+      'consumed/current identity drift sends no daemon request');
+    assertEqual(harness.controllerCreates, 0,
+      'consumed/current identity drift creates no controller');
+    assertEqual(harness.controllerStarts.length, 0,
+      'consumed/current identity drift creates no visible state');
+  }
+}
+
+async function runCodexStartAuthorityCases() {
+  console.log('\n--- B11: Codex auth-bound start authority ---');
+
+  const identities = [
+    acceptedIdentity('codex'),
+    acceptedIdentity('codex', { authState: 'api_key', billingKind: 'api' })
+  ];
+  for (const identity of identities) {
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      identitySequence: [identity, identity]
+    });
+    const task = `Codex ${identity.authState} provider-free task`;
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task,
+      challengeId: `dch_codex_${identity.authState}`
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, `${identity.authState} reaches one authenticated daemon start`);
+    if (!request) continue;
+    assertDeepEqual(request.payload, {
+      acceptedIdentity: identity,
+      task
+    }, `${identity.authState} transports only consumed identity and task`);
+    assertEqual(Object.prototype.hasOwnProperty.call(request.payload, 'providerId'), false,
+      `${identity.authState} payload has no standalone provider selector`);
+    const consumeCall = harness.calls.find((call) => call[0] === 'consumeChallenge');
+    assertDeepEqual(consumeCall[1].acceptedIdentity, identity,
+      `${identity.authState} challenge consumes the second authoritative projection`);
+    assertEqual(harness.controllerCreates, 0,
+      `${identity.authState} creates no controller before daemon echo`);
+
+    const delegationId = `delegation_codex_${identity.authState}`;
+    const error = await harness.emitStarted(request, {
+      delegationId,
+      acceptedIdentity: identity
+    });
+    assertEqual(error, null, `${identity.authState} exact daemon echo is accepted`);
+    const result = await pending;
+    assertEqual(result.ok, true, `${identity.authState} starts one accepted Codex run`);
+    assertDeepEqual(harness.controllerStarts, [{
+      delegationId,
+      acceptedIdentity: identity,
+      connection: 'connected'
+    }], `${identity.authState} controller persists the echoed identity`);
+    assertDeepEqual(harness.contexts.get(delegationId), {
+      acceptedIdentity: identity,
+      providerId: 'codex',
+      label: 'Codex',
+      profileVersion: '0.142.5',
+      authState: identity.authState,
+      billingKind: identity.billingKind
+    }, `${identity.authState} run context retains exact Codex billing authority`);
+  }
+
+  {
+    const chatgptIdentity = acceptedIdentity('codex');
+    const apiKeyIdentity = acceptedIdentity('codex', {
+      authState: 'api_key', billingKind: 'api'
+    });
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      identitySequence: [chatgptIdentity, chatgptIdentity]
+    });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Reject changed Codex auth echo',
+      challengeId: 'dch_codex_echo_mismatch'
+    });
+    const request = await harness.waitForStartRequest();
+    const error = await harness.emitStarted(request, {
+      delegationId: 'delegation_codex_echo_mismatch',
+      acceptedIdentity: apiKeyIdentity
+    });
+    assert(error instanceof Error, 'changed Codex auth echo rejects acceptance');
+    assertDeepEqual(await pending, { ok: false, code: 'start_rejected', snapshot: null },
+      'changed Codex auth echo returns one bounded rejection');
+    assertEqual(harness.controllerCreates, 0, 'changed auth echo creates no controller');
+    assertEqual(harness.startRequests.length, 1, 'changed auth echo is never replayed');
+  }
+
+  for (const authState of ['unauthenticated', 'unknown']) {
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'codex',
+      compatibilityClients: {
+        codex: {
+          compatibility: {
+            status: 'supported', reason: 'within_tested_range', checkedAt: 100
+          },
+          authState
+        }
+      }
+    });
+    const result = await harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: `Reject ${authState} Codex`,
+      challengeId: `dch_codex_${authState}`
+    });
+    assertDeepEqual(result, { ok: false, code: 'preflight_failed', snapshot: null },
+      `${authState} Codex evidence cannot reach consent or transport`);
+    assertEqual(harness.startRequests.length, 0, `${authState} sends no daemon start`);
+
+    const preflightHarness = buildDelegationCommandHarness({
+      providerConfig: { agentProviderId: 'codex' },
+      compatibilityClients: {
+        codex: {
+          compatibility: {
+            status: 'supported', reason: 'within_tested_range', checkedAt: 100
+          },
+          authState
+        }
+      }
+    });
+    const preflight = await preflightHarness.command({
+      type: 'FSB_DELEGATION_PREFLIGHT',
+      task: `Explain ${authState} Codex recovery`
+    });
+    assertDeepEqual(preflight, {
+      ok: false,
+      code: authState === 'unauthenticated' ? 'auth_unauthenticated' : 'auth_unknown',
+      providerId: 'codex',
+      providerLabel: 'Codex'
+    }, `${authState} survives background reduction only as a closed safe recovery code`);
+    assertEqual(JSON.stringify(preflight).includes('Logged in'), false,
+      `${authState} response contains no provider-native status bytes`);
+  }
+
+  {
+    const staleClients = {
+      codex: {
+        id: 'codex',
+        compatibility: { status: 'supported', reason: 'within_tested_range', checkedAt: 100 },
+        authState: 'chatgpt',
+        acceptedIdentity: acceptedIdentity('codex')
+      }
+    };
+    const refreshHarness = buildCompatibilityRefreshHarness({
+      clients: staleClients,
+      rejectRequest: true,
+      cachedSnapshot: { schemaVersion: 2, checkedAt: 100, adapters: [] }
+    });
+    const result = await refreshHarness.refresh();
+    assertEqual(result.refreshOutcome, 'stale', 'failed refresh uses only durable cached evidence');
+    assertDeepEqual(result.clients.codex.compatibility, {
+      status: 'degraded', reason: 'evidence_stale', checkedAt: 100
+    }, 'failed refresh closes fresh Codex compatibility');
+    assertEqual(result.clients.codex.authState, 'unknown',
+      'failed refresh forces Codex auth unknown');
+    assertEqual(Object.prototype.hasOwnProperty.call(
+      result.clients.codex, 'acceptedIdentity'
+    ), false, 'failed refresh strips accepted Codex start authority');
+  }
+
+  {
+    const checkedAt = 400;
+    const refreshHarness = buildCompatibilityRefreshHarness({
+      clients: {
+        codex: {
+          id: 'codex',
+          compatibility: {
+            status: 'degraded', reason: 'newer_than_tested_range', checkedAt
+          },
+          authState: 'api_key',
+          acceptedIdentity: acceptedIdentity('codex', {
+            authState: 'api_key', billingKind: 'api'
+          })
+        }
+      },
+      cachedSnapshot: { schemaVersion: 2, checkedAt, adapters: [] }
+    });
+    const cached = await refreshHarness.readCached();
+    assertEqual(cached.compatibilityExpiresAt, checkedAt + 15 * 60 * 1000,
+      'fresh newer-than-tested Codex evidence schedules the same expiry boundary');
+  }
+}
+
+async function runDelegationProviderRoutingCases() {
+  console.log('\n--- B11: accepted delegation provider routing is immutable ---');
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'claude-code' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Claude provider-free task',
+      challengeId: 'dch_claude'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'Claude authoritative start reaches one daemon request');
+    if (request) {
+      assertDeepEqual(request.payload, {
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code'], task: 'Claude provider-free task'
+      }, 'delegate.start sends only the consumed canonical identity and task');
+      await harness.emitStarted(request, {
+        delegationId: 'delegation_claude_route',
+        acceptedIdentity: acceptedIdentity('claude-code')
+      });
+      const result = await pending;
+      assertEqual(result.ok, true, 'matching Claude acceptance starts exactly one run');
+      const context = harness.contexts.get('delegation_claude_route');
+      assertDeepEqual(context, {
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code'],
+        providerId: 'claude-code',
+        label: 'Claude Code',
+        profileVersion: '2.1.177',
+        authState: 'unknown',
+        billingKind: 'subscription'
+      }, 'accepted Claude run stores only canonical immutable metadata');
+      assertEqual(Object.isFrozen(context), true, 'accepted Claude run metadata is deeply frozen');
+
+      harness.setProviderId('opencode');
+      await harness.emitDelegationEvent(request, {
+        delegationId: 'delegation_claude_route',
+        event: { type: 'result', sessionId: null, payload: {} }
+      });
+      assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+        timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
+      }, 'later events ignore changed settings and use only accepted Claude context');
+      await harness.resolveFinal(request, { status: 'succeeded' });
+      assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+        timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+        terminalCode: 'completed',
+        treeSettled: true,
+        acceptedIdentity: ACCEPTED_IDENTITIES['claude-code']
+      }, 'Claude final settlement retains subscription billing from accepted context');
+      assertEqual(harness.contexts.has('delegation_claude_route'), false,
+        'terminal settlement always clears accepted Claude context');
+    } else {
+      await pending;
+    }
+  }
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'OpenCode provider-free task',
+      challengeId: 'dch_opencode'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'OpenCode authoritative start reaches one daemon request');
+    if (request) {
+      assertDeepEqual(request.payload, {
+        acceptedIdentity: ACCEPTED_IDENTITIES.opencode, task: 'OpenCode provider-free task'
+      }, 'OpenCode delegate.start payload is exact and canonical');
+      await harness.emitStarted(request, {
+        delegationId: 'delegation_opencode_route',
+        acceptedIdentity: acceptedIdentity('opencode')
+      });
+      const result = await pending;
+      assertEqual(result.ok, true, 'matching OpenCode acceptance starts exactly one run');
+      assertDeepEqual(harness.contexts.get('delegation_opencode_route'), {
+        acceptedIdentity: ACCEPTED_IDENTITIES.opencode,
+        providerId: 'opencode',
+        label: 'OpenCode',
+        profileVersion: '1.14.25',
+        authState: 'unknown',
+        billingKind: 'unknown'
+      }, 'accepted OpenCode context never inherits Claude identity or billing');
+      harness.setProviderId('claude-code');
+      await harness.emitDelegationEvent(request, {
+        delegationId: 'delegation_opencode_route',
+        event: { type: 'result', sessionId: null, payload: {} }
+      });
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
+        'OpenCode result billing remains unknown after a settings change');
+      assertDeepEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity,
+        ACCEPTED_IDENTITIES.opencode,
+        'OpenCode event identity remains canonical after a settings change');
+      await harness.resolveFinal(request, { status: 'failed', terminal: { code: 'agent_failed' } });
+      assertEqual(harness.acceptedEvents.at(-1).context.acceptedIdentity.billingKind, 'unknown',
+        'OpenCode terminal billing remains unknown');
+      assertEqual(harness.contexts.has('delegation_opencode_route'), false,
+        'terminal settlement always clears accepted OpenCode context');
+    } else {
+      const result = await pending;
+      assertEqual(result.ok, true, 'OpenCode must not be rejected before daemon routing');
+    }
+  }
+
+  {
+    const harness = buildDelegationProviderRoutingHarness({ providerId: 'opencode' });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Reject mismatched acceptance',
+      challengeId: 'dch_mismatch'
+    });
+    const request = await harness.waitForStartRequest();
+    assert(request, 'mismatch case reaches one selected OpenCode request');
+    if (request) {
+      await harness.emitStarted(request, {
+        delegationId: 'delegation_mismatch_route',
+        acceptedIdentity: acceptedIdentity('claude-code')
+      });
+      const result = await pending;
+      assertDeepEqual(result, { ok: false, code: 'start_rejected', snapshot: null },
+        'mismatched started adapter fails before controller persistence');
+      assertEqual(harness.controllerStarts.length, 0,
+        'mismatched started adapter never reaches controller start');
+      assertEqual(harness.contexts.has('delegation_mismatch_route'), false,
+        'mismatched started adapter leaves no accepted context');
+    } else {
+      await pending;
+    }
+  }
+
+  {
+    const trustGate = deferred();
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'claude-code',
+      getTrustedGate: trustGate
+    });
+    const pending = harness.command({
+      type: 'FSB_DELEGATION_START',
+      task: 'Selection changes before consume',
+      challengeId: 'dch_provider_change'
+    });
+    await flushMicrotasks();
+    harness.setProviderId('opencode');
+    trustGate.resolve();
+    const result = await pending;
+    assertDeepEqual(result, { ok: false, code: 'provider_changed', snapshot: null },
+      'selection change before consume returns the bounded provider-changed result');
+    assertEqual(harness.calls.some((call) => call[0] === 'consumeChallenge'), false,
+      'selection change cannot consume the original provider challenge');
+    assertEqual(harness.startRequests.length, 0,
+      'selection change before consume cannot send delegate.start');
+  }
+
+  {
+    const hydrated = {
+      delegationId: 'delegation_hydrated_open',
+      acceptedIdentity: acceptedIdentity('opencode'),
+      provider: { id: 'opencode', label: 'OpenCode' },
+      terminal: null,
+      entries: [{
+        init: {
+          client: { id: 'opencode', label: 'OpenCode' },
+          profileVersion: '1.14.25'
+        }
+      }]
+    };
+    const harness = buildDelegationProviderRoutingHarness({
+      providerId: 'claude-code',
+      hydratedSnapshots: [hydrated]
+    });
+    await harness.boot();
+    const syntheticRequest = {
+      id: 'ext_hydrated_open',
+      options: {},
+      final: deferred()
+    };
+    await harness.emitDelegationEvent(syntheticRequest, {
+      delegationId: hydrated.delegationId,
+      event: { type: 'result', sessionId: null, payload: {} }
+    });
+    assertDeepEqual(harness.acceptedEvents.at(-1).context, {
+      timestamp: harness.acceptedEvents.at(-1).context.timestamp,
+      acceptedIdentity: ACCEPTED_IDENTITIES.opencode
+    }, 'eviction-style hydration restores context only from accepted persisted metadata');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -515,26 +3049,369 @@ function runSourceContractCase() {
     'const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {',
     'chrome.runtime.onMessage.addListener(fsbHandleRuntimeMessage);',
     'function fsbDispatchInternalMessage(request) {',
-    'globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;'
+    'globalThis.fsbDispatchInternalMessage = fsbDispatchInternalMessage;',
+    'function resolveMcpVisualSessionTabId(sessionToken) {',
+    'globalThis.resolveMcpVisualSessionTabId = resolveMcpVisualSessionTabId;'
   ];
   for (const snippet of backgroundSnippets) {
     assert(backgroundSource.includes(snippet), `background.js includes ${snippet}`);
   }
+  assertEqual((backgroundSource.match(/case 'getMcpClients'/g) || []).length, 1, 'background.js contains exactly one getMcpClients case');
+  assertEqual((backgroundSource.match(/case 'refreshMcpCompatibility'/g) || []).length, 1,
+    'background.js contains exactly one explicit compatibility refresh case');
+  assert(backgroundSource.includes("error: 'mcp_client_inventory_unavailable'"), 'getMcpClients carries the bounded failure code');
+  assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]getMcpClients['"]/.test(backgroundSource),
+    'background.js never self-sends getMcpClients');
+  const compatibilityComposition = extractCompatibilityCompositionSource(backgroundSource);
+  const liveCompatibilityRefresh = extractNamedFunctionSource(
+    backgroundSource,
+    'function fsbRefreshMcpCompatibility() {'
+  );
+  assertEqual((backgroundSource.match(/let fsbMcpCompatibilityRefreshPromise = null;/g) || []).length, 1,
+    'background owns one coalesced compatibility refresh promise');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addPairingStatusObserver\(/g) || []).length, 1,
+    'background installs exactly one paired cold-refresh observer');
+  assert(liveCompatibilityRefresh.includes('await providers.replaceCompatibility(validated)')
+      && liveCompatibilityRefresh.indexOf('await providers.replaceCompatibility(validated)')
+        < liveCompatibilityRefresh.indexOf('await fsbReadMergedMcpClients(providers)'),
+    'validated durable compatibility replacement precedes merged fan-out');
+  assert(!compatibilityComposition.includes('chrome.runtime.sendMessage'),
+    'cold compatibility hydration emits no explicit UI announcement');
+  for (const forbidden of [
+    'selectedProvider', 'selectedModel', 'apiKey', 'endpoint', 'doctor',
+    'nativeMessaging', 'child_process', 'delegate.status'
+  ]) {
+    assert(!compatibilityComposition.includes(forbidden),
+      `compatibility refresh orchestration does not touch ${forbidden}`);
+  }
+  const sunsetListAgents = backgroundSource.indexOf("//     case 'listAgents':");
+  assert(sunsetListAgents >= 0, 'sunset listAgents runtime case remains commented out');
+  assert(backgroundSource.indexOf("case 'getMcpClients'") < sunsetListAgents,
+    'new inventory action is independent from the later sunset listAgents block');
 
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'extension', 'ws', 'mcp-bridge-client.js'), 'utf8');
   assert(bridgeSource.includes('globalThis.fsbDispatchInternalMessage'), 'mcp-bridge-client.js prefers globalThis.fsbDispatchInternalMessage');
   assert(bridgeSource.includes('agent_management_deprecated'), 'mcp-bridge-client.js carries the agent deprecation errorCode');
+  assert(bridgeSource.includes("sendExtRequest('adapter.compatibility', {}, { timeout: ADAPTER_COMPATIBILITY_REQUEST_TIMEOUT_MS })"),
+    'bridge compatibility wrapper sends only the exact method, payload, and five-second timeout');
   assert(!bridgeSource.includes('fsb-mcp-internal'), 'dead fsb-mcp-internal CustomEvent scaffolding removed');
+  assert(backgroundSource.includes("case 'reloadMcpBridgePairing':"), 'background.js includes the secret-free pairing reload action');
+  assert(backgroundSource.includes('mcpBridgeClient.reloadPairingAndReconnect()'), 'background.js delegates pairing reload directly to the bridge client');
+  assert(!/chrome\.runtime\.sendMessage\s*\(\s*\{\s*action\s*:\s*['"]reloadMcpBridgePairing['"]/.test(backgroundSource),
+    'background.js never self-sends the pairing reload action');
+
+  const orderedImports = [
+    "importScripts('utils/delegation-providers.js')",
+    "importScripts('utils/delegation-preflight.js')",
+    "importScripts('utils/delegation-consent.js')",
+    "importScripts('utils/delegation-event-store.js')",
+    "importScripts('utils/delegation-controller.js')"
+  ].map((token) => backgroundSource.indexOf(token));
+  assert(orderedImports.every((index) => index >= 0),
+    'background loads the provider helper and all delegation modules');
+  assert(orderedImports.every((index, position) => position === 0 || orderedImports[position - 1] < index),
+    'provider helper and delegation modules load once in dependency order');
+  const providerHelperImport = orderedImports[0];
+  for (const consumer of [
+    "importScripts('utils/mcp-agent-providers.js')",
+    "importScripts('utils/delegation-preflight.js')",
+    "importScripts('utils/delegation-consent.js')",
+    "importScripts('utils/delegation-event-store.js')",
+    "importScripts('utils/delegation-controller.js')"
+  ]) {
+    assert(providerHelperImport < backgroundSource.indexOf(consumer),
+      `canonical provider helper loads before ${consumer}`);
+  }
+  const nativeWakeImport = "importScripts('utils/native-host-wake.js')";
+  const nativeWakeImportIndex = backgroundSource.indexOf(nativeWakeImport);
+  const bridgeImportIndex = backgroundSource.indexOf("importScripts('ws/mcp-bridge-client.js')");
+  const nativeProbeIndex = backgroundSource.indexOf('FsbNativeHostWake.probePresence()');
+  assertEqual((backgroundSource.match(/importScripts\('utils\/native-host-wake\.js'\)/g) || []).length, 1,
+    'background loads the native wake helper exactly once');
+  assert(nativeWakeImportIndex > orderedImports[0] && nativeWakeImportIndex < bridgeImportIndex,
+    'native wake helper loads after pure preflight and before bridge composition');
+  assert(nativeProbeIndex > bridgeImportIndex,
+    'silent native presence probe starts only after background dependencies exist');
+  assertEqual((backgroundSource.match(/FsbNativeHostWake\.probePresence\(\)/g) || []).length, 1,
+    'service-worker boot starts exactly one advisory presence probe');
+  assertEqual((backgroundSource.match(/FsbNativeHostWake\.ensureWake\(\)/g) || []).length, 1,
+    'offline preflight owns the sole actual wake join');
+  assert(backgroundSource.includes("type: 'FSB_NATIVE_WAKE_CHECKING'")
+      && backgroundSource.includes('attemptId: wakePromise.attemptId')
+      && backgroundSource.includes('intentId: intentId'),
+    'checking fanout carries only the exact attempt and current intent ids');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addEventObserver\(/g) || []).length, 1,
+    'background installs exactly one awaited delegation bridge observer');
+  assertEqual((backgroundSource.match(/mcpBridgeClient\.addDelegationConnectionObserver\(/g) || []).length, 1,
+    'background installs exactly one delegation connection observer');
+  assert(backgroundSource.indexOf('await controller.hydrate()')
+      < backgroundSource.indexOf('controller.subscribe((runtimeEvent)'),
+    'controller hydration completes before runtime subscription');
+  assert(backgroundSource.indexOf('controller.subscribe((runtimeEvent)')
+      < backgroundSource.indexOf('mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent)'),
+    'hydrated subscription precedes the one live bridge observer');
+
+  const delegationComposition = extractDelegationCompositionSource(backgroundSource);
+  assertEqual((backgroundSource.match(/let fsbDelegationBootPromise = null;/g) || []).length, 1,
+    'background owns one delegation boot promise');
+  assert(delegationComposition.includes("const FSB_DELEGATION_GENERATION_PREFIX = 'fsbDelegationGeneration:v1:'"),
+    'wake reconciliation stores bounded per-id daemon generation metadata');
+  assert(delegationComposition.includes('chrome.storage.session.get([key])')
+      && delegationComposition.includes('chrome.storage.session.set({')
+      && delegationComposition.includes('chrome.storage.session.remove(fsbDelegationGenerationKey(delegationId))'),
+    'daemon generation metadata stays in session storage and clears at terminal');
+  assertEqual((delegationComposition.match(/'delegate\.status'/g) || []).length, 1,
+    'wake reconciliation has one exact empty-payload delegate.status transport');
+  assert(delegationComposition.includes('{},\n    { timeout: FSB_DELEGATION_STATUS_TIMEOUT_MS }'),
+    'wake status request remains empty-payload with a bounded transport timeout');
+  assertEqual((delegationComposition.match(/retainDelegationHeartbeat\(delegationId\)/g) || []).length, 1,
+    'controller receives one id-keyed heartbeat retain callback');
+  assertEqual((delegationComposition.match(/releaseDelegationHeartbeat\(delegationId\)/g) || []).length, 1,
+    'controller receives one id-keyed heartbeat release callback');
+  const nativePreflight = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationPreflightCommand(request) {'),
+    delegationComposition.indexOf('async function fsbDelegationConsentCommand(request) {')
+  );
+  assert(nativePreflight.includes("authority.result.code !== 'agent_offline'")
+      && nativePreflight.includes('await fsbDelegationPreflightResult()'),
+    'only exact offline authority may wake and successful reachability reruns pure preflight directly');
+  assert(nativePreflight.includes("armMcpBridge('native-host-wake')")
+      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_TIMEOUT_MS')
+      && nativePreflight.includes('FSB_NATIVE_WAKE_BRIDGE_POLL_MS'),
+    'native continuation uses one bounded ordinary bridge readiness wait');
+  assert(!/(?:delegate\.start|FSB_DELEGATION_START|consumeChallenge|issueChallenge|activeSessions|chrome\.tabs)/.test(nativePreflight),
+    'native preflight continuation cannot replay, consent, create sessions, or touch tabs');
+
+  const bootSource = delegationComposition.slice(
+    delegationComposition.indexOf('async function bootstrapDelegationController() {')
+  );
+  const bootHydrate = bootSource.indexOf('const hydratedSnapshots = await controller.hydrate()');
+  const bootSubscribe = bootSource.indexOf('controller.subscribe((runtimeEvent)');
+  const bootObserver = bootSource.indexOf('mcpBridgeClient.addEventObserver(fsbObserveDelegationBridgeEvent)');
+  const bootReconcile = bootSource.indexOf('await fsbReconcileDelegationSnapshots(controller, hydratedSnapshots)');
+  assert(bootHydrate >= 0 && bootHydrate < bootSubscribe
+      && bootSubscribe < bootObserver && bootObserver < bootReconcile,
+    'boot hydrates silently before subscription, observer install, and status reconcile');
+  const reconcileSource = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbReconcileDelegationSnapshots(controller, snapshots) {'),
+    delegationComposition.indexOf('async function fsbReadAuthoritativeProviderConfig()')
+  );
+  assert(delegationComposition.includes("armMcpBridge('delegation-reconcile')")
+      && reconcileSource.includes('await fsbReadDelegationStatus()'),
+    'wake reconciliation uses the ordinary bridge and one shared status snapshot');
+  assert(reconcileSource.includes('for (const snapshot of snapshots)')
+      && reconcileSource.includes('delegationId: snapshot.delegationId'),
+    'one status response reconciles every hydrated server id independently');
+  const connectionObserverSource = delegationComposition.slice(
+    delegationComposition.indexOf('function fsbObserveDelegationConnection(connection) {'),
+    delegationComposition.indexOf('async function bootstrapDelegationController() {')
+  );
+  assert(connectionObserverSource.includes("connection: 'disconnected'")
+      && connectionObserverSource.includes('for (const snapshot of snapshots)')
+      && connectionObserverSource.includes('fsbDelegationActiveIds'),
+    'heartbeat disconnect reconciles and fans out every active controller record');
+  assert(!/(?:delegate\.start|task\s*:|\badopt\b|\breplay\b)/.test(reconcileSource),
+    'wake reconciliation cannot start, adopt, or replay delegated work');
+  const snapshotCommand = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationSnapshotCommand(request) {'),
+    delegationComposition.indexOf('async function fsbDelegationLifecycleCommand(request, method)')
+  );
+  assert(snapshotCommand.indexOf('await bootstrapDelegationController()')
+      < snapshotCommand.indexOf('boot.controller.getSnapshot(request.delegationId)'),
+    'snapshot responses wait for the shared hydrated boot promise');
+  assert(snapshotCommand.includes('await fsbReconcileDelegationSnapshots(boot.controller, [before])'),
+    'id-keyed snapshot refresh observes supervisor status before replying');
+  assert(snapshotCommand.includes('await boot.controller.refreshActiveTab({ delegationId: request.delegationId })'),
+    'snapshot replies derive active-tab eligibility inside the controller before replying');
+  const lifecycleCommand = delegationComposition.slice(
+    delegationComposition.indexOf('async function fsbDelegationLifecycleCommand(request, operation) {'),
+    delegationComposition.indexOf('async function fsbDelegationSnapshotCommand(request) {')
+  );
+  assert(lifecycleCommand.includes('await controller.refreshActiveTab({ delegationId: request.delegationId })')
+      && lifecycleCommand.includes('const refreshed = controller.getSnapshot(request.delegationId)'),
+    'lifecycle replies refresh and return canonical active-tab eligibility after settlement');
+  assert(lifecycleCommand.indexOf("fsbDelegationHasExactKeys(request, ['delegationId', 'type'])")
+      < lifecycleCommand.indexOf('controller.takeControl'),
+    'lifecycle requests reject caller ownership fields before controller mutation');
+
+  for (const type of [
+    'FSB_DELEGATION_PREFLIGHT', 'FSB_DELEGATION_CONSENT', 'FSB_DELEGATION_SET_TRUST',
+    'FSB_DELEGATION_CLEAR_TRUST', 'FSB_DELEGATION_START', 'FSB_DELEGATION_TAKE_CONTROL',
+    'FSB_DELEGATION_RESUME', 'FSB_DELEGATION_STOP', 'FSB_DELEGATION_SNAPSHOT'
+  ]) {
+    assertEqual((backgroundSource.match(new RegExp(`case '${type}'`, 'g')) || []).length, 1,
+      `${type} has one closed background command route`);
+  }
+
+  const legacyStart = backgroundSource.slice(
+    backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'),
+    backgroundSource.indexOf('async function handleStopAutomation', backgroundSource.indexOf('async function handleStartAutomation(request, sender, sendResponse) {'))
+  );
+  const authorityBranch = legacyStart.indexOf('const authoritativeProvider = await fsbReadAuthoritativeProviderConfig()');
+  assert(authorityBranch >= 0, 'legacy start reloads background-authoritative provider config');
+  for (const mutation of [
+    'chrome.sidePanel.setOptions', 'conversationSessions.has', 'chrome.tabs.get',
+    'activeSessions.set', 'runAgentLoop'
+  ]) {
+    assert(authorityBranch < legacyStart.indexOf(mutation),
+      `agent provider branch precedes ${mutation}`);
+  }
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'delegation-controller.js'),
+    'utf8'
+  );
+  const delegatedStart = backgroundSource.slice(
+    backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'),
+    backgroundSource.indexOf('function fsbDelegationMapLifecycleFailure', backgroundSource.indexOf('async function fsbDelegationStartCommand(request) {'))
+  );
+  assert(!/request\.(?:trusted|consent|consentGranted|agentId)/.test(delegatedStart),
+    'delegated start never reads caller trust, consent, or agent identity');
+  assert(delegatedStart.includes("fsbDelegationHasExactKeys(request, ['challengeId', 'task', 'type'])")
+      && !/request\.(?:providerId|adapterId|providerLabel|billingKind)/.test(delegatedStart),
+    'delegated start request remains exact and provider-free');
+  assert(delegatedStart.indexOf('consumeChallenge') < delegatedStart.indexOf("sendExtRequest(\n      'delegate.start'"),
+    'challenge consumption precedes delegate.start transport');
+  assert(delegatedStart.indexOf('resolveAccepted(payload.delegationId)')
+      < delegatedStart.indexOf('controller.getSnapshot(delegationId)'),
+    'server-minted delegation id acceptance precedes returned controller state');
+  const startedObserver = delegationComposition.slice(
+    delegationComposition.indexOf("if (bridgeEvent.event === 'delegation.started') {"),
+    delegationComposition.indexOf("if (bridgeEvent.event !== 'delegation.event') return;")
+  );
+  assert(delegationComposition.includes('const fsbDelegationRunContexts = new Map()')
+      && !delegationComposition.includes('fsbDelegationProfiles'),
+    'background owns one accepted-run metadata map instead of a profile-only map');
+  assert(delegatedStart.includes('await controller.start({')
+      && delegatedStart.includes('acceptedIdentity: echoedIdentity'),
+    'request-bound started acceptance durably commits canonical metadata before resolving');
+  const controllerStart = controllerSource.slice(
+    controllerSource.indexOf('function start(input) {'),
+    controllerSource.indexOf('function acceptEvent(input) {')
+  );
+  assert(controllerStart.indexOf('await eventStore.appendBeforeFanout(')
+      < controllerStart.indexOf('var runtimeEvent = _emit(record, canonicalEntry.sequence)'),
+    'controller start write completes before live fanout');
+  assert(delegationComposition.includes("value === 'ext_request_timeout' || value === 'bridge_topology_changed'")
+      && delegationComposition.includes("return 'route_lost'")
+      && delegationComposition.includes("treeSettled: !transportError && code !== 'tree_unsettled'"),
+    'transport timeout/topology loss requires exact cancellation before ownership release');
+
+  const clearTrust = backgroundSource.slice(
+    backgroundSource.indexOf('async function fsbDelegationClearTrustCommand(request) {'),
+    backgroundSource.indexOf('function fsbDelegationTerminalCode', backgroundSource.indexOf('async function fsbDelegationClearTrustCommand(request) {'))
+  );
+  assert(clearTrust.includes('FsbDelegationConsent.clearTrusted'),
+    'clear trust delegates only to the authority-reducing primitive');
+  assert(!/(?:issueChallenge|consumeChallenge|controller|delegate\.start)/.test(clearTrust),
+    'clear trust cannot consume consent, touch a controller, or start a run');
+
+  const registrySource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'agent-registry.js'),
+    'utf8'
+  );
+  assert(!/(?:input|request)\.(?:activeTabId|liveTabIds)/.test(controllerSource),
+    'controller never consumes caller-supplied active or live tab ids');
+  assert(controllerSource.indexOf('await getActiveTab({ delegationId: record.delegationId })')
+      < controllerSource.indexOf('await registry.getDelegationOwnedTabs({'),
+    'controller queries the active tab before the complete ownership snapshot');
+  assert(controllerSource.indexOf('await getLiveTabIds({')
+      < controllerSource.indexOf('await registry.restoreHoldLease({'),
+    'controller queries sealed tab identities before complete lease restoration');
+  const hydrateSource = controllerSource.slice(
+    controllerSource.indexOf('function hydrate() {'),
+    controllerSource.indexOf('function subscribe(listener) {')
+  );
+  assert(hydrateSource.includes('eventStore.hydrateNonterminal()')
+      && hydrateSource.includes('await _retainHeartbeatOnce(record)')
+      && !hydrateSource.includes('_emit('),
+    'controller hydration is silent and retains one owner for each nonterminal ledger');
+  const controllerReconcile = controllerSource.slice(
+    controllerSource.indexOf('function reconcile(input) {'),
+    controllerSource.indexOf('function bindRegisteredAgent(input) {')
+  );
+  assert(controllerReconcile.includes('priorGeneration && priorGeneration !== status.generation')
+      && controllerReconcile.includes('if (restartLoss && !active)')
+      && controllerReconcile.includes("_settle(record, 'daemon_restart_lost_run', { cancel: false })"),
+    'restart loss requires prior generation change and matching explicit disposition');
+  assert(controllerSource.includes("_hasExactKeys(value, ['active', 'generation', 'restartLosses', 'routeLosses'])")
+      && controllerReconcile.includes('priorGeneration === status.generation && routeLoss')
+      && controllerReconcile.includes("_settle(record, 'route_lost', { cancel: false })"),
+    'wake route loss requires exact same-generation daemon evidence and never re-cancels');
+  assert(!controllerSource.includes('recoveryDisposition'),
+    'controller rejects caller-authored restart disposition shortcuts');
+  assert(!/(?:startOperation|delegate\.start|\badopt\b|\breplay\b)/.test(controllerReconcile),
+    'same-generation reconcile observes without start, adopt, or replay');
+  assert(controllerReconcile.includes("typeof registry.getDelegationHoldLease === 'function'")
+      && controllerReconcile.indexOf('registry.getDelegationHoldLease({')
+        < controllerReconcile.indexOf("_settle(record, 'resume_ownership_lost', { cancel: true })"),
+    'held wake requires the exact sealed lease before continued observation');
+  const terminalCommitSource = controllerSource.slice(
+    controllerSource.indexOf('async function _commitTerminal(record, code, release, options) {'),
+    controllerSource.indexOf('function _settle(record, requestedCode, options) {')
+  );
+  assert(terminalCommitSource.indexOf('await eventStore.markTerminal(record.delegationId')
+      < terminalCommitSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+      && terminalCommitSource.lastIndexOf('await _releaseHeartbeatOnce(record)')
+        < terminalCommitSource.lastIndexOf('var runtimeEvent = _emit(record'),
+    'terminal ledger commit precedes one heartbeat release and live fanout');
+  assert(!/chrome\.tabs\.query\s*\(\s*\{[^}]*\bactive\s*:/s.test(registrySource),
+    'registry never queries current active-tab state');
+  for (const method of ['sealHoldLease', 'restoreHoldLease', 'releaseDelegation']) {
+    assert(!backgroundSource.includes(`.${method}(`),
+      `background never mutates registry lifecycle directly through ${method}`);
+  }
+  for (const method of ['delegate.cancel', 'delegate.hold', 'delegate.resume']) {
+    assertEqual((backgroundSource.match(new RegExp(`'${method.replace('.', '\\.')}'`, 'g')) || []).length, 1,
+      `${method} transport exists only as an injected controller callback`);
+  }
+
+  const nativeWakeSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'native-host-wake.js'),
+    'utf8'
+  );
+  const preflightSource = fs.readFileSync(
+    path.join(__dirname, '..', 'extension', 'utils', 'delegation-preflight.js'),
+    'utf8'
+  );
+  assertEqual((nativeWakeSource.match(/\.connectNative\(/g) || []).length, 1,
+    'background helper owns one silent native presence API edge');
+  assertEqual((nativeWakeSource.match(/\.sendNativeMessage\(/g) || []).length, 1,
+    'background helper owns one actual native wake API edge');
+  assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(bridgeSource),
+    'bridge client remains native-free');
+  assert(!/(?:connectNative|sendNativeMessage|io\.github\.fullselfbrowsing\.fsb_native_host)/.test(preflightSource),
+    'pure preflight utility remains native-free');
 }
 
 // ---------------------------------------------------------------------------
 
 async function run() {
+  if (SELECTED_SECTION === 'codex-start-authority') {
+    await runCodexStartAuthorityCases();
+    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+    process.exit(failed > 0 ? 1 : 0);
+  }
+  if (SELECTED_SECTION === 'accepted-identity') {
+    await runAcceptedIdentityBoundaryCases();
+    console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
+    process.exit(failed > 0 ? 1 : 0);
+  }
   await runPrefersInternalDispatchCase();
   await runSendMessageFallbackCase();
   await runListCredentialsSecretStripCase();
   await runAgentActionDeprecationCase();
+  await runDriftSettlementCases();
+  await runTaskStatusRouteCase();
   await runWrapperBehaviorCases();
+  await runCompatibilityRefreshCases();
+  await runAgentRegistryBootstrapFailureCase();
+  await runDelegationBootQuarantineCase();
+  await runDelegationBootReadinessCase();
+  await runIndependentDelegationWakeBootstrapCase();
+  await runDelegationLateConnectFenceCase();
+  await runPairingRuntimeActionCases();
+  await runDelegationAuthorityCases();
+  await runDelegationProviderRoutingCases();
   runSourceContractCase();
 
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

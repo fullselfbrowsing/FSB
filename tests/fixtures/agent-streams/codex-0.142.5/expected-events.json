@@ -1,0 +1,52 @@
+[
+  {
+    "type": "init",
+    "sessionId": "synthetic-codex-thread-01",
+    "payload": {
+      "threadId": "synthetic-codex-thread-01"
+    }
+  },
+  {
+    "type": "assistant",
+    "sessionId": "synthetic-codex-thread-01",
+    "payload": {
+      "text": "synthetic-assistant-before-tool"
+    }
+  },
+  {
+    "type": "tool_use",
+    "sessionId": "synthetic-codex-thread-01",
+    "payload": {
+      "id": "synthetic-call-01",
+      "name": "mcp__fsb__search_capabilities"
+    }
+  },
+  {
+    "type": "tool_result",
+    "sessionId": "synthetic-codex-thread-01",
+    "payload": {
+      "tool_use_id": "synthetic-call-01",
+      "is_error": false
+    }
+  },
+  {
+    "type": "result",
+    "sessionId": "synthetic-codex-thread-01",
+    "payload": {
+      "subtype": "success",
+      "is_error": false,
+      "candidate": true,
+      "cost": null,
+      "tokens": {
+        "total": 150,
+        "input": 100,
+        "output": 50,
+        "reasoning": 10,
+        "cache": {
+          "read": 20,
+          "write": 0
+        }
+      }
+    }
+  }
+]

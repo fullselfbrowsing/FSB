@@ -1,6 +1,6 @@
 # FSB Chrome Extension
 
-`extension/` is the unpacked Chrome extension package for FSB v0.9.90. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
+`extension/` is the unpacked Chrome extension package for FSB v0.9.91. Public users should install FSB from the Chrome Web Store so Chrome can apply release updates automatically. Load this directory only for local development or an urgent unreleased fix.
 
 ## Load Unpacked
 
@@ -12,6 +12,10 @@
 6. Right-click the extension and choose **Open side panel**.
 
 After code changes, reload the extension from `chrome://extensions` and refresh any open tabs so content scripts re-inject.
+
+## Google Sheets Development
+
+Google Sheets capabilities reuse an already signed-in, agent-owned spreadsheet tab. They require no Google Cloud client ID, consent prompt, token setup, or Sheets-specific MCP update. Reload the unpacked extension after changes, refresh the open Sheet, and reconnect the existing MCP bridge. See [Google Sheets signed-in session integration](../docs/google-sheets-api.md) for the bounded operation contract and UAT gates.
 
 ## Key Entry Points
 

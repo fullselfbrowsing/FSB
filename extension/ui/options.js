@@ -1,7 +1,9 @@
-// FSB v0.9.90 - Modern Dashboard Control Panel Script
+// FSB v0.9.91 - Modern Dashboard Control Panel Script
 
 // Default settings
 const defaultSettings = {
+  providerKind: 'api',
+  agentProviderId: '',
   modelProvider: 'xai',
   modelName: 'grok-4-1-fast',
   apiKey: '',
@@ -37,7 +39,11 @@ const defaultSettings = {
   // Phase 245 D-07: global toggle for action change_report emission. When
   // false, the dispatcher skips harvest instrumentation entirely (zero
   // overhead) and action tool responses revert to pre-Phase-245 shape.
-  fsbChangeReportsEnabled: true
+  fsbChangeReportsEnabled: true,
+  // Exact-fidelity MCP replay is opt-out. Saved MCP sessions age out
+  // independently of Autopilot history.
+  fsbMcpSessionRecordingEnabled: true,
+  fsbMcpSessionRetentionDays: 30
 };
 
 let fsbRecommendedAgentCap = defaultSettings.fsbAgentCap;
@@ -59,6 +65,15 @@ function clampAgentCapValue(value, fallbackValue) {
   if (raw < 1) return 1;
   if (raw > 64) return 64;
   return raw;
+}
+
+function clampMcpSessionRetentionDays(value) {
+  let days = (typeof value === 'number') ? value : parseInt(value, 10);
+  if (!Number.isFinite(days)) days = defaultSettings.fsbMcpSessionRetentionDays;
+  days = Math.floor(days);
+  if (days < 1) return 1;
+  if (days > 365) return 365;
+  return days;
 }
 
 async function resolveRecommendedAgentCap() {
@@ -116,6 +131,44 @@ const dashboardState = {
   wsConnected: false
 };
 
+// Provider intent is kept separate from advisory inventory evidence. The
+// existing hidden #modelProvider select remains the API-only source of truth;
+// an agent id is never written into it.
+const providerPanelState = {
+  providerKind: 'api',
+  agentProviderId: '',
+  recommendation: { providerKind: 'api', providerId: 'xai', reason: 'fallback' },
+  clients: Object.create(null),
+  evidenceStatus: 'idle',
+  hasSuccessfulEvidence: false
+};
+
+let providerEvidenceRefreshPromise = null;
+let providerEvidenceRefreshDebounceHandle = null;
+let providerEvidenceRefreshQueued = false;
+let providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
+let providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
+let providerCompatibilityExpiryHandle = null;
+let providerCompatibilityProjectionPromise = null;
+let providerCompatibilityGeneration = 0;
+let providerManualRefreshGeneration = 0;
+let providerManualSuccess = null;
+const PROVIDER_EVIDENCE_TIMEOUT_MS = 5000;
+const MAX_TIMEOUT_DELAY_MS = 2_147_483_647;
+const MCP_BRIDGE_PAIRING_KEY = 'fsbMcpBridgePairing';
+const MCP_BRIDGE_STATE_KEY = 'mcpBridgeState';
+const MCP_BRIDGE_PAIRING_PATTERN = /^fsb-auth\.[A-Za-z0-9_-]{43}$/;
+const MCP_BRIDGE_PAIRING_COPY = Object.freeze({
+  paired: 'Local bridge paired for this browser session.',
+  configured: 'Pairing saved. Start or restart fsb-mcp-server serve, then retry.',
+  expired: 'Pairing code was rejected or expired. Run fsb-mcp-server pair again.',
+  unpaired: 'No local bridge pairing is saved for this browser session.'
+});
+let providerSettingsModelLoadTimer = null;
+let providerSettingsLoadGeneration = 0;
+let delegationTrustClearPending = false;
+let delegationTrustClearProviderId = '';
+
 // Initialize analytics
 let analytics = null;
 
@@ -153,6 +206,7 @@ function initializeDashboard() {
 
   // Load saved settings
   loadSettings();
+  loadMcpBridgePairingStatus();
 
   // Replace native <select>s with the custom dropdown widget. Runs after
   // loadSettings() so each select's current .value/.selected already
@@ -207,6 +261,47 @@ function cacheElements() {
   
   // Form elements
   elements.modelProvider = document.getElementById('modelProvider');
+  elements.providerRoster = document.getElementById('providerRoster');
+  elements.providerSelectionRadios = document.querySelectorAll('input[name="fsbProviderSelection"]');
+  elements.providerRecommendationBadges = document.querySelectorAll('[data-provider-recommendation]');
+  elements.providerEvidenceBadges = document.querySelectorAll('[data-provider-evidence]');
+  elements.providerDescriptions = document.querySelectorAll('[data-provider-description]');
+  elements.providerCompatibilityGroups = document.querySelectorAll('[data-provider-compatibility-group]');
+  elements.providerCompatibilityIcons = document.querySelectorAll('[data-provider-compatibility-icon]');
+  elements.providerCompatibilityStatuses = document.querySelectorAll('[data-provider-compatibility-status]');
+  elements.providerCompatibilityDescriptions = document.querySelectorAll('[data-provider-compatibility-description]');
+  elements.refreshProviderStatusBtn = document.getElementById('refreshProviderStatusBtn');
+  elements.providerEvidenceAnnouncement = document.getElementById('providerEvidenceAnnouncement');
+  elements.apiProviderDetails = document.getElementById('apiProviderDetails');
+  elements.agentProviderDetails = document.getElementById('agentProviderDetails');
+  elements.agentProviderDetailsHeading = document.getElementById('agentProviderDetailsHeading');
+  elements.agentNoCredentialCaption = document.getElementById('agentNoCredentialCaption');
+  elements.agentEvidenceEmptyState = document.getElementById('agentEvidenceEmptyState');
+  elements.agentInstallationStatus = document.getElementById('agentInstallationStatus');
+  elements.agentConnectionStatus = document.getElementById('agentConnectionStatus');
+  elements.agentCompatibilityStatus = document.getElementById('agentCompatibilityStatus');
+  elements.agentCompatibilityHelp = document.getElementById('agentCompatibilityHelp');
+  elements.agentCompatibilityChecked = document.getElementById('agentCompatibilityChecked');
+  elements.agentAccountStatus = document.getElementById('agentAccountStatus');
+  elements.agentAccountHelp = document.getElementById('agentAccountHelp');
+  elements.agentSetupStatus = document.getElementById('agentSetupStatus');
+  elements.openAgentSetupGuideBtn = document.getElementById('openAgentSetupGuideBtn');
+  elements.mcpBridgePairingCode = document.getElementById('mcpBridgePairingCode');
+  elements.pairMcpBridgeBtn = document.getElementById('pairMcpBridgeBtn');
+  elements.removeMcpBridgePairingBtn = document.getElementById('removeMcpBridgePairingBtn');
+  elements.mcpBridgePairingStatus = document.getElementById('mcpBridgePairingStatus');
+  elements.agentUsageTokens = document.getElementById('agentUsageTokens');
+  elements.agentUsageTurns = document.getElementById('agentUsageTurns');
+  elements.agentUsageDuration = document.getElementById('agentUsageDuration');
+  elements.agentUsageEmptyState = document.getElementById('agentUsageEmptyState');
+  elements.agentBillingStatus = document.getElementById('agentBillingStatus');
+  elements.agentBillingCopy = document.getElementById('agentBillingCopy');
+  elements.agentBillingLink = document.getElementById('agentBillingLink');
+  elements.agentBillingLinkLabel = document.getElementById('agentBillingLinkLabel');
+  ensureDelegationTrustControl();
+  elements.otherMcpClientsDisclosure = document.getElementById('otherMcpClientsDisclosure');
+  elements.otherMcpClientsSummary = document.getElementById('otherMcpClientsSummary');
+  elements.otherMcpClientsList = document.getElementById('otherMcpClientsList');
   elements.modelSearch = document.getElementById('modelSearch');
   elements.modelName = document.getElementById('modelName');
   elements.apiKey = document.getElementById('apiKey');
@@ -242,6 +337,8 @@ function cacheElements() {
   elements.fsbTriggerCapCurrentActive = document.getElementById('fsbTriggerCapCurrentActive');
   // Phase 245 D-07: Action Change Reports global toggle.
   elements.fsbChangeReportsEnabled = document.getElementById('fsbChangeReportsEnabled');
+  elements.fsbMcpSessionRecordingEnabled = document.getElementById('fsbMcpSessionRecordingEnabled');
+  elements.fsbMcpSessionRetentionDays = document.getElementById('fsbMcpSessionRetentionDays');
   elements.prioritizeViewport = document.getElementById('prioritizeViewport');
   elements.animatedActionHighlights = document.getElementById('animatedActionHighlights');
   elements.showSidepanelProgress = document.getElementById('showSidepanelProgress');
@@ -310,6 +407,1221 @@ function cacheElements() {
   elements.auditClearBtn = document.getElementById('auditClearBtn');
 }
 
+function ensureDelegationTrustControl() {
+  if (!elements.agentProviderDetails || elements.delegationTrustSection) return;
+  const section = document.createElement('section');
+  section.className = 'agent-provider-details__section';
+  section.hidden = true;
+  section.setAttribute('aria-labelledby', 'delegationTrustHeading');
+
+  const heading = document.createElement('h4');
+  heading.id = 'delegationTrustHeading';
+  heading.textContent = 'Run confirmation';
+  const copy = document.createElement('p');
+  copy.textContent = 'Require confirmation before the selected agent starts another delegated browser task.';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'form-secondary-btn provider-detail-action';
+  button.textContent = 'Restore confirmation';
+  const status = document.createElement('p');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.setAttribute('aria-atomic', 'true');
+
+  section.appendChild(heading);
+  section.appendChild(copy);
+  section.appendChild(button);
+  section.appendChild(status);
+  elements.agentProviderDetails.appendChild(section);
+  elements.delegationTrustSection = section;
+  elements.delegationTrustCopy = copy;
+  elements.delegationTrustClearBtn = button;
+  elements.delegationTrustStatus = status;
+}
+
+function getCanonicalDelegationProvider(providerId) {
+  const helper = (typeof globalThis !== 'undefined')
+    ? globalThis.FsbDelegationProviders
+    : null;
+  const get = getOwnDataValue(helper, 'get');
+  if (typeof get !== 'function' || typeof providerId !== 'string') return null;
+  let metadata;
+  try {
+    metadata = get.call(helper, providerId);
+  } catch (_error) {
+    return null;
+  }
+  const id = getOwnDataValue(metadata, 'id');
+  const label = getOwnDataValue(metadata, 'label');
+  const billingKind = getOwnDataValue(metadata, 'billingKind');
+  if (id !== providerId
+      || typeof label !== 'string'
+      || !label
+      || (billingKind !== 'subscription' && billingKind !== 'unknown')) return null;
+  return { id, label, billingKind };
+}
+
+function getShippedDelegationProviderIds() {
+  const helper = (typeof globalThis !== 'undefined')
+    ? globalThis.FsbDelegationProviders
+    : null;
+  const ids = getOwnDataValue(helper, 'ids');
+  if (typeof ids !== 'function') return [];
+  let values;
+  try {
+    values = ids.call(helper);
+  } catch (_error) {
+    return [];
+  }
+  if (!Array.isArray(values)) return [];
+  const shipped = [];
+  const seen = Object.create(null);
+  for (let index = 0; index < values.length; index += 1) {
+    const provider = getCanonicalDelegationProvider(values[index]);
+    if (!provider || Object.prototype.hasOwnProperty.call(seen, provider.id)) return [];
+    seen[provider.id] = true;
+    shipped.push(provider.id);
+  }
+  return shipped;
+}
+
+function renderDelegationTrustControl() {
+  if (!elements.delegationTrustSection) return;
+  const provider = providerPanelState.providerKind === 'agent'
+    ? getCanonicalDelegationProvider(providerPanelState.agentProviderId)
+    : null;
+  const visible = !!provider;
+  elements.delegationTrustSection.hidden = !visible;
+  if (!visible) {
+    if (elements.delegationTrustClearBtn) {
+      elements.delegationTrustClearBtn.disabled = delegationTrustClearPending;
+    }
+    if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = '';
+    return;
+  }
+  if (elements.delegationTrustCopy) {
+    elements.delegationTrustCopy.textContent =
+      `Require confirmation before ${provider.label} starts another delegated browser task.`;
+  }
+  if (elements.delegationTrustClearBtn) {
+    elements.delegationTrustClearBtn.textContent = `Restore confirmation for ${provider.label}`;
+    elements.delegationTrustClearBtn.disabled = delegationTrustClearPending;
+  }
+  if (delegationTrustClearPending
+      && delegationTrustClearProviderId !== provider.id
+      && elements.delegationTrustStatus) {
+    elements.delegationTrustStatus.textContent = '';
+  }
+}
+
+async function clearDelegationTrust() {
+  if (delegationTrustClearPending || providerPanelState.providerKind !== 'agent') return;
+  const provider = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+  if (!provider) return;
+  delegationTrustClearPending = true;
+  delegationTrustClearProviderId = provider.id;
+  if (elements.delegationTrustClearBtn) elements.delegationTrustClearBtn.disabled = true;
+  if (elements.delegationTrustStatus) elements.delegationTrustStatus.textContent = 'Restoring confirmation…';
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: 'FSB_DELEGATION_CLEAR_TRUST',
+      providerId: provider.id
+    });
+    if (!result
+        || result.ok !== true
+        || result.providerId !== provider.id
+        || result.trusted !== false) {
+      throw new Error('delegation trust clear was rejected');
+    }
+    const selected = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+    if (selected && selected.id === provider.id && elements.delegationTrustStatus) {
+      elements.delegationTrustStatus.textContent = `Confirmation restored for ${provider.label}`;
+    }
+  } catch (_error) {
+    const selected = getCanonicalDelegationProvider(providerPanelState.agentProviderId);
+    if (selected && selected.id === provider.id && elements.delegationTrustStatus) {
+      elements.delegationTrustStatus.textContent = 'Could not restore confirmation. Try again.';
+    }
+  } finally {
+    delegationTrustClearPending = false;
+    delegationTrustClearProviderId = '';
+    renderDelegationTrustControl();
+  }
+}
+
+function getProviderPanelHelper() {
+  const helper = (typeof globalThis !== 'undefined') ? globalThis.FSBProvidersPanel : null;
+  return helper
+    && typeof helper.isApiProvider === 'function'
+    && typeof helper.isAgentProvider === 'function'
+    && typeof helper.normalizeSettings === 'function'
+    && typeof helper.getCompatibilityDisplayModel === 'function'
+    && typeof helper.getAgentAuthDisplay === 'function'
+    ? helper
+    : null;
+}
+
+function getOwnDataValue(object, key) {
+  if (!object || typeof object !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key);
+    return descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      ? descriptor.value
+      : undefined;
+  } catch (_error) {
+    return undefined;
+  }
+}
+
+function isProviderDataRecord(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    return Object.prototype.toString.call(value) === '[object Object]';
+  } catch (_error) {
+    return false;
+  }
+}
+
+function copyProviderClientMap(value) {
+  if (!isProviderDataRecord(value)) return null;
+  const copy = Object.create(null);
+  try {
+    Object.keys(value).forEach((key) => {
+      const row = getOwnDataValue(value, key);
+      if (isProviderDataRecord(row)) copy[key] = row;
+    });
+  } catch (_error) {
+    return null;
+  }
+  return copy;
+}
+
+function copyProviderDataRecord(value) {
+  if (!isProviderDataRecord(value)) return {};
+  let prototype = Object.prototype;
+  try {
+    const candidate = Object.getPrototypeOf(value);
+    if (candidate && Object.getPrototypeOf(candidate) === null) prototype = candidate;
+  } catch (_error) { /* use this realm's plain-object prototype */ }
+  const copy = Object.create(prototype);
+  try {
+    Object.keys(value).forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return;
+      Object.defineProperty(copy, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    });
+  } catch (_error) { /* return only the safely copied fields */ }
+  return copy;
+}
+
+function projectStaleProviderCompatibility(clients) {
+  const projected = copyProviderClientMap(clients) || Object.create(null);
+  getShippedDelegationProviderIds().forEach((providerId) => {
+    const row = getOwnDataValue(projected, providerId);
+    if (!isProviderDataRecord(row)) return;
+    const nextRow = copyProviderDataRecord(row);
+    nextRow.authState = 'unknown';
+    delete nextRow.acceptedIdentity;
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const status = getOwnDataValue(compatibility, 'status');
+    const reason = getOwnDataValue(compatibility, 'reason');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    const runnable = (status === 'supported' && reason === 'within_tested_range')
+      || (status === 'degraded' && reason === 'newer_than_tested_range');
+    if (!runnable || !Number.isSafeInteger(checkedAt) || checkedAt < 0) {
+      projected[providerId] = nextRow;
+      return;
+    }
+    const nextCompatibility = copyProviderDataRecord(compatibility);
+    nextCompatibility.status = 'degraded';
+    nextCompatibility.reason = 'evidence_stale';
+    nextCompatibility.checkedAt = checkedAt;
+    nextRow.compatibility = nextCompatibility;
+    projected[providerId] = nextRow;
+  });
+  return projected;
+}
+
+function getProviderCompatibilityCheckedAt(clients) {
+  const providerIds = getShippedDelegationProviderIds();
+  if (!providerIds.length) return null;
+  let earliest = null;
+  for (const providerId of providerIds) {
+    const row = getOwnDataValue(clients, providerId);
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    if (!Number.isSafeInteger(checkedAt) || checkedAt < 0) return null;
+    earliest = earliest === null ? checkedAt : Math.min(earliest, checkedAt);
+  }
+  return earliest;
+}
+
+function getProviderStorageCompatibilityCheckedAt(change) {
+  const nextEnvelope = getOwnDataValue(change, 'newValue');
+  const compatibility = getOwnDataValue(nextEnvelope, 'compatibility');
+  const schemaVersion = getOwnDataValue(compatibility, 'schemaVersion');
+  const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+  return schemaVersion === 2 && Number.isSafeInteger(checkedAt) && checkedAt >= 0
+    ? checkedAt
+    : null;
+}
+
+function newestProviderCompatibilityCheckedAt(current, candidate) {
+  if (!Number.isSafeInteger(candidate) || candidate < 0) return current;
+  if (!Number.isSafeInteger(current) || current < 0) return candidate;
+  return Math.max(current, candidate);
+}
+
+function getProviderManualSuccessToken(observedCheckedAt) {
+  const success = providerManualSuccess;
+  if (!success
+      || !Number.isSafeInteger(observedCheckedAt)
+      || observedCheckedAt < 0) return null;
+  return { generation: success.generation, checkedAt: success.checkedAt };
+}
+
+function isCurrentProviderManualSuccess(token) {
+  return !!token && !!providerManualSuccess
+    && token.generation === providerManualSuccess.generation
+    && token.checkedAt === providerManualSuccess.checkedAt;
+}
+
+function consumeProviderManualSuccess(token) {
+  if (isCurrentProviderManualSuccess(token)) providerManualSuccess = null;
+}
+
+function isValidProviderCompatibilityProjection(value) {
+  if (!isProviderDataRecord(value)) return false;
+  const status = getOwnDataValue(value, 'status');
+  const reason = getOwnDataValue(value, 'reason');
+  const checkedAt = getOwnDataValue(value, 'checkedAt');
+  if (!Number.isSafeInteger(checkedAt) || checkedAt < 0) return false;
+  if (status === 'supported') return reason === 'within_tested_range';
+  if (status === 'degraded') {
+    return reason === 'newer_than_tested_range' || reason === 'evidence_stale';
+  }
+  return status === 'unsupported' && [
+    'binary_not_found',
+    'version_missing',
+    'version_malformed',
+    'below_minimum',
+    'wrong_major',
+    'adapter_unshipped',
+    'matrix_invalid'
+  ].includes(reason);
+}
+
+function mergeProviderCompatibilityProjection(currentClients, projectedClients) {
+  const helper = getProviderPanelHelper();
+  const merged = copyProviderClientMap(currentClients) || Object.create(null);
+  if (!helper || !Array.isArray(helper.AGENT_PROVIDER_IDS)) return null;
+  let mergedAny = false;
+  helper.AGENT_PROVIDER_IDS.forEach((providerId) => {
+    const currentRow = getOwnDataValue(merged, providerId);
+    const projectedRow = getOwnDataValue(projectedClients, providerId);
+    const compatibility = getOwnDataValue(projectedRow, 'compatibility');
+    if (!isProviderDataRecord(currentRow)
+        || !isValidProviderCompatibilityProjection(compatibility)) return;
+    const nextRow = copyProviderDataRecord(currentRow);
+    nextRow.compatibility = copyProviderDataRecord(compatibility);
+    const authState = getOwnDataValue(projectedRow, 'authState');
+    nextRow.authState = ['chatgpt', 'api_key', 'unauthenticated', 'unknown'].includes(authState)
+      ? authState
+      : 'unknown';
+    delete nextRow.acceptedIdentity;
+    merged[providerId] = nextRow;
+    mergedAny = true;
+  });
+  return mergedAny ? merged : null;
+}
+
+function hasDegradedProviderCompatibility(clients) {
+  return getShippedDelegationProviderIds().some((providerId) => {
+    const row = getOwnDataValue(clients, providerId);
+    const compatibility = getOwnDataValue(row, 'compatibility');
+    const status = getOwnDataValue(compatibility, 'status');
+    const reason = getOwnDataValue(compatibility, 'reason');
+    const checkedAt = getOwnDataValue(compatibility, 'checkedAt');
+    return status === 'degraded'
+      && (reason === 'newer_than_tested_range' || reason === 'evidence_stale')
+      && Number.isSafeInteger(checkedAt)
+      && checkedAt >= 0;
+  });
+}
+
+function getCompatibilityRefreshFailureMessage(clients) {
+  return hasDegradedProviderCompatibility(clients)
+    ? 'Compatibility data could not be refreshed. Cached support is now Degraded.'
+    : 'Compatibility data is unavailable. Showing Unsupported.';
+}
+
+function requestMcpClients(liveCompatibility = false) {
+  return new Promise((resolve, reject) => {
+    const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
+    if (!runtime || typeof runtime.sendMessage !== 'function') {
+      reject(new Error('provider_status_unavailable'));
+      return;
+    }
+
+    let settled = false;
+    let timeoutHandle = null;
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      callback(value);
+    };
+    timeoutHandle = setTimeout(() => {
+      settle(reject, new Error('provider_status_unavailable'));
+    }, PROVIDER_EVIDENCE_TIMEOUT_MS);
+
+    try {
+      const request = liveCompatibility
+        ? { action: 'refreshMcpCompatibility' }
+        : { action: 'getMcpClients' };
+      runtime.sendMessage(request, (response) => {
+        if (settled) return;
+        if (runtime.lastError) {
+          settle(reject, new Error('provider_status_unavailable'));
+          return;
+        }
+        if (!isProviderDataRecord(response) || getOwnDataValue(response, 'success') !== true) {
+          settle(reject, new Error('provider_status_unavailable'));
+          return;
+        }
+        const clients = copyProviderClientMap(getOwnDataValue(response, 'clients'));
+        const refreshOutcome = getOwnDataValue(response, 'refreshOutcome');
+        const compatibilityExpiresAt = getOwnDataValue(response, 'compatibilityExpiresAt');
+        const validExpiry = compatibilityExpiresAt === null
+          || (Number.isSafeInteger(compatibilityExpiresAt) && compatibilityExpiresAt >= 0);
+        if (!clients || !['refreshed', 'stale', 'unavailable'].includes(refreshOutcome)
+            || !validExpiry) {
+          settle(reject, new Error('provider_status_unavailable'));
+          return;
+        }
+        settle(resolve, {
+          clients: clients,
+          refreshOutcome: refreshOutcome,
+          compatibilityExpiresAt: compatibilityExpiresAt
+        });
+      });
+    } catch (_error) {
+      settle(reject, new Error('provider_status_unavailable'));
+    }
+  });
+}
+
+function getProviderBadgeByData(badges, dataKey, providerId) {
+  let match = null;
+  Array.prototype.some.call(badges || [], (badge) => {
+    if (badge.dataset?.[dataKey] !== providerId) return false;
+    match = badge;
+    return true;
+  });
+  return match;
+}
+
+function getProviderCompatibilityModel(helper, providerId) {
+  const row = getOwnDataValue(providerPanelState.clients, providerId);
+  return helper.getCompatibilityDisplayModel(providerId, row, (checkedAt) => {
+    return new Date(checkedAt).toLocaleString();
+  });
+}
+
+function setProviderCompatibilityClass(status, model) {
+  if (!status || !status.classList || !model) return;
+  status.classList.remove(
+    'compatibility-badge--supported',
+    'compatibility-badge--degraded',
+    'compatibility-badge--unsupported'
+  );
+  status.classList.add(model.className);
+}
+
+function setProviderCompatibilityIcon(icon, model) {
+  if (!icon || !icon.classList || !model) return;
+  icon.classList.remove('fa-circle-check', 'fa-triangle-exclamation', 'fa-circle-xmark');
+  icon.classList.add(model.icon);
+  icon.setAttribute('aria-hidden', 'true');
+}
+
+function renderProviderCompatibility() {
+  const helper = getProviderPanelHelper();
+  if (!helper || typeof helper.getCompatibilityDisplayModel !== 'function') return;
+  const statuses = elements.providerCompatibilityStatuses || [];
+
+  Array.prototype.forEach.call(statuses, (status) => {
+    const providerId = status.dataset?.providerCompatibilityStatus;
+    if (!helper.isAgentProvider(providerId)) return;
+    const model = getProviderCompatibilityModel(helper, providerId);
+    if (!model) return;
+    const icon = getProviderBadgeByData(
+      elements.providerCompatibilityIcons,
+      'providerCompatibilityIcon',
+      providerId
+    );
+    const description = getProviderBadgeByData(
+      elements.providerCompatibilityDescriptions,
+      'providerCompatibilityDescription',
+      providerId
+    );
+    status.textContent = model.label;
+    setProviderCompatibilityClass(status, model);
+    setProviderCompatibilityIcon(icon, model);
+    if (description) {
+      description.textContent = `Compatibility: ${model.label}. ${model.detail}`;
+    }
+  });
+}
+
+function renderProviderAccessibleDescriptions() {
+  const helper = getProviderPanelHelper();
+  if (!helper) return;
+  const descriptions = elements.providerDescriptions || [];
+
+  Array.prototype.forEach.call(descriptions, (description) => {
+    const providerId = description.dataset?.providerDescription;
+    const parts = [];
+    const recommendationBadge = getProviderBadgeByData(
+      elements.providerRecommendationBadges,
+      'providerRecommendation',
+      providerId
+    );
+    if (recommendationBadge && !recommendationBadge.hidden) {
+      parts.push('Recommended.');
+    }
+
+    if (helper.isAgentProvider(providerId)) {
+      const evidenceBadge = getProviderBadgeByData(
+        elements.providerEvidenceBadges,
+        'providerEvidence',
+        providerId
+      );
+      const evidenceText = evidenceBadge && !evidenceBadge.hidden
+        ? String(evidenceBadge.textContent || '').trim()
+        : '';
+      if (evidenceText) {
+        parts.push(/[.!?…]$/.test(evidenceText) ? evidenceText : `${evidenceText}.`);
+      }
+    }
+
+    description.textContent = parts.join(' ');
+  });
+}
+
+function renderProviderRecommendation() {
+  const helper = getProviderPanelHelper();
+  const recommendation = providerPanelState.recommendation;
+  const badges = elements.providerRecommendationBadges || [];
+  let shown = false;
+
+  Array.prototype.forEach.call(badges, (badge) => {
+    badge.hidden = true;
+    const providerId = badge.dataset?.providerRecommendation;
+    const providerKind = helper && helper.isAgentProvider(providerId) ? 'agent' : 'api';
+    if (!shown && recommendation
+        && recommendation.providerKind === providerKind
+        && recommendation.providerId === providerId) {
+      badge.hidden = false;
+      shown = true;
+    }
+  });
+  renderProviderAccessibleDescriptions();
+}
+
+function setProviderEvidenceBadgeClass(badge, status) {
+  if (!badge || !badge.classList) return;
+  badge.classList.remove(
+    'provider-badge--connected',
+    'provider-badge--installed',
+    'provider-badge--seen',
+    'provider-badge--error',
+    'provider-badge--neutral'
+  );
+  if (providerPanelState.evidenceStatus === 'unavailable') {
+    badge.classList.add('provider-badge--error');
+  } else if (status.live) {
+    badge.classList.add('provider-badge--connected');
+  } else if (status.installed) {
+    badge.classList.add('provider-badge--installed');
+  } else if (status.seenBefore) {
+    badge.classList.add('provider-badge--seen');
+  } else {
+    badge.classList.add('provider-badge--neutral');
+  }
+}
+
+function hasSupportedAgentEvidence(helper) {
+  return helper.AGENT_PROVIDER_IDS.some((providerId) => {
+    const row = getOwnDataValue(providerPanelState.clients, providerId);
+    const status = helper.getAgentStatus(row);
+    return status.clicked || status.installed || status.seenBefore || status.live;
+  });
+}
+
+function safeObservedClientName(id, row) {
+  const displayName = getOwnDataValue(row, 'displayName');
+  const candidate = typeof displayName === 'string' && displayName.trim()
+    ? displayName.trim()
+    : id;
+  return String(candidate).slice(0, 200);
+}
+
+function renderOtherMcpClients(helper) {
+  const disclosure = elements.otherMcpClientsDisclosure;
+  const summary = elements.otherMcpClientsSummary;
+  const list = elements.otherMcpClientsList;
+  if (!disclosure || !summary || !list) return;
+
+  const rows = [];
+  Object.keys(providerPanelState.clients).forEach((id) => {
+    const row = getOwnDataValue(providerPanelState.clients, id);
+    if (!isProviderDataRecord(row)) return;
+    const raw = getOwnDataValue(row, 'raw') === true;
+    if (!raw && (helper.isApiProvider(id) || helper.isAgentProvider(id))) return;
+    rows.push({ id: id, name: safeObservedClientName(id, row) });
+  });
+  rows.sort((a, b) => {
+    const aName = a.name.toLocaleLowerCase();
+    const bName = b.name.toLocaleLowerCase();
+    if (aName < bName) return -1;
+    if (aName > bName) return 1;
+    return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+  });
+
+  summary.textContent = `Other MCP clients (${rows.length})`;
+  list.textContent = '';
+  rows.forEach((row) => {
+    const item = document.createElement('li');
+    item.textContent = `${row.name} — Observed MCP client`;
+    list.appendChild(item);
+  });
+  disclosure.hidden = rows.length === 0;
+  if (rows.length === 0) disclosure.open = false;
+}
+
+function renderProviderEvidence() {
+  const helper = getProviderPanelHelper();
+  if (!helper || typeof helper.getAgentStatus !== 'function') return;
+  const badges = elements.providerEvidenceBadges || [];
+
+  Array.prototype.forEach.call(badges, (badge) => {
+    const providerId = badge.dataset?.providerEvidence;
+    if (!helper.isAgentProvider(providerId)) {
+      badge.hidden = true;
+      return;
+    }
+    const row = getOwnDataValue(providerPanelState.clients, providerId);
+    const status = helper.getAgentStatus(row);
+    let label = status.primaryLabel;
+    if (providerPanelState.evidenceStatus === 'loading' && !providerPanelState.hasSuccessfulEvidence) {
+      label = 'Loading provider status…';
+    } else if (providerPanelState.evidenceStatus === 'unavailable') {
+      label = 'Status unavailable';
+    } else if (providerPanelState.evidenceStatus === 'stale') {
+      label = `${status.primaryLabel} · Status may be stale`;
+    }
+    badge.textContent = label;
+    badge.hidden = false;
+    setProviderEvidenceBadgeClass(badge, status);
+    if (providerPanelState.evidenceStatus === 'stale') {
+      badge.setAttribute('data-stale', 'true');
+      badge.setAttribute('title', 'Status may be stale. Refresh after the FSB server reconnects.');
+    } else {
+      badge.removeAttribute('data-stale');
+      if (status.checkedAt !== null) {
+        badge.setAttribute('title', `Installed status checked ${new Date(status.checkedAt).toLocaleString()}`);
+      } else {
+        badge.removeAttribute('title');
+      }
+    }
+  });
+  renderProviderAccessibleDescriptions();
+
+  if (elements.agentEvidenceEmptyState) {
+    const absenceConfirmed = providerPanelState.evidenceStatus === 'ready'
+      && !hasSupportedAgentEvidence(helper);
+    elements.agentEvidenceEmptyState.hidden = !absenceConfirmed;
+  }
+  renderProviderCompatibility();
+  renderOtherMcpClients(helper);
+}
+
+function renderSelectedAgentCompatibility(helper, providerId) {
+  const compatibility = getProviderCompatibilityModel(helper, providerId);
+  if (elements.agentCompatibilityStatus && compatibility) {
+    elements.agentCompatibilityStatus.textContent = compatibility.label;
+  }
+  if (elements.agentCompatibilityHelp && compatibility) {
+    elements.agentCompatibilityHelp.textContent = compatibility.detail;
+  }
+  if (elements.agentCompatibilityChecked && compatibility) {
+    elements.agentCompatibilityChecked.textContent = compatibility.checkedText || '';
+    elements.agentCompatibilityChecked.hidden = !compatibility.checkedText;
+  }
+}
+
+function renderSelectedAgentDetails() {
+  const helper = getProviderPanelHelper();
+  renderDelegationTrustControl();
+  if (!helper || providerPanelState.providerKind !== 'agent'
+      || !helper.isAgentProvider(providerPanelState.agentProviderId)) return;
+  const providerId = providerPanelState.agentProviderId;
+  const definition = helper.getProviderDefinition('agent', providerId);
+  if (!definition) return;
+  const row = getOwnDataValue(providerPanelState.clients, providerId);
+  const status = helper.getAgentStatus(row);
+  const auth = helper.getAgentAuthDisplay(providerId, row);
+  const unavailable = providerPanelState.evidenceStatus === 'unavailable';
+  const initialLoading = providerPanelState.evidenceStatus === 'loading'
+    && !providerPanelState.hasSuccessfulEvidence;
+  const billing = helper.getBillingLabel(providerId, row);
+
+  if (elements.agentProviderDetailsHeading) {
+    elements.agentProviderDetailsHeading.textContent = `${definition.displayName} details`;
+  }
+  if (elements.agentNoCredentialCaption) {
+    elements.agentNoCredentialCaption.textContent = "FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.";
+  }
+  if (elements.agentInstallationStatus) {
+    elements.agentInstallationStatus.textContent = initialLoading
+      ? 'Loading provider status…'
+      : unavailable
+      ? 'Status unavailable'
+      : (status.installed ? 'Installed' : 'Not installed');
+  }
+  if (elements.agentConnectionStatus) {
+    elements.agentConnectionStatus.textContent = initialLoading
+      ? 'Loading provider status…'
+      : unavailable
+      ? 'Status unavailable'
+      : (status.live ? 'Connected now' : (status.seenBefore ? 'Seen before' : 'Not connected'));
+  }
+  renderSelectedAgentCompatibility(helper, providerId);
+  if (elements.agentAccountStatus && auth) elements.agentAccountStatus.textContent = auth.label;
+  if (elements.agentAccountHelp) {
+    elements.agentAccountHelp.textContent = auth ? auth.help : '';
+  }
+  if (elements.agentSetupStatus) {
+    if (providerPanelState.evidenceStatus === 'stale') {
+      elements.agentSetupStatus.textContent = 'Status may be stale. Refresh after the FSB server reconnects.';
+    } else if (unavailable) {
+      elements.agentSetupStatus.textContent = 'Agent status is unavailable. Your selection is unchanged.';
+    } else if (status.clicked && !status.installed) {
+      elements.agentSetupStatus.textContent = 'Setup was copied during onboarding. Installation is not confirmed.';
+    } else if (status.installed) {
+      elements.agentSetupStatus.textContent = 'This CLI is installed. Open the setup guide to review its FSB connection.';
+    } else {
+      elements.agentSetupStatus.textContent = 'Open the setup guide to connect this CLI to FSB.';
+    }
+  }
+  if (elements.agentUsageTokens) elements.agentUsageTokens.textContent = '—';
+  if (elements.agentUsageTurns) elements.agentUsageTurns.textContent = '—';
+  if (elements.agentUsageDuration) elements.agentUsageDuration.textContent = '—';
+  if (elements.agentUsageEmptyState) elements.agentUsageEmptyState.textContent = 'No delegated runs yet';
+  if (elements.agentBillingStatus) elements.agentBillingStatus.textContent = billing.label;
+  if (elements.agentBillingCopy) elements.agentBillingCopy.textContent = definition.billingCopy;
+  if (elements.agentBillingLink) {
+    elements.agentBillingLink.setAttribute('href', definition.billingUrl);
+    elements.agentBillingLink.setAttribute('target', '_blank');
+    elements.agentBillingLink.setAttribute('rel', 'noopener noreferrer');
+    elements.agentBillingLink.hidden = false;
+  }
+  if (elements.agentBillingLinkLabel) {
+    elements.agentBillingLinkLabel.textContent = definition.billingLinkLabel;
+  }
+}
+
+function openAgentSetupGuide() {
+  const runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
+  const setupUrl = runtime && typeof runtime.getURL === 'function'
+    ? runtime.getURL('ui/onboarding.html')
+    : 'onboarding.html';
+  if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.create === 'function') {
+    chrome.tabs.create({ url: setupUrl });
+  } else if (typeof window !== 'undefined' && typeof window.open === 'function') {
+    window.open(setupUrl, '_blank', 'noopener');
+  }
+}
+
+function renderMcpBridgePairingStatus(status, isAlert = false) {
+  const statusElement = elements.mcpBridgePairingStatus;
+  const normalized = Object.prototype.hasOwnProperty.call(MCP_BRIDGE_PAIRING_COPY, status)
+    ? status
+    : 'unpaired';
+  if (!statusElement) return normalized;
+  statusElement.textContent = MCP_BRIDGE_PAIRING_COPY[normalized];
+  statusElement.setAttribute('role', isAlert ? 'alert' : 'status');
+  statusElement.setAttribute('aria-live', isAlert ? 'assertive' : 'polite');
+  statusElement.setAttribute('aria-atomic', 'true');
+  return normalized;
+}
+
+function requestMcpBridgePairingReload() {
+  return new Promise((resolve) => {
+    const runtime = typeof chrome !== 'undefined' && chrome ? chrome.runtime : null;
+    if (!runtime || typeof runtime.sendMessage !== 'function') {
+      resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_unavailable' });
+      return;
+    }
+    try {
+      runtime.sendMessage({ action: 'reloadMcpBridgePairing' }, (response) => {
+        if (runtime.lastError) {
+          resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+          return;
+        }
+        resolve(response && typeof response === 'object'
+          ? response
+          : { success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+      });
+    } catch (_error) {
+      resolve({ success: false, errorCode: 'mcp_bridge_pairing_reload_failed' });
+    }
+  });
+}
+
+async function pairMcpBridge() {
+  const input = elements.mcpBridgePairingCode;
+  const pairingCode = String(input && input.value ? input.value : '').trim();
+  if (!MCP_BRIDGE_PAIRING_PATTERN.test(pairingCode)) {
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Enter the pairing code printed by fsb-mcp-server pair.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+      elements.mcpBridgePairingStatus.setAttribute('aria-atomic', 'true');
+    }
+    return { success: false, errorCode: 'invalid_pairing_code' };
+  }
+
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  if (!session || typeof session.set !== 'function') {
+    if (input) input.value = '';
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be saved. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_storage_unavailable' };
+  }
+
+  try {
+    const storageWrite = session.set({
+      [MCP_BRIDGE_PAIRING_KEY]: { pairingCode: pairingCode, storedAt: Date.now() }
+    });
+    // The DOM copy is cleared immediately after initiating the trusted session
+    // write and before any runtime message or network reconnect begins.
+    if (input) input.value = '';
+    await Promise.resolve(storageWrite);
+  } catch (_error) {
+    if (input) input.value = '';
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be saved. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_storage_failed' };
+  }
+
+  const response = await requestMcpBridgePairingReload();
+  const status = response && response.success === true
+    && Object.prototype.hasOwnProperty.call(MCP_BRIDGE_PAIRING_COPY, response.pairingStatus)
+    ? response.pairingStatus
+    : 'configured';
+  renderMcpBridgePairingStatus(status, status === 'expired');
+  return { success: response && response.success === true, pairingStatus: status };
+}
+
+async function removeMcpBridgePairing() {
+  const input = elements.mcpBridgePairingCode;
+  if (input) input.value = '';
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  try {
+    if (!session || typeof session.remove !== 'function') throw new Error('session unavailable');
+    await Promise.resolve(session.remove(MCP_BRIDGE_PAIRING_KEY));
+  } catch (_error) {
+    if (elements.mcpBridgePairingStatus) {
+      elements.mcpBridgePairingStatus.textContent = 'Pairing could not be removed. Try again.';
+      elements.mcpBridgePairingStatus.setAttribute('role', 'alert');
+      elements.mcpBridgePairingStatus.setAttribute('aria-live', 'assertive');
+    }
+    return { success: false, errorCode: 'pairing_session_remove_failed' };
+  }
+
+  await requestMcpBridgePairingReload();
+  if (elements.mcpBridgePairingStatus) {
+    elements.mcpBridgePairingStatus.textContent = 'Pairing removed.';
+    elements.mcpBridgePairingStatus.setAttribute('role', 'status');
+    elements.mcpBridgePairingStatus.setAttribute('aria-live', 'polite');
+    elements.mcpBridgePairingStatus.setAttribute('aria-atomic', 'true');
+  }
+  return { success: true, pairingStatus: 'unpaired' };
+}
+
+async function loadMcpBridgePairingStatus() {
+  if (elements.mcpBridgePairingCode) elements.mcpBridgePairingCode.value = '';
+  const session = typeof chrome !== 'undefined' ? chrome.storage?.session : null;
+  if (!session || typeof session.get !== 'function') {
+    return renderMcpBridgePairingStatus('unpaired');
+  }
+  try {
+    const stored = await session.get([MCP_BRIDGE_STATE_KEY]);
+    const status = stored && stored[MCP_BRIDGE_STATE_KEY]
+      ? stored[MCP_BRIDGE_STATE_KEY].pairingStatus
+      : 'unpaired';
+    return renderMcpBridgePairingStatus(status, status === 'expired');
+  } catch (_error) {
+    return renderMcpBridgePairingStatus('unpaired');
+  }
+}
+
+function setProviderEvidenceAnnouncement(message, isAlert = false) {
+  const announcement = elements.providerEvidenceAnnouncement;
+  if (!announcement) return;
+  announcement.textContent = message || '';
+  announcement.hidden = !message;
+  announcement.setAttribute('role', isAlert ? 'alert' : 'status');
+  announcement.setAttribute('aria-live', isAlert ? 'assertive' : 'polite');
+}
+
+function getSelectedCompatibilityLabel(helper) {
+  if (!helper || providerPanelState.providerKind !== 'agent'
+      || !helper.isAgentProvider(providerPanelState.agentProviderId)) return null;
+  const model = getProviderCompatibilityModel(helper, providerPanelState.agentProviderId);
+  return model ? model.label : null;
+}
+
+function clearProviderCompatibilityExpiryTimer() {
+  if (providerCompatibilityExpiryHandle === null) return;
+  clearTimeout(providerCompatibilityExpiryHandle);
+  providerCompatibilityExpiryHandle = null;
+}
+
+function beginProviderCompatibilityGeneration() {
+  providerCompatibilityGeneration += 1;
+  return providerCompatibilityGeneration;
+}
+
+function clearProviderEvidenceRefreshDebounce() {
+  if (providerEvidenceRefreshDebounceHandle !== null) {
+    clearTimeout(providerEvidenceRefreshDebounceHandle);
+  }
+  providerEvidenceRefreshDebounceHandle = null;
+  providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
+}
+
+function discardPendingProviderEvidenceRefresh() {
+  clearProviderEvidenceRefreshDebounce();
+  providerEvidenceRefreshQueued = false;
+  providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
+}
+
+function scheduleProviderCompatibilityExpiry(expiresAt) {
+  clearProviderCompatibilityExpiryTimer();
+  if (!Number.isSafeInteger(expiresAt) || expiresAt < 0) return;
+  let now;
+  try {
+    now = Date.now();
+  } catch (_error) {
+    return;
+  }
+  if (!Number.isSafeInteger(now) || now < 0) return;
+  const delay = Math.max(0, expiresAt - now);
+  if (!Number.isSafeInteger(delay) || delay > MAX_TIMEOUT_DELAY_MS) return;
+  providerCompatibilityExpiryHandle = setTimeout(() => {
+    providerCompatibilityExpiryHandle = null;
+    refreshProviderCompatibilityProjection();
+  }, delay);
+}
+
+function refreshProviderCompatibilityProjection() {
+  if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
+  if (providerCompatibilityProjectionPromise) return providerCompatibilityProjectionPromise;
+  const helper = getProviderPanelHelper();
+  const compatibilityGeneration = beginProviderCompatibilityGeneration();
+  let tracked;
+  tracked = requestMcpClients(false)
+    .then((result) => {
+      if (compatibilityGeneration !== providerCompatibilityGeneration) {
+        return providerPanelState.clients;
+      }
+      if (result.refreshOutcome === 'unavailable') {
+        throw new Error('provider_compatibility_unavailable');
+      }
+      const merged = mergeProviderCompatibilityProjection(
+        providerPanelState.clients,
+        result.clients
+      );
+      if (!merged) throw new Error('provider_compatibility_unavailable');
+      providerPanelState.clients = merged;
+      scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
+      renderProviderCompatibility();
+      if (helper && providerPanelState.providerKind === 'agent'
+          && helper.isAgentProvider(providerPanelState.agentProviderId)) {
+        renderSelectedAgentDetails();
+      }
+      return providerPanelState.clients;
+    })
+    .catch(() => {
+      if (compatibilityGeneration !== providerCompatibilityGeneration) {
+        return providerPanelState.clients;
+      }
+      clearProviderCompatibilityExpiryTimer();
+      providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
+      renderProviderCompatibility();
+      if (helper && providerPanelState.providerKind === 'agent'
+          && helper.isAgentProvider(providerPanelState.agentProviderId)) {
+        renderSelectedAgentDetails();
+      }
+      return providerPanelState.clients;
+    })
+    .finally(() => {
+      if (providerCompatibilityProjectionPromise === tracked) {
+        providerCompatibilityProjectionPromise = null;
+      }
+    });
+  providerCompatibilityProjectionPromise = tracked;
+  return tracked;
+}
+
+function refreshProviderEvidence({
+  announce = false,
+  liveCompatibility = announce,
+  preserveManualSuccess = null
+} = {}) {
+  const wantsLiveCompatibility = liveCompatibility === true;
+  if (providerEvidenceRefreshPromise) return providerEvidenceRefreshPromise;
+
+  beginProviderCompatibilityGeneration();
+  const helper = getProviderPanelHelper();
+  const previousCompatibilityLabel = getSelectedCompatibilityLabel(helper);
+  const preserveCurrentSuccess = isCurrentProviderManualSuccess(preserveManualSuccess)
+    && providerPanelState.hasSuccessfulEvidence
+    && providerPanelState.evidenceStatus === 'ready';
+  const manualGeneration = wantsLiveCompatibility
+    ? ++providerManualRefreshGeneration
+    : null;
+  if (manualGeneration !== null) {
+    providerManualSuccess = null;
+    discardPendingProviderEvidenceRefresh();
+    clearProviderCompatibilityExpiryTimer();
+  }
+  setProviderStatusRefreshing(true);
+  if (!preserveCurrentSuccess) {
+    providerPanelState.evidenceStatus = 'loading';
+    setProviderEvidenceAnnouncement('');
+    renderProviderRecommendation();
+    renderProviderEvidence();
+    renderSelectedAgentDetails();
+  }
+
+  providerEvidenceRefreshPromise = requestMcpClients(liveCompatibility === true)
+    .then((result) => {
+      const resultCheckedAt = getProviderCompatibilityCheckedAt(result.clients);
+      const matchingManualSuccess = preserveCurrentSuccess
+        && isCurrentProviderManualSuccess(preserveManualSuccess)
+        && result.refreshOutcome !== 'unavailable'
+        && resultCheckedAt !== null
+        && resultCheckedAt >= preserveManualSuccess.checkedAt;
+      if (manualGeneration !== null && result.refreshOutcome === 'refreshed'
+          && resultCheckedAt !== null) {
+        providerManualSuccess = {
+          generation: manualGeneration,
+          checkedAt: resultCheckedAt
+        };
+      }
+      if (!preserveCurrentSuccess || matchingManualSuccess) {
+        providerPanelState.clients = result.clients;
+        providerPanelState.hasSuccessfulEvidence = result.refreshOutcome !== 'unavailable';
+        providerPanelState.evidenceStatus = matchingManualSuccess
+          ? 'ready'
+          : (result.refreshOutcome === 'refreshed' ? 'ready' : result.refreshOutcome);
+        providerPanelState.recommendation = helper.getRecommendation(result.clients);
+        scheduleProviderCompatibilityExpiry(result.compatibilityExpiresAt);
+      }
+      if (announce && result.refreshOutcome === 'refreshed') {
+        const nextCompatibilityLabel = getSelectedCompatibilityLabel(helper);
+        const changed = previousCompatibilityLabel && nextCompatibilityLabel
+          && previousCompatibilityLabel !== nextCompatibilityLabel;
+        const compatibilityText = changed
+          ? ` Compatibility is now ${nextCompatibilityLabel}.`
+          : '';
+        setProviderEvidenceAnnouncement(`Provider status refreshed.${compatibilityText}`);
+      } else if (announce) {
+        const message = result.refreshOutcome === 'stale'
+          ? getCompatibilityRefreshFailureMessage(result.clients)
+          : 'Compatibility data is unavailable. Showing Unsupported.';
+        setProviderEvidenceAnnouncement(message, true);
+      }
+      return result.clients;
+    })
+    .catch(() => {
+      if (preserveCurrentSuccess) return providerPanelState.clients;
+      clearProviderCompatibilityExpiryTimer();
+      if (providerPanelState.hasSuccessfulEvidence) {
+        providerPanelState.clients = projectStaleProviderCompatibility(providerPanelState.clients);
+        providerPanelState.evidenceStatus = 'stale';
+      } else {
+        providerPanelState.clients = Object.create(null);
+        providerPanelState.evidenceStatus = 'unavailable';
+        providerPanelState.recommendation = helper.getRecommendation(providerPanelState.clients);
+      }
+      if (announce) {
+        const message = providerPanelState.evidenceStatus === 'stale'
+          ? getCompatibilityRefreshFailureMessage(providerPanelState.clients)
+          : 'Compatibility data is unavailable. Showing Unsupported.';
+        setProviderEvidenceAnnouncement(message, true);
+      }
+      return providerPanelState.clients;
+    })
+    .finally(() => {
+      setProviderStatusRefreshing(false);
+      renderProviderRecommendation();
+      renderProviderEvidence();
+      renderSelectedAgentDetails();
+      if (preserveCurrentSuccess) consumeProviderManualSuccess(preserveManualSuccess);
+      providerEvidenceRefreshPromise = null;
+      if (providerEvidenceRefreshQueued) {
+        const queuedCheckedAt = providerEvidenceRefreshQueuedCompatibilityCheckedAt;
+        providerEvidenceRefreshQueued = false;
+        providerEvidenceRefreshQueuedCompatibilityCheckedAt = null;
+        refreshProviderEvidence({
+          preserveManualSuccess: getProviderManualSuccessToken(queuedCheckedAt)
+        });
+      }
+    });
+
+  return providerEvidenceRefreshPromise;
+}
+
+function scheduleProviderEvidenceRefresh(compatibilityCheckedAt = null) {
+  beginProviderCompatibilityGeneration();
+  if (providerEvidenceRefreshPromise) {
+    clearProviderEvidenceRefreshDebounce();
+    providerEvidenceRefreshQueued = true;
+    providerEvidenceRefreshQueuedCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+      providerEvidenceRefreshQueuedCompatibilityCheckedAt,
+      compatibilityCheckedAt
+    );
+    return;
+  }
+  const debouncedCheckedAt = newestProviderCompatibilityCheckedAt(
+    providerEvidenceRefreshDebounceCompatibilityCheckedAt,
+    compatibilityCheckedAt
+  );
+  if (providerEvidenceRefreshDebounceHandle !== null) {
+    clearTimeout(providerEvidenceRefreshDebounceHandle);
+  }
+  providerEvidenceRefreshDebounceCompatibilityCheckedAt = debouncedCheckedAt;
+  providerEvidenceRefreshDebounceHandle = setTimeout(() => {
+    const debouncedCheckedAt = providerEvidenceRefreshDebounceCompatibilityCheckedAt;
+    providerEvidenceRefreshDebounceHandle = null;
+    providerEvidenceRefreshDebounceCompatibilityCheckedAt = null;
+    if (providerEvidenceRefreshPromise) {
+      providerEvidenceRefreshQueued = true;
+      providerEvidenceRefreshQueuedCompatibilityCheckedAt = newestProviderCompatibilityCheckedAt(
+        providerEvidenceRefreshQueuedCompatibilityCheckedAt,
+        debouncedCheckedAt
+      );
+    } else {
+      refreshProviderEvidence({
+        preserveManualSuccess: getProviderManualSuccessToken(debouncedCheckedAt)
+      });
+    }
+  }, 100);
+}
+
+function renderProviderSelection() {
+  const activeKind = providerPanelState.providerKind;
+  const activeId = activeKind === 'agent'
+    ? providerPanelState.agentProviderId
+    : elements.modelProvider?.value;
+  const radios = elements.providerSelectionRadios || [];
+
+  Array.prototype.forEach.call(radios, (radio) => {
+    const selected = radio.dataset?.providerKind === activeKind
+      && radio.dataset?.providerId === activeId;
+    radio.checked = selected;
+    radio.setAttribute('aria-checked', selected ? 'true' : 'false');
+    const row = typeof radio.closest === 'function' ? radio.closest('.provider-row') : null;
+    if (row) row.classList.toggle('is-selected', selected);
+  });
+}
+
+function renderProviderKind() {
+  const showAgentDetails = providerPanelState.providerKind === 'agent';
+  if (elements.apiProviderDetails) elements.apiProviderDetails.hidden = showAgentDetails;
+  if (elements.agentProviderDetails) elements.agentProviderDetails.hidden = !showAgentDetails;
+  renderDelegationTrustControl();
+}
+
+function runApiProviderSelectionPath(provider, previousSelection, silentIfNoKey) {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && ui.IN_SCOPE_PROVIDERS && ui.IN_SCOPE_PROVIDERS[provider]) {
+    const discoveryOptions = { previousSelection: previousSelection };
+    if (silentIfNoKey) discoveryOptions.silentIfNoKey = true;
+    ui.runDiscovery(provider, discoveryOptions);
+  } else {
+    updateModelOptions(provider);
+  }
+  updateApiKeyVisibility(provider);
+}
+
+function invalidateProviderDiscovery(restoreUi) {
+  const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
+  if (ui && typeof ui.invalidateDiscovery === 'function') {
+    ui.invalidateDiscovery({ restoreUi: restoreUi === true });
+  }
+}
+
+function cancelPendingProviderSettingsModelLoad() {
+  providerSettingsLoadGeneration += 1;
+  if (providerSettingsModelLoadTimer !== null) {
+    clearTimeout(providerSettingsModelLoadTimer);
+    providerSettingsModelLoadTimer = null;
+  }
+}
+
+function setProviderSelection(kind, id, { markDirty = true } = {}) {
+  const helper = getProviderPanelHelper();
+  if (!helper) return false;
+  const validSelection = kind === 'api'
+    ? helper.isApiProvider(id)
+    : (kind === 'agent' && helper.isAgentProvider(id));
+  if (!validSelection) return false;
+  if (markDirty) cancelPendingProviderSettingsModelLoad();
+  const previousKind = providerPanelState.providerKind;
+  const previousId = previousKind === 'agent'
+    ? providerPanelState.agentProviderId
+    : elements.modelProvider?.value;
+  if (previousKind !== kind || previousId !== id) {
+    invalidateProviderDiscovery(kind === 'agent');
+  }
+
+  if (kind === 'api') {
+    const previousSelection = elements.modelName?.value;
+    providerPanelState.providerKind = 'api';
+    if (elements.modelProvider) elements.modelProvider.value = id;
+    runApiProviderSelectionPath(id, previousSelection, !markDirty);
+  } else if (kind === 'agent') {
+    providerPanelState.providerKind = 'agent';
+    providerPanelState.agentProviderId = id;
+  }
+
+  renderProviderSelection();
+  renderProviderKind();
+  renderSelectedAgentDetails();
+  if (markDirty) markUnsavedChanges();
+  return true;
+}
+
 function setupEventListeners() {
   // Navigation
   elements.navItems.forEach(item => {
@@ -327,6 +1639,33 @@ function setupEventListeners() {
       setThemePreference(mode);
       showToast(`${mode} theme`, 'info');
     });
+  }
+
+  // One delegated handler covers click and keyboard-driven native-radio
+  // changes. Selection stays in form state until the existing Save action.
+  if (elements.providerRoster) {
+    elements.providerRoster.addEventListener('change', (event) => {
+      const radio = event.target;
+      if (!radio || radio.name !== 'fsbProviderSelection') return;
+      setProviderSelection(radio.dataset?.providerKind, radio.dataset?.providerId);
+    });
+  }
+  if (elements.refreshProviderStatusBtn) {
+    elements.refreshProviderStatusBtn.addEventListener('click', () => {
+      refreshProviderEvidence({ announce: true });
+    });
+  }
+  if (elements.openAgentSetupGuideBtn) {
+    elements.openAgentSetupGuideBtn.addEventListener('click', openAgentSetupGuide);
+  }
+  if (elements.pairMcpBridgeBtn) {
+    elements.pairMcpBridgeBtn.addEventListener('click', pairMcpBridge);
+  }
+  if (elements.removeMcpBridgePairingBtn) {
+    elements.removeMcpBridgePairingBtn.addEventListener('click', removeMcpBridgePairing);
+  }
+  if (elements.delegationTrustClearBtn) {
+    elements.delegationTrustClearBtn.addEventListener('click', clearDelegationTrust);
   }
 
   // Form inputs change detection
@@ -348,7 +1687,9 @@ function setupEventListeners() {
     elements.enableLogin,
     elements.captchaSolverEnabled,
     elements.captchaApiKey,
-    elements.sttProvider
+    elements.sttProvider,
+    elements.fsbMcpSessionRecordingEnabled,
+    elements.fsbMcpSessionRetentionDays
   ];
 
   formInputs.forEach(input => {
@@ -515,6 +1856,15 @@ function setupEventListeners() {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'session' && changes && changes.fsbAgentRegistry) {
         scheduleRefreshActiveAgentCount();
+        scheduleProviderEvidenceRefresh();
+      } else if (area === 'session' && changes && changes.mcpBridgeState) {
+        const nextState = changes.mcpBridgeState.newValue;
+        const nextStatus = nextState && nextState.pairingStatus;
+        renderMcpBridgePairingStatus(nextStatus, nextStatus === 'expired');
+      } else if (area === 'local' && changes && changes.fsbAgentProviders) {
+        scheduleProviderEvidenceRefresh(
+          getProviderStorageCompatibilityCheckedAt(changes.fsbAgentProviders)
+        );
       } else if (area === 'local' && changes && changes.fsbAgentCap) {
         scheduleRefreshActiveAgentCount();
       } else if (area === 'session' && changes && changes.fsbTriggerRegistry) {
@@ -735,7 +2085,7 @@ function setupEventListeners() {
   if (elements.fullApiTest) {
     elements.fullApiTest.addEventListener('click', runFullApiTest);
   }
-  
+
   // Save bar
   if (elements.saveBtn) {
     elements.saveBtn.addEventListener('click', saveSettings);
@@ -1053,7 +2403,8 @@ let _fsbSelectOutsideClickBound = false;
 // truth -- picking a custom option sets its .value and redispatches a real
 // 'change' event, so every existing change-listener elsewhere keeps working
 // untouched. modelName is excluded (it's the model-combobox's own hidden
-// native select, already driven by a separate custom combobox).
+// native select), as is modelProvider (the visible Providers radio roster
+// mirrors that compatibility select).
 // After loadSettings' async storage callback assigns `.value` on the underlying
 // native <select>s, call this to bring the wrapped custom-select labels back
 // into sync. Uses each select's already-attached `sync()` (stashed on the DOM
@@ -1067,9 +2418,24 @@ function syncFsbSelectLabels() {
   });
 }
 
+function setFsbSelectCardOpen(wrap, open) {
+  const card = typeof wrap.closest === 'function' ? wrap.closest('.settings-card') : null;
+  if (card) card.classList.toggle('settings-card--select-open', open);
+}
+
+function closeFsbSelect(wrap) {
+  const menu = wrap.querySelector('.fsb-select__menu'); if (menu) menu.hidden = true;
+  const btn = wrap.querySelector('.fsb-select__btn'); if (btn) btn.classList.remove('is-open');
+  const chev = wrap.querySelector('.fsb-select__chev');
+  if (chev) { chev.classList.add('fa-chevron-down'); chev.classList.remove('fa-chevron-up'); }
+  setFsbSelectCardOpen(wrap, false);
+}
+
 function initFsbSelects() {
   document.querySelectorAll('.form-select, .chart-select').forEach((sel) => {
-    if (sel.getAttribute('data-enh') === '1' || sel.classList.contains('model-combobox__native')) return;
+    if (sel.getAttribute('data-enh') === '1'
+        || sel.classList.contains('model-combobox__native')
+        || sel.classList.contains('provider-roster__native')) return;
     sel.setAttribute('data-enh', '1');
     sel.style.display = 'none';
 
@@ -1096,6 +2462,7 @@ function initFsbSelects() {
       btn.classList.toggle('is-open', open);
       chev.classList.toggle('fa-chevron-up', open);
       chev.classList.toggle('fa-chevron-down', !open);
+      setFsbSelectCardOpen(wrap, open);
     }
     function sync() {
       const v = sel.value;
@@ -1137,8 +2504,9 @@ function initFsbSelects() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const willOpen = menu.hidden;
-      document.querySelectorAll('.fsb-select__menu').forEach((m) => { if (m !== menu) m.hidden = true; });
-      document.querySelectorAll('.fsb-select__btn').forEach((b) => { if (b !== btn) b.classList.remove('is-open'); });
+      document.querySelectorAll('.fsb-select').forEach((w) => {
+        if (w !== wrap) closeFsbSelect(w);
+      });
       setOpen(willOpen);
     });
     btn.addEventListener('keydown', (e) => {
@@ -1152,17 +2520,32 @@ function initFsbSelects() {
     _fsbSelectOutsideClickBound = true;
     document.addEventListener('click', (e) => {
       document.querySelectorAll('.fsb-select').forEach((w) => {
-        if (w.contains(e.target)) return;
-        const m = w.querySelector('.fsb-select__menu'); if (m) m.hidden = true;
-        const b = w.querySelector('.fsb-select__btn'); if (b) b.classList.remove('is-open');
-        const c = w.querySelector('.fsb-select__chev');
-        if (c) { c.classList.add('fa-chevron-down'); c.classList.remove('fa-chevron-up'); }
+        if (!w.contains(e.target)) closeFsbSelect(w);
       });
     });
   }
 }
 
+function setProviderStatusRefreshing(isRefreshing) {
+  const button = elements.refreshProviderStatusBtn;
+  if (!button) return;
+  const refreshing = isRefreshing === true;
+  const label = button.querySelector('.provider-roster__refresh-label');
+  const pending = button.querySelector('.provider-roster__refresh-pending');
+  button.disabled = refreshing;
+  button.setAttribute('aria-busy', refreshing ? 'true' : 'false');
+  button.classList.toggle('is-refreshing', refreshing);
+  if (label) label.hidden = refreshing;
+  if (pending) pending.hidden = !refreshing;
+}
+
+function normalizeSectionId(sectionId) {
+  return sectionId === 'api-config' ? 'providers' : sectionId;
+}
+
 function switchSection(sectionId) {
+  sectionId = normalizeSectionId(sectionId);
+
   // Update navigation
   elements.navItems.forEach(item => {
     item.classList.toggle('active', item.dataset.section === sectionId);
@@ -1178,6 +2561,10 @@ function switchSection(sectionId) {
   
   dashboardState.currentSection = sectionId;
 
+  if (sectionId === 'providers') {
+    refreshProviderEvidence();
+  }
+
   // Render the merged Consent & Audit cards when entering Advanced Settings (they
   // read the consent envelope + audit ring + classify on demand). The stale
   // '#consent-audit' hash also renders for back-compat.
@@ -1191,7 +2578,7 @@ function switchSection(sectionId) {
 
 function initializeSections() {
   // Check URL hash for initial section
-  const hash = window.location.hash.slice(1);
+  const hash = normalizeSectionId(window.location.hash.slice(1));
   if (hash && document.getElementById(hash)) {
     switchSection(hash);
   }
@@ -1321,14 +2708,37 @@ function updateApiKeyVisibility(provider) {
   }
 }
 
+function stageLatentApiModel(modelName) {
+  if (!elements.modelName || !modelName) return;
+  elements.modelName.value = modelName;
+  if (elements.modelName.value === modelName) return;
+
+  // #modelName starts empty. When an agent is active we intentionally skip
+  // API discovery, so retain the saved API model as a hidden placeholder until
+  // the user switches back and the normal provider path repopulates the list.
+  const option = document.createElement('option');
+  option.value = modelName;
+  option.textContent = modelName;
+  elements.modelName.appendChild(option);
+  elements.modelName.value = modelName;
+}
+
 function loadSettings() {
+  cancelPendingProviderSettingsModelLoad();
+  const loadGeneration = providerSettingsLoadGeneration;
   chrome.storage.local.get(Object.keys(defaultSettings), async (data) => {
     data = data || {};
     fsbRecommendedAgentCap = await resolveRecommendedAgentCap();
+    if (loadGeneration !== providerSettingsLoadGeneration) return;
     const hasStoredAgentCap = Object.prototype.hasOwnProperty.call(data, 'fsbAgentCap')
       && typeof data.fsbAgentCap === 'number'
       && Number.isFinite(data.fsbAgentCap);
-    const settings = { ...defaultSettings, ...data };
+    const mergedSettings = { ...defaultSettings, ...data };
+    const providerHelper = getProviderPanelHelper();
+    const normalizedProviderSettings = providerHelper
+      ? providerHelper.normalizeSettings(mergedSettings)
+      : { providerKind: 'api', modelProvider: 'xai', agentProviderId: '' };
+    const settings = { ...mergedSettings, ...normalizedProviderSettings };
     if (!hasStoredAgentCap) {
       settings.fsbAgentCap = fsbRecommendedAgentCap;
     }
@@ -1339,31 +2749,25 @@ function loadSettings() {
       settings.modelName = 'grok-4-1-fast'; // All legacy modes map to new default
     }
     
-    // Update model provider and options
-    if (elements.modelProvider) {
-      const initialProvider = settings.modelProvider || 'xai';
-      elements.modelProvider.value = initialProvider;
-      const ui = (typeof globalThis !== 'undefined') ? globalThis.FSBDiscoveryUI : null;
-      if (ui && ui.IN_SCOPE_PROVIDERS[initialProvider]) {
-        // Phase 232: discoverModels() now hydrates from chrome.storage.local
-        // before checking cache, so a previously-discovered list shows
-        // immediately on page open (no need to re-click Discover after a
-        // service-worker restart). Sticky selection in renderModelDropdown
-        // ensures settings.modelName is preserved even if not in the list.
-        ui.runDiscovery(initialProvider, {
-          previousSelection: settings.modelName,
-          silentIfNoKey: true
-        });
-      } else {
-        updateModelOptions(initialProvider);
-      }
-      updateApiKeyVisibility(initialProvider);
-    }
+    // Restore both latent provider choices before applying the saved kind.
+    // Staging the model gives the existing discovery path its sticky previous
+    // selection while allowing saved-agent loads to avoid API work entirely.
+    stageLatentApiModel(settings.modelName);
+    if (elements.modelProvider) elements.modelProvider.value = settings.modelProvider;
+    providerPanelState.agentProviderId = settings.agentProviderId;
+    const activeProviderId = settings.providerKind === 'agent'
+      ? settings.agentProviderId
+      : settings.modelProvider;
+    setProviderSelection(settings.providerKind, activeProviderId, { markDirty: false });
     
     // Update model name
     if (elements.modelName && settings.modelName) {
       // Wait for options to be populated
-      setTimeout(() => {
+      providerSettingsModelLoadTimer = setTimeout(() => {
+        providerSettingsModelLoadTimer = null;
+        if (loadGeneration !== providerSettingsLoadGeneration
+            || providerPanelState.providerKind !== 'api'
+            || elements.modelProvider?.value !== settings.modelProvider) return;
         elements.modelName.value = settings.modelName;
         if (typeof globalThis !== 'undefined' && globalThis.FSBModelCombobox) {
           globalThis.FSBModelCombobox.refresh();
@@ -1373,13 +2777,15 @@ function loadSettings() {
         if (selectedModel) {
           updateModelDescription(selectedModel.description);
         }
-        updateApiKeyVisibility(settings.modelProvider || 'xai');
-        // Load-order fix: run the API-connection check inside this model-name timer.
-        // By the time it fires, the callback's synchronous body has already populated
-        // the apiKey + provider inputs and modelName was just applied above, so
-        // checkApiConnection reads populated inputs -- not the empty fields the old
-        // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
-        checkApiConnection();
+        if (settings.providerKind === 'api') {
+          updateApiKeyVisibility(settings.modelProvider || 'xai');
+          // Load-order fix: run the API-connection check inside this model-name timer.
+          // By the time it fires, the callback's synchronous body has already populated
+          // the apiKey + provider inputs and modelName was just applied above, so
+          // checkApiConnection reads populated inputs -- not the empty fields the old
+          // page-init call (initializeDashboard) saw, which falsely reported 'No API Key'.
+          checkApiConnection();
+        }
       }, 100);
     }
     
@@ -1492,6 +2898,15 @@ function loadSettings() {
       elements.fsbChangeReportsEnabled.checked = settings.fsbChangeReportsEnabled ?? true;
     }
 
+    if (elements.fsbMcpSessionRecordingEnabled) {
+      elements.fsbMcpSessionRecordingEnabled.checked = settings.fsbMcpSessionRecordingEnabled !== false;
+    }
+    if (elements.fsbMcpSessionRetentionDays) {
+      const retentionDays = clampMcpSessionRetentionDays(settings.fsbMcpSessionRetentionDays);
+      elements.fsbMcpSessionRetentionDays.value = String(retentionDays);
+      refreshStepper(elements.fsbMcpSessionRetentionDays);
+    }
+
     // Credential Manager
     if (elements.enableLogin) {
       elements.enableLogin.checked = settings.enableLogin ?? false;
@@ -1524,6 +2939,8 @@ function loadSettings() {
     // event, so app-level change listeners (markUnsavedChanges + discovery)
     // do not fire on page load.
     if (typeof syncFsbSelectLabels === 'function') syncFsbSelectLabels();
+
+    refreshProviderEvidence();
 
     addLog('info', 'Settings loaded successfully');
   });
@@ -1627,8 +3044,30 @@ function refreshActiveTriggerCount() {
   }
 }
 
+function normalizeProviderFormSelection() {
+  const providerHelper = getProviderPanelHelper();
+  const normalizedProviderSettings = providerHelper
+    ? providerHelper.normalizeSettings({
+        providerKind: providerPanelState.providerKind,
+        modelProvider: elements.modelProvider?.value,
+        agentProviderId: providerPanelState.agentProviderId
+      })
+    : { providerKind: 'api', modelProvider: 'xai', agentProviderId: '' };
+  providerPanelState.providerKind = normalizedProviderSettings.providerKind;
+  providerPanelState.agentProviderId = normalizedProviderSettings.agentProviderId;
+  if (elements.modelProvider) {
+    elements.modelProvider.value = normalizedProviderSettings.modelProvider;
+  }
+  renderProviderSelection();
+  renderProviderKind();
+  return normalizedProviderSettings;
+}
+
 function saveSettings() {
+  const normalizedProviderSettings = normalizeProviderFormSelection();
   const settings = {
+    providerKind: normalizedProviderSettings.providerKind,
+    agentProviderId: normalizedProviderSettings.agentProviderId,
     modelProvider: elements.modelProvider?.value || 'xai',
     modelName: elements.modelName?.value || 'grok-4-1-fast',
     apiKey: (elements.apiKey?.value || '').trim(),
@@ -1671,7 +3110,9 @@ function saveSettings() {
     })(),
     // Phase 245 D-07: persist Action Change Reports toggle. Default true so
     // builds where the user has never visited the toggle still emit reports.
-    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true
+    fsbChangeReportsEnabled: elements.fsbChangeReportsEnabled?.checked ?? true,
+    fsbMcpSessionRecordingEnabled: elements.fsbMcpSessionRecordingEnabled?.checked ?? true,
+    fsbMcpSessionRetentionDays: clampMcpSessionRetentionDays(elements.fsbMcpSessionRetentionDays?.value)
   };
   
   chrome.storage.local.set(settings, () => {
@@ -1681,7 +3122,7 @@ function saveSettings() {
     addLog('info', 'Settings saved successfully');
     
     // Update connection status if API key changed
-    if (settings.apiKey) {
+    if (settings.providerKind === 'api' && settings.apiKey) {
       checkApiConnection();
     }
   });
@@ -2781,6 +4222,9 @@ async function loadSessionList() {
             <span><i class="fas fa-clock"></i> ${formatSessionDate(session.startTime)}</span>
             <span><i class="fas fa-play-circle"></i> ${session.actionCount || 0} actions</span>
             <span><i class="fas fa-hourglass-half"></i> ${formatSessionDuration(session.startTime, session.endTime)}</span>
+            ${session.mode === 'mcp-agent'
+              ? `<span class="session-source-badge mcp">MCP · ${escapeHtml(session.mcpClient || 'Agent')}</span>`
+              : `<span class="session-source-badge">Autopilot</span>`}
           </div>
         </div>
         <div class="session-item-status">
@@ -3109,21 +4553,11 @@ async function deleteSession(sessionId) {
   }
 
   try {
-    const stored = await chrome.storage.local.get(['fsbSessionLogs', 'fsbSessionIndex']);
-    const sessionStorage = stored.fsbSessionLogs || {};
-    const sessionIndex = stored.fsbSessionIndex || [];
-
-    // Remove from storage
-    delete sessionStorage[sessionId];
-
-    // Remove from index
-    const updatedIndex = sessionIndex.filter(s => s.id !== sessionId);
-
-    // Save changes
-    await chrome.storage.local.set({
-      fsbSessionLogs: sessionStorage,
-      fsbSessionIndex: updatedIndex
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteSessionHistory',
+      sessionId
     });
+    if (!response?.success) throw new Error(response?.error || 'Failed to delete session history');
 
     // Close detail panel if viewing this session
     if (currentViewingSession && currentViewingSession.id === sessionId) {
@@ -3151,7 +4585,8 @@ async function clearAllSessions() {
   }
 
   try {
-    await chrome.storage.local.remove(['fsbSessionLogs', 'fsbSessionIndex']);
+    const response = await chrome.runtime.sendMessage({ action: 'clearSessionHistory' });
+    if (!response?.success) throw new Error(response?.error || 'Failed to clear session history');
 
     closeSessionDetail();
     loadSessionList();
@@ -7527,6 +8962,8 @@ function initializeSyncSection() {
   const DEFAULT_DEBOUNCE_MS = 500;
   let _currentModels = [];
   let _currentSearchQuery = '';
+  let _discoveryGeneration = 0;
+  let _activeDiscoveryRun = null;
 
   function _doc() { return (typeof document !== 'undefined') ? document : null; }
 
@@ -7537,6 +8974,81 @@ function initializeSyncSection() {
     if (!doc) return '';
     const el = doc.getElementById(inputId);
     return (el && typeof el.value === 'string') ? el.value.trim() : '';
+  }
+
+  function _captureDiscoveryUiState() {
+    const doc = _doc();
+    if (!doc) return null;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    const optionSource = select && (select.options || select.children);
+    return {
+      options: optionSource ? Array.prototype.map.call(optionSource, option => ({
+        value: option.value,
+        textContent: option.textContent,
+        disabled: option.disabled === true
+      })) : [],
+      value: select ? select.value : '',
+      selectDisabled: select ? select.disabled === true : false,
+      refreshDisabled: refresh ? refresh.disabled === true : false,
+      statusText: status ? status.textContent : '',
+      statusHidden: status ? status.hidden === true : true,
+      statusClasses: status && status.classList
+        ? ['info', 'warning', 'error', 'loading'].filter(name => status.classList.contains(name))
+        : []
+    };
+  }
+
+  function _restoreDiscoveryUiState(snapshot) {
+    const doc = _doc();
+    if (!doc || !snapshot) return;
+    const select = doc.getElementById('modelName');
+    const refresh = doc.getElementById('refreshModelsBtn');
+    const status = doc.getElementById('modelDiscoveryStatus');
+    if (select) {
+      select.innerHTML = '';
+      snapshot.options.forEach(saved => {
+        const option = doc.createElement('option');
+        option.value = saved.value;
+        option.textContent = saved.textContent;
+        option.disabled = saved.disabled;
+        select.appendChild(option);
+      });
+      select.value = snapshot.value;
+      select.disabled = snapshot.selectDisabled;
+    }
+    if (refresh) refresh.disabled = snapshot.refreshDisabled;
+    if (status) {
+      ['info', 'warning', 'error', 'loading'].forEach(name => status.classList.remove(name));
+      snapshot.statusClasses.forEach(name => status.classList.add(name));
+      status.textContent = snapshot.statusText;
+      status.hidden = snapshot.statusHidden;
+      if (snapshot.statusHidden) status.setAttribute('hidden', '');
+      else status.removeAttribute('hidden');
+    }
+  }
+
+  function invalidateDiscovery(options) {
+    const activeRun = _activeDiscoveryRun;
+    Object.keys(_debounceTimers).forEach(provider => {
+      const timer = _debounceTimers[provider];
+      if (timer !== null && timer !== undefined) clearTimeout(timer);
+      _debounceTimers[provider] = null;
+    });
+    _discoveryGeneration += 1;
+    _activeDiscoveryRun = null;
+    if (options && options.restoreUi === true && activeRun) {
+      _restoreDiscoveryUiState(activeRun.snapshot);
+    }
+  }
+
+  function _isDiscoveryCurrent(generation) {
+    return generation === _discoveryGeneration;
+  }
+
+  function _cancelledDiscoveryResult(provider) {
+    return { ok: false, reason: 'cancelled', provider };
   }
 
   function setDiscoveryStatus(state) {
@@ -7727,96 +9239,113 @@ function initializeSyncSection() {
       // Out-of-scope provider — do nothing; legacy updateModelOptions handles it.
       return { ok: false, reason: 'out-of-scope', provider };
     }
+    const priorSnapshot = _activeDiscoveryRun && _activeDiscoveryRun.snapshot;
+    const generation = _discoveryGeneration + 1;
+    _discoveryGeneration = generation;
+    _activeDiscoveryRun = {
+      generation,
+      snapshot: priorSnapshot || _captureDiscoveryUiState()
+    };
 
-    const apiKey = _getInputValueForProvider(provider);
-    if (!apiKey) {
-      // No key yet. Phase 232: prefer the persistent discovery cache
-      // (chrome.storage.local) so a list discovered in a prior session is
-      // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
-      // the persistent cache is empty/expired.
-      let cachedIds = [];
-      if (typeof global.hydrateDiscoveryCache === 'function') {
-        try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
-      }
-      if (typeof global.getDiscoveredModelIds === 'function') {
-        try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
-      }
-      if (cachedIds.length) {
-        const list = cachedIds.map(id => ({ id, displayName: id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus(options.silentIfNoKey
-          ? { kind: 'hidden' }
-          : { kind: 'info', text: list.length + ' models (cached)' });
-        return { ok: true, models: list, source: 'persistent-cache', provider };
-      }
-      if (options.silentIfNoKey) {
-        const fallbackTable = global.FALLBACK_MODELS || {};
-        const list = (fallbackTable[provider] || []).map(m => ({ id: m.id, displayName: m.name || m.id }));
-        renderModelDropdown(list, options.previousSelection);
-        setDiscoveryStatus({ kind: 'hidden' });
-      } else {
-        _renderFallback(provider, 'Enter an API key to discover live models');
-      }
-      return { ok: false, reason: 'missing-api-key', provider };
-    }
-
-    if (options.force && typeof global.clearDiscoveryCache === 'function') {
-      try { global.clearDiscoveryCache(provider); } catch (_) { /* noop */ }
-    }
-
-    if (typeof global.discoverModels !== 'function') {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'discovery-unavailable', provider };
-    }
-
-    _renderLoading();
-
-    let result;
     try {
-      result = await global.discoverModels(provider, apiKey);
-    } catch (err) {
-      _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
-    }
+      const apiKey = _getInputValueForProvider(provider);
+      if (!apiKey) {
+        // No key yet. Phase 232: prefer the persistent discovery cache
+        // (chrome.storage.local) so a list discovered in a prior session is
+        // shown immediately on reopen. Fall back to FALLBACK_MODELS only when
+        // the persistent cache is empty/expired.
+        let cachedIds = [];
+        if (typeof global.hydrateDiscoveryCache === 'function') {
+          try { await global.hydrateDiscoveryCache(); } catch (_) { /* noop */ }
+          if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+        }
+        if (typeof global.getDiscoveredModelIds === 'function') {
+          try { cachedIds = global.getDiscoveredModelIds(provider) || []; } catch (_) { cachedIds = []; }
+        }
+        if (cachedIds.length) {
+          const list = cachedIds.map(id => ({ id, displayName: id }));
+          renderModelDropdown(list, options.previousSelection);
+          setDiscoveryStatus(options.silentIfNoKey
+            ? { kind: 'hidden' }
+            : { kind: 'info', text: list.length + ' models (cached)' });
+          return { ok: true, models: list, source: 'persistent-cache', provider };
+        }
+        if (options.silentIfNoKey) {
+          const fallbackTable = global.FALLBACK_MODELS || {};
+          const list = (fallbackTable[provider] || []).map(m => ({ id: m.id, displayName: m.name || m.id }));
+          renderModelDropdown(list, options.previousSelection);
+          setDiscoveryStatus({ kind: 'hidden' });
+        } else {
+          _renderFallback(provider, 'Enter an API key to discover live models');
+        }
+        return { ok: false, reason: 'missing-api-key', provider };
+      }
 
-    if (result && result.ok) {
-      const list = (result.models || []).map(m => ({
-        id: m.id,
-        displayName: m.displayName || m.name || m.id,
-        name: m.name,
-        description: m.description,
-        provider
-      }));
-      const chosen = renderModelDropdown(list, options.previousSelection);
-      _setControlsDisabled(false);
-      const cached = result.source === 'cache';
-      const text = cached
-        ? list.length + ' models (cached)'
-        : list.length + ' models discovered';
-      setDiscoveryStatus({ kind: 'info', text });
-      // Phase 232: when the user's saved model is not in the discovered list,
-      // renderModelDropdown now keeps it selected as a synthetic "(saved)"
-      // entry, so chosen === previousSelection and no reassignment happens.
-      return result;
-    }
+      if (options.force && typeof global.clearDiscoveryCache === 'function') {
+        try { global.clearDiscoveryCache(provider); } catch (_) { /* noop */ }
+      }
 
-    // Failure path
-    const reason = result && result.reason;
-    if (reason === 'auth-failed') {
-      _renderAuthFailed(result && result.message);
-      return result;
-    }
-    if (reason === 'network-failed' || reason === 'timeout' || reason === 'empty-response') {
+      if (typeof global.discoverModels !== 'function') {
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return { ok: false, reason: 'discovery-unavailable', provider };
+      }
+
+      _renderLoading();
+
+      let result;
+      try {
+        result = await global.discoverModels(provider, apiKey);
+      } catch (err) {
+        if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return { ok: false, reason: 'network-failed', provider, message: String(err && err.message || err) };
+      }
+
+      if (!_isDiscoveryCurrent(generation)) return _cancelledDiscoveryResult(provider);
+
+      if (result && result.ok) {
+        const list = (result.models || []).map(m => ({
+          id: m.id,
+          displayName: m.displayName || m.name || m.id,
+          name: m.name,
+          description: m.description,
+          provider
+        }));
+        const chosen = renderModelDropdown(list, options.previousSelection);
+        _setControlsDisabled(false);
+        const cached = result.source === 'cache';
+        const text = cached
+          ? list.length + ' models (cached)'
+          : list.length + ' models discovered';
+        setDiscoveryStatus({ kind: 'info', text });
+        // Phase 232: when the user's saved model is not in the discovered list,
+        // renderModelDropdown now keeps it selected as a synthetic "(saved)"
+        // entry, so chosen === previousSelection and no reassignment happens.
+        return result;
+      }
+
+      // Failure path
+      const reason = result && result.reason;
+      if (reason === 'auth-failed') {
+        _renderAuthFailed(result && result.message);
+        return result;
+      }
+      if (reason === 'network-failed' || reason === 'timeout' || reason === 'empty-response') {
+        _renderFallback(provider, 'Using fallback models — discovery unavailable');
+        return result;
+      }
+      if (reason === 'missing-api-key') {
+        _renderFallback(provider, 'Enter an API key to discover live models');
+        return result;
+      }
+      // Unknown failure — best-effort fallback
       _renderFallback(provider, 'Using fallback models — discovery unavailable');
-      return result;
+      return result || { ok: false, reason: 'unknown', provider };
+    } finally {
+      if (_activeDiscoveryRun && _activeDiscoveryRun.generation === generation) {
+        _activeDiscoveryRun = null;
+      }
     }
-    if (reason === 'missing-api-key') {
-      _renderFallback(provider, 'Enter an API key to discover live models');
-      return result;
-    }
-    // Unknown failure — best-effort fallback
-    _renderFallback(provider, 'Using fallback models — discovery unavailable');
-    return result || { ok: false, reason: 'unknown', provider };
   }
 
   function scheduleDiscoveryFromKeyChange(provider, opts) {
@@ -7825,6 +9354,13 @@ function initializeSyncSection() {
     if (_debounceTimers[provider]) clearTimeout(_debounceTimers[provider]);
     _debounceTimers[provider] = setTimeout(() => {
       _debounceTimers[provider] = null;
+      const doc = _doc();
+      const activeProvider = doc && doc.getElementById('modelProvider');
+      if (providerPanelState.providerKind !== 'api'
+          || !activeProvider
+          || activeProvider.value !== provider) {
+        return;
+      }
       runDiscovery(provider, { force: true });
     }, wait);
   }
@@ -7832,6 +9368,7 @@ function initializeSyncSection() {
   const api = {
     IN_SCOPE_PROVIDERS,
     runDiscovery,
+    invalidateDiscovery,
     scheduleDiscoveryFromKeyChange,
     setDiscoveryStatus,
     renderModelDropdown,

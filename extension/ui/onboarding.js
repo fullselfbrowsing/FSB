@@ -45,6 +45,16 @@
   ];
 
   const ROLL_CLIENTS = INSTALL_CLIENTS.slice(0, 7);
+  const ALL_INSTALL_CLIENT_IDS = [
+    'claude-code',
+    'claude-desktop',
+    'cursor',
+    'vscode',
+    'windsurf',
+    'codex',
+    'opencode'
+  ];
+  const FSB_AGENT_PROVIDERS_STORAGE_KEY = 'fsbAgentProviders';
   const STEP_LABELS = { welcome: 'Welcome', path: 'Path', mcp: 'MCP', provider: 'Provider', apikey: 'API Key', setup: 'Setup', pin: 'Pin', done: 'Done' };
 
   const state = {
@@ -78,6 +88,7 @@
   let fanCloseTimer = null;
   let hoverTimer = null;
   let currentWindowId = null;
+  let copyClickMutationTail = Promise.resolve();
 
   globalThis.FSB_ONBOARDING_PROVIDER_KEY_FIELDS = PROVIDER_KEY_FIELDS;
   globalThis.FSB_ONBOARDING_INSTALL_CLIENTS = INSTALL_CLIENTS;
@@ -782,7 +793,10 @@
   }
 
   function copyCommand(text, key) {
+    const clientId = key === 'current' ? ROLL_CLIENTS[state.iconIndex].id : key;
+    const source = key === 'current' ? 'base' : (key === 'all' ? 'all' : 'fan');
     writeClipboard(text);
+    persistCopyClick(clientId, source).catch(() => {});
     clearTimeout(copiedTimer);
     state.copied = key;
     copiedTimer = setTimeout(() => {
@@ -791,6 +805,58 @@
     }, 1600);
     showToast('Install command copied');
     render();
+  }
+
+  async function persistCopyClick(clientId, source) {
+    const targetIds = clientId === 'all' ? ALL_INSTALL_CLIENT_IDS : [clientId];
+    if (
+      targetIds.some((id) => typeof id !== 'string' || !id) ||
+      (source !== 'base' && source !== 'fan' && source !== 'all')
+    ) {
+      return;
+    }
+
+    const mutate = async () => {
+      const stored = await storageGet([FSB_AGENT_PROVIDERS_STORAGE_KEY]);
+      const existing = stored && stored[FSB_AGENT_PROVIDERS_STORAGE_KEY];
+      const envelope = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? Object.assign({}, existing)
+        : {};
+      const clicked = envelope.clicked && typeof envelope.clicked === 'object' && !Array.isArray(envelope.clicked)
+        ? Object.assign({}, envelope.clicked)
+        : {};
+
+      envelope.clicked = clicked;
+      envelope.connected = envelope.connected && typeof envelope.connected === 'object' && !Array.isArray(envelope.connected)
+        ? Object.assign({}, envelope.connected)
+        : {};
+      envelope.installed = envelope.installed && typeof envelope.installed === 'object' && !Array.isArray(envelope.installed)
+        ? Object.assign({}, envelope.installed)
+        : {};
+
+      const now = Date.now();
+      targetIds.forEach((id) => {
+        const previous = clicked[id] && typeof clicked[id] === 'object' && !Array.isArray(clicked[id])
+          ? clicked[id]
+          : {};
+        const previousCount = Number.isFinite(previous.count) ? previous.count : 0;
+        const firstClickedAt = Number.isFinite(previous.firstClickedAt) && previous.firstClickedAt
+          ? previous.firstClickedAt
+          : now;
+        clicked[id] = {
+          count: previousCount + 1,
+          firstClickedAt,
+          lastClickedAt: now,
+          source
+        };
+      });
+
+      await storageSet({ [FSB_AGENT_PROVIDERS_STORAGE_KEY]: envelope });
+    };
+
+    const result = copyClickMutationTail.then(mutate, mutate);
+    copyClickMutationTail = result.catch(() => {});
+    return result;
   }
 
   function writeClipboard(text) {

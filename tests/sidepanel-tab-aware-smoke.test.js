@@ -107,6 +107,7 @@ globalThis.chrome = {
 // --- Module loads (sidecar + owner-chip; Plan 11-01+ will require additional modules) ---
 const TabConvStore = require('../extension/ui/sidepanel-tab-conv-store.js');
 require('../extension/ui/owner-chip.js'); // registers globalThis.FSBOwnerChip
+const DelegationFeed = require('../extension/ui/delegation-feed.js');
 
 // --- DOM stub helpers (forward-compat for Plan 11-02 lockout assertions) ---
 function createButtonStub() {
@@ -350,8 +351,9 @@ function installDomStub(idMap) {
 
   // 4.3 sidepanel.js carries the runtime gate inside handleSendMessage
   const handleSendBodyMatch = sidepanelSrcForP4.match(/async function handleSendMessage\(\)\s*\{[\s\S]*?^\}/m);
-  ok(handleSendBodyMatch && /if \(await _isActiveTabForeignOwned\(\)\) return;/.test(handleSendBodyMatch[0]),
-     'Part 4.3 -- handleSendMessage body contains _isActiveTabForeignOwned runtime gate');
+  ok(handleSendBodyMatch
+      && /if \(await _isActiveTabForeignOwned\(\)\)\s*\{[\s\S]*?_clearDelegationPreflightIntent\(intentId\);[\s\S]*?updateSendButtonState\(\);[\s\S]*?return;[\s\S]*?\}/.test(handleSendBodyMatch[0]),
+     'Part 4.3 -- handleSendMessage foreign-owner gate clears the reserved intent before returning');
 
   // 4.4 sidepanel.css carries .fsb-foreign-owned-disabled rule
   ok(/\.fsb-foreign-owned-disabled\s*\{[^}]*opacity:\s*0\.45[^}]*pointer-events:\s*none/s.test(sidepanelCssSrc),
@@ -360,6 +362,41 @@ function installDomStub(idMap) {
   // 4.5 sidepanel.html carries the aria-describedby description span
   ok(/<span\s+id=\"fsb-lockout-aria-description\"\s+class=\"sr-only\">/.test(sidepanelHtmlSrc),
      'Part 4.5 -- sidepanel.html carries fsb-lockout-aria-description sr-only span');
+
+  // Phase 61 Plan 07: the delegation renderer is loaded exactly once before
+  // sidepanel.js and every fixed delegation mount id is unique.
+  const feedScriptCount = (sidepanelHtmlSrc.match(/<script src="delegation-feed\.js"><\/script>/g) || []).length;
+  ok(feedScriptCount === 1
+      && sidepanelHtmlSrc.indexOf('delegation-feed.js') < sidepanelHtmlSrc.indexOf('sidepanel.js'),
+     'Part 4.6 -- delegation-feed.js loads exactly once before sidepanel.js');
+  const delegationIds = ['delegationRun', 'delegationStateCard', 'delegationFeed', 'delegationAnnouncer', 'delegationControlBar'];
+  const uniqueDelegationIds = delegationIds.every(function(id) {
+    return (sidepanelHtmlSrc.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1;
+  });
+  ok(uniqueDelegationIds,
+     'Part 4.7 -- every fixed delegation DOM id appears exactly once');
+  ok(DelegationFeed && typeof DelegationFeed.render === 'function'
+      && globalThis.FsbDelegationFeed === DelegationFeed,
+     'Part 4.8 -- delegation feed preserves classic-global/CommonJS dual export');
+  const delegationEligibility = sidepanelSrcForP4.match(
+    /function _delegationCanTakeControl\(snapshot\)\s*\{[\s\S]*?^\}/m
+  );
+  ok(delegationEligibility
+      && delegationEligibility[0].indexOf("snapshot.state === 'running'") !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.tabId === _activeTabIdSnapshot') !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.owned === true') !== -1
+      && delegationEligibility[0].indexOf('snapshot.activeTab.canTakeControl === true') !== -1
+      && delegationEligibility[0].indexOf('FSBOwnerChip') === -1,
+     'Part 4.9 -- Take control uses only exact canonical snapshot eligibility for the active tab');
+  const activationDelegationRefresh = /chrome\.tabs\.onActivated\.addListener[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?await _hydrateDelegationForSelectedConversation\(\)/.test(sidepanelSrcForP4);
+  ok(activationDelegationRefresh,
+     'Part 4.10 -- active-tab swaps refresh delegated eligibility after updating the tab snapshot');
+  ok(/changes\.fsbAgentRegistry[\s\S]{0,160}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelSrcForP4),
+     'Part 4.11 -- registry ownership changes refresh the controller-owned delegated snapshot');
+  ok(handleSendBodyMatch
+      && handleSendBodyMatch[0].indexOf("type: 'FSB_DELEGATION_PREFLIGHT'")
+        < handleSendBodyMatch[0].indexOf('_handleLegacySendMessage(message)'),
+     'Part 4.12 -- background preflight routes API tasks to the untouched legacy send path');
 
   console.log('\n--- Part 5: envelope CRUD + LRU eviction (FILLED in Plan 11-03) ---');
 

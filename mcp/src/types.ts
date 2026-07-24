@@ -16,6 +16,7 @@ export type MCPMessageType =
   | 'mcp:list-triggers'       // List persisted trigger snapshots
   | 'mcp:start-visual-session' // MCP-owned visible lifecycle start
   | 'mcp:end-visual-session'   // MCP-owned visible lifecycle end
+  | 'mcp:task-status'          // Client-authored complete/partial/fail summary
   | 'mcp:execute-action'      // Manual: execute a single browser action
   | 'mcp:go-back'             // Phase 242 D-01: ownership-gated single-step browser-history back
   | 'mcp:get-dom'             // Read DOM snapshot
@@ -45,7 +46,8 @@ export type MCPMessageType =
   | 'mcp:capabilities-invoke' // Phase 28: queued capability invoke (serialized, invoke_capability)
   | 'agent:register'         // Phase 238: lazy-mint per-process agent_id
   | 'agent:release'          // Phase 238: handler only; server caller in Phase 241
-  | 'agent:status';          // Phase 238: caller-self introspection
+  | 'agent:status'           // Phase 238: caller-self introspection
+  | 'system:client-inventory'; // Phase 57: additive installed MCP-client inventory
 
 // Messages FROM extension TO MCP server (responses)
 export interface MCPResponse {
@@ -78,6 +80,8 @@ export interface BridgeOptions {
   promotionJitterMs?: number;
   maxReconnectDelayMs?: number;
   allowedBrowserOrigins?: string[];
+  capabilities?: BridgeCapability[];
+  handleExtRequest?: ExtRequestHandler;
 }
 
 export interface BridgeTopologyState {
@@ -96,6 +100,7 @@ export interface BridgeTopologyState {
 export interface RelayHello {
   type: 'relay:hello';
   instanceId: string;
+  capabilities?: BridgeCapability[];
 }
 
 // Relay protocol: hub -> MCP instance handshake ack
@@ -107,6 +112,7 @@ export interface RelayWelcome {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  capabilities?: BridgeCapability[];
 }
 
 export interface RelayState {
@@ -116,9 +122,49 @@ export interface RelayState {
   relayCount: number;
   lastExtensionHeartbeatAt: number | null;
   lastDisconnectReason: string | null;
+  capabilities?: BridgeCapability[];
 }
 
 export type RelayMessage = RelayHello | RelayWelcome | RelayState;
+
+export type BridgeCapability = 'agent-spawn';
+
+export interface ExtRequest {
+  id: string;
+  type: 'ext:request';
+  method: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ExtError {
+  code: 'agent_provider_offline' | 'bridge_topology_changed' |
+    'ext_unauthorized' | 'invalid_ext_request' | 'ext_request_timeout';
+  message: string;
+  retryable: boolean;
+}
+
+export type ExtResponse =
+  | { id: string; type: 'ext:response'; payload: Record<string, unknown>; error?: never }
+  | { id: string; type: 'ext:response'; error: ExtError; payload?: never };
+
+export interface ExtEvent {
+  id: string;
+  type: 'ext:event';
+  event: string;
+  payload: Record<string, unknown>;
+}
+
+export type ExtMessage = ExtRequest | ExtResponse | ExtEvent;
+
+export interface ExtRequestContext {
+  readonly signal: AbortSignal;
+}
+
+export type ExtRequestHandler = (
+  request: ExtRequest,
+  emit: (event: ExtEvent) => void,
+  context?: ExtRequestContext,
+) => Promise<Record<string, unknown>>;
 
 // Tool result wrapper
 export interface ToolResult {

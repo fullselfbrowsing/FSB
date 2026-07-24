@@ -4,20 +4,65 @@ on:
   push:
     tags:
       # Only mcp release tags trigger npm publish. Repo-wide milestone
-      # tags (v0.9.x) are markers, not publishable artifacts; including them
-      # caused every milestone tag to fail npm-publish (re-publishing an
-      # existing mcp version).
+      # tags are markers, not publishable artifacts.
       - 'mcp-v*'
   workflow_dispatch:
 
 jobs:
+  windows-bootstrap:
+    name: build native-host Windows artifacts
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.package-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install MCP dependencies
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build x64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch x64
+      - name: Build arm64 native-host bootstrap
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch arm64
+      - name: Verify PE architecture, embedded version, and checksums
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b %errorlevel%
+          node scripts/build-native-host-windows.mjs --arch all --verify-only --metadata-out mcp/native-host/windows-artifacts.json
+      - name: Execute x64 bootstrap and safe registry-helper contract harnesses
+        run: node tests/mcp-native-host-packaging.test.js --section windows-bootstrap
+      - name: Read package version
+        id: package-version
+        shell: pwsh
+        run: |
+          node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'version=' + require('./mcp/package.json').version + String.fromCharCode(10))"
+      - name: Upload version-bound bootstrap payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsb-native-host-${{ steps.package-version.outputs.version }}
+          if-no-files-found: error
+          path: |
+            mcp/native-host/bin/win32-x64/fsb-native-host.exe
+            mcp/native-host/bin/win32-x64/fsb-native-host-registry.exe
+            mcp/native-host/bin/win32-arm64/fsb-native-host.exe
+            mcp/native-host/bin/win32-arm64/fsb-native-host-registry.exe
+            mcp/native-host/windows-artifacts.json
+
   publish:
+    needs: windows-bootstrap
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    defaults:
-      run:
-        working-directory: mcp
     steps:
       - uses: actions/checkout@v4
 
@@ -26,36 +71,107 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm ci
-      - run: npm run build
-
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Install exact MCP dependency tree
+        run: npm --prefix mcp ci --no-audit --no-fund
+      - name: Build MCP package
+        run: npm --prefix mcp run build
+      - name: Download version-bound Windows bootstrap payload
+        uses: actions/download-artifact@v4
+        with:
+          name: fsb-native-host-${{ needs.windows-bootstrap.outputs.version }}
+          path: mcp/native-host
+      - name: Verify release tag and package version binding
+        if: github.event_name == 'push'
+        run: test "$GITHUB_REF_NAME" = "mcp-v${{ needs.windows-bootstrap.outputs.version }}"
+      - name: Pack the exact verified payload once
+        id: pack
+        working-directory: mcp
+        run: |
+          mkdir -p "$RUNNER_TEMP/fsb-npm-pack"
+          npm pack . --ignore-scripts --json --pack-destination "$RUNNER_TEMP/fsb-npm-pack" > "$RUNNER_TEMP/fsb-pack-receipt.json"
+          node -e "const fs=require('fs');const path=require('path');const r=require(process.env.RUNNER_TEMP+'/fsb-pack-receipt.json')[0];fs.appendFileSync(process.env.GITHUB_OUTPUT,'tarball='+path.resolve(process.env.RUNNER_TEMP,'fsb-npm-pack',r.filename)+String.fromCharCode(10))"
+      - name: Verify final tarball PE files, receipt, complete bundle, and offline negatives
+        run: node tests/mcp-native-host-packaging.test.js --section workflow-and-pack
+        env:
+          FSB_REQUIRE_REAL_WINDOWS_ARTIFACTS: '1'
+          FSB_PACKED_TARBALL: ${{ steps.pack.outputs.tarball }}
+      - name: Bind tarball, lock, receipt, and PE checksums
+        id: release-metadata
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          node <<'NODE'
+          const { createHash } = require('crypto');
+          const { mkdirSync, readFileSync, writeFileSync, appendFileSync } = require('fs');
+          const { basename, join } = require('path');
+          const hash = (algorithm, bytes) => createHash(algorithm).update(bytes).digest('hex');
+          const packageManifest = require('./mcp/package.json');
+          const lockBytes = readFileSync('./mcp/package-lock.json');
+          const receiptBytes = readFileSync('./mcp/native-host/runtime-integrity.json');
+          const receipt = JSON.parse(receiptBytes);
+          const windows = require('./mcp/native-host/windows-artifacts.json');
+          if (windows.version !== packageManifest.version || windows.package !== packageManifest.name) {
+            throw new Error('Windows metadata package/version mismatch');
+          }
+          const lockSha256 = hash('sha256', lockBytes);
+          if (receipt.lockSha256 !== lockSha256) throw new Error('runtime receipt lock mismatch');
+          const tarballBytes = readFileSync(process.env.TARBALL);
+          const metadata = {
+            schema: 1,
+            packageName: packageManifest.name,
+            packageVersion: packageManifest.version,
+            tarball: basename(process.env.TARBALL),
+            tarballBytes: tarballBytes.length,
+            tarballSha512: hash('sha512', tarballBytes),
+            lockSha256,
+            integrityReceiptSha256: hash('sha256', receiptBytes),
+            peArtifacts: windows.artifacts.map(({ architecture, role, path, bytes, peMachine, sha256, packageVersion, roleMarker }) => ({
+              architecture,
+              role,
+              path,
+              bytes,
+              peMachine,
+              sha256,
+              packageVersion,
+              roleMarker,
+            })),
+          };
+          const directory = join(process.env.RUNNER_TEMP, 'fsb-release-metadata');
+          const pathname = join(directory, `fsb-mcp-server-${packageManifest.version}-release-metadata.json`);
+          mkdirSync(directory, { recursive: true });
+          writeFileSync(pathname, `${JSON.stringify(metadata, null, 2)}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `metadata=${pathname}\n`);
+          NODE
+      - name: Upload version-keyed release integrity metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsb-mcp-release-metadata-${{ needs.windows-bootstrap.outputs.version }}
+          if-no-files-found: error
+          path: ${{ steps.release-metadata.outputs.metadata }}
+      - name: Publish the already-verified tarball to npm
+        run: npm publish "${{ steps.pack.outputs.tarball }}" --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Extract version
-        id: version
-        run: echo "version=$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "fsb-mcp-server v${{ steps.version.outputs.version }}"
+          name: "fsb-mcp-server v${{ needs.windows-bootstrap.outputs.version }}"
           body: |
             ## Install / Update
 
             ```bash
-            npx -y fsb-mcp-server@${{ steps.version.outputs.version }}
+            npx -y fsb-mcp-server@${{ needs.windows-bootstrap.outputs.version }}
             ```
 
             Or install globally:
             ```bash
-            npm i -g fsb-mcp-server@${{ steps.version.outputs.version }}
+            npm i -g fsb-mcp-server@${{ needs.windows-bootstrap.outputs.version }}
             ```
 
             Install into MCP clients:
             ```bash
             npx fsb-mcp-server install --all
             ```
+          files: |
+            ${{ steps.release-metadata.outputs.metadata }}
           generate_release_notes: true

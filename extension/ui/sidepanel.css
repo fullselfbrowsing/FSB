@@ -1709,6 +1709,502 @@ body[data-sidepanel-view="history"] .author-footer {
   user-select: none;
 }
 
+/* Delegated agent feed. The renderer supplies text-only semantic nodes; these
+   rules intentionally reuse the shared side-panel tokens in both themes. */
+.delegation-run {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fsb-space-4);
+  width: 100%;
+  max-width: 100%;
+}
+
+.delegation-run.hidden,
+.delegation-control-bar.hidden {
+  display: none;
+}
+
+.delegation-state-card,
+.delegation-entry,
+.delegation-summary,
+.delegation-control-bar {
+  border: 1px solid var(--fsb-border-subtle);
+  background: var(--fsb-surface-elevated);
+  color: var(--fsb-text-primary);
+  box-shadow: var(--fsb-shadow-xs);
+}
+
+.delegation-state-card,
+.delegation-entry,
+.delegation-summary {
+  width: 100%;
+  padding: var(--fsb-space-4);
+  border-radius: 16px;
+  overflow-wrap: anywhere;
+}
+
+.delegation-state-card:empty {
+  display: none;
+}
+
+.delegation-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fsb-space-2);
+}
+
+.delegation-entry {
+  border-left: 4px solid var(--fsb-info);
+}
+
+.delegation-entry-retry {
+  background: color-mix(in srgb, var(--fsb-warning) 8%, var(--fsb-surface-elevated) 92%);
+}
+
+.delegation-state-card[data-delegation-tone="active"],
+.delegation-entry[data-delegation-tone="active"],
+.delegation-summary[data-delegation-tone="active"] {
+  border-left: 4px solid var(--fsb-primary);
+}
+
+.delegation-state-card[data-delegation-tone="info"],
+.delegation-entry[data-delegation-tone="info"],
+.delegation-summary[data-delegation-tone="info"] {
+  border-left: 4px solid var(--fsb-info);
+}
+
+.delegation-state-card[data-delegation-state="native-wake-checking"] {
+  border-left-color: var(--fsb-info);
+}
+
+.delegation-native-wake-spinner {
+  color: var(--fsb-info);
+  animation: delegation-native-wake-spin 900ms linear infinite;
+}
+
+@keyframes delegation-native-wake-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.delegation-state-card[data-delegation-tone="success"],
+.delegation-entry[data-delegation-tone="success"],
+.delegation-summary[data-delegation-tone="success"] {
+  border-left: 4px solid var(--fsb-success);
+}
+
+.delegation-state-card[data-delegation-tone="warning"],
+.delegation-entry[data-delegation-tone="warning"],
+.delegation-summary[data-delegation-tone="warning"] {
+  border-left: 4px solid var(--fsb-warning);
+}
+
+.delegation-state-card[data-delegation-tone="danger"],
+.delegation-entry[data-delegation-tone="danger"],
+.delegation-summary[data-delegation-tone="danger"] {
+  border-left: 4px solid var(--fsb-danger);
+}
+
+.delegation-state-card[data-delegation-tone="neutral"],
+.delegation-entry[data-delegation-tone="neutral"],
+.delegation-summary[data-delegation-tone="neutral"] {
+  border-left: 4px solid var(--fsb-text-muted);
+}
+
+.delegation-entry-heading,
+.delegation-state-heading {
+  margin: 0 0 var(--fsb-space-2);
+  color: var(--fsb-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.delegation-semantic-heading,
+.delegation-tool-call-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--fsb-space-1);
+}
+
+.delegation-semantic-icon {
+  flex: 0 0 auto;
+  color: var(--fsb-info);
+}
+
+[data-delegation-tone="active"] .delegation-semantic-icon {
+  color: var(--fsb-primary);
+}
+
+[data-delegation-tone="success"] .delegation-semantic-icon {
+  color: var(--fsb-success);
+}
+
+[data-delegation-tone="warning"] .delegation-semantic-icon {
+  color: var(--fsb-warning);
+}
+
+[data-delegation-tone="danger"] .delegation-semantic-icon {
+  color: var(--fsb-danger);
+}
+
+[data-delegation-tone="neutral"] .delegation-semantic-icon {
+  color: var(--fsb-text-muted);
+}
+
+.delegation-entry-detail,
+.delegation-entry-state,
+.delegation-state-body,
+.delegation-state-note {
+  margin: 0;
+  color: var(--fsb-text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.delegation-consent-forbidden,
+.delegation-state-note {
+  margin-top: var(--fsb-space-2);
+}
+
+.delegation-trust-control {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fsb-space-2);
+  margin-top: var(--fsb-space-4);
+  color: var(--fsb-text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.delegation-trust-checkbox {
+  flex: 0 0 auto;
+  margin: var(--fsb-space-1) 0 0;
+}
+
+.delegation-inline-error {
+  margin: var(--fsb-space-4) 0 0;
+  padding: var(--fsb-space-2) var(--fsb-space-4);
+  border-left: 4px solid var(--fsb-danger);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fsb-danger) 8%, var(--fsb-surface-elevated) 92%);
+  color: var(--fsb-danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.delegation-state-card[role="alert"] {
+  border-left: 4px solid var(--fsb-danger);
+}
+
+.delegation-doctor-command {
+  display: block;
+  margin-top: var(--fsb-space-4);
+  padding: var(--fsb-space-2) var(--fsb-space-4);
+  border-radius: 8px;
+  background: var(--fsb-surface-muted);
+  color: var(--fsb-text-primary);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.delegation-definition-list,
+.delegation-summary-metrics,
+.delegation-tool-breakdown-list {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: var(--fsb-space-1) var(--fsb-space-2);
+  margin: 0;
+}
+
+.delegation-run-metadata {
+  margin-bottom: var(--fsb-space-4);
+}
+
+.delegation-run-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+.delegation-result-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fsb-space-2) var(--fsb-space-4);
+}
+
+.delegation-definition-label,
+.delegation-definition-value {
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.delegation-definition-label {
+  color: var(--fsb-text-muted);
+  font-weight: 600;
+}
+
+.delegation-definition-value {
+  color: var(--fsb-text-primary);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.delegation-machine-value {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  word-break: break-all;
+}
+
+.delegation-tool-breakdown {
+  margin-top: var(--fsb-space-4);
+  padding: var(--fsb-space-2);
+  border-radius: 12px;
+  background: var(--fsb-surface-muted);
+}
+
+.delegation-tool-call-details {
+  padding: var(--fsb-space-2);
+  border-radius: var(--fsb-radius-sm);
+  background: var(--fsb-surface-muted);
+}
+
+.delegation-tool-call-summary {
+  color: var(--fsb-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.delegation-tool-call-details[open] .delegation-definition-list {
+  margin-top: var(--fsb-space-2);
+}
+
+.delegation-technical-details {
+  margin-top: var(--fsb-space-4);
+  padding: var(--fsb-space-2) var(--fsb-space-4);
+  border-radius: 8px;
+  background: var(--fsb-surface-muted);
+  color: var(--fsb-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.delegation-technical-details code {
+  display: block;
+  margin-top: var(--fsb-space-2);
+}
+
+.delegation-tool-breakdown-toggle,
+.delegation-technical-summary {
+  color: var(--fsb-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.delegation-tool-breakdown-list {
+  margin-top: var(--fsb-space-2);
+}
+
+.delegation-state-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fsb-space-2);
+  margin-top: var(--fsb-space-4);
+}
+
+.stop-btn[data-delegation-action="stop"] {
+  min-width: 44px;
+  width: 44px;
+  min-height: 44px;
+  height: 44px;
+}
+
+.delegation-action {
+  min-height: 44px;
+  padding: var(--fsb-space-2) var(--fsb-space-4);
+  border: 1px solid var(--fsb-border-subtle);
+  border-radius: 10px;
+  background: var(--fsb-surface-muted);
+  color: var(--fsb-text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.delegation-action-primary {
+  border-color: var(--fsb-primary);
+  background: var(--fsb-primary);
+  color: var(--fsb-text-inverse);
+}
+
+.delegation-action-danger {
+  border-color: var(--fsb-danger);
+  background: color-mix(in srgb, var(--fsb-danger) 10%, var(--fsb-surface-elevated) 90%);
+  color: var(--fsb-danger);
+}
+
+.delegation-action:hover:not(:disabled) {
+  border-color: var(--fsb-border-strong);
+  transform: translateY(-1px);
+}
+
+.delegation-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.delegation-action:focus-visible,
+.delegation-tool-call-summary:focus-visible,
+.delegation-tool-breakdown-toggle:focus-visible,
+.delegation-technical-summary:focus-visible,
+.delegation-trust-control input:focus-visible {
+  outline: 2px solid var(--fsb-primary);
+  outline-offset: 2px;
+  box-shadow: var(--fsb-focus-ring);
+}
+
+.delegation-control-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fsb-space-2);
+  margin: 0 var(--fsb-space-4);
+  padding: var(--fsb-space-2) var(--fsb-space-4);
+  border-left: 4px solid var(--fsb-warning);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.delegation-control-bar:not(.hidden) {
+  display: flex;
+}
+
+.delegation-control-copy {
+  color: var(--fsb-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.delegation-entry-new {
+  animation: delegation-entry-tint 200ms ease-out;
+}
+
+@keyframes delegation-entry-tint {
+  from { background: color-mix(in srgb, var(--fsb-primary) 12%, var(--fsb-surface-elevated) 88%); }
+  to { background: var(--fsb-surface-elevated); }
+}
+
+[data-theme="dark"] .delegation-state-card,
+[data-theme="dark"] .delegation-entry,
+[data-theme="dark"] .delegation-summary,
+[data-theme="dark"] .delegation-control-bar {
+  background: var(--fsb-surface-elevated);
+  color: var(--fsb-text-primary);
+  border-color: var(--fsb-border-subtle);
+}
+
+@media (max-width: 350px) {
+  .delegation-native-wake-heading {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .delegation-native-wake-body {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .delegation-state-actions,
+  .delegation-control-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .delegation-action {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .delegation-result-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .delegation-definition-list,
+  .delegation-summary-metrics,
+  .delegation-tool-breakdown-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .delegation-state-card[data-delegation-state="native-wake-checking"] {
+    border-color: CanvasText;
+    border-left-color: CanvasText;
+  }
+
+  .delegation-native-wake-heading,
+  .delegation-native-wake-body,
+  .delegation-native-wake-spinner {
+    color: CanvasText;
+  }
+
+  .delegation-native-wake-spinner {
+    forced-color-adjust: auto;
+  }
+}
+
+@media (min-width: 500px) {
+  .delegation-result-grid,
+  .delegation-consent-permissions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-messages {
+    scroll-behavior: auto !important;
+  }
+
+  .delegation-native-wake-spinner {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .status-dot.running,
+  .stop-btn[data-delegation-action="stop"],
+  .stop-btn[data-delegation-action="stop"] i {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .delegation-entry-new,
+  .delegation-action,
+  .delegation-run,
+  .delegation-control-bar {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 /* Phase 11 FINT-20 -- visually-hidden screen-reader-only utility.
    Used by the aria-describedby description span near the owner chip
    (sidepanel.html line ~27 post-Plan-11-02). Pattern from standard

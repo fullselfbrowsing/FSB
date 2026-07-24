@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const nodeAssert = require('node:assert/strict');
 const { pathToFileURL } = require('url');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -98,6 +99,11 @@ async function main() {
     assertEqual(bridge.registerCount(), 1, 'Test 1: exactly one agent:register call after first ensure');
     assertEqual(bridge.calls[0].type, 'agent:register', 'Test 1: call type is agent:register');
     assert(bridge.calls[0].payload && typeof bridge.calls[0].payload === 'object', 'Test 1: payload is an object');
+    nodeAssert.deepStrictEqual(
+      bridge.calls[0],
+      { type: 'agent:register', payload: {} },
+      'Test 1: no suppliers preserve the exact legacy registration message',
+    );
 
     // Subsequent calls return cached id; sendAndWait MUST NOT fire again.
     const id2 = await scope.ensure(bridge);
@@ -248,6 +254,61 @@ async function main() {
     assert(err3.message.indexOf('agent:register failed') !== -1, 'Test 5c: error message contains "agent:register failed" (got: ' + err3.message + ')');
 
     console.log('Test 5 (response shape validation): PASS');
+  }
+
+  // ===== Test 6: optional bounded delegation registration sidecar =====
+  {
+    const delegationId = 'Delegation_live_61-04';
+    const scope = new AgentScope({
+      environment: { FSB_DELEGATION_ID: delegationId },
+    });
+    const bridge = new MockBridge();
+    await scope.ensure(bridge);
+    nodeAssert.deepStrictEqual(
+      bridge.calls[0],
+      { type: 'agent:register', payload: { delegationId } },
+      'Test 6a: valid daemon id appears only on the initial registration sidecar',
+    );
+    await scope.ensure(bridge);
+    assertEqual(bridge.registerCount(), 1, 'Test 6a: cached ensure does not resend the sidecar');
+
+    for (const malformed of [
+      '',
+      'short',
+      'contains.dot',
+      'contains space',
+      'x'.repeat(129),
+    ]) {
+      const rejectedScope = new AgentScope({
+        environment: { FSB_DELEGATION_ID: malformed },
+      });
+      const rejectedBridge = new MockBridge();
+      await nodeAssert.rejects(
+        rejectedScope.ensure(rejectedBridge),
+        /Invalid FSB_DELEGATION_ID/,
+        'Test 6b: malformed delegation env must fail closed',
+      );
+      assertEqual(
+        rejectedBridge.registerCount(),
+        0,
+        'Test 6b: malformed delegation env is rejected before registration',
+      );
+    }
+
+    const sourceRoot = path.join(repoRoot, 'mcp', 'src');
+    const schemaSources = [
+      path.join(sourceRoot, 'tools', 'manual.ts'),
+      path.join(sourceRoot, 'tools', 'schemas.ts'),
+      path.join(sourceRoot, 'tool-registry.ts'),
+    ].filter((file) => fs.existsSync(file));
+    for (const schemaSource of schemaSources) {
+      const body = fs.readFileSync(schemaSource, 'utf8');
+      assert(
+        !body.includes('FSB_DELEGATION_ID') && !body.includes('delegationId'),
+        'Test 6c: delegation correlation must not enter caller tool schemas: ' + schemaSource,
+      );
+    }
+    console.log('Test 6 (optional bounded delegation registration sidecar): PASS');
   }
 
   console.log('agent-scope.test.js: PASS');

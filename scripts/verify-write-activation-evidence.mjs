@@ -10,9 +10,9 @@
 
 'use strict';
 
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 import { reportReadiness } from './report-t1-readiness.mjs';
@@ -108,6 +108,39 @@ function requireFields(record, fields, label, failures) {
   }
 }
 
+function validateRepositoryFileReferences(records, field, failures) {
+  const seen = new Set();
+  for (const record of records) {
+    const reference = record && record[field];
+    if (!isNonEmptyString(reference)) continue;
+    const normalized = reference.trim();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    if (isAbsolute(normalized)) {
+      failures.push(field + ' must be repository-relative: ' + normalized);
+      continue;
+    }
+
+    const resolvedReference = resolve(ROOT, normalized);
+    const repositoryRelative = relative(ROOT, resolvedReference);
+    if (repositoryRelative === '..' ||
+        repositoryRelative.startsWith('..' + sep) ||
+        isAbsolute(repositoryRelative)) {
+      failures.push(field + ' must stay inside the repository: ' + normalized);
+      continue;
+    }
+
+    try {
+      if (!statSync(resolvedReference).isFile()) {
+        failures.push(field + ' must reference a regular file: ' + normalized);
+      }
+    } catch (_error) {
+      failures.push(field + ' references a missing repository file: ' + normalized);
+    }
+  }
+}
+
 export function writeRowsFromReport(report) {
   const rows = report && Array.isArray(report.rows) ? report.rows : [];
   const activeWrites = [];
@@ -142,6 +175,8 @@ export function validateWriteActivationEvidence(evidence, report) {
 
   const activeBySlug = mapBySlug(activeRecords, 'activeWrites', failures);
   const guardedBySlug = mapBySlug(guardedRecords, 'guardedWrites', failures);
+  validateRepositoryFileReferences(activeRecords, 'evidenceRef', failures);
+  validateRepositoryFileReferences(guardedRecords, 'templateRef', failures);
   const rows = writeRowsFromReport(report);
   const activeRowSet = new Set(rows.activeWrites.map((row) => row.slug));
   const guardedRowSet = new Set(rows.guardedWrites.map((row) => row.slug));

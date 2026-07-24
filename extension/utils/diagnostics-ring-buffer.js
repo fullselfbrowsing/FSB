@@ -12,9 +12,101 @@
 
   var STORAGE_KEY = 'fsb_diagnostics_ring';
   var MAX_ENTRIES = 100;
+  var MAX_CONTEXT_DEPTH = 4;
+  var MAX_OBJECT_KEYS = 20;
+  var MAX_ARRAY_ITEMS = 100;
+  var FSB_BRIDGE_SECRET_PATTERN = /fsb-auth\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+  var FSB_BRIDGE_SECRET_REPLACEMENT = '[REDACTED_FSB_BRIDGE_SECRET]';
 
   // In-memory shadow for synchronous appends; reconciled with chrome.storage on every write.
   var _inMemoryRing = [];
+
+  function _redactBridgeSecretString(value) {
+    if (typeof value !== 'string') return value;
+    try {
+      var shared = (typeof globalThis !== 'undefined')
+        ? globalThis.redactBridgeSecretsInString : null;
+      if (typeof shared === 'function') {
+        var sharedResult = shared(value);
+        if (typeof sharedResult === 'string') return sharedResult;
+      }
+    } catch (e) { /* use the private fallback */ }
+    return value.replace(FSB_BRIDGE_SECRET_PATTERN, FSB_BRIDGE_SECRET_REPLACEMENT);
+  }
+
+  function _shapeSafeValue(value) {
+    if (Array.isArray(value)) return { kind: 'array', length: value.length };
+    if (value && typeof value === 'object') {
+      try {
+        return { kind: 'object', keys: Math.min(Object.keys(value).length, MAX_OBJECT_KEYS) };
+      } catch (e) {
+        return { kind: 'object', keys: 0 };
+      }
+    }
+    if (value === null || value === undefined) return { kind: 'empty' };
+    return { kind: typeof value };
+  }
+
+  function _sanitizeDiagnosticValue(value, depth) {
+    if (typeof value === 'string') return _redactBridgeSecretString(value);
+    if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
+    if (value === undefined) return { kind: 'empty' };
+    if (typeof value !== 'object') return _shapeSafeValue(value);
+
+    if (value instanceof Error) {
+      return {
+        kind: 'error',
+        name: _redactBridgeSecretString(String(value.name || 'Error')),
+        message: _redactBridgeSecretString(String(value.message || ''))
+      };
+    }
+
+    if (depth >= MAX_CONTEXT_DEPTH) return _shapeSafeValue(value);
+
+    if (Array.isArray(value)) {
+      return value.slice(0, MAX_ARRAY_ITEMS).map(function(item) {
+        return _sanitizeDiagnosticValue(item, depth + 1);
+      });
+    }
+
+    var result = {};
+    var keys;
+    try {
+      keys = Object.keys(value).slice(0, MAX_OBJECT_KEYS);
+    } catch (e) {
+      return { kind: 'object', keys: 0 };
+    }
+    for (var i = 0; i < keys.length; i++) {
+      var rawKey = keys[i];
+      var safeKey = _redactBridgeSecretString(rawKey);
+      try {
+        result[safeKey] = _sanitizeDiagnosticValue(value[rawKey], depth + 1);
+      } catch (e) {
+        result[safeKey] = { kind: 'unavailable' };
+      }
+    }
+    return result;
+  }
+
+  function _makeSafeEntry(entry) {
+    var whitelisted = {
+      ts: typeof entry.ts === 'number' ? entry.ts : Date.now(),
+      level: String(entry.level || 'warn'),
+      prefix: String(entry.prefix || ''),
+      category: String(entry.category || ''),
+      message: String(entry.message || ''),
+      redactedContext: (entry.redactedContext && typeof entry.redactedContext === 'object')
+        ? entry.redactedContext : {}
+    };
+    return {
+      ts: whitelisted.ts,
+      level: _redactBridgeSecretString(whitelisted.level),
+      prefix: _redactBridgeSecretString(whitelisted.prefix),
+      category: _redactBridgeSecretString(whitelisted.category),
+      message: _redactBridgeSecretString(whitelisted.message),
+      redactedContext: _sanitizeDiagnosticValue(whitelisted.redactedContext, 0)
+    };
+  }
 
   function _hasChromeStorage() {
     return typeof chrome !== 'undefined'
@@ -27,15 +119,7 @@
   function appendDiagnosticEntry(entry) {
     if (!entry || typeof entry !== 'object') return Promise.resolve();
     // Defensive copy with explicit field whitelist to prevent accidental disclosure.
-    var safe = {
-      ts: typeof entry.ts === 'number' ? entry.ts : Date.now(),
-      level: String(entry.level || 'warn'),
-      prefix: String(entry.prefix || ''),
-      category: String(entry.category || ''),
-      message: String(entry.message || ''),
-      redactedContext: (entry.redactedContext && typeof entry.redactedContext === 'object')
-        ? entry.redactedContext : {}
-    };
+    var safe = _makeSafeEntry(entry);
     _inMemoryRing.push(safe);
     if (_inMemoryRing.length > MAX_ENTRIES) {
       _inMemoryRing.splice(0, _inMemoryRing.length - MAX_ENTRIES); // FIFO trim
@@ -47,6 +131,9 @@
       try {
         chrome.storage.local.get([STORAGE_KEY], function(stored) {
           var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
+          ring = ring.filter(function(item) {
+            return item && typeof item === 'object';
+          }).map(_makeSafeEntry);
           ring.push(safe);
           if (ring.length > MAX_ENTRIES) {
             ring = ring.slice(ring.length - MAX_ENTRIES);
@@ -78,6 +165,9 @@
       try {
         chrome.storage.local.get([STORAGE_KEY], function(stored) {
           var ring = (stored && Array.isArray(stored[STORAGE_KEY])) ? stored[STORAGE_KEY] : [];
+          ring = ring.filter(function(item) {
+            return item && typeof item === 'object';
+          }).map(_makeSafeEntry);
           if (!shouldClear) {
             resolve({ entries: ring });
             return;

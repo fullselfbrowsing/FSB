@@ -1,12 +1,16 @@
 # Changelog
 
-All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.90`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
+All notable changes to the FSB product (Chrome extension + showcase dashboard) are documented in this file. Entries are organized by FSB milestone. The extension version is `0.9.91`; milestone versions such as `v0.11.0` and `v0.12.0` are the meaningful release units.
 
 The `fsb-mcp-server` npm package keeps its own semver changelog in [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md).
 
 ## [Unreleased]
 
 Nothing yet.
+
+## v0.9.91 — Version Metadata Alignment — 2026-07-14
+
+The extension, showcase, skill, documentation, and store metadata align at `0.9.91`. The independently versioned `fsb-mcp-server` advances to `0.11.0` for the `mcp:task-status` terminal task-outcome contract; see [`mcp/CHANGELOG.md`](./mcp/CHANGELOG.md) for its package-specific release notes and compatibility requirements.
 
 ## v0.9.90 — Native Capability Catalog, Trigger Watchers, Control Panel Redesign & Onboarding — 2026-07-06
 

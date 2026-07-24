@@ -1,11 +1,17 @@
 import { randomBytes } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage, type Server } from 'node:http';
+import type { Duplex } from 'node:stream';
 import WebSocket from 'ws';
 import { WebSocketServer, type WebSocket as WsWebSocket } from 'ws';
 import type {
   BridgeMode,
+  BridgeCapability,
   BridgeOptions,
   BridgeTopologyState,
+  ExtEvent,
+  ExtRequest,
+  ExtResponse,
+  ExtRequestHandler,
   MCPMessage,
   MCPResponse,
   RelayHello,
@@ -13,11 +19,39 @@ import type {
   RelayWelcome,
 } from './types.js';
 import { FSB_ERROR_MESSAGES } from './errors.js';
+import {
+  FSB_EXT_PROTOCOL,
+  authenticateBridgeProtocols,
+  bindAllowedExtensionOrigin,
+  readBridgeAuthState,
+} from './bridge-auth.js';
+import { makeExtError, parseExtFrame } from './ext-protocol.js';
 
 interface PendingRequest {
   resolve: (value: MCPResponse) => void;
   reject: (reason: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+}
+
+interface AcceptedSocketMetadata {
+  browserOrigin: string | null;
+  extAuthorized: boolean;
+  sessionId: string | null;
+  unauthorizedSent: boolean;
+}
+
+interface ActiveExtRequest {
+  id: string;
+  originSocket: WsWebSocket;
+  target: 'local' | 'relay';
+  relayId?: string;
+  settled: boolean;
+  abortController: AbortController | null;
+}
+
+interface ActiveRelayedExtRequest {
+  hubSocket: WebSocket;
+  abortController: AbortController;
 }
 
 // The three error messages this file's disconnect paths reject in-flight
@@ -37,6 +71,10 @@ const BRIDGE_DISCONNECT_MESSAGES = new Set<string>([
   'Lost connection to hub',
 ]);
 
+const HEARTBEAT_NONCE_MIN_LENGTH = 16;
+const HEARTBEAT_NONCE_MAX_LENGTH = 64;
+const HEARTBEAT_NONCE_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export function isBridgeDisconnectError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return BRIDGE_DISCONNECT_MESSAGES.has(msg);
@@ -53,16 +91,23 @@ export class WebSocketBridge {
   private promotionJitterMs: number;
   private maxReconnectDelayMs: number;
   private allowedBrowserOrigins: string[];
+  private capabilities: Set<BridgeCapability>;
+  private handleExtRequest: ExtRequestHandler | null;
 
   // Hub mode state
   private wss: WebSocketServer | null = null;
+  private httpServer: Server | null = null;
   private extensionClient: WsWebSocket | null = null;
   private relayClients = new Map<string, WsWebSocket>();
+  private relayCapabilities = new Map<string, Set<BridgeCapability>>();
+  private activeExtRequests = new Map<string, ActiveExtRequest>();
   private messageOrigin = new Map<string, string>(); // msgId -> instanceId | "local"
   private handshakeTimers = new Map<WsWebSocket, ReturnType<typeof setTimeout>>();
+  private acceptedSocketMetadata = new WeakMap<WsWebSocket, AcceptedSocketMetadata>();
 
   // Relay mode state
   private hubConnection: WebSocket | null = null;
+  private relayActiveExtRequests = new Map<string, ActiveRelayedExtRequest>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 0;
   private intentionalClose = false;
@@ -81,13 +126,33 @@ export class WebSocketBridge {
 
   constructor(options: BridgeOptions = {}) {
     this.port = options.port ?? 7225;
-    this.host = options.host ?? 'localhost';
+    this.host = options.host ?? '127.0.0.1';
+    if (!WebSocketBridge.isLoopbackBindHost(this.host)) {
+      const error = new Error('BRIDGE_NON_LOOPBACK_BIND') as NodeJS.ErrnoException;
+      error.code = 'BRIDGE_NON_LOOPBACK_BIND';
+      throw error;
+    }
     this.instanceId = options.instanceId ?? randomBytes(4).toString('hex');
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 2_000;
     this.relayHandshakeTimeoutMs = options.relayHandshakeTimeoutMs ?? 5_000;
     this.promotionJitterMs = options.promotionJitterMs ?? 500;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
     this.allowedBrowserOrigins = options.allowedBrowserOrigins ?? ['chrome-extension://'];
+    this.handleExtRequest = typeof options.handleExtRequest === 'function'
+      ? options.handleExtRequest
+      : null;
+    this.capabilities = new Set(
+      this.handleExtRequest && options.capabilities?.includes('agent-spawn')
+        ? ['agent-spawn']
+        : [],
+    );
+    if (options.capabilities?.includes('agent-spawn') && !this.handleExtRequest) {
+      console.error(`[FSB Bridge ${this.instanceId}] Ignoring agent-spawn capability without a handler`);
+    }
+  }
+
+  private static isLoopbackBindHost(host: string): boolean {
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1';
   }
 
   // --------------------------------------------------------------------------
@@ -122,11 +187,19 @@ export class WebSocketBridge {
       this.reconnectTimer = null;
     }
 
+    for (const route of [...this.activeExtRequests.values()]) {
+      this._abortExtRoute(route);
+    }
+    for (const [id, route] of [...this.relayActiveExtRequests]) {
+      this._abortRelayedExtRequest(id, route.hubSocket);
+    }
+
     if (this.mode === 'hub') {
       // Close all relay clients
       for (const [id, ws] of this.relayClients) {
         ws.close();
         this.relayClients.delete(id);
+        this.relayCapabilities.delete(id);
       }
       // Close extension connection
       if (this.extensionClient) {
@@ -135,8 +208,9 @@ export class WebSocketBridge {
       }
       // Close server
       if (this.wss) {
-        this.wss.close();
-        this.wss = null;
+        this._closeHubServers();
+      } else if (this.httpServer) {
+        this._closeHubServers();
       }
       // Clean up handshake timers
       for (const [, timer] of this.handshakeTimers) {
@@ -163,6 +237,9 @@ export class WebSocketBridge {
     }
     this.progressListeners.clear();
     this.messageOrigin.clear();
+    this.relayCapabilities.clear();
+    this.activeExtRequests.clear();
+    this.relayActiveExtRequests.clear();
     this.connected = false;
     this.hubConnected = false;
     this.activeHubInstanceId = null;
@@ -242,7 +319,7 @@ export class WebSocketBridge {
     return {
       instanceId: this.instanceId,
       mode: this.mode,
-      hubConnected: this.mode === 'hub' ? this.wss !== null : this.hubConnected,
+      hubConnected: this.mode === 'hub' ? this.httpServer?.listening === true : this.hubConnected,
       extensionConnected,
       relayCount: this.mode === 'hub' ? this.relayClients.size : this.relayCount,
       pendingRequestCount: this.pendingRequests.size,
@@ -263,9 +340,37 @@ export class WebSocketBridge {
 
   private _startAsHub(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.wss = new WebSocketServer({ port: this.port, host: this.host });
+      const wss = new WebSocketServer({
+        noServer: true,
+        handleProtocols: (protocols) => protocols.has(FSB_EXT_PROTOCOL) ? FSB_EXT_PROTOCOL : false,
+      });
+      const httpServer = createServer((_req, res) => {
+        res.writeHead(404, { 'content-type': 'text/plain' });
+        res.end('Not found');
+      });
+      this.wss = wss;
+      this.httpServer = httpServer;
+      let startupSettled = false;
 
-      this.wss.on('listening', () => {
+      httpServer.on('upgrade', (req, socket, head) => {
+        const classification = this._classifyUpgrade(req);
+        if (!classification) {
+          this._rejectUpgrade(socket);
+          return;
+        }
+
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          this.acceptedSocketMetadata.set(ws, classification);
+          wss.emit('connection', ws, req);
+        });
+      });
+
+      httpServer.on('clientError', (_error, socket) => {
+        this._rejectUpgrade(socket);
+      });
+
+      httpServer.on('listening', () => {
+        startupSettled = true;
         this.mode = 'hub';
         this.hubConnected = true;
         this.activeHubInstanceId = this.instanceId;
@@ -276,101 +381,246 @@ export class WebSocketBridge {
         resolve();
       });
 
-      this.wss.on('error', (err: NodeJS.ErrnoException) => {
-        this.wss?.close();
-        this.wss = null;
+      httpServer.on('error', (err: NodeJS.ErrnoException) => {
+        this._closeHubServers();
         this.hubConnected = false;
-        reject(err);
+        if (!startupSettled) {
+          startupSettled = true;
+          reject(err);
+        } else {
+          this.lastDisconnectReason = 'hub_server_error';
+          console.error(`[FSB Bridge ${this.instanceId}] Hub HTTP server error:`, err.message);
+        }
       });
 
-      this.wss.on('connection', (ws: WsWebSocket, req: IncomingMessage) => {
-        if (!this.isAllowedWebSocketOrigin(req)) {
-          ws.close(1008, 'Forbidden origin');
-          return;
-        }
-
+      wss.on('connection', (ws: WsWebSocket) => {
         this._handleNewConnection(ws);
       });
+
+      wss.on('error', (err: Error) => {
+        console.error(`[FSB Bridge ${this.instanceId}] Hub WebSocket server error:`, err.message);
+      });
+
+      httpServer.listen(this.port, this.host);
     });
   }
 
-  private isAllowedWebSocketOrigin(req: IncomingMessage): boolean {
-    const originHeader = req.headers.origin;
-    if (!originHeader) return true;
+  private _closeHubServers(): void {
+    const wss = this.wss;
+    const httpServer = this.httpServer;
+    this.wss = null;
+    this.httpServer = null;
 
-    const origins = Array.isArray(originHeader) ? originHeader : [originHeader];
-    return origins.every((origin) =>
-      this.allowedBrowserOrigins.some((allowedOrigin) =>
+    if (wss) {
+      try {
+        wss.close();
+      } catch {
+        // A noServer WebSocketServer may not have accepted a socket yet.
+      }
+    }
+    if (httpServer?.listening) {
+      try {
+        httpServer.close();
+      } catch {
+        // The server may already be closing after an error.
+      }
+    }
+  }
+
+  private _activePort(): number {
+    const address = this.httpServer?.address();
+    return address && typeof address === 'object' ? address.port : this.port;
+  }
+
+  private _singleRawHeader(req: IncomingMessage, name: string): string | null {
+    const values: string[] = [];
+    for (let index = 0; index < req.rawHeaders.length; index += 2) {
+      if (req.rawHeaders[index]?.toLowerCase() === name) {
+        values.push(req.rawHeaders[index + 1] ?? '');
+      }
+    }
+    return values.length === 1 && values[0].length > 0 ? values[0] : null;
+  }
+
+  private _hasRawHeader(req: IncomingMessage, name: string): boolean {
+    for (let index = 0; index < req.rawHeaders.length; index += 2) {
+      if (req.rawHeaders[index]?.toLowerCase() === name) return true;
+    }
+    return false;
+  }
+
+  private _hasAllowedHost(req: IncomingMessage): boolean {
+    const hostHeader = this._singleRawHeader(req, 'host');
+    if (!hostHeader || typeof req.headers.host !== 'string') return false;
+    const normalized = hostHeader.toLowerCase();
+    if (req.headers.host.toLowerCase() !== normalized) return false;
+
+    const port = this._activePort();
+    const allowed = new Set([
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      ...(this.host === '::1' ? [`[::1]:${port}`] : []),
+    ]);
+    return allowed.has(normalized);
+  }
+
+  private _parseBrowserOrigin(req: IncomingMessage): string | null | false {
+    if (!this._hasRawHeader(req, 'origin')) return null;
+    const originHeader = this._singleRawHeader(req, 'origin');
+    if (!originHeader || typeof req.headers.origin !== 'string' || originHeader.includes(',')) {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(originHeader);
+      if (
+        parsed.protocol !== 'chrome-extension:'
+        || !parsed.host
+        || parsed.port
+        || parsed.username
+        || parsed.password
+        || (parsed.pathname !== '' && parsed.pathname !== '/')
+        || parsed.search
+        || parsed.hash
+      ) {
+        return false;
+      }
+      const canonical = `chrome-extension://${parsed.host}`;
+      if (originHeader !== canonical && originHeader !== `${canonical}/`) return false;
+      if (!this.allowedBrowserOrigins.some((allowedOrigin) =>
         allowedOrigin.endsWith('://')
-          ? origin.startsWith(allowedOrigin)
-          : origin === allowedOrigin,
-      ),
-    );
+          ? canonical.startsWith(allowedOrigin)
+          : canonical === allowedOrigin)) {
+        return false;
+      }
+      return canonical;
+    } catch {
+      return false;
+    }
+  }
+
+  private _classifyUpgrade(req: IncomingMessage): AcceptedSocketMetadata | null {
+    if (!this._hasAllowedHost(req)) return null;
+
+    const browserOrigin = this._parseBrowserOrigin(req);
+    if (browserOrigin === false) return null;
+    const state = readBridgeAuthState();
+
+    if (browserOrigin && state?.allowedExtensionOrigin && state.allowedExtensionOrigin !== browserOrigin) {
+      return null;
+    }
+
+    let extAuthorized = false;
+    let sessionId = state?.sessionId ?? null;
+    if (browserOrigin && state && authenticateBridgeProtocols(req.headers['sec-websocket-protocol'], state)) {
+      try {
+        const boundState = state.allowedExtensionOrigin === null
+          ? bindAllowedExtensionOrigin(browserOrigin)
+          : state;
+        extAuthorized = boundState.allowedExtensionOrigin === browserOrigin
+          && authenticateBridgeProtocols(req.headers['sec-websocket-protocol'], boundState);
+        if (!extAuthorized) return null;
+        sessionId = boundState.sessionId;
+      } catch {
+        return null;
+      }
+    }
+
+    return {
+      browserOrigin: browserOrigin || null,
+      extAuthorized,
+      sessionId,
+      unauthorizedSent: false,
+    };
+  }
+
+  private _rejectUpgrade(socket: Duplex): void {
+    if (socket.destroyed) return;
+    try {
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    } catch {
+      socket.destroy();
+    }
+  }
+
+  private _parseRelayHello(raw: string): RelayHello | null {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      const keys = Object.keys(parsed);
+      if (keys.some((key) => key !== 'type' && key !== 'instanceId' && key !== 'capabilities')) {
+        return null;
+      }
+      if (
+        parsed.type !== 'relay:hello'
+        || typeof parsed.instanceId !== 'string'
+        || parsed.instanceId.length === 0
+        || parsed.instanceId.length > 200
+        || parsed.instanceId.trim() !== parsed.instanceId
+      ) {
+        return null;
+      }
+      if (Object.prototype.hasOwnProperty.call(parsed, 'capabilities')) {
+        if (
+          !Array.isArray(parsed.capabilities)
+          || parsed.capabilities.length > 1
+          || parsed.capabilities.some((capability) => capability !== 'agent-spawn')
+        ) {
+          return null;
+        }
+      }
+      return parsed as unknown as RelayHello;
+    } catch {
+      return null;
+    }
   }
 
   /**
-   * When a new WebSocket connection arrives, wait for a relay:hello handshake.
-   * If it arrives, this is a relay client. If not within the configured timeout,
-   * treat it as the Chrome extension.
+   * Browser-Origin sockets are extension candidates. Origin-less sockets must
+   * prove that they are an MCP relay with a valid relay:hello before the short
+   * handshake deadline; they never fall through to extension authority.
    */
   private _handleNewConnection(ws: WsWebSocket): void {
-    let identified = false;
+    const metadata = this.acceptedSocketMetadata.get(ws);
+    if (!metadata) {
+      ws.close(1008, 'Socket classification unavailable');
+      return;
+    }
 
-    // Buffer messages until we know what this connection is
-    const buffered: string[] = [];
+    if (metadata.browserOrigin) {
+      if (this.extensionClient && !this._isCurrentExtAuthority(ws)) {
+        console.error(`[FSB Bridge ${this.instanceId}] Unprivileged extension candidate cannot replace active extension`);
+        ws.close(1008, 'Extension authorization required');
+        return;
+      }
+      this._registerExtensionClient(ws);
+      return;
+    }
+
+    let identified = false;
 
     const onMessage = (data: Buffer | string): void => {
       const raw = typeof data === 'string' ? data : data.toString();
-
-      if (!identified) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed.type === 'relay:hello' && parsed.instanceId) {
-            // This is a relay MCP client
-            identified = true;
-            clearTimeout(handshakeTimer);
-            this.handshakeTimers.delete(ws);
-            this._registerRelayClient(ws, parsed as RelayHello);
-            return;
-          }
-        } catch {
-          // Not valid JSON or not a relay hello -- treat as extension
-        }
-
-        // First message was NOT relay:hello -> this is the extension
-        identified = true;
-        clearTimeout(handshakeTimer);
-        this.handshakeTimers.delete(ws);
-        this._registerExtensionClient(ws);
-
-        // Process the buffered message as an extension message
-        this._handleExtensionMessage(raw);
+      if (identified) return;
+      identified = true;
+      clearTimeout(handshakeTimer);
+      this.handshakeTimers.delete(ws);
+      const hello = this._parseRelayHello(raw);
+      if (!hello) {
+        ws.close(1008, 'Relay handshake required');
         return;
       }
-
-      buffered.push(raw);
+      this._registerRelayClient(ws, hello);
     };
 
     ws.on('message', onMessage);
 
-    // If no message arrives within timeout, assume it's the extension
-    // (extension may not send anything until it receives a message)
+    // An Origin-less socket that does not identify itself is never an extension.
     const handshakeTimer = setTimeout(() => {
       if (!identified) {
         identified = true;
         this.handshakeTimers.delete(ws);
-        // If extension is already connected and healthy, don't replace it --
-        // this is likely a slow relay whose hello was delayed past the timeout
-        if (this.extensionClient && this.connected) {
-          console.error(`[FSB Bridge ${this.instanceId}] Unidentified connection while extension active, closing`);
-          ws.close();
-          return;
-        }
-        this._registerExtensionClient(ws);
-        // Process any buffered messages
-        for (const raw of buffered) {
-          this._handleExtensionMessage(raw);
-        }
+        ws.close(1008, 'Relay handshake required');
       }
     }, this.handshakeTimeoutMs);
 
@@ -389,6 +639,7 @@ export class WebSocketBridge {
     if (this.extensionClient) {
       console.error(`[FSB Bridge ${this.instanceId}] New extension connected, closing previous`);
       this.lastDisconnectReason = 'extension_replaced';
+      this._abortRoutesForOrigin(this.extensionClient);
       this.extensionClient.close();
     }
 
@@ -402,7 +653,7 @@ export class WebSocketBridge {
     // Replace the temporary message handler with the real one
     ws.removeAllListeners('message');
     ws.on('message', (data: Buffer | string) => {
-      this._handleExtensionMessage(typeof data === 'string' ? data : data.toString());
+      this._handleExtensionMessage(ws, typeof data === 'string' ? data : data.toString());
     });
 
     ws.on('close', () => {
@@ -422,6 +673,8 @@ export class WebSocketBridge {
       }
       this.progressListeners.clear();
 
+      this._abortRoutesForOrigin(ws);
+
       // Notify relay clients about pending requests that can't be fulfilled
       // (they'll get errors when they timeout)
       // Clean up messageOrigin entries for non-local origins
@@ -440,13 +693,20 @@ export class WebSocketBridge {
 
   private _registerRelayClient(ws: WsWebSocket, hello: RelayHello): void {
     const clientId = hello.instanceId;
+    const capabilities = new Set<BridgeCapability>(
+      Array.isArray(hello.capabilities) && hello.capabilities.includes('agent-spawn')
+        ? ['agent-spawn']
+        : [],
+    );
 
     if (this.relayClients.has(clientId)) {
       console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} reconnected, closing old`);
+      this._settleRoutesForRelay(clientId);
       this.relayClients.get(clientId)!.close();
     }
 
     this.relayClients.set(clientId, ws);
+    this.relayCapabilities.set(clientId, capabilities);
     console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} registered (total: ${this.relayClients.size})`);
 
     // Send welcome
@@ -472,6 +732,8 @@ export class WebSocketBridge {
       console.error(`[FSB Bridge ${this.instanceId}] Relay client ${clientId} disconnected`);
       if (this.relayClients.get(clientId) === ws) {
         this.relayClients.delete(clientId);
+        this.relayCapabilities.delete(clientId);
+        this._settleRoutesForRelay(clientId);
       }
 
       // Clean up messageOrigin entries for this client
@@ -512,28 +774,52 @@ export class WebSocketBridge {
    * Handle a message FROM the extension (a response to some request).
    * Route it to the correct origin (local pending request or relay client).
    */
-  private _handleExtensionMessage(raw: string): void {
-    // Phase 102.1: Handle keepalive pings from extension before type-checking MCPResponse
+  private _handleExtensionMessage(ws: WsWebSocket, raw: string): void {
+    let parsed: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(raw);
+      parsed = JSON.parse(raw) as Record<string, unknown>;
       if (parsed.type === 'mcp:ping') {
+        const heartbeat = this._parseHeartbeatPing(parsed);
+        if (!heartbeat) return;
         const heartbeatAt = Date.now();
         this.lastExtensionHeartbeatAt = heartbeatAt;
-        if (this.extensionClient && this.extensionClient.readyState === 1 /* WebSocket.OPEN */) {
-          this.extensionClient.send(JSON.stringify({ type: 'mcp:pong', ts: heartbeatAt }));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(heartbeat.nonce === undefined
+            ? { type: 'mcp:pong', ts: heartbeatAt }
+            : { type: 'mcp:pong', ts: heartbeatAt, nonce: heartbeat.nonce }));
         }
         this._broadcastRelayState();
         return;
       }
-    } catch { /* fall through to normal parse */ }
-
-    let resp: MCPResponse;
-    try {
-      resp = JSON.parse(raw) as MCPResponse;
     } catch {
       console.error(`[FSB Bridge ${this.instanceId}] Failed to parse extension message`);
       return;
     }
+
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+      if (!this._isCurrentExtAuthority(ws)) {
+        this._revokeExtAuthority(ws, parsed.id);
+        return;
+      }
+
+      const extFrame = parseExtFrame(parsed);
+      if (extFrame?.type === 'ext:request') {
+        this._handleExtRequest(ws, extFrame);
+      } else {
+        const id = typeof parsed.id === 'string' && parsed.id.length > 0 && parsed.id.length <= 200
+          ? parsed.id
+          : 'invalid_ext_request';
+        this._sendExtResponse(ws, makeExtError(
+          id,
+          'invalid_ext_request',
+          'Extension request frame is invalid',
+          false,
+        ));
+      }
+      return;
+    }
+
+    const resp = parsed as unknown as MCPResponse;
 
     const origin = this.messageOrigin.get(resp.id);
 
@@ -571,17 +857,256 @@ export class WebSocketBridge {
     }
   }
 
+  private _parseHeartbeatPing(
+    value: Record<string, unknown>,
+  ): { nonce?: string } | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const keys = Object.keys(value).sort();
+    const hasNonce = Object.prototype.hasOwnProperty.call(value, 'nonce');
+    if (
+      keys.length !== (hasNonce ? 3 : 2)
+      || keys[0] !== (hasNonce ? 'nonce' : 'ts')
+      || keys[hasNonce ? 1 : 0] !== 'ts'
+      || keys[hasNonce ? 2 : 1] !== 'type'
+      || value.type !== 'mcp:ping'
+      || typeof value.ts !== 'number'
+      || !Number.isSafeInteger(value.ts)
+      || value.ts < 0
+    ) {
+      return null;
+    }
+    if (!hasNonce) return {};
+    if (
+      typeof value.nonce !== 'string'
+      || value.nonce.length < HEARTBEAT_NONCE_MIN_LENGTH
+      || value.nonce.length > HEARTBEAT_NONCE_MAX_LENGTH
+      || !HEARTBEAT_NONCE_PATTERN.test(value.nonce)
+    ) {
+      return null;
+    }
+    return { nonce: value.nonce };
+  }
+
+  private _isCurrentExtAuthority(ws: WsWebSocket): boolean {
+    const metadata = this.acceptedSocketMetadata.get(ws);
+    if (!metadata?.extAuthorized || !metadata.browserOrigin || !metadata.sessionId) return false;
+    const state = readBridgeAuthState();
+    return state !== null
+      && state.sessionId === metadata.sessionId
+      && state.allowedExtensionOrigin === metadata.browserOrigin;
+  }
+
+  private _revokeExtAuthority(ws: WsWebSocket, requestId: unknown): void {
+    const metadata = this.acceptedSocketMetadata.get(ws);
+    if (!metadata) return;
+    metadata.extAuthorized = false;
+    if (!metadata.unauthorizedSent && ws.readyState === WebSocket.OPEN) {
+      metadata.unauthorizedSent = true;
+      const id = typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 200
+        ? requestId
+        : 'ext_unauthorized';
+      ws.send(JSON.stringify(makeExtError(
+        id,
+        'ext_unauthorized',
+        'Extension authorization is unavailable',
+        false,
+      )));
+    }
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close(1008, 'Extension authorization revoked');
+    }
+  }
+
+  private _handleExtRequest(ws: WsWebSocket, request: ExtRequest): void {
+    if (request.method === 'bridge.auth-status') {
+      this._sendExtResponse(ws, {
+        id: request.id,
+        type: 'ext:response',
+        payload: { authorized: true },
+      });
+      return;
+    }
+
+    if (this.activeExtRequests.has(request.id)) {
+      this._sendExtResponse(ws, makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request ID is already active',
+        false,
+      ));
+      return;
+    }
+
+    if (this.capabilities.has('agent-spawn') && this.handleExtRequest) {
+      const route: ActiveExtRequest = {
+        id: request.id,
+        originSocket: ws,
+        target: 'local',
+        settled: false,
+        abortController: new AbortController(),
+      };
+      this.activeExtRequests.set(request.id, route);
+      void this._invokeLocalExtHandler(request, route);
+      return;
+    }
+
+    for (const [relayId, relaySocket] of this.relayClients) {
+      if (
+        relaySocket.readyState === WebSocket.OPEN
+        && this.relayCapabilities.get(relayId)?.has('agent-spawn')
+      ) {
+        const route: ActiveExtRequest = {
+          id: request.id,
+          originSocket: ws,
+          target: 'relay',
+          relayId,
+          settled: false,
+          abortController: null,
+        };
+        this.activeExtRequests.set(request.id, route);
+        relaySocket.send(JSON.stringify(request));
+        return;
+      }
+    }
+
+    this._sendExtResponse(ws, makeExtError(
+      request.id,
+      'agent_provider_offline',
+      'No extension request handler is available',
+      true,
+    ));
+  }
+
+  private async _invokeLocalExtHandler(
+    request: ExtRequest,
+    route: ActiveExtRequest,
+  ): Promise<void> {
+    const handler = this.handleExtRequest;
+    if (!handler) return;
+    const emit = (event: ExtEvent): void => {
+      const current = this.activeExtRequests.get(request.id);
+      const parsedEvent = parseExtFrame(event);
+      if (
+        current !== route
+        || route.settled
+        || parsedEvent?.type !== 'ext:event'
+        || parsedEvent.id !== request.id
+      ) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid or late local extension event`);
+        return;
+      }
+      if (route.originSocket.readyState === WebSocket.OPEN) {
+        route.originSocket.send(JSON.stringify(parsedEvent));
+      }
+    };
+
+    try {
+      const payload = await handler(request, emit, {
+        signal: route.abortController!.signal,
+      });
+      const response = parseExtFrame({
+        id: request.id,
+        type: 'ext:response',
+        payload,
+      });
+      if (response?.type !== 'ext:response' || !('payload' in response)) {
+        throw new Error('invalid handler result');
+      }
+      this._settleExtRoute(route, response);
+    } catch {
+      console.error(`[FSB Bridge ${this.instanceId}] Local extension request handler failed`);
+      this._settleExtRoute(route, makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request handler failed',
+        false,
+      ));
+    }
+  }
+
+  private _settleExtRoute(route: ActiveExtRequest, response: ExtResponse): void {
+    if (route.settled || this.activeExtRequests.get(route.id) !== route) return;
+    route.settled = true;
+    this.activeExtRequests.delete(route.id);
+    this._sendExtResponse(route.originSocket, response);
+  }
+
+  private _abortRoutesForOrigin(originSocket: WsWebSocket): void {
+    for (const route of [...this.activeExtRequests.values()]) {
+      if (route.originSocket === originSocket) this._abortExtRoute(route);
+    }
+  }
+
+  private _abortExtRoute(route: ActiveExtRequest): void {
+    if (route.settled || this.activeExtRequests.get(route.id) !== route) return;
+    route.settled = true;
+    this.activeExtRequests.delete(route.id);
+    if (route.target === 'local') {
+      route.abortController?.abort(new Error('route_lost'));
+      return;
+    }
+    if (!route.relayId) return;
+    const relaySocket = this.relayClients.get(route.relayId);
+    if (relaySocket?.readyState === WebSocket.OPEN) {
+      relaySocket.send(JSON.stringify(makeExtError(
+        route.id,
+        'bridge_topology_changed',
+        'Extension route closed before delegation settled',
+        true,
+      )));
+    }
+  }
+
+  private _sendExtResponse(socket: WsWebSocket, response: ExtResponse): void {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
+  }
+
+  private _settleRoutesForRelay(relayId: string): void {
+    for (const route of [...this.activeExtRequests.values()]) {
+      if (route.target !== 'relay' || route.relayId !== relayId) continue;
+      this._settleExtRoute(route, makeExtError(
+        route.id,
+        'bridge_topology_changed',
+        'Selected relay disconnected before responding',
+        true,
+      ));
+    }
+  }
+
   /**
    * Handle a message FROM a relay client (a request to forward to extension).
    */
   private _handleRelayClientMessage(clientId: string, raw: string): void {
-    let msg: MCPMessage;
+    let parsed: Record<string, unknown>;
     try {
-      msg = JSON.parse(raw) as MCPMessage;
+      parsed = JSON.parse(raw) as Record<string, unknown>;
     } catch {
       console.error(`[FSB Bridge ${this.instanceId}] Failed to parse relay client message`);
       return;
     }
+
+    if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+      const frame = parseExtFrame(parsed);
+      if (frame?.type !== 'ext:event' && frame?.type !== 'ext:response') {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid relay extension frame`);
+        return;
+      }
+      const route = this.activeExtRequests.get(frame.id);
+      if (route?.target !== 'relay' || route.relayId !== clientId || route.settled) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped extension frame from unselected relay`);
+        return;
+      }
+      if (frame.type === 'ext:event') {
+        if (route.originSocket.readyState === WebSocket.OPEN) {
+          route.originSocket.send(JSON.stringify(frame));
+        }
+        return;
+      }
+      this._settleExtRoute(route, frame);
+      return;
+    }
+
+    const msg = parsed as unknown as MCPMessage;
 
     if (!this.extensionClient) {
       // Can't forward -- send error back to relay client
@@ -645,11 +1170,13 @@ export class WebSocketBridge {
       };
 
       try {
-        this.hubConnection = new WebSocket(`ws://${this.host}:${this.port}`);
+        const relayHost = this.host === '::1' ? '[::1]' : this.host;
+        this.hubConnection = new WebSocket(`ws://${relayHost}:${this.port}`);
       } catch (err) {
         settleReject(err instanceof Error ? err : new Error(String(err)));
         return;
       }
+      const hubSocket = this.hubConnection;
 
       handshakeTimer = setTimeout(() => {
         if (!this.hubConnected && this.mode === 'relay') {
@@ -660,7 +1187,13 @@ export class WebSocketBridge {
 
       this.hubConnection.on('open', () => {
         // Send handshake
-        const hello: RelayHello = { type: 'relay:hello', instanceId: this.instanceId };
+        const hello: RelayHello = this.capabilities.size > 0
+          ? {
+              type: 'relay:hello',
+              instanceId: this.instanceId,
+              capabilities: [...this.capabilities],
+            }
+          : { type: 'relay:hello', instanceId: this.instanceId };
         this.hubConnection!.send(JSON.stringify(hello));
         console.error(`[FSB Bridge ${this.instanceId}] Relay mode: connected to hub, sent hello`);
       });
@@ -689,6 +1222,21 @@ export class WebSocketBridge {
           return;
         }
 
+        if (typeof parsed.type === 'string' && parsed.type.startsWith('ext:')) {
+          const frame = parseExtFrame(parsed);
+          if (frame?.type === 'ext:request') {
+            this._handleRelayedExtRequest(frame);
+          } else if (
+            frame?.type === 'ext:response'
+            && frame.error?.code === 'bridge_topology_changed'
+          ) {
+            this._abortRelayedExtRequest(frame.id, hubSocket);
+          } else {
+            console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid hub extension frame`);
+          }
+          return;
+        }
+
         // Handle responses routed back from hub
         this._handleRelayResponse(parsed as unknown as MCPResponse);
       });
@@ -698,7 +1246,10 @@ export class WebSocketBridge {
           settleReject(new Error('Relay connection closed before handshake completed'));
         }
 
-        this.hubConnection = null;
+        for (const [id, route] of [...this.relayActiveExtRequests]) {
+          if (route.hubSocket === hubSocket) this._abortRelayedExtRequest(id, hubSocket);
+        }
+        if (this.hubConnection === hubSocket) this.hubConnection = null;
         this.hubConnected = false;
         this.activeHubInstanceId = null;
         this.relayExtensionConnected = false;
@@ -726,6 +1277,93 @@ export class WebSocketBridge {
         // onclose fires after onerror, promotion/reconnect handled there
       });
     });
+  }
+
+  private _handleRelayedExtRequest(request: ExtRequest): void {
+    const hubSocket = this.hubConnection;
+    if (!hubSocket || hubSocket.readyState !== WebSocket.OPEN) return;
+    if (this.relayActiveExtRequests.has(request.id)) {
+      hubSocket.send(JSON.stringify(makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request ID is already active',
+        false,
+      )));
+      return;
+    }
+    if (!this.capabilities.has('agent-spawn') || !this.handleExtRequest) {
+      hubSocket.send(JSON.stringify(makeExtError(
+        request.id,
+        'agent_provider_offline',
+        'No extension request handler is available',
+        true,
+      )));
+      return;
+    }
+
+    const route: ActiveRelayedExtRequest = {
+      hubSocket,
+      abortController: new AbortController(),
+    };
+    this.relayActiveExtRequests.set(request.id, route);
+    void this._invokeRelayedExtHandler(request, route);
+  }
+
+  private async _invokeRelayedExtHandler(
+    request: ExtRequest,
+    route: ActiveRelayedExtRequest,
+  ): Promise<void> {
+    const handler = this.handleExtRequest;
+    if (!handler) return;
+    const { hubSocket } = route;
+    const isActive = (): boolean => this.relayActiveExtRequests.get(request.id) === route;
+    const emit = (event: ExtEvent): void => {
+      const parsedEvent = parseExtFrame(event);
+      if (
+        !isActive()
+        || parsedEvent?.type !== 'ext:event'
+        || parsedEvent.id !== request.id
+      ) {
+        console.error(`[FSB Bridge ${this.instanceId}] Dropped invalid or late relayed extension event`);
+        return;
+      }
+      if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(JSON.stringify(parsedEvent));
+    };
+
+    let response: ExtResponse;
+    try {
+      const payload = await handler(request, emit, {
+        signal: route.abortController.signal,
+      });
+      const parsedResponse = parseExtFrame({
+        id: request.id,
+        type: 'ext:response',
+        payload,
+      });
+      if (parsedResponse?.type !== 'ext:response' || !('payload' in parsedResponse)) {
+        throw new Error('invalid handler result');
+      }
+      response = parsedResponse;
+    } catch {
+      console.error(`[FSB Bridge ${this.instanceId}] Relayed extension request handler failed`);
+      response = makeExtError(
+        request.id,
+        'invalid_ext_request',
+        'Extension request handler failed',
+        false,
+      );
+    }
+
+    if (!isActive()) return;
+    this.relayActiveExtRequests.delete(request.id);
+    if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(JSON.stringify(response));
+  }
+
+  private _abortRelayedExtRequest(id: string, hubSocket: WebSocket): void {
+    const route = this.relayActiveExtRequests.get(id);
+    if (!route || route.hubSocket !== hubSocket) return;
+    this.relayActiveExtRequests.delete(id);
+    route.abortController.abort(new Error('route_lost'));
   }
 
   /**

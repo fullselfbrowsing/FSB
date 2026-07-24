@@ -4,9 +4,29 @@ import { installToConfig, removeFromConfig, serializeByFormat } from './config-w
 import type { ConfigResult } from './config-writer.js';
 import { FSB_MCP_VERSION, FSB_SERVER_NAME } from './version.js';
 import { execSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import {
+  isNativeHostExtensionId,
+} from './native-host/constants.js';
+import {
+  installNativeHost,
+  uninstallNativeHost,
+} from './native-host-install/index.js';
+import { resolveNativeHostPlatformLayout } from './native-host-install/platform.js';
+import type {
+  NativeHostInstallRequest,
+  NativeHostInstallResult,
+  NativeHostInstallTransactionDependencies,
+  NativeHostUninstallResult,
+} from './native-host-install/types.js';
 
 /** CLI flags parsed from argv */
 export type InstallFlags = Record<string, boolean | string>;
+
+export interface NativeHostCliOperations {
+  install(request: NativeHostInstallRequest): Promise<NativeHostInstallResult>;
+  uninstall(): Promise<NativeHostUninstallResult>;
+}
 
 /** Matched platform for file-based install/uninstall */
 interface MatchedPlatform {
@@ -27,6 +47,259 @@ export interface SetupSection {
 
 const STDIO_COMMAND = 'npx -y fsb-mcp-server';
 const WINDOWS_STDIO_COMMAND = 'cmd /c npx -y fsb-mcp-server';
+const NATIVE_HOST_INSTALL_USAGE =
+  'Usage: fsb-mcp-server install --native-host [--extension-id <32 lowercase a-p chars>]';
+const NATIVE_HOST_UNINSTALL_USAGE =
+  'Usage: fsb-mcp-server uninstall --native-host';
+const NATIVE_HOST_REFUSAL_REASONS = new Set([
+  'boundary-changed',
+  'foreign-state',
+  'install-failed',
+  'invalid-materialized-package',
+  'invalid-pack-receipt',
+  'invalid-request',
+  'invalid-source-package',
+  'invalid-state',
+  'network-attempted',
+  'ownership-mismatch',
+  'pack-failed',
+  'process-output-exceeded',
+  'publication-failed',
+  'registration-publish-failed',
+  'registration-remove-failed',
+  'registry-key-cleanup-failed',
+  'registry-key-not-exact',
+  'registry-shadow',
+  'runtime-remove-failed',
+  'split-state',
+  'stable-root-not-absent',
+  'stage-failed',
+  'tarball-integrity-mismatch',
+  'unavailable',
+  'unsupported-architecture',
+  'version-mismatch',
+]);
+
+function expectedNativeHostLocation(): string {
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) return 'Unavailable';
+  try {
+    return resolveNativeHostPlatformLayout({
+      platform: process.platform as 'darwin' | 'linux' | 'win32',
+      homeDirectory: homedir(),
+      ...(process.platform === 'win32'
+        ? { localAppData: process.env.LOCALAPPDATA }
+        : {}),
+    }).manifestPath;
+  } catch {
+    return 'Unavailable';
+  }
+}
+
+const unavailableNativeHostCliOperations: NativeHostCliOperations = Object.freeze({
+  install: async (): Promise<NativeHostInstallResult> => Object.freeze({
+    status: 'refused',
+    reason: 'unavailable',
+    location: expectedNativeHostLocation(),
+    origin: null,
+    packageVersion: null,
+  }),
+  uninstall: async (): Promise<NativeHostUninstallResult> => Object.freeze({
+    status: 'refused',
+    reason: 'unavailable',
+    location: expectedNativeHostLocation(),
+    origin: null,
+    packageVersion: null,
+  }),
+});
+
+export function createNativeHostCliOperations(
+  dependencies: NativeHostInstallTransactionDependencies,
+): NativeHostCliOperations {
+  return Object.freeze({
+    install: (request: NativeHostInstallRequest) => installNativeHost(request, dependencies),
+    uninstall: () => uninstallNativeHost(dependencies),
+  });
+}
+
+function nativeHostTargetRequested(flags: InstallFlags): boolean {
+  return Boolean(flags && typeof flags === 'object' && Object.hasOwn(flags, 'native-host'));
+}
+
+function exactNativeFlags(
+  flags: InstallFlags,
+  allowedKeys: readonly string[],
+): Readonly<Record<string, unknown>> | null {
+  try {
+    if (!flags || typeof flags !== 'object' || Array.isArray(flags)) return null;
+    if (Object.getPrototypeOf(flags) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(flags);
+    if (
+      keys.length < 1
+      || keys.some((key) => typeof key !== 'string' || !allowedKeys.includes(key))
+    ) {
+      return null;
+    }
+    const values: Record<string, unknown> = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(flags, key);
+      if (
+        typeof key !== 'string'
+        || !descriptor
+        || !descriptor.enumerable
+        || !Object.hasOwn(descriptor, 'value')
+      ) {
+        return null;
+      }
+      values[key] = descriptor.value;
+    }
+    return values;
+  } catch {
+    return null;
+  }
+}
+
+function nativeInstallRequest(flags: InstallFlags): NativeHostInstallRequest | null {
+  const values = exactNativeFlags(flags, ['native-host', 'extension-id']);
+  if (!values || values['native-host'] !== true) return null;
+  if (!Object.hasOwn(values, 'extension-id')) return Object.freeze({});
+  const extensionId = values['extension-id'];
+  if (typeof extensionId !== 'string' || !isNativeHostExtensionId(extensionId)) return null;
+  return Object.freeze({ extensionId });
+}
+
+function validNativeUninstallFlags(flags: InstallFlags): boolean {
+  const values = exactNativeFlags(flags, ['native-host']);
+  return Boolean(
+    values
+    && Reflect.ownKeys(values).length === 1
+    && values['native-host'] === true,
+  );
+}
+
+function rejectNativeUsage(usage: string): void {
+  console.error(usage);
+  process.exitCode = 1;
+}
+
+function boundedNativeLocation(value: unknown): string {
+  return typeof value === 'string'
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= 4096
+    && !/[\u0000-\u001f\u007f-\u009f]/u.test(value)
+    ? value
+    : 'Unavailable';
+}
+
+function exactNativeOrigin(value: unknown): string | null {
+  if (
+    typeof value !== 'string'
+    || !value.startsWith('chrome-extension://')
+    || !value.endsWith('/')
+  ) {
+    return null;
+  }
+  const extensionId = value.slice('chrome-extension://'.length, -1);
+  return isNativeHostExtensionId(extensionId) ? value : null;
+}
+
+function stableNativeRefusalReason(value: unknown): string {
+  return typeof value === 'string' && NATIVE_HOST_REFUSAL_REASONS.has(value)
+    ? value
+    : 'unavailable';
+}
+
+function printNativeHostRefusal(reasonValue: unknown, locationValue: unknown): void {
+  console.error(`Native messaging host was not changed: ${stableNativeRefusalReason(reasonValue)}`);
+  console.error(`Expected location: ${boundedNativeLocation(locationValue)}`);
+  console.error('Run fsb-mcp-server doctor for repair details.');
+  process.exitCode = 1;
+}
+
+function exactNativeReceipt(value: unknown): Readonly<Record<string, unknown>> | null {
+  const expectedKeys = ['location', 'origin', 'packageVersion', 'reason', 'status'];
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== expectedKeys.length
+      || keys.some((key) => typeof key !== 'string' || !expectedKeys.includes(key))
+    ) {
+      return null;
+    }
+    const fields: Record<string, unknown> = Object.create(null);
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        typeof key !== 'string'
+        || !descriptor
+        || !descriptor.enumerable
+        || !Object.hasOwn(descriptor, 'value')
+      ) {
+        return null;
+      }
+      fields[key] = descriptor.value;
+    }
+    return fields;
+  } catch {
+    return null;
+  }
+}
+
+function printNativeInstallResult(result: unknown): void {
+  const receipt = exactNativeReceipt(result);
+  if (!receipt) {
+    printNativeHostRefusal('unavailable', 'Unavailable');
+    return;
+  }
+  const location = boundedNativeLocation(receipt.location);
+  const origin = exactNativeOrigin(receipt.origin);
+  if (receipt.status === 'refused') {
+    printNativeHostRefusal(receipt.reason, receipt.location);
+    return;
+  }
+  if (
+    location === 'Unavailable'
+    || !origin
+    || (receipt.status !== 'installed' && receipt.status !== 'already-installed')
+  ) {
+    printNativeHostRefusal('unavailable', location);
+    return;
+  }
+  console.log(receipt.status === 'installed'
+    ? 'Native messaging host installed.'
+    : 'Native messaging host is already installed.');
+  console.log(`Expected location: ${location}`);
+  console.log(`Allowed origin: ${origin}`);
+}
+
+function printNativeUninstallResult(result: unknown): void {
+  const receipt = exactNativeReceipt(result);
+  if (!receipt) {
+    printNativeHostRefusal('unavailable', 'Unavailable');
+    return;
+  }
+  const location = boundedNativeLocation(receipt.location);
+  if (receipt.status === 'refused') {
+    printNativeHostRefusal(receipt.reason, receipt.location);
+    return;
+  }
+  if (
+    location === 'Unavailable'
+    || (receipt.status !== 'removed' && receipt.status !== 'not-installed')
+  ) {
+    printNativeHostRefusal('unavailable', location);
+    return;
+  }
+  if (receipt.status === 'removed') {
+    console.log('Native messaging host removed.');
+    console.log('Removed: 1');
+  } else {
+    console.log('Native messaging host is not installed.');
+    console.log('Removed: 0');
+  }
+  console.log(`Expected location: ${location}`);
+}
 
 export function getClaudeCodeInstallCommand(): string {
   return 'claude mcp add --scope user ' + FSB_SERVER_NAME + ' -- ' + STDIO_COMMAND;
@@ -657,7 +930,24 @@ function getTargetPlatform(target: PlatformTarget): PlatformConfig {
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
-export async function runInstall(flags: InstallFlags): Promise<void> {
+export async function runInstall(
+  flags: InstallFlags,
+  nativeHostOperations: NativeHostCliOperations = unavailableNativeHostCliOperations,
+): Promise<void> {
+  if (nativeHostTargetRequested(flags)) {
+    const request = nativeInstallRequest(flags);
+    if (!request) {
+      rejectNativeUsage(NATIVE_HOST_INSTALL_USAGE);
+      return;
+    }
+    try {
+      printNativeInstallResult(await nativeHostOperations.install(request));
+    } catch {
+      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+    }
+    return;
+  }
+
   // Handle --list before anything else
   if (flags['list'] === true) {
     printPlatformListDetailed();
@@ -769,7 +1059,23 @@ export async function runInstall(flags: InstallFlags): Promise<void> {
  *
  * @param flags - Parsed CLI flags (platform keys mapped to boolean)
  */
-export async function runUninstall(flags: InstallFlags): Promise<void> {
+export async function runUninstall(
+  flags: InstallFlags,
+  nativeHostOperations: NativeHostCliOperations = unavailableNativeHostCliOperations,
+): Promise<void> {
+  if (nativeHostTargetRequested(flags)) {
+    if (!validNativeUninstallFlags(flags)) {
+      rejectNativeUsage(NATIVE_HOST_UNINSTALL_USAGE);
+      return;
+    }
+    try {
+      printNativeUninstallResult(await nativeHostOperations.uninstall());
+    } catch {
+      printNativeHostRefusal('unavailable', expectedNativeHostLocation());
+    }
+    return;
+  }
+
   // Capture --all before expansion (Pitfall 4)
   const isAll: boolean = flags['all'] === true;
 

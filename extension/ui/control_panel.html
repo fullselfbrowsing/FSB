@@ -44,9 +44,9 @@
               <i class="fas fa-tachometer-alt"></i>
               <span>Dashboard</span>
             </li>
-            <li class="nav-item" data-section="api-config">
-              <i class="fas fa-key"></i>
-              <span>API Configuration</span>
+            <li class="nav-item" data-section="providers">
+              <i class="fas fa-plug"></i>
+              <span>Providers</span>
             </li>
             <li class="nav-item" data-section="sync">
               <i class="fas fa-sync-alt"></i>
@@ -140,21 +140,182 @@
           </div>
         </section>
 
-        <!-- API Configuration Section -->
-        <section class="content-section" id="api-config">
+        <!-- Providers Section -->
+        <section class="content-section" id="providers">
           <div class="section-header">
-            <h2>API Configuration</h2>
-            <p>Configure your AI model provider and API settings</p>
+            <h2>Providers</h2>
+            <p>Choose how FSB runs AI tasks. API providers use keys stored locally; agent CLIs use their existing local sign-in.</p>
           </div>
-          
+
           <div class="form-card">
             <div class="form-section">
-              <h3>AI Model Configuration</h3>
-              
-              <!-- Model Provider Selection -->
-              <div class="form-group">
-                <label for="modelProvider">AI Provider <span id="providerIcon" style="display: inline-block; vertical-align: middle; margin-left: 6px;"></span></label>
-                <select id="modelProvider" class="form-select">
+              <fieldset id="providerRoster" class="provider-roster">
+                <legend class="provider-roster__legend">Choose a provider</legend>
+                <div class="provider-roster__toolbar">
+                  <p class="provider-roster__help">Select an agent CLI or API provider. Your choice is saved only when you use Save Settings.</p>
+                  <button type="button" id="refreshProviderStatusBtn" class="form-secondary-btn provider-roster__refresh" aria-busy="false">
+                    <i class="fas fa-sync-alt provider-roster__refresh-icon" aria-hidden="true"></i>
+                    <span class="provider-roster__refresh-label">Refresh status</span>
+                    <span class="provider-roster__refresh-pending" hidden>Refreshing…</span>
+                  </button>
+                </div>
+                <p id="providerEvidenceAnnouncement" class="provider-roster__announcement" role="status" aria-live="polite" hidden></p>
+
+                <div class="provider-groups">
+                  <section class="provider-group" aria-labelledby="agentProvidersHeading">
+                    <h3 id="agentProvidersHeading" class="provider-group__heading">Agent CLIs</h3>
+                    <div class="provider-group__rows">
+                      <label class="provider-row" for="provider-agent-claude-code" data-provider-kind="agent" data-provider-id="claude-code">
+                        <span class="provider-row__content">
+                          <span id="provider-agent-claude-code-name" class="provider-row__name">Claude Code</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="claude-code" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="claude-code" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-agent-claude-code-description" class="visually-hidden" data-provider-description="claude-code"></span>
+                        </span>
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="claude-code">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="claude-code" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="claude-code">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-claude-code-compatibility-description" class="visually-hidden" data-provider-compatibility-description="claude-code">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-claude-code" name="fsbProviderSelection" value="claude-code" data-provider-kind="agent" data-provider-id="claude-code" aria-labelledby="provider-agent-claude-code-name" aria-describedby="provider-agent-claude-code-description provider-agent-claude-code-compatibility-description">
+                      </label>
+                      <label class="provider-row" for="provider-agent-opencode" data-provider-kind="agent" data-provider-id="opencode">
+                        <span class="provider-row__content">
+                          <span id="provider-agent-opencode-name" class="provider-row__name">OpenCode</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="opencode" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="opencode" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-agent-opencode-description" class="visually-hidden" data-provider-description="opencode"></span>
+                        </span>
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="opencode">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="opencode" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="opencode">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-opencode-compatibility-description" class="visually-hidden" data-provider-compatibility-description="opencode">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-opencode" name="fsbProviderSelection" value="opencode" data-provider-kind="agent" data-provider-id="opencode" aria-labelledby="provider-agent-opencode-name" aria-describedby="provider-agent-opencode-description provider-agent-opencode-compatibility-description">
+                      </label>
+                      <label class="provider-row" for="provider-agent-codex" data-provider-kind="agent" data-provider-id="codex">
+                        <span class="provider-row__content">
+                          <span id="provider-agent-codex-name" class="provider-row__name">Codex</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="codex" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="codex" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-agent-codex-description" class="visually-hidden" data-provider-description="codex"></span>
+                        </span>
+                        <span class="provider-row__compatibility" data-provider-compatibility-group="codex">
+                          <span class="provider-row__compatibility-label">Compatibility</span>
+                          <i class="fas fa-circle-xmark provider-row__compatibility-icon" data-provider-compatibility-icon="codex" aria-hidden="true"></i>
+                          <span class="compatibility-badge compatibility-badge--unsupported" data-provider-compatibility-status="codex">Unsupported</span>
+                        </span>
+                        <span id="provider-agent-codex-compatibility-description" class="visually-hidden" data-provider-compatibility-description="codex">Compatibility: Unsupported. FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</span>
+                        <input class="provider-radio" type="radio" id="provider-agent-codex" name="fsbProviderSelection" value="codex" data-provider-kind="agent" data-provider-id="codex" aria-labelledby="provider-agent-codex-name" aria-describedby="provider-agent-codex-description provider-agent-codex-compatibility-description">
+                      </label>
+                    </div>
+                  </section>
+
+                  <section class="provider-group" aria-labelledby="apiProvidersHeading">
+                    <h3 id="apiProvidersHeading" class="provider-group__heading">API providers</h3>
+                    <div class="provider-group__rows">
+                      <label class="provider-row" for="provider-api-xai" data-provider-kind="api" data-provider-id="xai">
+                        <span class="provider-row__content">
+                          <span id="provider-api-xai-name" class="provider-row__name">xAI</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="xai" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="xai" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-xai-description" class="visually-hidden" data-provider-description="xai"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-xai" name="fsbProviderSelection" value="xai" data-provider-kind="api" data-provider-id="xai" aria-labelledby="provider-api-xai-name" aria-describedby="provider-api-xai-description" checked>
+                      </label>
+                      <label class="provider-row" for="provider-api-gemini" data-provider-kind="api" data-provider-id="gemini">
+                        <span class="provider-row__content">
+                          <span id="provider-api-gemini-name" class="provider-row__name">Google Gemini</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="gemini" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="gemini" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-gemini-description" class="visually-hidden" data-provider-description="gemini"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-gemini" name="fsbProviderSelection" value="gemini" data-provider-kind="api" data-provider-id="gemini" aria-labelledby="provider-api-gemini-name" aria-describedby="provider-api-gemini-description">
+                      </label>
+                      <label class="provider-row" for="provider-api-openai" data-provider-kind="api" data-provider-id="openai">
+                        <span class="provider-row__content">
+                          <span id="provider-api-openai-name" class="provider-row__name">OpenAI</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="openai" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="openai" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-openai-description" class="visually-hidden" data-provider-description="openai"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-openai" name="fsbProviderSelection" value="openai" data-provider-kind="api" data-provider-id="openai" aria-labelledby="provider-api-openai-name" aria-describedby="provider-api-openai-description">
+                      </label>
+                      <label class="provider-row" for="provider-api-anthropic" data-provider-kind="api" data-provider-id="anthropic">
+                        <span class="provider-row__content">
+                          <span id="provider-api-anthropic-name" class="provider-row__name">Anthropic</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="anthropic" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="anthropic" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-anthropic-description" class="visually-hidden" data-provider-description="anthropic"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-anthropic" name="fsbProviderSelection" value="anthropic" data-provider-kind="api" data-provider-id="anthropic" aria-labelledby="provider-api-anthropic-name" aria-describedby="provider-api-anthropic-description">
+                      </label>
+                      <label class="provider-row" for="provider-api-openrouter" data-provider-kind="api" data-provider-id="openrouter">
+                        <span class="provider-row__content">
+                          <span id="provider-api-openrouter-name" class="provider-row__name">OpenRouter</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="openrouter" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="openrouter" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-openrouter-description" class="visually-hidden" data-provider-description="openrouter"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-openrouter" name="fsbProviderSelection" value="openrouter" data-provider-kind="api" data-provider-id="openrouter" aria-labelledby="provider-api-openrouter-name" aria-describedby="provider-api-openrouter-description">
+                      </label>
+                      <label class="provider-row" for="provider-api-lmstudio" data-provider-kind="api" data-provider-id="lmstudio">
+                        <span class="provider-row__content">
+                          <span id="provider-api-lmstudio-name" class="provider-row__name">LM Studio</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="lmstudio" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="lmstudio" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-lmstudio-description" class="visually-hidden" data-provider-description="lmstudio"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-lmstudio" name="fsbProviderSelection" value="lmstudio" data-provider-kind="api" data-provider-id="lmstudio" aria-labelledby="provider-api-lmstudio-name" aria-describedby="provider-api-lmstudio-description">
+                      </label>
+                      <label class="provider-row" for="provider-api-custom" data-provider-kind="api" data-provider-id="custom">
+                        <span class="provider-row__content">
+                          <span id="provider-api-custom-name" class="provider-row__name">Custom</span>
+                          <span class="provider-row__badges">
+                            <span class="provider-badge provider-badge--recommended" data-provider-recommendation="custom" aria-hidden="true" hidden>Recommended</span>
+                            <span class="provider-badge provider-badge--status" data-provider-evidence="custom" aria-hidden="true" hidden>Status unavailable</span>
+                          </span>
+                          <span id="provider-api-custom-description" class="visually-hidden" data-provider-description="custom"></span>
+                        </span>
+                        <input class="provider-radio" type="radio" id="provider-api-custom" name="fsbProviderSelection" value="custom" data-provider-kind="api" data-provider-id="custom" aria-labelledby="provider-api-custom-name" aria-describedby="provider-api-custom-description">
+                      </label>
+                    </div>
+                  </section>
+                </div>
+
+                <details id="otherMcpClientsDisclosure" class="provider-other-clients" hidden>
+                  <summary id="otherMcpClientsSummary">Other MCP clients (0)</summary>
+                  <ul id="otherMcpClientsList" class="provider-other-clients__list"></ul>
+                </details>
+              </fieldset>
+            </div>
+          </div>
+
+          <div class="form-card provider-details-card">
+            <div class="form-section">
+              <div id="apiProviderDetails">
+                <h3>API provider settings</h3>
+                <select id="modelProvider" class="form-select provider-roster__native" tabindex="-1" aria-hidden="true">
                   <option value="xai">xAI (Grok)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
@@ -163,9 +324,7 @@
                   <option value="lmstudio">LM Studio</option>
                   <option value="custom">Custom (OpenAI Compatible)</option>
                 </select>
-                <div class="form-help">Select your preferred AI provider</div>
-              </div>
-              
+
               <!-- Model Selection -->
               <div class="form-group">
                 <label for="modelSearch">Model</label>
@@ -357,6 +516,88 @@
                 </button>
                 <div class="test-results" id="testResults"></div>
               </div>
+            </div>
+
+            <div id="agentProviderDetails" class="agent-provider-details" hidden>
+              <h3 id="agentProviderDetailsHeading">Agent CLI details</h3>
+              <p id="agentNoCredentialCaption" class="agent-provider-details__caption">FSB uses this CLI's existing sign-in and does not need its credential. Billing and limits follow the account or provider configured in the CLI.</p>
+
+              <div id="agentEvidenceEmptyState" class="provider-empty-state" hidden>
+                <h4>No agent CLI detected</h4>
+                <p>You can select an agent now and follow its setup guide, or continue with an API provider.</p>
+              </div>
+
+              <dl class="agent-provider-details__facts">
+                <div class="agent-provider-details__fact">
+                  <dt>Installation</dt>
+                  <dd id="agentInstallationStatus">Not reported</dd>
+                </div>
+                <div class="agent-provider-details__fact">
+                  <dt>Connection</dt>
+                  <dd id="agentConnectionStatus">Not reported</dd>
+                </div>
+                <div class="agent-provider-details__fact">
+                  <dt>Compatibility</dt>
+                  <dd id="agentCompatibilityStatus">Unsupported</dd>
+                  <dd id="agentCompatibilityHelp" class="agent-provider-details__help">FSB cannot verify compatibility for this CLI. Refresh status or review setup before starting a task.</dd>
+                  <dd id="agentCompatibilityChecked" class="agent-provider-details__help" hidden></dd>
+                </div>
+                <div class="agent-provider-details__fact">
+                  <dt>Account/Auth</dt>
+                  <dd id="agentAccountStatus">Not reported</dd>
+                  <dd id="agentAccountHelp" class="agent-provider-details__help">Claude Code does not report an auth state that FSB can safely read.</dd>
+                </div>
+              </dl>
+
+              <section class="agent-provider-details__section" aria-labelledby="agentSetupHeading">
+                <h4 id="agentSetupHeading">Setup</h4>
+                <p id="agentSetupStatus">Select an agent to view its setup guidance.</p>
+                <button type="button" id="openAgentSetupGuideBtn" class="form-secondary-btn provider-detail-action">Open setup guide</button>
+              </section>
+
+              <section class="agent-provider-details__section mcp-bridge-pairing" aria-labelledby="mcpBridgePairingHeading">
+                <h4 id="mcpBridgePairingHeading">Local bridge pairing</h4>
+                <p>Run fsb-mcp-server pair, then paste the code here. The code stays in this browser session.</p>
+                <label class="mcp-bridge-pairing__label" for="mcpBridgePairingCode">Pairing code</label>
+                <div class="mcp-bridge-pairing__row">
+                  <input type="password" id="mcpBridgePairingCode" class="form-input mcp-bridge-pairing__input" autocomplete="off" spellcheck="false">
+                  <div class="mcp-bridge-pairing__actions">
+                    <button type="button" id="pairMcpBridgeBtn" class="form-secondary-btn">Pair bridge</button>
+                    <button type="button" id="removeMcpBridgePairingBtn" class="form-secondary-btn">Remove pairing</button>
+                  </div>
+                </div>
+                <p id="mcpBridgePairingStatus" class="mcp-bridge-pairing__status" role="status" aria-live="polite" aria-atomic="true">No local bridge pairing is saved for this browser session.</p>
+              </section>
+
+              <section class="agent-provider-details__section" aria-labelledby="agentUsageHeading">
+                <h4 id="agentUsageHeading">Usage</h4>
+                <dl class="agent-usage-grid">
+                  <div class="agent-usage-grid__item">
+                    <dt>Tokens</dt>
+                    <dd id="agentUsageTokens">—</dd>
+                  </div>
+                  <div class="agent-usage-grid__item">
+                    <dt>Turns</dt>
+                    <dd id="agentUsageTurns">—</dd>
+                  </div>
+                  <div class="agent-usage-grid__item">
+                    <dt>Duration</dt>
+                    <dd id="agentUsageDuration">—</dd>
+                  </div>
+                </dl>
+                <p id="agentUsageEmptyState" class="provider-empty-copy">No delegated runs yet</p>
+              </section>
+
+              <section class="agent-provider-details__section" aria-labelledby="agentBillingHeading">
+                <h4 id="agentBillingHeading">Billing</h4>
+                <p id="agentBillingStatus" class="provider-badge provider-badge--neutral">Billing not reported</p>
+                <p id="agentBillingCopy">Billing details appear after you select an agent.</p>
+                <a id="agentBillingLink" class="provider-billing-link" target="_blank" rel="noopener noreferrer" hidden>
+                  <span id="agentBillingLinkLabel">Review billing</span>
+                  <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                </a>
+              </section>
+            </div>
             </div>
           </div>
         </section>
@@ -569,6 +810,43 @@
                       <span class="toggle-desc">Returns a compact diff describing what each action changed, so the AI doesn't need to re-read the page. Default on.</span>
                     </div>
                   </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card full-width" id="mcpSessionReplaySettings">
+              <div class="settings-card-header">
+                <div class="settings-card-icon">
+                  <i class="fas fa-clock-rotate-left"></i>
+                </div>
+                <div class="settings-card-title">
+                  <h3>MCP Session Replay</h3>
+                  <p>Local, exact-fidelity history for MCP agent actions</p>
+                </div>
+              </div>
+              <div class="settings-card-content">
+                <div class="setting-item">
+                  <label class="modern-toggle">
+                    <input type="checkbox" id="fsbMcpSessionRecordingEnabled" checked>
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                    <div class="toggle-content">
+                      <span class="toggle-label">Record MCP sessions for replay</span>
+                      <span class="toggle-desc">Stores replay data locally while redacting secret-bearing fields and sensitive inputs. Ordinary typed text and action results remain available for replay. MCP clients can save a local task memory by providing a secret-free completion, partial, or failure summary; no separate AI-provider call is made. Turning this off stops future MCP recording and saves any open recording. Existing MCP replay history stores up to the 50 most recent sessions, and no session is kept longer than the configured retention period. Autopilot history is unaffected.</span>
+                    </div>
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <div class="setting-label">
+                    <span>MCP replay retention (days)</span>
+                    <div class="fsb-stepper" data-min="1" data-max="365" data-step="1">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--dec" aria-label="Decrease MCP replay retention"><i class="fas fa-minus"></i></button>
+                      <input type="text" inputmode="numeric" class="fsb-stepper__input" id="fsbMcpSessionRetentionDays" value="30" aria-label="MCP replay retention days">
+                      <button type="button" class="fsb-stepper__btn fsb-stepper__btn--inc" aria-label="Increase MCP replay retention"><i class="fas fa-plus"></i></button>
+                    </div>
+                  </div>
+                  <div class="setting-hint">Default 30. Range 1 to 365 days. This automatically deletes expired MCP replay sessions only; Autopilot history is never pruned by this setting.</div>
                 </div>
               </div>
             </div>
@@ -1023,7 +1301,7 @@
               </div>
               <div class="site-graph-detail-toggle" id="knowledgeDetailToggle">
                 <button class="detail-btn active" data-level="simple">Overview</button>
-                <button class="detail-btn" data-level="full">Full Detail</button>
+                <button class="detail-btn" data-level="full">Expanded</button>
               </div>
             </div>
 
@@ -1796,7 +2074,7 @@
           <div class="branding-section">
             <div class="branding-content">
               <div class="fsb-foot-brand">
-                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.90</span>
+                <span class="version-tag fsb-foot-ver" translate="no">▽0.9.91</span>
               </div>
             </div>
           </div>
@@ -1921,6 +2199,8 @@
   <script src="../utils/consent-policy-store.js"></script>
   <script src="../utils/audit-log.js"></script>
   <script src="../utils/service-denylist.js"></script>
+  <script src="../utils/delegation-providers.js"></script>
+  <script src="providers-panel.js"></script>
   <script src="options.js"></script>
   <!--
     Phase 269 / CONS-01, CONS-02: kill-switch wiring.

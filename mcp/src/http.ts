@@ -7,6 +7,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createRuntime } from './runtime.js';
 import type { WebSocketBridge } from './bridge.js';
 import type { TaskQueue } from './queue.js';
+import {
+  NATIVE_HOST_HEALTH_PRODUCT,
+  NATIVE_HOST_PROTOCOL_VERSION,
+} from './native-host/constants.js';
+import { FSB_MCP_VERSION } from './version.js';
 
 type SessionContext = {
   server: McpServer;
@@ -23,6 +28,7 @@ type HttpServerOptions = {
 type RunningHttpServer = {
   endpoint: string;
   healthEndpoint: string;
+  markServeReady: () => void;
   close: () => Promise<void>;
 };
 
@@ -62,6 +68,8 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 export async function startHttpServer(options: HttpServerOptions): Promise<RunningHttpServer> {
   const sessions = new Map<string, SessionContext>();
+  let closed = false;
+  let serveReady = false;
 
   const server = createHttpServer((req, res) => {
     void handleRequest(req, res).catch((err: unknown) => {
@@ -88,6 +96,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     if (url.pathname === '/health') {
       sendJson(res, 200, {
         ok: true,
+        service: NATIVE_HOST_HEALTH_PRODUCT,
+        version: FSB_MCP_VERSION,
+        nativeHostProtocol: NATIVE_HOST_PROTOCOL_VERSION,
+        serveReady,
         transport: 'streamable-http',
         bridgeMode: options.bridge.topology.mode,
         extensionConnected: options.bridge.topology.extensionConnected,
@@ -175,7 +187,12 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   return {
     endpoint,
     healthEndpoint,
+    markServeReady: () => {
+      if (!closed) serveReady = true;
+    },
     close: async () => {
+      closed = true;
+      serveReady = false;
       for (const [, context] of sessions) {
         await context.transport.close().catch(() => {});
       }

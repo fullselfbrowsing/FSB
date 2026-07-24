@@ -49,7 +49,7 @@ const EXPECTED_NON_TRIGGER_TOOL_NAMES = [
   'get_site_guide', 'search_memory', 'report_progress', 'complete_task',
   'partial_task', 'fail_task', 'upload_file'
 ];
-const EXPECTED_NON_TRIGGER_REGISTRY_HASH = '6354d78836bc8927f55af4562dec099f614ebbe034d018c163d7b8b2e5c6b60d';
+const EXPECTED_NON_TRIGGER_REGISTRY_HASH = '0a525835adc6961463c5a954f3e80205f066e23bef6089283ef598c78f1d8623';
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);

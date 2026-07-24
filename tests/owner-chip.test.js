@@ -214,6 +214,16 @@ ok(sidepanelHtmlSrc.indexOf('fsb-owner-chip') >= 0,
   'Test 9d: sidepanel.html contains fsb-owner-chip element');
 ok(sidepanelHtmlSrc.indexOf('owner-chip.js') >= 0,
   'Test 9e: sidepanel.html loads owner-chip.js');
+ok((sidepanelHtmlSrc.match(/delegation-feed\.js/g) || []).length === 1
+    && sidepanelHtmlSrc.indexOf('owner-chip.js') < sidepanelHtmlSrc.indexOf('delegation-feed.js')
+    && sidepanelHtmlSrc.indexOf('delegation-feed.js') < sidepanelHtmlSrc.indexOf('sidepanel.js'),
+  'Test 9f: sidepanel delegation feed is loaded once without disturbing owner-chip-before-sidepanel order');
+ok((sidepanelHtmlSrc.match(/id="fsb-owner-chip"/g) || []).length === 1,
+  'Test 9g: sidepanel retains exactly one read-only owner chip after delegation mount additions');
+ok(/changes\.fsbAgentRegistry[\s\S]{0,220}refreshOwnerChip\(\)[\s\S]{0,180}_refreshSelectedDelegationSnapshot\(\)/.test(sidepanelJsSrc),
+  'Test 9h: one registry-change branch refreshes both the owner chip and canonical delegation snapshot');
+ok(/chrome\.tabs\.onActivated\.addListener[\s\S]*?refreshOwnerChip\(\)[\s\S]*?_activeTabIdSnapshot\s*=\s*activeInfo\.tabId[\s\S]*?_hydrateDelegationForSelectedConversation\(\)/.test(sidepanelJsSrc),
+  'Test 9i: tab activation preserves owner-chip refresh and then re-resolves delegated active-tab eligibility');
 
 // Read-only enforcement: chip span MUST NOT be a button or anchor (no click affordance).
 // Threat T-243-03-03 "Elevation via chip click-to-switch" mitigation.
