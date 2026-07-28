@@ -3951,12 +3951,6 @@ function denyPendingRequest(row) {
 }
 
 // Refresh the "N pending" count pill + the empty-state from the live row count.
-// Draining the queue (count >0 -> 0) also clears the chrome.action badge (the
-// queue is what the badge surfaces). The clear is transition-guarded: routine
-// empty renders must not clobber the badge's other users (ws-client connection
-// state, error alerts).
-let _pendingCountLastSeen = 0;
-
 function updatePendingCount() {
   const list = elements.pendingRequestList;
   if (!list) return;
@@ -3972,12 +3966,6 @@ function updatePendingCount() {
   if (elements.pendingRequestEmptyState) {
     elements.pendingRequestEmptyState.style.display = count > 0 ? 'none' : '';
   }
-  if (count === 0 && _pendingCountLastSeen > 0
-      && typeof chrome !== 'undefined' && chrome.action
-      && typeof chrome.action.setBadgeText === 'function') {
-    try { chrome.action.setBadgeText({ text: '' }); } catch (_e) { /* best-effort */ }
-  }
-  _pendingCountLastSeen = count;
 }
 
 let _toastTimer = null;

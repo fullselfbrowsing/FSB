@@ -1392,7 +1392,7 @@ class FSBWebSocket {
       this._sendStateSnapshot('connect');
       // Phase 223 MET-01: push metrics on connect (not polling).
       try { _broadcastMetrics(this, this.serverHashKey); } catch (_e) { /* defensive */ }
-      this._updateBadge(true);
+      try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(true); } catch (_e) { /* icon optional */ }
       _broadcastDashboardWsStatus(true);
       console.log('[FSB WS] Connected');
     };
@@ -1411,7 +1411,7 @@ class FSBWebSocket {
     this.ws.onclose = (event) => {
       this.connected = false;
       this._stopKeepalive();
-      this._updateBadge(false);
+      try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
       _broadcastDashboardWsStatus(false);
       recordFSBTransportReconnect('ws-close', {
         readyState: this.ws ? this.ws.readyState : null,
@@ -1444,7 +1444,7 @@ class FSBWebSocket {
     }
     this.ws = null;
     this.connected = false;
-    this._clearBadge();
+    try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setConnected(false); } catch (_e) { /* icon optional */ }
   }
 
   /**
@@ -2299,26 +2299,6 @@ class FSBWebSocket {
     }
   }
 
-  /**
-   * Update badge icon to reflect connection state.
-   * @param {boolean} connected
-   */
-  _updateBadge(connected) {
-    if (connected) {
-      chrome.action.setBadgeText({ text: ' ' });
-      chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
-    } else {
-      chrome.action.setBadgeText({ text: '!' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-    }
-  }
-
-  /**
-   * Clear badge (no WS configured or explicitly disconnected).
-   */
-  _clearBadge() {
-    chrome.action.setBadgeText({ text: '' });
-  }
 }
 
 // Global instance for service worker

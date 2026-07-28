@@ -9511,11 +9511,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
             url: request.url || sender.url,
             frameId: frameId
           });
-          // Only clear badge if the dashboard relay is not connected;
-          // otherwise the green indicator would vanish on every page navigation
-          if (typeof fsbWebSocket === 'undefined' || !fsbWebSocket.connected) {
-            chrome.action.setBadgeText({ text: '' });
-          }
           debugLog('[FSB Background] Tab marked as ready:', tabId);
           automationLogger.logInit('content_script', 'ready', { tabId, frameId, readyState: request.readyState, retry: request.retry || false });
           replayMcpVisualSessionForTab(tabId, { now: Date.now(), source: 'contentScriptReady' }).catch((error) => {
@@ -9585,8 +9580,6 @@ const fsbHandleRuntimeMessage = (request, sender, sendResponse) => {
         lineno: request.lineno,
         colno: request.colno
       });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
-      chrome.action.setBadgeText({ text: '!' });
       sendResponse({ success: true });
       break;
 
