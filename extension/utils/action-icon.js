@@ -50,7 +50,6 @@
     calling: { duration: 4000, from: '#8b5cf6', to: '#a78bfa', animated: true },
     watching: { duration: 5000, from: '#ff8c00', to: '#ffa500', animated: false }
   };
-  var ANIMATED_STATES = ['thinking', 'acting', 'calling'];
 
   // ---- Module state -------------------------------------------------------
   var unavailable = false;
@@ -58,11 +57,13 @@
   var initPromise = null;
   var liveSessionProbe = null;
 
-  var contexts = Object.create(null);      // size -> CanvasRenderingContext2D
+  var contexts = Object.create(null);       // size -> CanvasRenderingContext2D
   var animatedFrames = Object.create(null); // state -> array of frame records
+  var animatedBuilds = Object.create(null); // state -> in-flight build promise
   var staticFrames = Object.create(null);   // key -> frame record
+  var emitFailureLogged = false;
 
-  var currentState = null;   // one of ANIMATED_STATES while animating
+  var currentState = null;   // a STATES key with animated:true while animating
   var animating = false;
   var watching = false;
   var connected = false;
@@ -168,25 +169,11 @@
     return await createImageBitmap(blob);
   }
 
-  // Precompute everything once. Nothing is rendered inside the tick.
-  async function buildCache() {
+  // Only the four resting frames are rendered up front. A worker wake that never
+  // animates should not pay for a couple hundred frames it will never show.
+  async function buildStaticCache() {
     var bitmap = await loadGlyph();
     try {
-      for (var i = 0; i < ANIMATED_STATES.length; i++) {
-        var name = ANIMATED_STATES[i];
-        var spec = STATES[name];
-        var count = Math.round(spec.duration / FRAME_INTERVAL_MS);
-        var frames = new Array(count);
-        for (var f = 0; f < count; f++) {
-          frames[f] = renderFrame(bitmap, {
-            palette: spec,
-            progress: f / count,
-            bead: true,
-            dimmed: false
-          });
-        }
-        animatedFrames[name] = frames;
-      }
       staticFrames['idle:on'] = renderFrame(bitmap, { bead: false, dimmed: false });
       staticFrames['idle:off'] = renderFrame(bitmap, { bead: false, dimmed: true });
       staticFrames['watching:on'] = renderFrame(bitmap, {
@@ -200,7 +187,49 @@
     }
   }
 
+  // One state's worth of frames, rendered on first use and kept for the life of
+  // the worker. Concurrent callers share the in-flight build; a failed build is
+  // dropped so a later transition can retry it.
+  function ensureAnimatedFrames(state) {
+    if (animatedFrames[state]) return Promise.resolve(animatedFrames[state]);
+    if (animatedBuilds[state]) return animatedBuilds[state];
+    var build = (async function () {
+      var bitmap = await loadGlyph();
+      try {
+        var spec = STATES[state];
+        var count = Math.round(spec.duration / FRAME_INTERVAL_MS);
+        var frames = new Array(count);
+        for (var f = 0; f < count; f++) {
+          frames[f] = renderFrame(bitmap, {
+            palette: spec,
+            progress: f / count,
+            bead: true,
+            dimmed: false
+          });
+        }
+        animatedFrames[state] = frames;
+        return frames;
+      } finally {
+        bitmap.close();
+      }
+    })();
+    animatedBuilds[state] = build;
+    build.catch(function (e) {
+      delete animatedBuilds[state];
+      console.error('[FSB] action icon: could not render ' + state + ' frames:', e && e.message);
+    });
+    return build;
+  }
+
   // ---- Emission -----------------------------------------------------------
+
+  // Reported once. A repaint failure repeats every frame, so the first one is
+  // the only useful signal and the rest would be noise.
+  function noteEmitFailure(err) {
+    if (emitFailureLogged) return;
+    emitFailureLogged = true;
+    console.error('[FSB] action icon: setIcon failed, the icon will stop updating:', err && err.message);
+  }
 
   // Always global. A per-surface icon permanently shadows the global one, which
   // would silently strand the loop for that surface.
@@ -209,8 +238,8 @@
     lastEmitted = frame;
     try {
       var result = chrome.action.setIcon({ imageData: { 16: frame[16], 32: frame[32] } });
-      if (result && typeof result.catch === 'function') result.catch(function () {});
-    } catch (_e) { /* the icon is presentation-only */ }
+      if (result && typeof result.catch === 'function') result.catch(noteEmitFailure);
+    } catch (e) { noteEmitFailure(e); }
   }
 
   function staticFrame() {
@@ -301,7 +330,15 @@
     currentState = next;
     animating = true;
     persistIntent();
-    startLoop();
+    if (animatedFrames[next]) {
+      startLoop();
+      return;
+    }
+    // First time this state is shown: render its frames, then pick the loop up
+    // only if the state still applies once they are ready.
+    ensureAnimatedFrames(next).then(function () {
+      if (animating && currentState === next) startLoop();
+    }).catch(function () { /* reported by ensureAnimatedFrames */ });
   }
 
   function stopAnimation() {
@@ -324,15 +361,17 @@
           || !chrome.action
           || typeof chrome.action.setIcon !== 'function') {
         unavailable = true;
+        console.error('[FSB] action icon: canvas or chrome.action missing, staying on the manifest icon');
         return;
       }
       if (options && typeof options.hasLiveSession === 'function') {
         liveSessionProbe = options.hasLiveSession;
       }
       try {
-        await buildCache();
-      } catch (_e) {
+        await buildStaticCache();
+      } catch (e) {
         unavailable = true;
+        console.error('[FSB] action icon: base frames failed to render, icon disabled:', e && e.message);
         return;
       }
       var intent = await readIntent();
@@ -409,7 +448,14 @@
       lastEmitted = null;
       if (animating && currentState && STATES[currentState]) {
         if (timerId === null) startTime = Date.now();
-        startLoop();
+        var revived = currentState;
+        if (animatedFrames[revived]) {
+          startLoop();
+        } else {
+          ensureAnimatedFrames(revived).then(function () {
+            if (animating && currentState === revived) startLoop();
+          }).catch(function () { /* reported by ensureAnimatedFrames */ });
+        }
       } else {
         stopLoop();
         emit(staticFrame());
