@@ -65,7 +65,6 @@ class MemoryExtractor {
         if (this._isAuthError(error)) {
           console.error('[MemoryExtractor] AI extraction auth error:', error.message);
           session._lastExtractionActionIndex = allActions.length;
-          this._setBadgeError();
           throw error;
         }
 
@@ -84,7 +83,6 @@ class MemoryExtractor {
     // All attempts failed
     console.error('[MemoryExtractor] AI extraction failed:', lastError?.message);
     session._lastExtractionActionIndex = allActions.length;
-    this._setBadgeError();
     throw lastError;
   }
 
@@ -398,7 +396,6 @@ Produce the consolidated recon report as a single JSON object:`;
       return analysis;
     } catch (error) {
       console.error('[MemoryExtractor] Enrichment failed:', error.message);
-      this._setBadgeError();
       return null;
     }
   }
@@ -511,17 +508,6 @@ Produce the consolidated recon report as a single JSON object:`;
       msg.includes('network') || msg.includes('rate limit');
   }
 
-  /**
-   * Set extension badge to red "!" to indicate extraction failure.
-   */
-  _setBadgeError() {
-    try {
-      chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
-      chrome.action.setBadgeText({ text: '!' });
-    } catch (badgeErr) {
-      // Badge API might not be available in all contexts
-    }
-  }
 }
 
 // Singleton
