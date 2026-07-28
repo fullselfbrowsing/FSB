@@ -30,13 +30,21 @@
   var SIZES = [16, 32];              // toolbar renders 16/24/32 DIPs
   var RING_INSET_RATIO = 0.09;
   var RING_WIDTH_RATIO = 0.10;
-  var GLYPH_SCALE = 0.72;
+  // Full bleed, so the toolbar mark is the same size as the static manifest icon.
+  // The bead therefore rides over the artwork's empty black border instead of
+  // orbiting outside it, which is deliberate. Do not re-derive this from the ring
+  // constants: the old 1 - 2*inset - width made the tile narrower than the ring,
+  // so the bead left the artwork on the axes and cut across its corners.
+  var GLYPH_SCALE = 1.0;
   var BEAD_SEGMENTS = 24;
   var DIM_ALPHA = 0.5;
   var DIM_FILTER = 'grayscale(0.8)';
 
   var INTENT_KEY = 'fsbActionIconIntent';
-  var GLYPH_PATH = 'assets/icon128.png';
+  // One source per output size. icon16 is not a downscale of icon128 -- its mark
+  // was redrawn about a fifth chunkier to stay legible, so 16 has to come from
+  // its own asset or the mark renders thin. 128 into 32 is an exact 4:1 reduction.
+  var GLYPH_PATHS = { 16: 'assets/icon16.png', 32: 'assets/icon128.png' };
 
   // Normalized fade width expressed within the bead's own 0..1 span.
   var FADE_SPAN = FADE_FRACTION / BEAD_FRACTION;
@@ -145,45 +153,63 @@
     }
   }
 
-  // Renders one frame at every shipped size. The background stays transparent:
-  // an opaque fill becomes a solid block on dark toolbars and a service worker
-  // cannot read the toolbar theme.
-  function renderFrame(bitmap, spec) {
+  // Renders one frame at every shipped size, each from its own source bitmap.
+  // Nothing paints a background of its own -- the artwork already carries an
+  // opaque tile, and a service worker cannot read the toolbar theme to pick one.
+  function renderFrame(bitmaps, spec) {
     var frame = {};
     for (var i = 0; i < SIZES.length; i++) {
       var size = SIZES[i];
       var ctx = contextFor(size);
       ctx.clearRect(0, 0, size, size);
-      drawGlyph(ctx, size, bitmap, spec.dimmed === true);
+      drawGlyph(ctx, size, bitmaps[size], spec.dimmed === true);
       if (spec.bead === true) strokeBead(ctx, size, spec.palette, spec.progress || 0);
       frame[size] = ctx.getImageData(0, 0, size, size);
     }
     return frame;
   }
 
-  async function loadGlyph() {
-    // createImageBitmap rejects SVG sources in a worker, so the PNG is the
-    // only viable base image here.
-    var response = await fetch(chrome.runtime.getURL(GLYPH_PATH));
-    var blob = await response.blob();
-    return await createImageBitmap(blob);
+  function closeGlyphs(bitmaps) {
+    for (var i = 0; i < SIZES.length; i++) {
+      var bitmap = bitmaps[SIZES[i]];
+      if (bitmap) bitmap.close();
+    }
+  }
+
+  // One bitmap per output size. createImageBitmap rejects SVG sources in a
+  // worker, so PNG is the only viable base image here. A partial failure closes
+  // whatever already decoded rather than stranding it.
+  async function loadGlyphs() {
+    var bitmaps = {};
+    try {
+      for (var i = 0; i < SIZES.length; i++) {
+        var size = SIZES[i];
+        var response = await fetch(chrome.runtime.getURL(GLYPH_PATHS[size]));
+        var blob = await response.blob();
+        bitmaps[size] = await createImageBitmap(blob);
+      }
+    } catch (e) {
+      closeGlyphs(bitmaps);
+      throw e;
+    }
+    return bitmaps;
   }
 
   // Only the four resting frames are rendered up front. A worker wake that never
   // animates should not pay for a couple hundred frames it will never show.
   async function buildStaticCache() {
-    var bitmap = await loadGlyph();
+    var bitmaps = await loadGlyphs();
     try {
-      staticFrames['idle:on'] = renderFrame(bitmap, { bead: false, dimmed: false });
-      staticFrames['idle:off'] = renderFrame(bitmap, { bead: false, dimmed: true });
-      staticFrames['watching:on'] = renderFrame(bitmap, {
+      staticFrames['idle:on'] = renderFrame(bitmaps, { bead: false, dimmed: false });
+      staticFrames['idle:off'] = renderFrame(bitmaps, { bead: false, dimmed: true });
+      staticFrames['watching:on'] = renderFrame(bitmaps, {
         palette: STATES.watching, progress: 0, bead: true, dimmed: false
       });
-      staticFrames['watching:off'] = renderFrame(bitmap, {
+      staticFrames['watching:off'] = renderFrame(bitmaps, {
         palette: STATES.watching, progress: 0, bead: true, dimmed: true
       });
     } finally {
-      bitmap.close();
+      closeGlyphs(bitmaps);
     }
   }
 
@@ -194,13 +220,13 @@
     if (animatedFrames[state]) return Promise.resolve(animatedFrames[state]);
     if (animatedBuilds[state]) return animatedBuilds[state];
     var build = (async function () {
-      var bitmap = await loadGlyph();
+      var bitmaps = await loadGlyphs();
       try {
         var spec = STATES[state];
         var count = Math.round(spec.duration / FRAME_INTERVAL_MS);
         var frames = new Array(count);
         for (var f = 0; f < count; f++) {
-          frames[f] = renderFrame(bitmap, {
+          frames[f] = renderFrame(bitmaps, {
             palette: spec,
             progress: f / count,
             bead: true,
@@ -210,7 +236,7 @@
         animatedFrames[state] = frames;
         return frames;
       } finally {
-        bitmap.close();
+        closeGlyphs(bitmaps);
       }
     })();
     animatedBuilds[state] = build;
