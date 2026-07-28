@@ -42,7 +42,7 @@ See: .planning/milestones/v1.2.0-ROADMAP.md, .planning/milestones/v1.2.0-REQUIRE
 Phase: 65 (codex-adapter) — EXECUTING
 Plan: 8 of 8
 Status: human_needed
-Last activity: 2026-07-22
+Last activity: 2026-07-28 - Completed quick task 260728-k2v: animated toolbar action icon
 
 ## Roadmap At A Glance (v0.9.91, Phases 57-65)
 
@@ -266,6 +266,7 @@ Phase 60 resolved the static inline-agent/profile and Windows shell-free resolut
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
+| 260728-k2v | Replace the chrome.action connection badge with a state-driven animated toolbar icon | 2026-07-28 | 45aa40e1 |  | [260728-k2v-animated-toolbar-icon](./quick/260728-k2v-animated-toolbar-icon/) |
 | 260720-jb5 | Patch Sheets session redaction and multi-tab visual-session token finalization | 2026-07-20 | 2f8359b2 | Verified | [260720-jb5-patch-sheets-session-redaction-and-multi](./quick/260720-jb5-patch-sheets-session-redaction-and-multi/) |
 | 260715-hs1 | Replace Google Sheets OAuth with a zero-extra-auth signed-in tab session | 2026-07-15 | 9ab3d40d | Needs Review | [260715-hs1-replace-google-sheets-oauth-with-a-signe](./quick/260715-hs1-replace-google-sheets-oauth-with-a-signe/) |
 | 260715-8wh | Implement production-safe Google Sheets API MVP with Chrome OAuth, typed read/write capabilities, and spreadsheet-data recording redaction | 2026-07-15 | a83d21b8 |  | [260715-8wh-implement-production-safe-google-sheets-](./quick/260715-8wh-implement-production-safe-google-sheets-/) |
