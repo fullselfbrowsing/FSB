@@ -103,6 +103,9 @@ importScripts('utils/crawler-manager.js');
 // Overlay state builder for sendSessionStatus -> content script overlay
 importScripts('utils/overlay-state.js');
 
+// Toolbar action icon frames driven by the same overlay state
+try { importScripts('utils/action-icon.js'); } catch (e) { console.error('[FSB] Failed to load action-icon.js:', e.message); }
+
 // MCP bridge client for local MCP server connection
 try { importScripts('ws/mcp-bridge-client.js'); } catch (e) { console.error('[FSB] Failed to load mcp-bridge-client.js:', e.message); }
 
@@ -1123,6 +1126,8 @@ async function sendSessionStatus(tabId, statusData) {
   const overlayState = (typeof FSBOverlayStateUtils !== 'undefined' && FSBOverlayStateUtils.buildOverlayState)
     ? FSBOverlayStateUtils.buildOverlayState(statusData, session)
     : statusData; // fallback: send raw data if overlay-state.js failed to load
+  // Toolbar icon reads the same normalized state as the in-page overlay.
+  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.applyOverlayState(overlayState); } catch (_e) { /* icon is presentation-only */ }
   const payload = { action: 'sessionStatus', overlayState };
   try {
     await chrome.tabs.sendMessage(tabId, payload, { frameId: 0 });
@@ -5533,6 +5538,7 @@ async function fsbTriggerStartObserveForSnapshot(snap, reason) {
   const observeResult = await fsbTriggerSendTabMessage(tabId, fsbTriggerObserveMessage(snap));
   const caption = fsbTriggerBuildCaption(snap);
   const counts = await fsbTriggerCountsForTab(tabId);
+  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setWatching(counts.watching > 0); } catch (_e) { /* icon is presentation-only */ }
   const pulseResult = await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStart',
     selector: snap.selector,
@@ -5552,6 +5558,7 @@ async function fsbTriggerStopObserveForSnapshot(snap) {
   if (!triggerId || !Number.isFinite(tabId)) return;
   await fsbTriggerSendTabMessage(tabId, { action: 'triggerObserveStop', trigger_id: triggerId });
   const counts = await fsbTriggerCountsForTab(tabId);
+  try { if (globalThis.fsbActionIcon) globalThis.fsbActionIcon.setWatching(counts.watching > 0); } catch (_e) { /* icon is presentation-only */ }
   await fsbTriggerSendTabMessage(tabId, {
     action: 'triggerPulseStop',
     trigger_id: triggerId,
@@ -17538,6 +17545,17 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// Quick 260728-k2v: bring up the toolbar icon on every worker wake. The module
+// re-derives its own frame from persisted intent; the probe tells it whether a
+// session is still live so a stale animating record cannot resurrect a loop.
+try {
+  if (globalThis.fsbActionIcon) {
+    Promise.resolve(globalThis.fsbActionIcon.init({
+      hasLiveSession: () => activeSessions.size > 0
+    })).catch(() => {});
+  }
+} catch (_e) { /* icon is presentation-only */ }
+
 // --- chrome.alarms.onAlarm Listener (MCP reconnect + dom-stream watchdog; agent branch DEPRECATED) ---
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   // MCP replay recorder idle + retention alarms. The recorder owns the
@@ -17629,6 +17647,18 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         }
       } catch (_e) { /* swallow per defence in depth */ }
     }, Math.floor(Math.random() * 30000));
+    return;
+  }
+
+  // Quick 260728-k2v: toolbar icon watchdog. A worker killed mid-cycle leaves
+  // the icon frozen on its last frame, so this 30s beat re-derives the intended
+  // frame and revives the loop when one is owed. 0.5 is Chrome's periodic floor.
+  if (alarm && alarm.name === 'fsb-action-icon-watchdog') {
+    try {
+      if (globalThis.fsbActionIcon) {
+        await globalThis.fsbActionIcon.repair();
+      }
+    } catch (_e) { /* icon is presentation-only */ }
     return;
   }
 
@@ -17805,6 +17835,14 @@ chrome.runtime.onInstalled.addListener(async () => {
     console.error('[FSB Telemetry] alarm create failed:', e && e.message);
   }
 
+  // Quick 260728-k2v: 30s toolbar icon watchdog. Same idempotent create-by-name
+  // contract as the telemetry beat above; the alarms permission already exists.
+  try {
+    chrome.alarms.create('fsb-action-icon-watchdog', { periodInMinutes: 0.5 });
+  } catch (e) {
+    console.error('[FSB] action icon watchdog alarm create failed:', e && e.message);
+  }
+
   // Phase 272 / BEAT-06: install_announce. 30s setTimeout (NOT a chrome.alarm
   // -- the minimum alarm period is 30s but the 30s grace before announce is
   // a one-shot per install, not a recurring beat). Enqueue + flush invokes
@@ -17875,6 +17913,12 @@ chrome.runtime.onStartup.addListener(async () => {
     chrome.alarms.create('fsb-telemetry-beat', { periodInMinutes: 5 });
   } catch (e) {
     console.error('[FSB Telemetry] alarm create failed:', e && e.message);
+  }
+  // Quick 260728-k2v: re-arm the toolbar icon watchdog on every worker wake.
+  try {
+    chrome.alarms.create('fsb-action-icon-watchdog', { periodInMinutes: 0.5 });
+  } catch (e) {
+    console.error('[FSB] action icon watchdog alarm create failed:', e && e.message);
   }
   // Load debug mode setting
   await loadDebugMode();

@@ -622,9 +622,11 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // drift diagnostics pre-throttle -> 316. Phase 63 Plan 08 loads the native
   // wake controller -> 317. Phase 64 Plan 09 loads the canonical delegation
   // provider helper -> 318. PR #105 adds the MCP session recorder plus three
-  // Google Sheets support loads -> 322.
+  // Google Sheets support loads -> 322. The native-host install-command
+  // projector adds one pure shared helper -> 323.
+  // Quick 260728-k2v loads the animated action-icon module -> 324.
   const importScriptsCount = (bgSource.match(/importScripts/g) || []).length;
-  passAssertEqual(importScriptsCount, 322, 'background.js importScripts count = 322 (provider/delegation plus PR #105 loads)');
+  passAssertEqual(importScriptsCount, 324, 'background.js importScripts count = 324 (including animated action-icon module)');
   // Companion call-site-only count (regex requires open paren): Phase 5 baseline
   // was 150 actual importScripts() calls; Phase 6 adds 1 -> 151; Phase 8 adds 1 -> 152;
   // Phase 14 adds 2 (trigger-store + trigger-lifecycle) -> 154; Phase 15 adds 2
@@ -663,9 +665,11 @@ async function loadOffscreenHandlerSource(chromeMock) {
   // Phase 62 Plan 04 adds the protocol drift diagnostics call site -> 312.
   // Phase 63 Plan 08 adds the native wake controller call site -> 313.
   // Phase 64 Plan 09 adds the canonical delegation provider helper -> 314.
-  // PR #105 adds four call sites -> 318.
+  // PR #105 adds four call sites -> 318. The native-host install-command
+  // projector adds one pure shared helper call site -> 319.
+  // Quick 260728-k2v adds the animated action-icon module call site -> 320.
   const importScriptsCallSites = (bgSource.match(/importScripts\(/g) || []).length;
-  passAssertEqual(importScriptsCallSites, 318, 'background.js importScripts() call sites = 318 (provider/delegation plus PR #105 loads)');
+  passAssertEqual(importScriptsCallSites, 320, 'background.js importScripts() call sites = 320 (including animated action-icon module)');
 
   const lineCli = bgLines.findIndex(l => /importScripts\(['"]ai\/cli-parser\.js['"]\)/.test(l));
   const lineBridge = bgLines.findIndex(l => /importScripts\(['"]ai\/lattice-provider-bridge\.js['"]\)/.test(l));
